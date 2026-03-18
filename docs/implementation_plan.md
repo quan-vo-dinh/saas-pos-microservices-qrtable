@@ -107,7 +107,18 @@ Lợi ích của mô hình này cho Monorepo 8 services:
   - Chống Boilerplate: Không cần hàng tá file interfaces/mappers như Clean Arch thuần túy.
 ```
 
-### Step 0.3 — Khởi tạo 2 Frontend Apps (ngày 3-4)
+### Step 0.3 — Phác thảo ERD Hệ thống Tổng thể (ngày 3)
+
+> Phục vụ làm báo cáo Luận văn và tạo cái nhìn tổng quan ban đầu.
+
+```
+1. Vẽ sơ đồ ERD tổng thể (Draw.io / dbdiagram.io) cho 8 services.
+   → Focus vào quan hệ chính: Tenant, Category, MenuItem, Table, Order, Bill, Payment.
+2. Lưu ý: Bản vẽ này mang tính định hướng. Schema thực tế (TypeORM) sẽ được tinh chỉnh (Iterative) dựa theo UI Mocks ở các Phase tiếp theo.
+3. Xuất file ảnh sơ đồ vào thư mục `docs/architecture/erd.png`.
+```
+
+### Step 0.4 — Khởi tạo 2 Frontend Apps (ngày 3-4)
 
 ```
 1. Tạo apps/customer-pwa/:
@@ -123,7 +134,7 @@ Lợi ích của mô hình này cho Monorepo 8 services:
    → Verify: nx serve management-app → localhost:3000 ✅
 ```
 
-### Step 0.4 — Khởi tạo Shared Libraries (ngày 4-5)
+### Step 0.5 — Khởi tạo Shared Libraries (ngày 4-5)
 
 ```
 Frontend shared libs:
@@ -142,7 +153,7 @@ Viết file đầu tiên: libs/shared-types/src/index.ts
    → export type { ITenant, IUser, IRole }
 ```
 
-### Step 0.5 — Setup Hạ tầng Auth (ngày 5-6)
+### Step 0.6 — Setup Hạ tầng Auth (ngày 5-6)
 
 ```
 1. Update docker-compose.provider.yaml — đảm bảo PG, Redis, Keycloak, Mongo ok
@@ -153,7 +164,7 @@ Viết file đầu tiên: libs/shared-types/src/index.ts
 6. Verify: BFF → Catalog TCP health check ✅, BFF → SaaS TCP health check ✅
 ```
 
-### Step 0.6 — Dựng Layout Skeleton cho 2 Frontend Apps (ngày 6-7)
+### Step 0.7 — Dựng Layout Skeleton cho 2 Frontend Apps (ngày 6-7)
 
 > Áp dụng `.agent/skills/frontend-design` cho Design System
 
@@ -178,6 +189,7 @@ Viết file đầu tiên: libs/shared-types/src/index.ts
 - [ ] 2 frontend apps chạy được (customer-pwa:5173, management-app:3000)
 - [ ] Shared libs tạo xong (shared-types, shared-ui, shared-hooks, shared-utils)
 - [ ] Keycloak realm "qrtable" + roles tạo xong
+- [ ] Đã có bản vẽ ERD tổng thể (docs/architecture/erd.png)
 - [ ] Management App: login → redirect đúng role route
 - [ ] BFF → Catalog + SaaS TCP call thành công
 
