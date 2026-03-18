@@ -50,3 +50,5 @@ docker/**/docker_data/
 
 # Ignore Antigravity agent files
 .agent/
+
+vite.config.*.timestamp*

@@ -1,0 +1,19 @@
+{
+  "name": "frontend-utils",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/frontend/utils/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/frontend/utils",
+        "main": "libs/frontend/utils/src/index.ts",
+        "tsConfig": "libs/frontend/utils/tsconfig.lib.json",
+        "assets": ["libs/frontend/utils/*.md"]
+      }
+    }
+  }
+}
