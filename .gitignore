@@ -47,3 +47,6 @@ Thumbs.db
 
 # Ignore docker data
 docker/**/docker_data/
+
+# Ignore Antigravity agent files
+.agent/
