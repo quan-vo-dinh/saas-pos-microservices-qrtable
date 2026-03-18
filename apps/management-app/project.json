@@ -1,0 +1,35 @@
+{
+  "name": "management-app",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/management-app/src",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "continuous": true,
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "NODE_ENV=development pnpm --dir apps/management-app exec next dev --port 3000"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "NODE_ENV=production pnpm --dir apps/management-app build"
+      }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "NODE_ENV=production pnpm --dir apps/management-app exec next start --port 3000"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --dir apps/management-app lint"
+      }
+    }
+  },
+  "tags": []
+}
