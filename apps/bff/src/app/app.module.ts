@@ -8,6 +8,8 @@ import { ExceptionInterceptor } from '@common/interceptors/exception.interceptor
 import { ProductModule } from './modules/product/product.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthorizerModule } from './modules/authorizer/authorizer.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { SaasModule } from './modules/saas/saas.module';
 import { UserGuard } from '@common/guards/user.guard';
 import { PermissionGuard } from '@common/guards/permission.guard';
 import { RedisProvider } from '@common/configuration/redis.config';
@@ -19,6 +21,8 @@ import { ThrottlerGuard } from '@nestjs/throttler';
     ConfigModule.forRoot({ isGlobal: true, load: [() => CONFIGURATION] }),
     InvoiceModules,
     ProductModule,
+    CatalogModule,
+    SaasModule,
     UserModule,
     AuthorizerModule,
     RedisProvider,
