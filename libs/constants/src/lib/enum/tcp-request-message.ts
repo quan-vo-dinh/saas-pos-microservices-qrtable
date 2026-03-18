@@ -36,10 +36,28 @@ enum AUTHORIZER {
   VERIFY_USER_TOKEN = 'authorizer.verify_user_token',
 }
 
+enum CATALOG {
+  CREATE = 'catalog.create',
+  GET_BY_ID = 'catalog.get_by_id',
+  GET_LIST = 'catalog.get_list',
+  UPDATE = 'catalog.update',
+  DELETE = 'catalog.delete',
+}
+
+enum SAAS {
+  CREATE = 'saas.create',
+  GET_BY_ID = 'saas.get_by_id',
+  GET_LIST = 'saas.get_list',
+  UPDATE = 'saas.update',
+  DELETE = 'saas.delete',
+}
+
 export const TCP_REQUEST_MESSAGE = {
   INVOICE,
   PRODUCT,
   USER,
   KEYCLOAK,
   AUTHORIZER,
+  CATALOG,
+  SAAS,
 };
