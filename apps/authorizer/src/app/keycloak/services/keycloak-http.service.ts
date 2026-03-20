@@ -67,8 +67,10 @@ export class KeycloakHttpService {
   }
 
   async createUser(data: CreateKeyCloakUserRequest): Promise<string> {
-    const { email, firstName, lastName, password } = data;
+    const { email, firstName, lastName, password, tenantId } = data;
     const { access_token: accessToken } = await this.exchangeClientToken();
+
+    const attributes = tenantId ? { tenant_id: [tenantId] } : undefined;
 
     const { headers } = await this.axiosInstance.post(
       `/admin/realms/${this.realm}/users`,
@@ -86,6 +88,7 @@ export class KeycloakHttpService {
             temporary: false,
           },
         ],
+        attributes,
       },
       {
         headers: {

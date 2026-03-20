@@ -12,6 +12,7 @@ export type CreateKeyCloakUserRequest = {
   lastName: string;
   password: string;
   email: string;
+  tenantId?: string;
 };
 
 export type ExchangeUserTokenResponse = {

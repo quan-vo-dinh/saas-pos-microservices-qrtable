@@ -28,6 +28,7 @@ export class UserService {
         password: params.password,
         firstName: params.firstName,
         lastName: params.lastName,
+        tenantId: params.tenantId,
       },
       processId,
     );

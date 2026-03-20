@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Permissions } from '@common/decorators/permission.decorator';
 import { PERMISSION } from '@common/constants/enum/role.enum';
@@ -17,8 +17,14 @@ export class PermissionGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const userData = request[MetadataKey.USER_DATA] as AuthorizeResponse;
-    const userPermissions = userData.metadata.permissions as PERMISSION[];
+    const userData = request[MetadataKey.USER_DATA] as AuthorizeResponse | undefined;
+
+    if (!userData?.metadata) {
+      throw new UnauthorizedException('User data not found');
+    }
+
+    const permissions = userData.metadata.permissions;
+    const userPermissions = Array.isArray(permissions) ? (permissions as PERMISSION[]) : [];
 
     const isValid = requiredPermissions.every((permission) => userPermissions.includes(permission));
 

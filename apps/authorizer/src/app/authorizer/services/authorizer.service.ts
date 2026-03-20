@@ -9,6 +9,7 @@ import { Role } from '@common/schemas/role.schema';
 import { ClientGrpc } from '@nestjs/microservices';
 import { GRPC_SERVICES } from '@common/configuration/grpc.config';
 import { UserAccessService } from '@common/interfaces/grpc/user-access';
+import { PERMISSION } from '@common/constants/enum/role.enum';
 
 @Injectable()
 export class AuthorizerService {
@@ -55,29 +56,42 @@ export class AuthorizerService {
       throw new UnauthorizedException('Invalid token structure');
     }
 
+    let payload: JwtPayload;
+
     try {
       const key = await this.jwksClient.getSigningKey(decoded.header.kid);
 
       const publicKey = key.getPublicKey();
-      const payload = jwt.verify(token, publicKey, { algorithms: ['RS256'] }) as JwtPayload;
+      payload = jwt.verify(token, publicKey, { algorithms: ['RS256'] }) as JwtPayload;
       this.logger.debug({ payload });
-
-      const userId = payload.sub;
-
-      const user = await this.userValidation(userId, processId);
-      return {
-        valid: true,
-        metadata: {
-          jwt: payload,
-          permissions: (user.roles as unknown as Role[]).map((role) => role.permissions).flat(),
-          user,
-          userId: user.id,
-        },
-      };
     } catch (error) {
       this.logger.error({ error, processId });
       throw new UnauthorizedException('Invalid token');
     }
+
+    const userId = payload.sub;
+    const user = await this.userValidation(userId, processId);
+    const permissions = this.collectPermissions(user.roles as unknown as Role[] | undefined);
+
+    return {
+      valid: true,
+      metadata: {
+        jwt: payload,
+        permissions,
+        user,
+        userId: user.id,
+      },
+    };
+  }
+
+  private collectPermissions(roles?: Role[]): PERMISSION[] {
+    if (!Array.isArray(roles) || roles.length === 0) {
+      return [];
+    }
+
+    return roles
+      .flatMap((role) => (Array.isArray(role?.permissions) ? role.permissions : []))
+      .filter((permission): permission is PERMISSION => typeof permission === 'string');
   }
 
   private async userValidation(userId: string, processId: string) {

@@ -1,10 +1,9 @@
 import { Injectable, CanActivate, ExecutionContext, Inject, UnauthorizedException, Logger } from '@nestjs/common';
-import { firstValueFrom, map, Observable } from 'rxjs';
+import { firstValueFrom, Observable } from 'rxjs';
 import { Reflector } from '@nestjs/core';
 import { MetadataKey } from '@common/constants/common.constant';
 import { getAccessToken, setUserData } from '@common/utils/request.util';
 import { getProcessId } from '@common/utils/string.util';
-import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
@@ -42,9 +41,15 @@ export class UserGuard implements CanActivate {
   private async verifyUserToken(req: any): Promise<boolean> {
     try {
       const token = getAccessToken(req);
+      this.logger.debug('Verifying user token');
+
+      if (!token) {
+        throw new UnauthorizedException('Access token is required');
+      }
+
       const cacheKey = this.generateTokenCacheKey(token);
 
-      const processId = req[MetadataKey.PROCESSID] || getProcessId('einvoice-app');
+      const processId = req[MetadataKey.PROCESSID] || getProcessId('qrtable');
       const cacheData = await this.cacheManager.get<AuthorizeResponse>(cacheKey);
 
       if (cacheData) {
@@ -73,6 +78,18 @@ export class UserGuard implements CanActivate {
       return true;
     } catch (error) {
       this.logger.error({ error });
+
+      const errorDetails =
+        typeof (error as any)?.details === 'string'
+          ? (error as any).details
+          : typeof (error as any)?.message === 'string'
+            ? (error as any).message
+            : undefined;
+
+      if (errorDetails?.includes('User not found')) {
+        throw new UnauthorizedException('User is not provisioned in user-access');
+      }
+
       throw new UnauthorizedException('Token is invalid');
     }
   }

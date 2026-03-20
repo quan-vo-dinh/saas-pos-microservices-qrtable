@@ -18,6 +18,14 @@ import { SaasService } from '../services/saas.service';
 export class SaasController {
   constructor(private readonly saasService: SaasService) {}
 
+  @MessagePattern(TCP_REQUEST_MESSAGE.SAAS.HEALTH)
+  async health(): Promise<Response<{ service: string; status: 'UP' }>> {
+    return Response.success<{ service: string; status: 'UP' }>({
+      service: 'saas',
+      status: 'UP',
+    });
+  }
+
   @MessagePattern(TCP_REQUEST_MESSAGE.SAAS.CREATE)
   async create(@RequestParams() body: CreateTenantTcpRequest): Promise<Response<TenantTcpResponse>> {
     const result = await this.saasService.create(body);

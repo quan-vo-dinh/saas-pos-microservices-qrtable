@@ -76,8 +76,8 @@
   ],
   "variable": [
     { "key": "keycloakUrl", "value": "http://localhost:8180" },
-    { "key": "realm", "value": "einvoice-app" },
-    { "key": "clientId", "value": "einvoice-app" },
+    { "key": "realm", "value": "qrtable" },
+    { "key": "clientId", "value": "qrtable-bff" },
     { "key": "clientSecret", "value": "DÁN_SECRET_TRONG_TAB_CREDENTIALS_VÀO_ĐÂY" }
   ]
 }

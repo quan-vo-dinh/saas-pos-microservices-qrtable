@@ -9,6 +9,9 @@ import { ProcessId } from '@common/decorators/processId.decorator';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { map } from 'rxjs';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
+import { Request } from 'express';
+import { Req } from '@nestjs/common';
+import { MetadataKey } from '@common/constants/common.constant';
 
 @ApiTags('User')
 @Controller('users')
@@ -18,10 +21,15 @@ export class UserController {
   @Post()
   @ApiOkResponse({ type: ResponseDto<string> })
   @ApiOperation({ summary: 'Create a new user' })
-  create(@Body() body: CreateUserRequestDto, @ProcessId() processId: string) {
+  create(@Body() body: CreateUserRequestDto, @ProcessId() processId: string, @Req() request: Request) {
+    const tenantId = request[MetadataKey.TENANT_ID] as string | undefined;
+
     return this.userAccessClient
       .send<string, CreateUserTcpRequest>(TCP_REQUEST_MESSAGE.USER.CREATE, {
-        data: body,
+        data: {
+          ...body,
+          tenantId,
+        },
         processId,
       })
       .pipe(

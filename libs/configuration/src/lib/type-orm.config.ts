@@ -31,7 +31,7 @@ export class TypeOrmConfiguration {
     this.PORT = data?.PORT || Number(process.env['TYPEORM_PORT']) || 5432;
     this.USERNAME = data?.USERNAME || process.env['TYPEORM_USERNAME'] || 'postgres';
     this.PASSWORD = data?.PASSWORD || process.env['TYPEORM_PASSWORD'] || 'postgres';
-    this.DATABASE = data?.DATABASE || process.env['TYPEORM_DATABASE'] || 'einvoice-app';
+    this.DATABASE = data?.DATABASE || process.env['TYPEORM_DATABASE'] || 'qrtable';
     this.TYPE = (data?.TYPE as DatabaseType) || (process.env['TYPEORM_TYPE'] as DatabaseType) || 'postgres';
   }
 }

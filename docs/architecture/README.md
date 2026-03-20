@@ -5,6 +5,7 @@
 - `erd.dbml`: source of truth for dbdiagram/dbdocs.
 - `erd.mmd`: Mermaid version for quick rendering in markdown-centric workflows.
 - `erd.png`: exported image used in thesis report.
+- `erd-explanation.md`: detailed explanation for enums, tables, relationships, indexes, and business mapping.
 
 ## Export erd.png (recommended)
 

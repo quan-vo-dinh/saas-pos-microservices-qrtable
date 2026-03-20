@@ -1,3 +1,5 @@
 import { CreateUserRequestDto } from '../../gateway/user';
 
-export type CreateUserTcpRequest = CreateUserRequestDto;
+export type CreateUserTcpRequest = CreateUserRequestDto & {
+  tenantId?: string;
+};

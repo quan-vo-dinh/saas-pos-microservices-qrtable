@@ -42,6 +42,7 @@ enum CATALOG {
   GET_LIST = 'catalog.get_list',
   UPDATE = 'catalog.update',
   DELETE = 'catalog.delete',
+  HEALTH = 'catalog.health',
 }
 
 enum SAAS {
@@ -50,6 +51,7 @@ enum SAAS {
   GET_LIST = 'saas.get_list',
   UPDATE = 'saas.update',
   DELETE = 'saas.delete',
+  HEALTH = 'saas.health',
 }
 
 export const TCP_REQUEST_MESSAGE = {

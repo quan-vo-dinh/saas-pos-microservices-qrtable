@@ -3,4 +3,5 @@ export type CreateKeyCloakUserTcpRequest = {
   password: string;
   firstName: string;
   lastName: string;
+  tenantId?: string;
 };

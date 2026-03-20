@@ -16,8 +16,10 @@ import {
   GetCatalogByIdTcpRequest,
   UpdateCatalogTcpRequest,
 } from '@common/interfaces/tcp/catalog';
-import { Body, Controller, Delete, Get, Inject, Param, Patch, Post } from '@nestjs/common';
+import { buildTcpRequestContext } from '@common/utils/request.util';
+import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { map } from 'rxjs';
 
 @ApiTags('Catalog')
@@ -25,15 +27,33 @@ import { map } from 'rxjs';
 export class CatalogController {
   constructor(@Inject(TCP_SERVICES.CATALOG_SERVICE) private readonly catalogClient: TcpClient) {}
 
+  @Get('health')
+  @ApiOkResponse({ type: ResponseDto<{ service: string; status: 'UP' }> })
+  @ApiOperation({ summary: 'Check catalog tcp health' })
+  health(@ProcessId() processId: string) {
+    return this.catalogClient
+      .send<{ service: string; status: 'UP' }, void>(TCP_REQUEST_MESSAGE.CATALOG.HEALTH, { processId })
+      .pipe(
+        map(
+          (response) =>
+            new ResponseDto<{ service: string; status: 'UP' }>({
+              data: response.data,
+              statusCode: response.statusCode,
+              message: response.code as HTTP_MESSAGE,
+            }),
+        ),
+      );
+  }
+
   @Post()
   @ApiOkResponse({ type: ResponseDto<CatalogResponseDto> })
   @ApiOperation({ summary: 'Create a new catalog' })
-  create(@Body() body: CreateCatalogRequestDto, @ProcessId() processId: string) {
+  create(@Body() body: CreateCatalogRequestDto, @ProcessId() processId: string, @Req() req: Request) {
     return this.catalogClient
-      .send<CatalogTcpResponse, CreateCatalogTcpRequest>(TCP_REQUEST_MESSAGE.CATALOG.CREATE, {
-        data: body,
-        processId,
-      })
+      .send<
+        CatalogTcpResponse,
+        CreateCatalogTcpRequest
+      >(TCP_REQUEST_MESSAGE.CATALOG.CREATE, buildTcpRequestContext<CreateCatalogTcpRequest>(req, processId, body))
       .pipe(
         map(
           (response) =>
@@ -49,9 +69,12 @@ export class CatalogController {
   @Get()
   @ApiOkResponse({ type: ResponseDto<CatalogResponseDto[]> })
   @ApiOperation({ summary: 'Get all catalogs' })
-  findAll(@ProcessId() processId: string) {
+  findAll(@ProcessId() processId: string, @Req() req: Request) {
     return this.catalogClient
-      .send<CatalogTcpResponse[], void>(TCP_REQUEST_MESSAGE.CATALOG.GET_LIST, { processId })
+      .send<
+        CatalogTcpResponse[],
+        void
+      >(TCP_REQUEST_MESSAGE.CATALOG.GET_LIST, buildTcpRequestContext<void>(req, processId))
       .pipe(
         map(
           (response) =>
@@ -67,12 +90,12 @@ export class CatalogController {
   @Get(':id')
   @ApiOkResponse({ type: ResponseDto<CatalogResponseDto> })
   @ApiOperation({ summary: 'Get catalog by id' })
-  findById(@Param('id') id: string, @ProcessId() processId: string) {
+  findById(@Param('id') id: string, @ProcessId() processId: string, @Req() req: Request) {
     return this.catalogClient
-      .send<CatalogTcpResponse, GetCatalogByIdTcpRequest>(TCP_REQUEST_MESSAGE.CATALOG.GET_BY_ID, {
-        data: { id },
-        processId,
-      })
+      .send<
+        CatalogTcpResponse,
+        GetCatalogByIdTcpRequest
+      >(TCP_REQUEST_MESSAGE.CATALOG.GET_BY_ID, buildTcpRequestContext<GetCatalogByIdTcpRequest>(req, processId, { id }))
       .pipe(
         map(
           (response) =>
@@ -88,12 +111,17 @@ export class CatalogController {
   @Patch(':id')
   @ApiOkResponse({ type: ResponseDto<CatalogResponseDto> })
   @ApiOperation({ summary: 'Update catalog by id' })
-  update(@Param('id') id: string, @Body() body: UpdateCatalogRequestDto, @ProcessId() processId: string) {
+  update(
+    @Param('id') id: string,
+    @Body() body: UpdateCatalogRequestDto,
+    @ProcessId() processId: string,
+    @Req() req: Request,
+  ) {
     return this.catalogClient
-      .send<CatalogTcpResponse, UpdateCatalogTcpRequest>(TCP_REQUEST_MESSAGE.CATALOG.UPDATE, {
-        data: { id, ...body },
-        processId,
-      })
+      .send<
+        CatalogTcpResponse,
+        UpdateCatalogTcpRequest
+      >(TCP_REQUEST_MESSAGE.CATALOG.UPDATE, buildTcpRequestContext<UpdateCatalogTcpRequest>(req, processId, { id, ...body }))
       .pipe(
         map(
           (response) =>
@@ -109,12 +137,12 @@ export class CatalogController {
   @Delete(':id')
   @ApiOkResponse({ type: ResponseDto<boolean> })
   @ApiOperation({ summary: 'Delete catalog by id' })
-  remove(@Param('id') id: string, @ProcessId() processId: string) {
+  remove(@Param('id') id: string, @ProcessId() processId: string, @Req() req: Request) {
     return this.catalogClient
-      .send<boolean, DeleteCatalogTcpRequest>(TCP_REQUEST_MESSAGE.CATALOG.DELETE, {
-        data: { id },
-        processId,
-      })
+      .send<
+        boolean,
+        DeleteCatalogTcpRequest
+      >(TCP_REQUEST_MESSAGE.CATALOG.DELETE, buildTcpRequestContext<DeleteCatalogTcpRequest>(req, processId, { id }))
       .pipe(
         map(
           (response) =>

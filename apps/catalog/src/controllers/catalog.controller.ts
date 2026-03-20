@@ -18,6 +18,14 @@ import { CatalogService } from '../services/catalog.service';
 export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
 
+  @MessagePattern(TCP_REQUEST_MESSAGE.CATALOG.HEALTH)
+  async health(): Promise<Response<{ service: string; status: 'UP' }>> {
+    return Response.success<{ service: string; status: 'UP' }>({
+      service: 'catalog',
+      status: 'UP',
+    });
+  }
+
   @MessagePattern(TCP_REQUEST_MESSAGE.CATALOG.CREATE)
   async create(@RequestParams() body: CreateCatalogTcpRequest): Promise<Response<CatalogTcpResponse>> {
     const result = await this.catalogService.create(body);
