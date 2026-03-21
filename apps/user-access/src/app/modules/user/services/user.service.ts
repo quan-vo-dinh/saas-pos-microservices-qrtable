@@ -8,6 +8,15 @@ import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { CreateKeyCloakUserTcpRequest } from '@common/interfaces/tcp/authorizer';
 import { firstValueFrom, map } from 'rxjs';
+
+type UpsertIdentityParams = {
+  userId: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  roleNames?: string[];
+};
+
 @Injectable()
 export class UserService {
   constructor(
@@ -51,5 +60,9 @@ export class UserService {
 
   getUserByUserId(userId: string) {
     return this.userRepository.getByUserId(userId);
+  }
+
+  upsertUserByIdentity(params: UpsertIdentityParams) {
+    return this.userRepository.upsertByUserId(params);
   }
 }

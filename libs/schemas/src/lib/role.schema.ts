@@ -8,7 +8,7 @@ import { PERMISSION, ROLE } from '@common/constants/enum/role.enum';
   collection: 'role',
 })
 export class Role extends BaseSchema {
-  @Prop({ type: String, enum: ROLE, default: ROLE.ACCOUNTANT })
+  @Prop({ type: String, enum: ROLE, default: ROLE.WAITER })
   name: ROLE;
 
   @Prop({ type: String })

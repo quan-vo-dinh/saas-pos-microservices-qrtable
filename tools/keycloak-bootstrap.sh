@@ -92,7 +92,7 @@ for role in "${required_realm_mgmt_roles[@]}"; do
   fi
 done
 
-roles=(OWNER MANAGER WAITER CHEF BARISTA)
+roles=(SUPER_ADMIN OWNER MANAGER WAITER CHEF BARISTA)
 for role in "${roles[@]}"; do
   role_code="$(curl -sS -o /dev/null -w '%{http_code}' "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/roles/${role}" "${auth_header[@]}")"
   if [[ "${role_code}" == "404" ]]; then
@@ -103,26 +103,23 @@ for role in "${roles[@]}"; do
   fi
 done
 
-mapper_name='tenant_id-claim'
-mapper_exists="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${client_id_internal}/protocol-mappers/models" "${auth_header[@]}" | jq -r ".[] | select(.name == \"${mapper_name}\") | .name")"
+ensure_user_attribute_mapper() {
+  local mapper_name="$1"
+  local user_attribute="$2"
+  local claim_name="$3"
 
-if [[ -z "${mapper_exists}" ]]; then
-  echo "Creating protocol mapper: ${mapper_name}"
-  curl -sS -X POST "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${client_id_internal}/protocol-mappers/models" \
-    "${auth_header[@]}" "${json_header[@]}" \
-    -d '{
-      "name": "tenant_id-claim",
-      "protocol": "openid-connect",
-      "protocolMapper": "oidc-usermodel-attribute-mapper",
-      "config": {
-        "access.token.claim": "true",
-        "id.token.claim": "true",
-        "userinfo.token.claim": "true",
-        "user.attribute": "tenant_id",
-        "claim.name": "tenant_id",
-        "jsonType.label": "String"
-      }
-    }' >/dev/null
-fi
+  local mapper_exists
+  mapper_exists="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${client_id_internal}/protocol-mappers/models" "${auth_header[@]}" | jq -r ".[] | select(.name == \"${mapper_name}\") | .name")"
+
+  if [[ -z "${mapper_exists}" ]]; then
+    echo "Creating protocol mapper: ${mapper_name}"
+    curl -sS -X POST "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${client_id_internal}/protocol-mappers/models" \
+      "${auth_header[@]}" "${json_header[@]}" \
+      -d "{\"name\":\"${mapper_name}\",\"protocol\":\"openid-connect\",\"protocolMapper\":\"oidc-usermodel-attribute-mapper\",\"config\":{\"access.token.claim\":\"true\",\"id.token.claim\":\"true\",\"userinfo.token.claim\":\"true\",\"user.attribute\":\"${user_attribute}\",\"claim.name\":\"${claim_name}\",\"jsonType.label\":\"String\"}}" >/dev/null
+  fi
+}
+
+ensure_user_attribute_mapper "tenant_id-claim" "tenant_id" "tenant_id"
+ensure_user_attribute_mapper "sub_role-claim" "sub_role" "sub_role"
 
 echo "Keycloak bootstrap completed for realm ${KEYCLOAK_REALM}."

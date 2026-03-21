@@ -8,8 +8,9 @@ import { firstValueFrom, map } from 'rxjs';
 import { Role } from '@common/schemas/role.schema';
 import { ClientGrpc } from '@nestjs/microservices';
 import { GRPC_SERVICES } from '@common/configuration/grpc.config';
-import { UserAccessService } from '@common/interfaces/grpc/user-access';
-import { PERMISSION } from '@common/constants/enum/role.enum';
+import { UpsertIdentityRequest, UserAccessService } from '@common/interfaces/grpc/user-access';
+import { PERMISSION, ROLE } from '@common/constants/enum/role.enum';
+import { AUTH_ERROR_CODE } from '@common/constants/enum/auth-error-code.enum';
 
 @Injectable()
 export class AuthorizerService {
@@ -53,7 +54,7 @@ export class AuthorizerService {
     const decoded = jwt.decode(token, { complete: true }) as Jwt | null;
 
     if (!decoded || !decoded.header || !decoded.payload || !decoded.header.kid) {
-      throw new UnauthorizedException('Invalid token structure');
+      throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
     }
 
     let payload: JwtPayload;
@@ -66,11 +67,38 @@ export class AuthorizerService {
       this.logger.debug({ payload });
     } catch (error) {
       this.logger.error({ error, processId });
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
     }
 
-    const userId = payload.sub;
-    const user = await this.userValidation(userId, processId);
+    const userId = typeof payload.sub === 'string' ? payload.sub : undefined;
+
+    if (!userId) {
+      throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
+    }
+
+    let user = await this.userValidation(userId, processId);
+
+    if (!user) {
+      user = await this.autoProvisionFromToken(payload, processId);
+    }
+
+    if (!user) {
+      throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
+    }
+
+    const keycloakRoles = this.extractRealmRoles(payload);
+    const isRoleMappingValid = this.validateRoleMapping(keycloakRoles, user.roles as unknown as Role[] | undefined);
+
+    if (!isRoleMappingValid) {
+      this.logger.warn({
+        processId,
+        userId,
+        keycloakRoles,
+        internalRoles: (user.roles as unknown as Role[] | undefined)?.map((role) => role?.name),
+      });
+      throw new UnauthorizedException(AUTH_ERROR_CODE.ROLE_MAPPING_MISMATCH);
+    }
+
     const permissions = this.collectPermissions(user.roles as unknown as Role[] | undefined);
 
     return {
@@ -94,13 +122,104 @@ export class AuthorizerService {
       .filter((permission): permission is PERMISSION => typeof permission === 'string');
   }
 
-  private async userValidation(userId: string, processId: string) {
-    const user = await firstValueFrom(
-      this.userAccessService.getByUserId({ processId, userId }).pipe(map((data) => data.data)),
-    );
-    if (!user) {
-      throw new UnauthorizedException('User not found');
+  private extractRealmRoles(payload: JwtPayload): string[] {
+    const realmAccess = payload['realm_access'] as Record<string, unknown> | undefined;
+
+    if (!realmAccess) {
+      return [];
     }
+
+    const roles = realmAccess['roles'];
+
+    if (!Array.isArray(roles)) {
+      return [];
+    }
+
+    return roles.filter((role): role is string => typeof role === 'string');
+  }
+
+  private validateRoleMapping(keycloakRoles: string[], internalRoles?: Role[]): boolean {
+    const appRoles = new Set(Object.values(ROLE).map((role) => this.normalizeRoleName(role)));
+
+    const keycloakAppRoles = new Set(
+      keycloakRoles.map((role) => this.normalizeRoleName(role)).filter((role) => appRoles.has(role)),
+    );
+
+    const internalAppRoles = new Set(
+      (internalRoles || []).map((role) => this.normalizeRoleName(role?.name)).filter((role) => appRoles.has(role)),
+    );
+
+    if (keycloakAppRoles.size === 0 || internalAppRoles.size === 0) {
+      return false;
+    }
+
+    return Array.from(keycloakAppRoles).some((role) => internalAppRoles.has(role));
+  }
+
+  private normalizeRoleName(role?: string): string {
+    return (role || '').trim().toUpperCase();
+  }
+
+  private async userValidation(userId: string, processId: string) {
+    const user = await this.getUserByUserId(userId, processId);
+
+    if (!user) {
+      if (!this.isAutoProvisionOnFirstLoginEnabled()) {
+        throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
+      }
+
+      this.logger.warn({
+        processId,
+        userId,
+        message: 'User profile missing in user-access. Attempting first-login auto provisioning.',
+      });
+
+      return undefined;
+    }
+
     return user;
+  }
+
+  private async getUserByUserId(userId: string, processId: string) {
+    return firstValueFrom(this.userAccessService.getByUserId({ processId, userId }).pipe(map((data) => data.data)));
+  }
+
+  private async autoProvisionFromToken(payload: JwtPayload, processId: string) {
+    const userId = typeof payload.sub === 'string' ? payload.sub : undefined;
+    const email = typeof payload.email === 'string' ? payload.email : undefined;
+
+    if (!userId || !email) {
+      throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
+    }
+
+    const firstName = this.pickFirstString(payload, ['given_name', 'first_name']);
+    const lastName = this.pickFirstString(payload, ['family_name', 'last_name']);
+    const roleNames = this.extractRealmRoles(payload);
+
+    const upsertPayload: UpsertIdentityRequest = {
+      processId,
+      userId,
+      email,
+      firstName,
+      lastName,
+      roleNames,
+    };
+
+    return firstValueFrom(this.userAccessService.upsertByIdentity(upsertPayload).pipe(map((data) => data.data)));
+  }
+
+  private pickFirstString(payload: JwtPayload, keys: string[]): string | undefined {
+    for (const key of keys) {
+      const value = payload[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  private isAutoProvisionOnFirstLoginEnabled(): boolean {
+    return process.env['AUTH_AUTO_PROVISION_ON_FIRST_LOGIN'] === 'true';
   }
 }

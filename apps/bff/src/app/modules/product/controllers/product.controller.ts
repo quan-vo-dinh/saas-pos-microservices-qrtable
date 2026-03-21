@@ -9,6 +9,9 @@ import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message'
 import { ProcessId } from '@common/decorators/processId.decorator';
 import { map } from 'rxjs';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
+import { Authorization } from '@common/decorators/authorizer.decorator';
+import { Permissions } from '@common/decorators/permission.decorator';
+import { PERMISSION } from '@common/constants/enum/role.enum';
 
 @ApiTags('Product')
 @Controller('product')
@@ -16,6 +19,8 @@ export class ProductController {
   constructor(@Inject(TCP_SERVICES.PRODUCT_SERVICE) private readonly productClient: TcpClient) {}
 
   @Post()
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.PRODUCT_CREATE])
   @ApiOkResponse({ type: ResponseDto<ProductResponseDto> })
   @ApiOperation({ summary: 'Create a new product' })
   create(@Body() body: CreateProductRequestDto, @ProcessId() processId: string) {
@@ -38,6 +43,8 @@ export class ProductController {
   }
 
   @Get()
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.PRODUCT_GET_ALL])
   @ApiOkResponse({ type: ResponseDto<ProductResponseDto[]> })
   @ApiOperation({ summary: 'Get all products' })
   findAll(@ProcessId() processId: string) {

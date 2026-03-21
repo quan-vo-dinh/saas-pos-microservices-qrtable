@@ -10,6 +10,7 @@ import { getSessionCacheKey, getSessionIdFromRequest } from '@common/utils/reque
 type SessionData = {
   tenantId?: string;
   createdAt: number;
+  lastActivityAt: number;
 };
 
 @Injectable()
@@ -37,17 +38,43 @@ export class SessionGuard implements CanActivate {
       const existingSession = await this.cacheManager.get<SessionData>(cacheKey);
 
       if (existingSession) {
-        request[MetadataKey.SESSION_ID] = existingSessionId;
-        request[MetadataKey.TENANT_ID] = request[MetadataKey.TENANT_ID] || existingSession.tenantId;
+        const now = Date.now();
+        const idleTime = now - (existingSession.lastActivityAt || existingSession.createdAt);
 
-        return true;
+        if (idleTime <= SESSION_POLICY.IDLE_TIMEOUT_MS) {
+          await this.cacheManager.set(
+            cacheKey,
+            {
+              ...existingSession,
+              lastActivityAt: now,
+            },
+            SESSION_POLICY.TTL_MS,
+          );
+
+          request[MetadataKey.SESSION_ID] = existingSessionId;
+          request[MetadataKey.TENANT_ID] = request[MetadataKey.TENANT_ID] || existingSession.tenantId;
+          request.res?.setHeader(REQUEST_HEADERS.SESSION_ID, existingSessionId);
+
+          return true;
+        }
+
+        await this.cacheManager.del(cacheKey);
       }
     }
 
+    const now = Date.now();
     const sessionId = this.generateSessionId();
     const cacheKey = getSessionCacheKey(sessionId);
 
-    await this.cacheManager.set(cacheKey, { tenantId, createdAt: Date.now() }, SESSION_POLICY.TTL_MS);
+    await this.cacheManager.set(
+      cacheKey,
+      {
+        tenantId,
+        createdAt: now,
+        lastActivityAt: now,
+      },
+      SESSION_POLICY.TTL_MS,
+    );
 
     request[MetadataKey.SESSION_ID] = sessionId;
     request.res?.setHeader(REQUEST_HEADERS.SESSION_ID, sessionId);

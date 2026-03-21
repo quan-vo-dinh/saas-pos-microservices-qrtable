@@ -2,6 +2,9 @@ import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { ProcessId } from '@common/decorators/processId.decorator';
+import { Authorization } from '@common/decorators/authorizer.decorator';
+import { Permissions } from '@common/decorators/permission.decorator';
+import { PERMISSION } from '@common/constants/enum/role.enum';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
 import { CreateTenantRequestDto, TenantResponseDto, UpdateTenantRequestDto } from '@common/interfaces/gateway/saas';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
@@ -42,6 +45,8 @@ export class SaasController {
   }
 
   @Post()
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.SAAS_CREATE])
   @ApiOkResponse({ type: ResponseDto<TenantResponseDto> })
   @ApiOperation({ summary: 'Create a new tenant' })
   create(@Body() body: CreateTenantRequestDto, @ProcessId() processId: string, @Req() req: Request) {
@@ -63,6 +68,8 @@ export class SaasController {
   }
 
   @Get()
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.SAAS_GET_LIST])
   @ApiOkResponse({ type: ResponseDto<TenantResponseDto[]> })
   @ApiOperation({ summary: 'Get all tenants' })
   findAll(@ProcessId() processId: string, @Req() req: Request) {
@@ -81,6 +88,8 @@ export class SaasController {
   }
 
   @Get(':id')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.SAAS_GET_BY_ID])
   @ApiOkResponse({ type: ResponseDto<TenantResponseDto> })
   @ApiOperation({ summary: 'Get tenant by id' })
   findById(@Param('id') id: string, @ProcessId() processId: string, @Req() req: Request) {
@@ -102,6 +111,8 @@ export class SaasController {
   }
 
   @Patch(':id')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.SAAS_UPDATE])
   @ApiOkResponse({ type: ResponseDto<TenantResponseDto> })
   @ApiOperation({ summary: 'Update tenant by id' })
   update(
@@ -128,6 +139,8 @@ export class SaasController {
   }
 
   @Delete(':id')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.SAAS_DELETE])
   @ApiOkResponse({ type: ResponseDto<boolean> })
   @ApiOperation({ summary: 'Delete tenant by id' })
   remove(@Param('id') id: string, @ProcessId() processId: string, @Req() req: Request) {

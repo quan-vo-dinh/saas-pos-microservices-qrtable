@@ -12,20 +12,21 @@ export class CatalogRepository {
     return this.repo.save(catalog);
   }
 
-  findAll(): Promise<Catalog[]> {
-    return this.repo.find();
+  findAllByTenant(tenantId: string): Promise<Catalog[]> {
+    return this.repo.find({ where: { tenantId } });
   }
 
-  findById(id: string): Promise<Catalog> {
-    return this.repo.findOne({ where: { id } });
+  findByIdAndTenant(id: string, tenantId: string): Promise<Catalog> {
+    return this.repo.findOne({ where: { id, tenantId } });
   }
 
-  updateById(id: string, data: Partial<Catalog>): Promise<Catalog> {
-    return this.repo.save({ id, ...data });
+  async updateByIdAndTenant(id: string, tenantId: string, data: Partial<Catalog>): Promise<Catalog> {
+    await this.repo.update({ id, tenantId }, data);
+    return this.findByIdAndTenant(id, tenantId);
   }
 
-  deleteById(id: string): Promise<void> {
-    return this.repo.delete(id).then(() => undefined);
+  deleteByIdAndTenant(id: string, tenantId: string): Promise<void> {
+    return this.repo.delete({ id, tenantId }).then(() => undefined);
   }
 
   async exists(tenantId: string, name: string): Promise<boolean> {

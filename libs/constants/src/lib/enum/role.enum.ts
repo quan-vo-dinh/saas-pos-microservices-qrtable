@@ -1,9 +1,29 @@
 export enum ROLE {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  OWNER = 'OWNER',
+  MANAGER = 'MANAGER',
+  WAITER = 'WAITER',
+  CHEF = 'CHEF',
+  BARISTA = 'BARISTA',
   ADMINISTRATOR = 'administrator',
-  ACCOUNTANT = 'ant',
+  ACCOUNTANT = 'accountant',
 }
 
 export enum PERMISSION {
+  /* SAAS */
+  SAAS_CREATE = 'saas.create',
+  SAAS_GET_BY_ID = 'saas.get_by_id',
+  SAAS_GET_LIST = 'saas.get_list',
+  SAAS_UPDATE = 'saas.update',
+  SAAS_DELETE = 'saas.delete',
+
+  /* CATALOG */
+  CATALOG_CREATE = 'catalog.create',
+  CATALOG_GET_BY_ID = 'catalog.get_by_id',
+  CATALOG_GET_LIST = 'catalog.get_list',
+  CATALOG_UPDATE = 'catalog.update',
+  CATALOG_DELETE = 'catalog.delete',
+
   /* INVOICE */
   INVOICE_CREATE = 'invoice.create',
   INVOICE_GET_BY_ID = 'invoice.get_by_id',

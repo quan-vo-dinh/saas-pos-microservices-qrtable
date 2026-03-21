@@ -24,7 +24,6 @@ export class InvoiceController {
   @Authorization({ secured: true })
   @ApiOkResponse({ type: ResponseDto<InvoiceResponseDto> })
   @ApiOperation({ summary: 'Create a new invoice' })
-  @Authorization({ secured: true })
   @Permissions([PERMISSION.INVOICE_CREATE])
   create(
     @Body() body: CreateInvoiceRequestDto,

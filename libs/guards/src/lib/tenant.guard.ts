@@ -24,11 +24,16 @@ export class TenantGuard implements CanActivate {
     }
 
     const userData = request[MetadataKey.USER_DATA] as AuthorizeResponse | undefined;
+    const isSuperAdmin = this.isSuperAdmin(userData);
     const claimTenantId = this.getClaimTenantId(userData);
     const tenantId = (request[MetadataKey.TENANT_ID] as string | undefined) || claimTenantId;
 
     if (tenantId) {
       request[MetadataKey.TENANT_ID] = tenantId;
+    }
+
+    if (isSuperAdmin) {
+      return true;
     }
 
     if (!tenantId) {
@@ -90,5 +95,18 @@ export class TenantGuard implements CanActivate {
     }
 
     return undefined;
+  }
+
+  private isSuperAdmin(userData?: AuthorizeResponse): boolean {
+    const jwt = userData?.metadata?.jwt as Record<string, unknown> | undefined;
+
+    if (!jwt) {
+      return false;
+    }
+
+    const realmAccess = jwt['realm_access'] as Record<string, unknown> | undefined;
+    const roles = Array.isArray(realmAccess?.['roles']) ? (realmAccess?.['roles'] as unknown[]) : [];
+
+    return roles.some((role) => typeof role === 'string' && role === 'SUPER_ADMIN');
   }
 }

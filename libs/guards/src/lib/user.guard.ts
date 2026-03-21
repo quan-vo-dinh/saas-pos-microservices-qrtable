@@ -11,6 +11,7 @@ import { createHash } from 'crypto';
 import { GRPC_SERVICES } from '@common/configuration/grpc.config';
 import { ClientGrpc } from '@nestjs/microservices';
 import { AuthorizerService } from '@common/interfaces/grpc/authorizer/index';
+import { AUTH_ERROR_CODE } from '@common/constants/enum/auth-error-code.enum';
 @Injectable()
 export class UserGuard implements CanActivate {
   private readonly logger = new Logger(UserGuard.name);
@@ -29,7 +30,7 @@ export class UserGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
     const authOptions = this.reflector.get<{ secured: boolean }>(MetadataKey.SECURED, context.getHandler());
 
-    const req = context.switchToHttp().getRequest();
+    const req = context.switchToHttp().getRequest<Record<string, unknown>>();
 
     if (!authOptions?.secured) {
       return true;
@@ -38,18 +39,19 @@ export class UserGuard implements CanActivate {
     return this.verifyUserToken(req);
   }
 
-  private async verifyUserToken(req: any): Promise<boolean> {
+  private async verifyUserToken(req: Record<string, unknown>): Promise<boolean> {
     try {
       const token = getAccessToken(req);
       this.logger.debug('Verifying user token');
 
       if (!token) {
-        throw new UnauthorizedException('Access token is required');
+        throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
       }
 
       const cacheKey = this.generateTokenCacheKey(token);
 
-      const processId = req[MetadataKey.PROCESSID] || getProcessId('qrtable');
+      const processIdValue = req[MetadataKey.PROCESSID];
+      const processId = typeof processIdValue === 'string' && processIdValue ? processIdValue : getProcessId('qrtable');
       const cacheData = await this.cacheManager.get<AuthorizeResponse>(cacheKey);
 
       if (cacheData) {
@@ -68,7 +70,7 @@ export class UserGuard implements CanActivate {
       const { data: result } = response;
 
       if (!result?.valid) {
-        throw new UnauthorizedException('Token is invalid');
+        throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
       }
       this.logger.debug(`Set user data to cache for cache key: ${cacheKey}`);
 
@@ -79,23 +81,39 @@ export class UserGuard implements CanActivate {
     } catch (error) {
       this.logger.error({ error });
 
-      const errorDetails =
-        typeof (error as any)?.details === 'string'
-          ? (error as any).details
-          : typeof (error as any)?.message === 'string'
-            ? (error as any).message
-            : undefined;
+      const errorDetails = this.getErrorDetails(error);
 
-      if (errorDetails?.includes('User not found')) {
-        throw new UnauthorizedException('User is not provisioned in user-access');
+      if (
+        errorDetails?.includes(AUTH_ERROR_CODE.USER_NOT_PROVISIONED) ||
+        errorDetails?.includes(AUTH_ERROR_CODE.ROLE_MAPPING_MISMATCH)
+      ) {
+        throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
       }
 
-      throw new UnauthorizedException('Token is invalid');
+      throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
     }
   }
 
   generateTokenCacheKey(token: string): string {
     const hash = createHash('sha256').update(token).digest('hex');
     return `user-token:${hash}`;
+  }
+
+  private getErrorDetails(error: unknown): string | undefined {
+    if (!error || typeof error !== 'object') {
+      return undefined;
+    }
+
+    const errorDetails = (error as { details?: unknown }).details;
+    if (typeof errorDetails === 'string') {
+      return errorDetails;
+    }
+
+    const errorMessage = (error as { message?: unknown }).message;
+    if (typeof errorMessage === 'string') {
+      return errorMessage;
+    }
+
+    return undefined;
   }
 }

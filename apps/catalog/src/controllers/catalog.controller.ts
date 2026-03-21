@@ -7,6 +7,7 @@ import {
   CreateCatalogTcpRequest,
   DeleteCatalogTcpRequest,
   GetCatalogByIdTcpRequest,
+  GetCatalogListTcpRequest,
   UpdateCatalogTcpRequest,
 } from '@common/interfaces/tcp/catalog';
 import { Controller, UseInterceptors } from '@nestjs/common';
@@ -33,14 +34,14 @@ export class CatalogController {
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.CATALOG.GET_LIST)
-  async getList(): Promise<Response<CatalogTcpResponse[]>> {
-    const result = await this.catalogService.getList();
+  async getList(@RequestParams() body: GetCatalogListTcpRequest): Promise<Response<CatalogTcpResponse[]>> {
+    const result = await this.catalogService.getList(body);
     return Response.success<CatalogTcpResponse[]>(result);
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.CATALOG.GET_BY_ID)
   async getById(@RequestParams() body: GetCatalogByIdTcpRequest): Promise<Response<CatalogTcpResponse>> {
-    const result = await this.catalogService.getById(body.id);
+    const result = await this.catalogService.getById(body.id, body.tenantId || '');
     return Response.success<CatalogTcpResponse>(result);
   }
 
@@ -52,7 +53,7 @@ export class CatalogController {
 
   @MessagePattern(TCP_REQUEST_MESSAGE.CATALOG.DELETE)
   async remove(@RequestParams() body: DeleteCatalogTcpRequest): Promise<Response<boolean>> {
-    await this.catalogService.delete(body.id);
+    await this.catalogService.delete(body.id, body.tenantId || '');
     return Response.success<boolean>(true);
   }
 }

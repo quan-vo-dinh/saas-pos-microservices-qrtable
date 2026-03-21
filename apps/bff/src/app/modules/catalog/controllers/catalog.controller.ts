@@ -1,7 +1,11 @@
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { MetadataKey } from '@common/constants/common.constant';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { ProcessId } from '@common/decorators/processId.decorator';
+import { Authorization } from '@common/decorators/authorizer.decorator';
+import { Permissions } from '@common/decorators/permission.decorator';
+import { PERMISSION } from '@common/constants/enum/role.enum';
 import {
   CatalogResponseDto,
   CreateCatalogRequestDto,
@@ -14,6 +18,7 @@ import {
   CreateCatalogTcpRequest,
   DeleteCatalogTcpRequest,
   GetCatalogByIdTcpRequest,
+  GetCatalogListTcpRequest,
   UpdateCatalogTcpRequest,
 } from '@common/interfaces/tcp/catalog';
 import { buildTcpRequestContext } from '@common/utils/request.util';
@@ -46,14 +51,21 @@ export class CatalogController {
   }
 
   @Post()
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.CATALOG_CREATE])
   @ApiOkResponse({ type: ResponseDto<CatalogResponseDto> })
   @ApiOperation({ summary: 'Create a new catalog' })
   create(@Body() body: CreateCatalogRequestDto, @ProcessId() processId: string, @Req() req: Request) {
+    const tenantId = req[MetadataKey.TENANT_ID] as string | undefined;
+
     return this.catalogClient
-      .send<
-        CatalogTcpResponse,
-        CreateCatalogTcpRequest
-      >(TCP_REQUEST_MESSAGE.CATALOG.CREATE, buildTcpRequestContext<CreateCatalogTcpRequest>(req, processId, body))
+      .send<CatalogTcpResponse, CreateCatalogTcpRequest>(
+        TCP_REQUEST_MESSAGE.CATALOG.CREATE,
+        buildTcpRequestContext<CreateCatalogTcpRequest>(req, processId, {
+          ...body,
+          tenantId,
+        }),
+      )
       .pipe(
         map(
           (response) =>
@@ -67,14 +79,20 @@ export class CatalogController {
   }
 
   @Get()
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.CATALOG_GET_LIST])
   @ApiOkResponse({ type: ResponseDto<CatalogResponseDto[]> })
   @ApiOperation({ summary: 'Get all catalogs' })
   findAll(@ProcessId() processId: string, @Req() req: Request) {
+    const tenantId = req[MetadataKey.TENANT_ID] as string | undefined;
+
     return this.catalogClient
-      .send<
-        CatalogTcpResponse[],
-        void
-      >(TCP_REQUEST_MESSAGE.CATALOG.GET_LIST, buildTcpRequestContext<void>(req, processId))
+      .send<CatalogTcpResponse[], GetCatalogListTcpRequest>(
+        TCP_REQUEST_MESSAGE.CATALOG.GET_LIST,
+        buildTcpRequestContext<GetCatalogListTcpRequest>(req, processId, {
+          tenantId,
+        }),
+      )
       .pipe(
         map(
           (response) =>
@@ -88,14 +106,21 @@ export class CatalogController {
   }
 
   @Get(':id')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.CATALOG_GET_BY_ID])
   @ApiOkResponse({ type: ResponseDto<CatalogResponseDto> })
   @ApiOperation({ summary: 'Get catalog by id' })
   findById(@Param('id') id: string, @ProcessId() processId: string, @Req() req: Request) {
+    const tenantId = req[MetadataKey.TENANT_ID] as string | undefined;
+
     return this.catalogClient
-      .send<
-        CatalogTcpResponse,
-        GetCatalogByIdTcpRequest
-      >(TCP_REQUEST_MESSAGE.CATALOG.GET_BY_ID, buildTcpRequestContext<GetCatalogByIdTcpRequest>(req, processId, { id }))
+      .send<CatalogTcpResponse, GetCatalogByIdTcpRequest>(
+        TCP_REQUEST_MESSAGE.CATALOG.GET_BY_ID,
+        buildTcpRequestContext<GetCatalogByIdTcpRequest>(req, processId, {
+          id,
+          tenantId,
+        }),
+      )
       .pipe(
         map(
           (response) =>
@@ -109,6 +134,8 @@ export class CatalogController {
   }
 
   @Patch(':id')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.CATALOG_UPDATE])
   @ApiOkResponse({ type: ResponseDto<CatalogResponseDto> })
   @ApiOperation({ summary: 'Update catalog by id' })
   update(
@@ -117,11 +144,17 @@ export class CatalogController {
     @ProcessId() processId: string,
     @Req() req: Request,
   ) {
+    const tenantId = req[MetadataKey.TENANT_ID] as string | undefined;
+
     return this.catalogClient
-      .send<
-        CatalogTcpResponse,
-        UpdateCatalogTcpRequest
-      >(TCP_REQUEST_MESSAGE.CATALOG.UPDATE, buildTcpRequestContext<UpdateCatalogTcpRequest>(req, processId, { id, ...body }))
+      .send<CatalogTcpResponse, UpdateCatalogTcpRequest>(
+        TCP_REQUEST_MESSAGE.CATALOG.UPDATE,
+        buildTcpRequestContext<UpdateCatalogTcpRequest>(req, processId, {
+          id,
+          tenantId,
+          ...body,
+        }),
+      )
       .pipe(
         map(
           (response) =>
@@ -135,14 +168,21 @@ export class CatalogController {
   }
 
   @Delete(':id')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.CATALOG_DELETE])
   @ApiOkResponse({ type: ResponseDto<boolean> })
   @ApiOperation({ summary: 'Delete catalog by id' })
   remove(@Param('id') id: string, @ProcessId() processId: string, @Req() req: Request) {
+    const tenantId = req[MetadataKey.TENANT_ID] as string | undefined;
+
     return this.catalogClient
-      .send<
-        boolean,
-        DeleteCatalogTcpRequest
-      >(TCP_REQUEST_MESSAGE.CATALOG.DELETE, buildTcpRequestContext<DeleteCatalogTcpRequest>(req, processId, { id }))
+      .send<boolean, DeleteCatalogTcpRequest>(
+        TCP_REQUEST_MESSAGE.CATALOG.DELETE,
+        buildTcpRequestContext<DeleteCatalogTcpRequest>(req, processId, {
+          id,
+          tenantId,
+        }),
+      )
       .pipe(
         map(
           (response) =>

@@ -5,11 +5,6 @@ export class CreateCatalogRequestDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  tenantId: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
   name: string;
 
   @ApiPropertyOptional()

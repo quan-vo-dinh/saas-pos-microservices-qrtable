@@ -5,9 +5,19 @@
       "_id": {
         "$oid": "68a3f2f1b3e811435a8ad004"
       },
-      "name": "administrator",
-      "description": "admin role with all permissions",
+      "name": "SUPER_ADMIN",
+      "description": "platform-level super admin with cross-tenant capabilities",
       "permissions": [
+        "saas.create",
+        "saas.get_by_id",
+        "saas.get_list",
+        "saas.update",
+        "saas.delete",
+        "catalog.create",
+        "catalog.get_by_id",
+        "catalog.get_list",
+        "catalog.update",
+        "catalog.delete",
         "invoice.create",
         "invoice.get_by_id",
         "invoice.get_all",
@@ -35,16 +45,63 @@
       "_id": {
         "$oid": "68a3f2f1b3e811435a8ad005"
       },
-      "name": "accountant",
-      "description": "accountant role with user permissions",
+      "name": "OWNER",
+      "description": "tenant owner with full management permissions in own tenant",
       "permissions": [
-        "invoice.get_by_id",
-        "invoice.get_all",
+        "catalog.create",
+        "catalog.get_by_id",
+        "catalog.get_list",
+        "catalog.update",
+        "catalog.delete",
+        "user.create",
         "user.get_by_id",
-        "role.get_by_id",
-        "product.get_by_id",
-        "product.get_all"
+        "user.get_all",
+        "user.update",
+        "user.delete",
+        "invoice.get_by_id",
+        "invoice.get_all"
       ]
+    },
+    {
+      "_id": {
+        "$oid": "68a3f2f1b3e811435a8ad006"
+      },
+      "name": "MANAGER",
+      "description": "tenant manager with operational permissions",
+      "permissions": [
+        "catalog.create",
+        "catalog.get_by_id",
+        "catalog.get_list",
+        "catalog.update",
+        "catalog.delete",
+        "user.create",
+        "invoice.get_by_id",
+        "invoice.get_all"
+      ]
+    },
+    {
+      "_id": {
+        "$oid": "68a3f2f1b3e811435a8ad007"
+      },
+      "name": "WAITER",
+      "description": "service staff role for day-to-day floor operations",
+      "permissions": ["catalog.get_by_id", "catalog.get_list", "invoice.get_by_id", "invoice.get_all"]
+    },
+    {
+      "_id": {
+        "$oid": "68a3f2f1b3e811435a8ad008"
+      },
+      "name": "CHEF",
+      "description": "kitchen staff role",
+      "permissions": ["catalog.get_by_id", "catalog.get_list"]
+    },
+    {
+      "_id": {
+        "$oid": "68a3f2f1b3e811435a8ad009"
+      },
+      "name": "BARISTA",
+      "description": "bar staff role",
+      "permissions": ["catalog.get_by_id", "catalog.get_list"]
     }
   ]
 }

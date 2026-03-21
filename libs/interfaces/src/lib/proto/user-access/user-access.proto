@@ -4,6 +4,7 @@ package GRPC_USER_ACCESS_SERVICE;
 
 service UserAccessService {
   rpc getByUserId (UserById) returns (UserResponse);
+  rpc upsertByIdentity (UpsertIdentityRequest) returns (UserResponse);
 }
 
 message Role {
@@ -30,4 +31,13 @@ message UserResponse {
 message UserById {
   string userId = 1;
   string processId = 2;
+}
+
+message UpsertIdentityRequest {
+  string processId = 1;
+  string userId = 2;
+  string email = 3;
+  string firstName = 4;
+  string lastName = 5;
+  repeated string roleNames = 6;
 }

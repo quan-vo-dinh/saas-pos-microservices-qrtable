@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { UserService } from '../services/user.service';
 import { GrpcMethod } from '@nestjs/microservices';
-import { UserById } from '@common/interfaces/grpc/user-access';
+import { UpsertIdentityRequest, UserById } from '@common/interfaces/grpc/user-access';
 import { Response } from '@common/interfaces/grpc/common/response.interface';
 import { User } from '@common/schemas/user.schema';
 
@@ -12,6 +12,19 @@ export class UserGrpcController {
   @GrpcMethod('UserAccessService', 'getByUserId')
   async getByUserId(payload: UserById): Promise<Response<User>> {
     const result = await this.userService.getUserByUserId(payload.userId);
+
+    return Response.success<User>(result);
+  }
+
+  @GrpcMethod('UserAccessService', 'upsertByIdentity')
+  async upsertByIdentity(payload: UpsertIdentityRequest): Promise<Response<User>> {
+    const result = await this.userService.upsertUserByIdentity({
+      userId: payload.userId,
+      email: payload.email,
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      roleNames: payload.roleNames,
+    });
 
     return Response.success<User>(result);
   }

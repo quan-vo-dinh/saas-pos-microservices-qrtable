@@ -1,5 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CatalogTcpResponse, CreateCatalogTcpRequest, UpdateCatalogTcpRequest } from '@common/interfaces/tcp/catalog';
+import {
+  CatalogTcpResponse,
+  CreateCatalogTcpRequest,
+  GetCatalogListTcpRequest,
+  UpdateCatalogTcpRequest,
+} from '@common/interfaces/tcp/catalog';
 import { CatalogRepository } from '../repositories/catalog.repository';
 
 @Injectable()
@@ -27,12 +32,22 @@ export class CatalogService {
     });
   }
 
-  getList(): Promise<CatalogTcpResponse[]> {
-    return this.catalogRepository.findAll();
+  async getList(data: GetCatalogListTcpRequest): Promise<CatalogTcpResponse[]> {
+    const tenantId = data.tenantId?.trim();
+
+    if (!tenantId) {
+      throw new BadRequestException('tenantId is required');
+    }
+
+    return this.catalogRepository.findAllByTenant(tenantId);
   }
 
-  async getById(id: string): Promise<CatalogTcpResponse> {
-    const catalog = await this.catalogRepository.findById(id);
+  async getById(id: string, tenantId: string): Promise<CatalogTcpResponse> {
+    if (!tenantId?.trim()) {
+      throw new BadRequestException('tenantId is required');
+    }
+
+    const catalog = await this.catalogRepository.findByIdAndTenant(id, tenantId);
     if (!catalog) {
       throw new NotFoundException('Catalog not found');
     }
@@ -41,7 +56,12 @@ export class CatalogService {
   }
 
   async update(data: UpdateCatalogTcpRequest): Promise<CatalogTcpResponse> {
-    const current = await this.getById(data.id);
+    const tenantId = data.tenantId?.trim();
+    if (!tenantId) {
+      throw new BadRequestException('tenantId is required');
+    }
+
+    const current = await this.getById(data.id, tenantId);
     const nextName = data.name?.trim();
 
     if (nextName && nextName !== current.name) {
@@ -57,11 +77,11 @@ export class CatalogService {
       isActive: data.isActive,
     };
 
-    return this.catalogRepository.updateById(data.id, payload);
+    return this.catalogRepository.updateByIdAndTenant(data.id, tenantId, payload);
   }
 
-  async delete(id: string): Promise<void> {
-    await this.getById(id);
-    await this.catalogRepository.deleteById(id);
+  async delete(id: string, tenantId: string): Promise<void> {
+    await this.getById(id, tenantId);
+    await this.catalogRepository.deleteByIdAndTenant(id, tenantId);
   }
 }

@@ -10,7 +10,8 @@ export class TenantMiddleware implements NestMiddleware {
     const tenantId = this.resolveTenantId(req);
 
     if (tenantId) {
-      req[MetadataKey.TENANT_ID] = tenantId;
+      const requestWithMetadata = req as Request & Record<string, unknown>;
+      requestWithMetadata[MetadataKey.TENANT_ID] = tenantId;
     }
 
     Logger.debug(`TenantMiddleware: tenant ID: ${tenantId || 'none'}`, TenantMiddleware.name);

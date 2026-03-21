@@ -7,6 +7,16 @@ export interface UserById {
   processId: string;
 }
 
+export interface UpsertIdentityRequest {
+  processId: string;
+  userId: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  roleNames?: string[];
+}
+
 export interface UserAccessService {
   getByUserId(data: UserById): Observable<Response<User>>;
+  upsertByIdentity(data: UpsertIdentityRequest): Observable<Response<User>>;
 }
