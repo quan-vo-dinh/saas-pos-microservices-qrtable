@@ -208,22 +208,23 @@ qrtable/
 │   ├── customer-pwa/           # 📱 Customer PWA (React + Vite)
 │   └── management-app/         # 💻 Management App (Next.js — POS/KDS/Dashboard/Admin)
 ├── libs/
-│   ├── # ── Backend Shared ────────────────────
+│   ├── # ── Backend Shared (Flat structure từ khóa học) ───────
 │   ├── configuration/          # Centralized config (env validation)
 │   ├── constants/              # Shared constants, enums, Kafka topics
 │   ├── schemas/                # Database schemas & entities
-│   ├── dtos/                   # Shared DTOs, request/response types
-│   ├── guard/                  # UserGuard, TenantGuard, SessionGuard
+│   ├── dtos/                   # Backend DTOs (Server-side models)
+│   ├── guards/                 # UserGuard, TenantGuard, SessionGuard
 │   ├── interceptors/           # Exception, Logging, TCP Logging
 │   ├── middlewares/            # Logger, Tenant injection
 │   ├── providers/              # TCP, gRPC, Mongo, Postgres, Redis providers
 │   ├── queue/                  # Kafka producer/consumer modules
 │   ├── common/                 # Utilities, decorators, helpers
-│   ├── # ── Frontend Shared ───────────────────
-│   ├── shared-ui/              # UI components (Shadcn-based, sử dụng chung 2 app)
-│   ├── shared-hooks/           # React Query hooks, WebSocket hooks
-│   ├── shared-types/           # TypeScript interfaces, DTOs (frontend)
-│   └── shared-utils/           # Helpers, formatters, validators (frontend)
+│   ├── # ── Cross-Platform Shared (FE & BE) ───────────────────
+│   ├── shared/types/           # TypeScript interfaces, DTOs (Contract chung)
+│   ├── shared/utils/           # Pure functions, formatters (Dùng chung)
+│   ├── # ── Frontend Shared ───────────────────────────────────
+│   ├── frontend/ui/            # UI components (Shadcn-based, sử dụng chung 2 app)
+│   └── frontend/hooks/         # React Query hooks, WebSocket hooks
 ├── docker/
 │   ├── docker-compose.infra.yaml     # Infrastructure services
 │   ├── docker-compose.app.yaml       # Application services
@@ -274,10 +275,10 @@ qrtable/
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐    │
 │  │  📦 Shared Libraries (Nx libs)                           │    │
-│  │  ├── shared-ui/       → UI components (Shadcn-based)     │    │
-│  │  ├── shared-utils/    → Helpers, formatters, validators  │    │
-│  │  ├── shared-types/    → TypeScript interfaces, DTOs      │    │
-│  │  └── shared-hooks/    → React Query hooks, WS hooks      │    │
+│  │  ├── frontend/ui/     → UI components (Shadcn-based)     │    │
+│  │  ├── shared/utils/    → Helpers, formatters, validators  │    │
+│  │  ├── shared/types/    → TypeScript interfaces, DTOs      │    │
+│  │  └── frontend/hooks/  → React Query hooks, WS hooks      │    │
 │  └──────────────────────────────────────────────────────────┘    │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐    │
@@ -825,6 +826,26 @@ Giao tiếp:
 
 Hệ thống sử dụng 2 luồng xác thực song song:
 
+### 8.1.1 Identity vs Application User Profile (Clarification)
+
+Hệ thống sử dụng mô hình 2 lớp để tránh nhầm lẫn khi debug auth:
+
+1. Identity Layer (Keycloak)
+
+- Xác thực credential, cấp JWT, quản lý realm/client role.
+- Cung cấp claims như sub, email, tenant_id.
+
+2. Application Profile Layer (user-access DB)
+
+- Lưu user profile nội bộ, tenant assignment, role/permission nghiệp vụ.
+- Được dùng để authorize business APIs sau khi JWT đã hợp lệ.
+
+Kết luận quan trọng:
+
+- JWT valid là điều kiện cần.
+- User profile đã provisioned trong user-access là điều kiện đủ.
+- Nếu token hợp lệ nhưng chưa có profile nội bộ: trả 401 user_not_provisioned.
+
 ```
 ┌────────────────────────────────────────────────────────┐
 │  LUỒNG 1: JWT Authentication (Staff / Owner / Admin)   │
@@ -859,6 +880,22 @@ Hệ thống sử dụng 2 luồng xác thực song song:
 ```
 
 ### 8.2 Guard Chain Architecture
+
+### 8.2.1 Auth Error Taxonomy
+
+Để telemetry và debug nhất quán, ưu tiên dùng 3 nhóm lỗi:
+
+1. 401 invalid_token
+
+- Token sai cấu trúc, sai chữ ký, hết hạn, hoặc không verify được.
+
+2. 401 user_not_provisioned
+
+- Token hợp lệ nhưng userId (sub) chưa được provision vào user-access DB.
+
+3. 403 permission_denied
+
+- Đã xác thực và có profile, nhưng không đủ quyền thực hiện action.
 
 ```
 Request

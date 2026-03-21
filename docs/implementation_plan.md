@@ -136,20 +136,25 @@ Lợi ích của mô hình này cho Monorepo 8 services:
 
 ### Step 0.5 — Khởi tạo Shared Libraries (ngày 4-5)
 
+> Áp dụng quy tắc phân chia thư mục (Group by Platform) của Nx Monorepo để tránh conflict và rõ ràng responsibility.
+
 ```
-Frontend shared libs:
-  1. libs/shared-types/  → Nx lib (TypeScript only — contract giữa FE ↔ BE)
-  2. libs/shared-ui/     → Nx lib (React components — Design System)
-  3. libs/shared-hooks/  → Nx lib (React hooks — data fetching, WS)
-  4. libs/shared-utils/  → Nx lib (pure functions — formatters, validators)
+1. Cross-Platform Shared Libs (Dùng chung FE & BE):
+   → libs/shared/types/     (TypeScript interfaces — contract giữa FE ↔ BE)
+   → libs/shared/constants/ (Kafka topics, Enums chung)
 
-Backend shared libs (giữ + mở rộng từ khóa học):
-  5. libs/guards/         → Thêm SessionGuard, TenantGuard
-  6. libs/middlewares/    → Thêm TenantMiddleware (extract tenant từ subdomain)
-  7. libs/constants/      → Thêm Kafka topics, enums QRTable
-  8. libs/entities/       → Thêm TypeORM entities mới (giữ entities cũ cho reference)
+2. Frontend Shared Libs (Dùng riêng cho App Customer & Management):
+   → libs/frontend/ui/      (React components — Design System)
+   → libs/frontend/hooks/   (React hooks — data fetching, WS)
+   → libs/frontend/utils/   (Pure functions — formatters)
 
-Viết file đầu tiên: libs/shared-types/src/index.ts
+3. Backend Shared Libs (Giữ nguyên cấu trúc phẳng từ khóa học - Không nhét vào folder backend/ để tránh vỡ source lỗi):
+   → libs/guards/         (SessionGuard, TenantGuard)
+   → libs/middlewares/    (TenantMiddleware)
+   → libs/entities/       (TypeORM entities)
+   → libs/common/         (Decorators, utilities server-side)
+
+Viết file đầu tiên: libs/shared/types/src/index.ts
    → export type { ITenant, IUser, IRole }
 ```
 
@@ -162,6 +167,25 @@ Viết file đầu tiên: libs/shared-types/src/index.ts
 4. Implement TenantGuard (inject tenant_id tự động)
 5. Implement TenantMiddleware (extract tenant từ subdomain/header)
 6. Verify: BFF → Catalog TCP health check ✅, BFF → SaaS TCP health check ✅
+```
+
+### Step 0.6A — Auth Completion (Provisioning + Role Mapping)
+
+```
+1. Chốt mô hình auth 2 lớp:
+   → Keycloak: identity + JWT claims
+   → user-access DB: user profile nội bộ + app permissions
+2. Chốt strategy provisioning user:
+   → pre-provision qua API create user hoặc first-login upsert (dev-friendly)
+3. Mapping role Keycloak → role/permission nội bộ:
+   → OWNER, MANAGER, WAITER, CHEF, BARISTA
+4. Seed role + test users có liên kết đúng userId (sub)
+5. Verify:
+   → valid token + provisioned user => pass secured endpoints
+   → valid token + missing profile => 401 user_not_provisioned
+   → sai permission => 403 permission_denied
+6. Tham chiếu tài liệu quyết định chi tiết:
+   → docs/step-0-6-auth-completion-decision.md
 ```
 
 ### Step 0.7 — Dựng Layout Skeleton cho 2 Frontend Apps (ngày 6-7)
@@ -187,8 +211,11 @@ Viết file đầu tiên: libs/shared-types/src/index.ts
 - [ ] Services khóa học (invoice, product, user-access) vẫn tồn tại, có README đánh dấu TEMPLATE
 - [ ] 2 service QRTable mới (catalog, saas) khởi động được, áp dụng Pragmatic Layered Architecture
 - [ ] 2 frontend apps chạy được (customer-pwa:5173, management-app:3000)
-- [ ] Shared libs tạo xong (shared-types, shared-ui, shared-hooks, shared-utils)
+- [ ] Shared libs tạo xong theo chuẩn Nx Grouping (shared/types, frontend/ui, frontend/hooks...)
 - [ ] Keycloak realm "qrtable" + roles tạo xong
+- [ ] Internal actor có token hợp lệ và đã provisioned gọi được secured API
+- [ ] Internal actor có token hợp lệ nhưng thiếu profile nội bộ trả 401 rõ nghĩa
+- [ ] Role mapping OWNER/MANAGER/WAITER/CHEF/BARISTA pass smoke authorization
 - [ ] Đã có bản vẽ ERD tổng thể (docs/architecture/erd.png)
 - [ ] Management App: login → redirect đúng role route
 - [ ] BFF → Catalog + SaaS TCP call thành công
@@ -227,7 +254,7 @@ Bài 105-110: Khởi tạo TCP Microservice mới, Puppeteer, Cloudinary upload
    → Create/Edit Area form, Create/Edit Table form
    → QR Code generate + export (PDF/ảnh)
 
-4. Shared UI Components → libs/shared-ui/:
+4. Shared UI Components → libs/frontend/ui/:
    → <MenuItemCard />, <CategoryList />, <TableStatusBadge />
    → <QRCodeView />, <StatusBadge />, <DataTable />
 ```
@@ -253,7 +280,7 @@ Bài 105-110: Khởi tạo TCP Microservice mới, Puppeteer, Cloudinary upload
 ### Step 1.4 — 📝 Chiết xuất Shared Types (1 ngày)
 
 ```
-Từ Mock UI, chiết xuất ra libs/shared-types/catalog.types.ts:
+Từ Mock UI, chiết xuất ra libs/shared/types/catalog.types.ts:
 
 export enum CategoryStatus { ACTIVE = 'active', INACTIVE = 'inactive' }
 export enum MenuItemStatus { AVAILABLE = 'available', OUT_OF_STOCK = 'out_of_stock' }
@@ -326,7 +353,7 @@ export interface IMenuResponse { categories: (ICategory & { items: IMenuItem[] }
 ### Step 1.6 — 🔗 Tích hợp FE ↔ BE (3-4 ngày)
 
 ```
-1. libs/shared-hooks/: tạo React Query hooks:
+1. libs/frontend/hooks/: tạo React Query hooks:
    → useMenu(tenantId) — GET /menu
    → useCategories() — CRUD hooks
    → useMenuItems() — CRUD hooks
@@ -401,7 +428,7 @@ Bài 115-123: Kafka fundamentals, NestJS Kafka Transporter,
 ### Step 2.3 — 📝 Chiết xuất Shared Types (1 ngày)
 
 ```
-libs/shared-types/order.types.ts:
+libs/shared/types/order.types.ts:
 
 export enum OrderStatus { DRAFT, PENDING, PROCESSING, READY, SERVED, COMPLETED, CANCELED }
 export enum ServiceRequestType { CALL_STAFF, REQUEST_BILL, GENERAL_HELP }
@@ -465,7 +492,7 @@ export interface IKDSTicket { ticketId: string; tableId: string; items: ...; pri
 ### Step 2.5 — 🔗 Tích hợp FE ↔ BE (3-4 ngày)
 
 ```
-1. libs/shared-hooks/:
+1. libs/frontend/hooks/:
    → useCart(sessionId) — Redis cart via API
    → useSubmitOrder() — POST /orders + idempotency key
    → useOrderTracking(sessionId) — WebSocket room subscribe
@@ -522,7 +549,7 @@ Bài 111-113: Stripe Checkout Session, Stripe Webhook processing
 ### Step 3.3 — 📝 Shared Types + Step 3.4 — ⚙️ Backend (5-7 ngày)
 
 ```
-Types: libs/shared-types/payment.types.ts
+Types: libs/shared/types/payment.types.ts
   → IPayment, IPaymentMethod (enum), IRefund, IBillFinal
 
 Backend — Khởi tạo apps/payment/ (tham khảo template invoice/ cho Stripe pattern):
