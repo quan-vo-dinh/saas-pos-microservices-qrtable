@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import Providers from "./providers";
+import type { Metadata } from 'next';
+import './globals.css';
+import Providers from './providers';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const metadata: Metadata = {
-  title: "QRTable Management App",
-  description: "Management dashboard shell for QRTable SaaS POS",
+  title: 'QRTable Management App',
+  description: 'Management dashboard shell for QRTable SaaS POS',
 };
 
 export default function RootLayout({
@@ -13,9 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          <TooltipProvider>{children}</TooltipProvider>
+        </Providers>
       </body>
     </html>
   );

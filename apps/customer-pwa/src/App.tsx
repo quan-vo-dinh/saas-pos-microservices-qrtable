@@ -1,13 +1,24 @@
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { MobileShell } from '@/components/layout/mobile-shell';
+import { LandingPage } from '@/pages/landing-page';
+import { MenuPage } from '@/pages/menu-page';
+import { OrderTrackingPage } from '@/pages/order-tracking-page';
+import { RequestPaymentPage } from '@/pages/request-payment-page';
+
 function App() {
   return (
-    <main className="min-h-screen bg-white px-6 py-10 text-slate-900">
-      <section className="mx-auto max-w-md rounded-2xl border border-slate-200 p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold tracking-tight">Customer PWA</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Khung ứng dụng đã sẵn sàng cho Step 0.7 và các màn hình QR ordering.
-        </p>
-      </section>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<MobileShell />}>
+          <Route path="/" element={<Navigate to="/landing" replace />} />
+          <Route path="/landing" element={<LandingPage />} />
+          <Route path="/menu" element={<MenuPage />} />
+          <Route path="/order-tracking" element={<OrderTrackingPage />} />
+          <Route path="/request-payment" element={<RequestPaymentPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/landing" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
