@@ -8,9 +8,7 @@ export function MobileHeader() {
 
   const displayName = session?.restaurantName ?? 'QR Table';
   const displayTable = session?.tableName ?? '—';
-  const displaySession = session?.sessionId
-    ? `${session.sessionId.slice(0, 8)}…`
-    : 'No active session';
+  const displaySession = session?.sessionId ? `${session.sessionId.slice(0, 8)}…` : 'No active session';
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">

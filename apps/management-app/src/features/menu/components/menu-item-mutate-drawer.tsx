@@ -6,21 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useMenu } from './menu-provider';
 import { categories } from '../data/categories';
 import { menuItemMutateSchema, type MenuItemMutateInput } from '../data/schema';
@@ -32,23 +19,24 @@ export function MenuItemMutateDrawer() {
 
   const form = useForm<MenuItemMutateInput>({
     resolver: zodResolver(menuItemMutateSchema),
-    defaultValues: isEdit && currentItem
-      ? {
-          name: currentItem.name,
-          description: currentItem.description ?? '',
-          price: currentItem.price,
-          categoryId: currentItem.categoryId,
-          stock: currentItem.stock,
-          status: currentItem.status,
-        }
-      : {
-          name: '',
-          description: '',
-          price: 0,
-          categoryId: '',
-          stock: 0,
-          status: 'available',
-        },
+    defaultValues:
+      isEdit && currentItem
+        ? {
+            name: currentItem.name,
+            description: currentItem.description ?? '',
+            price: currentItem.price,
+            categoryId: currentItem.categoryId,
+            stock: currentItem.stock,
+            status: currentItem.status,
+          }
+        : {
+            name: '',
+            description: '',
+            price: 0,
+            categoryId: '',
+            stock: 0,
+            status: 'available',
+          },
   });
 
   function onSubmit(data: MenuItemMutateInput) {
@@ -71,26 +59,15 @@ export function MenuItemMutateDrawer() {
         <SheetHeader>
           <SheetTitle>{isEdit ? 'Edit Menu Item' : 'Add Menu Item'}</SheetTitle>
           <SheetDescription>
-            {isEdit
-              ? 'Update the menu item details.'
-              : 'Fill in the details to add a new menu item.'}
+            {isEdit ? 'Update the menu item details.' : 'Fill in the details to add a new menu item.'}
           </SheetDescription>
         </SheetHeader>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col gap-4 p-4 overflow-y-auto"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4 p-4 overflow-y-auto">
           <div className="grid gap-2">
             <Label htmlFor="item-name">Name *</Label>
-            <Input
-              id="item-name"
-              placeholder="e.g. Phở bò tái"
-              {...form.register('name')}
-            />
+            <Input id="item-name" placeholder="e.g. Phở bò tái" {...form.register('name')} />
             {form.formState.errors.name && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.name.message}
-              </p>
+              <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
             )}
           </div>
 
@@ -115,33 +92,21 @@ export function MenuItemMutateDrawer() {
                 {...form.register('price', { valueAsNumber: true })}
               />
               {form.formState.errors.price && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.price.message}
-                </p>
+                <p className="text-sm text-destructive">{form.formState.errors.price.message}</p>
               )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="item-stock">Stock *</Label>
-              <Input
-                id="item-stock"
-                type="number"
-                min={0}
-                {...form.register('stock', { valueAsNumber: true })}
-              />
+              <Input id="item-stock" type="number" min={0} {...form.register('stock', { valueAsNumber: true })} />
               {form.formState.errors.stock && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.stock.message}
-                </p>
+                <p className="text-sm text-destructive">{form.formState.errors.stock.message}</p>
               )}
             </div>
           </div>
 
           <div className="grid gap-2">
             <Label>Category *</Label>
-            <Select
-              defaultValue={form.getValues('categoryId')}
-              onValueChange={(v) => form.setValue('categoryId', v)}
-            >
+            <Select defaultValue={form.getValues('categoryId')} onValueChange={(v) => form.setValue('categoryId', v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
@@ -156,9 +121,7 @@ export function MenuItemMutateDrawer() {
               </SelectContent>
             </Select>
             {form.formState.errors.categoryId && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.categoryId.message}
-              </p>
+              <p className="text-sm text-destructive">{form.formState.errors.categoryId.message}</p>
             )}
           </div>
 
@@ -166,9 +129,7 @@ export function MenuItemMutateDrawer() {
             <Label>Status</Label>
             <Select
               defaultValue={form.getValues('status')}
-              onValueChange={(v) =>
-                form.setValue('status', v as 'available' | 'out_of_stock')
-              }
+              onValueChange={(v) => form.setValue('status', v as 'available' | 'out_of_stock')}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -191,9 +152,7 @@ export function MenuItemMutateDrawer() {
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
               Cancel
             </Button>
-            <Button type="submit">
-              {isEdit ? 'Save Changes' : 'Add Item'}
-            </Button>
+            <Button type="submit">{isEdit ? 'Save Changes' : 'Add Item'}</Button>
           </SheetFooter>
         </form>
       </SheetContent>

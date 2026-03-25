@@ -23,9 +23,8 @@ export function AreaMutateDialog() {
 
   const form = useForm<AreaMutateInput>({
     resolver: zodResolver(areaMutateSchema),
-    defaultValues: isEdit && currentArea
-      ? { name: currentArea.name, sortOrder: currentArea.sortOrder }
-      : { name: '', sortOrder: 0 },
+    defaultValues:
+      isEdit && currentArea ? { name: currentArea.name, sortOrder: currentArea.sortOrder } : { name: '', sortOrder: 0 },
   });
 
   function onSubmit(data: AreaMutateInput) {
@@ -48,33 +47,20 @@ export function AreaMutateDialog() {
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Area' : 'Add Area'}</DialogTitle>
           <DialogDescription>
-            {isEdit
-              ? 'Update the area details.'
-              : 'Create a new seating area for your restaurant.'}
+            {isEdit ? 'Update the area details.' : 'Create a new seating area for your restaurant.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="area-name">Name</Label>
-            <Input
-              id="area-name"
-              placeholder="e.g. Tầng trệt, Lầu 1, Sân vườn"
-              {...form.register('name')}
-            />
+            <Input id="area-name" placeholder="e.g. Tầng trệt, Lầu 1, Sân vườn" {...form.register('name')} />
             {form.formState.errors.name && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.name.message}
-              </p>
+              <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
             )}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="area-order">Sort Order</Label>
-            <Input
-              id="area-order"
-              type="number"
-              min={0}
-              {...form.register('sortOrder', { valueAsNumber: true })}
-            />
+            <Input id="area-order" type="number" min={0} {...form.register('sortOrder', { valueAsNumber: true })} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
