@@ -12,6 +12,8 @@ import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { Authorization } from '@common/decorators/authorizer.decorator';
 import { UserData } from '@common/decorators/userData.decorator';
 import { AuthorizedMetadata } from '@common/interfaces/tcp/authorizer';
+import { mapAuthorizedMetadataToAuthProfile } from '../mappers/auth-profile.mapper';
+
 @ApiTags('Authorizer')
 @Controller('authorizer')
 export class AuthorizerController {
@@ -45,23 +47,8 @@ export class AuthorizerController {
   @ApiOkResponse({ type: ResponseDto<AuthProfileResponseDto> })
   @ApiOperation({ summary: 'Get authenticated user profile' })
   me(@UserData() userData: AuthorizedMetadata): ResponseDto<AuthProfileResponseDto> {
-    const jwt = userData.jwt as Record<string, unknown> | undefined;
-    const realmAccess = (jwt?.['realm_access'] as Record<string, unknown> | undefined) || undefined;
-    const roles = Array.isArray(realmAccess?.['roles']) ? (realmAccess?.['roles'] as string[]) : [];
-
     return new ResponseDto<AuthProfileResponseDto>({
-      data: {
-        userId: userData.userId || '',
-        email: typeof jwt?.['email'] === 'string' ? (jwt['email'] as string) : undefined,
-        tenantId:
-          typeof jwt?.['tenant_id'] === 'string'
-            ? (jwt['tenant_id'] as string)
-            : typeof jwt?.['tenantId'] === 'string'
-              ? (jwt['tenantId'] as string)
-              : undefined,
-        roles,
-        permissions: userData.permissions as string[] | undefined,
-      },
+      data: mapAuthorizedMetadataToAuthProfile(userData),
       message: HTTP_MESSAGE.OK,
     });
   }

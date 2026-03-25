@@ -1,6 +1,7 @@
 'use client';
 
 import { Bell, LogOut, UserCircle2 } from 'lucide-react';
+import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -15,17 +16,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuthStore } from '@/lib/auth/auth-store';
 
 type AppTopbarProps = {
   title: string;
 };
 
 export function AppTopbar({ title }: AppTopbarProps) {
+  const { data: session } = useSession();
+  const profile = useAuthStore((state) => state.profile);
+
+  const displayName = session?.user?.name || profile?.email || 'QRTable User';
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="flex h-16 items-center gap-3 px-4 md:px-6">
         <SidebarTrigger variant="outline" />
-        <Separator orientation="vertical" className="!h-6 !self-center" />
+        <Separator orientation="vertical" className="h-6! self-center!" />
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{title}</p>
@@ -45,7 +52,7 @@ export function AppTopbar({ title }: AppTopbarProps) {
                 <AvatarImage src="https://github.com/shadcn.png" alt="Profile" />
                 <AvatarFallback>QT</AvatarFallback>
               </Avatar>
-              <span className="hidden text-sm font-medium md:inline">QRTable User</span>
+              <span className="hidden text-sm font-medium md:inline">{displayName}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
@@ -55,7 +62,11 @@ export function AppTopbar({ title }: AppTopbarProps) {
               <UserCircle2 />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                void signOut({ callbackUrl: '/login' });
+              }}
+            >
               <LogOut />
               Sign out
             </DropdownMenuItem>

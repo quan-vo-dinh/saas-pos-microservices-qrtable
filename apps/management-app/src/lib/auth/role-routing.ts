@@ -48,6 +48,27 @@ function normalizeRole(rawRole: string): AppRole | null {
   return null;
 }
 
+export function parseRoles(rawRoles?: unknown): AppRole[] {
+  if (!rawRoles) {
+    return [];
+  }
+
+  if (Array.isArray(rawRoles)) {
+    return rawRoles
+      .map((role) => (typeof role === 'string' ? normalizeRole(role) : null))
+      .filter((role): role is AppRole => role !== null);
+  }
+
+  if (typeof rawRoles === 'string') {
+    return rawRoles
+      .split(',')
+      .map((role) => normalizeRole(role))
+      .filter((role): role is AppRole => role !== null);
+  }
+
+  return [];
+}
+
 export function parseRolesFromCookie(rawValue?: string): AppRole[] {
   if (!rawValue) {
     return [];
@@ -59,19 +80,14 @@ export function parseRolesFromCookie(rawValue?: string): AppRole[] {
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) {
-        return parsed
-          .map((item) => (typeof item === 'string' ? normalizeRole(item) : null))
-          .filter((item): item is AppRole => item !== null);
+        return parseRoles(parsed);
       }
     } catch {
       return [];
     }
   }
 
-  return trimmed
-    .split(',')
-    .map((role) => normalizeRole(role))
-    .filter((role): role is AppRole => role !== null);
+  return parseRoles(trimmed);
 }
 
 export function getRoleHomeRoute(roles: AppRole[]): string {

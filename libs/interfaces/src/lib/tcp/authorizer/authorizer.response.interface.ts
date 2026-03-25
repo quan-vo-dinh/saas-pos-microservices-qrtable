@@ -1,13 +1,26 @@
 import { LoginResponseDto } from '../../gateway/authorizer';
 import { JwtPayload } from 'jsonwebtoken';
-import { PERMISSION } from '@common/constants/enum/role.enum';
+import { PERMISSION, ROLE } from '@common/constants/enum/role.enum';
 import { User } from '@common/schemas/user.schema';
+import { Role } from '@common/schemas/role.schema';
+
+export type KeycloakJwtPayload = JwtPayload & {
+  email?: string;
+  tenant_id?: string;
+  realm_access?: {
+    roles?: ROLE[];
+  };
+};
+
+export type PopulatedUser = Omit<User, 'roles'> & {
+  roles: Role[];
+};
 
 export class AuthorizedMetadata {
   userId: string | undefined;
-  user: User | undefined;
+  user: PopulatedUser | undefined;
   permissions: PERMISSION[] | undefined;
-  jwt: JwtPayload | undefined;
+  jwt: KeycloakJwtPayload | undefined;
 
   constructor(payload?: Partial<AuthorizedMetadata>) {
     Object.assign(this, payload);

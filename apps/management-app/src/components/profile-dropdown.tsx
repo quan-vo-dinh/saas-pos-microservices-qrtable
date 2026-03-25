@@ -1,6 +1,7 @@
 'use client';
 
 import { LogOut, Settings, User } from 'lucide-react';
+import { signOut, useSession } from 'next-auth/react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,8 +13,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAuthStore } from '@/lib/auth/auth-store';
 
 export function ProfileDropdown() {
+  const { data: session } = useSession();
+  const profile = useAuthStore((state) => state.profile);
+
+  const displayName = session?.user?.name || profile?.email || 'QRTable User';
+  const displayEmail = session?.user?.email || profile?.email || 'unknown@qrtable.local';
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -27,10 +35,8 @@ export function ProfileDropdown() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium leading-none">QRTable Owner</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              owner@qrtable.local
-            </p>
+            <p className="text-sm font-medium leading-none">{displayName}</p>
+            <p className="text-xs leading-none text-muted-foreground">{displayEmail}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -45,7 +51,11 @@ export function ProfileDropdown() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            void signOut({ callbackUrl: '/login' });
+          }}
+        >
           <LogOut className="mr-2 size-4" />
           Log out
         </DropdownMenuItem>

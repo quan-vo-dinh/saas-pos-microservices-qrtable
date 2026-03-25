@@ -1,26 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRoleHomeRoute, hasAccessToPath, parseRolesFromCookie } from '@/lib/auth/role-routing';
+import { auth } from '@/auth';
+import { getRoleHomeRoute, hasAccessToPath, parseRoles } from '@/lib/auth/role-routing';
 
-const AUTH_PATHS = ['/login', '/auth/callback'];
+const AUTH_PATHS = ['/login'];
 const PROTECTED_PREFIXES = ['/dashboard', '/pos', '/kds', '/admin'];
 
 function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-function buildLoginRedirect(request: NextRequest): URL {
+function buildSignInRedirect(request: NextRequest): URL {
   const url = new URL('/login', request.url);
   const nextPath = request.nextUrl.pathname + request.nextUrl.search;
-  if (nextPath && nextPath !== '/') {
-    url.searchParams.set('next', nextPath);
-  }
+  url.searchParams.set('next', nextPath || '/');
   return url;
 }
 
-export function middleware(request: NextRequest) {
+export default auth((request) => {
   const { pathname } = request.nextUrl;
-  const roleCookie = request.cookies.get('qrtable_roles')?.value ?? request.cookies.get('qrtable_role')?.value;
-  const roles = parseRolesFromCookie(roleCookie);
+  const roles = parseRoles(request.auth?.user?.roles);
 
   if (pathname === '/') {
     if (!roles.length) {
@@ -40,8 +38,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!roles.length) {
-    return NextResponse.redirect(buildLoginRedirect(request));
+  if (!request.auth) {
+    return NextResponse.redirect(buildSignInRedirect(request));
   }
 
   if (!hasAccessToPath(pathname, roles)) {
@@ -49,7 +47,7 @@ export function middleware(request: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)'],

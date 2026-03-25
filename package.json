@@ -14,7 +14,9 @@
     "dev:some": "pnpm dev --projects",
     "dev:bff-auth": "pnpm dev --projects=bff,authorizer",
     "dev:bff-invoice": "pnpm dev --projects=bff,invoice",
-    "dev:bff-product": "pnpm dev --projects=bff,product"
+    "dev:bff-product": "pnpm dev --projects=bff,product",
+    "theme:build": "pnpm --dir apps/keycloak-theme run build-keycloak-theme",
+    "theme:dev": "pnpm --dir apps/keycloak-theme run dev"
   },
   "private": true,
   "dependencies": {

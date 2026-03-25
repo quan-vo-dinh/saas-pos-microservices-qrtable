@@ -259,6 +259,27 @@ Bài 105-110: Khởi tạo TCP Microservice mới, Puppeteer, Cloudinary upload
    → <QRCodeView />, <StatusBadge />, <DataTable />
 ```
 
+### Step 1.25 — 🔐 Tích hợp Auth Frontend & Custom Keycloak UI (2-3 ngày)
+
+> **Mục tiêu:** Xây dựng hệ thống bảo vệ Route (Navigation Guard) cho Management App và đồng bộ giao diện đăng nhập Keycloak với Design System của QRTable.
+
+```
+1. Thiết lập Auth Context / Session Provider cho Next.js (Management App):
+   → Sử dụng NextAuth.js hoặc Keycloak JS Adapter để quản lý JWT Token trên Frontend.
+   → Cấu hình Next.js Middleware chặn các Route /dashboard, /pos, /kds nếu chưa đăng nhập.
+   → Tạo logic tự động Redirect về Keycloak Login Page nếu Token hết hạn (401).
+   → Cấu hình Zustand store để lưu trữ thông tin UserProfile & Role, phục vụ việc ẩn/hiện các UI control.
+
+2. Custom UI Theme cho Keycloak với Keycloakify:
+   → Khởi tạo project Keycloakify dùng React + Tailwind CSS + Shadcn UI.
+   → Xây dựng UI Login/Register/Forgot Password theo design system của QRTable (Logo, Typography, Brand Colors).
+   → Build dự án thành file .jar và deploy vào thư mục `themes/` của config Docker Keycloak hiện tại.
+
+3. Verify:
+   → Vào thử `/dashboard` lúc chưa có token → văng ra trang Login Keycloak giao diện mới.
+   → Đăng nhập tài khoản STAFF → chuyển về `/pos` (có truyền bearer token trên header).
+```
+
 ### Step 1.3 — 🎨 Mock UI: Customer PWA Menu (2-3 ngày)
 
 > **Nhắc nhở Frontend & Agent:** Customer PWA cũng ưu tiên hệ sinh thái Shadcn UI (các mobile sheet, drawer, button, avatar) và Tailwind MỚI cho giao diện app-like.

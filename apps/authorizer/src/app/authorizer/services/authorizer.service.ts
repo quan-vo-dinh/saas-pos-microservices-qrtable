@@ -1,11 +1,15 @@
-import { AuthorizeResponse, LoginTcpRequest } from '@common/interfaces/tcp/authorizer';
+import {
+  AuthorizeResponse,
+  KeycloakJwtPayload,
+  LoginTcpRequest,
+  PopulatedUser,
+} from '@common/interfaces/tcp/authorizer';
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { KeycloakHttpService } from '../../keycloak/services/keycloak-http.service';
-import jwt, { Jwt, JwtPayload } from 'jsonwebtoken';
+import jwt, { Jwt } from 'jsonwebtoken';
 import jwksRsa, { JwksClient } from 'jwks-rsa';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom, map } from 'rxjs';
-import { Role } from '@common/schemas/role.schema';
 import { ClientGrpc } from '@nestjs/microservices';
 import { GRPC_SERVICES } from '@common/configuration/grpc.config';
 import { UpsertIdentityRequest, UserAccessService } from '@common/interfaces/grpc/user-access';
@@ -57,13 +61,13 @@ export class AuthorizerService {
       throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
     }
 
-    let payload: JwtPayload;
+    let payload: KeycloakJwtPayload;
 
     try {
       const key = await this.jwksClient.getSigningKey(decoded.header.kid);
 
       const publicKey = key.getPublicKey();
-      payload = jwt.verify(token, publicKey, { algorithms: ['RS256'] }) as JwtPayload;
+      payload = jwt.verify(token, publicKey, { algorithms: ['RS256'] }) as KeycloakJwtPayload;
       this.logger.debug({ payload });
     } catch (error) {
       this.logger.error({ error, processId });
@@ -87,19 +91,19 @@ export class AuthorizerService {
     }
 
     const keycloakRoles = this.extractRealmRoles(payload);
-    const isRoleMappingValid = this.validateRoleMapping(keycloakRoles, user.roles as unknown as Role[] | undefined);
+    const isRoleMappingValid = this.validateRoleMapping(keycloakRoles, user.roles);
 
     if (!isRoleMappingValid) {
       this.logger.warn({
         processId,
         userId,
         keycloakRoles,
-        internalRoles: (user.roles as unknown as Role[] | undefined)?.map((role) => role?.name),
+        internalRoles: user.roles?.map((role) => role?.name),
       });
       throw new UnauthorizedException(AUTH_ERROR_CODE.ROLE_MAPPING_MISMATCH);
     }
 
-    const permissions = this.collectPermissions(user.roles as unknown as Role[] | undefined);
+    const permissions = this.collectPermissions(user.roles);
 
     return {
       valid: true,
@@ -112,7 +116,7 @@ export class AuthorizerService {
     };
   }
 
-  private collectPermissions(roles?: Role[]): PERMISSION[] {
+  private collectPermissions(roles?: PopulatedUser['roles']): PERMISSION[] {
     if (!Array.isArray(roles) || roles.length === 0) {
       return [];
     }
@@ -122,23 +126,11 @@ export class AuthorizerService {
       .filter((permission): permission is PERMISSION => typeof permission === 'string');
   }
 
-  private extractRealmRoles(payload: JwtPayload): string[] {
-    const realmAccess = payload['realm_access'] as Record<string, unknown> | undefined;
-
-    if (!realmAccess) {
-      return [];
-    }
-
-    const roles = realmAccess['roles'];
-
-    if (!Array.isArray(roles)) {
-      return [];
-    }
-
-    return roles.filter((role): role is string => typeof role === 'string');
+  private extractRealmRoles(payload: KeycloakJwtPayload): string[] {
+    return payload.realm_access?.roles ?? [];
   }
 
-  private validateRoleMapping(keycloakRoles: string[], internalRoles?: Role[]): boolean {
+  private validateRoleMapping(keycloakRoles: string[], internalRoles?: PopulatedUser['roles']): boolean {
     const appRoles = new Set(Object.values(ROLE).map((role) => this.normalizeRoleName(role)));
 
     const keycloakAppRoles = new Set(
@@ -184,16 +176,26 @@ export class AuthorizerService {
     return firstValueFrom(this.userAccessService.getByUserId({ processId, userId }).pipe(map((data) => data.data)));
   }
 
-  private async autoProvisionFromToken(payload: JwtPayload, processId: string) {
-    const userId = typeof payload.sub === 'string' ? payload.sub : undefined;
-    const email = typeof payload.email === 'string' ? payload.email : undefined;
+  private async autoProvisionFromToken(payload: KeycloakJwtPayload, processId: string) {
+    const userId = payload.sub;
+    const email = payload.email;
 
     if (!userId || !email) {
       throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
     }
 
-    const firstName = this.pickFirstString(payload, ['given_name', 'first_name']);
-    const lastName = this.pickFirstString(payload, ['family_name', 'last_name']);
+    const firstName =
+      typeof payload['given_name'] === 'string'
+        ? payload['given_name']
+        : typeof payload['first_name'] === 'string'
+          ? payload['first_name']
+          : undefined;
+    const lastName =
+      typeof payload['family_name'] === 'string'
+        ? payload['family_name']
+        : typeof payload['last_name'] === 'string'
+          ? payload['last_name']
+          : undefined;
     const roleNames = this.extractRealmRoles(payload);
 
     const upsertPayload: UpsertIdentityRequest = {
@@ -206,17 +208,6 @@ export class AuthorizerService {
     };
 
     return firstValueFrom(this.userAccessService.upsertByIdentity(upsertPayload).pipe(map((data) => data.data)));
-  }
-
-  private pickFirstString(payload: JwtPayload, keys: string[]): string | undefined {
-    for (const key of keys) {
-      const value = payload[key];
-      if (typeof value === 'string' && value.trim()) {
-        return value;
-      }
-    }
-
-    return undefined;
   }
 
   private isAutoProvisionOnFirstLoginEnabled(): boolean {
