@@ -1,12 +1,5 @@
 import { create } from 'zustand';
-
-type UserProfile = {
-  userId: string;
-  email?: string;
-  tenantId?: string;
-  roles: string[];
-  permissions: string[];
-};
+import type { UserProfile } from '@einvoice/types';
 
 type AuthStore = {
   profile: UserProfile | null;

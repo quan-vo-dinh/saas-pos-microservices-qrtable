@@ -1,11 +1,18 @@
 import { z } from 'zod';
+import type {
+  CategoryStatus,
+  MenuItemStatus,
+  Category as CategoryType,
+  MenuItem as MenuItemType,
+} from '@einvoice/types';
+
+// Re-export domain types for convenience
+export type { CategoryStatus, MenuItemStatus, CategoryType, MenuItemType };
 
 // ─── Enums ──────────────────────────────────────────
 export const categoryStatusEnum = z.enum(['active', 'inactive']);
-export type CategoryStatus = z.infer<typeof categoryStatusEnum>;
 
 export const menuItemStatusEnum = z.enum(['available', 'out_of_stock']);
-export type MenuItemStatus = z.infer<typeof menuItemStatusEnum>;
 
 // ─── Category ───────────────────────────────────────
 export const categorySchema = z.object({

@@ -10,6 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import type { SidebarData } from '@/components/layout/types';
+import { ROUTES } from '@/constants/routes';
 
 export const sidebarData: SidebarData = {
   appName: 'QRTable Management',
@@ -20,32 +21,32 @@ export const sidebarData: SidebarData = {
       items: [
         {
           title: 'Overview',
-          url: '/dashboard',
+          url: ROUTES.DASHBOARD,
           icon: LayoutDashboard,
         },
         {
           title: 'Menu',
-          url: '/dashboard/menu',
+          url: ROUTES.MENU,
           icon: Store,
         },
         {
           title: 'Tables',
-          url: '/dashboard/tables',
+          url: ROUTES.TABLES,
           icon: Table,
         },
         {
           title: 'Staff',
-          url: '/dashboard/staff',
+          url: ROUTES.STAFF,
           icon: Users,
         },
         {
           title: 'Orders',
-          url: '/dashboard/orders',
+          url: ROUTES.ORDERS,
           icon: ClipboardList,
         },
         {
           title: 'Subscription',
-          url: '/dashboard/subscription',
+          url: ROUTES.SUBSCRIPTION,
           icon: Building2,
         },
       ],
@@ -59,15 +60,15 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: 'Live Orders',
-              url: '/pos',
+              url: ROUTES.POS,
             },
             {
               title: 'POS Tables',
-              url: '/pos/tables',
+              url: ROUTES.POS_TABLES,
             },
             {
               title: 'POS Payment',
-              url: '/pos/payment',
+              url: ROUTES.POS_PAYMENT,
             },
           ],
         },
@@ -77,11 +78,11 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: 'Kitchen Board',
-              url: '/kds/kitchen',
+              url: ROUTES.KDS_KITCHEN,
             },
             {
               title: 'Bar Board',
-              url: '/kds/bar',
+              url: ROUTES.KDS_BAR,
             },
           ],
         },
@@ -96,19 +97,19 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: 'Admin Home',
-              url: '/admin',
+              url: ROUTES.ADMIN,
             },
             {
               title: 'Tenants',
-              url: '/admin/tenants',
+              url: ROUTES.ADMIN_TENANTS,
             },
             {
               title: 'Plans',
-              url: '/admin/plans',
+              url: ROUTES.ADMIN_PLANS,
             },
             {
               title: 'Analytics',
-              url: '/admin/analytics',
+              url: ROUTES.ADMIN_ANALYTICS,
             },
           ],
         },

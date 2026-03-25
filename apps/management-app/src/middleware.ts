@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getRoleHomeRoute, hasAccessToPath, parseRoles } from '@/lib/auth/role-routing';
-
-const AUTH_PATHS = ['/login'];
-const PROTECTED_PREFIXES = ['/dashboard', '/pos', '/kds', '/admin'];
+import { PROTECTED_PREFIXES, AUTH_PATHS, ROUTES } from '@/constants/routes';
 
 function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 function buildSignInRedirect(request: NextRequest): URL {
-  const url = new URL('/login', request.url);
+  const url = new URL(ROUTES.LOGIN, request.url);
   const nextPath = request.nextUrl.pathname + request.nextUrl.search;
   url.searchParams.set('next', nextPath || '/');
   return url;
@@ -22,7 +20,7 @@ export default auth((request) => {
 
   if (pathname === '/') {
     if (!roles.length) {
-      return NextResponse.redirect(new URL('/login', request.url));
+      return NextResponse.redirect(new URL(ROUTES.LOGIN, request.url));
     }
     return NextResponse.redirect(new URL(getRoleHomeRoute(roles), request.url));
   }

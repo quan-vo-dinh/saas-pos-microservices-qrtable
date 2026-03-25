@@ -9,6 +9,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: workspaceRoot,
   },
+  transpilePackages: [
+    '@einvoice/types',
+    '@einvoice/shared-constants',
+    '@einvoice/frontend-ui',
+    '@einvoice/frontend-hooks',
+    '@einvoice/frontend-utils',
+  ],
 };
 
 export default nextConfig;

@@ -1,44 +1,30 @@
-import { QrCode, ReceiptText, Soup, WalletCards } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-
-const NAV_ITEMS = [
-  {
-    to: '/landing',
-    label: 'Landing',
-    icon: QrCode,
-  },
-  {
-    to: '/menu',
-    label: 'Menu',
-    icon: Soup,
-  },
-  {
-    to: '/order-tracking',
-    label: 'Tracking',
-    icon: ReceiptText,
-  },
-  {
-    to: '/request-payment',
-    label: 'Payment',
-    icon: WalletCards,
-  },
-] as const;
+import { NAV_ITEMS } from '@/constants/nav-items';
+import { useSession } from '@/features/session/context/session-provider';
 
 export function MobileHeader() {
+  const { session } = useSession();
+
+  const displayName = session?.restaurantName ?? 'QR Table';
+  const displayTable = session?.tableName ?? '—';
+  const displaySession = session?.sessionId
+    ? `${session.sessionId.slice(0, 8)}…`
+    : 'No active session';
+
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex w-full max-w-screen-sm flex-col gap-4 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">QR Table Session</p>
-            <h1 className="mt-1 text-lg font-semibold tracking-tight text-foreground">Demo Coffee House</h1>
-            <p className="mt-1 text-xs text-muted-foreground">Session: x-session-id-demo</p>
+            <h1 className="mt-1 text-lg font-semibold tracking-tight text-foreground">{displayName}</h1>
+            <p className="mt-1 text-xs text-muted-foreground">Session: {displaySession}</p>
           </div>
 
           <div className="rounded-lg border border-border bg-card px-3 py-2 text-right">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Current Table</p>
-            <p className="text-sm font-semibold text-card-foreground">A-12</p>
+            <p className="text-sm font-semibold text-card-foreground">{displayTable}</p>
           </div>
         </div>
 

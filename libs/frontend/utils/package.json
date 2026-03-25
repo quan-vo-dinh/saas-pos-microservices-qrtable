@@ -2,10 +2,13 @@
   "name": "@einvoice/frontend-utils",
   "version": "0.0.1",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "dependencies": {
-    "tslib": "^2.3.0"
+    "@einvoice/types": "0.0.1",
+    "tslib": "^2.3.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.5.0"
   }
 }

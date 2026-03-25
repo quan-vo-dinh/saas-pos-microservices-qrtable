@@ -1,8 +1,11 @@
 import { z } from 'zod';
+import type { TableStatus, Area as AreaType, RestaurantTable as TableType } from '@einvoice/types';
+
+// Re-export domain types for convenience
+export type { TableStatus, AreaType, TableType };
 
 // ─── Enums ──────────────────────────────────────────
 export const tableStatusEnum = z.enum(['available', 'occupied', 'billing', 'cleaning']);
-export type TableStatus = z.infer<typeof tableStatusEnum>;
 
 // ─── Area ───────────────────────────────────────────
 export const areaSchema = z.object({

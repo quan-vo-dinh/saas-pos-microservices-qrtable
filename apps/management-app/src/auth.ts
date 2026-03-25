@@ -3,6 +3,8 @@ import Keycloak from 'next-auth/providers/keycloak';
 import { type JWT } from 'next-auth/jwt';
 import { parseRoles } from '@/lib/auth/role-routing';
 import { fetchAuthorizerMe } from '@/lib/auth/bff-server';
+import { ROUTES } from '@/constants/routes';
+import { TOKEN_REFRESH_BUFFER_MS } from '@/constants/api';
 
 type JwtClaims = {
   email?: string;
@@ -144,7 +146,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   pages: {
-    signIn: '/login',
+    signIn: ROUTES.LOGIN,
   },
   session: {
     strategy: 'jwt',
@@ -170,7 +172,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       }
 
-      if (typeof token.expiresAt === 'number' && Date.now() < token.expiresAt - 60_000) {
+      if (typeof token.expiresAt === 'number' && Date.now() < token.expiresAt - TOKEN_REFRESH_BUFFER_MS) {
         return token;
       }
 

@@ -1,16 +1,9 @@
-const DEFAULT_BFF_URL = 'http://localhost:3300/api/v1';
-
-type AuthorizerMeResponse = {
-  userId: string;
-  email?: string;
-  tenantId?: string;
-  roles?: string[];
-  permissions?: string[];
-};
+import type { UserProfile } from '@einvoice/types';
+import { API_CONFIG } from '@/constants/api';
 
 function normalizeBaseUrl(rawUrl?: string): string {
   if (!rawUrl) {
-    return DEFAULT_BFF_URL;
+    return API_CONFIG.DEFAULT_BFF_URL;
   }
 
   return rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
@@ -25,7 +18,6 @@ function unwrapResponse<T>(payload: unknown): T | null {
     return null;
   }
 
-  // Accept already-unwrapped payloads for compatibility with non-BFF integrations.
   const directPayload = payload as Record<string, unknown>;
   if ('userId' in directPayload) {
     return payload as T;
@@ -39,7 +31,7 @@ function unwrapResponse<T>(payload: unknown): T | null {
   return maybeData as T;
 }
 
-export async function fetchAuthorizerMe(accessToken: string, tenantId?: string): Promise<AuthorizerMeResponse | null> {
+export async function fetchAuthorizerMe(accessToken: string, tenantId?: string): Promise<UserProfile | null> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
   };
@@ -48,7 +40,7 @@ export async function fetchAuthorizerMe(accessToken: string, tenantId?: string):
     headers['x-tenant-id'] = tenantId;
   }
 
-  const response = await fetch(`${getBffBaseUrl()}/authorizer/me`, {
+  const response = await fetch(`${getBffBaseUrl()}${API_CONFIG.ENDPOINTS.AUTHORIZER_ME}`, {
     method: 'GET',
     headers,
     cache: 'no-store',
@@ -59,5 +51,5 @@ export async function fetchAuthorizerMe(accessToken: string, tenantId?: string):
   }
 
   const payload = (await response.json()) as unknown;
-  return unwrapResponse<AuthorizerMeResponse>(payload);
+  return unwrapResponse<UserProfile>(payload);
 }

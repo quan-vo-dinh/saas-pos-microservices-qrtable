@@ -1,35 +1,37 @@
-export const APP_ROLES = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'WAITER', 'CHEF', 'BARISTA'] as const;
+import { APP_ROLES, ROLE_PRIORITY, type AppRole } from '@einvoice/shared-constants';
+import { ROUTES } from '@/constants/routes';
 
-export type AppRole = (typeof APP_ROLES)[number];
+export type { AppRole };
+export { APP_ROLES };
 
 const ROLE_HOME_ROUTE: Record<AppRole, string> = {
-  SUPER_ADMIN: '/admin',
-  OWNER: '/dashboard',
-  MANAGER: '/dashboard',
-  WAITER: '/pos',
-  CHEF: '/kds/kitchen',
-  BARISTA: '/kds/bar',
+  SUPER_ADMIN: ROUTES.ADMIN,
+  OWNER: ROUTES.DASHBOARD,
+  MANAGER: ROUTES.DASHBOARD,
+  WAITER: ROUTES.POS,
+  CHEF: ROUTES.KDS_KITCHEN,
+  BARISTA: ROUTES.KDS_BAR,
 };
 
 const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] }> = [
   {
-    prefix: '/admin',
+    prefix: ROUTES.ADMIN,
     roles: ['SUPER_ADMIN'],
   },
   {
-    prefix: '/dashboard',
+    prefix: ROUTES.DASHBOARD,
     roles: ['OWNER', 'MANAGER'],
   },
   {
-    prefix: '/pos',
+    prefix: ROUTES.POS,
     roles: ['OWNER', 'MANAGER', 'WAITER'],
   },
   {
-    prefix: '/kds/kitchen',
+    prefix: ROUTES.KDS_KITCHEN,
     roles: ['OWNER', 'MANAGER', 'CHEF'],
   },
   {
-    prefix: '/kds/bar',
+    prefix: ROUTES.KDS_BAR,
     roles: ['OWNER', 'MANAGER', 'BARISTA'],
   },
   {
@@ -38,7 +40,7 @@ const ROUTE_ACCESS: Array<{ prefix: string; roles: AppRole[] }> = [
   },
 ];
 
-const ROLE_PRIORITY: AppRole[] = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'WAITER', 'CHEF', 'BARISTA'];
+const _ROLE_PRIORITY = ROLE_PRIORITY;
 
 function normalizeRole(rawRole: string): AppRole | null {
   const normalized = rawRole.trim().toUpperCase();
@@ -91,13 +93,13 @@ export function parseRolesFromCookie(rawValue?: string): AppRole[] {
 }
 
 export function getRoleHomeRoute(roles: AppRole[]): string {
-  for (const role of ROLE_PRIORITY) {
+  for (const role of _ROLE_PRIORITY) {
     if (roles.includes(role)) {
       return ROLE_HOME_ROUTE[role];
     }
   }
 
-  return '/login';
+  return ROUTES.LOGIN;
 }
 
 export function hasAccessToPath(pathname: string, roles: AppRole[]): boolean {
