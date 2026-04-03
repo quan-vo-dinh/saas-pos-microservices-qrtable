@@ -25,6 +25,10 @@ message AuthorizeResponse {
   optional AuthorizedMetadata metadata = 2;
 }
 
+message RealmAccess {
+  repeated string roles = 1;
+}
+
 message JWTPayload {
   string iss = 1;
   string aud = 2;
@@ -35,6 +39,11 @@ message JWTPayload {
   string sid = 7;
   string nonce = 8;
   bool isExpired = 9;
+  optional string email = 10;
+  optional string tenant_id = 11;
+  optional RealmAccess realm_access = 12;
+  optional string given_name = 13;
+  optional string family_name = 14;
 }
 
 message AuthorizedMetadata {

@@ -26,119 +26,133 @@
 
 Hệ thống QRTable sử dụng 2 mô hình xác thực độc lập phục vụ 2 actor khác nhau:
 
-#### Luồng 1: JWT (Staff/Owner/Admin) — OAuth 2.0 → Auth.js → BFF
-
-```mermaid
-graph TD
-    User["👤 User<br/>(Browser)"] -->|1. Click Sign In| App["📱 Management App<br/>(Next.js)"]
-    App -->|2. Redirect| KC["🔐 Keycloak<br/>(Identity Provider)"]
-    KC -->|3. Login Form| User
-    User -->|4. Enter Credentials| KC
-    KC -->|5. Verify Password<br/>Issue JWT| App
-    App -->|6. Store in httpOnly Cookie<br/>Auth.js Session| App
-    App -->|7. Middleware Check<br/>Extract Auth| App
-
-    App -->|8. API Call<br/>GET /api/v1/catalog<br/>Header: Authorization: Bearer JWT| BFF["🚪 BFF Service<br/>(API Gateway)"]
-
-    BFF -->|9a. Extract Token<br/>9b. Check Redis Cache| Redis["💾 Redis<br/>(Token Cache)"]
-    Redis -->|Cache HIT/MISS| BFF
-
-    BFF -->|9c. Call gRPC<br/>verifyUserToken| Auth["🔐 Auth Service<br/>(Authorizer)"]
-    Auth -->|Fetch JWKS<br/>Verify RS256| KC
-    BC -->|Return User Data| BFF
-
-    BFF -->|10. TenantGuard<br/>Extract tenant_id| BFF
-    BFF -->|11. RoleGuard<br/>Check Permissions| BFF
-    BFF -->|12. TCP Call| Svc["📋 Catalog Service<br/>(Business Logic)"]
-
-    Svc -->|13. Auto-filter<br/>WHERE tenant_id = ?| DB["🗄️ PostgreSQL<br/>+ Redis"]
-    DB -->|14. Return Data| Svc
-    Svc -->|15. Response JSON| BFF
-    BFF -->|16. Response HTTP 200| App
-    App -->|17. Render UI<br/>Cache in Zustand| User
-
-    App -->|⏰ After 55 min<br/>Token expires in 60 min| KC2["🔄 Refresh Token<br/>Silent (Auto)"]
-    KC2 -->|Auth.js jwt callback<br/>grant_type: refresh_token| KC
-    KC -->|New access_token| App
 ```
+┌───────────────────────────────────────────────────────────────────────────┐
+│                    LUỒNG 1: JWT (STAFF/OWNER/ADMIN)                       │
+│                                                                           │
+│  ┌─────────────┐        ┌─────────────┐      ┌──────────────┐            │
+│  │  Frontend   │        │   Keycloak  │      │     BFF      │            │
+│  │(Management) │        │   (Identity │      │  (API GW)    │            │
+│  └──────┬──────┘        │   Provider) │      └──────┬───────┘            │
+│         │               └──────┬──────┘             │                    │
+│         │                      │                   │                    │
+│  1. User clicks "Login"        │                   │                    │
+│         │                      │                   │                    │
+│  2. Redirect to Keycloak       │                   │                    │
+│         ├─────────────────────►│                   │                    │
+│         │                      │                   │                    │
+│  3. Enter credentials          │                   │                    │
+│         │   (username/password)│                   │                    │
+│         │◄─ verify ─ issue JWT │                   │                    │
+│         │     (RS256 signed)   │                   │                    │
+│         │                      │                   │                    │
+│  4. Redirect +JWT to app       │                   │                    │
+│         ├─────────────────────────────────┐        │                    │
+│         │                      │          │        │                    │
+│  5. Auth.js stores JWT         │          │        │                    │
+│         │   (httpOnly cookie)  │          │        │                    │
+│         │                      │          │        │                    │
+│  6. Next.js Middleware checks  │          │        │                    │
+│         │      auth via session│          │        │                    │
+│         │                      │          │        │                    │
+│  7. Make API call + JWT        │          │        │                    │
+│         │                      │          │        │                    │
+│         ├──────────────────────────────────┐       │                    │
+│         │      GET /api/catalog            │       │                    │
+│         │      Authorization: Bearer JWT   │       │                    │
+│         │                      │           │       │                    │
+│         │                      │           ├─────►│ UserGuard:         │
+│         │                      │           │      │ 1. Extract token   │
+│         │                      │           │      │ 2. Check Redis     │
+│         │                      │           │      │    cache           │
+│         │                      │           │      │ 3. If MISS:        │
+│         │                      │           │      │    call Auth Svc   │
+│         │                      │           │      │ 4. gRPC to        │
+│         │                      │           │      │    Keycloak JWKS   │
+│         │                      │           │      │ 5. Verify sig      │
+│         │                      │           │      │    Cache result    │
+│         │                      │           │      │ 6. Return user     │
+│         │                      │           │      │    data            │
+│         │                      │           │◄─────┤                    │
+│         │                      │           │      │ TenantGuard:       │
+│         │                      │           │      │ Extract tenant_id  │
+│         │                      │           │      │ from JWT claims    │
+│         │                      │           │      │                    │
+│         │                      │           │      │ RoleGuard:         │
+│         │                      │           │      │ Match route        │
+│         │                      │           │      │ permission         │
+│         │                      │           │      │                    │
+│         │                      │           │      │ →Controller/Svc    │
+│         │                      │           │      │ →Query filtered    │
+│         │                      │           │      │  by tenant_id      │
+│         │                      │           │      │                    │
+│  Response with tenant-isolated data       │      │                    │
+│         │◄──────────────────────────────────┤     │                    │
+│         │                      │               │                    │
+│  Cache in browser              │               │                    │
+│   + Zustand store             │               │                    │
+└───────┼──────────────────────────────────────────────────────────────┘
+        │
+        │ Token expires in 1 hour
+        │
+   ┌────▼──────────────────────────────────────────────────────────────┐
+   │  8. Refresh Token (Auto / Silent)                                 │
+   │                                                                  │
+   │  Auth.js jwt() callback:                                         │
+   │  IF current_time > (exp - 5min buffer) THEN:                    │
+   │    → POST to Keycloak token endpoint                            │
+   │    → Send refresh_token (= grant_type: refresh_token)           │
+   │    → Receive new access_token + new refresh_token              │
+   │    → Update JWT session with new tokens                        │
+   │    → Store in httpOnly cookie                                  │
+   │                                                                  │
+   └─────────────────────────────────────────────────────────────────┘
 
-**Các bước chính:**
 
-1. User click "Sign In" → redirect Keycloak
-2. Keycloak cấp JWT (RS256 signed)
-3. Auth.js lưu JWT vào httpOnly cookie (không thể access từ JS)
-4. Middleware kiểm tra auth → RoleGuard
-5. BFF verify JWT qua gRPC → Auth Service
-6. Auth Service verify signature qua Keycloak JWKS (cache 30 min)
-7. TenantGuard inject tenant_id vào request
-8. Service auto-filter queries WHERE tenant_id = ?
-9. AutoRefresh: Nếu token expires trong 5 phút → tự động refresh
-
----
-
-#### Luồng 2: Session (Customer/Guest) — HMAC Token → Anonymous
-
-```mermaid
-graph TD
-    Cust["👥 Customer<br/>(QR Scan)"] -->|1. Scan QR Code| PWA["📱 Customer PWA<br/>(Vite + React)"]
-
-    PWA -->|URL:<br/>https://slug.qrtable.io<br/>?table=T123&token=HMAC<br/>| PWA
-
-    PWA -->|2. Generate UUID<br/>sessionId = UUID()| PWA
-    PWA -->|3. Store in localStorage<br/>sessionId, tableId| Browser["🌐 Browser<br/>(localStorage)"]
-
-    Cust -->|4. Browse Menu| PWA
-    PWA -->|5. GET /api/v1/catalog<br/>Cookie: sessionId=UUID| BFF["🚪 BFF Service<br/>(API Gateway)"]
-
-    BFF -->|6a. SessionGuard<br/>Extract HMAC token<br/>6b. Validate HMAC<br/>verify(tableId, token, secret)| BFF
-
-    BFF -->|7. Resolve tenant_id<br/>from table mapping| SaaS["🏪 SaaS Service<br/>(Tenant Lookup)"]
-    SaaS -->|Return tenant_id| BFF
-
-    BFF -->|8. Get/Create Session<br/>session:{tid}:{uuid}| Redis["💾 Redis<br/>(Session Store)"]
-    Redis -->|TTL: 2 hours| Redis
-
-    BFF -->|9. TenantGuard<br/>Verify consistency| BFF
-    BFF -->|⚠️ NO RoleGuard<br/>Customer is Anonymous| BFF
-
-    BFF -->|10. Return Menu| PWA
-    PWA -->|11. Render Menu| Cust
-
-    Cust -->|12. Add to Cart| PWA
-    PWA -->|13. Update localStorage| Browser
-
-    Cust -->|14. Click Order| PWA
-    PWA -->|15. POST /api/v1/orders<br/>Cookie: sessionId=UUID<br/>?table=T123&token=HMAC<br/>Body: {items, total}| BFF
-
-    BFF -->|16. Validate HMAC (again)| BFF
-    BFF -->|17. Get Session from Redis| Redis
-    BFF -->|18. Check table_id match| BFF
-
-    BFF -->|19. TCP Call| Order["🍽️ Order Service"]
-    Order -->|20. BEGIN TRANSACTION<br/>Stock Lock| DB["🗄️ PostgreSQL<br/>"]
-    DB -->|21. SELECT ... FOR UPDATE<br/>Check stock >= qty| DB
-    DB -->|22. Deduct stock<br/>Insert order_items<br/>COMMIT| DB
-
-    Order -->|23. Emit Kafka<br/>order.created| Kafka["📨 Kafka<br/>(Event Stream)"]
-
-    BFF -->|24. WebSocket Push<br/>order.status_changed| PWA
-    PWA -->|25. Real-time Update| Cust
-
-    Note over PWA,BFF: ⚠️ NO KEYCLOAK<br/>Zero-friction UX<br/>Session TTL: 2 hours<br/>Idle Timeout: 30 min
+┌───────────────────────────────────────────────────────────────────────────┐
+│              LUỒNG 2: SESSION (CUSTOMER/GUEST - ANONYMOUS)                │
+│                                                                           │
+│  ┌─────────────┐                              ┌──────────────┐            │
+│  │  Customer   │                              │     BFF      │            │
+│  │   PWA       │                              │  (API GW)    │            │
+│  └──────┬──────┘                              └──────┬───────┘            │
+│         │                                           │                    │
+│  1. Scan QR Code                                    │                    │
+│         │                                           │                    │
+│  https://{slug}.qrtable.io?table=T123&token=HMAC   │                    │
+│         │                                           │                    │
+│  2. Browser creates session_id (UUID)              │                    │
+│         │    ├─ Store in localStorage             │                    │
+│         │    └─ Send in Cookie                    │                    │
+│         │                                           │                    │
+│  3. First request with HMAC token                  │                    │
+│         │                                           │                    │
+│         ├──────────────────────────────────────────►│SessionGuard:       │
+│         │  POST /orders                            │1. Extract token    │
+│         │  URL: ?table=T123&token=HMAC             │2. Validate HMAC:   │
+│         │  Cookie: session_id=UUID                │   verify(table_id, │
+│         │                                          │   token, secret)   │
+│         │                                          │3. Resolve          │
+│         │                                          │   tenant_id from   │
+│         │                                          │   table mapping    │
+│         │                                          │4. Get/create       │
+│         │                                          │   session in Redis:│
+│         │                                          │   session:{tid}:{s}│
+│         │                                          │5. Check session    │
+│         │                                          │   table_id matches │
+│         │                                          │6. Return ctx with  │
+│         │                                          │   sessionId,       │
+│         │                                          │   tenantId, tableId│
+│         │                                          │                    │
+│         │◄─────────────────────────────────────────┤                    │
+│  Response                                          │ TenantGuard:       │
+│         │                                          │ Verify tenant      │
+│         │                                          │ consistency        │
+│         │                                          │                    │
+│  ⚠ NO KEYCLOAK — Khách hàng không cần login       │                    │
+│    Zero-friction UX                               │                    │
+└────────────────────────────────────────────────────────────────────────┘
 ```
-
-**Các bước chính:**
-
-1. Customer scan QR → PWA load
-2. Extract tableId + HMAC từ URL
-3. Browser tạo sessionId (UUID) → store localStorage
-4. SessionGuard validate HMAC signature
-5. Resolve tenant_id từ table mapping
-6. Create session in Redis (2 hour lifetime, 30 min idle)
-7. ⚠️ NO Keycloak (zero-friction UX)
-8. Query auto-filter WHERE tenant_id = ?
-9. Stock validation: SELECT ... FOR UPDATE (pessimistic lock)
-10. Real-time WebSocket update via Kafka
 
 ### 1.2 Diagram Tuần tự Chi tiết (Sequence Diagram)
 

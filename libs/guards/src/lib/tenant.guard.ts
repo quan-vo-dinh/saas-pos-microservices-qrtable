@@ -2,7 +2,7 @@ import { MetadataKey } from '@common/constants/common.constant';
 import { SESSION_POLICY, TENANT_POLICY } from '@common/constants/request-context.constant';
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { getSessionCacheKey } from '@common/utils/request.util';
 
@@ -69,10 +69,16 @@ export class TenantGuard implements CanActivate {
   private isExcludedPath(path: string): boolean {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
+    // Match excluded prefixes by path segment so it works with global prefixes
+    // (e.g. "/api/v1/health" should match "/health") and without requiring a trailing slash.
     return TENANT_POLICY.EXCLUDED_PATH_PREFIXES.some((prefix) => {
-      return (
-        normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`) || normalizedPath.includes(`${prefix}/`)
-      );
+      const segment = prefix.startsWith('/') ? prefix.slice(1) : prefix;
+      if (!segment) return false;
+
+      // Escape regex special chars to avoid accidental pattern injection.
+      const escaped = segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`(^|/)${escaped}(/|$)`);
+      return re.test(normalizedPath);
     });
   }
 
@@ -104,7 +110,8 @@ export class TenantGuard implements CanActivate {
       return false;
     }
 
-    const realmAccess = jwt['realm_access'] as Record<string, unknown> | undefined;
+    // Handle both snake_case (raw JWT) and camelCase (proto-loader deserialized)
+    const realmAccess = (jwt['realm_access'] ?? jwt['realmAccess']) as Record<string, unknown> | undefined;
     const roles = Array.isArray(realmAccess?.['roles']) ? (realmAccess?.['roles'] as unknown[]) : [];
 
     return roles.some((role) => typeof role === 'string' && role === 'SUPER_ADMIN');

@@ -108,7 +108,15 @@ export class AuthorizerService {
     return {
       valid: true,
       metadata: {
-        jwt: payload,
+        jwt: {
+          ...payload,
+          // proto-loader (keepCase: false) serializes camelCase JS props → snake_case proto fields.
+          // Keycloak JWT uses snake_case natively, so provide explicit camelCase aliases.
+          tenantId: payload.tenant_id,
+          realmAccess: payload.realm_access,
+          givenName: payload['given_name'] as string | undefined,
+          familyName: payload['family_name'] as string | undefined,
+        },
         permissions,
         user,
         userId: user.id,
