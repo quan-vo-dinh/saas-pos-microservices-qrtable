@@ -7,6 +7,8 @@ import { Role } from '@common/schemas/role.schema';
 export type KeycloakJwtPayload = JwtPayload & {
   email?: string;
   tenant_id?: string;
+  given_name?: string;
+  family_name?: string;
   realm_access?: {
     roles?: ROLE[];
   };

@@ -108,15 +108,7 @@ export class AuthorizerService {
     return {
       valid: true,
       metadata: {
-        jwt: {
-          ...payload,
-          // proto-loader (keepCase: false) serializes camelCase JS props → snake_case proto fields.
-          // Keycloak JWT uses snake_case natively, so provide explicit camelCase aliases.
-          tenantId: payload.tenant_id,
-          realmAccess: payload.realm_access,
-          givenName: payload['given_name'] as string | undefined,
-          familyName: payload['family_name'] as string | undefined,
-        },
+        jwt: this.toProtoJwtPayload(payload),
         permissions,
         user,
         userId: user.id,
@@ -185,25 +177,12 @@ export class AuthorizerService {
   }
 
   private async autoProvisionFromToken(payload: KeycloakJwtPayload, processId: string) {
-    const userId = payload.sub;
-    const email = payload.email;
+    const { sub: userId, email, given_name: firstName, family_name: lastName } = payload;
 
     if (!userId || !email) {
       throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
     }
 
-    const firstName =
-      typeof payload['given_name'] === 'string'
-        ? payload['given_name']
-        : typeof payload['first_name'] === 'string'
-          ? payload['first_name']
-          : undefined;
-    const lastName =
-      typeof payload['family_name'] === 'string'
-        ? payload['family_name']
-        : typeof payload['last_name'] === 'string'
-          ? payload['last_name']
-          : undefined;
     const roleNames = this.extractRealmRoles(payload);
 
     const upsertPayload: UpsertIdentityRequest = {
@@ -220,5 +199,20 @@ export class AuthorizerService {
 
   private isAutoProvisionOnFirstLoginEnabled(): boolean {
     return process.env['AUTH_AUTO_PROVISION_ON_FIRST_LOGIN'] === 'true';
+  }
+
+  /**
+   * Maps Keycloak JWT payload (snake_case) to proto-compatible format.
+   * proto-loader (keepCase: false) serializes camelCase JS keys → snake_case proto wire fields,
+   * so camelCase aliases are required for snake_case fields defined in the .proto message.
+   */
+  private toProtoJwtPayload(payload: KeycloakJwtPayload): KeycloakJwtPayload {
+    return {
+      ...payload,
+      tenantId: payload.tenant_id,
+      realmAccess: payload.realm_access,
+      givenName: payload.given_name,
+      familyName: payload.family_name,
+    };
   }
 }
