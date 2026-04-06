@@ -1,15 +1,10 @@
 'use client';
 
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@einvoice/frontend-ui'
 import type { Row } from '@tanstack/react-table';
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { Button } from '@einvoice/frontend-ui';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@einvoice/frontend-ui';
+;
+;
 import { useMenu } from './menu-provider';
 import type { Category, MenuItem } from '../data/schema';
 

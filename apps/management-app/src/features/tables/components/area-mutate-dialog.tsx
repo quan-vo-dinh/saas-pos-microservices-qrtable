@@ -1,20 +1,10 @@
 'use client';
 
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label } from '@einvoice/frontend-ui'
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
-import {
-  Button,
-  Input,
-  Label,
-} from '@einvoice/frontend-ui';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@einvoice/frontend-ui';
+;
+;
 import { useTables } from './tables-provider';
 import { areaMutateSchema, type AreaMutateInput } from '../data/schema';
 

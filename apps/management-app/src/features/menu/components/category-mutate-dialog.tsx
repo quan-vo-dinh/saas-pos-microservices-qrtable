@@ -1,25 +1,10 @@
 'use client';
 
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@einvoice/frontend-ui'
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
-import {
-  Button,
-  Input,
-  Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@einvoice/frontend-ui';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@einvoice/frontend-ui';
+;
+;
 import { useMenu } from './menu-provider';
 import { categoryMutateSchema, type CategoryMutateInput } from '../data/schema';
 

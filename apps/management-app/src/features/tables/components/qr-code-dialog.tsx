@@ -1,18 +1,9 @@
 'use client';
 
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Separator } from '@einvoice/frontend-ui'
 import { Copy, Download, Printer, QrCode } from 'lucide-react';
-import {
-  Button,
-  Separator,
-} from '@einvoice/frontend-ui';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@einvoice/frontend-ui';
+;
+;
 import { useTables } from './tables-provider';
 
 export function QrCodeDialog() {

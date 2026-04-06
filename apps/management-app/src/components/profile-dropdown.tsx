@@ -1,22 +1,10 @@
 'use client';
 
+import { Avatar, AvatarFallback, AvatarImage, Button, DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@einvoice/frontend-ui'
 import { LogOut, Settings, User } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-  Button,
-} from '@einvoice/frontend-ui';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@einvoice/frontend-ui';
+;
+;
 import { useAuthStore } from '@/lib/auth/auth-store';
 
 export function ProfileDropdown() {

@@ -1,16 +1,10 @@
 'use client';
 
+import { Button, Popover, PopoverContent, PopoverTrigger, Separator } from '@einvoice/frontend-ui'
 import { Armchair, Pencil, QrCode, Trash2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  Button,
-  Separator,
-} from '@einvoice/frontend-ui';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@einvoice/frontend-ui';
+;
+;
 import type { RestaurantTable, TableStatus } from '../data/schema';
 import { TableStatusBadge, statusConfig } from './table-status-badge';
 import { useTables } from './tables-provider';

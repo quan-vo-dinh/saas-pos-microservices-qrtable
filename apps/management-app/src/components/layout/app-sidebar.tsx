@@ -1,12 +1,8 @@
 'use client';
 
+import { Avatar, AvatarFallback, AvatarImage, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@einvoice/frontend-ui'
 import { ChevronDown, Command } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@einvoice/frontend-ui';
+;
 import {
   Sidebar,
   SidebarContent,
@@ -17,11 +13,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from '@einvoice/frontend-ui';
+;
 import { sidebarData } from '@/components/layout/data/sidebar-data';
 import { NavGroup } from '@/components/layout/nav-group';
 
