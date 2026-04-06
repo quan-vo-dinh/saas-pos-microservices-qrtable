@@ -1,12 +1,9 @@
-import { FeaturePlaceholder } from '@einvoice/frontend-ui';
+import { QrLandingCard } from '@/features/landing/components/qr-landing-card';
 
 export function LandingPage() {
   return (
-    <FeaturePlaceholder
-      section="Landing"
-      title="QR Entry Skeleton"
-      description="Placeholder cho bước mở QR, nhận diện bàn, và khởi tạo customer session trước khi vào menu."
-      ctaLabel="Start Session"
-    />
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <QrLandingCard />
+    </div>
   );
 }
