@@ -23,8 +23,8 @@ import { TablesPrimaryButtons } from './components/tables-primary-buttons';
 import { TablesTable } from './components/tables-table';
 import { TableFloorPlan } from './components/table-floor-plan';
 import { TablesDialogs } from './components/tables-dialogs';
-import { areas } from './data/areas';
-import { tables } from './data/tables';
+import { areas } from '@einvoice/mock-data';
+import { tables } from '@einvoice/mock-data';
 
 export function TablesPage() {
   const defaultArea = areas[0]?.id ?? 'all';

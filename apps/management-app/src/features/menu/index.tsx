@@ -11,8 +11,8 @@ import { MenuPrimaryButtons } from './components/menu-primary-buttons';
 import { CategoriesTable } from './components/categories-table';
 import { MenuItemsTable } from './components/menu-items-table';
 import { MenuDialogs } from './components/menu-dialogs';
-import { categories } from './data/categories';
-import { menuItems } from './data/menu-items';
+import { categories } from '@einvoice/mock-data';
+import { menuItems } from '@einvoice/mock-data';
 
 export function MenuPage() {
   return (
