@@ -7,7 +7,8 @@
       "@einvoice/shared-constants": ["../../libs/shared/constants/src/index.ts"],
       "@einvoice/frontend-ui": ["../../libs/frontend/ui/src/index.ts"],
       "@einvoice/frontend-hooks": ["../../libs/frontend/hooks/src/index.ts"],
-      "@einvoice/frontend-utils": ["../../libs/frontend/utils/src/index.ts"]
+      "@einvoice/frontend-utils": ["../../libs/frontend/utils/src/index.ts"],
+      "@einvoice/mock-data": ["../../libs/shared/mock-data/src/index.ts"]
     }
   },
   "files": [],

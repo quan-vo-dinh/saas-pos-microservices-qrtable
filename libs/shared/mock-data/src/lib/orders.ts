@@ -1,0 +1,68 @@
+import type { Order } from '@einvoice/types';
+
+export const orders: Order[] = [
+  {
+    id: 'order-001',
+    tableId: 'tbl-001',
+    tableName: 'T1',
+    sessionId: 'session-001',
+    items: [
+      { id: 'oi-001', menuItemId: 'item-001', menuItemName: 'Gỏi cuốn tôm thịt', quantity: 2, unitPrice: 45000, note: null, status: 'preparing' },
+      { id: 'oi-002', menuItemId: 'item-005', menuItemName: 'Cơm tấm sườn bì', quantity: 1, unitPrice: 75000, note: 'Thêm trứng ốp la', status: 'preparing' },
+      { id: 'oi-003', menuItemId: 'item-011', menuItemName: 'Trà đá', quantity: 3, unitPrice: 10000, note: null, status: 'served' },
+    ],
+    totalAmount: 195000,
+    status: 'preparing',
+    paymentMethod: null,
+    paymentStatus: 'unpaid',
+    createdAt: '2026-04-06T10:30:00Z',
+    updatedAt: '2026-04-06T10:35:00Z',
+  },
+  {
+    id: 'order-002',
+    tableId: 'tbl-001',
+    tableName: 'T1',
+    sessionId: 'session-001',
+    items: [
+      { id: 'oi-004', menuItemId: 'item-015', menuItemName: 'Chè ba màu', quantity: 2, unitPrice: 30000, note: null, status: 'served' },
+    ],
+    totalAmount: 60000,
+    status: 'served',
+    paymentMethod: null,
+    paymentStatus: 'unpaid',
+    createdAt: '2026-04-06T10:45:00Z',
+    updatedAt: '2026-04-06T11:00:00Z',
+  },
+  {
+    id: 'order-003',
+    tableId: 'tbl-005',
+    tableName: 'T5',
+    sessionId: 'session-002',
+    items: [
+      { id: 'oi-005', menuItemId: 'item-007', menuItemName: 'Phở bò tái', quantity: 2, unitPrice: 85000, note: 'Không hành', status: 'confirmed' },
+      { id: 'oi-006', menuItemId: 'item-012', menuItemName: 'Cà phê sữa đá', quantity: 2, unitPrice: 29000, note: null, status: 'ready' },
+    ],
+    totalAmount: 228000,
+    status: 'confirmed',
+    paymentMethod: null,
+    paymentStatus: 'unpaid',
+    createdAt: '2026-04-06T11:15:00Z',
+    updatedAt: '2026-04-06T11:20:00Z',
+  },
+  {
+    id: 'order-004',
+    tableId: 'tbl-008',
+    tableName: 'L3',
+    sessionId: 'session-003',
+    items: [
+      { id: 'oi-007', menuItemId: 'item-003', menuItemName: 'Súp hải sản', quantity: 1, unitPrice: 65000, note: null, status: 'served' },
+      { id: 'oi-008', menuItemId: 'item-006', menuItemName: 'Bún bò Huế', quantity: 3, unitPrice: 80000, note: null, status: 'served' },
+    ],
+    totalAmount: 305000,
+    status: 'served',
+    paymentMethod: 'cash',
+    paymentStatus: 'paid',
+    createdAt: '2026-04-06T09:00:00Z',
+    updatedAt: '2026-04-06T09:45:00Z',
+  },
+];

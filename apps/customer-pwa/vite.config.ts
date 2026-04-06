@@ -16,6 +16,7 @@ export default defineConfig({
       '@einvoice/frontend-ui': path.resolve(workspaceRoot, 'libs/frontend/ui/src/index.ts'),
       '@einvoice/frontend-hooks': path.resolve(workspaceRoot, 'libs/frontend/hooks/src/index.ts'),
       '@einvoice/frontend-utils': path.resolve(workspaceRoot, 'libs/frontend/utils/src/index.ts'),
+      '@einvoice/mock-data': path.resolve(workspaceRoot, 'libs/shared/mock-data/src/index.ts'),
     },
   },
 });
