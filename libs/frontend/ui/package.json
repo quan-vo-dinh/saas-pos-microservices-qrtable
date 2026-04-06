@@ -1,6 +1,7 @@
 {
   "name": "@einvoice/frontend-ui",
   "version": "0.0.1",
+  "private": true,
   "type": "module",
   "main": "./index.js",
   "types": "./index.d.ts",
@@ -9,5 +10,15 @@
       "import": "./index.mjs",
       "require": "./index.js"
     }
+  },
+  "dependencies": {
+    "@einvoice/frontend-utils": "workspace:*",
+    "class-variance-authority": "^0.7.1",
+    "lucide-react": "^0.577.0",
+    "radix-ui": "^1.4.3"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
   }
 }
