@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Providers from './providers';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@einvoice/frontend-ui';
 
 export const metadata: Metadata = {
   title: 'QRTable Management App',

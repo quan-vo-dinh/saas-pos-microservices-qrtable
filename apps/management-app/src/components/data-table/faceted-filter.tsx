@@ -3,8 +3,11 @@
 import type { Column } from '@tanstack/react-table';
 import { Check, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import {
+  Badge,
+  Button,
+  Separator,
+} from '@einvoice/frontend-ui';
 import {
   Command,
   CommandEmpty,
@@ -18,8 +21,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
+} from '@einvoice/frontend-ui';
 
 type FacetedFilterOption = {
   label: string;

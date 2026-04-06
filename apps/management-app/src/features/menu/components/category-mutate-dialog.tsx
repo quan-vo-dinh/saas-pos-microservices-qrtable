@@ -2,7 +2,16 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
-import { Button } from '@/components/ui/button';
+import {
+  Button,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@einvoice/frontend-ui';
 import {
   Dialog,
   DialogContent,
@@ -10,10 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+} from '@einvoice/frontend-ui';
 import { useMenu } from './menu-provider';
 import { categoryMutateSchema, type CategoryMutateInput } from '../data/schema';
 

@@ -2,13 +2,15 @@
 
 import { Armchair, Pencil, QrCode, Trash2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import {
+  Button,
+  Separator,
+} from '@einvoice/frontend-ui';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
+} from '@einvoice/frontend-ui';
 import type { RestaurantTable, TableStatus } from '../data/schema';
 import { TableStatusBadge, statusConfig } from './table-status-badge';
 import { useTables } from './tables-provider';

@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@einvoice/frontend-ui';
 import {
   Sidebar,
   SidebarContent,
@@ -17,7 +17,11 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from '@einvoice/frontend-ui';
 import { sidebarData } from '@/components/layout/data/sidebar-data';
 import { NavGroup } from '@/components/layout/nav-group';
 

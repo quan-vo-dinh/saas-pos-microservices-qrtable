@@ -8,14 +8,14 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { Button } from '@einvoice/frontend-ui';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@einvoice/frontend-ui';
 
 type DataTablePaginationProps<TData> = {
   table: Table<TData>;

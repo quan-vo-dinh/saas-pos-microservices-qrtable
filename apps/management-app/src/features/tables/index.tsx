@@ -1,13 +1,18 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  ScrollArea,
+} from '@einvoice/frontend-ui';
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Header } from '@/components/layout/header';
 import { Main } from '@/components/layout/main';
 import { Search } from '@/components/search';

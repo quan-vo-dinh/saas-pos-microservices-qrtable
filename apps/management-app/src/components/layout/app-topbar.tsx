@@ -2,8 +2,13 @@
 
 import { Bell, LogOut, UserCircle2 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import {
+  Button,
+  Separator,
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from '@einvoice/frontend-ui';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { RouteBreadcrumb } from '@/components/layout/route-breadcrumb';
 import { ModeToggle } from '@/components/layout/mode-toggle';
@@ -14,8 +19,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+} from '@einvoice/frontend-ui';
 import { useAuthStore } from '@/lib/auth/auth-store';
 
 type AppTopbarProps = {

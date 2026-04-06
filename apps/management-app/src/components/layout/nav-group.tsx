@@ -15,7 +15,7 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@einvoice/frontend-ui';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +23,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@einvoice/frontend-ui';
 import type { NavCollapsible, NavGroup as NavGroupProps, NavItem, NavLink } from '@/components/layout/types';
 
 function isPathActive(pathname: string, item: NavItem): boolean {

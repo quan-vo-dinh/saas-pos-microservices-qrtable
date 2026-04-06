@@ -2,7 +2,11 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
-import { Button } from '@/components/ui/button';
+import {
+  Button,
+  Input,
+  Label,
+} from '@einvoice/frontend-ui';
 import {
   Dialog,
   DialogContent,
@@ -10,9 +14,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '@einvoice/frontend-ui';
 import { useTables } from './tables-provider';
 import { areaMutateSchema, type AreaMutateInput } from '../data/schema';
 

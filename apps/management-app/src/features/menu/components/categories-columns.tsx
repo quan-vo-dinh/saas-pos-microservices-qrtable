@@ -1,7 +1,7 @@
 'use client';
 
 import type { ColumnDef } from '@tanstack/react-table';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@einvoice/frontend-ui';
 import { DataTableColumnHeader } from '@/components/data-table';
 import type { Category } from '../data/schema';
 import { CategoryRowActions } from './data-table-row-actions';

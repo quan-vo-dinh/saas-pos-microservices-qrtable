@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Separator } from '@/components/ui/separator';
+import { Separator } from '@einvoice/frontend-ui';
 
 type HeaderProps = {
   children?: ReactNode;

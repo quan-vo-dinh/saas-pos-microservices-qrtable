@@ -1,6 +1,6 @@
 'use client';
 
-import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ConfirmDialog } from '@einvoice/frontend-ui';
 import { useTables } from './tables-provider';
 
 export function TableDeleteDialog() {

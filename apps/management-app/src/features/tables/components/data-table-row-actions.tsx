@@ -2,14 +2,14 @@
 
 import type { Row } from '@tanstack/react-table';
 import { MoreHorizontal, Pencil, QrCode, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@einvoice/frontend-ui';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@einvoice/frontend-ui';
 import { useTables } from './tables-provider';
 import type { RestaurantTable } from '../data/schema';
 

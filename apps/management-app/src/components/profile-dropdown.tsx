@@ -2,8 +2,12 @@
 
 import { LogOut, Settings, User } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  Button,
+} from '@einvoice/frontend-ui';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +16,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@einvoice/frontend-ui';
 import { useAuthStore } from '@/lib/auth/auth-store';
 
 export function ProfileDropdown() {

@@ -1,7 +1,7 @@
 'use client';
 
 import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@einvoice/frontend-ui';
 import { useMenu } from './menu-provider';
 
 export function MenuPrimaryButtons() {
