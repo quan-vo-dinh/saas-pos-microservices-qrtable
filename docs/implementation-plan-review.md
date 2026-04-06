@@ -1,8 +1,10 @@
 # 📋 BÁO CÁO ĐÁNH GIÁ & TƯ VẤN CHIẾN LƯỢC: IMPLEMENTATION PLAN
 
 > **Ngày đánh giá:** 26/03/2026
-> **Phiên bản tài liệu:** 1.0
+> **Ngày cập nhật lần cuối:** 04/04/2026
+> **Phiên bản tài liệu:** 1.1
 > **Trạng thái hiện tại:** Đã hoàn thành đến Step 1.25 (Auth Frontend + Keycloakify)
+> **Cập nhật:** Đã integrate 3 findings quan trọng nhất (3.1, 3.2, 3.3) vào implementation_plan.md. Fix sai sót Session TTL và Redis status.
 > **Tài liệu tham chiếu:**
 >
 > - `docs/implementation_plan.md`
@@ -42,22 +44,22 @@
 
 ### 1.2 Trạng Thái Thực Tế Codebase (Tính Đến 26/03/2026)
 
-| Thành phần                                        | Kế hoạch | Thực tế | Ghi chú                                                      |
-| ------------------------------------------------- | :------: | :-----: | ------------------------------------------------------------ |
-| Template services (invoice, product, user-access) |    ✅    |   ✅    | Giữ nguyên, có README                                        |
-| Catalog service                                   |    ✅    |   ✅    | Cấu trúc Pragmatic Layered đúng, chưa implement đầy đủ logic |
-| SaaS service                                      |    ✅    |   ✅    | Tồn tại, cấu trúc chuẩn, logic chưa implement                |
-| BFF service                                       |    ✅    |   ✅    | Hoạt động, guard chain đầy đủ                                |
-| Authorizer service                                |    ✅    |   ✅    | gRPC hoàn chỉnh                                              |
-| Customer PWA                                      |    ✅    |   ✅    | React + Vite, Tailwind, Shadcn configured                    |
-| Management App                                    |    ✅    |   ✅    | Next.js App Router, auth middleware ready                    |
-| Keycloak Theme                                    |    ✅    |   ✅    | Keycloakify project tồn tại, Storybook setup                 |
-| Shared libs (types, constants)                    |    ✅    |   ✅    | Cấu trúc đúng                                                |
-| Frontend libs (ui, hooks, utils)                  |    ✅    |   ⚠️    | Directory tồn tại, content cần populate thêm                 |
-| Guards (User, Session, Tenant, Permission)        |    ✅    |   ✅    | Đầy đủ, hoạt động                                            |
-| Redis trong Docker                                |    ✅    |   ⚠️    | Cần kiểm tra lại `docker-compose.provider.yaml`              |
-| Kafka                                             |    ❌    |   ❌    | Chưa setup (đúng tiến độ — Phase 2)                          |
-| Order/Kitchen/Payment/Notification services       |    ❌    |   ❌    | Chưa tạo (đúng tiến độ)                                      |
+| Thành phần                                        | Kế hoạch | Thực tế | Ghi chú                                                              |
+| ------------------------------------------------- | :------: | :-----: | -------------------------------------------------------------------- |
+| Template services (invoice, product, user-access) |    ✅    |   ✅    | Giữ nguyên, có README                                                |
+| Catalog service                                   |    ✅    |   ✅    | Cấu trúc Pragmatic Layered đúng, chưa implement đầy đủ logic         |
+| SaaS service                                      |    ✅    |   ✅    | Tồn tại, cấu trúc chuẩn, logic chưa implement                        |
+| BFF service                                       |    ✅    |   ✅    | Hoạt động, guard chain đầy đủ                                        |
+| Authorizer service                                |    ✅    |   ✅    | gRPC hoàn chỉnh                                                      |
+| Customer PWA                                      |    ✅    |   ✅    | React + Vite, Tailwind, Shadcn configured                            |
+| Management App                                    |    ✅    |   ✅    | Next.js App Router, auth middleware ready                            |
+| Keycloak Theme                                    |    ✅    |   ✅    | Keycloakify project tồn tại, Storybook setup                         |
+| Shared libs (types, constants)                    |    ✅    |   ✅    | Cấu trúc đúng                                                        |
+| Frontend libs (ui, hooks, utils)                  |    ✅    |   ⚠️    | Directory tồn tại, content cần populate thêm                         |
+| Guards (User, Session, Tenant, Permission)        |    ✅    |   ✅    | Đầy đủ, hoạt động                                                    |
+| Redis trong Docker                                |    ✅    |   ✅    | Đã có trong docker-compose.provider.yaml (port 6379) + Redis Insight |
+| Kafka                                             |    ❌    |   ❌    | Chưa setup (đúng tiến độ — Phase 2)                                  |
+| Order/Kitchen/Payment/Notification services       |    ❌    |   ❌    | Chưa tạo (đúng tiến độ)                                              |
 
 ---
 
@@ -93,6 +95,8 @@ Chọn N-Tier thay vì Clean Architecture thuần túy là quyết định hợp
 
 ### 3.1 🔴 CRITICAL — Thiếu Step "Staff Management" hoàn toàn
 
+> **✅ ĐÃ INTEGRATE vào implementation_plan.md (04/2026)** — Xem Phase 4C, Step 4.6 (Staff Management Backend) + Step 4.7 (Staff Management UI). Quyết định: mở rộng user-access service thay vì tạo service mới.
+
 **Vấn đề:** Business logic (Section 9) định nghĩa rõ rằng Owner/Manager cần có khả năng **mời/xóa/quản lý nhân viên, phân quyền**. Tuy nhiên, trong `implementation_plan.md`:
 
 - **Không có step nào dành cho Staff Management UI** (`/dashboard/staff`)
@@ -112,6 +116,8 @@ Chọn N-Tier thay vì Clean Architecture thuần túy là quyết định hợp
 ```
 
 ### 3.2 🔴 CRITICAL — Thiếu Permission Enum cho các domain mới
+
+> **✅ ĐÃ INTEGRATE vào implementation_plan.md (04/2026)** — Xem "PRE-PHASE 2 — PERMISSION & SEED EXTENSION", Step 2.0. PERMISSION enum cần mở rộng với 5 domain mới: ORDER*\*, KITCHEN*_, PAYMENT\__, TABLE*\*, SERVICE_REQUEST*\*.
 
 **Vấn đề:** File `step-0-6b` định nghĩa PERMISSION enum hiện tại chỉ có:
 
@@ -139,6 +145,8 @@ Chọn N-Tier thay vì Clean Architecture thuần túy là quyết định hợp
 
 ### 3.3 🟡 IMPORTANT — Thiếu luồng "Tenant Onboarding" trong plan
 
+> **✅ ĐÃ INTEGRATE vào implementation_plan.md (04/2026)** — Xem Phase 4B, Step 4.3 (SaaS + Tenant Onboarding). MVP: Admin-assisted onboard API + auto-provision. Self-service wizard là NICE-TO-HAVE.
+
 **Vấn đề:** Business logic (Section 1) mô tả chi tiết quy trình:
 
 1. Đăng ký định danh → 2. Khởi tạo Tenant → 3. Chọn gói dịch vụ → 4. Cấu hình vận hành
@@ -161,22 +169,30 @@ Step 4.2b — Tenant Onboarding Flow:
   5. E2E Test: Đăng ký nhà hàng mới → Đăng nhập → Dashboard hoạt động
 ```
 
-### 3.4 🟡 IMPORTANT — Session Management 2h vs 24h inconsistency
+### 3.4 ✅ ĐÃ GIẢI QUYẾT — Session Management TTL đã đúng 2h
 
-**Vấn đề:** Có sự **mâu thuẫn** giữa các tài liệu:
+> **Cập nhật (04/2026):** Kiểm tra codebase thực tế cho thấy Session TTL **ĐÃ ĐÚNG 2 giờ**, không phải 24h như phiên bản review ban đầu ghi nhận. File `libs/constants/src/lib/request-context.constant.ts` chứa `TTL_MS: 2 * 60 * 60 * 1000` (2h) và `IDLE_TIMEOUT_MS: 30 * 60 * 1000` (30 phút). **Không cần action.**
 
-- `technical-architecture.md` (Nguyên tắc 10): "Session lifetime = 2 giờ (max), idle timeout = 30 phút"
-- `step-0-6b` (SessionGuard code): `SESSION_POLICY.TTL_MS = 24 * 60 * 60 * 1000` (24 giờ)
-- `business-logic.md`: Không nêu rõ session lifetime
+~~**Vấn đề:** Có sự **mâu thuẫn** giữa các tài liệu:~~
 
-**Tác động:** Code hiện tại setting TTL 24h nhưng architecture doc nói 2h. Nếu session quá dài, bàn sẽ bị "treo" trạng thái Occupied lâu.
+- ~~`technical-architecture.md` (Nguyên tắc 10): "Session lifetime = 2 giờ (max), idle timeout = 30 phút"~~
+- ~~`step-0-6b` (SessionGuard code): `SESSION_POLICY.TTL_MS = 24 * 60 * 60 * 1000` (24 giờ)~~
+- ~~`business-logic.md`: Không nêu rõ session lifetime~~
 
-**Đề xuất:**
+**Thực tế codebase (đã verify 04/2026):**
 
-- **Thống nhất về 2 giờ max** cho session lifetime (đúng với ngữ cảnh nhà hàng — bữa ăn trung bình 1-2h)
-- Cập nhật `SESSION_POLICY.TTL_MS = 2 * 60 * 60 * 1000`
-- Giữ idle timeout 30 phút (đã nhất quán)
-- Document rõ trong implementation plan
+```typescript
+// libs/constants/src/lib/request-context.constant.ts
+export const SESSION_POLICY = {
+  ID_PREFIX: 'sid_',
+  CACHE_PREFIX: 'session',
+  TTL_MS: 2 * 60 * 60 * 1000, // ✅ 2 giờ — ĐÃ ĐÚNG
+  IDLE_TIMEOUT_MS: 30 * 60 * 1000, // ✅ 30 phút — ĐÃ ĐÚNG
+  COOKIE_KEY: 'x-session-id',
+};
+```
+
+**Kết luận:** Tất cả tài liệu và code đã nhất quán. Issue này **KHÔNG TỒN TẠI**.
 
 ### 3.5 🟡 IMPORTANT — Thiếu chiến lược Database Migration
 
@@ -369,16 +385,18 @@ BFF WebSocket Gateway Implementation Steps:
 
 ### 5.4 Infrastructure Gaps
 
-| Component      | Architecture | Docker Compose hiện tại | Gap                                  |
-| -------------- | :----------: | :---------------------: | ------------------------------------ |
-| PostgreSQL     |      ✅      |           ✅            | OK                                   |
-| MongoDB        |      ✅      |           ✅            | OK                                   |
-| Redis          |      ✅      |           ⚠️            | Cần verify có trong docker-compose   |
-| Kafka          |      ✅      |           ❌            | Cần thêm Phase 2                     |
-| Keycloak       |      ✅      |           ⚠️            | Có nhưng cần verify bootstrap script |
-| Grafana + Loki |      ✅      |           ❌            | Phase 6 (đúng tiến độ)               |
-| Prometheus     |      ✅      |           ❌            | Phase 6                              |
-| Tempo          |      ✅      |           ❌            | Phase 6                              |
+> **Cập nhật (04/2026):** Redis đã confirmed có trong docker-compose. Bổ sung DB-per-service migration step (Step 0.8 trong implementation_plan.md).
+
+| Component      | Architecture | Docker Compose hiện tại | Gap                              | Trạng thái (04/2026) |
+| -------------- | :----------: | :---------------------: | -------------------------------- | :------------------: |
+| PostgreSQL     |      ✅      |           ✅            | Cần init script tạo multiple DBs |   📋 Plan Step 0.8   |
+| MongoDB        |      ✅      |           ✅            | OK                               |          ✅          |
+| Redis          |      ✅      |           ✅            | OK (port 6379 + Redis Insight)   |          ✅          |
+| Kafka          |      ✅      |           ❌            | Cần thêm Phase 2                 |          ⏳          |
+| Keycloak       |      ✅      |           ✅            | Có + bootstrap script            |          ✅          |
+| Grafana + Loki |      ✅      |           ❌            | Phase 6 (đúng tiến độ)           |          ⏳          |
+| Prometheus     |      ✅      |           ❌            | Phase 6                          |          ⏳          |
+| Tempo          |      ✅      |           ❌            | Phase 6                          |          ⏳          |
 
 ---
 
@@ -685,12 +703,12 @@ Step 7.2 bổ sung — Demo Script Chi Tiết:
 
 ### 8.3 Technical Debt dự kiến
 
-| #   | Debt                                  | Ở đâu                        |             Priority fix             |
-| --- | ------------------------------------- | ---------------------------- | :----------------------------------: |
-| D1  | TypeORM `synchronize: true` trong dev | Catalog, SaaS                | Chuyển sang migrations trước Phase 3 |
-| D2  | Hardcoded mock data trong frontend    | Customer PWA, Management App |  Replace khi integration Phase 1.6   |
-| D3  | Permission enum thiếu                 | libs/constants               |          Fix trước Phase 2           |
-| D4  | Session TTL inconsistency (24h vs 2h) | libs/constants, guards       |               Fix ngay               |
+| #   | Debt                                      | Ở đâu                        |             Priority fix             | Trạng thái (04/2026) |
+| --- | ----------------------------------------- | ---------------------------- | :----------------------------------: | :------------------: |
+| D1  | TypeORM `synchronize: true` trong dev     | Catalog, SaaS                | Chuyển sang migrations trước Phase 3 |     ⏳ Chưa fix      |
+| D2  | Hardcoded mock data trong frontend        | Customer PWA, Management App |  Replace khi integration Phase 1.6   |     ⏳ Chưa fix      |
+| D3  | Permission enum thiếu                     | libs/constants               |          Fix trước Phase 2           |   📋 Plan Step 2.0   |
+| D4  | ~~Session TTL inconsistency (24h vs 2h)~~ | ~~libs/constants, guards~~   |             ~~Fix ngay~~             |    ✅ Đã đúng 2h     |
 
 ---
 
@@ -768,15 +786,15 @@ Step 7.2 bổ sung — Demo Script Chi Tiết:
 - Demo script chi tiết 4 actors
 - .env.example + SSL setup
 
-### 9.3 Quick Wins (Có thể làm ngay)
+### 9.3 Quick Wins (Trạng thái cập nhật 04/2026)
 
-| #   | Quick Win                                 | Effort  |   Impact   |
-| --- | ----------------------------------------- | :-----: | :--------: |
-| 1   | Fix Session TTL inconsistency (24h → 2h)  | 10 phút |    Cao     |
-| 2   | Tạo .env.example file                     | 30 phút | Trung bình |
-| 3   | Document Permission Matrix mới (markdown) |  1 giờ  |    Cao     |
-| 4   | Thêm README cho mỗi frontend app          | 30 phút |    Thấp    |
-| 5   | Setup TypeORM migration config            |  1 giờ  | Trung bình |
+| #   | Quick Win                                    | Effort  |   Impact   | Trạng thái       |
+| --- | -------------------------------------------- | :-----: | :--------: | :--------------- |
+| 1   | ~~Fix Session TTL inconsistency (24h → 2h)~~ | 10 phút |    Cao     | ✅ Đã đúng 2h    |
+| 2   | Tạo .env.example file                        | 30 phút | Trung bình | ⏳ Chưa làm      |
+| 3   | Document Permission Matrix mới (markdown)    |  1 giờ  |    Cao     | 📋 Plan Step 2.0 |
+| 4   | Thêm README cho mỗi frontend app             | 30 phút |    Thấp    | ⏳ Chưa làm      |
+| 5   | Setup TypeORM migration config               |  1 giờ  | Trung bình | ⏳ Chưa làm      |
 
 ---
 
@@ -786,28 +804,28 @@ Step 7.2 bổ sung — Demo Script Chi Tiết:
 
 #### 🔴 P0 — CRITICAL (Phải fix trước khi tiếp tục)
 
-| #   | Action                                            | Phase bị ảnh hưởng | Effort  |
-| --- | ------------------------------------------------- | :----------------: | :-----: |
-| A1  | Fix Session TTL inconsistency (24h → 2h)          |        All         | 10 phút |
-| A2  | Mở rộng PERMISSION enum cho Order/Kitchen/Payment |      2, 3, 4       | 2-3 giờ |
-| A3  | Cập nhật role.json seed data                      |      2, 3, 4       | 1-2 giờ |
-| A4  | Verify Redis có trong docker-compose              |        1, 2        | 30 phút |
+| #   | Action                                            | Phase bị ảnh hưởng | Effort  | Trạng thái (04/2026)  |
+| --- | ------------------------------------------------- | :----------------: | :-----: | :-------------------: |
+| A1  | ~~Fix Session TTL inconsistency (24h → 2h)~~      |        All         | 10 phút |    ✅ ĐÃ ĐÚNG (2h)    |
+| A2  | Mở rộng PERMISSION enum cho Order/Kitchen/Payment |      2, 3, 4       | 2-3 giờ | 📋 Đã plan (Step 2.0) |
+| A3  | Cập nhật role.json seed data                      |      2, 3, 4       | 1-2 giờ | 📋 Đã plan (Step 2.0) |
+| A4  | ~~Verify Redis có trong docker-compose~~          |        1, 2        | 30 phút |       ✅ ĐÃ CÓ        |
 
 #### 🟡 P1 — IMPORTANT (Nên bổ sung vào plan)
 
-| #   | Action                                   | Phase |    Effort     |
-| --- | ---------------------------------------- | :---: | :-----------: |
-| A5  | Thêm Staff Management step               |   4   |   3-4 ngày    |
-| A6  | Thêm Tenant Onboarding flow              |   4   |   3-4 ngày    |
-| A7  | Thêm Bank Transfer/VietQR payment option |   3   |   2-3 ngày    |
-| A8  | Thêm Revenue Report / Reconciliation     |   3   |   2-3 ngày    |
-| A9  | Chia Phase 2 thành 2A/2B                 |   2   |   Plan only   |
-| A10 | Chia Phase 4 thành 4A/4B/4C              |   4   |   Plan only   |
-| A11 | Cloudinary integration step              |   1   |   1-2 ngày    |
-| A12 | WebSocket rooms implementation guide     |   2   | 1 ngày (plan) |
-| A13 | Service Request backend entity/logic     |   2   |    1 ngày     |
-| A14 | Database migration strategy              |   0   | 1 ngày setup  |
-| A15 | Frontend testing (Component + E2E)       |   5   |   3-4 ngày    |
+| #   | Action                                   | Phase |    Effort     |     Trạng thái (04/2026)     |
+| --- | ---------------------------------------- | :---: | :-----------: | :--------------------------: |
+| A5  | Thêm Staff Management step               |   4   |   3-4 ngày    |    📋 Đã plan (Phase 4C)     |
+| A6  | Thêm Tenant Onboarding flow              |   4   |   3-4 ngày    |    📋 Đã plan (Phase 4B)     |
+| A7  | Thêm Bank Transfer/VietQR payment option |   3   |   2-3 ngày    | ⏳ NICE-TO-HAVE cho luận văn |
+| A8  | Thêm Revenue Report / Reconciliation     |   3   |   2-3 ngày    |         ⏳ Chưa plan         |
+| A9  | Chia Phase 2 thành 2A/2B                 |   2   |   Plan only   |       ✅ Đã thực hiện        |
+| A10 | Chia Phase 4 thành 4A/4B/4C              |   4   |   Plan only   |       ✅ Đã thực hiện        |
+| A11 | Cloudinary integration step              |   1   |   1-2 ngày    |    ⏳ Chưa plan chi tiết     |
+| A12 | WebSocket rooms implementation guide     |   2   | 1 ngày (plan) |    📋 Đã plan (Phase 2B)     |
+| A13 | Service Request backend entity/logic     |   2   |    1 ngày     |    📋 Đã plan (Phase 2A)     |
+| A14 | Database migration strategy              |   0   | 1 ngày setup  |         ⏳ Chưa plan         |
+| A15 | Frontend testing (Component + E2E)       |   5   |   3-4 ngày    |         ⏳ Chưa plan         |
 
 #### 🟢 P2 — NICE-TO-HAVE (Nếu còn thời gian)
 
@@ -823,15 +841,16 @@ Step 7.2 bổ sung — Demo Script Chi Tiết:
 
 ## 11. Lộ Trình Đề Xuất Cập Nhật
 
-### 11.1 Phase Remap (Đề xuất)
+### 11.1 Phase Remap (Đã áp dụng vào implementation_plan.md — 04/2026)
 
 ```
   PHASE           NỘI DUNG CẬP NHẬT                          ƯỚC LƯỢNG
   ─────           ──────────────────                          ─────────
   Phase 1 (còn)   Catalog Backend + Cloudinary + Integration   ~1.5-2 tuần
+  Pre-Phase 2     Permission & Seed Extension                  ~0.5-1 ngày
   Phase 2A         Order Service + Kafka + Session Logic        ~1.5-2 tuần
   Phase 2B         Kitchen/KDS + WebSocket Gateway + SLA        ~1-1.5 tuần
-  Phase 3          Payment (Stripe+Cash+VietQR) + Reports       ~1.5-2 tuần
+  Phase 3          Payment (Stripe+Cash) + Reports (optional)   ~1.5-2 tuần
   Phase 4A         Saga + Hardening                             ~1 tuần
   Phase 4B         SaaS + Tenant Onboarding + Feature Gating    ~1 tuần
   Phase 4C         Notification + Staff Management              ~1 tuần
@@ -889,9 +908,9 @@ Implementation plan hiện tại có nền tảng vững chắc và phương ph�
 
 **Hành động tiếp theo ngay lập tức:**
 
-1. Fix Session TTL (10 phút)
-2. Mở rộng PERMISSION enum + re-seed (2-3 giờ)
-3. Cập nhật implementation plan với các steps bổ sung (1 ngày)
+1. ~~Fix Session TTL (10 phút)~~ → ✅ Đã đúng 2h, không cần action
+2. Mở rộng PERMISSION enum + re-seed (2-3 giờ) → 📋 Đã plan vào Step 2.0 (Pre-Phase 2)
+3. ~~Cập nhật implementation plan với các steps bổ sung (1 ngày)~~ → ✅ Đã hoàn thành (04/2026): Phase 2A/2B, Phase 4A/4B/4C, Staff Management, Tenant Onboarding
 4. Tiếp tục Phase 1 remaining (Step 1.3 → 1.6)
 
 ---

@@ -1,8 +1,7 @@
 ---
 name: frontend-specialist
 description: Expert in React 19 + Vite (customer-pwa) and Next.js 16 App Router (management-app) for the QRTable platform. Use for UI components, TanStack Query, shadcn/ui, NextAuth, Zustand, and frontend architecture.
-tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-sonnet-4.5
+tools: [read, search, execute, edit, context7/*, nx-mcp-server/*]
 ---
 
 # Frontend Specialist — QRTable Platform

@@ -1,8 +1,7 @@
 ---
 name: database-architect
 description: Expert in TypeORM (PostgreSQL) and Mongoose (MongoDB) for QRTable multi-tenant data architecture. Use for entity design, schema changes, query optimization, migrations, and multi-tenant data isolation patterns.
-tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-sonnet-4.5
+tools: [read, search, execute, edit, context7/*, nx-mcp-server/*]
 ---
 
 # Database Architect — QRTable Platform
@@ -17,7 +16,7 @@ You are a database expert for a multi-tenant SaaS with PostgreSQL (TypeORM) and 
 
 ## Multi-Tenant Architecture
 
-**Shared DB with tenant_id discriminator** — NOT separate schemas per tenant.
+**Database-per-Service + tenant_id discriminator** — Each microservice owns its own database (e.g., `qrtable_saas`, `qrtable_catalog`, `qrtable_order`, `qrtable_payment`). Within each database, tenant isolation is enforced by `tenant_id` column on every tenant-scoped entity. Cross-service data access via TCP/Kafka only — NOT direct DB queries.
 
 Every tenant-scoped entity MUST have:
 

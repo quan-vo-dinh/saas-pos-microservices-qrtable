@@ -7,7 +7,23 @@
 
 ## 🏗️ TỔNG QUAN KIẾN TRÚC DỮ LIỆU
 
-Hệ thống QRTable áp dụng mô hình dữ liệu **Multi-Tenant (Đa khách thuê)** với kiến trúc chia theo **Cụm Dữ Liệu (Data Domains)**. Mỗi dữ liệu (ngoại trừ Pricing Plans) đều bắt buộc phải gắn với một `tenant_id` để đảm bảo tính cô lập và bảo mật tuyệt đối giữa các nhà hàng khác nhau.
+Hệ thống QRTable áp dụng mô hình dữ liệu kết hợp:
+
+- **Database-per-Service** (Microservice pattern): Mỗi microservice sở hữu database riêng, không truy cập trực tiếp database service khác. Cross-service data access thông qua TCP hoặc Kafka events.
+- **Multi-Tenant — Discriminator Column** (SaaS pattern): Trong mỗi database, tất cả tenants chia sẻ cùng tables, cô lập bằng cột `tenant_id`.
+
+### Database Boundaries
+
+| Database                       | Service         | Tables                                              |
+| ------------------------------ | --------------- | --------------------------------------------------- |
+| `qrtable_saas` (PostgreSQL)    | SaaS Management | tenants, pricing_plans, subscriptions               |
+| `qrtable_catalog` (PostgreSQL) | Catalog         | categories, menu_items, areas, tables               |
+| `qrtable_order` (PostgreSQL)   | Order           | sessions, orders, order_items, service_requests     |
+| `qrtable_payment` (PostgreSQL) | Payment         | bills, payments, refunds                            |
+| `qrtable_auth` (MongoDB)       | User-Access     | users, roles                                        |
+| Redis only                     | Kitchen         | KDS queues (Sorted Set, không có persistent tables) |
+
+**Lưu ý quan trọng:** Các references giữa tables khác database (VD: `orders.table_id → tables.id`) là **logical FK** — không enforce bằng DB foreign key constraint. Data integrity được đảm bảo ở application level.
 
 Toàn bộ ERD có thể được chia làm **5 Cụm Dữ liệu Cốt lõi** sau:
 

@@ -5,14 +5,24 @@ description: Multi-tenancy patterns for QRTable SaaS platform. Use when implemen
 
 # Multi-Tenant Architecture — QRTable
 
-## Strategy: Shared DB + tenant_id Discriminator
+## Strategy: Database-per-Service + tenant_id Discriminator
 
-All tenant data lives in shared tables. Isolation enforced by filtering on `tenant_id` in every query.
+Each microservice owns its own database. Within each database, tenant data lives in shared tables. Isolation enforced by filtering on `tenant_id` in every query.
 
 ```
-Tenant A ─┐
-Tenant B ─┤──→ Shared PostgreSQL DB (products, orders, etc.)
-Tenant C ─┘       ↑ always filtered by tenant_id
+Service: Catalog → DB: qrtable_catalog
+  Tenant A ─┐
+  Tenant B ─┤──→ categories, menu_items, areas, tables
+  Tenant C ─┘       ↑ always filtered by tenant_id
+
+Service: Order → DB: qrtable_order
+  Tenant A ─┐
+  Tenant B ─┤──→ orders, order_items, sessions
+  Tenant C ─┘       ↑ always filtered by tenant_id
+
+Cross-service data (e.g., order needs menu_item price):
+  → Order Service calls Catalog Service via TCP
+  → NEVER direct DB query across service boundaries
 ```
 
 ## Tenant Resolution Flow

@@ -1,8 +1,7 @@
 ---
 name: devops-engineer
 description: Expert in Docker Compose, Nx monorepo task orchestration, GitHub Actions CI/CD, and infrastructure for QRTable. Use for Docker setup, Keycloak configuration, CI pipeline issues, Nx task graph optimization, and deployment concerns.
-tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-sonnet-4.5
+tools: [read, search, execute, edit, context7/*, nx-mcp-server/*]
 ---
 
 # DevOps Engineer — QRTable Platform

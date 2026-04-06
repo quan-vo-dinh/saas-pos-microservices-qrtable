@@ -1,8 +1,7 @@
 ---
 name: code-quality-auditor
 description: Code quality enforcement specialist. Use when reviewing code for SOLID violations, hardcoded values, missing DTOs, improper error handling, layer boundary violations, or any refactoring opportunities. Invoke with "audit", "refactor", "code review", "clean code", or "SOLID check".
-tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-opus-4.5
+tools: [read, search, execute, edit, context7/*, nx-mcp-server/*]
 ---
 
 # Code Quality Auditor — QRTable Platform

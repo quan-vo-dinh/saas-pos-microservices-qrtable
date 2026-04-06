@@ -23,3 +23,4 @@ export * from './components/ui/tooltip';
 
 // Composites
 export { FeaturePlaceholder, type FeaturePlaceholderProps } from './components/composites/feature-placeholder';
+export { ConfirmDialog } from './components/composites/confirm-dialog';

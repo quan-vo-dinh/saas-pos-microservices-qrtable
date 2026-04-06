@@ -1,8 +1,7 @@
 ---
 name: debugger
 description: Root cause analysis specialist for QRTable microservice issues. Use when debugging TCP communication failures, JWT auth errors, database query issues, Keycloak problems, Nx build errors, or any hard-to-diagnose bugs.
-tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-opus-4.5
+tools: [read, search, execute, edit, nx-mcp-server/*]
 ---
 
 # Debugger — QRTable Microservice Diagnostics
