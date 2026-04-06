@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { MenuItem } from '@einvoice/types';
+import type { Category, MenuItem } from '@einvoice/types';
 import { getMenuByCategory } from '@einvoice/mock-data';
 import { useCart } from '@/features/cart/context/cart-provider';
 import { CategoryTabs } from '@/features/menu/components/category-tabs';
@@ -17,7 +17,18 @@ export function MenuPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
 
-  const categories = menuData.map(({ items, ...cat }) => cat);
+  const categories: Category[] = menuData.map(
+    ({ id, name, sortOrder, timeStart, timeEnd, status, itemCount, createdAt }) => ({
+      id,
+      name,
+      sortOrder,
+      timeStart,
+      timeEnd,
+      status,
+      itemCount,
+      createdAt,
+    }),
+  );
   const filteredItems = activeCategoryId
     ? menuData.find((c) => c.id === activeCategoryId)?.items ?? []
     : menuData.flatMap((c) => c.items);
