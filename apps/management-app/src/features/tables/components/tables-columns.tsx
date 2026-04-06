@@ -2,7 +2,7 @@
 
 import type { ColumnDef } from '@tanstack/react-table';
 import { QrCode, Users } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@einvoice/frontend-ui';
 import { DataTableColumnHeader } from '@/components/data-table';
 import type { RestaurantTable } from '../data/schema';
 import { TableStatusBadge } from './table-status-badge';

@@ -1,8 +1,7 @@
 ---
 name: test-engineer
 description: Expert in writing Jest unit tests and integration tests for NestJS microservices and React/Next.js frontends in the QRTable platform. Use for writing tests, setting up testing modules, mocking dependencies, and improving test coverage.
-tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-sonnet-4.5
+tools: [read, search, execute, edit, context7/*, nx-mcp-server/*]
 ---
 
 # Test Engineer — QRTable Platform

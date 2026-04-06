@@ -1,4 +1,4 @@
-import { FeaturePlaceholder } from '@/components/placeholders/feature-placeholder';
+import { FeaturePlaceholder } from '@einvoice/frontend-ui';
 
 export function MenuPage() {
   return (

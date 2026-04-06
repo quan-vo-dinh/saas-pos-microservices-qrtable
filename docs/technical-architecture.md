@@ -38,14 +38,14 @@ QRTable là nền tảng SaaS (Software as a Service) phục vụ ngành F&B, ch
 
 ### 1.2 Phạm vi Kỹ thuật
 
-| Khía cạnh            | Quyết định                                               |
-| -------------------- | -------------------------------------------------------- |
-| **Kiểu kiến trúc**   | Event-Driven Microservices                               |
-| **Mô hình SaaS**     | Multi-Tenant, Shared Database (Discriminator Column)     |
-| **Giao tiếp**        | TCP (sync), gRPC (auth), Kafka (async), WebSocket (push) |
-| **Tổ chức mã nguồn** | Nx Monorepo                                              |
-| **Triển khai**       | Docker + Docker Compose                                  |
-| **Môi trường**       | Self-hosted VPS / Cloud VM                               |
+| Khía cạnh            | Quyết định                                                              |
+| -------------------- | ----------------------------------------------------------------------- |
+| **Kiểu kiến trúc**   | Event-Driven Microservices                                              |
+| **Mô hình SaaS**     | Multi-Tenant, Database-per-Service + Discriminator Column (`tenant_id`) |
+| **Giao tiếp**        | TCP (sync), gRPC (auth), Kafka (async), WebSocket (push)                |
+| **Tổ chức mã nguồn** | Nx Monorepo                                                             |
+| **Triển khai**       | Docker + Docker Compose                                                 |
+| **Môi trường**       | Self-hosted VPS / Cloud VM                                              |
 
 ### 1.3 Actors
 
@@ -388,48 +388,87 @@ KDS
 
 ## 5. CHIẾN LƯỢC MULTI-TENANCY
 
-### 5.1 Mô hình: Shared Database — Discriminator Column
+### 5.1 Mô hình: Database-per-Service + Discriminator Column (`tenant_id`)
 
-Tất cả tenants chia sẻ cùng database instances. Cô lập dữ liệu được thực thi bằng cột `tenant_id` trên mọi entity.
+Hệ thống kết hợp **2 pattern** bổ sung cho nhau:
+
+1. **Database-per-Service** (Microservice pattern): Mỗi microservice sở hữu database riêng biệt, không truy cập trực tiếp database của service khác. Cross-service data access thông qua TCP hoặc Kafka events.
+
+2. **Shared Database per Tenant — Discriminator Column** (Multi-tenancy pattern): Trong mỗi database của từng service, tất cả tenants chia sẻ cùng tables. Cô lập dữ liệu được thực thi bằng cột `tenant_id` trên mọi tenant-scoped entity.
+
+```
+PostgreSQL Instance (1 server, port 5432)
+│
+├── DB "qrtable_saas"                   ← SaaS Management Service
+│   ├── tenants                          (KHÔNG có tenant_id — root entity)
+│   ├── pricing_plans                    (KHÔNG có tenant_id — platform-level)
+│   └── subscriptions                    (CÓ tenant_id)
+│
+├── DB "qrtable_catalog"                ← Catalog Service
+│   ├── categories                       (CÓ tenant_id)
+│   ├── menu_items                       (CÓ tenant_id)
+│   ├── areas                            (CÓ tenant_id)
+│   └── tables                           (CÓ tenant_id)
+│
+├── DB "qrtable_order"                  ← Order Service
+│   ├── orders                           (CÓ tenant_id)
+│   ├── order_items                      (CÓ tenant_id)
+│   └── service_requests                 (CÓ tenant_id)
+│
+├── DB "qrtable_payment"               ← Payment Service
+│   ├── bills                            (CÓ tenant_id)
+│   ├── payments                         (CÓ tenant_id)
+│   └── refunds                          (CÓ tenant_id)
+│
+MongoDB Instance (1 server, port 27017)
+├── DB "qrtable_auth"                   ← User-Access Service
+│   ├── users                            (CÓ tenant_id)
+│   └── roles                            (KHÔNG có tenant_id — global)
+│
+├── DB "qrtable_notification"           ← Notification Service
+│   └── notification_logs                (CÓ tenant_id)
+```
+
+**Lưu ý:** Kitchen Service **không có database riêng** — sử dụng Redis only cho KDS queue (Sorted Set).
+
+**Ví dụ data isolation trong 1 database (qrtable_catalog):**
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│               PostgreSQL Instance                    │
+│  DB: qrtable_catalog                                 │
 │                                                     │
-│  ┌─────────────────────────────────────────────┐    │
-│  │  Table: orders                               │    │
-│  │  ┌──────────┬───────────┬──────────────────┐ │    │
-│  │  │ tenant_id│ order_id  │ ...data...       │ │    │
-│  │  ├──────────┼───────────┼──────────────────┤ │    │
-│  │  │ t-001    │ ord-101   │ Phở bò x2       │ │    │
-│  │  │ t-001    │ ord-102   │ Cà phê x1       │ │    │
-│  │  │ t-002    │ ord-201   │ Pizza x1        │ │    │
-│  │  │ t-002    │ ord-202   │ Pasta x3        │ │    │
-│  │  └──────────┴───────────┴──────────────────┘ │    │
-│  │                                               │    │
-│  │  INDEX: (tenant_id, created_at)               │    │
-│  │  INDEX: (tenant_id, table_id)                 │    │
-│  │  UNIQUE: (tenant_id, table_name)              │    │
-│  └─────────────────────────────────────────────┘    │
+│  Table: categories                                   │
+│  ┌──────────┬───────────┬──────────────────┐        │
+│  │ tenant_id│ id        │ name             │        │
+│  ├──────────┼───────────┼──────────────────┤        │
+│  │ t-001    │ cat-101   │ Phở & Bún        │        │
+│  │ t-001    │ cat-102   │ Nước uống        │        │
+│  │ t-002    │ cat-201   │ Pizza            │        │
+│  │ t-002    │ cat-202   │ Pasta            │        │
+│  └──────────┴───────────┴──────────────────┘        │
+│                                                     │
+│  INDEX: (tenant_id, created_at)                     │
+│  UNIQUE: (tenant_id, name)                          │
 └─────────────────────────────────────────────────────┘
 ```
 
-**Lý do chọn:**
+**Lý do chọn mô hình kết hợp:**
 
-- Tối ưu tài nguyên — 1 instance PostgreSQL duy nhất
-- Đơn giản hóa migration — 1 schema apply cho tất cả tenants
-- Phù hợp MVP — dễ triển khai, dễ demo, dễ debug
-- Có thể nâng cấp lên Schema-per-Tenant nếu cần scale
+- **Database-per-Service:** Đúng chuẩn microservice → service independence, deploy/scale riêng, schema evolution không ảnh hưởng service khác
+- **Discriminator Column (tenant_id):** Tối ưu tài nguyên (1 PostgreSQL instance), đơn giản migration, phù hợp MVP/luận văn
+- **Trade-off:** Không có physical isolation giữa tenants (chấp nhận được cho scope luận văn). Nếu cần nâng cấp → chuyển sang Schema-per-Tenant hoặc Database-per-Tenant
 
 ### 5.2 Enforcement Rules
 
 ```yaml
 Database Level:
-  - Mọi entity: tenant_id UUID NOT NULL
+  - Mỗi service sở hữu database riêng (env: TYPEORM_DATABASE=qrtable_{service})
+  - Mọi tenant-scoped entity: tenant_id UUID NOT NULL
   - Composite indexes: (tenant_id, id), (tenant_id, created_at)
   - Unique constraints bao gồm tenant_id: UNIQUE(tenant_id, table_name)
   - TypeORM Entity Subscriber: auto-set tenant_id on INSERT
   - Global Query Filter: auto-append WHERE tenant_id = :tid
+  - Cross-service data: PHẢI qua TCP/Kafka, KHÔNG truy cập DB trực tiếp
 
 Cache Level (Redis):
   - Key pattern: {entity}:{tenant_id}:{resource_id}
@@ -488,16 +527,17 @@ File Storage Level:
 
 ### 6.1 Service Catalog
 
-| #   | Service                  | Transport     | Database     | Vai trò                                                     |
-| --- | ------------------------ | ------------- | ------------ | ----------------------------------------------------------- |
-| 1   | **BFF Service**          | HTTP + WS     | —            | API Gateway, WebSocket Gateway, Guard chain, Swagger        |
-| 2   | **Auth Service**         | gRPC          | — (Keycloak) | JWT verification, token introspection, user info retrieval  |
-| 3   | **SaaS Mgmt Service**    | TCP           | PostgreSQL   | Tenant CRUD, Subscription lifecycle, Pricing Plans          |
-| 4   | **Catalog Service**      | TCP           | PostgreSQL   | Menu (Category + Item), Table & Area, QR token management   |
-| 5   | **Order Service**        | TCP           | PostgreSQL   | Order state machine, Cart/Session, Stock locking            |
-| 6   | **Kitchen Service**      | TCP + Kafka   | Redis        | KDS ticket routing, FIFO queue, SLA monitoring, batching    |
-| 7   | **Payment Service**      | TCP + Webhook | PostgreSQL   | Stripe Checkout, Cash flow, Payment records, Reconciliation |
-| 8   | **Notification Service** | Kafka         | MongoDB      | Email (SMTP), Push events, Audit log                        |
+| #   | Service                  | Transport     | Database               | Vai trò                                                     |
+| --- | ------------------------ | ------------- | ---------------------- | ----------------------------------------------------------- |
+| 1   | **BFF Service**          | HTTP + WS     | — (stateless)          | API Gateway, WebSocket Gateway, Guard chain, Swagger        |
+| 2   | **Auth Service**         | gRPC          | — (Keycloak external)  | JWT verification, token introspection, user info retrieval  |
+| 3   | **SaaS Mgmt Service**    | TCP           | PG: `qrtable_saas`     | Tenant CRUD, Subscription lifecycle, Pricing Plans          |
+| 4   | **Catalog Service**      | TCP           | PG: `qrtable_catalog`  | Menu (Category + Item), Table & Area, QR token management   |
+| 5   | **Order Service**        | TCP           | PG: `qrtable_order`    | Order state machine, Cart/Session, Stock locking            |
+| 6   | **Kitchen Service**      | TCP + Kafka   | Redis only             | KDS ticket routing, FIFO queue, SLA monitoring, batching    |
+| 7   | **Payment Service**      | TCP + Webhook | PG: `qrtable_payment`  | Stripe Checkout, Cash flow, Payment records, Reconciliation |
+| 8   | **Notification Service** | Kafka         | Mongo: `qrtable_notif` | Email (SMTP), Push events, Audit log                        |
+| 9   | **User-Access Service**  | TCP           | Mongo: `qrtable_auth`  | User profile, Role mapping, Staff management                |
 
 ### 6.2 Chi tiết theo Domain
 

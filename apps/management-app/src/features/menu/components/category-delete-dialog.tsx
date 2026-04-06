@@ -1,6 +1,6 @@
 'use client';
 
-import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ConfirmDialog } from '@einvoice/frontend-ui';
 import { useMenu } from './menu-provider';
 
 export function CategoryDeleteDialog() {

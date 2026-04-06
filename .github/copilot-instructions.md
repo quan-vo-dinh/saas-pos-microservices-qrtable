@@ -2,6 +2,23 @@
 
 > Restaurant QR-code ordering SaaS platform. Nx monorepo, NestJS microservices + React/Next.js frontends.
 
+## 🤖 AI Behavior & Workflow Integration (CRITICAL)
+
+You are operating in an integrated environment combining the **Superpower Framework** workflow and the current **Workspace Context**. To ensure code quality, you MUST strictly adhere to the following rules:
+
+1. **Role Separation (Workflow vs. Context):**
+   - **The Workflow (HOW):** Always apply the Superpower mindset: Requirement Analysis -> Brainstorming/Planning -> TDD (if applicable) -> Coding -> Systematic Debugging -> Self-Verification (Verify). NEVER jump straight into writing implementation code without clarifying the solution first.
+   - **The Context (WHAT):** When starting to design and write code, **all architecture, ports, conventions, and design patterns MUST be strictly derived from this document and the files within the `.github/` directory.**
+
+2. **Conflict Resolution:**
+   - If there is a contradiction between the general principles of Superpower and the specific configurations in `.github/`, **the rules defined in `.github/` (especially this file) act as the Single Source of Truth and hold the highest priority.**
+
+3. **Current Codebase vs. Standards (DISCLAIMER):**
+   - The rules, architecture, and flows documented here are **TARGET STANDARDS**.
+   - The current codebase may contain technical debt, hardcoding, or bad patterns. When reading existing files for context, you are **STRICTLY FORBIDDEN from copying these bad patterns**. You must apply Clean Code principles, SOLID, and the structures defined herein to refactor or generate new code.
+
+---
+
 ## Architecture
 
 **Backend** — Event-driven microservices (NestJS hybrid apps: HTTP + TCP/gRPC):
@@ -23,7 +40,7 @@
 | customer-pwa   | React 19 + Vite + React Router v7 + shadcn/ui + TanStack Query    | 5173 |
 | management-app | Next.js 16 (App Router + RSC) + NextAuth v5 + Zustand + shadcn/ui | 3000 |
 
-**Multi-tenancy:** Shared DB with `tenant_id` discriminator column. `TenantMiddleware` resolves tenant from header/subdomain/JWT.
+**Multi-tenancy:** Database-per-Service + `tenant_id` discriminator column. Each service has its own DB (e.g., `qrtable_catalog`, `qrtable_order`). `TenantMiddleware` resolves tenant from header/subdomain/JWT.
 
 See [docs/technical-architecture.md](../docs/technical-architecture.md) for full system design.
 See [docs/step-0-2-pragmatic-layered-architecture.md](../docs/step-0-2-pragmatic-layered-architecture.md) for layered architecture details.

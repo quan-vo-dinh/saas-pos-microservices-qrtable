@@ -1,3 +1,5 @@
+'use client';
+
 export type FeaturePlaceholderProps = {
   section: string;
   title: string;

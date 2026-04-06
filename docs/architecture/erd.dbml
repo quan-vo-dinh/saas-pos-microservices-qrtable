@@ -1,9 +1,20 @@
 // QRTable ERD - Step 0.3 (orientation model)
 // NOTE: This schema is a planning baseline and will evolve iteratively in later phases.
+//
+// DATABASE-PER-SERVICE ARCHITECTURE:
+//   DB "qrtable_saas"     → tenants, pricing_plans, subscriptions
+//   DB "qrtable_catalog"  → categories, menu_items, areas, tables
+//   DB "qrtable_order"    → orders, order_items, sessions, service_requests (Phase 2)
+//   DB "qrtable_payment"  → bills, payments, refunds (Phase 3)
+//   MongoDB "qrtable_auth" → users, roles (User-Access Service)
+//
+// MULTI-TENANCY: Discriminator Column (tenant_id) trên mọi tenant-scoped entity.
+// Cross-service references (VD: order.table_id → tables.id) là logical FK,
+// KHÔNG enforce bằng DB foreign key constraint (vì khác database).
 
 Project qrtable_step_0_3 {
   database_type: "PostgreSQL"
-  Note: "Orientation-only ERD for thesis reporting and architecture alignment"
+  Note: "Orientation-only ERD for thesis reporting and architecture alignment. Database-per-Service with tenant_id discriminator."
 }
 
 Enum tenant_status {
@@ -312,28 +323,66 @@ Table service_requests {
   }
 }
 
+// // ─────────────────────────────────────────────────
+// // TABLE GROUPS — Database-per-Service boundaries
+// // ─────────────────────────────────────────────────
+
+// TableGroup qrtable_saas [color: #3498db] {
+//   tenants
+//   pricing_plans
+//   subscriptions
+// }
+
+// TableGroup qrtable_catalog [color: #2ecc71] {
+//   categories
+//   menu_items
+//   areas
+//   tables
+// }
+
+// TableGroup qrtable_order [color: #e67e22] {
+//   sessions
+//   orders
+//   order_items
+//   service_requests
+// }
+
+// TableGroup qrtable_payment [color: #9b59b6] {
+//   bills
+//   payments
+//   refunds
+// }
+
+// ─────────────────────────────────────────────────
+// RELATIONSHIPS
+// ─────────────────────────────────────────────────
+
+// Intra-service relationships (ENFORCED by DB foreign key)
 Ref: subscriptions.tenant_id > tenants.id
 Ref: subscriptions.pricing_plan_id > pricing_plans.id
-Ref: categories.tenant_id > tenants.id
-Ref: menu_items.tenant_id > tenants.id
 Ref: menu_items.category_id > categories.id
-Ref: areas.tenant_id > tenants.id
-Ref: tables.tenant_id > tenants.id
 Ref: tables.area_id > areas.id
-Ref: sessions.tenant_id > tenants.id
-Ref: sessions.table_id > tables.id
+Ref: orders.session_id > sessions.id
+Ref: order_items.order_id > orders.id
+Ref: bills.session_id > sessions.id
+Ref: payments.bill_id > bills.id
+Ref: refunds.payment_id > payments.id
+
+// Cross-service relationships (LOGICAL only — NOT enforced by DB FK, resolved via TCP/Kafka)
+// These references cross database boundaries. Data integrity maintained at application level.
+Ref: categories.tenant_id > tenants.id 
+Ref: menu_items.tenant_id > tenants.id
+Ref: areas.tenant_id > tenants.id
+Ref: tables.tenant_id > tenants.id 
+Ref: sessions.tenant_id > tenants.id 
+Ref: sessions.table_id > tables.id 
 Ref: orders.tenant_id > tenants.id
 Ref: orders.table_id > tables.id
-Ref: orders.session_id > sessions.id
 Ref: order_items.tenant_id > tenants.id
-Ref: order_items.order_id > orders.id
 Ref: order_items.menu_item_id > menu_items.id
-Ref: bills.tenant_id > tenants.id
-Ref: bills.session_id > sessions.id
-Ref: payments.tenant_id > tenants.id
-Ref: payments.bill_id > bills.id
+Ref: bills.tenant_id > tenants.id 
+Ref: payments.tenant_id > tenants.id 
 Ref: refunds.tenant_id > tenants.id
-Ref: refunds.payment_id > payments.id
 Ref: service_requests.tenant_id > tenants.id
-Ref: service_requests.table_id > tables.id
+Ref: service_requests.table_id > tables.id 
 Ref: service_requests.session_id > sessions.id

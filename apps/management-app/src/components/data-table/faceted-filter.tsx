@@ -1,10 +1,10 @@
 'use client';
 
+import { Badge, Button, Popover, PopoverContent, PopoverTrigger, Separator } from '@einvoice/frontend-ui'
 import type { Column } from '@tanstack/react-table';
 import { Check, PlusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+;
 import {
   Command,
   CommandEmpty,
@@ -14,12 +14,7 @@ import {
   CommandList,
   CommandSeparator,
 } from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
+;
 
 type FacetedFilterOption = {
   label: string;

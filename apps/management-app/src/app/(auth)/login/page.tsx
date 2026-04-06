@@ -1,6 +1,6 @@
 import { KeyRound } from 'lucide-react';
 import { signIn } from '@/auth';
-import { Button } from '@/components/ui/button';
+import { Button } from '@einvoice/frontend-ui';
 
 type LoginPageProps = {
   searchParams: Promise<{

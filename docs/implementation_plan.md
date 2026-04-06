@@ -2,18 +2,6 @@
 
 ## QRTable SaaS POS — Luận Văn Tốt Nghiệp
 
-> **Nguyên tắc thực thi (GOLDEN RULE):** Trước khi thực hiện BẤT KỲ tác vụ nào (Frontend, Backend, DB, UI Design...), Agent bắt buộc phải kiểm tra xem trong `.agent/skills/` hoặc các Rule hiện có đã định nghĩa chuẩn mực/nguyên tắc cho tác vụ đó chưa. Nếu có, **BẮT BUỘC** phải tuân thủ và áp dụng các nguyên tắc đó (VD: Clean Code, Architecture, Clean UI...).
->
-> **Quy trình: Mỗi Phase tuân thủ dòng chảy tuyến tính UI-First:** > `📚 Học → 🎨 Mock UI → 📝 Shared Types → ⚙️ Backend → 🔗 Tích hợp → ✅ Verify`
->
-> **Mục tiêu Kiến trúc & Tư duy:**
->
-> - `clean-code` — SRP, DRY, KISS, YAGNI, Guard Clauses, max 20 dòng/hàm
-> - `architecture` — Trade-off analysis, ADR documentation, pattern selection
-> - `api-patterns` — REST conventions, response format chuẩn hóa
-> - `database-design` — Schema design, indexing, TypeORM best practices
-> - `testing-patterns` — Test pyramid, AAA pattern
->
 > **Nguyên tắc Frontend & UI/UX:** Áp dụng các skills từ `.agent/skills/`:
 >
 > - `frontend-design` — Tuân thủ các nguyên tắc thiết kế UI/UX hiện đại
@@ -30,9 +18,13 @@
   ─────        ────────                            ───────      ─────────
   Phase 0      Refactor Codebase gốc               ✅ 1-104      ~1 tuần
   Phase 1      Catalog + Menu + Table               105-110      ~2-3 tuần
-  Phase 2      Ordering + KDS (Kafka)               115-123      ~2-3 tuần
+  Pre-Ph.2     Permission & Seed Extension          —            ~0.5-1 ngày
+  Phase 2A     Order Service + Kafka                115-123      ~1.5-2 tuần
+  Phase 2B     Kitchen/KDS + WebSocket Gateway      115-123      ~1-1.5 tuần
   Phase 3      Payment (Stripe + Cash)              111-113      ~1-2 tuần
-  Phase 4      Saga + SaaS + Edge Cases             124-129      ~1-2 tuần
+  Phase 4A     Saga + Hardening                     124-129      ~1 tuần
+  Phase 4B     SaaS + Tenant Onboarding             124-129      ~1 tuần
+  Phase 4C     Notification + Staff Management      —            ~1 tuần
   Phase 5      Testing Strategy                     130-135      ~1-2 tuần
   Phase 6      Observability Stack                  136-151      ~1-2 tuần
   Phase 7      Docker Deploy + Demo                 152-155      ~1 tuần
@@ -406,9 +398,64 @@ export interface IMenuResponse { categories: (ICategory & { items: IMenuItem[] }
 
 ---
 
-## PHASE 2 — ORDERING + KDS (~2-3 tuần)
+## PRE-PHASE 2 — PERMISSION & SEED EXTENSION (~0.5-1 ngày)
 
-> **Mục tiêu:** Đặt món → Staff xác nhận → Bếp nhận đơn → Real-time tracking.
+> **Mục tiêu:** Mở rộng hệ thống Permission để sẵn sàng cho Phase 2-3-4. Đây là **blocking prerequisite** — không code Phase 2 khi chưa hoàn thành.
+>
+> **Tham chiếu:** Review finding 3.2 — Permission Enum hiện tại chỉ có SAAS*\*, CATALOG*\_, INVOICE\__, USER*\*, ROLE*_, PRODUCT\_\_. Thiếu hoàn toàn các domain mới.
+
+### Step 2.0 — Mở rộng PERMISSION Enum & Role Seed Data
+
+```
+1. Mở rộng PERMISSION enum trong libs/constants/src/lib/enum/role.enum.ts:
+
+   // Order domain
+   → ORDER_CREATE, ORDER_CONFIRM, ORDER_CANCEL, ORDER_GET_LIST, ORDER_GET_BY_ID
+
+   // Kitchen domain
+   → KITCHEN_GET_QUEUE, KITCHEN_UPDATE_TICKET, KITCHEN_RECALL
+
+   // Payment domain
+   → PAYMENT_CREATE, PAYMENT_CONFIRM_CASH, PAYMENT_REFUND, PAYMENT_GET_HISTORY
+
+   // Table management domain
+   → TABLE_CREATE, TABLE_UPDATE, TABLE_DELETE, TABLE_TRANSFER, TABLE_UPDATE_STATUS
+
+   // Service request domain
+   → SERVICE_REQUEST_CREATE, SERVICE_REQUEST_ACKNOWLEDGE, SERVICE_REQUEST_RESOLVE
+
+2. Cập nhật Role → Permission mapping (role seed data):
+   → OWNER: tất cả permissions
+   → MANAGER: tất cả trừ SAAS_* (quản lý platform)
+   → WAITER: ORDER_CONFIRM, ORDER_GET_*, PAYMENT_CONFIRM_CASH,
+             TABLE_TRANSFER, TABLE_UPDATE_STATUS, SERVICE_REQUEST_*,
+             CATALOG_GET_*
+   → CHEF: KITCHEN_*, CATALOG_GET_*
+   → BARISTA: KITCHEN_*, CATALOG_GET_*
+   → CUSTOMER: không cần Permission (controlled tại controller level bằng SessionGuard)
+
+3. Re-seed MongoDB roles → verify auth flow vẫn hoạt động:
+   → pnpm auth:bootstrap:all (hoặc seed script tương ứng)
+   → Test: User có role WAITER → gọi được ORDER_CONFIRM endpoint
+   → Test: User có role CHEF → KHÔNG gọi được PAYMENT_* endpoint
+
+4. Document Permission Matrix mới (markdown table) → lưu vào docs/architecture/permission-matrix.md
+```
+
+### ✅ Acceptance Criteria Pre-Phase 2
+
+- [ ] PERMISSION enum có đầy đủ 5 domain mới (Order, Kitchen, Payment, Table, ServiceRequest)
+- [ ] Role seed data cập nhật đúng mapping cho 5 roles
+- [ ] Re-seed thành công, auth flow không bị break
+- [ ] Permission Matrix document tồn tại trong docs/architecture/
+
+---
+
+## PHASE 2A — ORDER SERVICE + KAFKA (~1.5-2 tuần)
+
+> **Mục tiêu:** Đặt món → Staff xác nhận → Order state machine + Stock locking + Session/Cart management.
+>
+> **Lý do tách:** Phase 2 gốc gộp Order + Kitchen + Kafka + WebSocket vào 7-10 ngày cho 1 người là không khả thi. Tách thành 2A (Order core) và 2B (Kitchen + WebSocket) giảm risk và cho phép verify từng phần.
 
 ### Step 2.1 — 📚 Học Kafka (3-4 ngày, song song với Step 2.2)
 
@@ -471,7 +518,7 @@ export interface IOrderStatusEvent { orderId: string; status: OrderStatus; }
 export interface IKDSTicket { ticketId: string; tableId: string; items: ...; priority: boolean; }
 ```
 
-### Step 2.4 — ⚙️ Build Backend: Order + Kitchen Services + Kafka (7-10 ngày)
+### Step 2.4 — ⚙️ Build Backend: Order Service + Kafka Setup (5-7 ngày)
 
 ```
 1. Docker Compose: thêm Kafka + Zookeeper containers
@@ -482,65 +529,142 @@ export interface IKDSTicket { ticketId: string; tableId: string; items: ...; pri
    → Entities: orders, order_items, bills, service_requests
    → Session Management (Redis): session:{tid}:{sid}, TTL 2h, idle 30min
    → Shared Cart (Redis): cart:{tid}:{sid}, Hash + version field
+     + Cart version check (optimistic locking)
+     + Broadcast cart changes tới các device khác cùng session
    → Order State Machine: transition validation + actor checks
-   → Stock Locking: SELECT ... FOR UPDATE
+   → Stock Locking: SELECT ... FOR UPDATE (pessimistic locking)
    → Bill Aggregation: merge orders per session
    → Table Transfer: atomic transaction
+   → Service Request entity: service_requests (id, tenant_id, table_id, session_id, type, status, created_at)
+     + Types: CALL_STAFF | REQUEST_BILL | GENERAL_HELP
    → Kafka Producer: order.created, order.confirmed, service.requested
 
-4. Khởi tạo apps/kitchen/ (service thuần Kafka Consumer — pattern mới):
-   → Áp dụng Pragmatic Layered Architecture
-   → Kafka Consumer: order.confirmed → tạo KDS ticket
-   → Redis Sorted Set: kds:{tid}:kitchen / kds:{tid}:bar (FIFO queue)
-   → Ticket routing: food → kitchen, drink → bar
-   → Batching logic + SLA monitoring + Priority flagging
-   → Kafka Producer: kitchen.item_ready
+4. BFF REST Endpoints (Order):
+   → POST /api/v1/orders               (Customer — SessionGuard)
+   → PATCH /api/v1/orders/:id/confirm   (Staff — UserGuard + ORDER_CONFIRM permission)
+   → PATCH /api/v1/orders/:id/cancel    (Customer: Pending only, Manager: Processing)
+   → GET  /api/v1/orders                (Staff — ORDER_GET_LIST permission)
+   → GET  /api/v1/orders/:id            (Staff/Customer — ORDER_GET_BY_ID permission)
+   → POST /api/v1/cart                  (Customer — SessionGuard)
+   → GET  /api/v1/cart                  (Customer — SessionGuard)
+   → POST /api/v1/service-requests      (Customer — SessionGuard)
+   → PATCH /api/v1/service-requests/:id/acknowledge (Staff — SERVICE_REQUEST_ACKNOWLEDGE)
 
-5. BFF WebSocket Gateway:
-   → Socket.io setup + Redis Adapter (scaling)
-   → Rooms: tenant:{tid}:staff, session:{sid}:customer, tenant:{tid}:kds:*
-   → Kafka Consumer → WebSocket bridge (broadcast events to rooms)
-
-6. BFF REST Endpoints:
-   → POST /api/v1/orders          (Customer — SessionGuard)
-   → PATCH /api/v1/orders/:id/confirm  (Staff — UserGuard)
-   → GET  /api/v1/kds/queue       (Chef — UserGuard)
-   → POST /api/v1/service-requests (Customer)
-
-7. Verify Backend: Postman + WebSocket tester (Postman WS) ✅
+5. Verify Backend: Postman test tất cả Order endpoints ✅
 ```
 
-### Step 2.5 — 🔗 Tích hợp FE ↔ BE (3-4 ngày)
+### Step 2.5 — 🔗 Tích hợp FE ↔ BE: Order + Cart (2-3 ngày)
 
 ```
 1. libs/frontend/hooks/:
    → useCart(sessionId) — Redis cart via API
    → useSubmitOrder() — POST /orders + idempotency key
+
+2. Customer PWA → real API:
+   → Cart: API calls thay mock, optimistic updates
+   → Order submit: loading → success animation → redirect tracking page
+   → Service Request buttons: gọi API thực
+
+3. Management App → real API:
+   → /pos/: live order list (polling initially, WebSocket in Phase 2B)
+   → Actions: confirm/cancel → API calls
+
+4. Verify:
+   → Khách thêm giỏ hàng → submit đơn → Staff thấy đơn mới trên POS ✅
+   → Stock lock: 2 khách cùng món cuối → 1 nhận "Hết hàng" ✅
+```
+
+### ✅ Acceptance Criteria Phase 2A
+
+- [ ] Order CRUD E2E: tạo → confirm → cancel hoạt động đúng
+- [ ] Stock Lock: 2 khách cùng món cuối → 1 nhận "Hết hàng"
+- [ ] Shared cart: 2 device cùng bàn = cùng giỏ hàng (version-based)
+- [ ] Bill Aggregation: nhiều orders → 1 bill per session
+- [ ] Service request: khách nhấn → staff thấy trên POS
+- [ ] Kafka producer: order events emit thành công
+- [ ] Permission check: WAITER gọi được ORDER_CONFIRM, CHEF không gọi được
+
+---
+
+## PHASE 2B — KITCHEN SERVICE + WEBSOCKET GATEWAY (~1-1.5 tuần)
+
+> **Mục tiêu:** KDS real-time, WebSocket Gateway, Kafka consumer bridge → real-time tracking cho tất cả actors.
+
+### Step 2.6 — ⚙️ Build Backend: Kitchen Service + WebSocket (5-7 ngày)
+
+```
+1. Khởi tạo apps/kitchen/ (service thuần Kafka Consumer — pattern mới):
+   → Áp dụng Pragmatic Layered Architecture
+   → KHÔNG cần PostgreSQL riêng — dùng Redis only cho KDS queue
+   → Kafka Consumer: order.confirmed → tạo KDS ticket
+   → Redis Sorted Set: kds:{tid}:kitchen / kds:{tid}:bar (FIFO queue)
+   → Ticket routing: food items → kitchen queue, drink items → bar queue
+   → Batching logic: gom cùng món từ các order khác nhau
+   → SLA monitoring: timer per ticket, warning khi quá threshold
+   → Priority flagging: Manager/Owner có thể đánh dấu ticket ưu tiên
+   → Kafka Producer: kitchen.item_ready, kitchen.sla_warning
+
+2. BFF WebSocket Gateway:
+   → Socket.io setup + Redis Adapter (horizontal scaling ready)
+   → Connection authentication:
+     + Staff: JWT handshake (extract from Authorization header)
+     + Customer: Session cookie (x-session-id)
+   → Room assignment on connect:
+     + WAITER  → tenant:{tid}:staff
+     + CHEF    → tenant:{tid}:kds:kitchen
+     + BARISTA → tenant:{tid}:kds:bar
+     + OWNER/MANAGER → tenant:{tid}:management
+     + CUSTOMER → session:{sid}:customer
+   → Kafka Consumer bridge: mỗi topic → map tới room(s) tương ứng
+   → Reconnection handling + room re-join after disconnect
+
+3. BFF REST Endpoints (Kitchen):
+   → GET  /api/v1/kds/queue          (Chef/Barista — KITCHEN_GET_QUEUE)
+   → PATCH /api/v1/kds/:id/start     (Chef/Barista — KITCHEN_UPDATE_TICKET)
+   → PATCH /api/v1/kds/:id/done      (Chef/Barista — KITCHEN_UPDATE_TICKET)
+   → PATCH /api/v1/kds/:id/recall    (Chef/Barista — KITCHEN_RECALL)
+   → PATCH /api/v1/kds/:id/priority  (Owner/Manager only)
+
+4. Kafka Consumer → WebSocket broadcast mapping:
+   → order.created      → tenant:{tid}:staff room (POS notification)
+   → order.confirmed    → session:{sid}:customer (status update) + tenant:{tid}:kds:* (new ticket)
+   → kitchen.item_ready → session:{sid}:customer (item ready) + tenant:{tid}:staff (serve notification)
+   → service.requested  → tenant:{tid}:staff (service bell)
+   → menu.updated       → broadcast to all customer sessions of tenant (live menu sync)
+
+5. Verify: Postman + Socket.io Admin UI + WebSocket tester ✅
+```
+
+### Step 2.7 — 🔗 Tích hợp FE ↔ BE: Real-time (2-3 ngày)
+
+```
+1. libs/frontend/hooks/ bổ sung:
    → useOrderTracking(sessionId) — WebSocket room subscribe
    → useKDSQueue(station) — WebSocket + REST hybrid
    → useLiveOrders() — WebSocket staff room
 
-2. Customer PWA → real API + WebSocket:
-   → Cart: API calls thay mock, optimistic updates
-   → Order submit: loading → success animation → redirect tracking
+2. Customer PWA → WebSocket integration:
    → Order tracking: WebSocket events → update timeline real-time
+   → Menu auto-refresh khi nhận menu.updated event
 
-3. Management App → real API + WebSocket:
-   → /pos/: WebSocket → live order list auto-update
-   → /kds/: WebSocket → tickets slide in, status updates real-time
-   → Actions (confirm, done, recall) → API calls → broadcast
+3. Management App → WebSocket integration:
+   → /pos/: WebSocket → live order list auto-update (đơn mới slides in)
+   → /kds/kitchen + /kds/bar: WebSocket → tickets slide in, status updates real-time
+   → Actions (start, done, recall) → API calls → broadcast tới rooms
 
 4. Verify end-to-end:
    → Khách đặt món → Staff thấy ngay → Confirm → KDS thấy ngay → Done → Khách thấy Ready ✅
 ```
 
-### ✅ Acceptance Criteria Phase 2
+### ✅ Acceptance Criteria Phase 2B
 
-- [ ] Ordering E2E: đặt → confirm → KDS → ready → served — real-time
-- [ ] Stock Lock: 2 khách cùng món cuối → 1 nhận "Hết hàng"
 - [ ] KDS FIFO đúng thứ tự + batching gom cùng món
-- [ ] Shared cart: 2 device cùng bàn = cùng giỏ hàng
-- [ ] Service request: khách nhấn → staff nhận thông báo real-time
+- [ ] KDS routing: food → kitchen queue, drink → bar queue
+- [ ] Real-time: order event → WebSocket broadcast < 2 giây
+- [ ] Ordering E2E full flow: đặt → confirm → KDS → ready → served — real-time
+- [ ] WebSocket rooms: mỗi role chỉ nhận events phù hợp
+- [ ] SLA timer: ticket quá threshold → đổi màu warning
+- [ ] Reconnection: mất kết nối → auto re-join room → nhận lại pending events
 
 ---
 
@@ -602,7 +726,11 @@ Backend — Khởi tạo apps/payment/ (tham khảo template invoice/ cho Stripe
 
 ---
 
-## PHASE 4 — SAGA + SaaS + EDGE CASES (~1-2 tuần)
+## PHASE 4A — SAGA + HARDENING (~1 tuần)
+
+> **Mục tiêu:** Đảm bảo data consistency qua distributed transactions + hardening edge cases.
+>
+> **Lý do tách Phase 4:** Phase gốc gộp Saga + SaaS + Notification + Staff Management vào 1-2 tuần là quá tải. Tách thành 4A/4B/4C cho phép focus từng mảng.
 
 ### Step 4.1 — 📚 Học Saga (3-4 ngày)
 
@@ -610,41 +738,179 @@ Backend — Khởi tạo apps/payment/ (tham khảo template invoice/ cho Stripe
 Bài 124-129: Distributed transactions, Saga Orchestration, Compensation Flow
 ```
 
-### Step 4.2 — ⚙️ Build (song song — không cần Mock UI mới)
+### Step 4.2 — ⚙️ Saga + Hardening Implementation (4-5 ngày)
 
 ```
 1. Saga: Order Confirm Orchestration
    → Stock Lock → Create Order → Notify KDS → if fail → compensation rollback
+   → Compensation: rollback stock, mark order failed, notify customer
 
 2. Saga: Payment Complete Orchestration
-   → Close Session → Update Table → Archive Bill → if fail → revert
+   → Validate billing constraint: check all order items status === 'Ready' || 'Served'
+   → Close Session → Update Table Status → Archive Bill → if fail → revert
+   → Compensation: reopen session, revert table status
 
-3. SaaS Service hoàn thiện (apps/saas/):
-   → Tenant CRUD, Subscription lifecycle, Feature gating middleware
-   → max_tables, max_staff theo plan
+3. Hardening:
+   → max_orders_per_session = 20 (configurable per tenant plan)
+   → Idempotency: SET NX cho order creation (prevent double-submit)
+   → Delete constraints: không xóa được Category có MenuItem, MenuItem có OrderItem active
+   → Audit log: bắt buộc ghi log khi Cancel order (actor, reason, timestamp)
 
-4. Notification Service — Khởi tạo apps/notification/ (tham khảo template invoice/ cho Kafka consumer + email pattern):
-   → Kafka consumer → Nodemailer email (welcome, receipt)
-
-5. Hardening:
-   → max_orders_per_session = 20, idempotency SET NX, delete constraints
+4. Verify Saga:
+   → Happy path: order confirm → stock locked → KDS notified ✅
+   → Compensation: stock lock fail → order rolled back → customer notified ✅
+   → Idempotency: double-submit cùng idempotency key → 1 order only ✅
 ```
 
-### Step 4.3 — 🎨 UI: SaaS Admin Pages + 🔗 Tích hợp (3-4 ngày)
+### ✅ Acceptance Criteria Phase 4A
+
+- [ ] Saga compensation: stock lock fail → order không tạo, stock rollback
+- [ ] Billing validation: chặn thanh toán khi còn món chưa Ready
+- [ ] Idempotency: double-submit → 1 order
+- [ ] Delete constraints: xóa category có items → bị chặn
+- [ ] Audit log ghi nhận mọi cancel action
+
+---
+
+## PHASE 4B — SaaS + TENANT ONBOARDING (~1 tuần)
+
+> **Mục tiêu:** Hoàn thiện SaaS platform: tenant lifecycle, subscription, feature gating, và tenant onboarding flow.
+>
+> **Tham chiếu:** Review finding 3.3 — Thiếu luồng Tenant Onboarding.
+
+### Step 4.3 — ⚙️ SaaS Service + Tenant Onboarding (4-5 ngày)
 
 ```
-1. /dashboard/subscription — plan selection, usage display
-2. /admin/tenants — tenant directory (search, suspend, activate)
-3. /admin/plans — pricing plan CRUD
+1. SaaS Service hoàn thiện (apps/saas/):
+   → Tenant CRUD (đã có basic) + bổ sung:
+     + Slug/Subdomain generation: auto-generate từ tên nhà hàng
+     + Slug validation: unique check, reserved words filter
+     + Tenant status lifecycle: Active → Suspended → Closed
+   → Subscription lifecycle:
+     + Plan CRUD (Free, Basic, Premium)
+     + Assign plan to tenant + start/end date tracking
+     + Auto-suspend cron job: tenant hết hạn subscription → status = Suspended
+   → Feature Gating middleware:
+     + TenantPlanGuard: kiểm tra tenant plan → max_tables, max_staff, max_orders_per_day
+     + Response 402 (Payment Required) khi exceed plan limit
+     + Frontend: hiển thị upgrade prompt khi bị chặn
+
+2. Tenant Onboarding Flow (MVP — Admin-assisted):
+   → Backend: POST /api/v1/saas/tenants/onboard (SUPER_ADMIN hoặc self-service)
+     + Tạo tenant record + generate slug
+     + Auto-provision: tạo Keycloak user cho Owner + assign OWNER role
+
+     + Seed default data: 1 default area "Khu vực chung", currency VND
+     + Assign Free plan mặc định
+   → Verify: Sau onboard → Owner login → Dashboard trống nhưng hoạt động ✅
+
+3. [NICE-TO-HAVE] Self-service Registration Wizard UI:
+   → /register/restaurant — Multi-step form:
+     Step 1: Thông tin nhà hàng (tên, loại, địa chỉ)
+     Step 2: Thông tin Owner (email, password)
+     Step 3: Chọn gói dịch vụ
+     Step 4: Xác nhận & Tạo
+   → Gọi POST /api/v1/saas/tenants/onboard
+   → Redirect → Login → Dashboard
+
+   LƯU Ý: Nếu thiếu thời gian, skip wizard UI. Dùng API + Postman demo đủ cho luận văn.
+```
+
+### Step 4.4 — 🎨 UI: SaaS Admin Pages + 🔗 Tích hợp (3-4 ngày)
+
+```
+1. /dashboard/subscription — Plan selection, usage display (bàn đã dùng/max, staff count)
+2. /admin/tenants — Tenant directory (search, suspend, activate) — SUPER_ADMIN only
+3. /admin/plans — Pricing plan CRUD — SUPER_ADMIN only
 4. Tích hợp API + verify feature gating E2E
 ```
 
-### ✅ Acceptance Criteria Phase 4
+### ✅ Acceptance Criteria Phase 4B
 
-- [ ] Saga compensation: stock lock fail → order không tạo
-- [ ] Feature gating: Lite plan → max 10 bàn → bàn 11 bị chặn
-- [ ] Idempotency: double-submit → 1 order
-- [ ] Welcome email khi tenant.created
+- [ ] Feature gating: Free plan → max 10 bàn → bàn 11 bị chặn (402)
+- [ ] Tenant onboarding API: tạo tenant → Owner login thành công
+- [ ] Slug generation: "Phở Hà Nội" → "pho-ha-noi" (unique)
+- [ ] Subscription lifecycle: assign plan → track usage → auto-suspend khi hết hạn
+- [ ] Admin UI: SUPER_ADMIN quản lý tenants + plans
+
+---
+
+## PHASE 4C — NOTIFICATION + STAFF MANAGEMENT (~1 tuần)
+
+> **Mục tiêu:** Email notifications + Staff management cho Owner/Manager.
+>
+> **Tham chiếu:** Review finding 3.1 — Thiếu Staff Management hoàn toàn.
+
+### Step 4.5 — ⚙️ Notification Service (2-3 ngày)
+
+```
+1. Khởi tạo apps/notification/ (tham khảo template invoice/ cho Kafka consumer):
+   → Kafka consumers:
+     + tenant.created → Welcome email cho Owner (Nodemailer)
+     + payment.completed → Receipt email cho Customer (nếu có email)
+     + tenant.suspended → Warning email cho Owner
+   → Email templates: HTML templates với tenant branding
+   → Audit log: MongoDB collection lưu tất cả notification sent/failed
+   → Retry logic: 3 retries với exponential backoff cho failed emails
+```
+
+### Step 4.6 — ⚙️ Staff Management Backend (2-3 ngày)
+
+> **Quyết định kiến trúc:** Mở rộng user-access service thay vì tạo service mới. Lý do: giảm complexity, user-access đã có user CRUD infrastructure, và cho 1-person team thì ít service = ít maintenance.
+
+```
+1. Mở rộng apps/user-access/ — Staff module:
+   → POST   /api/v1/admin/staff/invite    (Owner/Manager — USER_CREATE permission)
+     + Input: email, role (WAITER/CHEF/BARISTA)
+     + Logic: Gọi Keycloak Admin API → tạo user + assign role
+     + Logic: Tạo user profile trong MongoDB (user-access DB)
+     + Output: Invitation sent (email with temp password hoặc setup link)
+   → GET    /api/v1/admin/staff            (Owner/Manager — USER_GET_ALL)
+     + List staff của tenant hiện tại (filter by tenant_id)
+   → PATCH  /api/v1/admin/staff/:id/role   (Owner only — ROLE_UPDATE)
+     + Thay đổi role staff (VD: WAITER → MANAGER)
+     + Cập nhật cả Keycloak realm role + MongoDB permission mapping
+   → DELETE /api/v1/admin/staff/:id        (Owner only — USER_DELETE)
+     + Soft delete: disable user trong Keycloak + deactivate trong MongoDB
+     + KHÔNG hard delete (audit trail)
+
+2. BFF proxy controllers:
+   → Forward requests từ Management App → user-access service qua TCP
+
+3. Keycloak Admin API integration:
+   → Sử dụng @keycloak/keycloak-admin-client package
+   → Service account với realm-management role
+   → Operations: createUser, assignRole, removeRole, disableUser
+```
+
+### Step 4.7 — 🎨 UI: Staff Management Page (2-3 ngày)
+
+```
+1. /dashboard/staff — Staff directory:
+   → Bảng: Tên, Email, Role, Trạng thái (Active/Disabled), Ngày tham gia
+   → Filter by role
+   → Search by name/email
+
+2. Invite Staff Dialog:
+   → Form: Email, Role dropdown (WAITER/CHEF/BARISTA/MANAGER)
+   → Validation: email unique trong tenant
+   → Gửi → Staff nhận email invite → Login lần đầu → Auto-provision
+
+3. Staff Detail / Edit:
+   → Thay đổi role
+   → Disable/Enable staff account
+   → Xem activity log (nice-to-have)
+
+4. Tích hợp API + verify
+```
+
+### ✅ Acceptance Criteria Phase 4C
+
+- [ ] Welcome email gửi thành công khi tenant.created
+- [ ] Owner invite staff → Staff nhận email → Login thành công với đúng role
+- [ ] Owner thay đổi role staff → Permissions cập nhật ngay (cả Keycloak + MongoDB)
+- [ ] Owner disable staff → Staff không login được nữa
+- [ ] Notification retry: email fail → retry 3 lần → ghi audit log
 
 ---
 
@@ -747,15 +1013,22 @@ Bài 147-151: Tempo + OTel → auto-instrumentation → context propagation TCP/
 
 ## MAPPING TỔNG: KHÓA HỌC → PHASE
 
-|   Bài   | Nội dung                                    |    Phase    |
-| :-----: | ------------------------------------------- | :---------: |
-|  1-104  | Foundation (Nx, TCP, gRPC, Keycloak, Redis) |   ✅ Done   |
-| 105-110 | TCP Service mới + Cloudinary upload         | **Phase 1** |
-| 111-113 | Stripe Checkout + Webhook                   | **Phase 3** |
-| 115-123 | Kafka + Event-Driven                        | **Phase 2** |
-| 124-129 | Saga Pattern + Compensation                 | **Phase 4** |
-| 130-135 | Testing (Unit + Integration + E2E)          | **Phase 5** |
-| 136-151 | Observability (PLG + Prometheus + Tempo)    | **Phase 6** |
-| 152-155 | Docker Deploy                               | **Phase 7** |
+|   Bài   | Nội dung                                    |      Phase      |
+| :-----: | ------------------------------------------- | :-------------: |
+|  1-104  | Foundation (Nx, TCP, gRPC, Keycloak, Redis) |     ✅ Done     |
+| 105-110 | TCP Service mới + Cloudinary upload         |   **Phase 1**   |
+|    —    | Permission & Seed Extension                 | **Pre-Phase 2** |
+| 115-123 | Kafka + Event-Driven                        | **Phase 2A/2B** |
+| 111-113 | Stripe Checkout + Webhook                   |   **Phase 3**   |
+| 124-129 | Saga Pattern + Compensation                 |  **Phase 4A**   |
+|    —    | SaaS + Tenant Onboarding                    |  **Phase 4B**   |
+|    —    | Notification + Staff Management             |  **Phase 4C**   |
+| 130-135 | Testing (Unit + Integration + E2E)          |   **Phase 5**   |
+| 136-151 | Observability (PLG + Prometheus + Tempo)    |   **Phase 6**   |
+| 152-155 | Docker Deploy                               |   **Phase 7**   |
 
-> [!TIP] > **4 highlight demo ấn tượng nhất:** Phase 1 (QR + Menu), Phase 2 (Real-time Ordering), Phase 3 (Payment), Phase 6 (Grafana Tracing).
+> [!TIP]
+> **Critical Path:** Phase 1 → Pre-Phase 2 → Phase 2A → Phase 2B → Phase 3 → Phase 7 (Demo)
+> Phase 4A/4B/4C và Phase 6 có thể chạy song song hoặc sau Phase 3 tùy thời gian.
+>
+> **4 highlight demo ấn tượng nhất:** Phase 1 (QR + Menu), Phase 2 (Real-time Ordering), Phase 3 (Payment), Phase 6 (Grafana Tracing).

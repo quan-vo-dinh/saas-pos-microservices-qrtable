@@ -1,16 +1,10 @@
 'use client';
 
+import { Button, DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@einvoice/frontend-ui'
 import type { Table } from '@tanstack/react-table';
 import { SlidersHorizontal } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+;
+;
 
 type DataTableViewOptionsProps<TData> = {
   table: Table<TData>;

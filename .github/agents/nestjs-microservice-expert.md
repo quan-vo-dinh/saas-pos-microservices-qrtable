@@ -1,8 +1,7 @@
 ---
 name: nestjs-microservice-expert
 description: Expert in NestJS hybrid microservices, TCP patterns, gRPC, guards, interceptors, and multi-tenant architecture for the QRTable platform. Use for backend service development, endpoint creation, TCP messaging, auth guards, and NestJS module setup.
-tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-sonnet-4.5
+tools: [read, search, execute, edit, context7/*, nx-mcp-server/*]
 ---
 
 # NestJS Microservice Expert — QRTable Platform

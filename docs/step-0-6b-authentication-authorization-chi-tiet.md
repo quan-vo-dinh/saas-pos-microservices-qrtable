@@ -46,7 +46,7 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
 │     - Flow: TạoSessioID → Redis                     │
 │     - Token: UUID-based session ID trong Redis      │
 │     - Actor: Customer (ẩn danh)                     │
-│     - TTL: 24 giờ (có idle timeout 30 phút)        │
+│     - TTL: 2 giờ (có idle timeout 30 phút)         │
 │                                                      │
 └─────────────────────────────────────────────────────┘
 ```
@@ -221,7 +221,7 @@ STEP 3: SessionGuard (toàn cầu)
 │  ├─ Nếu không có sessionId:
 │  │  ├─ Generate: "sid_{random UUID}"
 │  │  ├─ Store Redis: { tenantId, createdAt, lastActivityAt }
-│  │  ├─ TTL: 24 giờ
+│  │  ├─ TTL: 2 giờ
 │  │  └─ response.setHeader(x-session-id, sessionId)
 
 STEP 4: TenantGuard (toàn cầu)
@@ -412,7 +412,7 @@ class UserGuard implements CanActivate {
 
 1. Nếu route secured=true → skip (JWT đã handle)
 2. Nếu route không secured → tạo/tái sử dụng session
-3. Session lưu trong Redis với TTL 24h
+3. Session lưu trong Redis với TTL 2h
 4. Có idle timeout 30 phút (nếu không hoạt động → session expire)
 5. Trả x-session-id trong response header
 
@@ -479,7 +479,7 @@ class SessionGuard implements CanActivate {
         createdAt: now,
         lastActivityAt: now,
       },
-      SESSION_POLICY.TTL_MS, // 24 giờ
+      SESSION_POLICY.TTL_MS, // 2 giờ
     );
 
     req[MetadataKey.SESSION_ID] = sessionId;
@@ -501,8 +501,10 @@ class SessionGuard implements CanActivate {
 
 export const SESSION_POLICY = {
   ID_PREFIX: 'sid_',
-  TTL_MS: 24 * 60 * 60 * 1000, // 24 giờ
+  CACHE_PREFIX: 'session',
+  TTL_MS: 2 * 60 * 60 * 1000, // 2 giờ (cập nhật từ 24h → 2h cho phù hợp ngữ cảnh nhà hàng)
   IDLE_TIMEOUT_MS: 30 * 60 * 1000, // 30 phút
+  COOKIE_KEY: 'x-session-id',
 };
 ```
 
@@ -1140,6 +1142,8 @@ private validateRoleMapping(keycloakRoles: string[], internalRoles?: Role[]): bo
 
 ## 9. Permission Matrix Chi Tiết
 
+> **⚠️ LƯU Ý QUAN TRỌNG (04/2026):** Permission enum hiện tại chỉ cover 6 domain gốc (SAAS, CATALOG, INVOICE, USER, ROLE, PRODUCT). Khi bắt đầu Phase 2, cần mở rộng thêm 5 domain mới: **ORDER, KITCHEN, PAYMENT, TABLE, SERVICE_REQUEST**. Xem chi tiết tại `implementation_plan.md` — **PRE-PHASE 2 — PERMISSION & SEED EXTENSION (Step 2.0)**.
+
 ### 9.1 Permission Enum
 
 **File:** `libs/constants/src/lib/enum/role.enum.ts`
@@ -1188,10 +1192,46 @@ export enum PERMISSION {
   PRODUCT_GET_ALL = 'product.get_all',
   PRODUCT_UPDATE = 'product.update',
   PRODUCT_DELETE = 'product.delete',
+
+  // ────────────────────────────────────────────────
+  // 🔜 CẦN BỔ SUNG TẠI STEP 2.0 (Pre-Phase 2):
+  // ────────────────────────────────────────────────
+
+  /* ORDER (Phase 2A) */
+  // ORDER_CREATE = 'order.create',
+  // ORDER_CONFIRM = 'order.confirm',
+  // ORDER_CANCEL = 'order.cancel',
+  // ORDER_GET_LIST = 'order.get_list',
+  // ORDER_GET_BY_ID = 'order.get_by_id',
+
+  /* KITCHEN (Phase 2B) */
+  // KITCHEN_GET_QUEUE = 'kitchen.get_queue',
+  // KITCHEN_UPDATE_TICKET = 'kitchen.update_ticket',
+  // KITCHEN_RECALL = 'kitchen.recall',
+
+  /* PAYMENT (Phase 3) */
+  // PAYMENT_CREATE = 'payment.create',
+  // PAYMENT_CONFIRM_CASH = 'payment.confirm_cash',
+  // PAYMENT_REFUND = 'payment.refund',
+  // PAYMENT_GET_HISTORY = 'payment.get_history',
+
+  /* TABLE (Phase 1-2) */
+  // TABLE_CREATE = 'table.create',
+  // TABLE_UPDATE = 'table.update',
+  // TABLE_DELETE = 'table.delete',
+  // TABLE_TRANSFER = 'table.transfer',
+  // TABLE_UPDATE_STATUS = 'table.update_status',
+
+  /* SERVICE REQUEST (Phase 2A) */
+  // SERVICE_REQUEST_CREATE = 'service_request.create',
+  // SERVICE_REQUEST_ACKNOWLEDGE = 'service_request.acknowledge',
+  // SERVICE_REQUEST_RESOLVE = 'service_request.resolve',
 }
 ```
 
 ### 9.2 Permission Matrix: Role → Permissions
+
+> **Bảng này chỉ hiển thị permissions HIỆN TẠI.** Khi hoàn thành Step 2.0 (Pre-Phase 2), cần bổ sung thêm cột: ORDER, KITCHEN, PAYMENT, TABLE, SERVICE_REQUEST.
 
 | **Role**               | **SAAS**                                             | **CATALOG**                   | **INVOICE**        | **USER**                      | **ROLE** | **PRODUCT** |
 | ---------------------- | ---------------------------------------------------- | ----------------------------- | ------------------ | ----------------------------- | -------- | ----------- |
@@ -1202,6 +1242,18 @@ export enum PERMISSION {
 | **CHEF**               | ❌                                                   | get_by_id, get_list           | ❌                 | ❌                            | ❌       | ❌          |
 | **BARISTA**            | ❌                                                   | get_by_id, get_list           | ❌                 | ❌                            | ❌       | ❌          |
 | **CUSTOMER** (session) | ❌                                                   | get_by_id, get_list\*         | ❌                 | ❌                            | ❌       | ❌          |
+
+**🔜 Permission Matrix mở rộng (Step 2.0 — Pre-Phase 2):**
+
+| **Role**               | **ORDER**                    | **KITCHEN**                      | **PAYMENT**               | **TABLE**               | **SERVICE_REQUEST**       |
+| ---------------------- | ---------------------------- | -------------------------------- | ------------------------- | ----------------------- | ------------------------- |
+| **SUPER_ADMIN**        | ✅ All                       | ✅ All                           | ✅ All                    | ✅ All                  | ✅ All                    |
+| **OWNER**              | ✅ All                       | ✅ All                           | ✅ All                    | ✅ All                  | ✅ All                    |
+| **MANAGER**            | ✅ All                       | ✅ All                           | ✅ All                    | ✅ All                  | ✅ All                    |
+| **WAITER**             | confirm, get_list, get_by_id | ❌                               | confirm_cash, get_history | transfer, update_status | ✅ All                    |
+| **CHEF**               | ❌                           | get_queue, update_ticket, recall | ❌                        | ❌                      | ❌                        |
+| **BARISTA**            | ❌                           | get_queue, update_ticket, recall | ❌                        | ❌                      | ❌                        |
+| **CUSTOMER** (session) | create (via SessionGuard)    | ❌                               | create (via SessionGuard) | ❌                      | create (via SessionGuard) |
 
 **Ghi chú:**
 
@@ -1575,8 +1627,10 @@ CUSTOMER (Browser)        BFF                      Redis
 // SESSION_POLICY constants:
 {
   ID_PREFIX: 'sid_',                   // Session ID prefix
-  TTL_MS: 24 * 60 * 60 * 1000,         // 24 giờ lifetime
-  IDLE_TIMEOUT_MS: 30 * 60 * 1000,     // 30 phút idle timeout
+  CACHE_PREFIX: 'session',            // Redis cache prefix
+  TTL_MS: 2 * 60 * 60 * 1000,         // 2 giờ lifetime (phù hợp bữa ăn 1-2h)
+  IDLE_TIMEOUT_MS: 30 * 60 * 1000,    // 30 phút idle timeout
+  COOKIE_KEY: 'x-session-id',         // Response header key
 }
 ```
 
@@ -1584,7 +1638,7 @@ CUSTOMER (Browser)        BFF                      Redis
 
 - Nếu customer không gửi request trong 30 phút → session delete
 - Mỗi request gửi lên → update lastActivityAt
-- Nếu session vẫn active → TTL được reset (24h từ lúc cuối cùng)
+- Nếu session vẫn active → TTL được reset (2h từ lúc cuối cùng)
 
 ### 11.3 Customer Routes (Không Secured)
 
@@ -2035,7 +2089,7 @@ MongoDB: qrtable
 
 Redis:
 ├─ user-token:{sha256_hash}: AuthorizeResponse (TTL 30 min)
-├─ session:{sid}: { tenantId?, createdAt, lastActivityAt } (TTL 24h)
+├─ session:{sid}: { tenantId?, createdAt, lastActivityAt } (TTL 2h)
 
 Keycloak:
 ├─ Realm: qrtable
