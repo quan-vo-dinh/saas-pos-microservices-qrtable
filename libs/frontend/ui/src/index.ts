@@ -1,1 +1,2 @@
-export { FeaturePlaceholder, type FeaturePlaceholderProps } from './lib/feature-placeholder';
+// Composites
+export { FeaturePlaceholder, type FeaturePlaceholderProps } from './components/composites/feature-placeholder';
