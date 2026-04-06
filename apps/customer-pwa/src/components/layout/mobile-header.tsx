@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { Button } from '@einvoice/frontend-ui';
 import { NAV_ITEMS } from '@/constants/nav-items';
 import { useSession } from '@/features/session/context/session-provider';
 
