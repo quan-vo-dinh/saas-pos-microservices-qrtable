@@ -15,17 +15,14 @@ Tài liệu này mô tả chi tiết các luồng nghiệp vụ cốt lõi, từ
 ### A. Các bước thiết lập
 
 1.  **Đăng ký Định danh:**
-
     - Người dùng cung cấp thông tin cơ bản (Email/SĐT, mật khẩu).
     - Hệ thống thực hiện xác thực (OTP/Email Verification). Ở bước này, người dùng chỉ là tài khoản cá nhân, chưa phải chủ cửa hàng.
 
 2.  **Khởi tạo Thực thể Nhà hàng (Tenant Creation):**
-
     - Khai báo thông tin doanh nghiệp: Tên quán, Loại hình (Café, Nhà hàng, Pub...), Địa chỉ.
     - **Logic Cốt lõi:** Hệ thống tự động sinh ra một Slug/Subdomain duy nhất (ví dụ: `the-coffee-house.qrtable.io`) làm định danh thương hiệu trên Internet.
 
 3.  **Lựa chọn Gói Dịch vụ (Subscription):**
-
     - Chủ quán chọn gói cước (Miễn phí, Cơ bản, Cao cấp).
     - **Quy tắc:** Gói cước giới hạn tính năng và quy mô (ví dụ: Gói Miễn phí chỉ cho phép tối đa 10 bàn, không có báo cáo nâng cao). Ghi nhận ngày bắt đầu và kết thúc gói.
     - **Actor quản lý:** Super Admin thiết lập Pricing Plans, Restaurant Owner chọn gói phù hợp.
@@ -52,7 +49,6 @@ Mô tả quá trình số hóa thực đơn giấy của nhà hàng thành Menu 
 Hệ thống tuân thủ cấu trúc 2 tầng đơn giản:
 
 1.  **Danh mục (Category):**
-
     - Dùng để nhóm các món ăn/đồ uống (Ví dụ: Khai vị, Món chính, Đồ uống, Tráng miệng).
     - **Logic hiển thị:** Có thể cài đặt khung giờ hiển thị cho danh mục (Ví dụ: "Điểm tâm" chỉ hiển thị 6h - 10h sáng).
     - **Trạng thái:** `Active` (Hiển thị) hoặc `Inactive` (Ẩn).
@@ -88,7 +84,6 @@ Chịu trách nhiệm số hóa mặt bằng nhà hàng và tạo ra các "cổn
 ### B. Logic Định danh và Sinh mã QR
 
 - **Cơ chế Ánh xạ (Mapping):**
-
   - Mỗi bàn được tạo ra sẽ gắn với một Token định danh duy nhất.
   - Mã QR là một URL chứa tham số: `https://ten-quan.qrtable.io?table_id=xyz&token=abc`.
 
@@ -226,7 +221,6 @@ Quy trình từ lúc khách quét QR đến khi đơn hàng được gửi đế
 ### A. Quy trình Nghiệp vụ Chi tiết
 
 1.  **Khởi tạo Phiên (Session Initiation):**
-
     - Khách quét mã QR, giao diện Menu mở ra (Progressive Web App).
     - Hệ thống nhận diện `Store_ID`, `Table_ID`, và xác thực `Token`.
     - **Logic Phiên (Session Management):**
@@ -245,24 +239,20 @@ Quy trình từ lúc khách quét QR đến khi đơn hàng được gửi đế
     - **Shared Cart Logic:** Tất cả khách quét QR vào cùng một bàn (trong cùng Session) sẽ thấy chung một giỏ hàng và có thể cùng thêm món.
 
 2.  **Lựa chọn Món (Item Selection):**
-
     - Duyệt Menu theo danh mục, kiểm tra trạng thái `Available`/`Out of Stock` Real-time.
     - Nhấn vào món → Hiển thị chi tiết (Hình ảnh lớn, Mô tả, Giá).
     - Chọn số lượng → Nhấn "Thêm vào giỏ".
 
 3.  **Quản lý Giỏ hàng (Cart Management):**
-
     - Xem danh sách món đã chọn, hiển thị: Tên món, Số lượng, Giá, Tổng cộng.
     - **Chỉnh sửa:** Tăng/giảm số lượng, xóa món, thêm Ghi chú món (Ví dụ: "Không cay", "Ít muối").
     - **Tính tổng tiền:** Tổng tiền = Σ(Giá món × Số lượng).
 
 4.  **Gửi Đơn hàng (Order Submission):**
-
     - Khách nhấn "Đặt món". Đơn hàng chuyển trạng thái `Pending` (Chờ xác nhận).
     - Hệ thống gửi Thông báo Tức thời (âm thanh/rung) đến thiết bị của nhân viên tại quầy/POS.
 
 5.  **Xác nhận và Điều phối (Confirmation & Routing):**
-
     - Nhân viên kiểm tra và nhấn "Xác nhận".
     - Đơn hàng chuyển sang `Processing` (Đang xử lý).
     - **Điều phối Bếp:** Hệ thống tự động tách đơn: Món ăn -> Màn hình Bếp; Đồ uống -> Màn hình Bar.
@@ -325,22 +315,18 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
 ### A. Quy trình Nghiệp vụ Chi tiết
 
 1.  **Tiếp nhận và Phân loại (Ticket Routing):**
-
     - Tách đơn tự động: Phân chia món ăn và đồ uống về Màn hình Bếp và Màn hình Bar riêng biệt.
     - Mỗi đơn xuất hiện dưới dạng một "Ticket" điện tử, hiển thị: số bàn, tên món, ghi chú và thời gian chờ.
 
 2.  **Tiếp nhận Chế biến (Acknowledging):**
-
     - **Trạng thái Chờ (Pending):** Thẻ mới có màu nổi bật (Đỏ/Vàng).
     - **Bắt đầu làm (Processing):** Đầu bếp nhấn vào thẻ để xác nhận "Đang làm món này", giúp tránh làm trùng.
 
 3.  **Xử lý theo Yêu cầu:**
-
     - Đầu bếp xem chính xác yêu cầu Modifiers và Ghi chú của khách.
     - **Logic Gộp đơn (Batching):** KDS hiển thị tổng số lượng của cùng một món đang chờ từ nhiều bàn (Ví dụ: "Tổng: 5 bát Phở bò"), giúp tối ưu hiệu suất nấu nướng.
 
 4.  **Hoàn thành Chế biến (Ready to Serve):**
-
     - Đầu bếp nhấn "Hoàn thành" (Done/Ready). Thẻ biến mất khỏi màn hình bếp.
     - **Kích hoạt Thông báo (Ping):** Hệ thống gửi thông báo ngay lập tức đến nhân viên phục vụ: "Bàn 05 - Món Phở bò đã xong".
 
@@ -363,12 +349,10 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
 ### A. Quy trình Nghiệp vụ Chi tiết
 
 1.  **Yêu cầu Thanh toán (Payment Request):**
-
     - Khách nhấn nút "Thanh toán" trên Web-app -> Hệ thống gửi Alert đến POS/Tablet của nhân viên.
     - **Khóa Đơn hàng (Order Locking):** Bàn chuyển sang trạng thái `Billing`, khách không thể đặt thêm món.
 
 2.  **Kiểm tra & Tổng hợp Hóa đơn (Final Review):**
-
     - Nhân viên kiểm tra danh sách món, số lượng, tổng tiền.
     - **Công thức tính tiền đơn giản:**
       ```
@@ -378,7 +362,6 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
     - **Ràng buộc trạng thái:** Chỉ cho phép chuyển sang Billing khi tất cả món đã `Ready` (Hoàn thành chế biến).
 
 3.  **Thực hiện Thanh toán (Payment Execution):**
-
     - **Thanh toán Tiền mặt (Cash):**
       ```
       Staff nhập số tiền khách đưa
@@ -400,8 +383,9 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
       THEN payment_status = "Paid", payment_method = "Bank Transfer"
       ```
 
-4.  **In Hóa đơn & Giải phóng Bàn (Closing):**
+      > **Lưu ý kiến trúc (2026-04):** Thanh toán chuyển khoản được xử lý thông qua Stripe Payment Methods (hỗ trợ PromptPay và các phương thức local), không tích hợp VietQR API riêng biệt. Xem `technical-architecture.md` §6.2.7 — Payment Service.
 
+4.  **In Hóa đơn & Giải phóng Bàn (Closing):**
     - In hóa đơn giấy.
     - **Đóng phiên (Close Session):** Ghi nhận doanh thu, cập nhật trạng thái bàn về `Available` (Trống).
 
@@ -672,7 +656,6 @@ Served → Completed:
 
 - **Vai trò:** Chủ nhà hàng/Quản lý nhà hàng
 - **Sub-roles:**
-
   - **Owner**: Toàn quyền trong tenant
   - **Manager**: Quản lý vận hành ca làm việc, có thể override một số quyền của Staff
 
@@ -694,7 +677,6 @@ Served → Completed:
 
 - **Vai trò:** Nhân viên nhà hàng
 - **Sub-roles:**
-
   - **Waiter/Server (Phục vụ)**: Xác nhận đơn, xử lý thanh toán, chuyển bàn
   - **Chef (Bếp trưởng)**: Xem & cập nhật KDS món ăn
   - **Barista/Bartender (Pha chế)**: Xem & cập nhật KDS đồ uống
