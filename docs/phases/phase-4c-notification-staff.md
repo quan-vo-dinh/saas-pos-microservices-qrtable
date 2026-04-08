@@ -28,7 +28,7 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 
 **Phạm vi & lý do:**
 
-- **Consumer Kafka** cho các sự kiện: `tenant.created` → email chào mừng (thiết lập quan hệ và hướng dẫn bước tiếp); `payment.completed` → Receipt email cho Customer (nếu có email); `payment.refunded` → thông báo tới chủ sở hữu và luồng audit (trách nhiệm và phát hiện bất thường); `tenant.suspended` → Warning email cho Owner. **Không** map `order.canceled` vào notification theo hướng đã tách cho audit fix #3 — tránh trùng semantics và noise.
+- **Consumer Kafka** cho 3 sự kiện (đúng registry §7.2): `tenant.created` → email chào mừng (thiết lập quan hệ và hướng dẫn bước tiếp); `payment.completed` → Receipt email cho Customer (nếu có email); `payment.refunded` → thông báo tới chủ sở hữu và luồng audit (trách nhiệm và phát hiện bất thường). **Không** map `order.canceled` vào notification (audit fix #3). `tenant.suspended` không qua Kafka — dùng Redis flag (AP1, xem Phase 4B) nên warning email cho Owner được trigger bởi SaaS Service trực tiếp hoặc cron job, không phải Kafka consumer.
 - **Email templates:** HTML templates với **tenant branding** (logo, tên nhà hàng, màu thương hiệu) — nhất quán thương hiệu và giảm nhầm lẫn với email generic.
 - **Retry logic:** Tối đa **3 retries** với **exponential backoff** cho failed emails — cân bằng giữa khả năng phục hồi tạm thời (hạ tầng email) và không giữ tải vô hạn trên consumer.
 - **Audit log:** MongoDB collection `notification_logs` (hoặc tương đương) lưu **tất cả notification sent/failed** — dùng cho troubleshooting, tra cứu sau gửi, hỗ trợ CS và tuân thủ "đã gửi gì, khi nào, cho ai".

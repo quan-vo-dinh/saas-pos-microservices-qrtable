@@ -487,7 +487,7 @@ WebSocket Level:
   - Connection auth verify tenant ownership
 
 File Storage Level:
-  - Path: uploads/{tenant_id}/menu_images/{filename}
+  - Path: qrtable/{tenant_id}/{folder}/{filename}
   - Presigned URL verify tenant ownership trước khi serve
 ```
 
@@ -547,7 +547,7 @@ File Storage Level:
 ```
 Trách nhiệm:
   - Điểm vào duy nhất cho mọi client (REST + WebSocket)
-  - Guard chain: UserGuard → TenantGuard → RoleGuard → SubRoleGuard
+  - Guard chain: UserGuard → SessionGuard → TenantGuard → PermissionGuard
   - Swagger API documentation
   - Rate limiting (NestJS Throttler + Redis)
   - Global Exception Interceptor (chuẩn hóa error response)
