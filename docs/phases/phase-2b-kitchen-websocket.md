@@ -56,6 +56,16 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
 - `kitchen.item_ready` phát từ BFF sau phản hồi TCP từ dịch vụ có thẩm quyền — tránh gateway tự suy luận trạng thái món
 - Phân tách rõ: topic Kafka (async domain) vs BFF Direct (side-effect đồng bộ sau command)
 
+**BFF REST Endpoints (Kitchen):**
+
+```
+GET  /api/v1/kds/queue          (Chef/Barista — KITCHEN_GET_QUEUE)
+PATCH /api/v1/kds/:id/start     (Chef/Barista — KITCHEN_UPDATE_TICKET)
+PATCH /api/v1/kds/:id/done      (Chef/Barista — KITCHEN_UPDATE_TICKET)
+PATCH /api/v1/kds/:id/recall    (Chef/Barista — KITCHEN_RECALL)
+PATCH /api/v1/kds/:id/priority  (Owner/Manager only)
+```
+
 **Verify:** Integration test hoặc script: publish `order.confirmed` → ticket xuất hiện đúng queue + room WS đúng role; SLA vượt ngưỡng → `kitchen.sla_warning` + management nhận WS; BFF path `kitchen.item_ready` → staff + customer nhận trong cùng scenario
 
 ### Step 2.7 — FE↔BE Real-time (2-3 ngày)
@@ -64,7 +74,10 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
 
 **Yêu cầu chính:**
 
-- Hooks tập trung (ví dụ trong shared lib): `useOrderTracking(sessionId)`, `useKDSQueue(station)`, `useLiveOrders()` — mục đích tái sử dụng và một nơi xử lý reconnect/subscribe
+- Hooks tập trung (trong `libs/frontend/hooks/`):
+  - `useOrderTracking(sessionId)` — WebSocket room subscribe, cập nhật timeline đơn hàng real-time cho Customer PWA
+  - `useKDSQueue(station)` — WebSocket + REST hybrid, subscribe room `kds:kitchen` hoặc `kds:bar` theo station
+  - `useLiveOrders()` — WebSocket staff room, nhận đơn mới slides in cho POS live order list
 - Customer PWA: theo dõi đơn qua WS theo session; menu tự làm mới khi nhận `menu.updated` (hoặc policy invalidate đã chốt với Catalog)
 - Management App: `/pos/` live orders; `/kds/` kanban (kitchen/bar) dùng WS — đồng bộ với Redis queue và sự kiện item ready
 

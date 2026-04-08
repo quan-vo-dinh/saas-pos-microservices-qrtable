@@ -40,6 +40,8 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 
 **Verify:** Mỗi lớp test có mục đích rõ (unit = invariant, integration = DB/tenant, E2E = journey); không trùng lặp vô ích giữa các lớp.
 
+**Test command:** `nx run-many --target=test --all`
+
 ### Acceptance Criteria — Phase 5
 
 - [ ] **Unit:** Độ phủ **> 60%** trên phạm vi **Order + Payment** (theo công cụ đo trong monorepo) — vì hai bounded context này gánh rủi ro tiền và vòng đời đơn.
@@ -57,6 +59,15 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 #### Step 6.1 — Học + Thiết lập nền quan sát (bài 136–151)
 
 **Mục tiêu:** Mọi dịch vụ có tín hiệu tối thiểu để vận hành và debug — và trace có thể **nối mạch** qua các hop nội bộ.
+
+**Course-to-lesson mapping:**
+
+| Bài     | Nội dung                                          |
+| ------- | ------------------------------------------------- |
+| 136–138 | Health Check                                      |
+| 139–144 | PLG Stack (Promtail + Loki + Grafana + Pino)      |
+| 145–146 | Prometheus + custom metrics                       |
+| 147–151 | Tempo + OTel (auto-instrumentation + propagation) |
 
 **Phạm vi (WHAT):**
 
@@ -82,7 +93,7 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 
 ### Acceptance Criteria — Phase 6
 
-- [ ] **Grafana** truy cập được tại **localhost:3001** (hoặc cổng đã chốt trong compose) với stack chạy local.
+- [ ] **Grafana** truy cập được tại **`localhost:3001`** với stack chạy local.
 - [ ] **Loki:** Truy vấn dạng `{app="order"}` (hoặc label tương đương đã chuẩn hóa) **thấy log** ứng với traffic thật hoặc script tạo tải.
 - [ ] **Tempo:** **Một trace một đơn** (hoặc một luồng đặt món đại diện) đi qua **BFF → Order → Kitchen** — chứng minh context propagation đã khớp kiến trúc.
 - [ ] **Prometheus:** Metric hiển thị **real-time** (làm mới dashboard thấy thay đổi theo hành vi hệ thống).
@@ -104,7 +115,7 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 
 - **Multi-stage** mỗi dịch vụ (builder → runner) — để artifact chạy tách khỏi toolchain build, phù hợp deploy và thesis artifact.
 - **docker-compose.app.yaml** — **8 backend + 2 frontend** (theo kiến trúc đã chốt).
-- **docker-compose.infra.yaml** — data plane (DB, cache, broker, … theo technical-architecture).
+- **docker-compose.infra.yaml** — data plane: **PG, Redis, Mongo, Keycloak, Kafka** (theo technical-architecture).
 - **docker-compose.monitoring.yaml** — quan sát (khớp Phase 6).
 - **Seed:** **1 tenant, 5 categories, 20 items, 8 tables** — đủ để demo đa bàn, menu có chiều sâu, không tốn thời gian nhập tay.
 
@@ -138,3 +149,9 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 - **Artifact triển khai** (Dockerfile multi-stage, compose tách lớp, seed, script demo) — cho phép tái lập hệ QRTable POS trong môi trường chuẩn mà không phụ thuộc cấu hình máy cá nhân.
 
 **Trạng thái tài liệu:** DONE
+
+## Lưu ý Roadmap
+
+- **Critical Path:** Phase 0 → 1 → 2A → 2B → 3 → 5-7 (Demo)
+- **Parallel Track:** Phase 4A/4B/4C (sau Phase 3, tùy thời gian)
+- **4 highlight demo ấn tượng nhất:** Phase 1 (QR + Menu), Phase 2 (Real-time Ordering), Phase 3 (Payment), Phase 6 (Grafana Tracing)

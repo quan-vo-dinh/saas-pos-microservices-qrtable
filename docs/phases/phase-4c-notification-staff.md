@@ -28,7 +28,7 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 
 **Phạm vi & lý do:**
 
-- **Consumer Kafka** cho các sự kiện: `tenant.created` → email chào mừng (thiết lập quan hệ và hướng dẫn bước tiếp); `payment.completed` → email biên lai (minh bạch thanh toán); `payment.refunded` → thông báo tới chủ sở hữu và luồng audit (trách nhiệm và phát hiện bất thường). **Không** map `order.canceled` vào notification theo hướng đã tách cho audit fix #3 — tránh trùng semantics và noise.
+- **Consumer Kafka** cho các sự kiện: `tenant.created` → email chào mừng (thiết lập quan hệ và hướng dẫn bước tiếp); `payment.completed` → Receipt email cho Customer (nếu có email); `payment.refunded` → thông báo tới chủ sở hữu và luồng audit (trách nhiệm và phát hiện bất thường); `tenant.suspended` → Warning email cho Owner. **Không** map `order.canceled` vào notification theo hướng đã tách cho audit fix #3 — tránh trùng semantics và noise.
 - **Kênh email** với nội dung HTML và **branding theo tenant** — nhất quán thương hiệu và giảm nhầm lẫn với email generic.
 - **MongoDB collection `notification_logs` (hoặc tương đương audit)** — lý do: tra cứu sau gửi, hỗ trợ CS và tuân thủ “đã gửi gì, khi nào, cho ai”.
 - **Retry: tối đa 3 lần, exponential backoff** — cân bằng giữa khả năng phục hồi tạm thời (hạ tầng email) và không giữ tải vô hạn trên consumer.
@@ -41,12 +41,20 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 
 **Phạm vi & lý do:**
 
-- **`POST /admin/staff/invite`** — quyền Owner/Manager với permission `USER_CREATE`: tạo user trong Keycloak, gán role phù hợp, tạo profile MongoDB theo tenant, gửi email mời — để người được mời có thể đăng nhập với đúng vai trò ngay từ đầu.
-- **`GET /admin/staff`** — liệt kê theo tenant — nền tảng cho UI và kiểm soát quy mô nhóm làm việc.
-- **`PATCH /admin/staff/:id/role`** — chỉ Owner, permission `ROLE_UPDATE`: cập nhật đồng thời Keycloak và MongoDB — tránh lệch role giữa đăng nhập và logic nghiệp vụ.
-- **`DELETE /admin/staff/:id`** — chỉ Owner: **soft delete** — vô hiệu hóa trong Keycloak và deactivate profile MongoDB — giữ lịch sử và chặn đăng nhập mà không xóa cứng dữ liệu audit.
+- **Staff Management Endpoints:**
+  ```
+  POST   /api/v1/admin/staff/invite    (Owner/Manager — USER_CREATE)
+  GET    /api/v1/admin/staff            (Owner/Manager — USER_GET_ALL)
+  PATCH  /api/v1/admin/staff/:id/role   (Owner only — ROLE_UPDATE)
+  DELETE /api/v1/admin/staff/:id        (Owner only — USER_DELETE)
+  ```
+- **`POST /api/v1/admin/staff/invite`** — quyền Owner/Manager với permission `USER_CREATE`: tạo user trong Keycloak, gán role phù hợp, tạo profile MongoDB theo tenant, gửi email mời — để người được mời có thể đăng nhập với đúng vai trò ngay từ đầu.
+- **`GET /api/v1/admin/staff`** — liệt kê theo tenant — nền tảng cho UI và kiểm soát quy mô nhóm làm việc.
+- **`PATCH /api/v1/admin/staff/:id/role`** — chỉ Owner, permission `ROLE_UPDATE`: cập nhật đồng thời Keycloak và MongoDB — tránh lệch role giữa đăng nhập và logic nghiệp vụ.
+- **`DELETE /api/v1/admin/staff/:id`** — chỉ Owner: **soft delete** — vô hiệu hóa trong Keycloak và deactivate profile MongoDB — giữ lịch sử và chặn đăng nhập mà không xóa cứng dữ liệu audit.
 - **BFF proxy controllers** — thống nhất `UserGuard` → `TenantGuard` → `PermissionGuard` và không lộ Keycloak admin ra client.
 - Sử dụng **Keycloak Admin API** (client thư viện chính thức) — giảm lỗi thủ công so với REST thuần và phù hợp với kiến trúc auth hiện có.
+- **Keycloak Admin API operations:** `createUser`, `assignRole`, `removeRole`, `disableUser`
 
 **Verify:** Invite end-to-end → user đăng nhập với role đúng; đổi role → cả hai hệ thống phản ánh; disable → không còn đăng nhập được; vi phạm permission trả lỗi rõ ràng.
 
@@ -57,6 +65,8 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 **Phạm vi & lý do:**
 
 - Route **`/dashboard/staff`**: bảng danh sách, dialog mời (email + role), màn chi tiết/chỉnh sửa (đổi role, bật/tắt hoạt động) — một luồng UX thống nhất với backend 4.6.
+- **Staff UI table columns:** Tên, Email, Role, Trạng thái (Active/Disabled), Ngày tham gia
+- **Invite Staff Dialog:** Form: Email, Role dropdown (WAITER/CHEF/BARISTA/MANAGER), Validation: email unique trong tenant
 - **Lọc theo role** và **tìm kiếm** — vận hành cửa hàng lớn không bị nghẽn khi danh sách dài.
 
 **Verify:** Owner/Manager thấy đúng dữ liệu tenant; thao tác invite/role/disable phản hồi nhất quán với API; role thấp không thấy hành động Owner-only.

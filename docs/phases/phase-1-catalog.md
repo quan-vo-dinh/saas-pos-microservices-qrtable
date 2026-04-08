@@ -43,7 +43,8 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 - `/dashboard/menu` — Category list + CRUD form (tên, sort order, khung giờ, trạng thái)
 - `/dashboard/menu/items` — MenuItem grid cards + CRUD form (tên, mô tả, giá, ảnh upload, category, stock)
 - `/dashboard/tables` — Area tabs + Table grid (tên, capacity, status badge) + QR generate/export
-- Shared UI components đặt trong `libs/frontend/ui/`
+- Shared UI components đặt trong `libs/frontend/ui/`:
+  - `<MenuItemCard />`, `<CategoryList />`, `<TableStatusBadge />`, `<QRCodeView />`, `<StatusBadge />`, `<DataTable />`
 
 **Lưu ý:** Sử dụng tối đa Shadcn UI ecosystem (DataTable, Form, Dialog, Tabs). Không tự code lại components cơ bản.
 
@@ -87,6 +88,23 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 - Enums: CategoryStatus, MenuItemStatus, TableStatus
 - Request/Response DTOs: ICreateCategoryDto, IMenuResponse, etc.
 
+**Entity fields & Enum values chi tiết:**
+
+```
+CategoryStatus { ACTIVE = 'active', INACTIVE = 'inactive' }
+MenuItemStatus { AVAILABLE = 'available', OUT_OF_STOCK = 'out_of_stock' }
+TableStatus { AVAILABLE, OCCUPIED, BILLING, CLEANING }
+
+ICategory { id, tenantId, name, sortOrder, timeStart?, timeEnd?, status, createdAt }
+IMenuItem { id, tenantId, categoryId, name, description?, price, imageUrl?, stock, sortOrder, status, createdAt }
+IArea { id, tenantId, name, sortOrder }
+ITable { id, tenantId, areaId, name, capacity, status, qrToken, sessionId? }
+
+ICreateCategoryDto { name, timeStart?, timeEnd? }
+ICreateMenuItemDto { categoryId, name, price, ... }
+IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
+```
+
 **Verify:** Types import được từ cả frontend và backend qua path aliases
 
 ### Step 1.45 — CloudinaryModule Setup (1-2 ngày)
@@ -122,9 +140,35 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 - BFF REST endpoints với appropriate guard chain (public menu: SessionGuard, admin CRUD: UserGuard + PermissionGuard)
 - BFF Multer middleware: memory storage, stream to Cloudinary (không lưu disk), body limit 20MB
 
+**TCP Message Patterns:**
+
+```
+CATALOG.CATEGORY.CREATE, CATALOG.CATEGORY.FIND_ALL, ...
+CATALOG.MENU_ITEM.CREATE, CATALOG.MENU.GET_FULL, ...
+CATALOG.TABLE.CREATE, CATALOG.TABLE.UPDATE_STATUS, ...
+```
+
+**BFF REST Endpoints:**
+
+```
+GET  /api/v1/menu?tenant_id=xxx           (public, cached — SessionGuard)
+POST /api/v1/admin/categories              (Owner/Manager — UserGuard + CATALOG_CREATE)
+POST /api/v1/admin/menu-items              (Owner/Manager — UserGuard + CATALOG_CREATE)
+POST /api/v1/admin/menu-items/:id/image    (Owner/Manager — multipart/form-data)
+DELETE /api/v1/admin/menu-items/:id/image  (Owner/Manager)
+POST /api/v1/admin/tables                  (Owner/Manager — UserGuard + CATALOG_CREATE)
+POST /api/v1/tables/:id/validate-qr        (public — SessionGuard)
+```
+
+**Redis cache keys:**
+
+- Menu: `menu:{tenant_id}` → full menu JSON (TTL 10 min, invalidate on change)
+- Table status: `table:{tenant_id}:{table_id}:status` (no expire, explicit update)
+
 **Lưu ý quan trọng:**
 
 - Phase 1 chưa có Kafka — cache invalidation dùng BFF Direct pattern (BFF gọi Redis DEL sau TCP response)
+- KHÔNG dùng Kafka cho menu.updated, table.status_changed (AP1)
 - Delete constraints: không xóa Category có MenuItem, không xóa MenuItem có active orders, không xóa Table có active session
 - TCP message patterns: CATALOG.CATEGORY._, CATALOG.MENU_ITEM._, CATALOG.TABLE.\* (đăng ký trong libs/constants)
 
@@ -137,6 +181,7 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 **Yêu cầu chính:**
 
 - React Query hooks trong `libs/frontend/hooks/`: useMenu, useCategories, useMenuItems, useTables, useUploadMenuItemImage
+  - `useUploadMenuItemImage(itemId)`: progress tracking, optimistic update (local preview), error handling (file too large, wrong format)
 - Customer PWA: thay mock data bằng API calls, QR landing validate token qua API
 - Management App: CRUD operations gọi API, image upload với progress indicator + preview
 - Optimistic updates + error handling cho tất cả mutations

@@ -36,6 +36,13 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 
 - Sau khi đổi enum/mapping phải **re-seed** dữ liệu role trên MongoDB (Authorizer) để JWT/permission check khớp thực tế
 
+**Kịch bản kiểm thử cụ thể:**
+
+- User có role WAITER → gọi được ORDER_CONFIRM endpoint
+- User có role CHEF → KHÔNG gọi được PAYMENT\_\* endpoint
+
+**Deliverable:** Document Permission Matrix → `docs/architecture/permission-matrix.md`
+
 **Verify:** Đăng nhập từng role → chỉ thấy/gọi được hành vi đúng permission; CUSTOMER chỉ thao tác qua session hợp lệ
 
 ### Step 2.1 — Nền tảng Kafka (học tập)
@@ -54,9 +61,25 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 
 **Yêu cầu chính:**
 
-- Customer: giỏ hàng + gửi đơn (flow đặt món end-to-end trên mock)
-- Staff POS: danh sách đơn “live” theo bàn/session (mock)
-- KDS: kanban tách khu bếp và bar (mock), phản ánh trạng thái line-item / ticket kitchen
+- **Customer PWA — Cart & Ordering:**
+  - Nút "Thêm vào giỏ" trên MenuItemCard
+  - Cart drawer: danh sách items, +/- quantity, note field, tổng tiền
+  - Nút "Gửi đơn hàng" (với animation)
+  - Order Tracking page: status timeline (Pending → Processing → Ready → Served)
+  - Service Request buttons: "Gọi nhân viên", "Yêu cầu thanh toán", "Hỗ trợ"
+- **Staff POS (`/pos/`):**
+  - Live Orders cards: bàn, items, tổng tiền, thời gian
+  - Buttons: "Xác nhận", "Từ chối" trên mỗi đơn
+  - Table Map: grid bàn với color-coded status
+  - Real-time: đơn mới slides in (animation)
+- **KDS (`/kds/kitchen` + `/kds/bar`):**
+  - Column-based Kanban: Chờ | Đang làm | Hoàn thành
+  - Mỗi ticket: số bàn, tên món, số lượng, ghi chú, timer
+  - Buttons: "Bắt đầu", "Xong", "Thu hồi (Recall)"
+  - SLA timer: đổi màu khi quá threshold (vàng → đỏ)
+  - Batching: gom cùng món highlight
+
+→ Tất cả dùng mock data + fake WebSocket (setTimeout simulate events).
 
 **Lưu ý quan trọng:** Mock phải phản ánh các trạng thái sẽ map sang `OrderStatus` và hàng đợi bếp — không chỉ layout tĩnh
 
@@ -71,6 +94,25 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 - Enum `OrderStatus` với nhánh chính: **DRAFT → PENDING → PROCESSING → READY → SERVED → COMPLETED** và nhánh **CANCELED** (chuyển từ các trạng thái cho phép theo business-logic §8)
 - `ServiceRequestType` và các interface domain: `IOrder`, `IOrderItem`, `IBill`, `ISession`, `ICartItem`, `IServiceRequest`
 - Định nghĩa tập **WebSocket event types** tương thích với BFF Direct (`order.created`, `service.requested`) và các cập nhật UI cần thiết ở phase này
+
+**Chi tiết field các entity/interface:**
+
+```
+IOrder { id, tenantId, tableId, sessionId, status, totalAmount, idempotencyKey, createdAt, updatedAt }
+IOrderItem { id, orderId, menuItemId, quantity, price, note, status }
+IBill { id, tenantId, sessionId, subtotal, total, status, paymentMethod, roundingAmount }
+ISession { tableId, startedAt, status, lastActivity }
+ICartItem { menuItemId, qty, note?, price, version }
+IServiceRequest { id, tenantId, tableId, sessionId, type, status, createdAt }
+
+OrderStatus { DRAFT, PENDING, PROCESSING, READY, SERVED, COMPLETED, CANCELED }
+ServiceRequestType { CALL_STAFF, REQUEST_BILL, GENERAL_HELP }
+
+WebSocket Event Types:
+IOrderCreatedEvent { orderId, tableId, items: IOrderItem[] }
+IOrderStatusEvent { orderId, status: OrderStatus }
+IKDSTicket { ticketId, tableId, items, priority: boolean }
+```
 
 **Verify:** Frontend và backend compile/import cùng bộ type; contract event có thể liệt kê trong review (tên event + payload tối thiểu)
 
@@ -97,6 +139,20 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 - Mọi query/command Order Service **lọc `tenant_id`**; TCP/BFF payload mang tenant context nhất quán
 - Idempotency và biên saga với Catalog/Payment giai đoạn sau — tham chiếu §12 khi thiết kế bước bù trừ
 
+**BFF REST Endpoints:**
+
+```
+POST /api/v1/orders               (Customer — SessionGuard)
+PATCH /api/v1/orders/:id/confirm   (Staff — UserGuard + ORDER_CONFIRM)
+PATCH /api/v1/orders/:id/cancel    (Customer: Pending only, Manager: Processing)
+GET  /api/v1/orders                (Staff — ORDER_GET_LIST)
+GET  /api/v1/orders/:id            (Staff/Customer — ORDER_GET_BY_ID)
+POST /api/v1/cart                  (Customer — SessionGuard)
+GET  /api/v1/cart                  (Customer — SessionGuard)
+POST /api/v1/service-requests      (Customer — SessionGuard)
+PATCH /api/v1/service-requests/:id/acknowledge (Staff — SERVICE_REQUEST_ACKNOWLEDGE)
+```
+
 **Verify:** Confirm đơn → tồn giảm đúng, không double-sell dưới concurrency; `order.confirmed` xuất hiện trên topic; UI nhận WS từ `order.created` / `service.requested`; chuyển bàn không mất cart/order
 
 ### Step 2.5 — Tích hợp FE ↔ BE
@@ -105,7 +161,9 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 
 **Yêu cầu chính:**
 
-- Hooks dữ liệu (query/mutation) cho cart, order, session, service request, POS list
+- Hooks dữ liệu (query/mutation) cho cart, order, session, service request, POS list:
+  - `useCart(sessionId)` — Redis cart via API
+  - `useSubmitOrder()` — POST /orders + idempotency key
 - Customer PWA: thay mock bằng API + session hợp lệ
 - Management POS: **polling** danh sách đơn/live view (WebSocket có thể bật dần nếu gateway đã sẵn)
 

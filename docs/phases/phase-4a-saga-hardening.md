@@ -19,7 +19,7 @@
 
 ## Tổng Quan
 
-Phase 4A nâng độ tin cậy của luồng lõi POS: mọi “chuỗi hành động” có nhiều bước (tồn kho → đơn → thông báo; kiểm tra billing → đóng phiên → cập nhật bàn → lưu trữ bill) được mô hình hóa như saga có compensation — để khi một bước thất bại, hệ thống không để lại trạng thái nửa vời mà có đường lui có kiểm soát. Đồng thời phase cố định các policy vận hành (giới hạn đơn theo phiên, idempotency, delete constraints, audit hủy) và một lớp outbox tối giản để đồng bộ “đã ghi DB” với “đã publish Kafka”, tránh mất sự kiện. Full CDC (Debezium) được ghi nhận là hướng sau luận án — không nằm trong phạm vi phase này.
+Phase 4A nâng độ tin cậy của luồng lõi POS: mọi "chuỗi hành động" có nhiều bước (tồn kho → đơn → thông báo; kiểm tra billing → đóng phiên → cập nhật bàn → lưu trữ bill) được mô hình hóa như saga có compensation — để khi một bước thất bại, hệ thống không để lại trạng thái nửa vời mà có đường lui có kiểm soát. Đồng thời phase cố định các policy vận hành (giới hạn đơn theo phiên, idempotency, delete constraints, audit hủy) và một lớp outbox tối giản để đồng bộ "đã ghi DB" với "đã publish Kafka", tránh mất sự kiện. Full CDC (Debezium) được ghi nhận là hướng sau luận án — không nằm trong phạm vi phase này.
 
 ## Steps
 
@@ -30,7 +30,7 @@ Phase 4A nâng độ tin cậy của luồng lõi POS: mọi “chuỗi hành đ
 **Yêu cầu chính (WHAT + WHY):**
 
 - Hoàn thành bài **124–129** trong lộ trình khóa học (saga, giao dịch phân tán, failure modes).
-- **Why:** Các luồng confirm order và complete payment là đa bước và cross-cutting; không có khung saga thì dễ lệ thuộc “happy path” và khó reasoning khi timeout/retry.
+- **Why:** Các luồng confirm order và complete payment là đa bước và cross-cutting; không có khung saga thì dễ lệ thuộc "happy path" và khó reasoning khi timeout/retry.
 
 **Verify:** Có thể mô tả bằng lời: điểm commit, điểm có thể retry, điểm bắt buộc compensation, và vì sao idempotency không thể thiếu ở biên HTTP.
 
@@ -42,7 +42,17 @@ Phase 4A nâng độ tin cậy của luồng lõi POS: mọi “chuỗi hành đ
 
 **WHAT:** Chuỗi nghiệp vụ: khóa/giữ tồn kho phù hợp → tạo/ghi nhận đơn → thông báo KDS (hoặc kênh bếp tương đương).
 
-**WHY:** Đảm bảo không có đơn “đã tạo” khi tồn không còn đủ, và không để tồn bị giữ vĩnh viễn nếu bước sau thất bại.
+**Saga Steps (Order Confirm):**
+
+| Step | Action                                   | Service | Compensation (reverse)       |
+| ---- | ---------------------------------------- | ------- | ---------------------------- |
+| 1    | Validate & Lock Stock                    | Catalog | Release locked stock         |
+| 2    | Update Order → Processing                | Order   | Mark order failed / rollback |
+| 3    | Route to KDS via Kafka `order.confirmed` | Kitchen | Notify customer of failure   |
+
+Compensation thực hiện theo thứ tự ngược: Step 3 → Step 2 → Step 1.
+
+**WHY:** Đảm bảo không có đơn "đã tạo" khi tồn không còn đủ, và không để tồn bị giữ vĩnh viễn nếu bước sau thất bại.
 
 **Compensation (ý định):** Hoàn tác phần tồn đã lock; đánh dấu đơn/thao tác thất bại theo rule nghiệp vụ; thông báo khách (hoặc kênh phù hợp) khi luồng không hoàn tất — để staff/khách không kỳ vọng đơn đã vào bếp.
 
@@ -50,7 +60,18 @@ Phase 4A nâng độ tin cậy của luồng lõi POS: mọi “chuỗi hành đ
 
 **WHAT:** Chuỗi nghiệp vụ: **validate billing** — toàn bộ line-item phải ở trạng thái cho phép thanh toán theo rule (ví dụ Ready/Served như §6.B) → đóng session → cập nhật trạng thái bàn → archive bill (lưu trữ hóa đơn/phiên theo policy).
 
-**WHY:** Thanh toán chỉ được phép khi nghiệp vụ “đã phục vụ đủ điều kiện”; tránh đóng tiền trên đơn chưa sẵn sàng và tránh bàn/phiên lệch với thực tế thanh toán.
+**Saga Steps (Payment Complete):**
+
+| Step | Action                                   | Service | Compensation (reverse)                   |
+| ---- | ---------------------------------------- | ------- | ---------------------------------------- |
+| 1    | Validate billing: all items Ready/Served | Order   | —                                        |
+| 2    | Close Session                            | Order   | Reopen session                           |
+| 3    | Update Table → Cleaning                  | Catalog | Revert table status                      |
+| 4    | Archive Bill                             | Order   | Unarchive bill, revert to previous state |
+
+Compensation thực hiện theo thứ tự ngược: Step 4 → Step 3 → Step 2 → Step 1.
+
+**WHY:** Thanh toán chỉ được phép khi nghiệp vụ "đã phục vụ đủ điều kiện"; tránh đóng tiền trên đơn chưa sẵn sàng và tránh bàn/phiên lệch với thực tế thanh toán.
 
 **Compensation (ý định):** Mở lại session nếu đã đóng nhưng bước sau lỗi; revert cập nhật bàn về trạng thái nhất quán trước bước lỗi — để không khóa bàn vĩnh viễn hoặc ghi nhận sai occupancy.
 
@@ -59,7 +80,7 @@ Phase 4A nâng độ tin cậy của luồng lõi POS: mọi “chuỗi hành đ
 | Chủ đề                   | WHAT                                                                                                   | WHY                                                             |
 | ------------------------ | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
 | `max_orders_per_session` | Giới hạn số đơn tối đa mỗi phiên, **cấu hình theo tenant**                                             | Chống abuse/spam đặt hàng và giữ vận hành POS ổn định           |
-| Idempotency              | Khóa idempotency kiểu **SET NX** (hoặc tương đương “chỉ thắng lần đầu”) cho thao tác submit quan trọng | Double-submit (double tap, retry client) không tạo trùng đơn    |
+| Idempotency              | Khóa idempotency kiểu **SET NX** (hoặc tương đương "chỉ thắng lần đầu") cho thao tác submit quan trọng | Double-submit (double tap, retry client) không tạo trùng đơn    |
 | Delete constraints       | Không xóa **Category** còn **MenuItem**; không xóa **MenuItem** còn **OrderItem** đang active          | Bảo toàn tham chiếu và lịch sử đơn; tránh orphan và sai báo cáo |
 | Audit cancel             | Mọi hủy đơn ghi **actor, reason, timestamp**                                                           | Phục vụ điều tra, đối soát và trách nhiệm vận hành              |
 
@@ -67,15 +88,15 @@ Phase 4A nâng độ tin cậy của luồng lõi POS: mọi “chuỗi hành đ
 
 **WHAT:** Bảng `outbox_events` (hoặc tên tương đương) trong **Order** và **Payment**; ghi event **cùng transaction** với thay đổi nghiệp vụ; job/cron nền poll → publish Kafka → đánh dấu đã gửi.
 
-**WHY:** Nếu chỉ publish Kafka sau khi commit, crash giữa chừng có thể làm mất sự kiện; outbox gắn “đã xảy ra” với “đã persist” trước khi broker nhận.
+**WHY:** Nếu chỉ publish Kafka sau khi commit, crash giữa chừng có thể làm mất sự kiện; outbox gắn "đã xảy ra" với "đã persist" trước khi broker nhận.
 
 **Phạm vi ngoài phase:** **Full CDC với Debezium** — ghi chú là **post-thesis** (độ phức tạp vận hành/infra cao hơn; phase này chấp nhận outbox poll đơn giản).
 
-**Verify (gợi ý tổng thể):** Scenario failure được diễn tả trong Acceptance Criteria; outbox không để lệch “DB đã commit nhưng không có bản ghi outbox” cho các sự kiện đã cam kết.
+**Verify (gợi ý tổng thể):** Scenario failure được diễn tả trong Acceptance Criteria; outbox không để lệch "DB đã commit nhưng không có bản ghi outbox" cho các sự kiện đã cam kết.
 
 ## Acceptance Criteria
 
-- [ ] **Saga compensation (order):** Khi khóa/giữ tồn thất bại → **không** tạo đơn hợp lệ; tồn và trạng thái hệ thống không ở trạng thái “có đơn nhưng không có đủ hàng”.
+- [ ] **Saga compensation (order):** Khi khóa/giữ tồn thất bại → **không** tạo đơn hợp lệ; tồn và trạng thái hệ thống không ở trạng thái "có đơn nhưng không có đủ hàng".
 - [ ] **Billing validation (payment):** Thanh toán **bị chặn** khi còn line-item chưa đạt điều kiện Ready/Served (theo rule §6.B / cấu hình nghiệp vụ đã thống nhất).
 - [ ] **Idempotency:** Gửi trùng cùng idempotency key (double-submit) → **một** đơn/hành động tương ứng, không nhân đôi side-effect.
 - [ ] **Delete constraints:** Không xóa được Category còn MenuItem; không xóa được MenuItem còn OrderItem active — API/DB phản hồi lỗi rõ ràng.
