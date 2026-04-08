@@ -414,10 +414,10 @@ PostgreSQL Instance (1 server, port 5432)
 ├── DB "qrtable_order"                  ← Order Service
 │   ├── orders                           (CÓ tenant_id)
 │   ├── order_items                      (CÓ tenant_id)
+│   ├── bills                            (CÓ tenant_id)
 │   └── service_requests                 (CÓ tenant_id)
 │
 ├── DB "qrtable_payment"               ← Payment Service
-│   ├── bills                            (CÓ tenant_id)
 │   ├── payments                         (CÓ tenant_id)
 │   └── refunds                          (CÓ tenant_id)
 │
@@ -621,7 +621,7 @@ Events emitted (Kafka):
 Trách nhiệm:
   - Menu Management: Category CRUD, MenuItem CRUD
   - Menu Item Image Upload: Cloudinary SDK integration
-    + Upload path: uploads/{tenant_id}/menu/{uuid}.{ext}
+    + Upload path: qrtable/{tenant_id}/menu/{uuid}.{ext}
     + Validation: max 5MB, types: image/jpeg, image/png, image/webp
     + Transformation: auto format, quality auto, max width 800px
     + Delete old image khi update, giữ image khi soft delete (audit)
@@ -640,7 +640,7 @@ Trách nhiệm:
 Entities (PostgreSQL):
   - categories: id, tenant_id, name, sort_order, time_start, time_end, status
   - menu_items: id, tenant_id, category_id, name, description, price, image_url,
-                stock, sort_order, status
+                stock, sort_order, status, deleted_at
   - areas: id, tenant_id, name, sort_order
   - tables: id, tenant_id, area_id, name, capacity, status, qr_token, session_id
 
@@ -673,7 +673,7 @@ Validation Rules:
 
 Entities (PostgreSQL):
   - orders: id, tenant_id, table_id, session_id, status, total_amount,
-            idempotency_key, created_at, updated_at
+            idempotency_key, created_at, updated_at, deleted_at
   - order_items: id, order_id, menu_item_id, quantity, price, note, status
   - bills: id, tenant_id, session_id, subtotal, total, status, payment_method,
            rounding_amount (VND rounding delta)
@@ -831,7 +831,7 @@ Trách nhiệm:
 Kafka Subscriptions:
   - tenant.created → send welcome email to owner
   - payment.completed → send receipt email (if email provided)
-  - order.canceled → log audit trail
+  - payment.refunded → notify owner, log audit trail
 
 Data Store:
   - MongoDB: audit_logs collection (flexible schema, time-series)
@@ -1034,10 +1034,7 @@ Request
 [TenantGuard]                  ← Cô lập: "Bạn thuộc tenant nào?"
   │
   ▼
-[RoleGuard]                    ← Phân quyền: "Bạn có role gì?"
-  │
-  ▼
-[SubRoleGuard]  (optional)     ← Chi tiết: "Waiter/Chef/Barista?"
+[PermissionGuard]              ← Phân quyền: "Bạn có permission cần thiết?"
   │
   ▼
 Controller → Service → Repository (auto-filtered by tenant_id)
