@@ -77,16 +77,18 @@ Compensation thực hiện theo thứ tự ngược: Step 4 → Step 3 → Step 
 
 #### Hardening chung
 
-| Chủ đề                   | WHAT                                                                                                   | WHY                                                             |
-| ------------------------ | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `max_orders_per_session` | Giới hạn số đơn tối đa mỗi phiên, **cấu hình theo tenant**                                             | Chống abuse/spam đặt hàng và giữ vận hành POS ổn định           |
-| Idempotency              | Khóa idempotency kiểu **SET NX** (hoặc tương đương "chỉ thắng lần đầu") cho thao tác submit quan trọng | Double-submit (double tap, retry client) không tạo trùng đơn    |
-| Delete constraints       | Không xóa **Category** còn **MenuItem**; không xóa **MenuItem** còn **OrderItem** đang active          | Bảo toàn tham chiếu và lịch sử đơn; tránh orphan và sai báo cáo |
-| Audit cancel             | Mọi hủy đơn ghi **actor, reason, timestamp**                                                           | Phục vụ điều tra, đối soát và trách nhiệm vận hành              |
+| Chủ đề                   | WHAT                                                                                                                                 | WHY                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `max_orders_per_session` | Giới hạn số đơn tối đa mỗi phiên (mặc định 20), **cấu hình theo tenant plan** — chống spam/đơn ảo                                    | Chống abuse/spam đặt hàng và giữ vận hành POS ổn định           |
+| Idempotency              | Redis SET NX cho order creation — cùng idempotency key chỉ thắng lần đầu, prevent double-submit                                      | Double-submit (double tap, retry client) không tạo trùng đơn    |
+| Delete constraints       | Không xóa **Category** còn **MenuItem**; không xóa **MenuItem** còn **OrderItem** đang active (status IN Pending, Processing, Ready) | Bảo toàn tham chiếu và lịch sử đơn; tránh orphan và sai báo cáo |
+| Audit cancel             | **BẮT BUỘC** ghi log khi Cancel order — **actor** (who), **reason** (why), **timestamp** (when)                                      | Phục vụ điều tra, đối soát và trách nhiệm vận hành              |
 
 #### Simplified Transactional Outbox
 
 **WHAT:** Bảng `outbox_events` (hoặc tên tương đương) trong **Order** và **Payment**; ghi event **cùng transaction** với thay đổi nghiệp vụ; job/cron nền poll → publish Kafka → đánh dấu đã gửi.
+
+**Data flow:** Khi state change xảy ra → ghi event vào bảng outbox **cùng DB transaction** với update nghiệp vụ → background cron poll outbox định kỳ → publish event lên Kafka → mark outbox record là "sent". Đảm bảo event không mất khi service crash giữa chừng (giữa commit DB và publish Kafka).
 
 **WHY:** Nếu chỉ publish Kafka sau khi commit, crash giữa chừng có thể làm mất sự kiện; outbox gắn "đã xảy ra" với "đã persist" trước khi broker nhận.
 

@@ -26,6 +26,13 @@ Phase 0 giữ nguyên codebase khóa học làm "living templates" và tạo cá
 
 **Mục tiêu:** Tổ chức rõ ràng giữa services khóa học (templates) và services QRTable mới.
 
+**Chiến lược "Template-First":** Các service khóa học (invoice, product, user-access) KHÔNG XÓA — giữ lại như "living templates" (bản mẫu đã hoạt động) cho TCP setup, TypeORM config, Guard patterns, Repository patterns. Khi tạo service QRTable mới (catalog, order, payment...):
+
+1. Tham khảo template service tương ứng
+2. Copy pattern/structure cần thiết
+3. Cải tiến: áp dụng Pragmatic Layered Architecture + .agent skills
+4. KHÔNG sửa đổi service gốc — giữ nguyên để so sánh/học hỏi
+
 **Yêu cầu chính:**
 
 - Đánh dấu services khóa học (invoice, product, user-access) với README "TEMPLATE — Do not modify"
@@ -46,6 +53,12 @@ Phase 0 giữ nguyên codebase khóa học làm "living templates" và tạo cá
 - Mỗi service tuân thủ N-Tier: controllers/ → services/ → repositories/ → entities/ → dtos/
 - Tận dụng NestJS DI container cho test/mocking
 - Không áp dụng Clean Architecture thuần túy — quá cồng kềnh cho scope dự án
+
+**Lợi ích cho Monorepo 8 services:**
+
+- **Nhanh chóng (Velocity):** Copy pattern dễ dàng từ template khóa học
+- **Đủ linh hoạt:** NestJS DI container đã sẵn sàng cho test/mocking
+- **Chống Boilerplate:** Không cần hàng tá file interfaces/mappers như Clean Arch thuần túy
 
 **Cấu trúc folder mẫu (catalog service):**
 
@@ -92,10 +105,10 @@ apps/catalog/src/
 
 **Yêu cầu chính:**
 
-- Cross-platform: `libs/shared/types/`, `libs/shared/constants/`
+- **Cross-Platform (FE & BE chung):** `libs/shared/types/`, `libs/shared/constants/` — contract giữa FE ↔ BE, Kafka topics, Enums chung
   - First shared types file: `libs/shared/types/src/index.ts` → `export type { ITenant, IUser, IRole }`
-- Frontend: `libs/frontend/ui/`, `libs/frontend/hooks/`, `libs/frontend/utils/`
-- Backend: giữ nguyên flat structure từ khóa học (`libs/guards/`, `libs/middlewares/`, `libs/entities/`, `libs/common/`)
+- **Frontend (riêng 2 app):** `libs/frontend/ui/`, `libs/frontend/hooks/`, `libs/frontend/utils/`
+- **Backend (giữ flat structure từ khóa học):** `libs/guards/`, `libs/middlewares/`, `libs/entities/`, `libs/common/` — KHÔNG nhét vào folder `backend/` để tránh vỡ import paths hiện có
 
 **Verify:** Import paths hoạt động — `@common/*` cho backend, `@einvoice/*` cho frontend
 
@@ -115,7 +128,14 @@ apps/catalog/src/
 
 - **2-layer auth model:** Keycloak quản lý identity (login/token) + user-access DB quản lý internal profile (roles, tenant mapping)
 - **Provisioning strategy:** Pre-provision (Owner tạo staff trước) vs First-login upsert (user login lần đầu → tự tạo profile)
+- **Role mapping Keycloak → internal:** OWNER, MANAGER, WAITER, CHEF, BARISTA
 - **Tham chiếu chi tiết:** `docs/references/auth-system-reference.md`
+
+**Verification scenarios:**
+
+- `valid token + provisioned user` → pass secured endpoints
+- `valid token + missing profile` → 401 `user_not_provisioned`
+- `sai permission` → 403 `permission_denied`
 
 **Verify:** BFF → Catalog/SaaS TCP health check OK, secured endpoints reject invalid tokens
 

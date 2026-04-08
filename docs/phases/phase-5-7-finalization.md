@@ -18,7 +18,7 @@
 
 ## Tổng Quan
 
-Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn thiện” trước bàn giao: **Testing** đảm bảo hành vi đúng theo business-logic và kiến trúc đã chọn; **Observability** đảm bảo khi hệ chạy nhiều tiến trình và message bus, vẫn trả lời được _đang lỗi ở đâu, ai bị ảnh hưởng, nghiệp vụ có đạt SLA không_; **Docker + Demo** đảm bảo người chấm và đồng nghiệp có thể nhắc lại cùng một kịch bản mà không phụ thuộc máy dev cá nhân. Thứ tự gợi ý: ưu tiên nền test song song với chỉnh observability tối thiểu (health/log), sau đó hoàn thiện dashboard/alert và cuối cùng đóng gói compose + seed + script bảo vệ.
+Ba mảng này được gộp một tài liệu vì cùng một "cổng hoàn thiện" trước bàn giao: **Testing** đảm bảo hành vi đúng theo business-logic và kiến trúc đã chọn; **Observability** đảm bảo khi hệ chạy nhiều tiến trình và message bus, vẫn trả lời được _đang lỗi ở đâu, ai bị ảnh hưởng, nghiệp vụ có đạt SLA không_; **Docker + Demo** đảm bảo người chấm và đồng nghiệp có thể nhắc lại cùng một kịch bản mà không phụ thuộc máy dev cá nhân. Thứ tự gợi ý: ưu tiên nền test song song với chỉnh observability tối thiểu (health/log), sau đó hoàn thiện dashboard/alert và cuối cùng đóng gói compose + seed + script bảo vệ.
 
 ---
 
@@ -30,13 +30,26 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 
 #### Step 5.1 — Học phạm vi + Viết kiểm thử (bài 130–135)
 
-**Mục tiêu:** Bao phủ có chủ đích các rủi ro nghiệp vụ/kỹ thuật đã cam kết trong kiến trúc — không nhắm mục tiêu “số đẹp” mà nhắm **chỗ dễ gãy**.
+**Mục tiêu:** Bao phủ có chủ đích các rủi ro nghiệp vụ/kỹ thuật đã cam kết trong kiến trúc — không nhắm mục tiêu "số đẹp" mà nhắm **chỗ dễ gãy**.
 
 **Phạm vi (WHAT, không chi tiết HOW):**
 
 - **Unit (Jest):** Chuyển trạng thái **Order State Machine**; quy tắc **làm tròn VND**; **HMAC-SHA256** cho token/QR theo contract đã thống nhất; **Table State Machine** — vì đây là logic thuần, dễ test nhanh và dễ hồi quy.
-- **Integration (Jest + Testcontainers):** **Catalog CRUD** kèm **cô lập multi-tenant** trên PostgreSQL thật trong container — vì sai `tenant_id` chỉ thấy rõ khi có DB và transaction; **tạo đơn + khóa/kịch bản tồn kho** — vì cần chứng minh race/isolation ở tầng persistence và service.
-- **E2E (Supertest):** Ba luồng đại diện nghiệp vụ: (1) **QR → menu → đặt món → xác nhận**; (2) **Thanh toán tiền mặt → đóng session/bàn**; (3) **Onboarding tenant** — vì đây là các “câu chuyện” người dùng cuối và hội đồng thường hỏi tới.
+
+- **Kịch bản Unit cụ thể:**
+  - **Order State Machine:** Validate cả valid transitions (Pending → Processing → Ready → Served) **lẫn** invalid transitions (Ready → Pending phải reject) — đảm bảo state machine không cho phép bước lùi trái phép.
+  - **VND rounding edge cases:** 0đ → 0đ; 999đ → 1.000đ; 1.000đ → 1.000đ (đã tròn); 127.500đ → 128.000đ — xác nhận công thức `Math.ceil(raw / 1000) * 1000` đúng ở biên.
+  - **HMAC-SHA256 QR token:** Generate token → validate thành công; tampered token → reject; expired token (nếu có TTL) → reject.
+  - **Table State Machine:** Available → Occupied → Billing → Cleaning → Available; reject invalid transitions (Cleaning → Billing phải fail).
+
+- **Integration (Jest + Testcontainers):**
+  - **Catalog CRUD + multi-tenant isolation (PostgreSQL container):** Tạo data cho tenant A → verify tenant B query **không thấy** data tenant A — chứng minh `tenant_id` filter hoạt động ở tầng persistence.
+  - **Order creation + concurrent stock locking:** 2 requests **cùng lúc** cho cùng món cuối cùng (stock = 1) → chỉ 1 thành công, 1 nhận lỗi hết hàng — vì cần chứng minh race/isolation ở tầng persistence và service.
+
+- **E2E (Supertest):** Ba luồng đại diện nghiệp vụ:
+  - **Flow 1:** QR scan → validate token → menu load → add to cart → submit order → staff confirm — luồng đặt món cơ bản end-to-end.
+  - **Flow 2:** Payment cash → staff confirm → bill lock (immutable) → close session → bàn chuyển Cleaning — luồng thanh toán tiền mặt đầy đủ.
+  - **Flow 3:** Tenant onboarding → Owner login → Dashboard hoạt động (có thể tạo category, menu item) — luồng SaaS onboarding.
 
 **Verify:** Mỗi lớp test có mục đích rõ (unit = invariant, integration = DB/tenant, E2E = journey); không trùng lặp vô ích giữa các lớp.
 
@@ -45,14 +58,14 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 ### Acceptance Criteria — Phase 5
 
 - [ ] **Unit:** Độ phủ **> 60%** trên phạm vi **Order + Payment** (theo công cụ đo trong monorepo) — vì hai bounded context này gánh rủi ro tiền và vòng đời đơn.
-- [ ] **Integration:** Có ít nhất một kịch bản chứng minh **cô lập multi-tenant** trên Catalog (hoặc luồng tương đương đã thống nhất) — để không thể “nhìn thấy” dữ liệu tenant khác.
+- [ ] **Integration:** Có ít nhất một kịch bản chứng minh **cô lập multi-tenant** trên Catalog (hoặc luồng tương đương đã thống nhất) — để không thể "nhìn thấy" dữ liệu tenant khác.
 - [ ] **E2E:** Cả **3 luồng** (QR→order→confirm; cash payment→close session; tenant onboarding) **pass** ổn định trên CI hoặc môi trường chuẩn hóa — vì đây là bằng chứng end-to-end cho đề tài.
 
 ---
 
 ## Phase 6 — Observability (~1–2 tuần)
 
-**Vì sao:** Hệ có BFF, nhiều microservice, Kafka và WebSocket; không có health + log + metric + trace thì **thời gian sửa lỗi** và **độ tin cậy demo** giảm mạnh, và khó chứng minh luồng “một đơn đi qua nhiều hop”.
+**Vì sao:** Hệ có BFF, nhiều microservice, Kafka và WebSocket; không có health + log + metric + trace thì **thời gian sửa lỗi** và **độ tin cậy demo** giảm mạnh, và khó chứng minh luồng "một đơn đi qua nhiều hop".
 
 ### Steps
 
@@ -71,9 +84,9 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 
 **Phạm vi (WHAT):**
 
-- **Health check** trên toàn bộ dịch vụ — vì đây là điều kiện tiên quyết cho orchestrator, alert và demo “hệ còn sống”.
+- **Health check** trên toàn bộ dịch vụ — vì đây là điều kiện tiên quyết cho orchestrator, alert và demo "hệ còn sống".
 - **Stack PLG** (Promtail + Loki + Grafana) cùng **logger có cấu trúc** (Pino) — vì log tập trung giúp truy vết theo `app`/tenant/request mà không SSH từng container.
-- **Prometheus + metric tùy chỉnh + dashboard** — vì cần nhìn **tải, lỗi, độ trễ** theo thời gian thực, không chỉ “có log”.
+- **Prometheus + metric tùy chỉnh + dashboard** — vì cần nhìn **tải, lỗi, độ trễ** theo thời gian thực, không chỉ "có log".
 - **Tempo + OpenTelemetry (auto-instrumentation)** và **lan truyền context** qua **TCP/Kafka** — vì một đơn có thể đi BFF → Order → Kitchen; không nối trace thì không chứng minh được phân tán.
 
 **Verify:** Từ một request đại diện, có thể trả lời: log ở đâu, metric nào liên quan, trace id đi qua những service nào.
@@ -97,13 +110,13 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 - [ ] **Loki:** Truy vấn dạng `{app="order"}` (hoặc label tương đương đã chuẩn hóa) **thấy log** ứng với traffic thật hoặc script tạo tải.
 - [ ] **Tempo:** **Một trace một đơn** (hoặc một luồng đặt món đại diện) đi qua **BFF → Order → Kitchen** — chứng minh context propagation đã khớp kiến trúc.
 - [ ] **Prometheus:** Metric hiển thị **real-time** (làm mới dashboard thấy thay đổi theo hành vi hệ thống).
-- [ ] **Alert:** Khi **dừng có chủ đích** một dịch vụ quan trọng, có **cảnh báo kích hoạt** theo rule đã định nghĩa — vì AC này xác nhận vòng “phát hiện → tín hiệu” hoạt động.
+- [ ] **Alert:** Khi **dừng có chủ đích** một dịch vụ quan trọng, có **cảnh báo kích hoạt** theo rule đã định nghĩa — vì AC này xác nhận vòng "phát hiện → tín hiệu" hoạt động.
 
 ---
 
 ## Phase 7 — Docker Deploy + Demo (~1 tuần)
 
-**Vì sao:** Luận văn và review cần **một lệnh (hoặc một chuỗi compose rõ ràng)** để lên full stack; seed và script demo giảm rủi ro “trên máy em chạy được”.
+**Vì sao:** Luận văn và review cần **một lệnh (hoặc một chuỗi compose rõ ràng)** để lên full stack; seed và script demo giảm rủi ro "trên máy em chạy được".
 
 ### Steps
 
@@ -127,16 +140,19 @@ Ba mảng này được gộp một tài liệu vì cùng một “cổng hoàn 
 
 **Phạm vi (WHAT):**
 
-- **Demo script** (thoại + thứ tự thao tác + tab trình duyệt): Tab 1 **QR + Menu**; Tab 2 **Staff confirm + KDS** và **Payment + bill**; Tab 3 **Grafana trace** toàn đường đi.
+- **Demo script** (kịch bản 15–20 phút cho bảo vệ luận văn):
+  - **Tab 1 (Customer):** QR scan → menu hiển thị → chọn món + thêm giỏ hàng → submit đơn hàng.
+  - **Tab 2 (Management):** Staff confirm đơn → KDS hiển thị ticket → Chef/Barista xử lý → Payment (cash hoặc Stripe) → bill close.
+  - **Tab 3 (Monitoring):** Grafana trace xuyên suốt — chỉ trace ID đi từ BFF → Order → Kitchen → Payment, chứng minh phân tán.
 - **Full stack dry run** ít nhất một lần end-to-end trước ngày bảo vệ — vì phát hiện lỗi compose/network/sớm hơn slide.
-- **Backup seed script** (hoặc tài liệu reset nhanh) — vì demo có thể cần “về trạng thái sạch” giữa các lần diễn tập.
+- **Backup plan:** Seed data script chạy nhanh nếu cần reset giữa các lần diễn tập — đưa hệ thống về trạng thái sạch trong < 2 phút.
 
 **Verify:** Một người chưa tham gia code có thể đi theo script và đạt cùng kết quả quan sát được (UI + trace).
 
 ### Acceptance Criteria — Phase 7
 
 - [ ] **`docker compose up`** (theo tài liệu triển khai) → **full system hoạt động** (đăng nhập/QR/luồng chính không gãy).
-- [ ] **Kịch bản demo E2E** chạy **mượt** trong khung thời gian đã định — không bước “chờ may mắn”.
+- [ ] **Kịch bản demo E2E** chạy **mượt** trong khung thời gian đã định — không bước "chờ may mắn".
 - [ ] **Grafana trace** hiển thị **đủ đường đi** (BFF → các service liên quan → kitchen) cho một tương tác demo tiêu biểu.
 - [ ] **Seed data** sẵn sàng theo đúng quy mô đã nêu — không phải thủ công trước giờ G.
 

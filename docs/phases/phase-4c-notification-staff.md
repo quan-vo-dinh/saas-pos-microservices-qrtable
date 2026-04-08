@@ -29,9 +29,9 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 **Phạm vi & lý do:**
 
 - **Consumer Kafka** cho các sự kiện: `tenant.created` → email chào mừng (thiết lập quan hệ và hướng dẫn bước tiếp); `payment.completed` → Receipt email cho Customer (nếu có email); `payment.refunded` → thông báo tới chủ sở hữu và luồng audit (trách nhiệm và phát hiện bất thường); `tenant.suspended` → Warning email cho Owner. **Không** map `order.canceled` vào notification theo hướng đã tách cho audit fix #3 — tránh trùng semantics và noise.
-- **Kênh email** với nội dung HTML và **branding theo tenant** — nhất quán thương hiệu và giảm nhầm lẫn với email generic.
-- **MongoDB collection `notification_logs` (hoặc tương đương audit)** — lý do: tra cứu sau gửi, hỗ trợ CS và tuân thủ “đã gửi gì, khi nào, cho ai”.
-- **Retry: tối đa 3 lần, exponential backoff** — cân bằng giữa khả năng phục hồi tạm thời (hạ tầng email) và không giữ tải vô hạn trên consumer.
+- **Email templates:** HTML templates với **tenant branding** (logo, tên nhà hàng, màu thương hiệu) — nhất quán thương hiệu và giảm nhầm lẫn với email generic.
+- **Retry logic:** Tối đa **3 retries** với **exponential backoff** cho failed emails — cân bằng giữa khả năng phục hồi tạm thời (hạ tầng email) và không giữ tải vô hạn trên consumer.
+- **Audit log:** MongoDB collection `notification_logs` (hoặc tương đương) lưu **tất cả notification sent/failed** — dùng cho troubleshooting, tra cứu sau gửi, hỗ trợ CS và tuân thủ "đã gửi gì, khi nào, cho ai".
 
 **Verify:** Sự kiện mẫu trên staging → email đúng loại và đúng tenant branding; bản ghi audit tồn tại; scenario lỗi downstream → số lần thử và trạng thái cuối phản ánh policy.
 
@@ -46,10 +46,15 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
   - List staff by tenant — Owner/Manager, USER_GET_ALL
   - Change staff role — Owner only, ROLE_UPDATE
   - Disable staff (soft delete) — Owner only, USER_DELETE
-- **Invite staff** — quyền Owner/Manager với permission `USER_CREATE`: tạo user trong Keycloak, gán role phù hợp, tạo profile MongoDB theo tenant, gửi email mời — để người được mời có thể đăng nhập với đúng vai trò ngay từ đầu.
-- **List staff** — liệt kê theo tenant — nền tảng cho UI và kiểm soát quy mô nhóm làm việc.
-- **Change role** — chỉ Owner, permission `ROLE_UPDATE`: cập nhật đồng thời Keycloak và MongoDB — tránh lệch role giữa đăng nhập và logic nghiệp vụ.
-- **Disable staff** — chỉ Owner: **soft delete** — vô hiệu hóa trong Keycloak và deactivate profile MongoDB — giữ lịch sử và chặn đăng nhập mà không xóa cứng dữ liệu audit.
+
+- **Invite flow (behavioral):** Owner nhập email + role → Keycloak Admin API tạo user + assign role phù hợp → tạo user profile trong MongoDB (liên kết tenant) → gửi invitation email (temp password hoặc setup link) → Staff nhận email → Login lần đầu → Auto-provision profile nếu cần.
+
+- **Role change (behavioral):** Cập nhật **CẢ** Keycloak realm role **+** MongoDB permission mapping **đồng thời** — đảm bảo consistency giữa identity provider và application layer. Tránh lệch role giữa đăng nhập và logic nghiệp vụ.
+
+- **Disable staff (soft delete, behavioral):** Disable user trong Keycloak (không login được) + deactivate trong MongoDB. **KHÔNG hard delete** — giữ audit trail và lịch sử hoạt động. Staff bị disable không thể đăng nhập nhưng dữ liệu lịch sử vẫn tra cứu được.
+
+- **Tenant isolation:** Staff đã invited thuộc cùng tenant — tenant isolation enforced qua `tenant_id` filter trên mọi query. Không thể xem/quản lý staff của tenant khác.
+
 - **BFF proxy controllers** — thống nhất `UserGuard` → `TenantGuard` → `PermissionGuard` và không lộ Keycloak admin ra client.
 - Sử dụng **Keycloak Admin API** (client thư viện chính thức) — giảm lỗi thủ công so với REST thuần và phù hợp với kiến trúc auth hiện có.
 - **Keycloak Admin API operations:** `createUser`, `assignRole`, `removeRole`, `disableUser`
@@ -63,9 +68,20 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 **Phạm vi & lý do:**
 
 - Route **`/dashboard/staff`**: bảng danh sách, dialog mời (email + role), màn chi tiết/chỉnh sửa (đổi role, bật/tắt hoạt động) — một luồng UX thống nhất với backend 4.6.
-- **Staff UI table columns:** Tên, Email, Role, Trạng thái (Active/Disabled), Ngày tham gia
-- **Invite Staff Dialog:** Form: Email, Role dropdown (WAITER/CHEF/BARISTA/MANAGER), Validation: email unique trong tenant
-- **Lọc theo role** và **tìm kiếm** — vận hành cửa hàng lớn không bị nghẽn khi danh sách dài.
+
+- **Staff directory table:** Các cột hiển thị: Tên, Email, Role, Trạng thái (Active/Disabled), Ngày tham gia.
+  - **Filter** by role (dropdown hoặc tabs).
+  - **Search** by name/email (text input, debounce).
+
+- **Invite Staff Dialog:**
+  - Form: Email + Role dropdown (WAITER/CHEF/BARISTA/MANAGER).
+  - Validation: email unique trong tenant (kiểm tra trước khi gửi invite).
+  - Flow sau gửi: Staff nhận email → Login lần đầu → Auto-provision → Xuất hiện trong danh sách.
+
+- **Staff Detail / Edit:**
+  - Thay đổi role
+  - Disable/Enable staff account
+  - Xem activity log (nice-to-have)
 
 **Verify:** Owner/Manager thấy đúng dữ liệu tenant; thao tác invite/role/disable phản hồi nhất quán với API; role thấp không thấy hành động Owner-only.
 

@@ -32,14 +32,15 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
 - **Kitchen Service (Redis-only, không database):**
   - Consumer Kafka `order.confirmed` → tạo/cập nhật ticket KDS trong Redis
   - Hàng đợi FIFO dùng Redis Sorted Set: `kds:{tenant_id}:kitchen`, `kds:{tenant_id}:bar` (score = thứ tự ưu tiên thời gian / sequence đã thống nhất contract)
-  - Routing theo loại món: food → `kds:{tid}:kitchen`, drink → `kds:{tid}:bar`
-  - Batching: gom cùng món qua nhiều bàn trong một ticket/aggregate hiển thị — giảm nhiễu trên màn KDS và phản ánh cách bếp làm thực tế
-  - SLA: timer theo ticket; khi vượt ngưỡng → cảnh báo (UI + sự kiện downstream)
+  - Routing theo loại món (phân loại dựa trên category type của menu item): food → `kds:{tid}:kitchen`, drink → `kds:{tid}:bar`
+  - Batching: gom cùng món từ các order khác nhau — hiển thị tổng số lượng cần chuẩn bị, giảm nhiễu trên màn KDS và phản ánh cách bếp làm thực tế
+  - SLA: timer theo ticket; khi vượt ngưỡng (ví dụ 15 phút, configurable per tenant) → emit `kitchen.sla_warning` + cảnh báo UI (đổi màu vàng → đỏ)
   - Producer Kafka `kitchen.sla_warning` (ưu tiên P2): do timer nội bộ Kitchen Service, không block confirm đơn
-  - Priority flagging: Owner/Manager có thể đánh dấu ưu tiên ticket — ảnh hưởng thứ tự hiển thị/alert trong Redis contract
+  - Priority flagging: Owner/Manager có thể đánh dấu ưu tiên ticket → đẩy lên đầu queue, ảnh hưởng thứ tự hiển thị/alert trong Redis contract
+  - Recall logic: Chef/Barista lỡ nhấn "Done" → recall để đưa ticket quay lại trạng thái Processing
 - **WebSocket Gateway:**
   - Socket.io + Redis Adapter để scale ngang và đồng bộ room giữa các instance
-  - Auth handshake: Staff dùng JWT; Customer dùng session cookie (đúng trust boundary PWA vs staff app)
+  - Auth handshake: Staff dùng JWT từ Authorization header khi handshake; Customer dùng session identifier (đúng trust boundary PWA vs staff app)
   - Room assignment cố định theo contract:
     - WAITER → `tenant:{tid}:staff`
     - CHEF → `tenant:{tid}:kds:kitchen`
@@ -47,8 +48,13 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
     - OWNER / MANAGER → `tenant:{tid}:management`
     - CUSTOMER → `session:{sid}:customer`
   - **Kafka Consumer Bridge** (3 topic → WS): `order.confirmed` → room KDS/staff liên quan; `kitchen.sla_warning` → `tenant:{tid}:management`; `payment.completed` → `session:{sid}:customer`
-  - **BFF Direct side-effects** (5 sự kiện sau TCP/HTTP thành công): `order.created` → staff; `kitchen.item_ready` → staff + customer; `menu.updated` → broadcast tenant-wide theo policy đã chốt; `table.status_changed` → staff; `service.requested` → staff
-  - Reconnection: client disconnect → khi kết nối lại tự join lại room đúng role/session; gateway/bridge đảm bảo không mất trạng thái cần thiết cho UI (pending events hoặc snapshot contract)
+  - **BFF Direct side-effects** (5 sự kiện sau TCP/HTTP thành công):
+    - `order.created` → staff room (thông báo đơn mới)
+    - `kitchen.item_ready` → staff room + customer session room (món đã xong)
+    - `menu.updated` → broadcast tất cả rooms tenant-wide (sync menu + invalidate cache)
+    - `table.status_changed` → staff room (cập nhật trạng thái bàn)
+    - `service.requested` → staff room (chuông gọi nhân viên)
+  - Reconnection: client disconnect → khi kết nối lại auto re-join room đúng role/session → nhận lại pending events; gateway/bridge đảm bảo không mất trạng thái cần thiết cho UI
 
 **Lưu ý quan trọng:**
 
@@ -72,15 +78,16 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
 **Yêu cầu chính:**
 
 - Hooks cho: customer order tracking (subscribe WebSocket room), KDS queue management (WS + REST hybrid), staff live orders (WS room subscribe)
-- Customer PWA: theo dõi đơn qua WS theo session; menu tự làm mới khi nhận `menu.updated` (hoặc policy invalidate đã chốt với Catalog)
-- Management App: `/pos/` live orders; `/kds/` kanban (kitchen/bar) dùng WS — đồng bộ với Redis queue và sự kiện item ready
+- Customer PWA: Order tracking page cập nhật real-time qua WebSocket theo session (status timeline phản ánh ngay khi trạng thái đơn/món thay đổi). Menu auto-refresh khi nhận `menu.updated` event (hoặc policy invalidate đã chốt với Catalog)
+- Management App `/pos/`: WebSocket → live order list auto-update (đơn mới slides in với animation, trạng thái đổi real-time)
+- Management App `/kds/`: tickets slide in khi có đơn mới, status updates real-time qua WS. Actions (start, done, recall) → API calls → broadcast kết quả tới rooms liên quan (staff + customer)
 
 **Lưu ý quan trọng:**
 
 - UI chỉ render theo payload đã version/contract; không hard-code logic routing food/drink ở FE — hiển thị theo dữ liệu từ backend/KDS
 - Reconnect phải được kiểm thử trên mạng không ổn định (tab background, sleep, VPN)
 
-**Verify:** Manual hoặc E2E: đặt đơn → confirm → ticket trên KDS → ready → khách và staff thấy cập nhật; đổi menu → PWA reflect; disconnect WS 10s → reconnect → room và events vẫn đúng
+**Verify:** E2E flow: Khách đặt đơn → Staff thấy ngay trên POS → Staff confirm → KDS thấy ticket ngay → Chef/Barista done → Khách thấy trạng thái Ready. Đổi menu → PWA reflect tức thì. Disconnect WS 10s → reconnect → room và events vẫn đúng
 
 ## Acceptance Criteria
 

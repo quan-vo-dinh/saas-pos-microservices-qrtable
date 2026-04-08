@@ -63,7 +63,7 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 
 - **Customer PWA — Cart & Ordering:**
   - Nút "Thêm vào giỏ" trên MenuItemCard
-  - Cart drawer: danh sách items, +/- quantity, note field, tổng tiền
+  - Cart drawer: danh sách items, +/- quantity, note field per item, tổng tiền
   - Nút "Gửi đơn hàng" (với animation)
   - Order Tracking page: status timeline (Pending → Processing → Ready → Served)
   - Service Request buttons: "Gọi nhân viên", "Yêu cầu thanh toán", "Hỗ trợ"
@@ -124,11 +124,12 @@ IKDSTicket { ticketId, tableId, items, priority: boolean }
 
 - Persistence **PostgreSQL** cho toàn bộ aggregate order domain (không dùng Mongo cho entities nghiệp vụ này)
 - Vùng dữ liệu: đơn (`orders`), dòng món (`order_items`), **hóa đơn (`bills`) thuộc Order Service** — Payment Service phase sau chỉ tiêu thụ/kết nối thanh toán, không là owner bill
-- Phiên khách: Redis key `session:{tenant_id}:{session_id}`, TTL **2 giờ**, **idle 30 phút** (gia hạn/đóng session theo rule nghiệp vụ)
-- Giỏ chung: Redis key `cart:{tenant_id}:{session_id}` dạng **Hash** kèm field **version** (optimistic locking khi nhiều tab/thiết bị)
-- **Order state machine** khớp §8; mọi chuyển trạng thái có guard nghiệp vụ (ai được phép, từ trạng thái nào)
-- **Khóa tồn kho:** pessimistic lock trên PostgreSQL (**SELECT … FOR UPDATE**) trên dòng tồn/menu item liên quan khi confirm — tránh oversell
-- **Tổng hợp bill theo session**; **chuyển bàn** thực hiện **atomic** (đơn/session/cart/bàn không lệch trạng thái giữa chừng)
+- Phiên khách: Redis key `session:{tenant_id}:{session_id}`, TTL **2 giờ**, **idle 30 phút**. Rule auto-close: nếu `last_activity` > 30 phút VÀ `order_count == 0` → tự đóng session; nếu đã có đơn (`order_count > 0`) thì chỉ gia hạn idle timer, không tự đóng
+- Giỏ chung: Redis key `cart:{tenant_id}:{session_id}` dạng **Hash** kèm field **version** (optimistic locking). Khi update cart: kiểm tra version match trước khi ghi — nếu conflict → trả lỗi để client retry với dữ liệu mới nhất. Broadcast cart changes tới các device khác cùng session qua WebSocket
+- **Order state machine** khớp §8; mọi chuyển trạng thái có guard nghiệp vụ — validation rules per transition: ai được phép trigger transition nào (Customer chỉ cancel từ PENDING; Manager/Owner có thể cancel từ PROCESSING; chỉ Staff Waiter/Manager mới confirm được)
+- **Khóa tồn kho:** pessimistic lock trên PostgreSQL (**SELECT … FOR UPDATE**) trên dòng tồn/menu item liên quan khi confirm. Flow: nếu `stock >= requested` → deduct stock + create order_item + COMMIT; nếu không đủ → ROLLBACK → trả "Món đã hết" cho client — tránh oversell
+- **Tổng hợp bill theo session:** merge nhiều orders thành 1 bill per session; **chuyển bàn** thực hiện **atomic**: validate bàn đích status == Available → BEGIN → cập nhật orders, sessions, cart, bàn cũ → Available, bàn mới → Occupied → COMMIT → notify KDS về sự thay đổi
+- **Service request:** entity lưu trạng thái phục vụ — type: `CALL_STAFF` | `REQUEST_BILL` | `GENERAL_HELP`; status flow: `PENDING` → `ACKNOWLEDGED` → `RESOLVED`
 - **Kafka:** chỉ producer topic **`order.confirmed`** trong phase này (đúng registry §7.2)
 - **BFF Direct (AP1, không Kafka):** sau tác vụ thành công, emit **`order.created`** và **`service.requested`** → gateway WebSocket tới client
 - Môi trường dev: broker Kafka + Zookeeper chạy cùng stack container với các service khác
@@ -158,10 +159,10 @@ IKDSTicket { ticketId, tableId, items, priority: boolean }
 **Yêu cầu chính:**
 
 - Hooks cho cart management và order submission (với idempotency key), session, service request, POS list
-- Customer PWA: thay mock bằng API + session hợp lệ
-- Management POS: **polling** danh sách đơn/live view (WebSocket có thể bật dần nếu gateway đã sẵn)
+- Customer PWA: thay mock bằng API + session hợp lệ; optimistic updates cho cart. Order submit: loading → success animation → redirect tới tracking page. Service Request buttons gọi API thực
+- Management POS: **polling** danh sách đơn/live view (WebSocket chuyển sang ở Phase 2B). Actions: confirm/cancel → API calls cập nhật trạng thái đơn
 
-**Verify:** Khách đặt từ PWA → POS thấy đơn; bếp/bar cập nhật từ KDS mock hoặc UI tối thiểu nếu đã nối API; không lộ dữ liệu cross-tenant
+**Verify:** Khách thêm giỏ hàng → submit đơn → Staff thấy đơn mới trên POS. Stock lock: 2 khách cùng đặt món cuối → 1 nhận "Hết hàng". Không lộ dữ liệu cross-tenant
 
 ## Acceptance Criteria
 

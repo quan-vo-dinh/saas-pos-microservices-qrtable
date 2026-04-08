@@ -40,9 +40,15 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 
 **Yêu cầu chính:**
 
-- `/dashboard/menu` — Category list + CRUD form (tên, sort order, khung giờ, trạng thái)
-- `/dashboard/menu/items` — MenuItem grid cards + CRUD form (tên, mô tả, giá, ảnh upload, category, stock)
-- `/dashboard/tables` — Area tabs + Table grid (tên, capacity, status badge) + QR generate/export
+- `/dashboard/menu` — Category list + CRUD form
+  - Category form fields: tên, time_start, time_end, sort_order
+  - Drag-drop reorder cho categories
+- `/dashboard/menu/items` — MenuItem grid + CRUD form
+  - Grid cards: ảnh, tên, giá, stock, trạng thái
+  - Form fields: tên, mô tả, giá, ảnh (upload), category dropdown, stock
+- `/dashboard/tables` — Area & Table management
+  - Area tabs → Table grid (tên, capacity, trạng thái badge)
+  - QR Code generate + export (PDF/ảnh)
 - Shared UI components: card hiển thị menu item, danh sách category, badge trạng thái bàn, hiển thị QR code, data table — đặt trong shared UI library
 
 **Lưu ý:** Sử dụng tối đa Shadcn UI ecosystem (DataTable, Form, Dialog, Tabs). Không tự code lại components cơ bản.
@@ -61,6 +67,8 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 - Zustand store cho UserProfile & Role (ẩn/hiện UI controls)
 - Custom Keycloak theme với Keycloakify (React + Tailwind + Shadcn UI)
 
+**Lưu ý quan trọng:** Build Keycloakify project thành file `.jar` → deploy vào thư mục `themes/` của Docker Keycloak hiện tại.
+
 **Verify:** Truy cập `/dashboard` không có token → redirect tới Keycloak login (giao diện custom)
 
 ### Step 1.3 — Mock UI: Customer PWA Menu (2-3 ngày)
@@ -69,9 +77,9 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 
 **Yêu cầu chính:**
 
-- QR Landing Page: parse URL params (`?table={id}&token={hmac}`)
-- Menu Page: category tabs, grid menu items (ảnh, tên, giá), "Hết hàng" badge
-- Item detail: bottom sheet (ảnh lớn, mô tả, chọn số lượng)
+- QR Landing Page: parse URL params (`?table={id}&token={hmac}`), loading spinner → redirect to menu page
+- Menu Page: category tabs, grid menu items (ảnh, tên, giá), "Hết hàng" badge khi stock = 0
+- Item detail: tap item → detail bottom sheet (ảnh lớn, mô tả, chọn số lượng)
 
 **Lưu ý:** Ưu tiên Shadcn UI mobile components (Sheet, Drawer, Button).
 
@@ -115,8 +123,12 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 - CloudinaryModule trong `libs/providers/` — config từ env
 - CloudinaryService: uploadImage, deleteImage, getOptimizedUrl
 - Validation: max 5MB, image types only (jpeg, png, webp)
-- Tenant-isolated storage: `qrtable/{tenant_id}/menu/` (Phase 1), `qrtable/{tenant_id}/branding/` (Phase 4B)
+- Transformation: auto format, quality auto, max width 800px
 - Auto-generate responsive URLs (thumbnail 200px, medium 400px, large 800px)
+- Tenant-isolated folder structure:
+  - `qrtable/{tenant_id}/menu/` — ảnh món ăn (Phase 1)
+  - `qrtable/{tenant_id}/branding/` — logo, banner (Phase 4B)
+  - `qrtable/{tenant_id}/qr-exports/` — QR PDF exports (nice-to-have)
 
 **Lưu ý:** Env vars: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET. Thêm vào docker-compose.yml.
 
@@ -130,14 +142,19 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 
 - TypeORM entities cho 4 domain objects: categories, menu_items, areas, tables (schema: technical-architecture.md §6.2.4)
 - Multi-tenant isolation: mọi query filter theo tenant_id
-- Category: CRUD + sort ordering + time-based visibility (chỉ hiển thị trong khung giờ)
-- MenuItem: CRUD + stock management + soft delete (giữ deleted_at cho audit)
-- MenuItem image upload: tích hợp CloudinaryModule, validate file type/size
-- Area/Table: CRUD + QR token generation (HMAC-SHA256) + validate
-- Table State Machine: Available → Occupied → Billing → Cleaning (xem business-logic.md §3.C)
-- Redis cache: `menu:{tenant_id}` → full menu JSON (TTL 10 min, invalidate on change)
+- **Category:** CRUD + sort ordering + time-based visibility logic — category chỉ hiển thị trong khung giờ `time_start` → `time_end` (ví dụ: "Bữa sáng" chỉ show 6:00-11:00)
+- **MenuItem:** CRUD + stock management + soft delete constraints
+- **MenuItem Image Upload behavioral flow:**
+  - Khi create/update MenuItem: nếu có file → upload Cloudinary → lưu `image_url`
+  - Khi update ảnh: upload ảnh mới → xóa ảnh cũ trên Cloudinary → cập nhật `image_url`
+  - Khi soft delete MenuItem: KHÔNG xóa ảnh (giữ cho audit trail)
+- **Area/Table:** CRUD + QR Token (HMAC-SHA256) generate/validate
+- **Table State Machine:** Available → Occupied → Billing → Cleaning — business rules cho mỗi transition (xem business-logic.md §3.C)
+- **Redis cache:**
+  - `menu:{tenant_id}` → full menu JSON (TTL: 10 min, invalidate on change)
+  - `table:{tenant_id}:{table_id}:status` → status string (no expire, explicit update)
 - BFF REST endpoints với appropriate guard chain (public menu: SessionGuard, admin CRUD: UserGuard + PermissionGuard)
-- BFF Multer middleware: memory storage, stream to Cloudinary (không lưu disk), body limit 20MB
+- **BFF Config:** Body parser limit 20MB, Multer memory storage (stream to Cloudinary, không lưu disk)
 
 **TCP Message Patterns:** Đăng ký TCP message patterns cho Catalog CRUD theo convention hiện có trong `libs/constants`
 
@@ -156,9 +173,11 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 
 **Lưu ý quan trọng:**
 
-- Phase 1 chưa có Kafka — cache invalidation dùng BFF Direct pattern (BFF gọi Redis DEL sau TCP response)
-- KHÔNG dùng Kafka cho menu.updated, table.status_changed (AP1)
-- Delete constraints: không xóa Category có MenuItem, không xóa MenuItem có active orders, không xóa Table có active session
+- **Side-effects Pattern (Phase 1):** Chưa có Kafka ở Phase 1 (setup ở Phase 2A). Cache invalidation: BFF gọi Redis DEL trực tiếp sau TCP response. WebSocket chưa triển khai (Phase 2B). KHÔNG dùng Kafka cho menu.updated, table.status_changed (AP1)
+- **Delete constraints:**
+  - Không xóa Category có MenuItem
+  - Không xóa MenuItem có active orders
+  - Không xóa Table có active session
 - TCP message patterns đăng ký trong `libs/constants` theo convention hiện có
 
 **Verify:** Postman/Thunder Client test tất cả endpoints — CRUD + image upload + QR validate
@@ -169,13 +188,17 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 
 **Yêu cầu chính:**
 
-- React Query hooks cho menu, categories, menu items, tables queries/mutations
-  - Hook upload ảnh menu item với progress tracking, optimistic update (local preview), error handling (file quá lớn, sai format)
-- Customer PWA: thay mock data bằng API calls, QR landing validate token qua API
-- Management App: CRUD operations gọi API, image upload với progress indicator + preview
+- React Query hooks cho: menu query, category CRUD, menu item CRUD, table CRUD, image upload
+  - Image upload hook: progress tracking, optimistic update (local preview trước khi upload xong), error handling (file too large, wrong format)
+- **Customer PWA:** thay mock data → QR landing validate token qua API, menu page real data + loading states + error states
+- **Management App:** CRUD operations, image upload với drag-drop hoặc click-to-select, preview trước submit, upload progress indicator
 - Optimistic updates + error handling cho tất cả mutations
 
-**Verify:** Owner tạo category + item → Customer PWA thấy ngay. Upload ảnh → hiển thị trên cả 2 apps. Cache invalidation hoạt động.
+**Verify E2E:**
+
+- Owner tạo item → Customer thấy ngay
+- Upload ảnh → hiển thị cả 2 apps
+- Edit giá → customer refresh → giá mới (cache invalidation)
 
 ## Acceptance Criteria
 
