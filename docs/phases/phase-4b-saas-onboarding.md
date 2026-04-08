@@ -37,7 +37,7 @@ Sự kiện domain (`tenant.created`, v.v.) tồn tại để **Notification** v
   - `tenant.suspended`: **không** bắt buộc Kafka; thay vào đó **cờ Redis** (ví dụ AP1) để các guard kiểm tra nhanh và chặn sớm — vì suspend thường cần hiệu lực tức thì.
 - **Subscription:** CRUD **Plan** (Free, Basic, Premium), gán plan cho tenant, theo dõi **start/end**, và **cron auto-suspend** khi hết hạn hoặc vi phạm điều kiện gói — để vận hành không phụ thuộc can thiệp thủ công cho từng tenant nhỏ.
 - **Feature gating:** `TenantPlanGuard` (hoặc tương đương) áp giới hạn theo plan: `max_tables`, `max_staff`, `max_orders_per_day`; khi vượt → phản hồi **402** (hoặc semantic “payment / plan required” đã thống nhất API) để client và support hiểu đây là giới hạn gói, không phải lỗi auth ngẫu nhiên.
-- **Tenant Onboarding (MVP admin-assisted):** `POST /api/v1/saas/tenants/onboard` tạo tenant **và** provision **Keycloak Owner**, seed mặc định (ví dụ **1 area**, **VND**), gán **Free plan** — một lần gọi đủ để tenant có thể đăng nhập và bắt đầu cấu hình.
+- **Tenant Onboarding (MVP admin-assisted):** Endpoint onboard tenant mới — SUPER_ADMIN hoặc self-service — tạo tenant **và** provision **Keycloak Owner**, seed mặc định (ví dụ **1 area**, **VND**), gán **Free plan** — một lần gọi đủ để tenant có thể đăng nhập và bắt đầu cấu hình.
 - **Nice-to-have:** Wizard self-service (`/register/restaurant`, form nhiều bước) — giảm tải admin nhưng chỉ sau khi API onboarding và gating đã ổn.
 
   ```
@@ -67,7 +67,7 @@ Sự kiện domain (`tenant.created`, v.v.) tồn tại để **Notification** v
 ## Acceptance Criteria
 
 - [ ] Feature gating: plan Free → tối đa 10 bàn → tạo/chỉnh bàn thứ 11 bị chặn với **402**
-- [ ] Tenant onboarding API: `POST /api/v1/saas/tenants/onboard` tạo tenant + Owner Keycloak + seed mặc định + gán Free plan thành công theo contract
+- [ ] Tenant onboarding API: endpoint onboard tạo tenant + Owner Keycloak + seed mặc định + gán Free plan thành công theo contract
 - [ ] Slug generation: ví dụ `"Phở Hà Nội"` → `"pho-ha-noi"` (chuẩn hóa + unique trong hệ thống)
 - [ ] Subscription lifecycle: gán plan → theo dõi kỳ hạn → auto-suspend qua cron khi điều kiện kích hoạt
 - [ ] Admin UI: `/admin/tenants` và `/admin/plans` chỉ **SUPER_ADMIN**; `/dashboard/subscription` phục vụ chủ quán theo policy quyền đã chốt

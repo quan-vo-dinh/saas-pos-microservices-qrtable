@@ -43,8 +43,7 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 - `/dashboard/menu` — Category list + CRUD form (tên, sort order, khung giờ, trạng thái)
 - `/dashboard/menu/items` — MenuItem grid cards + CRUD form (tên, mô tả, giá, ảnh upload, category, stock)
 - `/dashboard/tables` — Area tabs + Table grid (tên, capacity, status badge) + QR generate/export
-- Shared UI components đặt trong `libs/frontend/ui/`:
-  - `<MenuItemCard />`, `<CategoryList />`, `<TableStatusBadge />`, `<QRCodeView />`, `<StatusBadge />`, `<DataTable />`
+- Shared UI components: card hiển thị menu item, danh sách category, badge trạng thái bàn, hiển thị QR code, data table — đặt trong shared UI library
 
 **Lưu ý:** Sử dụng tối đa Shadcn UI ecosystem (DataTable, Form, Dialog, Tabs). Không tự code lại components cơ bản.
 
@@ -140,25 +139,15 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 - BFF REST endpoints với appropriate guard chain (public menu: SessionGuard, admin CRUD: UserGuard + PermissionGuard)
 - BFF Multer middleware: memory storage, stream to Cloudinary (không lưu disk), body limit 20MB
 
-**TCP Message Patterns:**
-
-```
-CATALOG.CATEGORY.CREATE, CATALOG.CATEGORY.FIND_ALL, ...
-CATALOG.MENU_ITEM.CREATE, CATALOG.MENU.GET_FULL, ...
-CATALOG.TABLE.CREATE, CATALOG.TABLE.UPDATE_STATUS, ...
-```
+**TCP Message Patterns:** Đăng ký TCP message patterns cho Catalog CRUD theo convention hiện có trong `libs/constants`
 
 **BFF REST Endpoints:**
 
-```
-GET  /api/v1/menu?tenant_id=xxx           (public, cached — SessionGuard)
-POST /api/v1/admin/categories              (Owner/Manager — UserGuard + CATALOG_CREATE)
-POST /api/v1/admin/menu-items              (Owner/Manager — UserGuard + CATALOG_CREATE)
-POST /api/v1/admin/menu-items/:id/image    (Owner/Manager — multipart/form-data)
-DELETE /api/v1/admin/menu-items/:id/image  (Owner/Manager)
-POST /api/v1/admin/tables                  (Owner/Manager — UserGuard + CATALOG_CREATE)
-POST /api/v1/tables/:id/validate-qr        (public — SessionGuard)
-```
+- Public menu query (cached) — SessionGuard
+- Admin category CRUD — UserGuard + CATALOG_CREATE/UPDATE/DELETE permission
+- Admin menu item CRUD + image upload (multipart/form-data) — UserGuard + CATALOG_CREATE permission
+- Admin table CRUD — UserGuard + CATALOG_CREATE permission
+- Public QR token validation — SessionGuard
 
 **Redis cache keys:**
 
@@ -170,7 +159,7 @@ POST /api/v1/tables/:id/validate-qr        (public — SessionGuard)
 - Phase 1 chưa có Kafka — cache invalidation dùng BFF Direct pattern (BFF gọi Redis DEL sau TCP response)
 - KHÔNG dùng Kafka cho menu.updated, table.status_changed (AP1)
 - Delete constraints: không xóa Category có MenuItem, không xóa MenuItem có active orders, không xóa Table có active session
-- TCP message patterns: CATALOG.CATEGORY._, CATALOG.MENU_ITEM._, CATALOG.TABLE.\* (đăng ký trong libs/constants)
+- TCP message patterns đăng ký trong `libs/constants` theo convention hiện có
 
 **Verify:** Postman/Thunder Client test tất cả endpoints — CRUD + image upload + QR validate
 
@@ -180,8 +169,8 @@ POST /api/v1/tables/:id/validate-qr        (public — SessionGuard)
 
 **Yêu cầu chính:**
 
-- React Query hooks trong `libs/frontend/hooks/`: useMenu, useCategories, useMenuItems, useTables, useUploadMenuItemImage
-  - `useUploadMenuItemImage(itemId)`: progress tracking, optimistic update (local preview), error handling (file too large, wrong format)
+- React Query hooks cho menu, categories, menu items, tables queries/mutations
+  - Hook upload ảnh menu item với progress tracking, optimistic update (local preview), error handling (file quá lớn, sai format)
 - Customer PWA: thay mock data bằng API calls, QR landing validate token qua API
 - Management App: CRUD operations gọi API, image upload với progress indicator + preview
 - Optimistic updates + error handling cho tất cả mutations

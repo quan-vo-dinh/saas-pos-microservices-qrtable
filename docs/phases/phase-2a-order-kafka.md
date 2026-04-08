@@ -141,17 +141,13 @@ IKDSTicket { ticketId, tableId, items, priority: boolean }
 
 **BFF REST Endpoints:**
 
-```
-POST /api/v1/orders               (Customer — SessionGuard)
-PATCH /api/v1/orders/:id/confirm   (Staff — UserGuard + ORDER_CONFIRM)
-PATCH /api/v1/orders/:id/cancel    (Customer: Pending only, Manager: Processing)
-GET  /api/v1/orders                (Staff — ORDER_GET_LIST)
-GET  /api/v1/orders/:id            (Staff/Customer — ORDER_GET_BY_ID)
-POST /api/v1/cart                  (Customer — SessionGuard)
-GET  /api/v1/cart                  (Customer — SessionGuard)
-POST /api/v1/service-requests      (Customer — SessionGuard)
-PATCH /api/v1/service-requests/:id/acknowledge (Staff — SERVICE_REQUEST_ACKNOWLEDGE)
-```
+- Order submit — Customer, SessionGuard
+- Order confirm — Staff, UserGuard + ORDER_CONFIRM
+- Order cancel — Customer (Pending only) hoặc Manager (Processing)
+- Order list/detail query — Staff ORDER_GET_LIST / Staff+Customer ORDER_GET_BY_ID
+- Cart CRUD — Customer, SessionGuard
+- Service request submit — Customer, SessionGuard
+- Service request acknowledge — Staff, SERVICE_REQUEST_ACKNOWLEDGE
 
 **Verify:** Confirm đơn → tồn giảm đúng, không double-sell dưới concurrency; `order.confirmed` xuất hiện trên topic; UI nhận WS từ `order.created` / `service.requested`; chuyển bàn không mất cart/order
 
@@ -161,9 +157,7 @@ PATCH /api/v1/service-requests/:id/acknowledge (Staff — SERVICE_REQUEST_ACKNOW
 
 **Yêu cầu chính:**
 
-- Hooks dữ liệu (query/mutation) cho cart, order, session, service request, POS list:
-  - `useCart(sessionId)` — Redis cart via API
-  - `useSubmitOrder()` — POST /orders + idempotency key
+- Hooks cho cart management và order submission (với idempotency key), session, service request, POS list
 - Customer PWA: thay mock bằng API + session hợp lệ
 - Management POS: **polling** danh sách đơn/live view (WebSocket có thể bật dần nếu gateway đã sẵn)
 

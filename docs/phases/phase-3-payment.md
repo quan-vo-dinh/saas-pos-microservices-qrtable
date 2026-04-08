@@ -52,13 +52,11 @@ Phase 3 tách trách nhiệm thanh toán khỏi Order Service để tuân thủ 
 
 - **Entities:** `payments` (gồm `rounded_amount`, `rounding_delta`, tham chiếu method/status/Stripe), `refunds`, `audit_payments`.
 - **BFF REST Endpoints:**
-  ```
-  POST /api/v1/payment/checkout         (Customer/Staff — create Stripe session)
-  POST /api/v1/payment/cash-confirm     (Staff — PAYMENT_CONFIRM_CASH)
-  POST /api/v1/payment/stripe/webhook   (Stripe — raw body + signature verify)
-  POST /api/v1/payment/refund           (Owner/Manager — PAYMENT_REFUND)
-  GET  /api/v1/payment/history          (Staff — PAYMENT_GET_HISTORY)
-  ```
+  - Payment checkout (tạo Stripe session) — Customer/Staff
+  - Cash payment confirm — Staff, PAYMENT_CONFIRM_CASH
+  - Stripe webhook receiver — raw body + signature verify
+  - Refund request — Owner/Manager, PAYMENT_REFUND
+  - Payment history — Staff, PAYMENT_GET_HISTORY
 - **Stripe:** Checkout Session với **`currency: "vnd"`**; webhook xử lý sau khi BFF nhận **POST `/payment/stripe/webhook`** với raw body và verify signature — Payment Service là nơi interpret event và cập nhật trạng thái.
 - **Tiền mặt:** Staff xác nhận thu đủ → service ghi nhận và emit **`payment.completed`** qua Kafka.
 - **Làm tròn:** `rounded_total = Math.ceil(raw_total / 1000) * 1000`, `rounding_delta = rounded_total - raw_total`, lưu đủ raw/rounded/delta trên bản ghi thanh toán (align §6.2.7).

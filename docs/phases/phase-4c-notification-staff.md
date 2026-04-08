@@ -42,16 +42,14 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 **Phạm vi & lý do:**
 
 - **Staff Management Endpoints:**
-  ```
-  POST   /api/v1/admin/staff/invite    (Owner/Manager — USER_CREATE)
-  GET    /api/v1/admin/staff            (Owner/Manager — USER_GET_ALL)
-  PATCH  /api/v1/admin/staff/:id/role   (Owner only — ROLE_UPDATE)
-  DELETE /api/v1/admin/staff/:id        (Owner only — USER_DELETE)
-  ```
-- **`POST /api/v1/admin/staff/invite`** — quyền Owner/Manager với permission `USER_CREATE`: tạo user trong Keycloak, gán role phù hợp, tạo profile MongoDB theo tenant, gửi email mời — để người được mời có thể đăng nhập với đúng vai trò ngay từ đầu.
-- **`GET /api/v1/admin/staff`** — liệt kê theo tenant — nền tảng cho UI và kiểm soát quy mô nhóm làm việc.
-- **`PATCH /api/v1/admin/staff/:id/role`** — chỉ Owner, permission `ROLE_UPDATE`: cập nhật đồng thời Keycloak và MongoDB — tránh lệch role giữa đăng nhập và logic nghiệp vụ.
-- **`DELETE /api/v1/admin/staff/:id`** — chỉ Owner: **soft delete** — vô hiệu hóa trong Keycloak và deactivate profile MongoDB — giữ lịch sử và chặn đăng nhập mà không xóa cứng dữ liệu audit.
+  - Invite staff — Owner/Manager, USER_CREATE permission
+  - List staff by tenant — Owner/Manager, USER_GET_ALL
+  - Change staff role — Owner only, ROLE_UPDATE
+  - Disable staff (soft delete) — Owner only, USER_DELETE
+- **Invite staff** — quyền Owner/Manager với permission `USER_CREATE`: tạo user trong Keycloak, gán role phù hợp, tạo profile MongoDB theo tenant, gửi email mời — để người được mời có thể đăng nhập với đúng vai trò ngay từ đầu.
+- **List staff** — liệt kê theo tenant — nền tảng cho UI và kiểm soát quy mô nhóm làm việc.
+- **Change role** — chỉ Owner, permission `ROLE_UPDATE`: cập nhật đồng thời Keycloak và MongoDB — tránh lệch role giữa đăng nhập và logic nghiệp vụ.
+- **Disable staff** — chỉ Owner: **soft delete** — vô hiệu hóa trong Keycloak và deactivate profile MongoDB — giữ lịch sử và chặn đăng nhập mà không xóa cứng dữ liệu audit.
 - **BFF proxy controllers** — thống nhất `UserGuard` → `TenantGuard` → `PermissionGuard` và không lộ Keycloak admin ra client.
 - Sử dụng **Keycloak Admin API** (client thư viện chính thức) — giảm lỗi thủ công so với REST thuần và phù hợp với kiến trúc auth hiện có.
 - **Keycloak Admin API operations:** `createUser`, `assignRole`, `removeRole`, `disableUser`
@@ -84,4 +82,4 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 - Notification Service là điểm mở rộng cho các sự kiện email khác (cảnh báo SLA, marketing opt-in) mà không đụng vào path đồng bộ chính
 - User-access là biên quản lý nhân sự tenant-scoped, sẵn sàng gắn thêm policy (ví dụ số slot staff theo gói SaaS) nếu phase sau yêu cầu
 - UI staff tái sử dụng pattern bảng + dialog + RBAC cho các màn admin khác
-- Bảng tra cứu nhanh: topics `tenant.created`, `payment.completed`, `payment.refunded`; collection audit notification; endpoints `/admin/staff*` qua BFF
+- Bảng tra cứu nhanh: topics `tenant.created`, `payment.completed`, `payment.refunded`; collection audit notification; staff management endpoints qua BFF

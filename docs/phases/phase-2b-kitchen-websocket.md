@@ -58,13 +58,10 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
 
 **BFF REST Endpoints (Kitchen):**
 
-```
-GET  /api/v1/kds/queue          (Chef/Barista — KITCHEN_GET_QUEUE)
-PATCH /api/v1/kds/:id/start     (Chef/Barista — KITCHEN_UPDATE_TICKET)
-PATCH /api/v1/kds/:id/done      (Chef/Barista — KITCHEN_UPDATE_TICKET)
-PATCH /api/v1/kds/:id/recall    (Chef/Barista — KITCHEN_RECALL)
-PATCH /api/v1/kds/:id/priority  (Owner/Manager only)
-```
+- KDS queue query — Chef/Barista, KITCHEN_GET_QUEUE
+- KDS ticket start/done — Chef/Barista, KITCHEN_UPDATE_TICKET
+- KDS ticket recall — Chef/Barista, KITCHEN_RECALL
+- KDS ticket priority — Owner/Manager only
 
 **Verify:** Integration test hoặc script: publish `order.confirmed` → ticket xuất hiện đúng queue + room WS đúng role; SLA vượt ngưỡng → `kitchen.sla_warning` + management nhận WS; BFF path `kitchen.item_ready` → staff + customer nhận trong cùng scenario
 
@@ -74,10 +71,7 @@ PATCH /api/v1/kds/:id/priority  (Owner/Manager only)
 
 **Yêu cầu chính:**
 
-- Hooks tập trung (trong `libs/frontend/hooks/`):
-  - `useOrderTracking(sessionId)` — WebSocket room subscribe, cập nhật timeline đơn hàng real-time cho Customer PWA
-  - `useKDSQueue(station)` — WebSocket + REST hybrid, subscribe room `kds:kitchen` hoặc `kds:bar` theo station
-  - `useLiveOrders()` — WebSocket staff room, nhận đơn mới slides in cho POS live order list
+- Hooks cho: customer order tracking (subscribe WebSocket room), KDS queue management (WS + REST hybrid), staff live orders (WS room subscribe)
 - Customer PWA: theo dõi đơn qua WS theo session; menu tự làm mới khi nhận `menu.updated` (hoặc policy invalidate đã chốt với Catalog)
 - Management App: `/pos/` live orders; `/kds/` kanban (kitchen/bar) dùng WS — đồng bộ với Redis queue và sự kiện item ready
 
@@ -102,5 +96,5 @@ PATCH /api/v1/kds/:id/priority  (Owner/Manager only)
 
 - Kitchen Service vận hành trên Redis + Kafka, không persistence riêng — sẵn sàng gắn thêm billing/POS phase mà không đổi contract queue cốt lõi
 - WebSocket Gateway có Redis Adapter, map room theo role và session — có thể mở rộng topic/event mới cho thanh toán hoặc thông báo vận hành
-- FE hooks real-time (`useOrderTracking`, `useKDSQueue`, `useLiveOrders`) dùng chung cho POS và PWA
+- FE hooks real-time (order tracking, KDS queue, live orders) dùng chung cho POS và PWA
 - Bảng tra cứu nhanh: topic `order.confirmed`, `kitchen.sla_warning`, `payment.completed`; keys `kds:{tid}:kitchen`, `kds:{tid}:bar`; rooms `tenant:{tid}:staff`, `tenant:{tid}:kds:kitchen`, `tenant:{tid}:kds:bar`, `tenant:{tid}:management`, `session:{sid}:customer`
