@@ -151,13 +151,14 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
     ├──→ Order Service (TCP): submit order
     │       ├── Pessimistic lock: SELECT ... FOR UPDATE (stock check)
     │       ├── Persist order → PostgreSQL
-    │       ├── Emit Kafka: "order.created"
-    │       └── WebSocket → notify Staff POS
+    │       └── Return response → BFF
+    │           └── BFF Direct: emit WebSocket → notify Staff POS (AP1)
     │
-    ├──→ Kitchen Service (Kafka consumer: "order.confirmed")
-    │       ├── Route ticket: food → KDS Bếp, drink → KDS Bar
-    │       ├── Redis Sorted Set (FIFO queue)
-    │       └── WebSocket → push ticket to KDS screens
+    ├──→ Order confirm → Emit Kafka: "order.confirmed" (P1+P2)
+    │       └── Kitchen Service (Kafka consumer):
+    │           ├── Route ticket: food → KDS Bếp, drink → KDS Bar
+    │           ├── Redis Sorted Set (FIFO queue)
+    │           └── BFF Direct: emit WebSocket → KDS screens (sau TCP confirm response)
     │
     └──→ Payment Service (TCP): process payment
             ├── Stripe Checkout Session → webhook → verify → update status
@@ -551,14 +552,19 @@ Trách nhiệm:
   - Rate limiting (NestJS Throttler + Redis)
   - Global Exception Interceptor (chuẩn hóa error response)
   - Logger Middleware (process ID tracking across services)
-  - WebSocket Gateway: Kafka event → broadcast to rooms
+  - WebSocket Gateway: Kafka event bridge (3 topics) + BFF Direct side-effects (6 events)
   - CORS, Body parser (20mb limit cho image upload)
+  - Multer middleware: memory storage, stream to Cloudinary (không lưu disk)
+  - Upload endpoint: POST /api/v1/admin/menu-items/:id/image (multipart/form-data)
+  - BFF Direct Side-Effects Pattern (AP1): xử lý WebSocket emit + cache invalidation
+    sau TCP response cho UI-layer events (xem §7.3)
 
 Giao tiếp:
   - → Auth Service (gRPC): verify token
   - → Catalog/Order/Payment/SaaS Service (TCP): business operations
   - → Redis: token cache, rate limit counter
-  - → Kafka: subscribe events → bridge to WebSocket
+  - → Kafka: subscribe 3 domain events (order.confirmed, kitchen.sla_warning, payment.completed)
+  - → Cloudinary: stream image upload (menu items)
 
 Không có Database riêng — BFF chỉ là proxy + orchestrator.
 ```
@@ -614,6 +620,11 @@ Events emitted (Kafka):
 ```
 Trách nhiệm:
   - Menu Management: Category CRUD, MenuItem CRUD
+  - Menu Item Image Upload: Cloudinary SDK integration
+    + Upload path: uploads/{tenant_id}/menu/{uuid}.{ext}
+    + Validation: max 5MB, types: image/jpeg, image/png, image/webp
+    + Transformation: auto format, quality auto, max width 800px
+    + Delete old image khi update, giữ image khi soft delete (audit)
   - Table & Area Management: Area CRUD, Table CRUD
   - QR Token: sinh HMAC-SHA256 token, validate, re-generate
   - Table State Machine: Available → Occupied → Billing → Cleaning
@@ -633,9 +644,9 @@ Entities (PostgreSQL):
   - areas: id, tenant_id, name, sort_order
   - tables: id, tenant_id, area_id, name, capacity, status, qr_token, session_id
 
-Events emitted (Kafka):
-  - menu.updated → invalidate cache + WebSocket broadcast to customers
-  - table.status_changed → WebSocket broadcast to staff
+BFF Direct Side-Effects (AP1 — không qua Kafka, xem §7.3):
+  - Menu CRUD response → BFF invalidate Redis cache + WebSocket broadcast to customers
+  - Table status change response → BFF emit WebSocket broadcast to staff
 
 Caching (Redis):
   - menu:{tenant_id} → full menu JSON (TTL: 10 min, invalidate on change)
@@ -679,11 +690,13 @@ Session State (Redis):
     → TTL: bound to session TTL
 
 Events emitted (Kafka):
-  - order.created → notify staff (WebSocket)
-  - order.confirmed → route to Kitchen Service
-  - order.ready → notify waiter (WebSocket)
-  - order.completed → analytics pipeline
-  - service.requested → notify staff (WebSocket) — yêu cầu phục vụ từ khách
+  - order.confirmed → route to Kitchen Service (P1+P2)
+  - order.completed → analytics pipeline (future)
+
+BFF Direct Side-Effects (AP1 — không qua Kafka, xem §7.3):
+  - order.created → BFF emit WS tới tenant:{tid}:staff
+  - order.ready → BFF emit WS tới tenant:{tid}:staff + session:{sid}:customer
+  - service.requested → BFF emit WS tới tenant:{tid}:staff
 
 Table Transfer (Atomic Transaction):
   Trigger: Staff/Manager chuyển bàn
@@ -730,13 +743,16 @@ Data Store (Redis — không cần PostgreSQL riêng):
   - ticket:{ticket_id} → Hash { order_id, table_name, items, status, created_at }
 
 Events emitted (Kafka):
-  - kitchen.item_ready → trigger waiter notification
-  - kitchen.sla_warning → trigger manager alert
+  - kitchen.sla_warning → trigger manager alert (P2: sinh bởi internal timer)
 
-WebSocket push:
-  - Room tenant:{tid}:kds:kitchen → new ticket, status change, SLA warning
-  - Room tenant:{tid}:kds:bar → same for bar
-  - Room tenant:{tid}:staff → "Bàn 05 — Phở bò đã xong"
+BFF Direct Side-Effects (AP1 — không qua Kafka, xem §7.3):
+  - kitchen.item_ready → BFF emit WS tới tenant:{tid}:staff + session:{sid}:customer
+
+WebSocket push (do BFF xử lý — Kitchen không emit WS trực tiếp):
+  - BFF Direct → tenant:{tid}:kds:kitchen — new ticket, status change
+  - BFF Direct → tenant:{tid}:kds:bar — same for bar
+  - BFF Direct → tenant:{tid}:staff — "Bàn 05 — Phở bò đã xong"
+  - Kafka bridge → tenant:{tid}:management — kitchen.sla_warning (P2: sinh bởi timer)
 ```
 
 #### 6.2.7 Payment Service
@@ -844,19 +860,90 @@ Giao tiếp:
 
 ### 7.2 Kafka Topic Registry
 
-| Topic                  | Producer          | Consumer(s)                    | Payload chính                      |
-| ---------------------- | ----------------- | ------------------------------ | ---------------------------------- |
-| `tenant.created`       | SaaS Mgmt Service | Notification, Catalog (init)   | `{ tenantId, ownerEmail, slug }`   |
-| `tenant.suspended`     | SaaS Mgmt Service | BFF (block requests)           | `{ tenantId, reason }`             |
-| `menu.updated`         | Catalog Service   | BFF (cache invalidate + WS)    | `{ tenantId, action, itemId }`     |
-| `table.status_changed` | Catalog Service   | BFF (WS broadcast)             | `{ tenantId, tableId, newStatus }` |
-| `order.created`        | Order Service     | BFF (WS → notify staff)        | `{ tenantId, orderId, tableId }`   |
-| `order.confirmed`      | Order Service     | Kitchen Service (route to KDS) | `{ tenantId, orderId, items[] }`   |
-| `kitchen.item_ready`   | Kitchen Service   | BFF (WS → notify waiter)       | `{ tenantId, tableId, itemName }`  |
-| `kitchen.sla_warning`  | Kitchen Service   | BFF (WS → alert manager)       | `{ tenantId, ticketId, waitTime }` |
-| `payment.completed`    | Payment Service   | Order Svc, Catalog Svc, Notif  | `{ tenantId, billId, method }`     |
-| `payment.refunded`     | Payment Service   | Order Svc, Notification        | `{ tenantId, paymentId, amount }`  |
-| `service.requested`    | Order Service     | BFF (WS → notify staff)        | `{ tenantId, tableId, type }`      |
+**Nguyên tắc chọn lọc:** Hệ thống áp dụng bộ quy tắc 4P+2AP (xem §7.4) để quyết định event nào dùng Kafka vs BFF Direct. Chỉ 5 topics vượt qua bộ lọc:
+
+| Topic                 | Producer          | Consumer(s)                  | Principle  | Payload chính                      |
+| --------------------- | ----------------- | ---------------------------- | ---------- | ---------------------------------- |
+| `order.confirmed`     | Order Service     | Kitchen Service              | P1, P2     | `{ tenantId, orderId, items[] }`   |
+| `payment.completed`   | Payment Service   | Order, Catalog, Notification | P1, P2, P3 | `{ tenantId, billId, method }`     |
+| `payment.refunded`    | Payment Service   | Order, Notification          | P1, P3     | `{ tenantId, paymentId, amount }`  |
+| `kitchen.sla_warning` | Kitchen Service   | BFF (WS → alert manager)     | P2         | `{ tenantId, ticketId, waitTime }` |
+| `tenant.created`      | SaaS Mgmt Service | Notification, Catalog        | P1, P3     | `{ tenantId, ownerEmail, slug }`   |
+
+> 6 event còn lại (order.created, menu.updated, table.status_changed, kitchen.item_ready, service.requested, tenant.suspended) KHÔNG dùng Kafka — thay bằng BFF Direct Side-Effects Pattern (xem §7.3).
+
+### 7.3 BFF Direct Side-Effects Pattern
+
+Cho các event chỉ cần trigger UI-layer side-effects (WebSocket push, cache invalidation) mà không cần business logic ở bounded context khác, BFF xử lý trực tiếp sau TCP response — không đi qua Kafka:
+
+```
+BFF Controller (pseudo-code):
+  const response = await this.client.send(TCP_PATTERN, payload);
+  if (response.success) {
+    // Side-effect 1: WebSocket broadcast
+    this.wsGateway.emitToRoom(room, event, data);
+    // Side-effect 2: Cache invalidation (nếu cần)
+    await this.cacheManager.del(cacheKey);
+  }
+  return response;
+```
+
+| Trigger (TCP response tại BFF) | WebSocket Room                                  | Cache Action                  |
+| ------------------------------ | ----------------------------------------------- | ----------------------------- |
+| Order created                  | `tenant:{tid}:staff`                            | —                             |
+| Menu item CRUD                 | `tenant:{tid}:*` (broadcast all customers)      | `DEL menu:{tid}`              |
+| Table status changed           | `tenant:{tid}:staff`                            | `SET table:{tid}:{id}:status` |
+| Kitchen item ready             | `tenant:{tid}:staff` + `session:{sid}:customer` | —                             |
+| Service requested              | `tenant:{tid}:staff`                            | —                             |
+| Tenant suspended               | —                                               | `SET tenant:{tid}:suspended`  |
+
+**Lý do thiết kế (AP1):** BFF là API Gateway duy nhất. Khi BFF gọi TCP và nhận response, nó đã có đủ thông tin để thực hiện UI side-effects. Dùng Kafka làm trung gian cho single-consumer UI events vi phạm AP1 — thêm latency, complexity, và infrastructure cost mà không giải quyết bài toán domain nào.
+
+### 7.4 Async Messaging Decision Framework (4P + 2AP)
+
+Bộ quy tắc quyết định khi nào sử dụng Kafka vs giao tiếp đồng bộ (TCP/gRPC) vs BFF Direct.
+
+#### Inclusion Principles (Khi nào dùng Kafka)
+
+**P1 — Cross-Context Domain Reaction:**
+Dùng Kafka khi state change ở Bounded Context A cần trigger **business logic độc lập** ở Bounded Context B. "Business logic" ≠ UI side-effect. Áp dụng bất kể số lượng consumer.
+
+**P2 — Temporal Decoupling:**
+Dùng Kafka khi producer **KHÔNG ĐƯỢC chờ** consumer xử lý xong — do long-running task, consumer tạm unavailable, hoặc event sinh nội bộ (timer/cron) không gắn với TCP request nào.
+
+**P3 — Domain Event Fan-out:**
+Dùng Kafka khi cùng 1 event cần trigger phản ứng nghiệp vụ ở **nhiều bounded context**. Producer tuân thủ Open/Closed Principle — thêm consumer mới không sửa producer code.
+
+**P4 — Atomicity Safeguard (Transactional Outbox):**
+Khi domain event là kết quả của DB write, event **PHẢI** được ghi cùng database transaction (Outbox Pattern) để tránh Dual-Write Problem. Background process poll outbox → publish Kafka.
+
+> ⚠️ Known Limitation (Thesis Scope): P4 được document nhưng chưa implement full Outbox. Simplified version sẽ được triển khai ở Phase 4A (Saga + Hardening).
+
+#### Exclusion Anti-patterns (Khi nào KHÔNG dùng Kafka)
+
+**AP1 — Kafka as UI Proxy (CẤM):**
+KHÔNG dùng Kafka chỉ để bridge UI side-effects (WebSocket, cache) khi BFF đã có đủ thông tin từ TCP response. Test: _"Side-effect cần business logic ở context khác?"_ → Không → BFF Direct.
+
+**AP2 — Sync for Fire-and-Forget (CẤM):**
+KHÔNG dùng TCP/gRPC cho tác vụ producer không cần response, đặc biệt long-running hoặc consumer tạm unavailable.
+
+#### Decision Flowchart
+
+```
+Event cần xử lý?
+  │
+  ├─ Consumer cần thực hiện BUSINESS LOGIC ở bounded context khác?
+  │   ├─ YES → Kafka (P1)
+  │   │   ├─ Nhiều consumer? → Kafka (P3 bổ sung)
+  │   │   └─ Cần atomicity với DB? → Outbox Pattern (P4)
+  │   └─ NO → chỉ UI side-effect
+  │       ├─ BFF đã có info từ TCP response? → BFF Direct (AP1 cấm Kafka)
+  │       └─ Event sinh nội bộ (timer, không qua BFF)? → Kafka (P2)
+  │
+  └─ Producer cần chờ consumer?
+      ├─ YES → TCP/gRPC (sync)
+      └─ NO, và consumer xử lý lâu → Kafka (P2, AP2 cấm sync)
+```
 
 ---
 
@@ -1015,36 +1102,40 @@ Cấu hình qua Keycloak **Protocol Mapper** (type: User Attribute → Token Cla
 │  │    Customer → session:{sid}:customer     │    │
 │  └──────────────────────────────────────────┘    │
 │           │                                      │
-│           │ Kafka Consumer (bridge)              │
-│           ▼                                      │
+│           ├─ Kafka Consumer Bridge (3 topics):   │
+│           │                                      │
 │  ┌──────────────────────────────────────────┐    │
-│  │  Event → Room mapping:                   │    │
-│  │                                          │    │
-│  │  order.created     → tenant:{tid}:staff  │    │
-│  │  order.confirmed   → session:{sid}:cust  │    │
-│  │  kitchen.item_ready→ tenant:{tid}:staff  │    │
+│  │  order.confirmed   → tenant:{tid}:kds:* │    │
 │  │  kitchen.sla_warn  → tenant:{tid}:mgmt  │    │
+│  │  payment.completed → session:{sid}:cust  │    │
+│  └──────────────────────────────────────────┘    │
+│           │                                      │
+│           ├─ BFF Direct (sau TCP response):      │
+│           │                                      │
+│  ┌──────────────────────────────────────────┐    │
+│  │  order.created     → tenant:{tid}:staff  │    │
+│  │  kitchen.item_ready→ tenant:{tid}:staff  │    │
 │  │  menu.updated      → tenant:{tid}:*     │    │
 │  │  table.status_chg  → tenant:{tid}:staff │    │
-│  │  payment.completed → session:{sid}:cust  │    │
+│  │  service.requested → tenant:{tid}:staff │    │
 │  └──────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────┘
 ```
 
 ### 9.2 Real-time Use Cases
 
-| Use Case                     | Event Source         | WebSocket Room             | Nội dung push                        |
-| ---------------------------- | -------------------- | -------------------------- | ------------------------------------ |
-| Đơn mới cho Staff            | `order.created`      | `tenant:{tid}:staff`       | `{ tableId, items, total }`          |
-| Order tracking (Customer)    | `order.confirmed`    | `session:{sid}:customer`   | `{ orderId, status: "Processing" }`  |
-| KDS ticket mới (Kitchen)     | `order.confirmed`    | `tenant:{tid}:kds:kitchen` | `{ ticket: { table, items, time } }` |
-| Món xong → notify waiter     | `kitchen.item_ready` | `tenant:{tid}:staff`       | `{ tableId, itemName: "Phở bò" }`    |
-| Menu sync (giá/out of stock) | `menu.updated`       | `tenant:{tid}:*` (public)  | `{ itemId, field, newValue }`        |
-| Table status change          | `table.status_chg`   | `tenant:{tid}:staff`       | `{ tableId, status: "Billing" }`     |
-| Payment done                 | `payment.completed`  | `session:{sid}:customer`   | `{ status: "Paid", receipt_url }`    |
-| SLA warning (quá giờ)        | `kitchen.sla_warn`   | `tenant:{tid}:management`  | `{ ticketId, waitingMin: 18 }`       |
-| Yêu cầu phục vụ (Customer)   | `service.requested`  | `tenant:{tid}:staff`       | `{ tableId, type: "CALL_STAFF" }`    |
-| Refund processed             | `payment.refunded`   | `tenant:{tid}:management`  | `{ paymentId, amount, reason }`      |
+| Use Case                     | Source      | Event                | WebSocket Room             | Nội dung push                        |
+| ---------------------------- | ----------- | -------------------- | -------------------------- | ------------------------------------ |
+| Đơn mới cho Staff            | BFF Direct  | `order.created`      | `tenant:{tid}:staff`       | `{ tableId, items, total }`          |
+| Order tracking (Customer)    | Kafka → BFF | `order.confirmed`    | `session:{sid}:customer`   | `{ orderId, status: "Processing" }`  |
+| KDS ticket mới (Kitchen)     | BFF Direct  | `order.confirmed`    | `tenant:{tid}:kds:kitchen` | `{ ticket: { table, items, time } }` |
+| Món xong → notify waiter     | BFF Direct  | `kitchen.item_ready` | `tenant:{tid}:staff`       | `{ tableId, itemName: "Phở bò" }`    |
+| Menu sync (giá/out of stock) | BFF Direct  | `menu.updated`       | `tenant:{tid}:*` (public)  | `{ itemId, field, newValue }`        |
+| Table status change          | BFF Direct  | `table.status_chg`   | `tenant:{tid}:staff`       | `{ tableId, status: "Billing" }`     |
+| Payment done                 | Kafka → BFF | `payment.completed`  | `session:{sid}:customer`   | `{ status: "Paid", receipt_url }`    |
+| SLA warning (quá giờ)        | Kafka → BFF | `kitchen.sla_warn`   | `tenant:{tid}:management`  | `{ ticketId, waitingMin: 18 }`       |
+| Yêu cầu phục vụ (Customer)   | BFF Direct  | `service.requested`  | `tenant:{tid}:staff`       | `{ tableId, type: "CALL_STAFF" }`    |
+| Refund processed             | Kafka → BFF | `payment.refunded`   | `tenant:{tid}:management`  | `{ paymentId, amount, reason }`      |
 
 ### 9.3 Scaling Strategy
 

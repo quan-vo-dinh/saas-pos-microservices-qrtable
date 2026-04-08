@@ -327,6 +327,41 @@ export interface IMenuResponse { categories: (ICategory & { items: IMenuItem[] }
 // ... etc.
 ```
 
+### Step 1.45 — ☁️ Setup File Upload Module (Cloudinary) (1-2 ngày)
+
+> Tham khảo khóa học bài 105-110 về Cloudinary upload pattern.
+
+```
+1. Cài đặt dependencies:
+   → npm install cloudinary multer @nestjs/platform-express
+   → Thêm env vars: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+   → Thêm env vars vào docker-compose.yml
+
+2. Tạo CloudinaryModule dùng chung (libs/providers/):
+   → CloudinaryProvider: config từ env
+   → CloudinaryService:
+     + uploadImage(file, tenantId, folder): Promise<{ url, publicId }>
+       - Validate: max 5MB, image types only (jpeg, png, webp)
+       - Path: uploads/{tenant_id}/{folder}/{uuid}.{ext}
+       - Transformation: auto format, quality auto, max width 800px
+     + deleteImage(publicId): Promise<void>
+     + getOptimizedUrl(publicId, options): string
+       - Auto-generate responsive URLs (thumbnail 200px, medium 400px, large 800px)
+
+3. Tenant-isolated storage structure:
+   → Folder structure trong Cloudinary:
+     qrtable/
+       └── {tenant_id}/
+           ├── menu/         # Ảnh món ăn (Phase 1)
+           ├── branding/     # Logo, banner (Phase 4B)
+           └── qr-exports/   # QR PDF exports (nice-to-have)
+
+4. Verify:
+   → Upload 1 ảnh test qua module → URL trả về đúng ✅
+   → Ảnh được lưu đúng folder tenant ✅
+   → Transformation: thumbnail 200px, medium 400px hoạt động ✅
+```
+
 ### Step 1.5 — ⚙️ Build Backend: Catalog Service (5-7 ngày)
 
 ```
@@ -340,6 +375,11 @@ export interface IMenuResponse { categories: (ICategory & { items: IMenuItem[] }
 3. Service Logic:
    → Category CRUD + sort ordering + time-based visibility
    → MenuItem CRUD + stock management + soft delete constraints
+   → MenuItem Image Upload:
+     + Tích hợp CloudinaryModule vào CatalogModule
+     + Khi create/update MenuItem: nếu có file → upload Cloudinary → lưu image_url
+     + Khi update ảnh: upload ảnh mới → xóa ảnh cũ → cập nhật image_url
+     + Khi soft delete MenuItem: KHÔNG xóa ảnh (giữ cho audit trail)
    → Area/Table CRUD + QR Token (HMAC-SHA256) generate/validate
    → Table State Machine logic (Available → Occupied → Billing → Cleaning)
 
@@ -356,10 +396,24 @@ export interface IMenuResponse { categories: (ICategory & { items: IMenuItem[] }
    → GET  /api/v1/menu?tenant_id=xxx           (public, cached)
    → POST /api/v1/admin/categories              (Owner/Manager guard)
    → POST /api/v1/admin/menu-items              (Owner/Manager guard)
+   → POST /api/v1/admin/menu-items/:id/image    (Owner/Manager guard — multipart/form-data)
+     + Multer middleware: single file, max 5MB, image types only
+     + Upload → Cloudinary → update menu_item.image_url
+   → DELETE /api/v1/admin/menu-items/:id/image  (Owner/Manager guard)
    → POST /api/v1/admin/tables                  (Owner/Manager guard)
    → POST /api/v1/tables/:id/validate-qr        (public)
 
-7. Verify Backend chạy độc lập:
+   [BFF Config Note]:
+   → Body parser limit: 20MB (đã có trong architecture doc)
+   → Multer config: memory storage (stream to Cloudinary, không lưu disk)
+
+7. Side-effects Pattern (Phase 1):
+   → Chưa có Kafka ở Phase 1 (setup ở Phase 2A).
+   → Cache invalidation: BFF gọi Redis DEL trực tiếp sau TCP response.
+   → WebSocket: chưa triển khai ở Phase 1 (Phase 2B).
+   → KHÔNG dùng Kafka cho menu.updated, table.status_changed (AP1).
+
+8. Verify Backend chạy độc lập:
    → Postman/Thunder Client test tất cả endpoints ✅
 ```
 
@@ -370,6 +424,10 @@ export interface IMenuResponse { categories: (ICategory & { items: IMenuItem[] }
    → useMenu(tenantId) — GET /menu
    → useCategories() — CRUD hooks
    → useMenuItems() — CRUD hooks
+   → useUploadMenuItemImage(itemId) — POST multipart/form-data
+     + Progress tracking (upload progress bar)
+     + Optimistic update: show local preview trước khi upload xong
+     + Error handling: file too large, wrong format
    → useTables() — CRUD hooks
 
 2. Customer PWA → kết nối API thực:
@@ -379,17 +437,26 @@ export interface IMenuResponse { categories: (ICategory & { items: IMenuItem[] }
 
 3. Management App → kết nối API thực:
    → /dashboard/menu: CRUD operations gọi API
+   → /dashboard/menu/items: Image upload UI:
+     + Drag-drop hoặc click-to-select image
+     + Preview image trước khi submit
+     + Upload progress indicator
+     + Crop/resize (nice-to-have, Cloudinary xử lý server-side)
    → /dashboard/tables: CRUD + QR generate từ API
    → Optimistic update + error handling
 
 4. Verify end-to-end:
    → Owner tạo category + item trên Dashboard → Customer PWA thấy ngay ✅
+   → Owner upload ảnh menu item → ảnh hiển thị trên Dashboard + Customer PWA ✅
    → Cache invalidation: edit giá → customer refresh → thấy giá mới ✅
 ```
 
 ### ✅ Acceptance Criteria Phase 1
 
 - [ ] Owner CRUD menu trên Dashboard → data hiện đúng
+- [ ] Owner upload ảnh menu item → ảnh hiển thị trên Dashboard + Customer PWA
+- [ ] Image upload: validate file type/size → reject nếu không hợp lệ
+- [ ] Cloudinary storage: ảnh lưu đúng path uploads/{tenant_id}/menu/
 - [ ] Customer quét QR → validate → thấy menu đúng bàn, đúng tenant
 - [ ] Redis cache: menu load < 100ms (cache hit)
 - [ ] Table state machine chuyển trạng thái đúng
@@ -537,7 +604,8 @@ export interface IKDSTicket { ticketId: string; tableId: string; items: ...; pri
    → Table Transfer: atomic transaction
    → Service Request entity: service_requests (id, tenant_id, table_id, session_id, type, status, created_at)
      + Types: CALL_STAFF | REQUEST_BILL | GENERAL_HELP
-   → Kafka Producer: order.created, order.confirmed, service.requested
+   → Kafka Producer: order.confirmed (P1+P2: route to Kitchen)
+   → BFF Direct (AP1): order.created, service.requested → WS emit sau TCP response
 
 4. BFF REST Endpoints (Order):
    → POST /api/v1/orders               (Customer — SessionGuard)
@@ -602,7 +670,8 @@ export interface IKDSTicket { ticketId: string; tableId: string; items: ...; pri
    → Batching logic: gom cùng món từ các order khác nhau
    → SLA monitoring: timer per ticket, warning khi quá threshold
    → Priority flagging: Manager/Owner có thể đánh dấu ticket ưu tiên
-   → Kafka Producer: kitchen.item_ready, kitchen.sla_warning
+   → Kafka Producer: kitchen.sla_warning (P2: sinh bởi internal timer)
+   → BFF Direct (AP1): kitchen.item_ready → WS emit sau TCP response
 
 2. BFF WebSocket Gateway:
    → Socket.io setup + Redis Adapter (horizontal scaling ready)
@@ -625,12 +694,19 @@ export interface IKDSTicket { ticketId: string; tableId: string; items: ...; pri
    → PATCH /api/v1/kds/:id/recall    (Chef/Barista — KITCHEN_RECALL)
    → PATCH /api/v1/kds/:id/priority  (Owner/Manager only)
 
-4. Kafka Consumer → WebSocket broadcast mapping:
-   → order.created      → tenant:{tid}:staff room (POS notification)
-   → order.confirmed    → session:{sid}:customer (status update) + tenant:{tid}:kds:* (new ticket)
-   → kitchen.item_ready → session:{sid}:customer (item ready) + tenant:{tid}:staff (serve notification)
+4. WebSocket broadcast mapping (xem §7.3 + §7.4 trong technical-architecture.md):
+
+   Kafka Consumer Bridge (3 topics — P1/P2/P3):
+   → order.confirmed    → tenant:{tid}:kds:kitchen / kds:bar (new KDS ticket)
+   → kitchen.sla_warning → tenant:{tid}:management (SLA alert)
+   → payment.completed  → session:{sid}:customer (payment done notification)
+
+   BFF Direct Side-Effects (AP1 — sau TCP response):
+   → order.created      → tenant:{tid}:staff (new order notification)
+   → kitchen.item_ready → tenant:{tid}:staff + session:{sid}:customer
+   → menu.updated       → tenant:{tid}:* (menu sync + cache DEL)
+   → table.status_changed → tenant:{tid}:staff
    → service.requested  → tenant:{tid}:staff (service bell)
-   → menu.updated       → broadcast to all customer sessions of tenant (live menu sync)
 
 5. Verify: Postman + Socket.io Admin UI + WebSocket tester ✅
 ```
@@ -704,6 +780,7 @@ Backend — Khởi tạo apps/payment/ (tham khảo template invoice/ cho Stripe
   → Cash Flow: staff confirm → Kafka payment.completed
   → VND Rounding: Math.ceil(amount / 1000) * 1000
   → Refund Flow: Stripe refund API + cash record
+  → Emit Kafka: payment.refunded (P1+P3) → Order Svc (adjust revenue), Notification (email)
   → Bill Finalization: immutable after Paid
   → BFF: POST /payment/checkout, POST /payment/cash-confirm, POST /payment/stripe/webhook
 ```
@@ -755,6 +832,11 @@ Bài 124-129: Distributed transactions, Saga Orchestration, Compensation Flow
    → Idempotency: SET NX cho order creation (prevent double-submit)
    → Delete constraints: không xóa được Category có MenuItem, MenuItem có OrderItem active
    → Audit log: bắt buộc ghi log khi Cancel order (actor, reason, timestamp)
+   → [SIMPLIFIED] Transactional Outbox (P4):
+     + Thêm outbox_events table vào Order Service + Payment Service
+     + Ghi event cùng DB transaction khi state change
+     + Background cron poll outbox → publish Kafka → mark sent
+     + Document: full CDC (Debezium) là post-thesis improvement
 
 4. Verify Saga:
    → Happy path: order confirm → stock locked → KDS notified ✅
@@ -786,6 +868,9 @@ Bài 124-129: Distributed transactions, Saga Orchestration, Compensation Flow
      + Slug/Subdomain generation: auto-generate từ tên nhà hàng
      + Slug validation: unique check, reserved words filter
      + Tenant status lifecycle: Active → Suspended → Closed
+   → Kafka Producer:
+     + tenant.created (P1+P3) → Notification (welcome email) + Catalog (seed default data)
+   → tenant.suspended: Redis flag (AP1 — không dùng Kafka)
    → Subscription lifecycle:
      + Plan CRUD (Free, Basic, Premium)
      + Assign plan to tenant + start/end date tracking

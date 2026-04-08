@@ -27,8 +27,16 @@ export default typescriptEslint.config(
                 ...globals.browser
             },
             parserOptions: {
-                projectService: true,
-                tsconfigRootDir: import.meta.dirname,
+                projectService: {
+                    allowDefaultProject: [
+                        "eslint.config.js",
+                        ".storybook/*.ts",
+                        ".storybook/*.tsx",
+                        ".storybook/*.js",
+                        ".storybook/*.jsx"
+                    ]
+                },
+                tsconfigRootDir: import.meta.dirname
             }
         },
         settings: {
