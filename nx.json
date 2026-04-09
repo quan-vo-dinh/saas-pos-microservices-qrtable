@@ -28,7 +28,25 @@
       }
     },
     { "plugin": "@nx/eslint/plugin", "options": { "targetName": "lint" } },
-    { "plugin": "@nx/jest/plugin", "options": { "targetName": "test" }, "exclude": ["apps/invoice-e2e/**/*"] },
+    {
+      "plugin": "@nx/jest/plugin",
+      "options": { "targetName": "test" },
+      "exclude": [
+        "apps/invoice-e2e/**/*",
+        "libs/schemas/**/*",
+        "libs/entities/**/*",
+        "libs/constants/**/*",
+        "libs/interfaces/**/*",
+        "libs/decorators/**/*",
+        "libs/utils/**/*",
+        "libs/configuration/**/*",
+        "libs/guards/**/*",
+        "libs/interceptors/**/*",
+        "libs/middlewares/**/*",
+        "libs/shared/**/*",
+        "libs/frontend/**/*"
+      ]
+    },
     {
       "plugin": "@nx/vite/plugin",
       "options": {
