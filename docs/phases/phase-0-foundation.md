@@ -120,7 +120,7 @@ apps/catalog/src/
 
 - Docker Compose: PostgreSQL, Redis, Keycloak, MongoDB hoạt động
 - Keycloak realm "qrtable" với 6 roles: SUPER_ADMIN, OWNER, MANAGER, WAITER, CHEF, BARISTA
-- Guard chain: UserGuard → SessionGuard → TenantGuard → PermissionGuard
+- Guard chain: UserGuard (staff) hoặc SessionGuard (khách) → TenantGuard → PermissionGuard
 - TenantMiddleware resolve tenant từ header/subdomain
 - Auth completion: provisioning strategy, role mapping Keycloak ↔ internal roles
 
@@ -159,7 +159,7 @@ apps/catalog/src/
 - [x] 2 frontend apps chạy được (customer-pwa, management-app)
 - [x] Shared libs tạo xong theo chuẩn Nx Grouping
 - [x] Keycloak realm "qrtable" + roles tạo xong
-- [x] Guard chain hoạt động (UserGuard → SessionGuard → TenantGuard → PermissionGuard)
+- [x] Guard chain hoạt động (UserGuard hoặc SessionGuard → TenantGuard → PermissionGuard)
 - [x] Role mapping pass smoke authorization
 - [x] BFF → Catalog + SaaS TCP call thành công
 - [x] Đã có bản vẽ ERD tổng thể (docs/architecture/erd.png)

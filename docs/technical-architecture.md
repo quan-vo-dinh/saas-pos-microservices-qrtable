@@ -986,7 +986,7 @@ Kết luận quan trọng:
 │         3. gRPC call → Auth Service → Keycloak verify  │
 │         4. Cache result in Redis (TTL: 30 min)         │
 │    5. TenantGuard: extract tenant_id from JWT claims   │
-│    6. RoleGuard: verify role matches endpoint          │
+│    6. PermissionGuard: verify permissions vs endpoint  │
 │    7. Inject { userId, tenantId, role } → request ctx  │
 └────────────────────────────────────────────────────────┘
 
@@ -1268,7 +1268,9 @@ On Menu Update (admin changes price/availability):
 │                                                          │
 │  Step 3: Route to KDS (Kitchen Service via Kafka)        │
 │    → Emit order.confirmed event                          │
-│    ✗ Compensation: emit order.canceled to KDS            │
+│    ✗ Compensation: đồng bộ hủy/ghi nhận với Kitchen       │
+│      (TCP hoặc lệnh nội bộ) — không Kafka topic mới      │
+│      ngoài registry §7.2                                 │
 │                                                          │
 │  IF all steps succeed → COMMIT                           │
 │  IF any step fails → execute compensations in reverse    │

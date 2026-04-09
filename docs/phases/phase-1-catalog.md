@@ -153,18 +153,18 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 - **Redis cache:**
   - `menu:{tenant_id}` → full menu JSON (TTL: 10 min, invalidate on change)
   - `table:{tenant_id}:{table_id}:status` → status string (no expire, explicit update)
-- BFF REST endpoints với appropriate guard chain (public menu: SessionGuard, admin CRUD: UserGuard + PermissionGuard)
+- BFF REST endpoints với appropriate guard chain (public menu: SessionGuard → TenantGuard; admin CRUD: UserGuard → TenantGuard → PermissionGuard)
 - **BFF Config:** Body parser limit 20MB, Multer memory storage (stream to Cloudinary, không lưu disk)
 
 **TCP Message Patterns:** Đăng ký TCP message patterns cho Catalog CRUD theo convention hiện có trong `libs/constants`
 
 **BFF REST Endpoints:**
 
-- Public menu query (cached) — SessionGuard
-- Admin category CRUD — UserGuard + CATALOG_CREATE/UPDATE/DELETE permission
-- Admin menu item CRUD + image upload (multipart/form-data) — UserGuard + CATALOG_CREATE permission
-- Admin table CRUD — UserGuard + CATALOG_CREATE permission
-- Public QR token validation — SessionGuard
+- Public menu query (cached) — SessionGuard → TenantGuard
+- Admin category CRUD — UserGuard → TenantGuard → PermissionGuard (CATALOG_CREATE/UPDATE/DELETE)
+- Admin menu item CRUD + image upload (multipart/form-data) — UserGuard → TenantGuard → PermissionGuard (CATALOG_CREATE)
+- Admin table CRUD — UserGuard → TenantGuard → PermissionGuard (CATALOG_CREATE)
+- Public QR token validation — SessionGuard → TenantGuard
 
 **Redis cache keys:**
 

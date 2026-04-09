@@ -2,7 +2,7 @@
 
 > **Nguyên tắc Frontend & UI/UX:** Sử dụng tối đa hệ sinh thái Shadcn UI (Lucide icons, React Hook Form, Zod, Radix UI, Recharts). Tuân thủ các conventions trong `.github/instructions/`.
 >
-> **Nguyên tắc Backend:** Pragmatic Layered Architecture (Controller → Service → Repository). Multi-tenant isolation bằng `tenant_id`. Guard chain: UserGuard → SessionGuard → TenantGuard → PermissionGuard.
+> **Nguyên tắc Backend:** Pragmatic Layered Architecture (Controller → Service → Repository). Multi-tenant isolation bằng `tenant_id`. Guard chain: **UserGuard** (staff/JWT) hoặc **SessionGuard** (khách) → **TenantGuard** → **PermissionGuard** (xem §8.2 technical-architecture).
 >
 > **Tham chiếu:** [Technical Architecture](technical-architecture.md) | [Business Logic](business-logic.md) | [Auth Reference](references/auth-system-reference.md)
 
