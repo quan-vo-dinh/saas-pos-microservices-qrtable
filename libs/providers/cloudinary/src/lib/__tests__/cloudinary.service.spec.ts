@@ -4,7 +4,18 @@ import { CloudinaryService } from '../cloudinary.service';
 import { CLOUDINARY_INJECTION_TOKEN } from '../cloudinary.constants';
 import { CloudinaryFolder } from '../cloudinary.constants';
 import { UploadImageOptions } from '../interfaces/cloudinary-options.interface';
-import { Readable } from 'stream';
+import { Writable } from 'stream';
+
+// Mock writable stream for testing
+class MockWritable extends Writable {
+  constructor() {
+    super();
+  }
+
+  override _write(_chunk: unknown, _encoding: string, callback: () => void) {
+    callback();
+  }
+}
 
 describe('CloudinaryService', () => {
   let service: CloudinaryService;
@@ -59,10 +70,11 @@ describe('CloudinaryService', () => {
 
       mockCloudinary.uploader.upload_stream.mockImplementation(
         (_options: unknown, callback: (error: Error | null, result: typeof mockUploadResult) => void) => {
-          callback(null, mockUploadResult);
-          const writable = new Readable();
-          writable.push(null);
-          return writable;
+          // Call callback with result asynchronously
+          process.nextTick(() => callback(null, mockUploadResult));
+
+          // Return proper writable stream
+          return new MockWritable();
         },
       );
 
@@ -105,10 +117,11 @@ describe('CloudinaryService', () => {
 
       mockCloudinary.uploader.upload_stream.mockImplementation(
         (_options: unknown, callback: (error: Error | null, result: typeof mockUploadResult) => void) => {
-          callback(null, mockUploadResult);
-          const writable = new Readable();
-          writable.push(null);
-          return writable;
+          // Call callback with result asynchronously
+          process.nextTick(() => callback(null, mockUploadResult));
+
+          // Return proper writable stream
+          return new MockWritable();
         },
       );
 
@@ -123,10 +136,11 @@ describe('CloudinaryService', () => {
 
       mockCloudinary.uploader.upload_stream.mockImplementation(
         (_options: unknown, callback: (error: Error | null, result: null) => void) => {
-          callback(new Error('Cloudinary SDK error'), null);
-          const writable = new Readable();
-          writable.push(null);
-          return writable;
+          // Call callback with error asynchronously
+          process.nextTick(() => callback(new Error('Cloudinary SDK error'), null));
+
+          // Return proper writable stream
+          return new MockWritable();
         },
       );
 
