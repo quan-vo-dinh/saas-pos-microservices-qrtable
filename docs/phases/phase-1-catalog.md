@@ -118,9 +118,11 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 
 **Mục tiêu:** Module upload ảnh dùng chung, tenant-isolated.
 
+> **Architecture Decision:** Module đặt tại `libs/providers/cloudinary/` (path alias: `@common/providers/cloudinary/*`). Chọn `libs/providers/` thay vì `libs/configuration/` vì CloudinaryModule chứa business logic (upload, validation, URL generation), không chỉ config. `libs/providers/` là category cho external service integrations — sau này Stripe (Phase 3), SMTP (Phase 4C) sẽ follow cùng pattern. Chi tiết: [design spec](../superpowers/specs/2026-04-09-cloudinary-module-setup-design.md).
+
 **Yêu cầu chính:**
 
-- CloudinaryModule trong `libs/providers/` — config từ env
+- CloudinaryModule trong `libs/providers/cloudinary/` — config từ env
 - CloudinaryService: uploadImage, deleteImage, getOptimizedUrl
 - Validation: max 5MB, image types only (jpeg, png, webp)
 - Transformation: auto format, quality auto, max width 800px
