@@ -14,7 +14,7 @@
     ],
     "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
   },
-  "nxCloudId": "6922cbc3c93ee30f7f83d1b2",
+  "nxCloudId": "69d78131f4f8f2480823927b",
   "plugins": [
     {
       "plugin": "@nx/webpack/plugin",
@@ -27,19 +27,8 @@
         "serveStaticTargetName": "serve-static"
       }
     },
-    {
-      "plugin": "@nx/eslint/plugin",
-      "options": {
-        "targetName": "lint"
-      }
-    },
-    {
-      "plugin": "@nx/jest/plugin",
-      "options": {
-        "targetName": "test"
-      },
-      "exclude": ["apps/invoice-e2e/**/*"]
-    },
+    { "plugin": "@nx/eslint/plugin", "options": { "targetName": "lint" } },
+    { "plugin": "@nx/jest/plugin", "options": { "targetName": "test" }, "exclude": ["apps/invoice-e2e/**/*"] },
     {
       "plugin": "@nx/vite/plugin",
       "options": {
@@ -56,17 +45,7 @@
     }
   ],
   "targetDefaults": {
-    "@nx/js:tsc": {
-      "cache": true,
-      "dependsOn": ["^build"],
-      "inputs": ["production", "^production"]
-    }
+    "@nx/js:tsc": { "cache": true, "dependsOn": ["^build"], "inputs": ["production", "^production"] }
   },
-  "generators": {
-    "@nx/react": {
-      "library": {
-        "unitTestRunner": "jest"
-      }
-    }
-  }
+  "generators": { "@nx/react": { "library": { "unitTestRunner": "jest" } } }
 }
