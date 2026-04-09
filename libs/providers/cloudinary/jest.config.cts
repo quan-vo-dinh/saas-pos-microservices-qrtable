@@ -1,11 +1,10 @@
 module.exports = {
-  displayName: 'decorators',
-  preset: '../../jest.preset.js',
+  displayName: 'providers-cloudinary',
+  preset: '../../../jest.preset.js',
   testEnvironment: 'node',
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/libs/decorators',
-  passWithNoTests: true,
+  coverageDirectory: '../../../coverage/libs/providers/cloudinary',
 };

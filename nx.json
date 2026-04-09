@@ -37,12 +37,7 @@
         "libs/entities/**/*",
         "libs/constants/**/*",
         "libs/interfaces/**/*",
-        "libs/decorators/**/*",
-        "libs/utils/**/*",
         "libs/configuration/**/*",
-        "libs/guards/**/*",
-        "libs/interceptors/**/*",
-        "libs/middlewares/**/*",
         "libs/shared/**/*",
         "libs/frontend/**/*"
       ]
