@@ -13,6 +13,14 @@ import {
 } from './cloudinary.constants';
 import { UploadImageOptions, UrlTransformOptions } from './interfaces/cloudinary-options.interface';
 import { CloudinaryUploadResponse, ResponsiveUrls } from './interfaces/cloudinary-response.interface';
+import { CloudinaryValidators } from './validators/cloudinary.validators';
+
+/**
+ * CloudinaryUploadResponseWithWarnings — Response include validation warnings
+ */
+export interface CloudinaryUploadResponseWithWarnings extends CloudinaryUploadResponse {
+  validationWarnings?: string[];
+}
 
 @Injectable()
 export class CloudinaryService {
@@ -21,15 +29,61 @@ export class CloudinaryService {
   constructor(
     @Inject(CLOUDINARY_INJECTION_TOKEN)
     private readonly cloudinary: typeof cloudinaryType,
+    private readonly validators: CloudinaryValidators,
   ) {}
 
-  async uploadImage(file: Buffer, options: UploadImageOptions): Promise<CloudinaryUploadResponse> {
-    this.validateFile(file, options.mimetype);
-
-    const folder = `${BASE_FOLDER}/${options.tenantId}/${options.folder}`;
-    const publicId = options.fileName || randomUUID();
+  /**
+   * uploadImage() — Upload ảnh lên Cloudinary với validation đầy đủ
+   *
+   * Hybrid validation pattern:
+   * - Layer 1 (expected ở BFF): Size check, basic MIME check
+   * - Layer 2 (CloudinaryService): Magic bytes, filename sanitize, UUID/enum validation, rate limit, quota check
+   *
+   * Soft-fail approach: log warnings, nhưng vẫn upload (frontend nhận warnings trong response)
+   */
+  async uploadImage(file: Buffer, options: UploadImageOptions): Promise<CloudinaryUploadResponseWithWarnings> {
+    const allWarnings: string[] = [];
 
     try {
+      // Validation 1: Size + MIME type (basic checks)
+      this.validateFile(file, options.mimetype);
+
+      // Validation 2: Magic bytes (actual file signature)
+      const magicBytesResult = this.validators.validateMagicBytes(file, options.mimetype);
+      allWarnings.push(...magicBytesResult.warnings);
+
+      // Validation 3: Filename sanitization
+      const { clean: cleanedFilename, warnings: filenameWarnings } = this.validators.sanitizeFilename(
+        options.fileName || randomUUID(),
+      );
+      allWarnings.push(...filenameWarnings);
+
+      // Validation 4: tenantId validation (UUID v4)
+      const tenantIdResult = this.validators.validateTenantId(options.tenantId);
+      allWarnings.push(...tenantIdResult.warnings);
+
+      // Validation 5: Folder enum validation (runtime check)
+      const folderResult = this.validators.validateFolderEnum(options.folder);
+      allWarnings.push(...folderResult.warnings);
+
+      // Validation 6: Rate limit check
+      const rateLimitResult = this.validators.checkRateLimit(options.tenantId);
+      allWarnings.push(...rateLimitResult.warnings);
+
+      // Validation 7: Disk quota check (placeholder, will implement with DB)
+      // const quotaResult = await this.validators.checkDiskQuota(options.tenantId, file.length);
+      // allWarnings.push(...quotaResult.warnings);
+
+      // Log warnings for monitoring
+      if (allWarnings.length > 0) {
+        this.logger.warn(`[${options.tenantId}] Upload warnings: ${allWarnings.join('; ')}`);
+      }
+
+      // Build folder path (multi-tenant isolation)
+      const folder = `${BASE_FOLDER}/${options.tenantId}/${options.folder}`;
+      const publicId = cleanedFilename;
+
+      // Upload to Cloudinary
       const result = await this.uploadToCloudinary(file, {
         folder,
         public_id: publicId,
@@ -39,6 +93,7 @@ export class CloudinaryService {
         transformation: [{ width: DEFAULT_LARGE_WIDTH, crop: 'limit' }],
       });
 
+      // Return response with warnings
       return {
         publicId: result.public_id,
         secureUrl: result.secure_url,
@@ -46,6 +101,7 @@ export class CloudinaryService {
         height: result.height,
         format: result.format,
         bytes: result.bytes,
+        validationWarnings: allWarnings.length > 0 ? allWarnings : undefined,
       };
     } catch (error) {
       if (error instanceof BadRequestException || error instanceof InternalServerErrorException) {

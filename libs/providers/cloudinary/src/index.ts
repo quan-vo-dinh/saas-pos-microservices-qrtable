@@ -2,7 +2,14 @@
 export { CloudinaryModule } from './lib/cloudinary.module';
 
 // Service
-export { CloudinaryService } from './lib/cloudinary.service';
+export { CloudinaryService, type CloudinaryUploadResponseWithWarnings } from './lib/cloudinary.service';
+
+// Validators
+export {
+  CloudinaryValidators,
+  type ValidationResult,
+  type ValidationWarning,
+} from './lib/validators/cloudinary.validators';
 
 // Constants
 export {
@@ -14,6 +21,11 @@ export {
   DEFAULT_THUMBNAIL_WIDTH,
   DEFAULT_MEDIUM_WIDTH,
   DEFAULT_LARGE_WIDTH,
+  FILENAME_REGEX,
+  UPLOAD_RATE_LIMIT,
+  UPLOAD_RATE_WINDOW,
+  DEFAULT_TENANT_QUOTA_MB,
+  MAGIC_BYTES,
   CloudinaryFolder,
 } from './lib/cloudinary.constants';
 

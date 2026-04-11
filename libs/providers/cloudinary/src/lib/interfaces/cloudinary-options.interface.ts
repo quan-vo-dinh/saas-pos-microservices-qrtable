@@ -8,8 +8,9 @@ export interface CloudinaryModuleOptions {
 }
 
 export interface CloudinaryModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   inject?: any[];
-  useFactory: (...args: any[]) => Promise<CloudinaryModuleOptions> | CloudinaryModuleOptions;
+  useFactory: (...args: unknown[]) => Promise<CloudinaryModuleOptions> | CloudinaryModuleOptions;
 }
 
 export interface UploadImageOptions {
