@@ -429,90 +429,161 @@ export class CloudinaryService {
   /**
    * deleteImage() — Xóa ảnh từ Cloudinary
    *
-   * Validate: public_id phải chứa tenant_id
-   * Lý do: ngăn xóa ảnh của tenant khác (bảo mật)
+   * ⚠️ LƯU Ý: Trong implementation hiện tại, KHÔNG có validate tenant_id
+   * (multi-tenant check sẽ do controller/service layer xử lý bên ngoài)
+   *
+   * Luồng:
+   * 1. Gọi cloudinary.uploader.destroy(publicId)
+   * 2. Nếu lỗi: log warning (không throw) → idempotent delete
+   * 3. Nếu "not found": coi là OK (ảnh đã xóa rồi)
    */
-  async deleteImage(publicId: string, tenantId: string): Promise<void> {
-    if (!publicId.includes(tenantId)) {
-      throw new UnauthorizedException('Cannot delete image of different tenant');
-    }
-
+  async deleteImage(publicId: string): Promise<void> {
     try {
-      await this.cloudinary.uploader.destroy(publicId);
+      const result = await this.cloudinary.uploader.destroy(publicId);
+
+      // Cloudinary trả: { result: 'ok' } hoặc { result: 'not found' }
+      if (result.result !== 'ok' && result.result !== 'not found') {
+        this.logger.warn(`Unexpected delete result for ${publicId}: ${result.result}`);
+      }
     } catch (error) {
-      throw new InternalServerErrorException(`Failed to delete: ${error.message}`);
+      // Không throw exception - xóa thất bại là warning, không fatal
+      this.logger.warn(`Failed to delete image ${publicId}: ${(error as Error).message}`);
     }
   }
 
   /**
    * getOptimizedUrl() — Tạo 3 URLs tối ưu
    *
-   * Tại sao cần:
-   * - Mobile (200px): tải nhanh
-   * - Tablet (400px): chi tiết vừa
-   * - Desktop (800px): chi tiết đầy đủ
+   * Phương pháp: Dùng cloudinary.url() SDK function (KHÔNG string manipulation)
    *
-   * Cloudinary cung cấp tất cả qua URL transformation params
+   * Lợi ích:
+   * - Cloudinary SDK handle tất cả complexity
+   * - URL được signed/secured tự động
+   * - Support tất cả transformation options
+   *
+   * Tại sao cần responsive URLs:
+   * - Mobile (200px): tải nhanh, dùng crop: 'fill' (square, aggressive)
+   * - Tablet (400px): chi tiết vừa, dùng crop: 'limit' (keep aspect ratio)
+   * - Desktop (800px): chi tiết đầy đủ, dùng crop: 'limit'
    */
-  getOptimizedUrl(originalUrl: string, options?: UrlTransformOptions): ResponsiveUrls {
-    const widths = {
-      thumbnail: options?.thumbnailWidth ?? DEFAULT_THUMBNAIL_WIDTH,
-      medium: options?.mediumWidth ?? DEFAULT_MEDIUM_WIDTH,
-      large: options?.largeWidth ?? DEFAULT_LARGE_WIDTH,
-    };
+  getOptimizedUrl(publicId: string, options?: UrlTransformOptions): ResponsiveUrls {
+    const thumbnailWidth = options?.thumbnailWidth ?? DEFAULT_THUMBNAIL_WIDTH;
+    const mediumWidth = options?.mediumWidth ?? DEFAULT_MEDIUM_WIDTH;
+    const largeWidth = options?.largeWidth ?? DEFAULT_LARGE_WIDTH;
 
-    // Transformation params: w_200,h_200,c_fill,f_auto,q_auto
-    // w_200 = width 200px
-    // c_fill = crop to fill (no letterbox)
-    // f_auto = auto format (WebP if supported)
-    // q_auto = auto quality (optimize size)
+    // Sử dụng cloudinary.url() để tạo URLs tối ưu
+    // Tham số transformation:
+    // - width: kích thước
+    // - crop: 'fill' (thumbnail, square) hoặc 'limit' (keep ratio)
+    // - fetch_format: 'auto' (detect WebP support)
+    // - quality: 'auto' (tự optimize chất lượng)
+    // - secure: true (dùng HTTPS)
 
     return {
-      thumbnail: this.buildTransformUrl(originalUrl, widths.thumbnail),
-      medium: this.buildTransformUrl(originalUrl, widths.medium),
-      large: this.buildTransformUrl(originalUrl, widths.large),
-      original: originalUrl,
+      // Thumbnail: 200x200 square, aggressive crop
+      thumbnail: this.cloudinary.url(publicId, {
+        width: thumbnailWidth,
+        crop: 'fill', // Cắt thành hình vuông
+        fetch_format: 'auto', // WebP nếu browser support
+        quality: 'auto', // Tự optimize quality
+        secure: true, // HTTPS
+      }),
+
+      // Medium: 400px width, keep aspect ratio
+      medium: this.cloudinary.url(publicId, {
+        width: mediumWidth,
+        crop: 'limit', // Giữ aspect ratio, max width
+        fetch_format: 'auto',
+        quality: 'auto',
+        secure: true,
+      }),
+
+      // Large: 800px width, keep aspect ratio
+      large: this.cloudinary.url(publicId, {
+        width: largeWidth,
+        crop: 'limit',
+        fetch_format: 'auto',
+        quality: 'auto',
+        secure: true,
+      }),
+
+      // Original: không thay đổi, chỉ optimize format & quality
+      original: this.cloudinary.url(publicId, {
+        fetch_format: 'auto',
+        quality: 'auto',
+        secure: true,
+      }),
     };
   }
 
   // Private helpers
+
+  /**
+   * validateFile() — Validate file size + MIME type
+   *
+   * Kiểm tra:
+   * 1. Kích thước ≤ 5MB
+   * 2. MIME type là jpeg/png/webp
+   *
+   * Được gọi trong uploadImage() TRƯỚC gửi lên Cloudinary
+   */
   private validateFile(buffer: Buffer, mimetype: string): void {
-    // Check size
+    // Kiểm tra kích thước
     if (buffer.length > MAX_FILE_SIZE) {
-      throw new BadRequestException('File too large');
+      throw new BadRequestException('File size exceeds 5MB limit');
     }
 
-    // Check MIME type
-    if (!ALLOWED_MIME_TYPES.includes(mimetype)) {
-      throw new BadRequestException('MIME type not allowed');
+    // Kiểm tra loại file
+    if (!ALLOWED_MIME_TYPES.includes(mimetype as (typeof ALLOWED_MIME_TYPES)[number])) {
+      throw new BadRequestException('Invalid file type. Allowed: jpeg, png, webp');
     }
   }
 
-  private async uploadToCloudinary(buffer: Buffer, options: any): Promise<any> {
+  /**
+   * uploadToCloudinary() — Stream-based upload
+   *
+   * Phương pháp: Sử dụng stream.pipe() (không lưu disk)
+   *
+   * Luồng:
+   * 1. Tạo upload_stream từ Cloudinary SDK
+   * 2. Tạo Readable stream từ buffer (dùng Readable.from())
+   * 3. Pipe buffer → uploadStream
+   * 4. Cloudinary nhận stream, upload, return result
+   *
+   * Lợi ích:
+   * - Không lưu ổ cứng (chỉ RAM)
+   * - Giải phóng bộ nhớ ngay sau upload
+   * - Tránh I/O bottleneck
+   */
+  private uploadToCloudinary(
+    buffer: Buffer,
+    options: Record<string, unknown>,
+  ): Promise<{
+    public_id: string;
+    secure_url: string;
+    width: number;
+    height: number;
+    format: string;
+    bytes: number;
+  }> {
     return new Promise((resolve, reject) => {
-      // Stream-based upload (không lưu disk)
-      const stream = this.cloudinary.uploader.upload_stream(options, (error, result) => {
-        if (error) reject(error);
-        else resolve(result);
+      // uploadStream: Cloudinary receiver
+      const uploadStream = this.cloudinary.uploader.upload_stream(options, (error, result) => {
+        if (error) {
+          reject(new InternalServerErrorException('Image upload failed'));
+        } else if (result) {
+          resolve(result);
+        } else {
+          reject(new InternalServerErrorException('Image upload failed'));
+        }
       });
 
-      // Pipe buffer vào stream
-      stream.end(buffer);
+      // readableStream: Convert buffer → stream (dùng Readable.from())
+      const readableStream = Readable.from(buffer);
+
+      // Pipe: buffer → uploadStream → Cloudinary
+      readableStream.pipe(uploadStream);
     });
-  }
-
-  private buildTransformUrl(originalUrl: string, width: number): string {
-    // Parse URL, insert transformation params
-    // https://res.cloudinary.com/qrtable/image/upload/
-    //   v123/qrtable/tenant/menu/item.png
-    //
-    // Thành:
-    // https://res.cloudinary.com/qrtable/image/upload/
-    //   w_200,h_200,c_fill,f_auto,q_auto    <-- Params
-    //   /v123/qrtable/tenant/menu/item.png
-
-    const params = `w_${width},h_${width},c_fill,f_auto,q_auto`;
-    return originalUrl.replace('/image/upload/', `/image/upload/${params}/`);
   }
 }
 ```
