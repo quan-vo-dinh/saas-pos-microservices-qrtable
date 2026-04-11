@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { CloudinaryService } from '../cloudinary.service';
+import { CloudinaryValidators } from '../validators/cloudinary.validators';
 import { CLOUDINARY_INJECTION_TOKEN } from '../cloudinary.constants';
 import { CloudinaryFolder } from '../cloudinary.constants';
 import { UploadImageOptions } from '../interfaces/cloudinary-options.interface';
@@ -28,8 +29,9 @@ describe('CloudinaryService', () => {
   };
 
   const mockUploadResult = {
-    public_id: 'qrtable/tenant-abc/menu/test-image',
-    secure_url: 'https://res.cloudinary.com/demo/image/upload/qrtable/tenant-abc/menu/test-image.jpg',
+    public_id: 'qrtable/550e8400-e29b-41d4-a716-446655440000/menu/test-image',
+    secure_url:
+      'https://res.cloudinary.com/demo/image/upload/qrtable/550e8400-e29b-41d4-a716-446655440000/menu/test-image.jpg',
     width: 800,
     height: 600,
     format: 'jpg',
@@ -48,6 +50,7 @@ describe('CloudinaryService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CloudinaryService,
+        CloudinaryValidators,
         {
           provide: CLOUDINARY_INJECTION_TOKEN,
           useValue: mockCloudinary,
@@ -60,13 +63,13 @@ describe('CloudinaryService', () => {
 
   describe('uploadImage', () => {
     const validOptions: UploadImageOptions = {
-      tenantId: 'tenant-abc',
+      tenantId: '550e8400-e29b-41d4-a716-446655440000', // Valid UUID v4
       folder: CloudinaryFolder.MENU,
       mimetype: 'image/jpeg',
     };
 
     it('should upload successfully and return CloudinaryUploadResponse', async () => {
-      const fileBuffer = Buffer.alloc(1024, 'a');
+      const jpegBuffer = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, ...Buffer.alloc(1000, 'a')]);
 
       mockCloudinary.uploader.upload_stream.mockImplementation(
         (_options: unknown, callback: (error: Error | null, result: typeof mockUploadResult) => void) => {
@@ -78,16 +81,18 @@ describe('CloudinaryService', () => {
         },
       );
 
-      const result = await service.uploadImage(fileBuffer, validOptions);
+      const result = await service.uploadImage(jpegBuffer, validOptions);
 
-      expect(result).toEqual({
-        publicId: 'qrtable/tenant-abc/menu/test-image',
-        secureUrl: 'https://res.cloudinary.com/demo/image/upload/qrtable/tenant-abc/menu/test-image.jpg',
-        width: 800,
-        height: 600,
-        format: 'jpg',
-        bytes: 102400,
-      });
+      expect(result.publicId).toBe('qrtable/550e8400-e29b-41d4-a716-446655440000/menu/test-image');
+      expect(result.secureUrl).toBe(
+        'https://res.cloudinary.com/demo/image/upload/qrtable/550e8400-e29b-41d4-a716-446655440000/menu/test-image.jpg',
+      );
+      expect(result.width).toBe(800);
+      expect(result.height).toBe(600);
+      expect(result.format).toBe('jpg');
+      expect(result.bytes).toBe(102400);
+      // Validations passed, so no warnings
+      expect(result.validationWarnings).toBeUndefined();
     });
 
     it('should throw BadRequestException when file exceeds 5MB', async () => {
@@ -113,7 +118,7 @@ describe('CloudinaryService', () => {
     });
 
     it('should upload to the correct tenant folder path', async () => {
-      const fileBuffer = Buffer.alloc(1024, 'a');
+      const jpegBuffer = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, ...Buffer.alloc(1000, 'a')]);
 
       mockCloudinary.uploader.upload_stream.mockImplementation(
         (_options: unknown, callback: (error: Error | null, result: typeof mockUploadResult) => void) => {
@@ -125,10 +130,10 @@ describe('CloudinaryService', () => {
         },
       );
 
-      await service.uploadImage(fileBuffer, validOptions);
+      await service.uploadImage(jpegBuffer, validOptions);
 
       const uploadCallOptions = mockCloudinary.uploader.upload_stream.mock.calls[0][0];
-      expect(uploadCallOptions.folder).toBe('qrtable/tenant-abc/menu');
+      expect(uploadCallOptions.folder).toBe('qrtable/550e8400-e29b-41d4-a716-446655440000/menu');
     });
 
     it('should throw InternalServerErrorException when Cloudinary SDK fails', async () => {
