@@ -1,21 +1,25 @@
 import { TypeOrmProvider } from '@common/configuration/type-orm.config';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { CONFIGURATION, TConfiguration } from './configuration';
-import { Catalog } from './entities/catalog.entity';
-import { CatalogController } from './controllers/catalog.controller';
-import { CatalogService } from './services/catalog.service';
-import { CatalogRepository } from './repositories/catalog.repository';
+import { CategoryModule } from './category/category.module';
+import { AreaModule } from './area/area.module';
+import { MenuItemModule } from './menu-item/menu-item.module';
+import { TableModule } from './table/table.module';
+import { MenuModule } from './menu/menu.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [() => CONFIGURATION] }),
     TypeOrmProvider,
-    TypeOrmModule.forFeature([Catalog]),
+    CategoryModule,
+    AreaModule,
+    MenuItemModule,
+    TableModule,
+    MenuModule,
   ],
-  controllers: [CatalogController],
-  providers: [CatalogService, CatalogRepository],
+  controllers: [],
+  providers: [],
 })
 export class AppModule {
   static CONFIGURATION: TConfiguration = CONFIGURATION;
