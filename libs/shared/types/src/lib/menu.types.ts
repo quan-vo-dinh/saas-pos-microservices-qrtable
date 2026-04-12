@@ -6,8 +6,6 @@ export type Category = {
   id: string;
   name: string;
   sortOrder: number;
-  timeStart: string | null;
-  timeEnd: string | null;
   status: CategoryStatus;
   itemCount: number;
   createdAt: string;
