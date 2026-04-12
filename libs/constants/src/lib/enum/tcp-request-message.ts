@@ -36,13 +36,46 @@ enum AUTHORIZER {
   VERIFY_USER_TOKEN = 'authorizer.verify_user_token',
 }
 
-enum CATALOG {
-  CREATE = 'catalog.create',
-  GET_BY_ID = 'catalog.get_by_id',
-  GET_LIST = 'catalog.get_list',
-  UPDATE = 'catalog.update',
-  DELETE = 'catalog.delete',
-  HEALTH = 'catalog.health',
+enum CATEGORY {
+  CREATE = 'category.create',
+  GET_LIST = 'category.get_list',
+  GET_BY_ID = 'category.get_by_id',
+  UPDATE = 'category.update',
+  DELETE = 'category.delete',
+  REORDER = 'category.reorder',
+}
+
+enum MENU_ITEM {
+  CREATE = 'menu_item.create',
+  GET_LIST = 'menu_item.get_list',
+  GET_BY_ID = 'menu_item.get_by_id',
+  UPDATE = 'menu_item.update',
+  SOFT_DELETE = 'menu_item.soft_delete',
+  UPDATE_IMAGE = 'menu_item.update_image',
+}
+
+enum AREA {
+  CREATE = 'area.create',
+  GET_LIST = 'area.get_list',
+  GET_BY_ID = 'area.get_by_id',
+  UPDATE = 'area.update',
+  DELETE = 'area.delete',
+  REORDER = 'area.reorder',
+}
+
+enum TABLE {
+  CREATE = 'table.create',
+  GET_LIST = 'table.get_list',
+  GET_BY_ID = 'table.get_by_id',
+  UPDATE = 'table.update',
+  DELETE = 'table.delete',
+  UPDATE_STATUS = 'table.update_status',
+  VALIDATE_QR_TOKEN = 'table.validate_qr_token',
+  REGENERATE_QR_TOKEN = 'table.regenerate_qr_token',
+}
+
+enum MENU {
+  GET_PUBLIC_MENU = 'menu.get_public_menu',
 }
 
 enum SAAS {
@@ -60,6 +93,10 @@ export const TCP_REQUEST_MESSAGE = {
   USER,
   KEYCLOAK,
   AUTHORIZER,
-  CATALOG,
+  CATEGORY,
+  MENU_ITEM,
+  AREA,
+  TABLE,
+  MENU,
   SAAS,
 };
