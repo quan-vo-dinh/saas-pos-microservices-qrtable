@@ -24,6 +24,7 @@ import {
 } from '@common/interfaces/tcp/catalog';
 import { buildTcpRequestContext } from '@common/utils/request.util';
 import { CloudinaryService } from '@common/providers/cloudinary/cloudinary.service';
+import { CloudinaryFolder } from '@common/providers/cloudinary/cloudinary.constants';
 import {
   BadRequestException,
   Body,
@@ -251,7 +252,7 @@ export class MenuItemAdminController {
 
     const uploadResult = await this.cloudinaryService.uploadImage(file.buffer, {
       tenantId,
-      folder: 'menu',
+      folder: CloudinaryFolder.MENU,
       mimetype: file.mimetype,
       fileName: file.originalname,
     });

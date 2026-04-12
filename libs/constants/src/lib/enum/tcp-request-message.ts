@@ -78,6 +78,10 @@ enum MENU {
   GET_PUBLIC_MENU = 'menu.get_public_menu',
 }
 
+enum CATALOG {
+  HEALTH = 'catalog.health',
+}
+
 enum SAAS {
   CREATE = 'saas.create',
   GET_BY_ID = 'saas.get_by_id',
@@ -98,5 +102,6 @@ export const TCP_REQUEST_MESSAGE = {
   AREA,
   TABLE,
   MENU,
+  CATALOG,
   SAAS,
 };
