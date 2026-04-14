@@ -8,13 +8,21 @@ applyTo: 'apps/bff/**,apps/authorizer/**,apps/user-access/**,apps/product/**,app
 
 ```
 src/
-├── main.ts              # Hybrid app bootstrap (HTTP + TCP)
-├── app.module.ts        # Root module
-├── <feature>/
-│   ├── <feature>.controller.ts   # HTTP endpoints only
-│   ├── <feature>.service.ts      # Business logic
-│   ├── <feature>.repository.ts   # DB queries
-│   └── <feature>.module.ts
+├── main.ts                          # Hybrid app bootstrap (HTTP + TCP)
+├── configuration/index.ts           # Service-specific config
+├── app/
+│   ├── app.module.ts                # Root module
+│   └── modules/
+│       └── <feature>/
+│           ├── controllers/
+│           │   └── <feature>.controller.ts   # HTTP/TCP endpoints
+│           ├── services/
+│           │   └── <feature>.service.ts      # Business logic
+│           ├── repositories/
+│           │   └── <feature>.repository.ts   # DB queries
+│           ├── tests/
+│           │   └── <feature>.service.spec.ts # Unit tests
+│           └── <feature>.module.ts           # Feature module
 ```
 
 ## Hybrid App Bootstrap Pattern
@@ -54,9 +62,9 @@ Every service's `main.ts` must:
 ## TypeORM Repository Pattern
 
 ```typescript
-// Always include tenant_id in queries
+// Always include tenantId in queries
 async findAll(tenantId: string): Promise<Entity[]> {
-  return this.repo.find({ where: { tenant_id: tenantId } });
+  return this.repo.find({ where: { tenantId } });
 }
 ```
 

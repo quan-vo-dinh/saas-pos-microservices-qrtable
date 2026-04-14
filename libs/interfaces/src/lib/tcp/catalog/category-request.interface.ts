@@ -1,10 +1,10 @@
-import { Category } from '@common/entities/category.entity';
+import { CATEGORY_STATUS } from '@common/constants/enum/catalog.enum';
 
 export type CreateCategoryTcpRequest = {
   tenantId: string;
   name: string;
   sortOrder?: number;
-  status?: string;
+  status?: CATEGORY_STATUS;
 };
 
 export type GetCategoryListTcpRequest = {
@@ -21,7 +21,7 @@ export type UpdateCategoryTcpRequest = {
   tenantId: string;
   name?: string;
   sortOrder?: number;
-  status?: string;
+  status?: CATEGORY_STATUS;
 };
 
 export type DeleteCategoryTcpRequest = {
@@ -33,5 +33,3 @@ export type ReorderCategoryTcpRequest = {
   tenantId: string;
   items: Array<{ id: string; sortOrder: number }>;
 };
-
-export type CategoryTcpResponse = Category;

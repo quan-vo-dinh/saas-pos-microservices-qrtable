@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
 
 export class PublicMenuItemDto {
   @ApiProperty()
@@ -16,8 +17,8 @@ export class PublicMenuItemDto {
   @ApiPropertyOptional()
   imageUrl: string | null;
 
-  @ApiProperty()
-  status: string;
+  @ApiProperty({ enum: MENU_ITEM_STATUS })
+  status: MENU_ITEM_STATUS;
 }
 
 export class PublicMenuCategoryDto {

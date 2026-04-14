@@ -2,7 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { TableRepository } from '../repositories/table.repository';
-import { Table, TableStatus } from '@common/entities/table.entity';
+import { Table } from '@common/entities/table.entity';
+import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { Area } from '@common/entities/area.entity';
 import {
   CreateTableTcpRequest,
@@ -17,11 +18,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-const VALID_TRANSITIONS: Record<TableStatus, TableStatus[]> = {
-  available: ['occupied'],
-  occupied: ['billing'],
-  billing: ['occupied', 'cleaning'],
-  cleaning: ['available'],
+const VALID_TRANSITIONS: Record<TABLE_STATUS, TABLE_STATUS[]> = {
+  [TABLE_STATUS.AVAILABLE]: [TABLE_STATUS.OCCUPIED],
+  [TABLE_STATUS.OCCUPIED]: [TABLE_STATUS.BILLING],
+  [TABLE_STATUS.BILLING]: [TABLE_STATUS.OCCUPIED, TABLE_STATUS.CLEANING],
+  [TABLE_STATUS.CLEANING]: [TABLE_STATUS.AVAILABLE],
 };
 
 @Injectable()
@@ -59,7 +60,7 @@ export class TableService {
       areaId: data.areaId,
       name: data.name.trim(),
       capacity: data.capacity ?? 1,
-      status: 'available' as TableStatus,
+      status: TABLE_STATUS.AVAILABLE,
       qrToken: 'temp',
       sessionId: null,
     });
@@ -116,7 +117,7 @@ export class TableService {
   async delete(data: DeleteTableTcpRequest): Promise<void> {
     const table = await this.getById({ id: data.id, tenantId: data.tenantId });
 
-    if (table.sessionId || table.status !== 'available') {
+    if (table.sessionId || table.status !== TABLE_STATUS.AVAILABLE) {
       throw new BadRequestException('Cannot delete active table');
     }
 
@@ -125,9 +126,9 @@ export class TableService {
 
   async updateStatus(data: UpdateTableStatusTcpRequest): Promise<Table> {
     const table = await this.getById({ id: data.id, tenantId: data.tenantId });
-    const newStatus = data.status as TableStatus;
+    const newStatus = data.status;
 
-    const allowedTransitions = VALID_TRANSITIONS[table.status as TableStatus];
+    const allowedTransitions = VALID_TRANSITIONS[table.status];
     if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
       throw new BadRequestException(
         `Invalid status transition: ${table.status} → ${newStatus}. Allowed: ${allowedTransitions?.join(', ') || 'none'}`,
@@ -136,10 +137,10 @@ export class TableService {
 
     const updatePayload: Partial<Table> = { status: newStatus };
 
-    if (newStatus === 'available') {
+    if (newStatus === TABLE_STATUS.AVAILABLE) {
       updatePayload.sessionId = null;
     }
-    if (newStatus === 'occupied' && data.sessionId) {
+    if (newStatus === TABLE_STATUS.OCCUPIED && data.sessionId) {
       updatePayload.sessionId = data.sessionId;
     }
 

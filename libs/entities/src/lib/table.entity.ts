@@ -1,8 +1,7 @@
 import { BaseEntity } from './base.entity';
 import { Column, Entity, Index, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { Area } from './area.entity';
-
-export type TableStatus = 'available' | 'occupied' | 'billing' | 'cleaning';
+import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 
 @Entity({ name: 'tables' })
 @Unique(['tenantId', 'name'])
@@ -26,8 +25,8 @@ export class Table extends BaseEntity {
   @Column({ type: 'int', default: 1 })
   capacity: number;
 
-  @Column({ type: 'varchar', length: 20, default: 'available' })
-  status: TableStatus;
+  @Column({ type: 'varchar', length: 20, default: TABLE_STATUS.AVAILABLE })
+  status: TABLE_STATUS;
 
   @Column({ name: 'qr_token', type: 'varchar', length: 255 })
   qrToken: string;

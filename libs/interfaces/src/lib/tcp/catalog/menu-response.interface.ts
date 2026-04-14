@@ -1,6 +1,4 @@
-export type GetPublicMenuTcpRequest = {
-  tenantId: string;
-};
+import { MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
 
 export type PublicMenuCategoryResponse = {
   id: string;
@@ -15,7 +13,7 @@ export type PublicMenuItemResponse = {
   description: string | null;
   price: number;
   imageUrl: string | null;
-  status: string;
+  status: MENU_ITEM_STATUS;
 };
 
 export type PublicMenuTcpResponse = {

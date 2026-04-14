@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
-import { BaseResponseDto } from '../common/base-response.dto';
+import { MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
 
 export class CreateMenuItemRequestDto {
   @ApiProperty()
@@ -69,40 +69,8 @@ export class UpdateMenuItemRequestDto {
   @IsOptional()
   sortOrder?: number;
 
-  @ApiPropertyOptional({ enum: ['available', 'out_of_stock'] })
-  @IsEnum(['available', 'out_of_stock'])
+  @ApiPropertyOptional({ enum: MENU_ITEM_STATUS })
+  @IsEnum(MENU_ITEM_STATUS)
   @IsOptional()
-  status?: string;
-}
-
-export class MenuItemResponseDto extends BaseResponseDto {
-  @ApiProperty()
-  tenantId: string;
-
-  @ApiProperty()
-  categoryId: string;
-
-  @ApiProperty()
-  name: string;
-
-  @ApiPropertyOptional()
-  description: string | null;
-
-  @ApiProperty()
-  price: number;
-
-  @ApiPropertyOptional()
-  imageUrl: string | null;
-
-  @ApiPropertyOptional()
-  imagePublicId: string | null;
-
-  @ApiProperty()
-  stock: number;
-
-  @ApiProperty()
-  sortOrder: number;
-
-  @ApiProperty()
-  status: string;
+  status?: MENU_ITEM_STATUS;
 }

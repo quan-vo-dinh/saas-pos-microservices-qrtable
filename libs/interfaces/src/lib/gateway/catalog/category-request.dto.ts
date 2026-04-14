@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { BaseResponseDto } from '../common/base-response.dto';
+import { CATEGORY_STATUS } from '@common/constants/enum/catalog.enum';
 
 export class CreateCategoryRequestDto {
   @ApiProperty()
@@ -15,10 +15,10 @@ export class CreateCategoryRequestDto {
   @IsOptional()
   sortOrder?: number;
 
-  @ApiPropertyOptional({ enum: ['active', 'inactive'] })
-  @IsEnum(['active', 'inactive'])
+  @ApiPropertyOptional({ enum: CATEGORY_STATUS })
+  @IsEnum(CATEGORY_STATUS)
   @IsOptional()
-  status?: string;
+  status?: CATEGORY_STATUS;
 }
 
 export class UpdateCategoryRequestDto {
@@ -33,10 +33,10 @@ export class UpdateCategoryRequestDto {
   @IsOptional()
   sortOrder?: number;
 
-  @ApiPropertyOptional({ enum: ['active', 'inactive'] })
-  @IsEnum(['active', 'inactive'])
+  @ApiPropertyOptional({ enum: CATEGORY_STATUS })
+  @IsEnum(CATEGORY_STATUS)
   @IsOptional()
-  status?: string;
+  status?: CATEGORY_STATUS;
 }
 
 class ReorderItemDto {
@@ -56,18 +56,4 @@ export class ReorderCategoryRequestDto {
   @ValidateNested({ each: true })
   @Type(() => ReorderItemDto)
   items: ReorderItemDto[];
-}
-
-export class CategoryResponseDto extends BaseResponseDto {
-  @ApiProperty()
-  tenantId: string;
-
-  @ApiProperty()
-  name: string;
-
-  @ApiProperty()
-  sortOrder: number;
-
-  @ApiProperty()
-  status: string;
 }

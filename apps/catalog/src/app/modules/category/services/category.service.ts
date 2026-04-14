@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CategoryRepository } from '../repositories/category.repository';
 import { Category } from '@common/entities/category.entity';
+import { CATEGORY_STATUS } from '@common/constants/enum/catalog.enum';
 import {
   CreateCategoryTcpRequest,
   GetCategoryListTcpRequest,
@@ -31,7 +32,7 @@ export class CategoryService {
       tenantId: data.tenantId,
       name: data.name.trim(),
       sortOrder: data.sortOrder ?? 0,
-      status: (data.status as Category['status']) ?? 'active',
+      status: data.status ?? CATEGORY_STATUS.ACTIVE,
     });
   }
 
@@ -60,7 +61,7 @@ export class CategoryService {
     const updatePayload: Partial<Category> = {};
     if (data.name !== undefined) updatePayload.name = data.name.trim();
     if (data.sortOrder !== undefined) updatePayload.sortOrder = data.sortOrder;
-    if (data.status !== undefined) updatePayload.status = data.status as Category['status'];
+    if (data.status !== undefined) updatePayload.status = data.status;
 
     const updated = await this.categoryRepository.updateByIdAndTenant(data.id, data.tenantId, updatePayload);
     if (!updated) {

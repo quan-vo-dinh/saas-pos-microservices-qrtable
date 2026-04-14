@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { BaseResponseDto } from '../common/base-response.dto';
 
 export class CreateAreaRequestDto {
   @ApiProperty()
@@ -46,15 +45,4 @@ export class ReorderAreaRequestDto {
   @ValidateNested({ each: true })
   @Type(() => ReorderItemDto)
   items: ReorderItemDto[];
-}
-
-export class AreaResponseDto extends BaseResponseDto {
-  @ApiProperty()
-  tenantId: string;
-
-  @ApiProperty()
-  name: string;
-
-  @ApiProperty()
-  sortOrder: number;
 }
