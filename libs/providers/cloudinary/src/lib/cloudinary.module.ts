@@ -4,6 +4,7 @@ import { CLOUDINARY_MODULE_OPTIONS } from './cloudinary.constants';
 import { CloudinaryProvider } from './cloudinary.provider';
 import { CloudinaryService } from './cloudinary.service';
 import { CloudinaryModuleAsyncOptions, CloudinaryModuleOptions } from './interfaces/cloudinary-options.interface';
+import { CloudinaryConfiguration } from './cloudinary.config';
 import { CloudinaryValidators } from './validators/cloudinary.validators';
 
 @Module({})
@@ -22,7 +23,9 @@ export class CloudinaryModule {
   }
 
   /**
-   * Self-resolving async registration — reads from ConfigService automatically.
+   * Self-resolving async registration — reads from CLOUDINARY_CONFIG namespace.
+   * Requires CLOUDINARY_CONFIG to be registered in app's Configuration class.
+   *
    * Usage: `CloudinaryModule.forRootAsync()`
    * Override: `CloudinaryModule.forRootAsync({ useFactory: ... })` for custom config.
    */
@@ -30,11 +33,14 @@ export class CloudinaryModule {
     const defaultOptions: CloudinaryModuleAsyncOptions = {
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        cloudName: configService.get<string>('CLOUDINARY_CLOUD_NAME', ''),
-        apiKey: configService.get<string>('CLOUDINARY_API_KEY', ''),
-        apiSecret: configService.get<string>('CLOUDINARY_API_SECRET', ''),
-      }),
+      useFactory: (configService: ConfigService) => {
+        const config = configService.get<CloudinaryConfiguration>('CLOUDINARY_CONFIG');
+        return {
+          cloudName: config?.CLOUD_NAME ?? '',
+          apiKey: config?.API_KEY ?? '',
+          apiSecret: config?.API_SECRET ?? '',
+        };
+      },
     };
 
     const resolved = options ?? defaultOptions;

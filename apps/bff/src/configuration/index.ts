@@ -5,6 +5,7 @@ import { AppConfiguration } from '@common/configuration/app.config';
 import { ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RedisConfiguration } from '@common/configuration/redis.config';
+import { CloudinaryConfiguration } from '@common/providers/cloudinary/cloudinary.config';
 class Configuration extends BaseConfiguration {
   @ValidateNested()
   @Type(() => AppConfiguration)
@@ -21,6 +22,10 @@ class Configuration extends BaseConfiguration {
   @ValidateNested()
   @Type(() => GrpcConfiguration)
   GRPC_SERV = new GrpcConfiguration();
+
+  @ValidateNested()
+  @Type(() => CloudinaryConfiguration)
+  CLOUDINARY_CONFIG = new CloudinaryConfiguration();
 }
 
 export const CONFIGURATION = new Configuration();
