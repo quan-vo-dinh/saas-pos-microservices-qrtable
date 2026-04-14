@@ -1,8 +1,7 @@
 import { BaseEntity } from './base.entity';
 import { Column, DeleteDateColumn, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { Category } from './category.entity';
-
-export type MenuItemStatus = 'available' | 'out_of_stock';
+import { MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
 
 @Entity({ name: 'menu_items' })
 @Index(['tenantId', 'categoryId'])
@@ -39,8 +38,8 @@ export class MenuItem extends BaseEntity {
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
 
-  @Column({ type: 'varchar', length: 20, default: 'available' })
-  status: MenuItemStatus;
+  @Column({ type: 'varchar', length: 20, default: MENU_ITEM_STATUS.AVAILABLE })
+  status: MENU_ITEM_STATUS;
 
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamp', nullable: true })
   deletedAt: Date | null;
