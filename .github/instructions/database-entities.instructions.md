@@ -9,30 +9,29 @@ applyTo: 'libs/entities/**,libs/schemas/**'
 ### Multi-Tenant Column (REQUIRED on all tenant-scoped entities)
 
 ```typescript
-@Column({ name: 'tenant_id' })
-tenant_id: string;
+@Column({ name: 'tenant_id', type: 'varchar', length: 64 })
+tenantId: string;
 ```
 
-Every entity that belongs to a tenant MUST have `tenant_id`. Never query without filtering by it.
+Every entity that belongs to a tenant MUST have `tenantId`. Never query without filtering by it.
 
 ### Base Entity Pattern
 
 ```typescript
-@Entity('table_name')
-export class MyEntity {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
-  @Column({ name: 'tenant_id' })
-  tenant_id: string;
-
-  @CreateDateColumn({ name: 'created_at' })
-  created_at: Date;
-
-  @UpdateDateColumn({ name: 'updated_at' })
-  updated_at: Date;
+@Entity({ name: 'table_name' })
+export class MyEntity extends BaseEntity {
+  @Column({ name: 'tenant_id', type: 'varchar', length: 64 })
+  tenantId: string;
 }
 ```
+
+`BaseEntity` (in `libs/entities/src/lib/base.entity.ts`) provides `id`, `createdAt`, `updatedAt` automatically.
+
+### Property Naming Convention
+
+- TypeScript properties: **camelCase** (`tenantId`, `createdAt`, `sortOrder`)
+- Database columns: **snake_case** via `@Column({ name: 'snake_case' })`
+- Always use explicit `name` mapping for multi-word columns
 
 ### TypeORM Config
 
@@ -47,8 +46,8 @@ export class MyEntity {
 @JoinColumn({ name: 'category_id' })
 category: Category;
 
-@Column({ name: 'category_id' })
-category_id: string;
+@Column({ name: 'category_id', type: 'uuid' })
+categoryId: string;
 ```
 
 Always store FK column explicitly alongside the relation.
@@ -83,5 +82,6 @@ this.model.find({ tenant_id: tenantId, ...otherFilters });
 
 - Table names: `snake_case` plural (`product_categories`, `order_items`)
 - Column names: `snake_case` (`created_at`, `tenant_id`, `product_id`)
-- Entity class names: `PascalCase` singular (`ProductCategory`)
-- TypeScript properties: `camelCase` mapped via `@Column({ name: 'snake_case' })`
+- Entity class names: `PascalCase` singular (`Product`, `Category`, `MenuItem`)
+- TypeScript properties: `camelCase` with `@Column({ name: 'snake_case' })` mapping
+- Status fields: use centralized enums from `@common/constants/enum/` (e.g., `CATEGORY_STATUS`)
