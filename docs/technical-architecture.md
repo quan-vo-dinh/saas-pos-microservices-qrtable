@@ -1224,7 +1224,27 @@ Checkout Session Metadata:
 | **Rate Limit**   | `rl:{endpoint}:{ip/token}`            | Request count                    | Window (s)         | Auto-expire                   |
 | **KDS Queue**    | `kds:{tenant_id}:{station}`           | Sorted Set of tickets            | No expire          | On ticket complete/remove     |
 
-### 11.2 Cache-Aside Pattern (Menu Example)
+### 11.2 Chính Sách Truy Cập Redis (Redis Access Policy)
+
+Redis được sử dụng có kiểm soát theo mô hình **phân tầng (Tiered Access)**. Không phải mọi microservice đều được phép kết nối Redis — chỉ những service có nhu cầu kiến trúc chính đáng cho ephemeral state hoặc cache.
+
+| Service               | Phase    | Redis Use Case                                         | Key Pattern                      |
+| --------------------- | -------- | ------------------------------------------------------ | -------------------------------- |
+| **BFF**               | Phase 0  | Auth cache, menu cache, rate limit, session validation | `user-token:*`, `menu:*`, `rl:*` |
+| **Order Service**     | Phase 2A | Session state, shared cart, idempotency                | `session:*`, `cart:*`, `idem:*`  |
+| **Kitchen Service**   | Phase 2B | KDS FIFO queue (Redis-only, không DB)                  | `kds:*`, `ticket:*`              |
+| **WebSocket Gateway** | Phase 2B | Socket.io Redis Adapter (multi-instance sync)          | `socket.io-adapter:*`            |
+
+**Service KHÔNG được kết nối Redis:** Catalog, SaaS, Payment, Auth, Notification, User-Access. Các service này sử dụng PostgreSQL/MongoDB/Keycloak làm source of truth — không có ephemeral state cần Redis.
+
+**Lý do:**
+
+- **BFF (Tier 1):** Edge layer cần low-latency cho auth/cache/rate-limit. Mọi data chỉ là cache — source of truth vẫn ở Keycloak/PostgreSQL.
+- **Order Service (Tier 2):** Session và Cart là **ephemeral state thuộc Order domain** — không phải cache. Cần direct access để đảm bảo optimistic locking và TTL/idle management.
+- **Kitchen Service (Tier 3):** Redis là **primary data store** cho KDS queue (Sorted Set FIFO). Service này không có database riêng — Redis-only by design. Queue operations cần O(log N) access, không thể proxy qua TCP.
+- **WebSocket Gateway (Tier 4):** Socket.io multi-instance yêu cầu shared pub/sub adapter — đây là yêu cầu kỹ thuật của thư viện, không phải business logic.
+
+### 11.3 Cache-Aside Pattern (Menu Example)
 
 ```
 GET /menu?tenant_id=t-001
@@ -1332,7 +1352,7 @@ Mỗi service expose health endpoint kiểm tra:
 | ------------ | ---------------------------------------------- |
 | BFF          | Redis connection, TCP clients reachable        |
 | Auth         | Keycloak reachable, gRPC listener active       |
-| Catalog      | PostgreSQL connection, Redis connection        |
+| Catalog      | PostgreSQL connection                          |
 | Order        | PostgreSQL connection, Redis connection, Kafka |
 | Kitchen      | Redis connection, Kafka consumer status        |
 | Payment      | PostgreSQL connection, Stripe API reachable    |

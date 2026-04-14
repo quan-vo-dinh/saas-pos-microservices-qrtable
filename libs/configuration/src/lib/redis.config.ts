@@ -22,6 +22,7 @@ export class RedisConfiguration {
 }
 
 export const RedisProvider = CacheModule.registerAsync({
+  isGlobal: true,
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: async (configService: ConfigService) => {
