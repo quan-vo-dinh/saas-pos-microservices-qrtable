@@ -1,4 +1,4 @@
-import { Table } from '@common/entities/table.entity';
+import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 
 export type CreateTableTcpRequest = {
   tenantId: string;
@@ -10,7 +10,7 @@ export type CreateTableTcpRequest = {
 export type GetTableListTcpRequest = {
   tenantId: string;
   areaId?: string;
-  status?: string;
+  status?: TABLE_STATUS;
 };
 
 export type GetTableByIdTcpRequest = {
@@ -34,7 +34,7 @@ export type DeleteTableTcpRequest = {
 export type UpdateTableStatusTcpRequest = {
   id: string;
   tenantId: string;
-  status: string;
+  status: TABLE_STATUS;
   sessionId?: string;
 };
 
@@ -48,5 +48,3 @@ export type RegenerateQrTokenTcpRequest = {
   id: string;
   tenantId: string;
 };
-
-export type TableTcpResponse = Table;

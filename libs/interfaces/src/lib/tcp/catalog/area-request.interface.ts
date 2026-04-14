@@ -1,5 +1,3 @@
-import { Area } from '@common/entities/area.entity';
-
 export type CreateAreaTcpRequest = {
   tenantId: string;
   name: string;
@@ -31,5 +29,3 @@ export type ReorderAreaTcpRequest = {
   tenantId: string;
   items: Array<{ id: string; sortOrder: number }>;
 };
-
-export type AreaTcpResponse = Area;

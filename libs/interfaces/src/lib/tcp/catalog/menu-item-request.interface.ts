@@ -1,4 +1,4 @@
-import { MenuItem } from '@common/entities/menu-item.entity';
+import { MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
 
 export type CreateMenuItemTcpRequest = {
   tenantId: string;
@@ -29,7 +29,7 @@ export type UpdateMenuItemTcpRequest = {
   price?: number;
   stock?: number;
   sortOrder?: number;
-  status?: string;
+  status?: MENU_ITEM_STATUS;
 };
 
 export type SoftDeleteMenuItemTcpRequest = {
@@ -43,5 +43,3 @@ export type UpdateMenuItemImageTcpRequest = {
   imageUrl: string;
   imagePublicId: string;
 };
-
-export type MenuItemTcpResponse = MenuItem;
