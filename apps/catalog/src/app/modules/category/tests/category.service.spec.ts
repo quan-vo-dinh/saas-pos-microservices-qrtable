@@ -3,6 +3,7 @@ import { CategoryService } from '../services/category.service';
 import { CategoryRepository } from '../repositories/category.repository';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MenuItem } from '@common/entities/menu-item.entity';
+import { CATEGORY_STATUS } from '@common/constants/enum/catalog.enum';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 describe('CategoryService', () => {
@@ -15,7 +16,7 @@ describe('CategoryService', () => {
     tenantId: 'tenant-1',
     name: 'Appetizers',
     sortOrder: 0,
-    status: 'active' as const,
+    status: CATEGORY_STATUS.ACTIVE,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

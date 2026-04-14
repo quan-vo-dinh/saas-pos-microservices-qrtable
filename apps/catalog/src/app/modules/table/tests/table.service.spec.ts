@@ -4,6 +4,7 @@ import { TableRepository } from '../repositories/table.repository';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Area } from '@common/entities/area.entity';
 import { Table } from '@common/entities/table.entity';
+import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { ConfigService } from '@nestjs/config';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { createHmac } from 'crypto';
@@ -21,7 +22,7 @@ describe('TableService', () => {
     areaId: 'area-1',
     name: 'Table 1',
     capacity: 4,
-    status: 'available',
+    status: TABLE_STATUS.AVAILABLE,
     qrToken: 'some-token',
     sessionId: null,
     createdAt: new Date(),
@@ -99,7 +100,7 @@ describe('TableService', () => {
 
   describe('delete', () => {
     it('should delete an available table', async () => {
-      const availableTable = { ...mockTable, status: 'available', sessionId: null } as unknown as Table;
+      const availableTable = { ...mockTable, status: TABLE_STATUS.AVAILABLE, sessionId: null } as unknown as Table;
       repository.findByIdAndTenant.mockResolvedValue(availableTable);
 
       await service.delete({ id: 'table-1', tenantId: 'tenant-1' });
@@ -107,7 +108,7 @@ describe('TableService', () => {
     });
 
     it('should throw BadRequestException for occupied table', async () => {
-      const occupiedTable = { ...mockTable, status: 'occupied', sessionId: 'session-1' } as unknown as Table;
+      const occupiedTable = { ...mockTable, status: TABLE_STATUS.OCCUPIED, sessionId: 'session-1' } as unknown as Table;
       repository.findByIdAndTenant.mockResolvedValue(occupiedTable);
 
       await expect(service.delete({ id: 'table-1', tenantId: 'tenant-1' })).rejects.toThrow(BadRequestException);
@@ -116,49 +117,49 @@ describe('TableService', () => {
 
   describe('updateStatus', () => {
     it('should transition available → occupied', async () => {
-      const availableTable = { ...mockTable, status: 'available' } as unknown as Table;
-      const occupiedTable = { ...mockTable, status: 'occupied' } as unknown as Table;
+      const availableTable = { ...mockTable, status: TABLE_STATUS.AVAILABLE } as unknown as Table;
+      const occupiedTable = { ...mockTable, status: TABLE_STATUS.OCCUPIED } as unknown as Table;
       repository.findByIdAndTenant.mockResolvedValue(availableTable);
       repository.updateByIdAndTenant.mockResolvedValue(occupiedTable);
 
       const result = await service.updateStatus({
         id: 'table-1',
         tenantId: 'tenant-1',
-        status: 'occupied',
+        status: TABLE_STATUS.OCCUPIED,
       });
-      expect(result.status).toBe('occupied');
+      expect(result.status).toBe(TABLE_STATUS.OCCUPIED);
     });
 
     it('should transition occupied → billing', async () => {
-      const occupiedTable = { ...mockTable, status: 'occupied' } as unknown as Table;
-      const billingTable = { ...mockTable, status: 'billing' } as unknown as Table;
+      const occupiedTable = { ...mockTable, status: TABLE_STATUS.OCCUPIED } as unknown as Table;
+      const billingTable = { ...mockTable, status: TABLE_STATUS.BILLING } as unknown as Table;
       repository.findByIdAndTenant.mockResolvedValue(occupiedTable);
       repository.updateByIdAndTenant.mockResolvedValue(billingTable);
 
       const result = await service.updateStatus({
         id: 'table-1',
         tenantId: 'tenant-1',
-        status: 'billing',
+        status: TABLE_STATUS.BILLING,
       });
-      expect(result.status).toBe('billing');
+      expect(result.status).toBe(TABLE_STATUS.BILLING);
     });
 
     it('should reject invalid transition available → cleaning', async () => {
-      const availableTable = { ...mockTable, status: 'available' } as unknown as Table;
+      const availableTable = { ...mockTable, status: TABLE_STATUS.AVAILABLE } as unknown as Table;
       repository.findByIdAndTenant.mockResolvedValue(availableTable);
 
-      await expect(service.updateStatus({ id: 'table-1', tenantId: 'tenant-1', status: 'cleaning' })).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.updateStatus({ id: 'table-1', tenantId: 'tenant-1', status: TABLE_STATUS.CLEANING }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should reject invalid transition billing → available', async () => {
-      const billingTable = { ...mockTable, status: 'billing' } as unknown as Table;
+      const billingTable = { ...mockTable, status: TABLE_STATUS.BILLING } as unknown as Table;
       repository.findByIdAndTenant.mockResolvedValue(billingTable);
 
-      await expect(service.updateStatus({ id: 'table-1', tenantId: 'tenant-1', status: 'available' })).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.updateStatus({ id: 'table-1', tenantId: 'tenant-1', status: TABLE_STATUS.AVAILABLE }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

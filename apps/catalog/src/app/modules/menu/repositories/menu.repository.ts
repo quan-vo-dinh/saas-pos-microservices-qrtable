@@ -1,5 +1,6 @@
 import { Category } from '@common/entities/category.entity';
 import { MenuItem } from '@common/entities/menu-item.entity';
+import { CATEGORY_STATUS, MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
@@ -15,7 +16,7 @@ export class MenuRepository {
 
   findActiveCategories(tenantId: string): Promise<Category[]> {
     return this.categoryRepo.find({
-      where: { tenantId, status: 'active' },
+      where: { tenantId, status: CATEGORY_STATUS.ACTIVE },
       order: { sortOrder: 'ASC' },
     });
   }
@@ -25,7 +26,7 @@ export class MenuRepository {
       where: {
         tenantId,
         categoryId,
-        status: 'available',
+        status: MENU_ITEM_STATUS.AVAILABLE,
         deletedAt: IsNull(),
       },
       order: { sortOrder: 'ASC' },
