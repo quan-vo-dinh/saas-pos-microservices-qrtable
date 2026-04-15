@@ -19,6 +19,7 @@ export class MenuItemRepository {
     }
     return this.repo.find({
       where,
+      relations: ['category'],
       order: { sortOrder: 'ASC' },
     });
   }
