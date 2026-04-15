@@ -1,8 +1,14 @@
 /** Environment-aware BFF API configuration. */
 export const API_CONFIG = {
-  DEFAULT_BFF_URL: 'http://localhost:3300/api/v1',
+  DEFAULT_BFF_URL: process.env.NEXT_PUBLIC_BFF_URL ?? 'http://localhost:3000/api/v1',
   ENDPOINTS: {
     AUTHORIZER_ME: '/authorizer/me',
+    CATEGORIES: '/admin/categories',
+    CATEGORIES_REORDER: '/admin/categories/reorder',
+    MENU_ITEMS: '/admin/menu-items',
+    AREAS: '/admin/areas',
+    AREAS_REORDER: '/admin/areas/reorder',
+    TABLES: '/admin/tables',
   },
 } as const;
 
