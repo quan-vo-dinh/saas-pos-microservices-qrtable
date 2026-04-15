@@ -2,9 +2,11 @@
 
 import { ConfirmDialog } from '@einvoice/frontend-ui';
 import { useMenu } from './menu-provider';
+import { useDeleteCategoryMutation } from '../hooks/use-menu-mutations';
 
 export function CategoryDeleteDialog() {
   const { open, setOpen, currentCategory } = useMenu();
+  const deleteMutation = useDeleteCategoryMutation();
 
   return (
     <ConfirmDialog
@@ -15,8 +17,10 @@ export function CategoryDeleteDialog() {
       confirmText="Delete"
       variant="destructive"
       onConfirm={() => {
-        console.log('Delete category:', currentCategory?.id);
-        setOpen(null);
+        if (!currentCategory) return;
+        deleteMutation.mutate(currentCategory.id, {
+          onSuccess: () => setOpen(null),
+        });
       }}
     />
   );

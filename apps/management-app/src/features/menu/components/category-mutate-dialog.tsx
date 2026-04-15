@@ -1,39 +1,62 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@einvoice/frontend-ui'
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
-;
-;
 import { useMenu } from './menu-provider';
 import { categoryMutateSchema, type CategoryMutateInput } from '../data/schema';
+import { useCreateCategoryMutation, useUpdateCategoryMutation } from '../hooks/use-menu-mutations';
 
 export function CategoryMutateDialog() {
   const { open, setOpen, currentCategory } = useMenu();
   const isEdit = open === 'edit-category';
   const isOpen = open === 'add-category' || open === 'edit-category';
 
+  const createMutation = useCreateCategoryMutation();
+  const updateMutation = useUpdateCategoryMutation();
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const form = useForm<CategoryMutateInput>({
     resolver: zodResolver(categoryMutateSchema),
-    defaultValues:
-      isEdit && currentCategory
-        ? {
-            name: currentCategory.name,
-            timeStart: currentCategory.timeStart ?? undefined,
-            timeEnd: currentCategory.timeEnd ?? undefined,
-            status: currentCategory.status,
-          }
-        : {
-            name: '',
-            status: 'active',
-          },
+    defaultValues: {
+      name: '',
+      status: 'active',
+    },
   });
 
+  useEffect(() => {
+    if (isEdit && currentCategory) {
+      form.reset({
+        name: currentCategory.name,
+        timeStart: currentCategory.timeStart ?? undefined,
+        timeEnd: currentCategory.timeEnd ?? undefined,
+        status: currentCategory.status,
+      });
+    } else if (isOpen) {
+      form.reset({ name: '', status: 'active' });
+    }
+  }, [isEdit, isOpen, currentCategory, form]);
+
   function onSubmit(data: CategoryMutateInput) {
-    // Mock: just log and close
-    console.log(isEdit ? 'Update category:' : 'Create category:', data);
-    setOpen(null);
-    form.reset();
+    if (isEdit && currentCategory) {
+      updateMutation.mutate(
+        { id: currentCategory.id, data },
+        {
+          onSuccess: () => {
+            setOpen(null);
+            form.reset();
+          },
+        },
+      );
+    } else {
+      createMutation.mutate(data, {
+        onSuccess: () => {
+          setOpen(null);
+          form.reset();
+        },
+      });
+    }
   }
 
   return (
@@ -90,7 +113,9 @@ export function CategoryMutateDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
               Cancel
             </Button>
-            <Button type="submit">{isEdit ? 'Save Changes' : 'Create Category'}</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Category'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

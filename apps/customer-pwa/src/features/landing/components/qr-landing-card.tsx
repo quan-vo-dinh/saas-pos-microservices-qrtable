@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { QrCode, CheckCircle2, XCircle, MapPin, Users } from 'lucide-react';
+import { QrCode, CheckCircle2, XCircle, Users } from 'lucide-react';
 import {
   Button,
   Card,
@@ -9,13 +9,9 @@ import {
   CardTitle,
   Skeleton,
 } from '@einvoice/frontend-ui';
-import { getSessionByQrToken, type MockSession } from '@einvoice/mock-data';
+import { useVerifyQrMutation } from '@/features/landing/hooks/use-verify-qr';
 import { useSession } from '@/features/session/context/session-provider';
 import { ROUTES } from '@/constants/routes';
-
-type ScanState = 'idle' | 'scanning' | 'confirmed' | 'error';
-
-const SCAN_DELAY_MS = 1500;
 
 export function QrLandingCard() {
   const [searchParams] = useSearchParams();
@@ -25,41 +21,29 @@ export function QrLandingCard() {
   const table = searchParams.get('table');
   const token = searchParams.get('token');
 
-  const [state, setState] = useState<ScanState>(
-    table && token ? 'scanning' : 'idle',
-  );
-  const [sessionData, setSessionData] = useState<MockSession | null>(null);
+  const verifyMutation = useVerifyQrMutation();
 
   useEffect(() => {
     if (!table || !token) return;
-
-    const timer = setTimeout(() => {
-      const result = getSessionByQrToken(token);
-      if (result) {
-        setSessionData(result);
-        setState('confirmed');
-      } else {
-        setState('error');
-      }
-    }, SCAN_DELAY_MS);
-
-    return () => clearTimeout(timer);
+    verifyMutation.mutate({ tableId: table, qrToken: token });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [table, token]);
 
   const handleEnterMenu = (): void => {
-    if (!sessionData) return;
+    if (!verifyMutation.data) return;
 
+    const tableData = verifyMutation.data;
     startSession({
-      sessionId: sessionData.sessionId,
-      tableId: sessionData.tableId,
-      tableName: sessionData.tableName,
-      restaurantName: sessionData.restaurantName,
+      sessionId: tableData.sessionId ?? tableData.id,
+      tableId: tableData.id,
+      tableName: tableData.name,
+      restaurantName: tableData.name,
     });
 
     navigate(ROUTES.MENU);
   };
 
-  if (state === 'idle') {
+  if (!table || !token) {
     return (
       <Card className="mx-auto max-w-sm shadow-md">
         <CardHeader className="text-center">
@@ -75,7 +59,7 @@ export function QrLandingCard() {
     );
   }
 
-  if (state === 'scanning') {
+  if (verifyMutation.isPending) {
     return (
       <Card className="mx-auto max-w-sm shadow-md">
         <CardHeader className="text-center">
@@ -91,7 +75,7 @@ export function QrLandingCard() {
     );
   }
 
-  if (state === 'error') {
+  if (verifyMutation.isError) {
     return (
       <Card className="mx-auto max-w-sm border-destructive/50 shadow-md">
         <CardHeader className="text-center">
@@ -107,31 +91,25 @@ export function QrLandingCard() {
     );
   }
 
-  // state === 'confirmed'
+  const tableData = verifyMutation.data;
   return (
     <Card className="mx-auto max-w-sm shadow-md">
       <CardHeader className="text-center">
         <CheckCircle2 className="mx-auto mb-2 size-12 text-green-600" />
-        <CardTitle>{sessionData?.restaurantName}</CardTitle>
+        <CardTitle>Xác thực thành công</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="bg-muted/50 space-y-2 rounded-lg p-4">
           <div className="flex items-center gap-2">
             <QrCode className="text-muted-foreground size-4" />
             <span className="font-medium">
-              Bàn {sessionData?.tableName}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="text-muted-foreground size-4" />
-            <span className="text-muted-foreground text-sm">
-              {sessionData?.areaName}
+              Bàn {tableData?.name}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Users className="text-muted-foreground size-4" />
             <span className="text-muted-foreground text-sm">
-              Sức chứa: {sessionData?.capacity} người
+              Sức chứa: {tableData?.capacity} người
             </span>
           </div>
         </div>

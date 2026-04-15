@@ -23,11 +23,36 @@ import { TablesPrimaryButtons } from './components/tables-primary-buttons';
 import { TablesTable } from './components/tables-table';
 import { TableFloorPlan } from './components/table-floor-plan';
 import { TablesDialogs } from './components/tables-dialogs';
-import { areas } from '@einvoice/mock-data';
-import { tables } from '@einvoice/mock-data';
+import { useAreasQuery, useTablesQuery } from './hooks/use-tables-query';
+import type { RestaurantTable } from '@einvoice/types';
 
 export function TablesPage() {
-  const defaultArea = areas[0]?.id ?? 'all';
+  const { data: areas, isPending: areasPending } = useAreasQuery();
+  const { data: tables, isPending: tablesPending } = useTablesQuery();
+
+  const defaultArea = areas?.[0]?.id ?? 'all';
+  const isPending = areasPending || tablesPending;
+
+  if (isPending) {
+    return (
+      <TablesProvider>
+        <Header fixed>
+          <Search />
+          <div className="ms-auto flex items-center gap-4">
+            <ThemeSwitch />
+            <ProfileDropdown />
+          </div>
+        </Header>
+        <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
+          <div className="space-y-3">
+            <div className="h-8 w-48 animate-pulse rounded bg-muted" />
+            <div className="h-10 w-full animate-pulse rounded bg-muted" />
+            <div className="h-[500px] w-full animate-pulse rounded bg-muted" />
+          </div>
+        </Main>
+      </TablesProvider>
+    );
+  }
 
   return (
     <TablesProvider>
@@ -55,7 +80,7 @@ export function TablesPage() {
         <Tabs defaultValue={defaultArea} className="flex flex-1 flex-col">
           <TabsList>
             <TabsTrigger value="all">All Areas</TabsTrigger>
-            {areas.map((area) => (
+            {(areas ?? []).map((area) => (
               <TabsTrigger key={area.id} value={area.id}>
                 {area.name} ({area.tableCount})
               </TabsTrigger>
@@ -63,16 +88,16 @@ export function TablesPage() {
           </TabsList>
 
           <TabsContent value="all" className="flex flex-1 flex-col mt-4">
-            <SplitView tables={tables} />
+            <SplitView tables={tables ?? []} />
           </TabsContent>
 
-          {areas.map((area) => (
+          {(areas ?? []).map((area) => (
             <TabsContent
               key={area.id}
               value={area.id}
               className="flex flex-1 flex-col mt-4"
             >
-              <AreaSplitView areaId={area.id} />
+              <AreaSplitView areaId={area.id} tables={tables ?? []} />
             </TabsContent>
           ))}
         </Tabs>
@@ -83,30 +108,28 @@ export function TablesPage() {
   );
 }
 
-function AreaSplitView({ areaId }: { areaId: string }) {
+function AreaSplitView({ areaId, tables }: { areaId: string; tables: RestaurantTable[] }) {
   const filtered = useMemo(
     () => tables.filter((t) => t.areaId === areaId),
-    [areaId]
+    [areaId, tables],
   );
   return <SplitView tables={filtered} />;
 }
 
-function SplitView({ tables: tableData }: { tables: typeof tables }) {
+function SplitView({ tables }: { tables: RestaurantTable[] }) {
   return (
     <ResizablePanelGroup className="min-h-[500px]">
-      {/* Left: DataTable List */}
       <ResizablePanel defaultSize={40} minSize={30}>
         <ScrollArea className="h-full pr-4">
-          <TablesTable data={tableData} />
+          <TablesTable data={tables} />
         </ScrollArea>
       </ResizablePanel>
 
       <ResizableHandle withHandle />
 
-      {/* Right: Floor Plan View */}
       <ResizablePanel defaultSize={60} minSize={30}>
         <ScrollArea className="h-full pl-4">
-          <TableFloorPlan tables={tableData} />
+          <TableFloorPlan tables={tables} />
         </ScrollArea>
       </ResizablePanel>
     </ResizablePanelGroup>

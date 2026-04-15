@@ -1,6 +1,6 @@
 'use client';
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@einvoice/frontend-ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger, Skeleton } from '@einvoice/frontend-ui';
 import { Header } from '@/components/layout/header';
 import { Main } from '@/components/layout/main';
 import { Search } from '@/components/search';
@@ -11,10 +11,12 @@ import { MenuPrimaryButtons } from './components/menu-primary-buttons';
 import { CategoriesTable } from './components/categories-table';
 import { MenuItemsTable } from './components/menu-items-table';
 import { MenuDialogs } from './components/menu-dialogs';
-import { categories } from '@einvoice/mock-data';
-import { menuItems } from '@einvoice/mock-data';
+import { useCategoriesQuery, useMenuItemsQuery } from './hooks/use-menu-query';
 
 export function MenuPage() {
+  const { data: categories, isPending: catPending } = useCategoriesQuery();
+  const { data: menuItems, isPending: itemsPending } = useMenuItemsQuery();
+
   return (
     <MenuProvider>
       <Header fixed>
@@ -42,10 +44,26 @@ export function MenuPage() {
             <TabsTrigger value="items">Menu Items</TabsTrigger>
           </TabsList>
           <TabsContent value="categories" className="flex flex-1 flex-col mt-4">
-            <CategoriesTable data={categories} />
+            {catPending ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : (
+              <CategoriesTable data={categories ?? []} />
+            )}
           </TabsContent>
           <TabsContent value="items" className="flex flex-1 flex-col mt-4">
-            <MenuItemsTable data={menuItems} />
+            {itemsPending ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : (
+              <MenuItemsTable data={menuItems ?? []} />
+            )}
           </TabsContent>
         </Tabs>
       </Main>

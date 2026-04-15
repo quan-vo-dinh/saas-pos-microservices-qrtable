@@ -2,9 +2,11 @@
 
 import { ConfirmDialog } from '@einvoice/frontend-ui';
 import { useTables } from './tables-provider';
+import { useDeleteTableMutation } from '../hooks/use-tables-mutations';
 
 export function TableDeleteDialog() {
   const { open, setOpen, currentTable } = useTables();
+  const deleteMutation = useDeleteTableMutation();
 
   return (
     <ConfirmDialog
@@ -15,8 +17,10 @@ export function TableDeleteDialog() {
       confirmText="Delete"
       variant="destructive"
       onConfirm={() => {
-        console.log('Delete table:', currentTable?.id);
-        setOpen(null);
+        if (!currentTable) return;
+        deleteMutation.mutate(currentTable.id, {
+          onSuccess: () => setOpen(null),
+        });
       }}
     />
   );

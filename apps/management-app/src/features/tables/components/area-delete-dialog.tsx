@@ -2,9 +2,11 @@
 
 import { ConfirmDialog } from '@einvoice/frontend-ui';
 import { useTables } from './tables-provider';
+import { useDeleteAreaMutation } from '../hooks/use-tables-mutations';
 
 export function AreaDeleteDialog() {
   const { open, setOpen, currentArea } = useTables();
+  const deleteMutation = useDeleteAreaMutation();
 
   return (
     <ConfirmDialog
@@ -15,8 +17,10 @@ export function AreaDeleteDialog() {
       confirmText="Delete"
       variant="destructive"
       onConfirm={() => {
-        console.log('Delete area:', currentArea?.id);
-        setOpen(null);
+        if (!currentArea) return;
+        deleteMutation.mutate(currentArea.id, {
+          onSuccess: () => setOpen(null),
+        });
       }}
     />
   );

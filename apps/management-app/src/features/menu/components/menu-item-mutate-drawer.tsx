@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
+import { Upload, X } from 'lucide-react';
 import {
   Button,
   Input,
@@ -15,7 +17,8 @@ import {
 } from '@einvoice/frontend-ui';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useMenu } from './menu-provider';
-import { categories } from '../data/categories';
+import { useCategoriesQuery } from '../hooks/use-menu-query';
+import { useCreateMenuItemMutation, useUpdateMenuItemMutation, useUploadMenuItemImageMutation } from '../hooks/use-menu-mutations';
 import { menuItemMutateSchema, type MenuItemMutateInput } from '../data/schema';
 
 export function MenuItemMutateDrawer() {
@@ -23,33 +26,99 @@ export function MenuItemMutateDrawer() {
   const isEdit = open === 'edit-item';
   const isOpen = open === 'add-item' || open === 'edit-item';
 
+  const { data: categories } = useCategoriesQuery();
+  const createMutation = useCreateMenuItemMutation();
+  const updateMutation = useUpdateMenuItemMutation();
+  const uploadMutation = useUploadMenuItemImageMutation();
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<MenuItemMutateInput>({
     resolver: zodResolver(menuItemMutateSchema),
-    defaultValues:
-      isEdit && currentItem
-        ? {
-            name: currentItem.name,
-            description: currentItem.description ?? '',
-            price: currentItem.price,
-            categoryId: currentItem.categoryId,
-            stock: currentItem.stock,
-            status: currentItem.status,
-          }
-        : {
-            name: '',
-            description: '',
-            price: 0,
-            categoryId: '',
-            stock: 0,
-            status: 'available',
-          },
+    defaultValues: {
+      name: '',
+      description: '',
+      price: 0,
+      categoryId: '',
+      stock: 0,
+      status: 'available',
+    },
   });
 
-  function onSubmit(data: MenuItemMutateInput) {
-    console.log(isEdit ? 'Update item:' : 'Create item:', data);
-    setOpen(null);
-    form.reset();
+  useEffect(() => {
+    if (isEdit && currentItem) {
+      form.reset({
+        name: currentItem.name,
+        description: currentItem.description ?? '',
+        price: currentItem.price,
+        categoryId: currentItem.categoryId,
+        stock: currentItem.stock,
+        status: currentItem.status,
+      });
+      setImagePreview(currentItem.imageUrl);
+    } else if (isOpen) {
+      form.reset({ name: '', description: '', price: 0, categoryId: '', stock: 0, status: 'available' });
+      setImagePreview(null);
+    }
+    setImageFile(null);
+    setUploadProgress(0);
+  }, [isEdit, isOpen, currentItem, form]);
+
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   }
+
+  function clearImage() {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
+
+  function onSubmit(data: MenuItemMutateInput) {
+    if (isEdit && currentItem) {
+      updateMutation.mutate(
+        { id: currentItem.id, data },
+        {
+          onSuccess: () => {
+            if (imageFile) {
+              uploadMutation.mutate(
+                { id: currentItem.id, file: imageFile, onProgress: setUploadProgress },
+                { onSettled: () => { setOpen(null); form.reset(); } },
+              );
+            } else {
+              setOpen(null);
+              form.reset();
+            }
+          },
+        },
+      );
+    } else {
+      createMutation.mutate(data, {
+        onSuccess: (createdItem) => {
+          if (imageFile && createdItem?.id) {
+            uploadMutation.mutate(
+              { id: createdItem.id, file: imageFile, onProgress: setUploadProgress },
+              { onSettled: () => { setOpen(null); form.reset(); } },
+            );
+          } else {
+            setOpen(null);
+            form.reset();
+          }
+        },
+      });
+    }
+  }
+
+  const activeCategories = (categories ?? []).filter((c) => c.status === 'active');
 
   return (
     <Sheet
@@ -117,13 +186,11 @@ export function MenuItemMutateDrawer() {
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                {categories
-                  .filter((c) => c.status === 'active')
-                  .map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
+                {activeCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {form.formState.errors.categoryId && (
@@ -149,16 +216,57 @@ export function MenuItemMutateDrawer() {
 
           <div className="grid gap-2">
             <Label>Image</Label>
-            <div className="flex h-32 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
-              Image upload placeholder
-            </div>
+            {imagePreview ? (
+              <div className="relative">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="h-32 w-full rounded-md border object-cover"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-1 right-1 size-6"
+                  onClick={clearImage}
+                >
+                  <X className="size-3" />
+                </Button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex h-32 items-center justify-center gap-2 rounded-md border border-dashed text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors cursor-pointer"
+              >
+                <Upload className="size-4" />
+                Click to upload image
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            {uploadMutation.isPending && (
+              <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            )}
           </div>
 
           <SheetFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
               Cancel
             </Button>
-            <Button type="submit">{isEdit ? 'Save Changes' : 'Add Item'}</Button>
+            <Button type="submit" disabled={isPending || uploadMutation.isPending}>
+              {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Item'}
+            </Button>
           </SheetFooter>
         </form>
       </SheetContent>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
 import {
@@ -19,7 +20,8 @@ import {
   SelectValue,
 } from '@einvoice/frontend-ui';
 import { useTables } from './tables-provider';
-import { areas } from '../data/areas';
+import { useAreasQuery } from '../hooks/use-tables-query';
+import { useCreateTableMutation, useUpdateTableMutation } from '../hooks/use-tables-mutations';
 import { tableMutateSchema, type TableMutateInput } from '../data/schema';
 
 export function TableMutateDialog() {
@@ -27,22 +29,39 @@ export function TableMutateDialog() {
   const isEdit = open === 'edit-table';
   const isOpen = open === 'add-table' || open === 'edit-table';
 
+  const { data: areas } = useAreasQuery();
+  const createMutation = useCreateTableMutation();
+  const updateMutation = useUpdateTableMutation();
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const form = useForm<TableMutateInput>({
     resolver: zodResolver(tableMutateSchema),
-    defaultValues:
-      isEdit && currentTable
-        ? {
-            name: currentTable.name,
-            areaId: currentTable.areaId,
-            capacity: currentTable.capacity,
-          }
-        : { name: '', areaId: '', capacity: 4 },
+    defaultValues: { name: '', areaId: '', capacity: 4 },
   });
 
+  useEffect(() => {
+    if (isEdit && currentTable) {
+      form.reset({
+        name: currentTable.name,
+        areaId: currentTable.areaId,
+        capacity: currentTable.capacity,
+      });
+    } else if (isOpen) {
+      form.reset({ name: '', areaId: '', capacity: 4 });
+    }
+  }, [isEdit, isOpen, currentTable, form]);
+
   function onSubmit(data: TableMutateInput) {
-    console.log(isEdit ? 'Update table:' : 'Create table:', data);
-    setOpen(null);
-    form.reset();
+    if (isEdit && currentTable) {
+      updateMutation.mutate(
+        { id: currentTable.id, data },
+        { onSuccess: () => { setOpen(null); form.reset(); } },
+      );
+    } else {
+      createMutation.mutate(data, {
+        onSuccess: () => { setOpen(null); form.reset(); },
+      });
+    }
   }
 
   return (
@@ -77,7 +96,7 @@ export function TableMutateDialog() {
                 <SelectValue placeholder="Select area" />
               </SelectTrigger>
               <SelectContent>
-                {areas.map((area) => (
+                {(areas ?? []).map((area) => (
                   <SelectItem key={area.id} value={area.id}>
                     {area.name}
                   </SelectItem>
@@ -105,7 +124,9 @@ export function TableMutateDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
               Cancel
             </Button>
-            <Button type="submit">{isEdit ? 'Save' : 'Add Table'}</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Saving...' : isEdit ? 'Save' : 'Add Table'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

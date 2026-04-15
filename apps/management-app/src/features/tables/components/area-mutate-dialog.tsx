@@ -1,28 +1,46 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label } from '@einvoice/frontend-ui'
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
-;
-;
 import { useTables } from './tables-provider';
 import { areaMutateSchema, type AreaMutateInput } from '../data/schema';
+import { useCreateAreaMutation, useUpdateAreaMutation } from '../hooks/use-tables-mutations';
 
 export function AreaMutateDialog() {
   const { open, setOpen, currentArea } = useTables();
   const isEdit = open === 'edit-area';
   const isOpen = open === 'add-area' || open === 'edit-area';
 
+  const createMutation = useCreateAreaMutation();
+  const updateMutation = useUpdateAreaMutation();
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const form = useForm<AreaMutateInput>({
     resolver: zodResolver(areaMutateSchema),
-    defaultValues:
-      isEdit && currentArea ? { name: currentArea.name, sortOrder: currentArea.sortOrder } : { name: '', sortOrder: 0 },
+    defaultValues: { name: '', sortOrder: 0 },
   });
 
+  useEffect(() => {
+    if (isEdit && currentArea) {
+      form.reset({ name: currentArea.name, sortOrder: currentArea.sortOrder });
+    } else if (isOpen) {
+      form.reset({ name: '', sortOrder: 0 });
+    }
+  }, [isEdit, isOpen, currentArea, form]);
+
   function onSubmit(data: AreaMutateInput) {
-    console.log(isEdit ? 'Update area:' : 'Create area:', data);
-    setOpen(null);
-    form.reset();
+    if (isEdit && currentArea) {
+      updateMutation.mutate(
+        { id: currentArea.id, data },
+        { onSuccess: () => { setOpen(null); form.reset(); } },
+      );
+    } else {
+      createMutation.mutate(data, {
+        onSuccess: () => { setOpen(null); form.reset(); },
+      });
+    }
   }
 
   return (
@@ -58,7 +76,9 @@ export function AreaMutateDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
               Cancel
             </Button>
-            <Button type="submit">{isEdit ? 'Save' : 'Create Area'}</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Saving...' : isEdit ? 'Save' : 'Create Area'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
