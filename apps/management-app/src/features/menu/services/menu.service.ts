@@ -2,6 +2,7 @@ import type { Category, MenuItem } from '@einvoice/types';
 import { uploadFile } from '@einvoice/frontend-utils';
 import type { UploadResult } from '@einvoice/frontend-utils';
 import { authApiClient } from '@/lib/api/authenticated-client';
+import { useAuthStore } from '@/lib/auth/auth-store';
 import { API_CONFIG } from '@/constants/api';
 
 export const menuService = {
@@ -85,6 +86,12 @@ export const menuService = {
   ): Promise<UploadResult> => {
     const baseUrl = API_CONFIG.DEFAULT_BFF_URL;
     const url = `${baseUrl}${API_CONFIG.ENDPOINTS.MENU_ITEMS}/${encodeURIComponent(id)}/image`;
-    return uploadFile({ url, file, onProgress });
+
+    const { accessToken, profile } = useAuthStore.getState();
+    const headers: Record<string, string> = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    if (profile?.tenantId) headers['x-tenant-id'] = profile.tenantId;
+
+    return uploadFile({ url, file, headers, onProgress });
   },
 };

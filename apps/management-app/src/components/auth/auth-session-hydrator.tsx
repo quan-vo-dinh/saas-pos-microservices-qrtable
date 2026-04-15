@@ -16,6 +16,7 @@ export function AuthSessionHydrator() {
   const { data: session, status } = useSession();
   const isSigningIn = useRef(false);
   const setProfile = useAuthStore((state) => state.setProfile);
+  const setAccessToken = useAuthStore((state) => state.setAccessToken);
   const setHydrated = useAuthStore((state) => state.setHydrated);
   const reset = useAuthStore((state) => state.reset);
 
@@ -60,6 +61,7 @@ export function AuthSessionHydrator() {
           return;
         }
 
+        setAccessToken(session.accessToken ?? null);
         setProfile({
           userId: profile.userId,
           email: profile.email,
@@ -76,6 +78,7 @@ export function AuthSessionHydrator() {
 
         if (error.message === 'UNAUTHORIZED') {
           // Keep the current authenticated session and hydrate from JWT claims to avoid login loops.
+          setAccessToken(session.accessToken ?? null);
           setProfile({
             userId: session.user?.id ?? '',
             email: session.user?.email ?? undefined,
@@ -102,6 +105,7 @@ export function AuthSessionHydrator() {
     session?.user?.permissions,
     session?.user?.roles,
     session?.user?.tenantId,
+    setAccessToken,
     setHydrated,
     setProfile,
     status,

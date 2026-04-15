@@ -9,8 +9,12 @@ type AuthClientOptions = Omit<RequestInit, 'headers'> & {
 };
 
 export function authApiClient<T>(path: string, options?: AuthClientOptions): Promise<T> {
-  const profile = useAuthStore.getState().profile;
+  const { profile, accessToken } = useAuthStore.getState();
   const authHeaders: Record<string, string> = {};
+
+  if (accessToken) {
+    authHeaders['Authorization'] = `Bearer ${accessToken}`;
+  }
 
   if (profile?.tenantId) {
     authHeaders['x-tenant-id'] = profile.tenantId;
