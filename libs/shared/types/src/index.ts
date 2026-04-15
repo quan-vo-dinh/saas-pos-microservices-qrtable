@@ -12,3 +12,9 @@ export type { Area, RestaurantTable, TableStatus } from './lib/table.types';
 
 // ─── Order ──────────────────────────────────────────
 export type { Order, OrderItem, OrderStatus, PaymentMethod, PaymentStatus } from './lib/order.types';
+
+// ─── Public Menu (Customer PWA) ─────────────────────
+export type { PublicMenuResponse, PublicMenuCategory, PublicMenuItem } from './lib/public-menu.types';
+
+// ─── QR Validation ──────────────────────────────────
+export type { ValidateQrRequest, ValidateQrResponse } from './lib/qr-validation.types';
