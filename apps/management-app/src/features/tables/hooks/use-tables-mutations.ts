@@ -10,8 +10,7 @@ import { tableKeys } from './use-tables-query';
 export function useCreateAreaMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; sortOrder?: number }) =>
-      tablesService.createArea(data),
+    mutationFn: (data: { name: string; sortOrder?: number }) => tablesService.createArea(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.areas() });
       toast.success('Area created successfully');
@@ -54,7 +53,7 @@ export function useDeleteAreaMutation() {
 export function useReorderAreasMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (orderedIds: string[]) => tablesService.reorderAreas(orderedIds),
+    mutationFn: (items: Array<{ id: string; sortOrder: number }>) => tablesService.reorderAreas(items),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.areas() });
       toast.success('Areas reordered');
@@ -70,8 +69,7 @@ export function useReorderAreasMutation() {
 export function useCreateTableMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; areaId: string; capacity: number }) =>
-      tablesService.createTable(data),
+    mutationFn: (data: { name: string; areaId: string; capacity: number }) => tablesService.createTable(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
       toast.success('Table created successfully');
@@ -114,8 +112,7 @@ export function useDeleteTableMutation() {
 export function useUpdateTableStatusMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      tablesService.updateTableStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: string }) => tablesService.updateTableStatus(id, status),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
       toast.success('Table status updated');

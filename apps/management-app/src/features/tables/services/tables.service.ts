@@ -4,8 +4,7 @@ import { API_CONFIG } from '@/constants/api';
 
 export const tablesService = {
   // ─── Areas ──────────────────────────────────────────
-  getAreas: (): Promise<Area[]> =>
-    authApiClient<Area[]>(API_CONFIG.ENDPOINTS.AREAS),
+  getAreas: (): Promise<Area[]> => authApiClient<Area[]>(API_CONFIG.ENDPOINTS.AREAS),
 
   getArea: (id: string): Promise<Area> =>
     authApiClient<Area>(`${API_CONFIG.ENDPOINTS.AREAS}/${encodeURIComponent(id)}`),
@@ -27,10 +26,10 @@ export const tablesService = {
       method: 'DELETE',
     }),
 
-  reorderAreas: (orderedIds: string[]): Promise<void> =>
+  reorderAreas: (items: Array<{ id: string; sortOrder: number }>): Promise<void> =>
     authApiClient<void>(API_CONFIG.ENDPOINTS.AREAS_REORDER, {
       method: 'PATCH',
-      body: JSON.stringify({ orderedIds }),
+      body: JSON.stringify({ items }),
     }),
 
   // ─── Tables ─────────────────────────────────────────

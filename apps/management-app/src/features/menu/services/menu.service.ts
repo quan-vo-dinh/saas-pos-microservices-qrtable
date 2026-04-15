@@ -7,8 +7,7 @@ import { API_CONFIG } from '@/constants/api';
 
 export const menuService = {
   // ─── Categories ─────────────────────────────────────
-  getCategories: (): Promise<Category[]> =>
-    authApiClient<Category[]>(API_CONFIG.ENDPOINTS.CATEGORIES),
+  getCategories: (): Promise<Category[]> => authApiClient<Category[]>(API_CONFIG.ENDPOINTS.CATEGORIES),
 
   getCategory: (id: string): Promise<Category> =>
     authApiClient<Category>(`${API_CONFIG.ENDPOINTS.CATEGORIES}/${encodeURIComponent(id)}`),
@@ -19,7 +18,10 @@ export const menuService = {
       body: JSON.stringify(data),
     }),
 
-  updateCategory: (id: string, data: { name: string; timeStart?: string; timeEnd?: string; status: string }): Promise<Category> =>
+  updateCategory: (
+    id: string,
+    data: { name: string; timeStart?: string; timeEnd?: string; status: string },
+  ): Promise<Category> =>
     authApiClient<Category>(`${API_CONFIG.ENDPOINTS.CATEGORIES}/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -30,10 +32,10 @@ export const menuService = {
       method: 'DELETE',
     }),
 
-  reorderCategories: (orderedIds: string[]): Promise<void> =>
+  reorderCategories: (items: Array<{ id: string; sortOrder: number }>): Promise<void> =>
     authApiClient<void>(API_CONFIG.ENDPOINTS.CATEGORIES_REORDER, {
       method: 'PATCH',
-      body: JSON.stringify({ orderedIds }),
+      body: JSON.stringify({ items }),
     }),
 
   // ─── Menu Items ─────────────────────────────────────
@@ -79,11 +81,7 @@ export const menuService = {
       method: 'DELETE',
     }),
 
-  uploadMenuItemImage: (
-    id: string,
-    file: File,
-    onProgress?: (percent: number) => void,
-  ): Promise<UploadResult> => {
+  uploadMenuItemImage: (id: string, file: File, onProgress?: (percent: number) => void): Promise<UploadResult> => {
     const baseUrl = API_CONFIG.DEFAULT_BFF_URL;
     const url = `${baseUrl}${API_CONFIG.ENDPOINTS.MENU_ITEMS}/${encodeURIComponent(id)}/image`;
 

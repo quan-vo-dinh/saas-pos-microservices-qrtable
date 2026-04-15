@@ -145,16 +145,20 @@ describe('menuService', () => {
   });
 
   describe('reorderCategories', () => {
-    it('should PATCH /admin/categories/reorder with orderedIds', async () => {
-      const orderedIds = ['cat-3', 'cat-1', 'cat-2'];
+    it('should PATCH /admin/categories/reorder with items', async () => {
+      const items = [
+        { id: 'cat-3', sortOrder: 0 },
+        { id: 'cat-1', sortOrder: 1 },
+        { id: 'cat-2', sortOrder: 2 },
+      ];
       mockAuthApiClient.mockResolvedValue(undefined);
 
-      await menuService.reorderCategories(orderedIds);
+      await menuService.reorderCategories(items);
 
       expect(mockAuthApiClient).toHaveBeenCalledTimes(1);
       expect(mockAuthApiClient).toHaveBeenCalledWith(CATEGORIES_REORDER, {
         method: 'PATCH',
-        body: JSON.stringify({ orderedIds }),
+        body: JSON.stringify({ items }),
       });
     });
   });

@@ -22,15 +22,17 @@ type ApiClientOptions = RequestInit & {
  * Automatically handles JSON parsing, error responses, and data unwrapping.
  */
 export async function apiClient<T>(path: string, options?: ApiClientOptions): Promise<T> {
-  const { baseUrl = '', ...fetchOptions } = options ?? {};
+  const { baseUrl = '', headers, ...restOptions } = options ?? {};
   const url = `${baseUrl}${path}`;
 
+  const mergedHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(headers as Record<string, string>),
+  };
+
   const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...fetchOptions.headers,
-    },
-    ...fetchOptions,
+    ...restOptions,
+    headers: mergedHeaders,
   });
 
   if (!response.ok) {

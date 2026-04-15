@@ -73,16 +73,12 @@ describe('apiClient', () => {
 
     await apiClient('/secure', {
       headers: {
-        'Content-Type': 'application/json',
         Authorization: 'Bearer tok-123',
         'x-tenant-id': 'tenant-abc',
       },
     });
 
     const calledOptions = fetchSpy.mock.calls[0][1] as RequestInit;
-    // Note: the spread order in apiClient is { headers: { default, ...custom }, ...fetchOptions }
-    // so fetchOptions.headers overwrites the merged object.
-    // Callers should include Content-Type in their custom headers if they also pass other headers.
     expect(calledOptions.headers).toEqual(
       expect.objectContaining({
         'Content-Type': 'application/json',
@@ -92,11 +88,9 @@ describe('apiClient', () => {
     );
   });
 
-  it('custom headers overwrite the merged headers object due to spread order', async () => {
+  it('preserves Content-Type when custom headers omit it', async () => {
     fetchSpy.mockResolvedValue(mockResponse({ ok: true }));
 
-    // When caller provides headers without Content-Type, the ...fetchOptions
-    // spread overwrites the computed headers, losing Content-Type.
     await apiClient('/secure', {
       headers: {
         Authorization: 'Bearer tok-123',
@@ -105,6 +99,7 @@ describe('apiClient', () => {
 
     const calledOptions = fetchSpy.mock.calls[0][1] as RequestInit;
     expect(calledOptions.headers).toEqual({
+      'Content-Type': 'application/json',
       Authorization: 'Bearer tok-123',
     });
   });

@@ -50,14 +50,18 @@ export const menuItemsColumns: ColumnDef<MenuItem>[] = [
     ),
   },
   {
-    accessorKey: 'categoryName',
+    id: 'categoryName',
+    accessorFn: (row: MenuItem & { category?: { name: string }; categoryName?: string }) =>
+      row.category?.name || row.categoryName,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Category" />
     ),
     cell: ({ row }) => (
-      <Badge variant="outline">{row.getValue('categoryName')}</Badge>
+      <Badge variant="outline">{row.getValue('categoryName') || '---'}</Badge>
     ),
-    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+    filterFn: (row, id, value: string[]) => {
+      return value.includes(row.getValue(id));
+    },
   },
   {
     accessorKey: 'price',

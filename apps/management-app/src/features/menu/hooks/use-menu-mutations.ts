@@ -25,8 +25,13 @@ export function useCreateCategoryMutation() {
 export function useUpdateCategoryMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { name: string; timeStart?: string; timeEnd?: string; status: string } }) =>
-      menuService.updateCategory(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { name: string; timeStart?: string; timeEnd?: string; status: string };
+    }) => menuService.updateCategory(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.categories() });
       toast.success('Category updated successfully');
@@ -54,7 +59,7 @@ export function useDeleteCategoryMutation() {
 export function useReorderCategoriesMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (orderedIds: string[]) => menuService.reorderCategories(orderedIds),
+    mutationFn: (items: Array<{ id: string; sortOrder: number }>) => menuService.reorderCategories(items),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.categories() });
       toast.success('Categories reordered');
@@ -93,8 +98,7 @@ export function useCreateMenuItemMutation() {
 export function useUpdateMenuItemMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: MenuItemInput }) =>
-      menuService.updateMenuItem(id, data),
+    mutationFn: ({ id, data }: { id: string; data: MenuItemInput }) => menuService.updateMenuItem(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.all });
       toast.success('Menu item updated successfully');
