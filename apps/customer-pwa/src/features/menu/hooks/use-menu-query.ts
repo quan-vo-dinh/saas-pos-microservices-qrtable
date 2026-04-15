@@ -1,22 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
+import type { PublicMenuCategory, PublicMenuItem } from '@einvoice/types';
 import { menuService } from '../services/menu.service';
 
 export const customerMenuKeys = {
   all: ['customer-menu'] as const,
-  categories: () => [...customerMenuKeys.all, 'categories'] as const,
-  items: (categoryId?: string) => [...customerMenuKeys.all, 'items', { categoryId }] as const,
+  fullMenu: () => [...customerMenuKeys.all, 'full'] as const,
 };
 
-export function useCategoriesQuery() {
+export function useFullMenuQuery() {
   return useQuery({
-    queryKey: customerMenuKeys.categories(),
-    queryFn: menuService.getCategories,
+    queryKey: customerMenuKeys.fullMenu(),
+    queryFn: menuService.getFullMenu,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useMenuItemsQuery(categoryId?: string) {
-  return useQuery({
-    queryKey: customerMenuKeys.items(categoryId),
-    queryFn: () => menuService.getItems(categoryId),
-  });
+export function extractCategories(menu: PublicMenuCategory[]): Array<{ id: string; name: string; sortOrder: number; itemCount: number }> {
+  return menu.map((cat) => ({
+    id: cat.id,
+    name: cat.name,
+    sortOrder: cat.sortOrder,
+    itemCount: cat.items.length,
+  }));
+}
+
+export function extractItems(menu: PublicMenuCategory[], categoryId?: string | null): PublicMenuItem[] {
+  if (categoryId) {
+    return menu.find((cat) => cat.id === categoryId)?.items ?? [];
+  }
+  return menu.flatMap((cat) => cat.items);
 }
