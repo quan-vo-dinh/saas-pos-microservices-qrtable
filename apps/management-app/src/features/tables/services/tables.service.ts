@@ -1,59 +1,72 @@
 import type { Area, RestaurantTable } from '@einvoice/types';
-import { apiClient } from '@einvoice/frontend-utils';
-import { getBffBaseUrl } from '@/lib/auth/bff-server';
-
-const bffUrl = () => getBffBaseUrl();
+import { authApiClient } from '@/lib/api/authenticated-client';
+import { API_CONFIG } from '@/constants/api';
 
 export const tablesService = {
-  getAreas: () => apiClient<Area[]>('/catalog/areas', { baseUrl: bffUrl() }),
+  // ─── Areas ──────────────────────────────────────────
+  getAreas: (): Promise<Area[]> =>
+    authApiClient<Area[]>(API_CONFIG.ENDPOINTS.AREAS),
 
-  getArea: (id: string) => apiClient<Area>(`/catalog/areas/${encodeURIComponent(id)}`, { baseUrl: bffUrl() }),
+  getArea: (id: string): Promise<Area> =>
+    authApiClient<Area>(`${API_CONFIG.ENDPOINTS.AREAS}/${encodeURIComponent(id)}`),
 
-  createArea: (data: { name: string; sortOrder?: number }) =>
-    apiClient<Area>('/catalog/areas', {
-      baseUrl: bffUrl(),
+  createArea: (data: { name: string; sortOrder?: number }): Promise<Area> =>
+    authApiClient<Area>(API_CONFIG.ENDPOINTS.AREAS, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateArea: (id: string, data: { name: string; sortOrder?: number }) =>
-    apiClient<Area>(`/catalog/areas/${encodeURIComponent(id)}`, {
-      baseUrl: bffUrl(),
+  updateArea: (id: string, data: { name: string; sortOrder?: number }): Promise<Area> =>
+    authApiClient<Area>(`${API_CONFIG.ENDPOINTS.AREAS}/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  deleteArea: (id: string) =>
-    apiClient<void>(`/catalog/areas/${encodeURIComponent(id)}`, {
-      baseUrl: bffUrl(),
+  deleteArea: (id: string): Promise<void> =>
+    authApiClient<void>(`${API_CONFIG.ENDPOINTS.AREAS}/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
 
-  getTables: (areaId?: string) => {
+  reorderAreas: (orderedIds: string[]): Promise<void> =>
+    authApiClient<void>(API_CONFIG.ENDPOINTS.AREAS_REORDER, {
+      method: 'PATCH',
+      body: JSON.stringify({ orderedIds }),
+    }),
+
+  // ─── Tables ─────────────────────────────────────────
+  getTables: (areaId?: string): Promise<RestaurantTable[]> => {
     const query = areaId ? `?areaId=${encodeURIComponent(areaId)}` : '';
-    return apiClient<RestaurantTable[]>(`/catalog/tables${query}`, { baseUrl: bffUrl() });
+    return authApiClient<RestaurantTable[]>(`${API_CONFIG.ENDPOINTS.TABLES}${query}`);
   },
 
-  getTable: (id: string) =>
-    apiClient<RestaurantTable>(`/catalog/tables/${encodeURIComponent(id)}`, { baseUrl: bffUrl() }),
+  getTable: (id: string): Promise<RestaurantTable> =>
+    authApiClient<RestaurantTable>(`${API_CONFIG.ENDPOINTS.TABLES}/${encodeURIComponent(id)}`),
 
-  createTable: (data: { name: string; areaId: string; capacity: number }) =>
-    apiClient<RestaurantTable>('/catalog/tables', {
-      baseUrl: bffUrl(),
+  createTable: (data: { name: string; areaId: string; capacity: number }): Promise<RestaurantTable> =>
+    authApiClient<RestaurantTable>(API_CONFIG.ENDPOINTS.TABLES, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateTable: (id: string, data: { name: string; areaId: string; capacity: number }) =>
-    apiClient<RestaurantTable>(`/catalog/tables/${encodeURIComponent(id)}`, {
-      baseUrl: bffUrl(),
+  updateTable: (id: string, data: { name: string; areaId: string; capacity: number }): Promise<RestaurantTable> =>
+    authApiClient<RestaurantTable>(`${API_CONFIG.ENDPOINTS.TABLES}/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  deleteTable: (id: string) =>
-    apiClient<void>(`/catalog/tables/${encodeURIComponent(id)}`, {
-      baseUrl: bffUrl(),
+  deleteTable: (id: string): Promise<void> =>
+    authApiClient<void>(`${API_CONFIG.ENDPOINTS.TABLES}/${encodeURIComponent(id)}`, {
       method: 'DELETE',
+    }),
+
+  updateTableStatus: (id: string, status: string): Promise<RestaurantTable> =>
+    authApiClient<RestaurantTable>(`${API_CONFIG.ENDPOINTS.TABLES}/${encodeURIComponent(id)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+
+  regenerateQr: (id: string): Promise<RestaurantTable> =>
+    authApiClient<RestaurantTable>(`${API_CONFIG.ENDPOINTS.TABLES}/${encodeURIComponent(id)}/regenerate-qr`, {
+      method: 'POST',
     }),
 };

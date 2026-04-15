@@ -1,42 +1,48 @@
 import type { Category, MenuItem } from '@einvoice/types';
-import { apiClient } from '@einvoice/frontend-utils';
-import { getBffBaseUrl } from '@/lib/auth/bff-server';
-
-const bffUrl = () => getBffBaseUrl();
+import { uploadFile } from '@einvoice/frontend-utils';
+import type { UploadResult } from '@einvoice/frontend-utils';
+import { authApiClient } from '@/lib/api/authenticated-client';
+import { API_CONFIG } from '@/constants/api';
 
 export const menuService = {
-  getCategories: () => apiClient<Category[]>('/catalog/categories', { baseUrl: bffUrl() }),
+  // ─── Categories ─────────────────────────────────────
+  getCategories: (): Promise<Category[]> =>
+    authApiClient<Category[]>(API_CONFIG.ENDPOINTS.CATEGORIES),
 
-  getCategory: (id: string) =>
-    apiClient<Category>(`/catalog/categories/${encodeURIComponent(id)}`, { baseUrl: bffUrl() }),
+  getCategory: (id: string): Promise<Category> =>
+    authApiClient<Category>(`${API_CONFIG.ENDPOINTS.CATEGORIES}/${encodeURIComponent(id)}`),
 
-  createCategory: (data: { name: string; timeStart?: string; timeEnd?: string; status: string }) =>
-    apiClient<Category>('/catalog/categories', {
-      baseUrl: bffUrl(),
+  createCategory: (data: { name: string; timeStart?: string; timeEnd?: string; status: string }): Promise<Category> =>
+    authApiClient<Category>(API_CONFIG.ENDPOINTS.CATEGORIES, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateCategory: (id: string, data: { name: string; timeStart?: string; timeEnd?: string; status: string }) =>
-    apiClient<Category>(`/catalog/categories/${encodeURIComponent(id)}`, {
-      baseUrl: bffUrl(),
+  updateCategory: (id: string, data: { name: string; timeStart?: string; timeEnd?: string; status: string }): Promise<Category> =>
+    authApiClient<Category>(`${API_CONFIG.ENDPOINTS.CATEGORIES}/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  deleteCategory: (id: string) =>
-    apiClient<void>(`/catalog/categories/${encodeURIComponent(id)}`, {
-      baseUrl: bffUrl(),
+  deleteCategory: (id: string): Promise<void> =>
+    authApiClient<void>(`${API_CONFIG.ENDPOINTS.CATEGORIES}/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
 
-  getMenuItems: (categoryId?: string) => {
+  reorderCategories: (orderedIds: string[]): Promise<void> =>
+    authApiClient<void>(API_CONFIG.ENDPOINTS.CATEGORIES_REORDER, {
+      method: 'PATCH',
+      body: JSON.stringify({ orderedIds }),
+    }),
+
+  // ─── Menu Items ─────────────────────────────────────
+  getMenuItems: (categoryId?: string): Promise<MenuItem[]> => {
     const query = categoryId ? `?categoryId=${encodeURIComponent(categoryId)}` : '';
-    return apiClient<MenuItem[]>(`/catalog/menu-items${query}`, { baseUrl: bffUrl() });
+    return authApiClient<MenuItem[]>(`${API_CONFIG.ENDPOINTS.MENU_ITEMS}${query}`);
   },
 
-  getMenuItem: (id: string) =>
-    apiClient<MenuItem>(`/catalog/menu-items/${encodeURIComponent(id)}`, { baseUrl: bffUrl() }),
+  getMenuItem: (id: string): Promise<MenuItem> =>
+    authApiClient<MenuItem>(`${API_CONFIG.ENDPOINTS.MENU_ITEMS}/${encodeURIComponent(id)}`),
 
   createMenuItem: (data: {
     name: string;
@@ -45,9 +51,8 @@ export const menuService = {
     categoryId: string;
     stock: number;
     status: string;
-  }) =>
-    apiClient<MenuItem>('/catalog/menu-items', {
-      baseUrl: bffUrl(),
+  }): Promise<MenuItem> =>
+    authApiClient<MenuItem>(API_CONFIG.ENDPOINTS.MENU_ITEMS, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -62,16 +67,24 @@ export const menuService = {
       stock: number;
       status: string;
     },
-  ) =>
-    apiClient<MenuItem>(`/catalog/menu-items/${encodeURIComponent(id)}`, {
-      baseUrl: bffUrl(),
+  ): Promise<MenuItem> =>
+    authApiClient<MenuItem>(`${API_CONFIG.ENDPOINTS.MENU_ITEMS}/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
 
-  deleteMenuItem: (id: string) =>
-    apiClient<void>(`/catalog/menu-items/${encodeURIComponent(id)}`, {
-      baseUrl: bffUrl(),
+  deleteMenuItem: (id: string): Promise<void> =>
+    authApiClient<void>(`${API_CONFIG.ENDPOINTS.MENU_ITEMS}/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
+
+  uploadMenuItemImage: (
+    id: string,
+    file: File,
+    onProgress?: (percent: number) => void,
+  ): Promise<UploadResult> => {
+    const baseUrl = API_CONFIG.DEFAULT_BFF_URL;
+    const url = `${baseUrl}${API_CONFIG.ENDPOINTS.MENU_ITEMS}/${encodeURIComponent(id)}/image`;
+    return uploadFile({ url, file, onProgress });
+  },
 };
