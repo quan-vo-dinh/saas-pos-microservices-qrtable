@@ -42,7 +42,7 @@ export function uploadFile({ url, file, headers, onProgress }: UploadOptions): P
     });
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('image', file);
 
     xhr.open('POST', url);
     if (headers) {

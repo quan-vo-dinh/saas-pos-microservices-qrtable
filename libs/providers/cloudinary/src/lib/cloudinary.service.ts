@@ -88,9 +88,7 @@ export class CloudinaryService {
         folder,
         public_id: publicId,
         resource_type: 'image',
-        format: 'auto',
-        quality: 'auto',
-        transformation: [{ width: DEFAULT_LARGE_WIDTH, crop: 'limit' }],
+        transformation: [{ width: DEFAULT_LARGE_WIDTH, crop: 'limit', quality: 'auto' }],
       });
 
       // Return response with warnings
@@ -182,6 +180,7 @@ export class CloudinaryService {
     return new Promise((resolve, reject) => {
       const uploadStream = this.cloudinary.uploader.upload_stream(options, (error, result) => {
         if (error) {
+          this.logger.error(`Cloudinary upload error: ${JSON.stringify(error)}`);
           reject(new InternalServerErrorException('Image upload failed'));
         } else if (result) {
           resolve(result);

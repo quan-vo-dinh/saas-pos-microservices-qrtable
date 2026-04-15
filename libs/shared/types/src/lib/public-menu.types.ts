@@ -14,4 +14,6 @@ export type PublicMenuCategory = {
   items: PublicMenuItem[];
 };
 
-export type PublicMenuResponse = PublicMenuCategory[];
+export type PublicMenuResponse = {
+  categories: PublicMenuCategory[];
+};

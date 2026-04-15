@@ -125,8 +125,19 @@ ensure_user_attribute_mapper() {
   fi
 }
 
+# Add mappers to BFF client (current client_id_internal)
 ensure_user_attribute_mapper "tenant_id-claim" "tenant_id" "tenant_id"
 ensure_user_attribute_mapper "sub_role-claim" "sub_role" "sub_role"
+
+# Add same mappers to management-app client so JWT tokens include tenant_id
+mgmt_client_internal="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=management-app" "${auth_header[@]}" | jq -r '.[0].id // empty')"
+if [[ -n "${mgmt_client_internal}" ]]; then
+  saved_client_id="${client_id_internal}"
+  client_id_internal="${mgmt_client_internal}"
+  ensure_user_attribute_mapper "tenant_id-claim" "tenant_id" "tenant_id"
+  ensure_user_attribute_mapper "sub_role-claim" "sub_role" "sub_role"
+  client_id_internal="${saved_client_id}"
+fi
 
 ensure_user_for_role() {
   local user_id="$1"

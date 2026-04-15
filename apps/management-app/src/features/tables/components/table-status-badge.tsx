@@ -29,7 +29,9 @@ type TableStatusBadgeProps = {
 };
 
 export function TableStatusBadge({ status, className }: TableStatusBadgeProps) {
-  const config = statusConfig[status];
+  const normalizedStatus = (status || '').toLowerCase() as TableStatus;
+  const config = statusConfig[normalizedStatus] || { label: status || 'Unknown', className: 'bg-gray-500/15 text-gray-700 dark:text-gray-400 border-gray-500/20' };
+  
   return (
     <Badge variant="outline" className={cn(config.className, className)}>
       {config.label}

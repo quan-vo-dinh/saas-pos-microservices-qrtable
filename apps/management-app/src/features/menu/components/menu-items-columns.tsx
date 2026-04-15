@@ -2,6 +2,7 @@
 
 import type { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@einvoice/frontend-ui';
+import { ImageIcon } from 'lucide-react';
 import { DataTableColumnHeader } from '@/components/data-table';
 import type { MenuItem } from '../data/schema';
 import { MenuItemRowActions } from './data-table-row-actions';
@@ -14,6 +15,24 @@ function formatVND(value: number): string {
 }
 
 export const menuItemsColumns: ColumnDef<MenuItem>[] = [
+  {
+    id: 'image',
+    header: '',
+    cell: ({ row }) => {
+      const imageUrl = row.original.imageUrl;
+      return (
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-muted overflow-hidden border border-border">
+          {imageUrl ? (
+            <img src={imageUrl} alt={row.original.name} className="h-full w-full object-cover" />
+          ) : (
+            <ImageIcon className="h-4 w-4 text-muted-foreground/60" />
+          )}
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableHiding: false,
+  },
   {
     accessorKey: 'name',
     header: ({ column }) => (

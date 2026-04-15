@@ -10,12 +10,17 @@ export const customerMenuKeys = {
 export function useFullMenuQuery() {
   return useQuery({
     queryKey: customerMenuKeys.fullMenu(),
-    queryFn: menuService.getFullMenu,
+    queryFn: async () => {
+      const response = await menuService.getFullMenu();
+      return response.categories;
+    },
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function extractCategories(menu: PublicMenuCategory[]): Array<{ id: string; name: string; sortOrder: number; itemCount: number }> {
+export function extractCategories(
+  menu: PublicMenuCategory[],
+): Array<{ id: string; name: string; sortOrder: number; itemCount: number }> {
   return menu.map((cat) => ({
     id: cat.id,
     name: cat.name,
