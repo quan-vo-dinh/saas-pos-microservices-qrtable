@@ -2,7 +2,6 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { Category, MenuItem } from '@einvoice/types';
 import { menuService } from '../services/menu.service';
 import { menuKeys } from './use-menu-query';
 

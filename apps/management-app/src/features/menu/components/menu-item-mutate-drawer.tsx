@@ -59,14 +59,16 @@ export function MenuItemMutateDrawer() {
         stock: currentItem.stock,
         status: currentItem.status,
       });
-      setImagePreview(currentItem.imageUrl);
     } else if (isOpen) {
       form.reset({ name: '', description: '', price: 0, categoryId: '', stock: 0, status: 'available' });
-      setImagePreview(null);
     }
-    setImageFile(null);
-    setUploadProgress(0);
   }, [isEdit, isOpen, currentItem, form]);
+
+  const derivedImagePreview = imageFile
+    ? imagePreview
+    : isEdit && currentItem?.imageUrl
+      ? currentItem.imageUrl
+      : null;
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -216,10 +218,10 @@ export function MenuItemMutateDrawer() {
 
           <div className="grid gap-2">
             <Label>Image</Label>
-            {imagePreview ? (
+            {derivedImagePreview ? (
               <div className="relative">
                 <img
-                  src={imagePreview}
+                  src={derivedImagePreview}
                   alt="Preview"
                   className="h-32 w-full rounded-md border object-cover"
                 />
