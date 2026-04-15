@@ -5,6 +5,14 @@
   "projectType": "library",
   "tags": [],
   "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "libs/frontend/utils/jest.config.cts",
+        "passWithNoTests": true
+      }
+    },
     "build": {
       "executor": "@nx/js:tsc",
       "outputs": ["{options.outputPath}"],
