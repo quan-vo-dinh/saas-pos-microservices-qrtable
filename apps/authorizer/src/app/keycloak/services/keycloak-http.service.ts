@@ -1,4 +1,6 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { CreateKeyCloakUserRequest, ExchangeClientTokenResponse } from '@common/interfaces/common/index';
@@ -99,7 +101,7 @@ export class KeycloakHttpService {
     const userId = headers['location'].split('/').pop();
 
     if (!userId) {
-      throw new InternalServerErrorException('Failed to create user in Keycloak');
+      throw new BusinessException(ErrorCode.KEYCLOAK_USER_CREATION_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     this.logger.debug(`Created user in Keycloak with ID: ${userId}`);

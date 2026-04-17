@@ -12,9 +12,10 @@ export function MenuItemDeleteDialog() {
     <ConfirmDialog
       open={open === 'delete-item'}
       onOpenChange={(v) => !v && setOpen(null)}
-      title="Delete Menu Item"
-      description={`Are you sure you want to delete "${currentItem?.name ?? ''}"? This action cannot be undone.`}
-      confirmText="Delete"
+      title="Xóa món ăn"
+      description={`Bạn có chắc chắn muốn xóa "${currentItem?.name ?? ''}"? Thao tác này không thể hoàn tác.`}
+      confirmText="Xóa"
+      cancelText="Hủy"
       variant="destructive"
       onConfirm={() => {
         if (!currentItem) return;

@@ -1,10 +1,9 @@
 import { HttpStatus } from '@nestjs/common';
-import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ResponseDto<T> {
   @ApiProperty({ type: String })
-  message = HTTP_MESSAGE.OK;
+  message = 'OK';
 
   @ApiProperty()
   data?: T;
@@ -17,6 +16,9 @@ export class ResponseDto<T> {
 
   @ApiProperty({ type: String })
   duration?: string;
+
+  @ApiProperty({ type: String, required: false })
+  errorCode?: string;
 
   constructor(data?: Partial<ResponseDto<T>>) {
     if (data) Object.assign(this, data);

@@ -1,6 +1,6 @@
-import { ForbiddenException } from '@nestjs/common';
 import { MetadataKey } from '@common/constants/common.constant';
 import { TenantGuard } from '@common/guards/tenant.guard';
+import { BusinessException } from '@common/error-messages/business.exception';
 
 jest.mock('uuid', () => ({
   v4: jest.fn().mockReturnValue('mock-uuid'),
@@ -43,7 +43,7 @@ describe('TenantGuard', () => {
           },
         }),
       ),
-    ).rejects.toThrow(new ForbiddenException('Tenant mismatch with user identity'));
+    ).rejects.toThrow(BusinessException);
   });
 
   it('throws when session tenant mismatches request tenant', async () => {
@@ -64,7 +64,7 @@ describe('TenantGuard', () => {
           [MetadataKey.SESSION_ID]: 'sid-1',
         }),
       ),
-    ).rejects.toThrow(new ForbiddenException('Tenant mismatch with session'));
+    ).rejects.toThrow(BusinessException);
   });
 
   it('allows super admin without tenant context', async () => {

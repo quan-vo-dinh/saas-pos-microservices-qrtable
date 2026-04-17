@@ -1,15 +1,18 @@
-import { CallHandler, ExecutionContext, HttpException, Logger, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, HttpException, HttpStatus, Logger, NestInterceptor } from '@nestjs/common';
 import { Observable, catchError, map } from 'rxjs';
 import { Request } from 'express';
 import { MetadataKey } from '@common/constants/common.constant';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
-import { HttpStatus } from '@nestjs/common';
+import { BusinessException, BusinessExceptionResponse } from '@common/error-messages/business.exception';
+import { transformDbError } from '@common/error-messages/db-error.transformer';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { getErrorMessage } from '@common/error-messages/error-messages.registry';
 
 export class ExceptionInterceptor implements NestInterceptor {
   private readonly logger = new Logger(ExceptionInterceptor.name);
 
-  intercept(context: ExecutionContext, next: CallHandler<any>): Observable<any> | Promise<Observable<any>> {
+  intercept(context: ExecutionContext, next: CallHandler<unknown>): Observable<unknown> {
     const ctx = context.switchToHttp();
     const request: Request & { [MetadataKey.PROCESSID]: string; [MetadataKey.STARTTIME]: number } = ctx.getRequest();
 
@@ -17,22 +20,114 @@ export class ExceptionInterceptor implements NestInterceptor {
     const startTime = request[MetadataKey.STARTTIME];
 
     return next.handle().pipe(
-      map((data: ResponseDto<unknown>) => {
+      map((data: unknown) => {
         const durationMs = Date.now() - startTime;
-        data.processID = processID;
-        data.duration = `${durationMs} ms`;
-        return data;
+        const responseData = data as ResponseDto<unknown>;
+        responseData.processID = processID;
+        responseData.duration = `${durationMs} ms`;
+        return responseData;
       }),
       catchError((error) => {
         this.logger.error({ error });
         const durationMs = Date.now() - startTime;
 
-        const message = error.response?.message || error.message || HTTP_MESSAGE.INTERNAL_SERVER_ERROR;
-        const statusCode =
-          error?.code || error.statusCode || error?.response?.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+        // 1. BusinessException — extract errorCode + message directly
+        if (error instanceof BusinessException) {
+          const response = error.getResponse() as BusinessExceptionResponse;
+          throw new HttpException(
+            new ResponseDto({
+              data: null,
+              errorCode: response.errorCode,
+              message: response.message,
+              statusCode: response.statusCode,
+              duration: `${durationMs} ms`,
+              processID,
+            }),
+            response.statusCode,
+          );
+        }
+
+        // 2. TypeORM QueryFailedError — transform to BusinessException
+        const dbError = transformDbError(error);
+        if (dbError) {
+          const response = dbError.getResponse() as BusinessExceptionResponse;
+          throw new HttpException(
+            new ResponseDto({
+              data: null,
+              errorCode: response.errorCode,
+              message: response.message,
+              statusCode: response.statusCode,
+              duration: `${durationMs} ms`,
+              processID,
+            }),
+            response.statusCode,
+          );
+        }
+
+        // 3. RpcException from TCP microservice
+        // TcpLoggingInterceptor throws RpcException({ code, message, errorCode })
+        // NestJS TCP client deserializes it as either:
+        //   - plain object { code, message, errorCode } (direct)
+        //   - or wrapped { error: { code, message, errorCode } }
+        const rpcPayload = (error?.error && typeof error.error === 'object' ? error.error : error) as
+          | Record<string, unknown>
+          | undefined;
+        if (
+          rpcPayload &&
+          typeof rpcPayload === 'object' &&
+          !(rpcPayload instanceof Error) &&
+          typeof rpcPayload['code'] === 'number'
+        ) {
+          const statusCode = rpcPayload['code'] as number;
+          const rpcMessage = (rpcPayload['message'] as string) || HTTP_MESSAGE.INTERNAL_SERVER_ERROR;
+          const errorCode = rpcPayload['errorCode'] as string | undefined;
+
+          throw new HttpException(
+            new ResponseDto({
+              data: null,
+              errorCode,
+              message: rpcMessage,
+              statusCode,
+              duration: `${durationMs} ms`,
+              processID,
+            }),
+            statusCode,
+          );
+        }
+
+        // 4. Standard NestJS HttpException (NotFoundException, BadRequestException, etc.)
+        if (error instanceof HttpException) {
+          const statusCode = error.getStatus();
+          const response = error.getResponse();
+          const message =
+            typeof response === 'string'
+              ? response
+              : ((response as Record<string, unknown>)?.['message'] ?? HTTP_MESSAGE.INTERNAL_SERVER_ERROR);
+
+          throw new HttpException(
+            new ResponseDto({
+              data: null,
+              message: Array.isArray(message) ? message.join(', ') : String(message),
+              statusCode,
+              duration: `${durationMs} ms`,
+              processID,
+            }),
+            statusCode,
+          );
+        }
+
+        // 5. Unknown error — fallback
+        const message = getErrorMessage(ErrorCode.COMMON_INTERNAL_ERROR);
         throw new HttpException(
-          new ResponseDto({ data: null, message, statusCode, duration: `${durationMs} ms`, processID }),
-          statusCode,
+          new ResponseDto({
+            data: null,
+            errorCode: ErrorCode.COMMON_INTERNAL_ERROR,
+            message,
+            statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+            duration: `${durationMs} ms`,
+            processID,
+          }),
+          HttpStatus.INTERNAL_SERVER_ERROR,
         );
       }),
     );

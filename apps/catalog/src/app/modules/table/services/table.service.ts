@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { TableRepository } from '../repositories/table.repository';
@@ -47,12 +49,12 @@ export class TableService {
       where: { id: data.areaId, tenantId: data.tenantId },
     });
     if (!area) {
-      throw new BadRequestException('Area not found in this tenant');
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_AREA_NOT_FOUND, HttpStatus.BAD_REQUEST);
     }
 
     const nameExists = await this.tableRepository.existsByName(data.tenantId, data.name.trim());
     if (nameExists) {
-      throw new BadRequestException('Table name already exists');
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_DUPLICATE_NAME, HttpStatus.CONFLICT);
     }
 
     const table = await this.tableRepository.create({
@@ -78,7 +80,7 @@ export class TableService {
   async getById(data: GetTableByIdTcpRequest): Promise<Table> {
     const table = await this.tableRepository.findByIdAndTenant(data.id, data.tenantId);
     if (!table) {
-      throw new NotFoundException('Table not found');
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return table;
   }
@@ -89,7 +91,7 @@ export class TableService {
     if (data.name && data.name.trim() !== current.name) {
       const nameExists = await this.tableRepository.existsByName(data.tenantId, data.name.trim());
       if (nameExists) {
-        throw new BadRequestException('Table name already exists');
+        throw new BusinessException(ErrorCode.CATALOG_TABLE_DUPLICATE_NAME, HttpStatus.CONFLICT);
       }
     }
 
@@ -98,7 +100,7 @@ export class TableService {
         where: { id: data.areaId, tenantId: data.tenantId },
       });
       if (!area) {
-        throw new BadRequestException('Area not found in this tenant');
+        throw new BusinessException(ErrorCode.CATALOG_TABLE_AREA_NOT_FOUND, HttpStatus.BAD_REQUEST);
       }
     }
 
@@ -109,7 +111,7 @@ export class TableService {
 
     const updated = await this.tableRepository.updateByIdAndTenant(data.id, data.tenantId, updatePayload);
     if (!updated) {
-      throw new NotFoundException('Table not found');
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
   }
@@ -118,7 +120,7 @@ export class TableService {
     const table = await this.getById({ id: data.id, tenantId: data.tenantId });
 
     if (table.sessionId || table.status !== TABLE_STATUS.AVAILABLE) {
-      throw new BadRequestException('Cannot delete active table');
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_CANNOT_DELETE_ACTIVE, HttpStatus.CONFLICT);
     }
 
     await this.tableRepository.deleteByIdAndTenant(data.id, data.tenantId);
@@ -130,9 +132,11 @@ export class TableService {
 
     const allowedTransitions = VALID_TRANSITIONS[table.status];
     if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
-      throw new BadRequestException(
-        `Invalid status transition: ${table.status} → ${newStatus}. Allowed: ${allowedTransitions?.join(', ') || 'none'}`,
-      );
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_INVALID_TRANSITION, HttpStatus.BAD_REQUEST, {
+        current: table.status,
+        new: newStatus,
+        allowed: allowedTransitions?.join(', ') || 'none',
+      });
     }
 
     const updatePayload: Partial<Table> = { status: newStatus };
@@ -146,7 +150,7 @@ export class TableService {
 
     const updated = await this.tableRepository.updateByIdAndTenant(data.id, data.tenantId, updatePayload);
     if (!updated) {
-      throw new NotFoundException('Table not found');
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
   }
@@ -158,12 +162,12 @@ export class TableService {
     const expectedBuffer = Buffer.from(expectedToken, 'hex');
 
     if (tokenBuffer.length !== expectedBuffer.length || !timingSafeEqual(tokenBuffer, expectedBuffer)) {
-      throw new BadRequestException('Invalid QR token');
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_INVALID_QR_TOKEN, HttpStatus.FORBIDDEN);
     }
 
     const table = await this.tableRepository.findByIdAndTenant(data.tableId, data.tenantId);
     if (!table) {
-      throw new NotFoundException('Table not found');
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return table;
   }
@@ -174,7 +178,7 @@ export class TableService {
     const newToken = this.generateQrToken(data.id, data.tenantId);
     const updated = await this.tableRepository.updateByIdAndTenant(data.id, data.tenantId, { qrToken: newToken });
     if (!updated) {
-      throw new NotFoundException('Table not found');
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
   }

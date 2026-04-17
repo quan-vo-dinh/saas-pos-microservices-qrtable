@@ -4,7 +4,7 @@ import { MenuItemRepository } from '../repositories/menu-item.repository';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Category } from '@common/entities/category.entity';
 import { MenuItem } from '@common/entities/menu-item.entity';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
 
 describe('MenuItemService', () => {
   let service: MenuItemService;
@@ -78,7 +78,7 @@ describe('MenuItemService', () => {
       });
     });
 
-    it('should throw BadRequestException for invalid category', async () => {
+    it('should throw BusinessException for invalid category', async () => {
       categoryRepo.findOne.mockResolvedValue(null);
 
       await expect(
@@ -88,7 +88,7 @@ describe('MenuItemService', () => {
           name: 'Spring Rolls',
           price: 5.99,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(BusinessException);
     });
   });
 
@@ -103,10 +103,10 @@ describe('MenuItemService', () => {
   });
 
   describe('getById', () => {
-    it('should throw NotFoundException when not found', async () => {
+    it('should throw BusinessException when not found', async () => {
       repository.findByIdAndTenant.mockResolvedValue(null);
 
-      await expect(service.getById({ id: 'item-999', tenantId: 'tenant-1' })).rejects.toThrow(NotFoundException);
+      await expect(service.getById({ id: 'item-999', tenantId: 'tenant-1' })).rejects.toThrow(BusinessException);
     });
   });
 
@@ -124,7 +124,7 @@ describe('MenuItemService', () => {
       expect(result).toEqual(updatedItem);
     });
 
-    it('should throw BadRequestException for invalid categoryId on update', async () => {
+    it('should throw BusinessException for invalid categoryId on update', async () => {
       repository.findByIdAndTenant.mockResolvedValue(mockMenuItem);
       categoryRepo.findOne.mockResolvedValue(null);
 
@@ -134,7 +134,7 @@ describe('MenuItemService', () => {
           tenantId: 'tenant-1',
           categoryId: 'cat-invalid',
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(BusinessException);
     });
   });
 

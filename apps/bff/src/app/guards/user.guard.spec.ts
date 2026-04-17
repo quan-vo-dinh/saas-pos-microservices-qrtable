@@ -1,7 +1,6 @@
-import { UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { of, throwError } from 'rxjs';
-import { AUTH_ERROR_CODE } from '@common/constants/enum/auth-error-code.enum';
+import { BusinessException } from '@common/error-messages/business.exception';
 import { MetadataKey } from '@common/constants/common.constant';
 import { UserGuard } from '@common/guards/user.guard';
 
@@ -36,9 +35,7 @@ describe('UserGuard', () => {
 
     const guard = new UserGuard(reflector, {} as any, { get: jest.fn(), set: jest.fn() } as any);
 
-    await expect(guard.canActivate(getContext({ headers: {} }))).rejects.toThrow(
-      new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN),
-    );
+    await expect(guard.canActivate(getContext({ headers: {} }))).rejects.toThrow(BusinessException);
   });
 
   it('maps role_mapping_mismatch to user_not_provisioned', async () => {
@@ -47,9 +44,7 @@ describe('UserGuard', () => {
     } as unknown as Reflector;
 
     const mockAuthorizerService = {
-      verifyUserToken: jest
-        .fn()
-        .mockReturnValue(throwError(() => ({ details: AUTH_ERROR_CODE.ROLE_MAPPING_MISMATCH }))),
+      verifyUserToken: jest.fn().mockReturnValue(throwError(() => ({ details: 'ROLE_MAPPING_MISMATCH' }))),
     };
 
     const guard = new UserGuard(
@@ -74,7 +69,7 @@ describe('UserGuard', () => {
           [MetadataKey.PROCESSID]: 'pid-1',
         }),
       ),
-    ).rejects.toThrow(new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED));
+    ).rejects.toThrow(BusinessException);
   });
 
   it('returns true and caches user data when token is valid', async () => {

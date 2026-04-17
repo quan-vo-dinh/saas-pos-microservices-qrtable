@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { CreateTenantTcpRequest, TenantTcpResponse, UpdateTenantTcpRequest } from '@common/interfaces/tcp/saas';
 import { SaasRepository } from '../repositories/saas.repository';
 
@@ -9,13 +11,13 @@ export class SaasService {
   async create(data: CreateTenantTcpRequest): Promise<TenantTcpResponse> {
     const name = data.name?.trim();
     if (!name) {
-      throw new BadRequestException('name is required');
+      throw new BusinessException(ErrorCode.SAAS_TENANT_NAME_REQUIRED, HttpStatus.BAD_REQUEST);
     }
 
     const slug = this.makeSlug(data.slug || name);
     const exists = await this.saasRepository.existsBySlug(slug);
     if (exists) {
-      throw new BadRequestException('Tenant already exists');
+      throw new BusinessException(ErrorCode.SAAS_TENANT_ALREADY_EXISTS, HttpStatus.CONFLICT);
     }
 
     return this.saasRepository.create({
@@ -32,7 +34,7 @@ export class SaasService {
   async getById(id: string): Promise<TenantTcpResponse> {
     const tenant = await this.saasRepository.findById(id);
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new BusinessException(ErrorCode.SAAS_TENANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
     return tenant;
@@ -46,7 +48,7 @@ export class SaasService {
     if (slug !== tenant.slug) {
       const exists = await this.saasRepository.existsBySlug(slug);
       if (exists) {
-        throw new BadRequestException('Tenant already exists');
+        throw new BusinessException(ErrorCode.SAAS_TENANT_ALREADY_EXISTS, HttpStatus.CONFLICT);
       }
     }
 

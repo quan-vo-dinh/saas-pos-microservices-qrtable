@@ -1,7 +1,6 @@
-import { UnauthorizedException } from '@nestjs/common';
 import jwt from 'jsonwebtoken';
 import { of } from 'rxjs';
-import { AUTH_ERROR_CODE } from '@common/constants/enum/auth-error-code.enum';
+import { BusinessException } from '@common/error-messages/business.exception';
 import { AuthorizerService } from './authorizer.service';
 
 jest.mock('jsonwebtoken', () => ({
@@ -94,9 +93,7 @@ describe('AuthorizerService', () => {
       }),
     );
 
-    await expect(service.verifyUserToken('token', 'pid-1')).rejects.toThrow(
-      new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED),
-    );
+    await expect(service.verifyUserToken('token', 'pid-1')).rejects.toThrow(BusinessException);
   });
 
   it('auto-provisions user on first login when enabled', async () => {

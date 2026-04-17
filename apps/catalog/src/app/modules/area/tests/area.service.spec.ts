@@ -3,7 +3,7 @@ import { AreaService } from '../services/area.service';
 import { AreaRepository } from '../repositories/area.repository';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Table } from '@common/entities/table.entity';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
 
 describe('AreaService', () => {
   let service: AreaService;
@@ -54,27 +54,27 @@ describe('AreaService', () => {
       expect(repository.existsByName).toHaveBeenCalledWith('tenant-1', 'Main Hall');
     });
 
-    it('should throw BadRequestException for duplicate name', async () => {
+    it('should throw BusinessException for duplicate name', async () => {
       repository.existsByName.mockResolvedValue(true);
 
-      await expect(service.create({ tenantId: 'tenant-1', name: 'Main Hall' })).rejects.toThrow(BadRequestException);
+      await expect(service.create({ tenantId: 'tenant-1', name: 'Main Hall' })).rejects.toThrow(BusinessException);
     });
   });
 
   describe('getById', () => {
-    it('should throw NotFoundException when not found', async () => {
+    it('should throw BusinessException when not found', async () => {
       repository.findByIdAndTenant.mockResolvedValue(null);
 
-      await expect(service.getById({ id: 'area-999', tenantId: 'tenant-1' })).rejects.toThrow(NotFoundException);
+      await expect(service.getById({ id: 'area-999', tenantId: 'tenant-1' })).rejects.toThrow(BusinessException);
     });
   });
 
   describe('delete', () => {
-    it('should throw BadRequestException when area has tables', async () => {
+    it('should throw BusinessException when area has tables', async () => {
       repository.findByIdAndTenant.mockResolvedValue(mockArea);
       tableRepo.count.mockResolvedValue(5);
 
-      await expect(service.delete({ id: 'area-1', tenantId: 'tenant-1' })).rejects.toThrow(BadRequestException);
+      await expect(service.delete({ id: 'area-1', tenantId: 'tenant-1' })).rejects.toThrow(BusinessException);
     });
   });
 

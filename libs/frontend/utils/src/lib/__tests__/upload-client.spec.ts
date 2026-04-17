@@ -194,7 +194,7 @@ describe('uploadFile', () => {
     latestXhr.responseText = 'Bad Request';
     latestXhr._emit('load');
 
-    await expect(promise).rejects.toThrow('Upload failed with status 400: Bad Request');
+    await expect(promise).rejects.toThrow('Bad Request');
   });
 
   it('rejects on HTTP 500', async () => {
@@ -204,7 +204,7 @@ describe('uploadFile', () => {
     latestXhr.responseText = 'Internal Server Error';
     latestXhr._emit('load');
 
-    await expect(promise).rejects.toThrow('Upload failed with status 500: Internal Server Error');
+    await expect(promise).rejects.toThrow('Internal Server Error');
   });
 
   // -----------------------------------------------------------------------

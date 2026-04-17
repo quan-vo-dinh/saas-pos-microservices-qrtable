@@ -1,5 +1,5 @@
 import { TcpLoggingInterceptor } from '@common/interceptors/tcpLogging.interceptor';
-import { Controller, UnauthorizedException, UseInterceptors } from '@nestjs/common';
+import { Controller, HttpStatus, UseInterceptors } from '@nestjs/common';
 import { AuthorizerService } from '../services/authorizer.service';
 import { MessagePattern } from '@nestjs/microservices';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
@@ -7,6 +7,8 @@ import { RequestParams } from '@common/decorators/request-param.decorator';
 import { AuthorizeResponse, LoginTcpRequest, LoginTcpResponse } from '@common/interfaces/tcp/authorizer';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
 import { ProcessId } from '@common/decorators/processId.decorator';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 
 @Controller()
 @UseInterceptors(TcpLoggingInterceptor)
@@ -23,7 +25,7 @@ export class AuthorizerController {
   async verifyUserToken(@RequestParams() token: string, @ProcessId() processId: string) {
     const result = await this.authorizerService.verifyUserToken(token, processId);
     if (!result.valid) {
-      throw new UnauthorizedException('Token is invalid');
+      throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, HttpStatus.UNAUTHORIZED);
     }
     return Response.success<AuthorizeResponse>(result);
   }

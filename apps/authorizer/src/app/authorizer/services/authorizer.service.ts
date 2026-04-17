@@ -4,7 +4,7 @@ import {
   LoginTcpRequest,
   PopulatedUser,
 } from '@common/interfaces/tcp/authorizer';
-import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { KeycloakHttpService } from '../../keycloak/services/keycloak-http.service';
 import jwt, { Jwt } from 'jsonwebtoken';
 import jwksRsa, { JwksClient } from 'jwks-rsa';
@@ -14,7 +14,8 @@ import { ClientGrpc } from '@nestjs/microservices';
 import { GRPC_SERVICES } from '@common/configuration/grpc.config';
 import { UpsertIdentityRequest, UserAccessService } from '@common/interfaces/grpc/user-access';
 import { PERMISSION, ROLE } from '@common/constants/enum/role.enum';
-import { AUTH_ERROR_CODE } from '@common/constants/enum/auth-error-code.enum';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 
 @Injectable()
 export class AuthorizerService {
@@ -58,7 +59,7 @@ export class AuthorizerService {
     const decoded = jwt.decode(token, { complete: true }) as Jwt | null;
 
     if (!decoded || !decoded.header || !decoded.payload || !decoded.header.kid) {
-      throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
+      throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, HttpStatus.UNAUTHORIZED);
     }
 
     let payload: KeycloakJwtPayload;
@@ -71,13 +72,13 @@ export class AuthorizerService {
       this.logger.debug({ payload });
     } catch (error) {
       this.logger.error({ error, processId });
-      throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
+      throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, HttpStatus.UNAUTHORIZED);
     }
 
     const userId = typeof payload.sub === 'string' ? payload.sub : undefined;
 
     if (!userId) {
-      throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
+      throw new BusinessException(ErrorCode.AUTH_USER_NOT_PROVISIONED, HttpStatus.UNAUTHORIZED);
     }
 
     let user = await this.userValidation(userId, processId);
@@ -87,7 +88,7 @@ export class AuthorizerService {
     }
 
     if (!user) {
-      throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
+      throw new BusinessException(ErrorCode.AUTH_USER_NOT_PROVISIONED, HttpStatus.UNAUTHORIZED);
     }
 
     const keycloakRoles = this.extractRealmRoles(payload);
@@ -100,7 +101,7 @@ export class AuthorizerService {
         keycloakRoles,
         internalRoles: user.roles?.map((role) => role?.name),
       });
-      throw new UnauthorizedException(AUTH_ERROR_CODE.ROLE_MAPPING_MISMATCH);
+      throw new BusinessException(ErrorCode.AUTH_ROLE_MAPPING_MISMATCH, HttpStatus.UNAUTHORIZED);
     }
 
     const permissions = this.collectPermissions(user.roles);
@@ -157,7 +158,7 @@ export class AuthorizerService {
 
     if (!user) {
       if (!this.isAutoProvisionOnFirstLoginEnabled()) {
-        throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
+        throw new BusinessException(ErrorCode.AUTH_USER_NOT_PROVISIONED, HttpStatus.UNAUTHORIZED);
       }
 
       this.logger.warn({
@@ -180,7 +181,7 @@ export class AuthorizerService {
     const { sub: userId, email, given_name: firstName, family_name: lastName } = payload;
 
     if (!userId || !email) {
-      throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
+      throw new BusinessException(ErrorCode.AUTH_USER_NOT_PROVISIONED, HttpStatus.UNAUTHORIZED);
     }
 
     const roleNames = this.extractRealmRoles(payload);

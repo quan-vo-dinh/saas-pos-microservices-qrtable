@@ -157,7 +157,7 @@ describe('apiClient', () => {
       const apiErr = err as ApiError;
       expect(apiErr.status).toBe(404);
       expect(apiErr.body).toBe('Not Found');
-      expect(apiErr.message).toBe('API Error 404: Not Found');
+      expect(apiErr.message).toBe('Not Found');
       expect(apiErr.name).toBe('ApiError');
     }
   });
@@ -166,7 +166,7 @@ describe('apiClient', () => {
     fetchSpy.mockResolvedValue(mockResponse('Internal Server Error', { ok: false, status: 500 }));
 
     await expect(apiClient('/fail')).rejects.toThrow(ApiError);
-    await expect(apiClient('/fail')).rejects.toThrow('API Error 500');
+    await expect(apiClient('/fail')).rejects.toThrow('Internal Server Error');
   });
 
   // -----------------------------------------------------------------------

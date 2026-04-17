@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { MenuItemRepository } from '../repositories/menu-item.repository';
 import { MenuItem } from '@common/entities/menu-item.entity';
 import { Category } from '@common/entities/category.entity';
@@ -26,7 +28,7 @@ export class MenuItemService {
       where: { id: data.categoryId, tenantId: data.tenantId },
     });
     if (!category) {
-      throw new BadRequestException('Category not found in this tenant');
+      throw new BusinessException(ErrorCode.CATALOG_MENU_ITEM_CATEGORY_NOT_FOUND, HttpStatus.BAD_REQUEST);
     }
 
     return this.menuItemRepository.create({
@@ -47,7 +49,7 @@ export class MenuItemService {
   async getById(data: GetMenuItemByIdTcpRequest): Promise<MenuItem> {
     const item = await this.menuItemRepository.findByIdAndTenant(data.id, data.tenantId);
     if (!item) {
-      throw new NotFoundException('Menu item not found');
+      throw new BusinessException(ErrorCode.CATALOG_MENU_ITEM_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return item;
   }
@@ -60,7 +62,7 @@ export class MenuItemService {
         where: { id: data.categoryId, tenantId: data.tenantId },
       });
       if (!category) {
-        throw new BadRequestException('Category not found in this tenant');
+        throw new BusinessException(ErrorCode.CATALOG_MENU_ITEM_CATEGORY_NOT_FOUND, HttpStatus.BAD_REQUEST);
       }
     }
 
@@ -75,7 +77,7 @@ export class MenuItemService {
 
     const updated = await this.menuItemRepository.updateByIdAndTenant(data.id, data.tenantId, updatePayload);
     if (!updated) {
-      throw new NotFoundException('Menu item not found');
+      throw new BusinessException(ErrorCode.CATALOG_MENU_ITEM_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
   }
@@ -93,7 +95,7 @@ export class MenuItemService {
       imagePublicId: data.imagePublicId,
     });
     if (!updated) {
-      throw new NotFoundException('Menu item not found');
+      throw new BusinessException(ErrorCode.CATALOG_MENU_ITEM_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
   }

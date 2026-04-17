@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { AreaRepository } from '../repositories/area.repository';
 import { Area } from '@common/entities/area.entity';
 import {
@@ -24,7 +26,7 @@ export class AreaService {
   async create(data: CreateAreaTcpRequest): Promise<Area> {
     const exists = await this.areaRepository.existsByName(data.tenantId, data.name.trim());
     if (exists) {
-      throw new BadRequestException('Area name already exists');
+      throw new BusinessException(ErrorCode.CATALOG_AREA_DUPLICATE_NAME, HttpStatus.CONFLICT);
     }
 
     return this.areaRepository.create({
@@ -41,7 +43,7 @@ export class AreaService {
   async getById(data: GetAreaByIdTcpRequest): Promise<Area> {
     const area = await this.areaRepository.findByIdAndTenant(data.id, data.tenantId);
     if (!area) {
-      throw new NotFoundException('Area not found');
+      throw new BusinessException(ErrorCode.CATALOG_AREA_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return area;
   }
@@ -52,7 +54,7 @@ export class AreaService {
     if (data.name && data.name.trim() !== current.name) {
       const exists = await this.areaRepository.existsByName(data.tenantId, data.name.trim());
       if (exists) {
-        throw new BadRequestException('Area name already exists');
+        throw new BusinessException(ErrorCode.CATALOG_AREA_DUPLICATE_NAME, HttpStatus.CONFLICT);
       }
     }
 
@@ -62,7 +64,7 @@ export class AreaService {
 
     const updated = await this.areaRepository.updateByIdAndTenant(data.id, data.tenantId, updatePayload);
     if (!updated) {
-      throw new NotFoundException('Area not found');
+      throw new BusinessException(ErrorCode.CATALOG_AREA_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
   }
@@ -74,7 +76,7 @@ export class AreaService {
       where: { areaId: data.id, tenantId: data.tenantId },
     });
     if (tableCount > 0) {
-      throw new BadRequestException('Cannot delete area with tables');
+      throw new BusinessException(ErrorCode.CATALOG_AREA_HAS_TABLES, HttpStatus.CONFLICT);
     }
 
     await this.areaRepository.deleteByIdAndTenant(data.id, data.tenantId);

@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { successMessage, getErrorDisplayMessage } from '@einvoice/frontend-utils';
 import { menuService } from '../services/menu.service';
 import { menuKeys } from './use-menu-query';
 
@@ -14,10 +15,10 @@ export function useCreateCategoryMutation() {
       menuService.createCategory(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.categories() });
-      toast.success('Category created successfully');
+      toast.success(successMessage('created', 'category'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create category: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -34,10 +35,10 @@ export function useUpdateCategoryMutation() {
     }) => menuService.updateCategory(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.categories() });
-      toast.success('Category updated successfully');
+      toast.success(successMessage('updated', 'category'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update category: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -48,10 +49,10 @@ export function useDeleteCategoryMutation() {
     mutationFn: (id: string) => menuService.deleteCategory(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.categories() });
-      toast.success('Category deleted');
+      toast.success(successMessage('deleted', 'category'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete category: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -62,10 +63,10 @@ export function useReorderCategoriesMutation() {
     mutationFn: (items: Array<{ id: string; sortOrder: number }>) => menuService.reorderCategories(items),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.categories() });
-      toast.success('Categories reordered');
+      toast.success(successMessage('reordered', 'category'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to reorder categories: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -87,10 +88,10 @@ export function useCreateMenuItemMutation() {
     mutationFn: (data: MenuItemInput) => menuService.createMenuItem(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.all });
-      toast.success('Menu item created successfully');
+      toast.success(successMessage('created', 'menuItem'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create menu item: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -101,10 +102,10 @@ export function useUpdateMenuItemMutation() {
     mutationFn: ({ id, data }: { id: string; data: MenuItemInput }) => menuService.updateMenuItem(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.all });
-      toast.success('Menu item updated successfully');
+      toast.success(successMessage('updated', 'menuItem'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update menu item: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -115,10 +116,10 @@ export function useDeleteMenuItemMutation() {
     mutationFn: (id: string) => menuService.deleteMenuItem(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.all });
-      toast.success('Menu item deleted');
+      toast.success(successMessage('deleted', 'menuItem'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete menu item: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -130,10 +131,10 @@ export function useUploadMenuItemImageMutation() {
       menuService.uploadMenuItemImage(id, file, onProgress),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: menuKeys.all });
-      toast.success('Image uploaded successfully');
+      toast.success(successMessage('imageUploaded'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to upload image: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }

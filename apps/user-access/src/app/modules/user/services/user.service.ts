@@ -1,7 +1,8 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { UserRepository } from '../repositories/user.repository';
 import { CreateUserTcpRequest } from '@common/interfaces/tcp/user';
-import { ERROR_CODE } from '@common/constants/enum/error-code.enum';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { createUserRequestMapping } from '../mapper';
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
@@ -28,7 +29,7 @@ export class UserService {
     const isExists = await this.userRepository.exists(params.email);
 
     if (isExists) {
-      throw new BadRequestException(ERROR_CODE.USER_ALREADY_EXISTS);
+      throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, HttpStatus.CONFLICT);
     }
 
     const userId = await this.createKeycloakUser(

@@ -2,12 +2,27 @@ import type { ApiResponse } from '@einvoice/types';
 
 export class ApiError extends Error {
   readonly status: number;
+  readonly errorCode: string | undefined;
+  readonly serverMessage: string;
   readonly body: string;
 
   constructor(status: number, body: string) {
-    super(`API Error ${status}: ${body}`);
+    let errorCode: string | undefined;
+    let serverMessage = body;
+
+    try {
+      const parsed = JSON.parse(body) as Record<string, unknown>;
+      errorCode = parsed['errorCode'] as string | undefined;
+      serverMessage = (parsed['message'] as string) ?? body;
+    } catch {
+      // body is not JSON — use raw text
+    }
+
+    super(serverMessage);
     this.name = 'ApiError';
     this.status = status;
+    this.errorCode = errorCode;
+    this.serverMessage = serverMessage;
     this.body = body;
   }
 }

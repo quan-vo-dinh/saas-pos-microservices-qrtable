@@ -26,11 +26,11 @@ import { buildTcpRequestContext } from '@common/utils/request.util';
 import { CloudinaryService } from '@common/providers/cloudinary/cloudinary.service';
 import { CloudinaryFolder } from '@common/providers/cloudinary/cloudinary.constants';
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   Get,
+  HttpStatus,
   Inject,
   Param,
   Patch,
@@ -39,6 +39,8 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -236,7 +238,7 @@ export class MenuItemAdminController {
     @Req() req: Request,
   ): Promise<ResponseDto<MenuItemTcpResponse>> {
     if (!file) {
-      throw new BadRequestException('Image file is required');
+      throw new BusinessException(ErrorCode.UPLOAD_FILE_REQUIRED, HttpStatus.BAD_REQUEST);
     }
 
     const tenantId = req[MetadataKey.TENANT_ID] as string;

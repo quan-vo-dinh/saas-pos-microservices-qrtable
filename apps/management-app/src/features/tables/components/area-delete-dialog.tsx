@@ -12,9 +12,10 @@ export function AreaDeleteDialog() {
     <ConfirmDialog
       open={open === 'delete-area'}
       onOpenChange={(v) => !v && setOpen(null)}
-      title="Delete Area"
-      description={`Are you sure you want to delete "${currentArea?.name ?? ''}"? All tables in this area will also be removed.`}
-      confirmText="Delete"
+      title="Xóa khu vực"
+      description={`Bạn có chắc chắn muốn xóa "${currentArea?.name ?? ''}"? Tất cả các bàn trong khu vực này cũng sẽ bị xóa.`}
+      confirmText="Xóa"
+      cancelText="Hủy"
       variant="destructive"
       onConfirm={() => {
         if (!currentArea) return;

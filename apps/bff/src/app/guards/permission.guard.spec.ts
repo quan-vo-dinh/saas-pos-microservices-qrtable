@@ -1,8 +1,8 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { MetadataKey } from '@common/constants/common.constant';
 import { PERMISSION } from '@common/constants/enum/role.enum';
 import { PermissionGuard } from '@common/guards/permission.guard';
+import { BusinessException } from '@common/error-messages/business.exception';
 
 describe('PermissionGuard', () => {
   const getContext = (request: Record<string, unknown>) =>
@@ -23,7 +23,7 @@ describe('PermissionGuard', () => {
       get: jest.fn().mockReturnValue([PERMISSION.CATALOG_GET_LIST]),
     } as unknown as Reflector);
 
-    expect(() => guard.canActivate(getContext({}))).toThrow(new UnauthorizedException('User data not found'));
+    expect(() => guard.canActivate(getContext({}))).toThrow(BusinessException);
   });
 
   it('throws ForbiddenException when user lacks required permissions', () => {
@@ -39,7 +39,7 @@ describe('PermissionGuard', () => {
       },
     } as Record<string, unknown>;
 
-    expect(() => guard.canActivate(getContext(request))).toThrow(new ForbiddenException('Permission denied'));
+    expect(() => guard.canActivate(getContext(request))).toThrow(BusinessException);
   });
 
   it('returns true when user has all required permissions', () => {

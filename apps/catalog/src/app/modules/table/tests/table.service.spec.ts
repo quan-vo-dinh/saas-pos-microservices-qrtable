@@ -6,7 +6,7 @@ import { Area } from '@common/entities/area.entity';
 import { Table } from '@common/entities/table.entity';
 import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { ConfigService } from '@nestjs/config';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
 import { createHmac } from 'crypto';
 
 describe('TableService', () => {
@@ -80,20 +80,20 @@ describe('TableService', () => {
       expect(repository.updateByIdAndTenant).toHaveBeenCalled();
     });
 
-    it('should throw BadRequestException for invalid area', async () => {
+    it('should throw BusinessException for invalid area', async () => {
       areaRepo.findOne.mockResolvedValue(null);
 
       await expect(service.create({ tenantId: 'tenant-1', areaId: 'area-invalid', name: 'Table 1' })).rejects.toThrow(
-        BadRequestException,
+        BusinessException,
       );
     });
 
-    it('should throw BadRequestException for duplicate name', async () => {
+    it('should throw BusinessException for duplicate name', async () => {
       areaRepo.findOne.mockResolvedValue(mockArea);
       repository.existsByName.mockResolvedValue(true);
 
       await expect(service.create({ tenantId: 'tenant-1', areaId: 'area-1', name: 'Table 1' })).rejects.toThrow(
-        BadRequestException,
+        BusinessException,
       );
     });
   });
@@ -107,11 +107,11 @@ describe('TableService', () => {
       expect(repository.deleteByIdAndTenant).toHaveBeenCalledWith('table-1', 'tenant-1');
     });
 
-    it('should throw BadRequestException for occupied table', async () => {
+    it('should throw BusinessException for occupied table', async () => {
       const occupiedTable = { ...mockTable, status: TABLE_STATUS.OCCUPIED, sessionId: 'session-1' } as unknown as Table;
       repository.findByIdAndTenant.mockResolvedValue(occupiedTable);
 
-      await expect(service.delete({ id: 'table-1', tenantId: 'tenant-1' })).rejects.toThrow(BadRequestException);
+      await expect(service.delete({ id: 'table-1', tenantId: 'tenant-1' })).rejects.toThrow(BusinessException);
     });
   });
 
@@ -150,7 +150,7 @@ describe('TableService', () => {
 
       await expect(
         service.updateStatus({ id: 'table-1', tenantId: 'tenant-1', status: TABLE_STATUS.CLEANING }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(BusinessException);
     });
 
     it('should reject invalid transition billing → available', async () => {
@@ -159,7 +159,7 @@ describe('TableService', () => {
 
       await expect(
         service.updateStatus({ id: 'table-1', tenantId: 'tenant-1', status: TABLE_STATUS.AVAILABLE }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(BusinessException);
     });
   });
 
@@ -176,7 +176,7 @@ describe('TableService', () => {
       expect(result).toEqual(mockTable);
     });
 
-    it('should throw BadRequestException for wrong token', async () => {
+    it('should throw BusinessException for wrong token', async () => {
       const wrongToken = createHmac('sha256', 'wrong-secret').update('table-1tenant-1').digest('hex');
 
       await expect(
@@ -185,7 +185,7 @@ describe('TableService', () => {
           tenantId: 'tenant-1',
           token: wrongToken,
         }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(BusinessException);
     });
   });
 });

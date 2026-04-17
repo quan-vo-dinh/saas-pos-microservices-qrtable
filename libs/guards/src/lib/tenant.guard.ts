@@ -2,7 +2,9 @@ import { MetadataKey } from '@common/constants/common.constant';
 import { SESSION_POLICY, TENANT_POLICY } from '@common/constants/request-context.constant';
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable, Logger, HttpStatus } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Cache } from 'cache-manager';
 import { getSessionCacheKey } from '@common/utils/request.util';
 
@@ -37,11 +39,11 @@ export class TenantGuard implements CanActivate {
     }
 
     if (!tenantId) {
-      throw new ForbiddenException('Tenant is required');
+      throw new BusinessException(ErrorCode.TENANT_REQUIRED, HttpStatus.FORBIDDEN);
     }
 
     if (claimTenantId && claimTenantId !== tenantId) {
-      throw new ForbiddenException('Tenant mismatch with user identity');
+      throw new BusinessException(ErrorCode.TENANT_MISMATCH_IDENTITY, HttpStatus.FORBIDDEN);
     }
 
     const sessionId = request[MetadataKey.SESSION_ID] as string | undefined;
@@ -51,11 +53,11 @@ export class TenantGuard implements CanActivate {
       const session = await this.cacheManager.get<SessionData>(cacheKey);
 
       if (!session) {
-        throw new ForbiddenException('Session not found');
+        throw new BusinessException(ErrorCode.TENANT_SESSION_NOT_FOUND, HttpStatus.FORBIDDEN);
       }
 
       if (session.tenantId && session.tenantId !== tenantId) {
-        throw new ForbiddenException('Tenant mismatch with session');
+        throw new BusinessException(ErrorCode.TENANT_MISMATCH_SESSION, HttpStatus.FORBIDDEN);
       }
 
       if (!session.tenantId) {

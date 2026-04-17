@@ -29,7 +29,7 @@ export const categorySchema = z.object({
 export type Category = z.infer<typeof categorySchema>;
 
 export const categoryMutateSchema = z.object({
-  name: z.string().min(1, 'Category name is required').max(100),
+  name: z.string().min(1, 'Tên danh mục là bắt buộc').max(100),
   timeStart: z.string().optional(),
   timeEnd: z.string().optional(),
   status: categoryStatusEnum,
@@ -55,11 +55,11 @@ export const menuItemSchema = z.object({
 export type MenuItem = z.infer<typeof menuItemSchema>;
 
 export const menuItemMutateSchema = z.object({
-  name: z.string().min(1, 'Item name is required').max(200),
+  name: z.string().min(1, 'Tên món là bắt buộc').max(200),
   description: z.string().max(500).optional(),
-  price: z.number().min(0, 'Price must be positive'),
-  categoryId: z.string().min(1, 'Category is required'),
-  stock: z.number().int().min(0, 'Stock must be non-negative'),
+  price: z.number().min(0, 'Giá phải lớn hơn hoặc bằng 0'),
+  categoryId: z.string().min(1, 'Danh mục là bắt buộc'),
+  stock: z.number().int().min(0, 'Số lượng tồn kho không được âm'),
   status: menuItemStatusEnum,
 });
 

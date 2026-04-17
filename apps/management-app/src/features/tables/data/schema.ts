@@ -18,7 +18,7 @@ export const areaSchema = z.object({
 export type Area = z.infer<typeof areaSchema>;
 
 export const areaMutateSchema = z.object({
-  name: z.string().min(1, 'Area name is required').max(100),
+  name: z.string().min(1, 'Tên khu vực là bắt buộc').max(100),
   sortOrder: z.number().int().min(0).optional(),
 });
 
@@ -39,9 +39,9 @@ export const tableSchema = z.object({
 export type RestaurantTable = z.infer<typeof tableSchema>;
 
 export const tableMutateSchema = z.object({
-  name: z.string().min(1, 'Table name is required').max(50),
-  areaId: z.string().min(1, 'Area is required'),
-  capacity: z.number().int().min(1, 'Capacity must be at least 1').max(50),
+  name: z.string().min(1, 'Tên bàn là bắt buộc').max(50),
+  areaId: z.string().min(1, 'Khu vực là bắt buộc'),
+  capacity: z.number().int().min(1, 'Sức chứa tối thiểu là 1').max(50),
 });
 
 export type TableMutateInput = z.infer<typeof tableMutateSchema>;

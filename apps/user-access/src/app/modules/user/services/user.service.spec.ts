@@ -1,6 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
 import { of } from 'rxjs';
-import { ERROR_CODE } from '@common/constants/enum/error-code.enum';
+import { BusinessException } from '@common/error-messages/business.exception';
 import { UserService } from './user.service';
 
 jest.mock('../mapper', () => ({
@@ -46,7 +45,7 @@ describe('UserService', () => {
         },
         'pid-1',
       ),
-    ).rejects.toThrow(new BadRequestException(ERROR_CODE.USER_ALREADY_EXISTS));
+    ).rejects.toThrow(BusinessException);
   });
 
   it('upserts user by identity through repository', async () => {

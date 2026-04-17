@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { successMessage, getErrorDisplayMessage } from '@einvoice/frontend-utils';
 import { tablesService } from '../services/tables.service';
 import { tableKeys } from './use-tables-query';
 
@@ -13,10 +14,10 @@ export function useCreateAreaMutation() {
     mutationFn: (data: { name: string; sortOrder?: number }) => tablesService.createArea(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.areas() });
-      toast.success('Area created successfully');
+      toast.success(successMessage('created', 'area'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create area: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -28,10 +29,10 @@ export function useUpdateAreaMutation() {
       tablesService.updateArea(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.areas() });
-      toast.success('Area updated successfully');
+      toast.success(successMessage('updated', 'area'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update area: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -42,10 +43,10 @@ export function useDeleteAreaMutation() {
     mutationFn: (id: string) => tablesService.deleteArea(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
-      toast.success('Area deleted');
+      toast.success(successMessage('deleted', 'area'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete area: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -56,10 +57,10 @@ export function useReorderAreasMutation() {
     mutationFn: (items: Array<{ id: string; sortOrder: number }>) => tablesService.reorderAreas(items),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.areas() });
-      toast.success('Areas reordered');
+      toast.success(successMessage('reordered', 'area'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to reorder areas: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -72,10 +73,10 @@ export function useCreateTableMutation() {
     mutationFn: (data: { name: string; areaId: string; capacity: number }) => tablesService.createTable(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
-      toast.success('Table created successfully');
+      toast.success(successMessage('created', 'table'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to create table: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -87,10 +88,10 @@ export function useUpdateTableMutation() {
       tablesService.updateTable(id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
-      toast.success('Table updated successfully');
+      toast.success(successMessage('updated', 'table'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update table: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -101,10 +102,10 @@ export function useDeleteTableMutation() {
     mutationFn: (id: string) => tablesService.deleteTable(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
-      toast.success('Table deleted');
+      toast.success(successMessage('deleted', 'table'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to delete table: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -115,10 +116,10 @@ export function useUpdateTableStatusMutation() {
     mutationFn: ({ id, status }: { id: string; status: string }) => tablesService.updateTableStatus(id, status),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
-      toast.success('Table status updated');
+      toast.success(successMessage('statusUpdated'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update table status: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }
@@ -129,10 +130,10 @@ export function useRegenerateQrMutation() {
     mutationFn: (id: string) => tablesService.regenerateQr(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
-      toast.success('QR code regenerated');
+      toast.success(successMessage('qrRegenerated'));
     },
     onError: (error: Error) => {
-      toast.error(`Failed to regenerate QR code: ${error.message}`);
+      toast.error(getErrorDisplayMessage(error));
     },
   });
 }

@@ -1,4 +1,6 @@
-import { BadRequestException, Inject, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { v2 as cloudinaryType } from 'cloudinary';
 import { Readable } from 'stream';
 import { randomUUID } from 'crypto';
@@ -102,11 +104,11 @@ export class CloudinaryService {
         validationWarnings: allWarnings.length > 0 ? allWarnings : undefined,
       };
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof InternalServerErrorException) {
+      if (error instanceof BusinessException) {
         throw error;
       }
       this.logger.error(`Upload failed: ${(error as Error).message}`);
-      throw new InternalServerErrorException('Image upload failed');
+      throw new BusinessException(ErrorCode.UPLOAD_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -158,11 +160,11 @@ export class CloudinaryService {
 
   private validateFile(buffer: Buffer, mimetype: string): void {
     if (buffer.length > MAX_FILE_SIZE) {
-      throw new BadRequestException('File size exceeds 5MB limit');
+      throw new BusinessException(ErrorCode.UPLOAD_FILE_TOO_LARGE, HttpStatus.BAD_REQUEST);
     }
 
     if (!ALLOWED_MIME_TYPES.includes(mimetype as (typeof ALLOWED_MIME_TYPES)[number])) {
-      throw new BadRequestException('Invalid file type. Allowed: jpeg, png, webp');
+      throw new BusinessException(ErrorCode.UPLOAD_INVALID_FILE_TYPE, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -181,11 +183,11 @@ export class CloudinaryService {
       const uploadStream = this.cloudinary.uploader.upload_stream(options, (error, result) => {
         if (error) {
           this.logger.error(`Cloudinary upload error: ${JSON.stringify(error)}`);
-          reject(new InternalServerErrorException('Image upload failed'));
+          reject(new BusinessException(ErrorCode.UPLOAD_FAILED, HttpStatus.INTERNAL_SERVER_ERROR));
         } else if (result) {
           resolve(result);
         } else {
-          reject(new InternalServerErrorException('Image upload failed'));
+          reject(new BusinessException(ErrorCode.UPLOAD_FAILED, HttpStatus.INTERNAL_SERVER_ERROR));
         }
       });
 

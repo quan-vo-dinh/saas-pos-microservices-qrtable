@@ -1,22 +1,20 @@
-import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, HttpStatus, Injectable, Logger, NestInterceptor } from '@nestjs/common';
 import { catchError, Observable, tap } from 'rxjs';
 import { RpcException } from '@nestjs/microservices';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
-import { HttpStatus } from '@nestjs/common';
+import { BusinessException, BusinessExceptionResponse } from '@common/error-messages/business.exception';
+import { transformDbError } from '@common/error-messages/db-error.transformer';
 
 @Injectable()
 export class TcpLoggingInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler<any>): Observable<any> | Promise<Observable<any>> {
+  intercept(context: ExecutionContext, next: CallHandler<unknown>): Observable<unknown> {
     const now = Date.now();
     const handler = context.getHandler();
     const handlerName = handler.name || 'unknown_handler';
 
     const args = context.getArgs();
-
-    // lấy vị trí đầu tiên thì nó đại diện cho payload trong TCP microservice
-    const param = args[0];
-
-    const processId = param?.processId || 'unknown_process_id';
+    const param = args[0] as Record<string, unknown> | undefined;
+    const processId = (param?.['processId'] as string) || 'unknown_process_id';
 
     Logger.log(
       `ProcessId: '${processId}' >> method: '${handlerName}' >> at '${now}' >> param: ${JSON.stringify(param)}`,
@@ -30,10 +28,29 @@ export class TcpLoggingInterceptor implements NestInterceptor {
       catchError((error) => {
         const duration = Date.now() - now;
         Logger.error(
-          `TCP » Error process '${processId}': ${error.message} >> data: ${JSON.stringify(
-            error,
-          )}, after: '${duration}ms'`,
+          `TCP » Error process '${processId}': ${error.message} >> data: ${JSON.stringify(error)}, after: '${duration}ms'`,
         );
+
+        // BusinessException — propagate errorCode + message
+        if (error instanceof BusinessException) {
+          const response = error.getResponse() as BusinessExceptionResponse;
+          throw new RpcException({
+            code: response.statusCode,
+            message: response.message,
+            errorCode: response.errorCode,
+          });
+        }
+
+        // TypeORM QueryFailedError — transform then propagate
+        const dbError = transformDbError(error);
+        if (dbError) {
+          const response = dbError.getResponse() as BusinessExceptionResponse;
+          throw new RpcException({
+            code: response.statusCode,
+            message: response.message,
+            errorCode: response.errorCode,
+          });
+        }
 
         throw new RpcException({
           code: error.status || error.code || error.error?.code || HttpStatus.INTERNAL_SERVER_ERROR,

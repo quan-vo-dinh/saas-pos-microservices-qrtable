@@ -12,9 +12,10 @@ export function CategoryDeleteDialog() {
     <ConfirmDialog
       open={open === 'delete-category'}
       onOpenChange={(v) => !v && setOpen(null)}
-      title="Delete Category"
-      description={`Are you sure you want to delete "${currentCategory?.name ?? ''}"? This action cannot be undone. All menu items in this category will need to be reassigned.`}
-      confirmText="Delete"
+      title="Xóa danh mục"
+      description={`Bạn có chắc chắn muốn xóa "${currentCategory?.name ?? ''}"? Thao tác này không thể hoàn tác. Tất cả món ăn trong danh mục này cần được gán lại.`}
+      confirmText="Xóa"
+      cancelText="Hủy"
       variant="destructive"
       onConfirm={() => {
         if (!currentCategory) return;

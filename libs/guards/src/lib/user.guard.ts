@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, Inject, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, Inject, Logger, HttpStatus } from '@nestjs/common';
 import { firstValueFrom, Observable } from 'rxjs';
 import { Reflector } from '@nestjs/core';
 import { MetadataKey } from '@common/constants/common.constant';
@@ -11,7 +11,8 @@ import { createHash } from 'crypto';
 import { GRPC_SERVICES } from '@common/configuration/grpc.config';
 import { ClientGrpc } from '@nestjs/microservices';
 import { AuthorizerService } from '@common/interfaces/grpc/authorizer/index';
-import { AUTH_ERROR_CODE } from '@common/constants/enum/auth-error-code.enum';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 @Injectable()
 export class UserGuard implements CanActivate {
   private readonly logger = new Logger(UserGuard.name);
@@ -45,7 +46,7 @@ export class UserGuard implements CanActivate {
       this.logger.debug('Verifying user token');
 
       if (!token) {
-        throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
+        throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, HttpStatus.UNAUTHORIZED);
       }
 
       const cacheKey = this.generateTokenCacheKey(token);
@@ -70,7 +71,7 @@ export class UserGuard implements CanActivate {
       const { data: result } = response;
 
       if (!result?.valid) {
-        throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
+        throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, HttpStatus.UNAUTHORIZED);
       }
       this.logger.debug(`Set user data to cache for cache key: ${cacheKey}`);
 
@@ -83,14 +84,11 @@ export class UserGuard implements CanActivate {
 
       const errorDetails = this.getErrorDetails(error);
 
-      if (
-        errorDetails?.includes(AUTH_ERROR_CODE.USER_NOT_PROVISIONED) ||
-        errorDetails?.includes(AUTH_ERROR_CODE.ROLE_MAPPING_MISMATCH)
-      ) {
-        throw new UnauthorizedException(AUTH_ERROR_CODE.USER_NOT_PROVISIONED);
+      if (errorDetails?.includes('USER_NOT_PROVISIONED') || errorDetails?.includes('ROLE_MAPPING_MISMATCH')) {
+        throw new BusinessException(ErrorCode.AUTH_USER_NOT_PROVISIONED, HttpStatus.UNAUTHORIZED);
       }
 
-      throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
+      throw new BusinessException(ErrorCode.AUTH_TOKEN_INVALID, HttpStatus.UNAUTHORIZED);
     }
   }
 

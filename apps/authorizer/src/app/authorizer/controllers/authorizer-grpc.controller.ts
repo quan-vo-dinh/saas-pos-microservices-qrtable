@@ -4,6 +4,7 @@ import { AuthorizerService } from '../services/authorizer.service';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { VerifyUserTokenRequest, VerifyUserTokenResponse } from '@common/interfaces/grpc/authorizer';
 import { Response } from '@common/interfaces/grpc/common/response.interface';
+import { BusinessException } from '@common/error-messages/business.exception';
 
 @Controller()
 export class AuthorizerGrpcController {
@@ -18,6 +19,13 @@ export class AuthorizerGrpcController {
       return Response.success(result);
     } catch (error) {
       this.logger.error({ error, processId: params?.processId });
+
+      if (error instanceof BusinessException) {
+        throw new RpcException({
+          code: status.UNAUTHENTICATED,
+          message: error.message,
+        });
+      }
 
       if (error instanceof UnauthorizedException) {
         throw new RpcException({

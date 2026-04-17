@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { CategoryRepository } from '../repositories/category.repository';
 import { Category } from '@common/entities/category.entity';
 import { CATEGORY_STATUS } from '@common/constants/enum/catalog.enum';
@@ -25,7 +27,7 @@ export class CategoryService {
   async create(data: CreateCategoryTcpRequest): Promise<Category> {
     const exists = await this.categoryRepository.existsByName(data.tenantId, data.name.trim());
     if (exists) {
-      throw new BadRequestException('Category name already exists');
+      throw new BusinessException(ErrorCode.CATALOG_CATEGORY_DUPLICATE_NAME, HttpStatus.CONFLICT);
     }
 
     return this.categoryRepository.create({
@@ -43,7 +45,7 @@ export class CategoryService {
   async getById(data: GetCategoryByIdTcpRequest): Promise<Category> {
     const category = await this.categoryRepository.findByIdAndTenant(data.id, data.tenantId);
     if (!category) {
-      throw new NotFoundException('Category not found');
+      throw new BusinessException(ErrorCode.CATALOG_CATEGORY_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return category;
   }
@@ -54,7 +56,7 @@ export class CategoryService {
     if (data.name && data.name.trim() !== current.name) {
       const exists = await this.categoryRepository.existsByName(data.tenantId, data.name.trim());
       if (exists) {
-        throw new BadRequestException('Category name already exists');
+        throw new BusinessException(ErrorCode.CATALOG_CATEGORY_DUPLICATE_NAME, HttpStatus.CONFLICT);
       }
     }
 
@@ -65,7 +67,7 @@ export class CategoryService {
 
     const updated = await this.categoryRepository.updateByIdAndTenant(data.id, data.tenantId, updatePayload);
     if (!updated) {
-      throw new NotFoundException('Category not found');
+      throw new BusinessException(ErrorCode.CATALOG_CATEGORY_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
   }
@@ -77,7 +79,7 @@ export class CategoryService {
       where: { categoryId: data.id, tenantId: data.tenantId, deletedAt: IsNull() },
     });
     if (menuItemCount > 0) {
-      throw new BadRequestException('Cannot delete category with active menu items');
+      throw new BusinessException(ErrorCode.CATALOG_CATEGORY_HAS_ACTIVE_ITEMS, HttpStatus.CONFLICT);
     }
 
     await this.categoryRepository.deleteByIdAndTenant(data.id, data.tenantId);

@@ -1,3 +1,5 @@
+import { ApiError } from './api-client';
+
 export type UploadOptions = {
   url: string;
   file: File;
@@ -29,7 +31,7 @@ export function uploadFile({ url, file, headers, onProgress }: UploadOptions): P
           reject(new Error(`Upload response parse error: ${xhr.responseText}`));
         }
       } else {
-        reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.responseText}`));
+        reject(new ApiError(xhr.status, xhr.responseText));
       }
     });
 

@@ -12,9 +12,10 @@ export function TableDeleteDialog() {
     <ConfirmDialog
       open={open === 'delete-table'}
       onOpenChange={(v) => !v && setOpen(null)}
-      title="Delete Table"
-      description={`Are you sure you want to delete table "${currentTable?.name ?? ''}"? The associated QR code will also be invalidated.`}
-      confirmText="Delete"
+      title="Xóa bàn"
+      description={`Bạn có chắc chắn muốn xóa bàn "${currentTable?.name ?? ''}"? Mã QR liên kết cũng sẽ bị vô hiệu hóa.`}
+      confirmText="Xóa"
+      cancelText="Hủy"
       variant="destructive"
       onConfirm={() => {
         if (!currentTable) return;

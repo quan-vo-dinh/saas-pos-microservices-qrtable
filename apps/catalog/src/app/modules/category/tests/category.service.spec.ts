@@ -4,7 +4,7 @@ import { CategoryRepository } from '../repositories/category.repository';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MenuItem } from '@common/entities/menu-item.entity';
 import { CATEGORY_STATUS } from '@common/constants/enum/catalog.enum';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
 
 describe('CategoryService', () => {
   let service: CategoryService;
@@ -56,10 +56,10 @@ describe('CategoryService', () => {
       expect(repository.existsByName).toHaveBeenCalledWith('tenant-1', 'Appetizers');
     });
 
-    it('should throw BadRequestException for duplicate name', async () => {
+    it('should throw BusinessException for duplicate name', async () => {
       repository.existsByName.mockResolvedValue(true);
 
-      await expect(service.create({ tenantId: 'tenant-1', name: 'Appetizers' })).rejects.toThrow(BadRequestException);
+      await expect(service.create({ tenantId: 'tenant-1', name: 'Appetizers' })).rejects.toThrow(BusinessException);
     });
   });
 
@@ -71,10 +71,10 @@ describe('CategoryService', () => {
       expect(result).toEqual(mockCategory);
     });
 
-    it('should throw NotFoundException when not found', async () => {
+    it('should throw BusinessException when not found', async () => {
       repository.findByIdAndTenant.mockResolvedValue(null);
 
-      await expect(service.getById({ id: 'cat-999', tenantId: 'tenant-1' })).rejects.toThrow(NotFoundException);
+      await expect(service.getById({ id: 'cat-999', tenantId: 'tenant-1' })).rejects.toThrow(BusinessException);
     });
   });
 
@@ -87,11 +87,11 @@ describe('CategoryService', () => {
       expect(repository.deleteByIdAndTenant).toHaveBeenCalledWith('cat-1', 'tenant-1');
     });
 
-    it('should throw BadRequestException when category has active menu items', async () => {
+    it('should throw BusinessException when category has active menu items', async () => {
       repository.findByIdAndTenant.mockResolvedValue(mockCategory);
       menuItemRepo.count.mockResolvedValue(3);
 
-      await expect(service.delete({ id: 'cat-1', tenantId: 'tenant-1' })).rejects.toThrow(BadRequestException);
+      await expect(service.delete({ id: 'cat-1', tenantId: 'tenant-1' })).rejects.toThrow(BusinessException);
     });
   });
 
