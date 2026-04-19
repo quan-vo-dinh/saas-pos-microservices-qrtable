@@ -4,6 +4,10 @@
 > **Ước lượng:** ~2-3 tuần
 > **Trạng thái:** ✅ DONE (Steps 1.1–1.6 hoàn thành)
 
+> **Convention note (post-Step 2.3, 2026-04-19):** Phase 1 docs còn dùng I-prefix cho interface (vd `ICategory`, `IMenuItem`).
+> Sau Step 2.3, convention dropped I-prefix per ADR ([`docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md`](../superpowers/specs/2026-04-19-step-2.3-shared-types-design.md)).
+> Phase 1 docs giữ historical naming as-is; code và types lib đã follow convention mới (`Category`, `MenuItem`).
+
 ## Prerequisites
 
 - Phase 0 hoàn thành — [phase-0-foundation.md](phase-0-foundation.md)

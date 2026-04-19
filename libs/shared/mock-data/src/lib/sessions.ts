@@ -1,36 +1,61 @@
-export type MockSession = {
-  sessionId: string;
-  tableId: string;
-  tableName: string;
+import type { Session } from '@einvoice/types';
+import { SessionStatus } from '@einvoice/types';
+
+const TENANT_A = 'tenant_a';
+
+/**
+ * Mock-only extension to Session type — adds fields needed for mock UI rendering
+ * (areaName, restaurantName) and QR validation mocking (qrToken).
+ *
+ * In production, qrToken validation thuộc Catalog/Tenant module; restaurantName
+ * lookup from Tenant entity. Mock data inlines for convenience.
+ */
+export type MockSessionExtended = Session & {
   areaName: string;
   capacity: number;
   restaurantName: string;
   qrToken: string;
 };
 
-export const sessions: MockSession[] = [
+export const sessions: MockSessionExtended[] = [
   {
-    sessionId: 'session-001',
+    id: 'session-001',
+    tenantId: TENANT_A,
     tableId: 'tbl-001',
     tableName: 'T1',
+    status: SessionStatus.ACTIVE,
+    startedAt: '2026-04-06T10:00:00Z',
+    lastActivity: '2026-04-06T11:00:00Z',
+    orderCount: 2,
     areaName: 'Tầng trệt',
     capacity: 4,
     restaurantName: 'Nhà hàng QR Table Demo',
     qrToken: 'hmac_t1_abc123',
   },
   {
-    sessionId: 'session-002',
+    id: 'session-002',
+    tenantId: TENANT_A,
     tableId: 'tbl-005',
     tableName: 'T5',
+    status: SessionStatus.ACTIVE,
+    startedAt: '2026-04-06T11:00:00Z',
+    lastActivity: '2026-04-06T11:30:00Z',
+    orderCount: 1,
     areaName: 'Tầng trệt',
     capacity: 6,
     restaurantName: 'Nhà hàng QR Table Demo',
     qrToken: 'hmac_t5_def456',
   },
   {
-    sessionId: 'session-003',
+    id: 'session-003',
+    tenantId: TENANT_A,
     tableId: 'tbl-008',
     tableName: 'L3',
+    status: SessionStatus.CLOSED,
+    startedAt: '2026-04-06T08:30:00Z',
+    lastActivity: '2026-04-06T09:45:00Z',
+    closedAt: '2026-04-06T09:50:00Z',
+    orderCount: 1,
     areaName: 'Lầu 1',
     capacity: 4,
     restaurantName: 'Nhà hàng QR Table Demo',
