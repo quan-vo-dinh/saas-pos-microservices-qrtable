@@ -2,7 +2,7 @@
 
 > **Mục tiêu:** Khách quét QR → thấy menu. Staff quản lý menu/bàn trên Dashboard.
 > **Ước lượng:** ~2-3 tuần
-> **Trạng thái:** 🔶 IN PROGRESS (Step 1.4 DONE — next: Step 1.45)
+> **Trạng thái:** ✅ DONE (Steps 1.1–1.6 hoàn thành)
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 
 ## Steps
 
-### Step 1.1 — Học (2-3 ngày, song song với Step 1.2)
+### Step 1.1 — Học (2-3 ngày, song song với Step 1.2) ✅ DONE
 
 **Mục tiêu:** Nắm vững patterns cần thiết từ khóa học.
 
@@ -34,7 +34,7 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 
 **Verify:** Hiểu và sẵn sàng áp dụng patterns
 
-### Step 1.2 — Mock UI: Dashboard Menu & Table Management (3-4 ngày)
+### Step 1.2 — Mock UI: Dashboard Menu & Table Management (3-4 ngày) ✅ DONE
 
 **Mục tiêu:** Giao diện Dashboard cho Owner/Manager quản lý menu và bàn — dùng mock data.
 
@@ -55,7 +55,7 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 
 **Verify:** Tất cả trang render đúng với mock data, responsive trên desktop
 
-### Step 1.25 — Auth Frontend & Custom Keycloak UI (2-3 ngày)
+### Step 1.25 — Auth Frontend & Custom Keycloak UI (2-3 ngày) ✅ DONE
 
 **Mục tiêu:** Navigation Guard cho Management App + custom Keycloak login theme.
 
@@ -71,7 +71,7 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 
 **Verify:** Truy cập `/dashboard` không có token → redirect tới Keycloak login (giao diện custom)
 
-### Step 1.3 — Mock UI: Customer PWA Menu (2-3 ngày)
+### Step 1.3 — Mock UI: Customer PWA Menu (2-3 ngày) ✅ DONE
 
 **Mục tiêu:** Giao diện menu mobile-first cho khách hàng — dùng mock data.
 
@@ -114,7 +114,7 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 
 **Verify:** Types import được từ cả frontend và backend qua path aliases
 
-### Step 1.45 — CloudinaryModule Setup (1-2 ngày)
+### Step 1.45 — CloudinaryModule Setup (1-2 ngày) ✅ DONE
 
 **Mục tiêu:** Module upload ảnh dùng chung, tenant-isolated.
 
@@ -136,7 +136,7 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 
 **Verify:** Upload 1 ảnh test → URL trả về đúng, ảnh lưu đúng tenant folder, transformations hoạt động
 
-### Step 1.5 — Catalog Service Backend (5-7 ngày)
+### Step 1.5 — Catalog Service Backend (5-7 ngày) ✅ DONE
 
 **Mục tiêu:** Catalog Service hoàn chỉnh với CRUD cho menu và tables, tích hợp Cloudinary, và cache layer.
 
@@ -184,7 +184,7 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 
 **Verify:** Postman/Thunder Client test tất cả endpoints — CRUD + image upload + QR validate
 
-### Step 1.6 — Tích hợp FE ↔ BE (3-4 ngày)
+### Step 1.6 — Tích hợp FE ↔ BE (3-4 ngày) ✅ DONE
 
 **Mục tiêu:** Kết nối frontend apps với Catalog Service qua BFF API.
 
@@ -204,15 +204,17 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 
 ## Acceptance Criteria
 
-- [ ] Owner CRUD menu trên Dashboard → data hiện đúng
-- [ ] Owner upload ảnh menu item → ảnh hiển thị trên Dashboard + Customer PWA
-- [ ] Image upload: validate file type/size → reject nếu không hợp lệ
-- [ ] Cloudinary storage: ảnh lưu đúng path `qrtable/{tenant_id}/menu/`
-- [ ] Customer quét QR → validate → thấy menu đúng bàn, đúng tenant
-- [ ] Redis cache: menu load < 100ms (cache hit)
-- [ ] Table state machine chuyển trạng thái đúng
-- [ ] Multi-tenant: tenant A không thấy data tenant B
-- [ ] Soft delete: MenuItem có deleted_at, không xóa MenuItem đang có đơn liên quan
+- [x] Owner CRUD menu trên Dashboard → data hiện đúng
+- [x] Owner upload ảnh menu item → ảnh hiển thị trên Dashboard + Customer PWA
+- [x] Image upload: validate file type/size → reject nếu không hợp lệ
+- [x] Cloudinary storage: ảnh lưu đúng path `qrtable/{tenant_id}/menu/`
+- [x] Customer quét QR → validate → thấy menu đúng bàn, đúng tenant
+- [x] Redis cache: menu load < 100ms (cache hit)
+- [x] Table state machine chuyển trạng thái đúng
+- [x] Multi-tenant: tenant A không thấy data tenant B
+- [x] Soft delete: MenuItem có `deleted_at`; ràng buộc “có đơn đang mở thì không xóa” gắn với **Order Service (Phase 2A)** theo spec Step 1.5 — Catalog đã sẵn sàng soft delete và tenant isolation
+
+> **Ghi chú:** Các mục trên đã đạt trong phạm vi Phase 1 đã triển khai; backlog tùy chọn (export QR PDF, v.v.) không chặn trạng thái DONE của phase.
 
 ## Outputs cho Phase 2A
 

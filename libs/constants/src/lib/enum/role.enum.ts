@@ -5,8 +5,6 @@ export enum ROLE {
   WAITER = 'WAITER',
   CHEF = 'CHEF',
   BARISTA = 'BARISTA',
-  ADMINISTRATOR = 'administrator',
-  ACCOUNTANT = 'accountant',
 }
 
 export enum PERMISSION {
@@ -46,10 +44,40 @@ export enum PERMISSION {
   ROLE_UPDATE = 'role.update',
   ROLE_DELETE = 'role.delete',
 
-  /* PRODUCT */
+  /* PRODUCT (legacy template — kept for SUPER_ADMIN backward compat) */
   PRODUCT_CREATE = 'product.create',
   PRODUCT_GET_BY_ID = 'product.get_by_id',
   PRODUCT_GET_ALL = 'product.get_all',
   PRODUCT_UPDATE = 'product.update',
   PRODUCT_DELETE = 'product.delete',
+
+  /* ORDER (Phase 2A) */
+  ORDER_CREATE = 'order.create',
+  ORDER_CONFIRM = 'order.confirm',
+  ORDER_CANCEL = 'order.cancel',
+  ORDER_GET_LIST = 'order.get_list',
+  ORDER_GET_BY_ID = 'order.get_by_id',
+
+  /* KITCHEN (Phase 2B) */
+  KITCHEN_GET_QUEUE = 'kitchen.get_queue',
+  KITCHEN_UPDATE_TICKET = 'kitchen.update_ticket',
+  KITCHEN_RECALL = 'kitchen.recall',
+
+  /* PAYMENT (Phase 3) */
+  PAYMENT_CREATE = 'payment.create',
+  PAYMENT_CONFIRM_CASH = 'payment.confirm_cash',
+  PAYMENT_REFUND = 'payment.refund',
+  PAYMENT_GET_HISTORY = 'payment.get_history',
+
+  /* TABLE (Phase 1-2A) */
+  TABLE_CREATE = 'table.create',
+  TABLE_UPDATE = 'table.update',
+  TABLE_DELETE = 'table.delete',
+  TABLE_TRANSFER = 'table.transfer',
+  TABLE_UPDATE_STATUS = 'table.update_status',
+
+  /* SERVICE_REQUEST (Phase 2A) */
+  SERVICE_REQUEST_CREATE = 'service_request.create',
+  SERVICE_REQUEST_ACKNOWLEDGE = 'service_request.acknowledge',
+  SERVICE_REQUEST_RESOLVE = 'service_request.resolve',
 }

@@ -149,8 +149,6 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
 | **CHEF**        | Đầu bếp                                | Single-tenant               | Đầu bếp           | `CHEF`            |
 | **BARISTA**     | Nhân viên pha chế                      | Single-tenant               | Nhân viên pha chế | `BARISTA`         |
 
-**Cũ (không dùng nữa):** `administrator`, `accountant` (được thay thế bằng mô hình trên)
-
 ### 3.2 Actor Đặc Biệt: CUSTOMER (Guest)
 
 **Customer** không phải role trong Keycloak mà là:
@@ -1142,8 +1140,6 @@ private validateRoleMapping(keycloakRoles: string[], internalRoles?: Role[]): bo
 
 ## 9. Permission Matrix Chi Tiết
 
-> **⚠️ LƯU Ý QUAN TRỌNG (04/2026):** Permission enum hiện tại chỉ cover 6 domain gốc (SAAS, CATALOG, INVOICE, USER, ROLE, PRODUCT). Khi bắt đầu Phase 2, cần mở rộng thêm 5 domain mới: **ORDER, KITCHEN, PAYMENT, TABLE, SERVICE_REQUEST**. Xem chi tiết tại `implementation_plan.md` — **PRE-PHASE 2 — PERMISSION & SEED EXTENSION (Step 2.0)**.
-
 ### 9.1 Permission Enum
 
 **File:** `libs/constants/src/lib/enum/role.enum.ts`
@@ -1186,180 +1182,83 @@ export enum PERMISSION {
   ROLE_UPDATE = 'role.update',
   ROLE_DELETE = 'role.delete',
 
-  /* PRODUCT */
+  /* PRODUCT (legacy) */
   PRODUCT_CREATE = 'product.create',
   PRODUCT_GET_BY_ID = 'product.get_by_id',
   PRODUCT_GET_ALL = 'product.get_all',
   PRODUCT_UPDATE = 'product.update',
   PRODUCT_DELETE = 'product.delete',
 
-  // ────────────────────────────────────────────────
-  // 🔜 CẦN BỔ SUNG TẠI STEP 2.0 (Pre-Phase 2):
-  // ────────────────────────────────────────────────
-
   /* ORDER (Phase 2A) */
-  // ORDER_CREATE = 'order.create',
-  // ORDER_CONFIRM = 'order.confirm',
-  // ORDER_CANCEL = 'order.cancel',
-  // ORDER_GET_LIST = 'order.get_list',
-  // ORDER_GET_BY_ID = 'order.get_by_id',
+  ORDER_CREATE = 'order.create',
+  ORDER_CONFIRM = 'order.confirm',
+  ORDER_CANCEL = 'order.cancel',
+  ORDER_GET_LIST = 'order.get_list',
+  ORDER_GET_BY_ID = 'order.get_by_id',
 
   /* KITCHEN (Phase 2B) */
-  // KITCHEN_GET_QUEUE = 'kitchen.get_queue',
-  // KITCHEN_UPDATE_TICKET = 'kitchen.update_ticket',
-  // KITCHEN_RECALL = 'kitchen.recall',
+  KITCHEN_GET_QUEUE = 'kitchen.get_queue',
+  KITCHEN_UPDATE_TICKET = 'kitchen.update_ticket',
+  KITCHEN_RECALL = 'kitchen.recall',
 
   /* PAYMENT (Phase 3) */
-  // PAYMENT_CREATE = 'payment.create',
-  // PAYMENT_CONFIRM_CASH = 'payment.confirm_cash',
-  // PAYMENT_REFUND = 'payment.refund',
-  // PAYMENT_GET_HISTORY = 'payment.get_history',
+  PAYMENT_CREATE = 'payment.create',
+  PAYMENT_CONFIRM_CASH = 'payment.confirm_cash',
+  PAYMENT_REFUND = 'payment.refund',
+  PAYMENT_GET_HISTORY = 'payment.get_history',
 
-  /* TABLE (Phase 1-2) */
-  // TABLE_CREATE = 'table.create',
-  // TABLE_UPDATE = 'table.update',
-  // TABLE_DELETE = 'table.delete',
-  // TABLE_TRANSFER = 'table.transfer',
-  // TABLE_UPDATE_STATUS = 'table.update_status',
+  /* TABLE (Phase 1-2A) */
+  TABLE_CREATE = 'table.create',
+  TABLE_UPDATE = 'table.update',
+  TABLE_DELETE = 'table.delete',
+  TABLE_TRANSFER = 'table.transfer',
+  TABLE_UPDATE_STATUS = 'table.update_status',
 
-  /* SERVICE REQUEST (Phase 2A) */
-  // SERVICE_REQUEST_CREATE = 'service_request.create',
-  // SERVICE_REQUEST_ACKNOWLEDGE = 'service_request.acknowledge',
-  // SERVICE_REQUEST_RESOLVE = 'service_request.resolve',
+  /* SERVICE_REQUEST (Phase 2A) */
+  SERVICE_REQUEST_CREATE = 'service_request.create',
+  SERVICE_REQUEST_ACKNOWLEDGE = 'service_request.acknowledge',
+  SERVICE_REQUEST_RESOLVE = 'service_request.resolve',
 }
 ```
 
-### 9.2 Permission Matrix: Role → Permissions
+### 9.2 Permission Matrix: Role → Permissions (Active — Step 2.0)
 
-> **Bảng này chỉ hiển thị permissions HIỆN TẠI.** Khi hoàn thành Step 2.0 (Pre-Phase 2), cần bổ sung thêm cột: ORDER, KITCHEN, PAYMENT, TABLE, SERVICE_REQUEST.
+> Single source of truth: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md)
 
-| **Role**               | **SAAS**                                             | **CATALOG**                   | **INVOICE**        | **USER**                      | **ROLE** | **PRODUCT** |
-| ---------------------- | ---------------------------------------------------- | ----------------------------- | ------------------ | ----------------------------- | -------- | ----------- |
-| **SUPER_ADMIN**        | ✅ All (create, get_by_id, get_list, update, delete) | ✅ All                        | ✅ All (+ send)    | ✅ All                        | ✅ All   | ✅ All      |
-| **OWNER**              | ❌                                                   | create, get\*, update, delete | get_by_id, get_all | create, get\*, update, delete | ❌       | ❌          |
-| **MANAGER**            | ❌                                                   | create, get\*, update, delete | get_by_id, get_all | create                        | ❌       | ❌          |
-| **WAITER**             | ❌                                                   | get_by_id, get_list           | get_by_id, get_all | ❌                            | ❌       | ❌          |
-| **CHEF**               | ❌                                                   | get_by_id, get_list           | ❌                 | ❌                            | ❌       | ❌          |
-| **BARISTA**            | ❌                                                   | get_by_id, get_list           | ❌                 | ❌                            | ❌       | ❌          |
-| **CUSTOMER** (session) | ❌                                                   | get_by_id, get_list\*         | ❌                 | ❌                            | ❌       | ❌          |
-
-**🔜 Permission Matrix mở rộng (Step 2.0 — Pre-Phase 2):**
-
-| **Role**               | **ORDER**                    | **KITCHEN**                      | **PAYMENT**               | **TABLE**               | **SERVICE_REQUEST**       |
-| ---------------------- | ---------------------------- | -------------------------------- | ------------------------- | ----------------------- | ------------------------- |
-| **SUPER_ADMIN**        | ✅ All                       | ✅ All                           | ✅ All                    | ✅ All                  | ✅ All                    |
-| **OWNER**              | ✅ All                       | ✅ All                           | ✅ All                    | ✅ All                  | ✅ All                    |
-| **MANAGER**            | ✅ All                       | ✅ All                           | ✅ All                    | ✅ All                  | ✅ All                    |
-| **WAITER**             | confirm, get_list, get_by_id | ❌                               | confirm_cash, get_history | transfer, update_status | ✅ All                    |
-| **CHEF**               | ❌                           | get_queue, update_ticket, recall | ❌                        | ❌                      | ❌                        |
-| **BARISTA**            | ❌                           | get_queue, update_ticket, recall | ❌                        | ❌                      | ❌                        |
-| **CUSTOMER** (session) | create (via SessionGuard)    | ❌                               | create (via SessionGuard) | ❌                      | create (via SessionGuard) |
+| **Role**               | **SAAS** | **CATALOG**                   | **INVOICE**        | **USER**                              | **ROLE** | **PRODUCT** | **ORDER**                    | **KITCHEN**                      | **PAYMENT**                                       | **TABLE**               | **SERVICE_REQUEST**       |
+| ---------------------- | -------- | ----------------------------- | ------------------ | ------------------------------------- | -------- | ----------- | ---------------------------- | -------------------------------- | ------------------------------------------------- | ----------------------- | ------------------------- |
+| **SUPER_ADMIN**        | ✅ All   | ✅ All                        | ✅ All (+ send)    | ✅ All                                | ✅ All   | ✅ All      | ✅ All                       | ✅ All                           | ✅ All                                            | ✅ All                  | ✅ All                    |
+| **OWNER**              | ❌       | create, get\*, update, delete | get_by_id, get_all | create, get\*, update, delete         | ❌       | ❌          | ✅ All                       | ✅ All                           | ✅ All                                            | ✅ All                  | ✅ All                    |
+| **MANAGER**            | ❌       | create, get\*, update, delete | get_by_id, get_all | create, get\*, update **(no delete)** | ❌       | ❌          | ✅ All                       | ✅ All                           | ✅ All                                            | ✅ All                  | ✅ All                    |
+| **WAITER**             | ❌       | get_by_id, get_list           | get_by_id, get_all | ❌                                    | ❌       | ❌          | confirm, get_list, get_by_id | ❌                               | confirm_cash, **get_history**                     | transfer, update_status | ✅ All                    |
+| **CHEF**               | ❌       | get_by_id, get_list           | ❌                 | ❌                                    | ❌       | ❌          | ❌                           | get_queue, update_ticket, recall | ❌                                                | ❌                      | ❌                        |
+| **BARISTA**            | ❌       | get_by_id, get_list           | ❌                 | ❌                                    | ❌       | ❌          | ❌                           | get_queue, update_ticket, recall | ❌                                                | ❌                      | ❌                        |
+| **CUSTOMER** (session) | ❌       | get_by_id, get_list\*         | ❌                 | ❌                                    | ❌       | ❌          | create (via SessionGuard)    | ❌                               | request-bill (via SessionGuard, controller-level) | ❌                      | create (via SessionGuard) |
 
 **Ghi chú:**
 
-- `get*` = get_by_id + get_list
+- `get*` = `get_by_id` + `get_list` (hoặc `get_all` cho INVOICE/USER/ROLE/PRODUCT — legacy naming)
 - CUSTOMER không có "role" thực sự, chỉ có session → permissions hardcoded tại controller level
+- **MANAGER không có `user.delete`** — Manager là operational role; xóa user là HR action thuộc Owner
+- **OWNER + MANAGER không có `invoice.create/update/delete/send`** — Bills thuộc Order Service, INVOICE\_\* legacy
+- **WAITER có `payment.get_history`** — cho "last bill" queries từ customer
 
 ### 9.3 Data File: role.json
 
 **File:** `apps/user-access/src/seeder/role.json`
 
-```json
-{
-  "collection": "role",
-  "data": [
-    {
-      "_id": {
-        "$oid": "68a3f2f1b3e811435a8ad004"
-      },
-      "name": "SUPER_ADMIN",
-      "description": "platform-level super admin with cross-tenant capabilities",
-      "permissions": [
-        "saas.create",
-        "saas.get_by_id",
-        "saas.get_list",
-        "saas.update",
-        "saas.delete",
-        "catalog.create",
-        "catalog.get_by_id",
-        "catalog.get_list",
-        "catalog.update",
-        "catalog.delete",
-        "invoice.create",
-        "invoice.get_by_id",
-        "invoice.get_all",
-        "invoice.update",
-        "invoice.delete",
-        "invoice.send",
-        "user.create",
-        "user.get_by_id",
-        "user.get_all",
-        "user.update",
-        "user.delete",
-        "role.create",
-        "role.get_by_id",
-        "role.get_all",
-        "role.update",
-        "role.delete",
-        "product.create",
-        "product.get_by_id",
-        "product.get_all",
-        "product.update",
-        "product.delete"
-      ]
-    },
-    {
-      "_id": { "$oid": "68a3f2f1b3e811435a8ad005" },
-      "name": "OWNER",
-      "description": "tenant owner with full management permissions",
-      "permissions": [
-        "catalog.create",
-        "catalog.get_by_id",
-        "catalog.get_list",
-        "catalog.update",
-        "catalog.delete",
-        "user.create",
-        "user.get_by_id",
-        "user.get_all",
-        "user.update",
-        "user.delete",
-        "invoice.get_by_id",
-        "invoice.get_all"
-      ]
-    },
-    {
-      "_id": { "$oid": "68a3f2f1b3e811435a8ad006" },
-      "name": "MANAGER",
-      "description": "tenant manager with operational permissions",
-      "permissions": [
-        "catalog.create",
-        "catalog.get_by_id",
-        "catalog.get_list",
-        "catalog.update",
-        "catalog.delete",
-        "user.create",
-        "invoice.get_by_id",
-        "invoice.get_all"
-      ]
-    },
-    {
-      "_id": { "$oid": "68a3f2f1b3e811435a8ad007" },
-      "name": "WAITER",
-      "permissions": ["catalog.get_by_id", "catalog.get_list", "invoice.get_by_id", "invoice.get_all"]
-    },
-    {
-      "_id": { "$oid": "68a3f2f1b3e811435a8ad008" },
-      "name": "CHEF",
-      "permissions": ["catalog.get_by_id", "catalog.get_list"]
-    },
-    {
-      "_id": { "$oid": "68a3f2f1b3e811435a8ad009" },
-      "name": "BARISTA",
-      "permissions": ["catalog.get_by_id", "catalog.get_list"]
-    }
-  ]
-}
-```
+**Current contents (Step 2.0 — 2026-04-19):** Full canonical matrix với 6 roles và 51 permissions distributed per [`permission-matrix.md`](../architecture/permission-matrix.md) §6. Permission counts:
+
+| Role        | Permission count |
+| ----------- | ---------------- |
+| SUPER_ADMIN | 51               |
+| OWNER       | 32               |
+| MANAGER     | 31               |
+| WAITER      | 14               |
+| CHEF        | 5                |
+| BARISTA     | 5                |
+
+Refer to actual file `apps/user-access/src/seeder/role.json` for full content (auto-generated from canonical matrix).
 
 ---
 
@@ -1933,7 +1832,7 @@ Cause 2: User profile exists nhưng roles mismatch
 Cause 3: Role mapping validation fails
 ├─ Check:
 │  └─ Keycloak roles & DB roles have intersection?
-│  └─ If NOT: User has OWNER in token but only ADMINISTRATOR in DB (old role)
+│  └─ If NOT: Token roles and DB role names share no intersection (stale `user.roles` or wrong realm assignment)
 ├─ Solution:
 │  └─ Reseed roles (toggle old roles to new): prune mode
 │  └─ Update user.roles to new roles ObjectId
@@ -2012,7 +1911,7 @@ POST /authorizer/login
 2. **Role mapping validation:**
    - Keycloak roles (từ realm) ≠ Internal roles (từ MongoDB)
    - MUST have intersection (giao nhau) để hợp lệ
-   - Nếu user có OWNER token role nhưng DB role là ADMINISTRATOR → ROLE_MAPPING_MISMATCH 401
+   - Nếu token có `OWNER` nhưng các role trong MongoDB không có tên trùng với realm roles → ROLE_MAPPING_MISMATCH 401
 
 3. **Permission collection:**
    - Permissions đến từ user.roles[*].permissions
@@ -2107,7 +2006,7 @@ Hệ thống authentication, authorization, role, và permission của QRTable �
 1. ✅ **Hỗ trợ 2 actor loại:** Staff (JWT từ Keycloak) + Customer (Session anonymous)
 2. ✅ **Enforce tenant isolation:** Mọi request có tenantId, prevent cross-tenant access
 3. ✅ **Validate role consistency:** Keycloak roles ∩ Internal roles ≠ ∅
-4. ✅ **Granular permissions:** 6 roles + 30+ permissions, flexible assignment
+4. ✅ **Granular permissions:** 6 roles + 51 permissions, flexible assignment
 5. ✅ **Caching & performance:** Token cached 30 min, session cached 24h + idle 30 min
 6. ✅ **Debug-friendly:** Clear error codes, processId tracking, structured logging
 

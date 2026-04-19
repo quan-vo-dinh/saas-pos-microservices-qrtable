@@ -29,7 +29,7 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 **Yêu cầu chính:**
 
 - Bổ sung enum permission: `ORDER_CREATE`, `ORDER_CONFIRM`, `ORDER_CANCEL`, `ORDER_GET_LIST`, `ORDER_GET_BY_ID`, `KITCHEN_GET_QUEUE`, `KITCHEN_UPDATE_TICKET`, `KITCHEN_RECALL`, `PAYMENT_CREATE`, `PAYMENT_CONFIRM_CASH`, `PAYMENT_REFUND`, `PAYMENT_GET_HISTORY`, `TABLE_CREATE`, `TABLE_UPDATE`, `TABLE_DELETE`, `TABLE_TRANSFER`, `TABLE_UPDATE_STATUS`, `SERVICE_REQUEST_CREATE`, `SERVICE_REQUEST_ACKNOWLEDGE`, `SERVICE_REQUEST_RESOLVE`
-- Mapping role → permission: **OWNER** (full trừ các quyền `SAAS_*` nếu có trong hệ thống), **MANAGER** (tương tự OWNER, không gồm `SAAS_*`), **WAITER** (`ORDER_CONFIRM`, `ORDER_GET_*`, `PAYMENT_CONFIRM_CASH`, `TABLE_TRANSFER`, `TABLE_UPDATE_STATUS`, `SERVICE_REQUEST_*`, `CATALOG_GET_*`), **CHEF/BARISTA** (`KITCHEN_*`, `CATALOG_GET_*`), **CUSTOMER** không gán qua matrix này — kiểm soát ở tầng controller bằng `SessionGuard` (table/session scope)
+- Mapping role → permission: **OWNER** (full trừ các quyền `SAAS_*`, `ROLE_*`, `PRODUCT_*`), **MANAGER** (tương tự OWNER, không gồm `USER_DELETE`), **WAITER** (`ORDER_CONFIRM`, `ORDER_GET_*`, `PAYMENT_CONFIRM_CASH`, `PAYMENT_GET_HISTORY`, `TABLE_TRANSFER`, `TABLE_UPDATE_STATUS`, `SERVICE_REQUEST_*`, `CATALOG_GET_*`, `INVOICE_GET_*`), **CHEF/BARISTA** (`KITCHEN_*`, `CATALOG_GET_*`), **CUSTOMER** không gán qua matrix này — kiểm soát ở tầng controller bằng `SessionGuard` (table/session scope). Canonical matrix: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md).
 - Chuỗi guard cho endpoint staff: `UserGuard` → `TenantGuard` → `PermissionGuard` (thứ tự bắt buộc theo kiến trúc platform)
 
 **Lưu ý quan trọng:**
@@ -39,7 +39,7 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 **Kịch bản kiểm thử cụ thể:**
 
 - User có role WAITER → gọi được ORDER_CONFIRM endpoint
-- User có role CHEF → KHÔNG gọi được PAYMENT\_\* endpoint
+- User có role CHEF → KHÔNG gọi được PAYMENT endpoint
 
 **Deliverable:** Document Permission Matrix → `docs/architecture/permission-matrix.md`
 
@@ -89,7 +89,7 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 
 **Mục tiêu:** Một nguồn sự thật cho FE/BE về đơn, dòng món, hóa đơn, phiên, giỏ, yêu cầu phục vụ và payload WebSocket — tránh drift khi Order Service và BFF phát sự kiện.
 
-**Yêu cầu chính:**
+**Yêu cầu cxhính:**
 
 - Enum `OrderStatus` với nhánh chính: **DRAFT → PENDING → PROCESSING → READY → SERVED → COMPLETED** và nhánh **CANCELED** (chuyển từ các trạng thái cho phép theo business-logic §8)
 - `ServiceRequestType` và các interface domain: `IOrder`, `IOrderItem`, `IBill`, `ISession`, `ICartItem`, `IServiceRequest`
@@ -100,7 +100,7 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 ```
 IOrder { id, tenantId, tableId, sessionId, status, totalAmount, idempotencyKey, createdAt, updatedAt }
 IOrderItem { id, orderId, menuItemId, quantity, price, note, status }
-IBill { id, tenantId, sessionId, subtotal, total, status, paymentMethod, roundingAmount }
+IBill { id, tenantId, sessionId, subotal, total, status, paymentMethod, roundingAmount }
 ISession { tableId, startedAt, status, lastActivity }
 ICartItem { menuItemId, qty, note?, price, version }
 IServiceRequest { id, tenantId, tableId, sessionId, type, status, createdAt }
@@ -130,8 +130,8 @@ IKDSTicket { ticketId, tableId, items, priority: boolean }
 - **Khóa tồn kho:** pessimistic lock trên PostgreSQL (**SELECT … FOR UPDATE**) trên dòng tồn/menu item liên quan khi confirm. Flow: nếu `stock >= requested` → deduct stock + create order_item + COMMIT; nếu không đủ → ROLLBACK → trả "Món đã hết" cho client — tránh oversell
 - **Tổng hợp bill theo session:** merge nhiều orders thành 1 bill per session; **chuyển bàn** thực hiện **atomic**: validate bàn đích status == Available → BEGIN → cập nhật orders, sessions, cart, bàn cũ → Available, bàn mới → Occupied → COMMIT → notify KDS về sự thay đổi
 - **Service request:** entity lưu trạng thái phục vụ — type: `CALL_STAFF` | `REQUEST_BILL` | `GENERAL_HELP`; status flow: `PENDING` → `ACKNOWLEDGED` → `RESOLVED`
-- **Kafka:** chỉ producer topic **`order.confirmed`** trong phase này (đúng registry §7.2)
-- **BFF Direct (AP1, không Kafka):** sau tác vụ thành công, emit **`order.created`** và **`service.requested`** → gateway WebSocket tới client
+- **Kafka:** chỉ producer topic `**order.confirmed`\*\* trong phase này (đúng registry §7.2)
+- **BFF Direct (AP1, không Kafka):** sau tác vụ thành công, emit `**order.created`** và `**service.requested\*\*` → gateway WebSocket tới client
 - Môi trường dev: broker Kafka + Zookeeper chạy cùng stack container với các service khác
 - Module client Kafka dùng chung (producer config, error handling, observability cơ bản)
 
@@ -166,16 +166,16 @@ IKDSTicket { ticketId, tableId, items, priority: boolean }
 
 ## Acceptance Criteria
 
-- [ ] Enum permission Step 2.0 đầy đủ; role seed MongoDB khớp mapping OWNER / MANAGER / WAITER / CHEF / BARISTA
-- [ ] Endpoint staff đi qua `UserGuard` → `TenantGuard` → `PermissionGuard`; CUSTOMER bọc `SessionGuard` đúng scope
-- [ ] `OrderStatus` và chuyển trạng thái khớp §8 (kể cả nhánh CANCELED)
-- [ ] Redis: `session:{tid}:{sid}` TTL 2h, idle 30 phút; `cart:{tid}:{sid}` Hash có version, cập nhật không ghi đè lẫn nhau khi conflict
-- [ ] Bill thuộc Order Service (PostgreSQL), không nằm Payment Service
-- [ ] Kafka: có message hợp lệ trên topic duy nhất **`order.confirmed`**
-- [ ] BFF Direct: **`order.created`** và **`service.requested`** dẫn tới emit WebSocket cho client
-- [ ] Xác nhận đơn dùng pessimistic lock tồn kho; stress đơn giản không oversell
-- [ ] Chuyển bàn atomic; không orphan order/cart
-- [ ] Customer PWA và POS dùng API thật; multi-tenant cô lập
+- Enum permission Step 2.0 đầy đủ; role seed MongoDB khớp mapping OWNER / MANAGER / WAITER / CHEF / BARISTA
+- Endpoint staff đi qua `UserGuard` → `TenantGuard` → `PermissionGuard`; CUSTOMER bọc `SessionGuard` đúng scope
+- `OrderStatus` và chuyển trạng thái khớp §8 (kể cả nhánh CANCELED)
+- Redis: `session:{tid}:{sid}` TTL 2h, idle 30 phút; `cart:{tid}:{sid}` Hash có version, cập nhật không ghi đè lẫn nhau khi conflict
+- Bill thuộc Order Service (PostgreSQL), không nằm Payment Service
+- Kafka: có message hợp lệ trên topic duy nhất `**order.confirmed`\*\*
+- BFF Direct: `**order.created**` và `**service.requested**` dẫn tới emit WebSocket cho client
+- Xác nhận đơn dùng pessimistic lock tồn kho; stress đơn giản không oversell
+- Chuyển bàn atomic; không orphan order/cart
+- Customer PWA và POS dùng API thật; multi-tenant cô lập
 
 ## Outputs cho Phase tiếp theo
 

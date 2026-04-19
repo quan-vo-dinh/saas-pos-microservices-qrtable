@@ -24,7 +24,7 @@ Phân rã thành các tài liệu con, mỗi file đại diện cho 1 phase có 
 ### Tiến độ dự án hiện tại
 
 - **Phase 0:** ✅ Hoàn thành (Step 0.1 → 0.7)
-- **Phase 1:** 🔶 Đang triển khai — đã xong đến Step 1.4 (Shared Types)
+- **Phase 1:** ✅ Hoàn thành (Steps 1.1–1.6)
 - **Phase 2+:** Chưa bắt đầu
 
 ---
@@ -197,7 +197,7 @@ Lý do: AI/developer khi triển khai sẽ đọc codebase thực tế — plan 
 | Header + nguyên tắc           | 1-13      | Master index                     | Rút gọn                     |
 | Tổng quan lộ trình            | 14-31     | Master index                     | Thêm links, cập nhật status |
 | Phase 0 (Steps 0.1-0.7 + AC)  | 35-214    | `phase-0-foundation.md`          | ✅ DONE                     |
-| Phase 1 (Steps 1.1-1.6 + AC)  | 217-465   | `phase-1-catalog.md`             | 🔶 IN PROGRESS              |
+| Phase 1 (Steps 1.1-1.6 + AC)  | 217-465   | `phase-1-catalog.md`             | ✅ DONE                     |
 | Pre-Phase 2 (Step 2.0 + AC)   | 468-518   | `phase-2a-order-kafka.md`        | Merge đầu file              |
 | Phase 2A (Steps 2.1-2.5 + AC) | 521-653   | `phase-2a-order-kafka.md`        | Fix #4                      |
 | Phase 2B (Steps 2.6-2.7 + AC) | 657-743   | `phase-2b-kitchen-websocket.md`  |                             |
@@ -228,7 +228,7 @@ Nguyên tắc chuyển đổi:
 
 **`phase-1-catalog.md`** (~120-150 dòng)
 
-- 🔶 IN PROGRESS — Step 1.4 done, next: Step 1.45
+- ✅ DONE — Steps 1.1–1.6 và acceptance đã đóng (đồng bộ `implementation_plan.md`)
 - 8 steps: Học (1.1), Mock UI Dashboard (1.2), Auth Frontend + Keycloakify (1.25), Mock UI Customer (1.3), Shared Types (1.4), Cloudinary (1.45), Catalog Backend (1.5), FE↔BE (1.6)
 - Key: Cloudinary module, BFF Direct (chưa có Kafka), Table State Machine
 

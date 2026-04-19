@@ -81,7 +81,7 @@ export class UserRepository {
     let roles = await this.roleModel.find({ name: { $in: queryNames } }).exec();
 
     if (!roles.length) {
-      roles = await this.roleModel.find({ name: { $in: [ROLE.WAITER, ROLE.ACCOUNTANT] } }).exec();
+      roles = await this.roleModel.find({ name: { $in: [ROLE.WAITER] } }).exec();
     }
 
     return roles.map((role: Role) => role._id).filter((id): id is ObjectId => Boolean(id));

@@ -38,7 +38,27 @@
         "product.get_by_id",
         "product.get_all",
         "product.update",
-        "product.delete"
+        "product.delete",
+        "order.create",
+        "order.confirm",
+        "order.cancel",
+        "order.get_list",
+        "order.get_by_id",
+        "kitchen.get_queue",
+        "kitchen.update_ticket",
+        "kitchen.recall",
+        "payment.create",
+        "payment.confirm_cash",
+        "payment.refund",
+        "payment.get_history",
+        "table.create",
+        "table.update",
+        "table.delete",
+        "table.transfer",
+        "table.update_status",
+        "service_request.create",
+        "service_request.acknowledge",
+        "service_request.resolve"
       ]
     },
     {
@@ -46,20 +66,40 @@
         "$oid": "68a3f2f1b3e811435a8ad005"
       },
       "name": "OWNER",
-      "description": "tenant owner with full management permissions in own tenant",
+      "description": "tenant owner with full operational + HR permissions",
       "permissions": [
         "catalog.create",
         "catalog.get_by_id",
         "catalog.get_list",
         "catalog.update",
         "catalog.delete",
+        "invoice.get_by_id",
+        "invoice.get_all",
         "user.create",
         "user.get_by_id",
         "user.get_all",
         "user.update",
         "user.delete",
-        "invoice.get_by_id",
-        "invoice.get_all"
+        "order.create",
+        "order.confirm",
+        "order.cancel",
+        "order.get_list",
+        "order.get_by_id",
+        "kitchen.get_queue",
+        "kitchen.update_ticket",
+        "kitchen.recall",
+        "payment.create",
+        "payment.confirm_cash",
+        "payment.refund",
+        "payment.get_history",
+        "table.create",
+        "table.update",
+        "table.delete",
+        "table.transfer",
+        "table.update_status",
+        "service_request.create",
+        "service_request.acknowledge",
+        "service_request.resolve"
       ]
     },
     {
@@ -67,16 +107,39 @@
         "$oid": "68a3f2f1b3e811435a8ad006"
       },
       "name": "MANAGER",
-      "description": "tenant manager with operational permissions",
+      "description": "tenant manager with operational permissions (no user delete)",
       "permissions": [
         "catalog.create",
         "catalog.get_by_id",
         "catalog.get_list",
         "catalog.update",
         "catalog.delete",
-        "user.create",
         "invoice.get_by_id",
-        "invoice.get_all"
+        "invoice.get_all",
+        "user.create",
+        "user.get_by_id",
+        "user.get_all",
+        "user.update",
+        "order.create",
+        "order.confirm",
+        "order.cancel",
+        "order.get_list",
+        "order.get_by_id",
+        "kitchen.get_queue",
+        "kitchen.update_ticket",
+        "kitchen.recall",
+        "payment.create",
+        "payment.confirm_cash",
+        "payment.refund",
+        "payment.get_history",
+        "table.create",
+        "table.update",
+        "table.delete",
+        "table.transfer",
+        "table.update_status",
+        "service_request.create",
+        "service_request.acknowledge",
+        "service_request.resolve"
       ]
     },
     {
@@ -84,24 +147,51 @@
         "$oid": "68a3f2f1b3e811435a8ad007"
       },
       "name": "WAITER",
-      "description": "service staff role for day-to-day floor operations",
-      "permissions": ["catalog.get_by_id", "catalog.get_list", "invoice.get_by_id", "invoice.get_all"]
+      "description": "service staff role for floor operations and cash payment confirmation",
+      "permissions": [
+        "catalog.get_by_id",
+        "catalog.get_list",
+        "invoice.get_by_id",
+        "invoice.get_all",
+        "order.confirm",
+        "order.get_list",
+        "order.get_by_id",
+        "payment.confirm_cash",
+        "payment.get_history",
+        "table.transfer",
+        "table.update_status",
+        "service_request.create",
+        "service_request.acknowledge",
+        "service_request.resolve"
+      ]
     },
     {
       "_id": {
         "$oid": "68a3f2f1b3e811435a8ad008"
       },
       "name": "CHEF",
-      "description": "kitchen staff role",
-      "permissions": ["catalog.get_by_id", "catalog.get_list"]
+      "description": "kitchen staff role — manages food tickets in KDS",
+      "permissions": [
+        "catalog.get_by_id",
+        "catalog.get_list",
+        "kitchen.get_queue",
+        "kitchen.update_ticket",
+        "kitchen.recall"
+      ]
     },
     {
       "_id": {
         "$oid": "68a3f2f1b3e811435a8ad009"
       },
       "name": "BARISTA",
-      "description": "bar staff role",
-      "permissions": ["catalog.get_by_id", "catalog.get_list"]
+      "description": "bar staff role — manages drink tickets in KDS",
+      "permissions": [
+        "catalog.get_by_id",
+        "catalog.get_list",
+        "kitchen.get_queue",
+        "kitchen.update_ticket",
+        "kitchen.recall"
+      ]
     }
   ]
 }
