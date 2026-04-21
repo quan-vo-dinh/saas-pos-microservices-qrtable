@@ -139,7 +139,7 @@ _Quy chuẩn hóa doanh thu và dòng tiền._
 2. Chủ quán set up Menu (Tạo `categories`, `menu_items`) và Bàn ghế (Tạo `areas`, `tables`).
 3. Khách hàng tới quán, quét QR trên `table`. Hệ thống chuyển `table_status` thành `occupied` và sinh ra 1 bản ghi `sessions`.
 4. Khách chọn món, bấm "Gửi". Hệ thống sinh ra bản ghi `orders` (và nhiều `order_items`), trừ `stock_qty` của `menu_items`. Gắn vào `session_id` đó.
-5. Nhân viên Bếp tương tác thay đổi trạng thái của `orders` (Pending -> Processing -> Ready -> Served).
+5. Nhân viên Bếp tương tác thay đổi trạng thái của `orders` (PENDING → PROCESSING → READY → SERVED) — UPPERCASE values per Step 2.3 ADR.
 6. Khách ăn xong, gọi tính tiền. Cập nhật `table_status` thành `billing`. Hệ thống tổng hợp các `orders` sinh ra 1 bản ghi `bills`.
 7. Nhân viên thu tiền (Cash/Chuyển khoản). Sinh ra bản ghi `payments`.
 8. Thanh toán xong: Cập nhật `bills` -> closed, `sessions` -> closed, `table_status` -> `cleaning`.

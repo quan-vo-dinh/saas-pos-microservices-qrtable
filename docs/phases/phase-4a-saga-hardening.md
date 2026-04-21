@@ -77,12 +77,12 @@ Compensation thực hiện theo thứ tự ngược: Step 4 → Step 3 → Step 
 
 #### Hardening chung
 
-| Chủ đề                   | WHAT                                                                                                                                 | WHY                                                             |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `max_orders_per_session` | Giới hạn số đơn tối đa mỗi phiên (mặc định 20), **cấu hình theo tenant plan** — chống spam/đơn ảo                                    | Chống abuse/spam đặt hàng và giữ vận hành POS ổn định           |
-| Idempotency              | Redis SET NX cho order creation — cùng idempotency key chỉ thắng lần đầu, prevent double-submit                                      | Double-submit (double tap, retry client) không tạo trùng đơn    |
-| Delete constraints       | Không xóa **Category** còn **MenuItem**; không xóa **MenuItem** còn **OrderItem** đang active (status IN Pending, Processing, Ready) | Bảo toàn tham chiếu và lịch sử đơn; tránh orphan và sai báo cáo |
-| Audit cancel             | **BẮT BUỘC** ghi log khi Cancel order — **actor** (who), **reason** (why), **timestamp** (when)                                      | Phục vụ điều tra, đối soát và trách nhiệm vận hành              |
+| Chủ đề                   | WHAT                                                                                                                        | WHY                                                             |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `max_orders_per_session` | Giới hạn số đơn tối đa mỗi phiên (mặc định 20), **cấu hình theo tenant plan** — chống spam/đơn ảo                           | Chống abuse/spam đặt hàng và giữ vận hành POS ổn định           |
+| Idempotency              | Redis SET NX cho order creation — cùng idempotency key chỉ thắng lần đầu, prevent double-submit                             | Double-submit (double tap, retry client) không tạo trùng đơn    |
+| Delete constraints       | Không xóa **Category** còn **MenuItem**; không xóa **MenuItem** còn **OrderItem** đang active (status IN PROCESSING, READY) | Bảo toàn tham chiếu và lịch sử đơn; tránh orphan và sai báo cáo |
+| Audit cancel             | **BẮT BUỘC** ghi log khi Cancel order — **actor** (who), **reason** (why), **timestamp** (when)                             | Phục vụ điều tra, đối soát và trách nhiệm vận hành              |
 
 #### Simplified Transactional Outbox
 

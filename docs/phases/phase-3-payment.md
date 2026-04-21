@@ -48,7 +48,7 @@ Phase 3 tách trách nhiệm thanh toán khỏi Order Service để tuân thủ 
 
 **Mục tiêu:** Một contract type dùng chung FE/BFF/service và một persistence layer thanh toán tách biệt — để audit, refund và Kafka payload không phụ thuộc vào implementation UI.
 
-**Shared types (thư viện dùng chung):** `IPayment`, enum `IPaymentMethod`, `IRefund`, `IBillFinal` (và các field cần thiết để rounding / trạng thái / tham chiếu Stripe) — phản ánh semantics nghiệp vụ, không dư thừa field Order.
+**Shared types (thư viện dùng chung):** `Payment`, `PaymentMethod` (enum đã defined ở Step 2.3 với CASH only — Phase 3 EXTEND thêm `CARD, MOMO, ZALOPAY, BANK_TRANSFER`), `Refund`, và mở rộng `Bill` (đã defined Step 2.3) với các field cần thiết để rounding / paid amount / change / Stripe reference — phản ánh semantics nghiệp vụ, không dư thừa field Order. Drop I-prefix per Step 2.3 ADR.
 
 **Payment Service (PostgreSQL):**
 
@@ -97,7 +97,7 @@ Phase 3 tách trách nhiệm thanh toán khỏi Order Service để tuân thủ 
 
 ## Outputs cho Phase tiếp theo
 
-- Contract type thanh toán (`IPayment`, method enum, refund, bill final) tái sử dụng được trên toàn monorepo.
+- Contract type thanh toán (`Payment`, `PaymentMethod` enum, `Refund`, `Bill` final) tái sử dụng được trên toàn monorepo (drop I-prefix per Step 2.3 ADR).
 - Payment Service với schema `payments` / `refunds` / `audit_payments` và sự kiện Kafka ổn định — Order Service chỉ cần phản ứng theo `billId` và topic, không duplicate logic làm tròn.
 - BFF webhook Stripe (`POST /payment/stripe/webhook`) và luồng TCP tới Payment Service là mẫu cho gateway thanh toán mở rộng sau này.
 - UI POS/Dashboard/Customer đã chứng minh được UX rounding, tiền thừa, Stripe và refund — sẵn sàng gắn báo cáo đối soát, thông báo (Notification Service), hoặc in hóa đơn ở phase sau mà không đổi contract cốt lõi.

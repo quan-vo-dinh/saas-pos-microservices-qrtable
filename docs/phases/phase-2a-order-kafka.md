@@ -65,7 +65,7 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
   - Nút "Thêm vào giỏ" trên MenuItemCard
   - Cart drawer: danh sách items, +/- quantity, note field per item, tổng tiền
   - Nút "Gửi đơn hàng" (với animation)
-  - Order Tracking page: status timeline (Pending → Processing → Ready → Served)
+  - Order Tracking page: status timeline (PENDING → PROCESSING → READY → SERVED)
   - Service Request buttons: "Gọi nhân viên", "Yêu cầu thanh toán", "Hỗ trợ"
 - **Staff POS (`/pos/`):**
   - Live Orders cards: bàn, items, tổng tiền, thời gian
@@ -85,36 +85,54 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 
 **Verify:** Demo được luồng khách đặt → staff thấy đơn → bếp/bar thấy ticket trên mock
 
+> **Status:** ⬜ Not Started — Step 2.2 chưa được triển khai. Thứ tự thực hiện thực tế: Step 2.0 → 2.3 → (**2.2 pending**) → 2.4 → 2.5. Spec/plan canonical sẽ được tạo mới khi bắt đầu, dựa trên shared types đã khóa từ Step 2.3.
+
 ### Step 2.3 — Shared types & hợp đồng realtime
 
 **Mục tiêu:** Một nguồn sự thật cho FE/BE về đơn, dòng món, hóa đơn, phiên, giỏ, yêu cầu phục vụ và payload WebSocket — tránh drift khi Order Service và BFF phát sự kiện.
 
-**Yêu cầu cxhính:**
+**Yêu cầu chính:**
 
 - Enum `OrderStatus` với nhánh chính: **DRAFT → PENDING → PROCESSING → READY → SERVED → COMPLETED** và nhánh **CANCELED** (chuyển từ các trạng thái cho phép theo business-logic §8)
-- `ServiceRequestType` và các interface domain: `IOrder`, `IOrderItem`, `IBill`, `ISession`, `ICartItem`, `IServiceRequest`
-- Định nghĩa tập **WebSocket event types** tương thích với BFF Direct (`order.created`, `service.requested`) và các cập nhật UI cần thiết ở phase này
+- `ServiceRequestType` và các type domain (drop I-prefix per Step 2.3 ADR): `Order`, `OrderItem`, `Bill`, `Session`, `CartItem`, `ServiceRequest`
+- 4 status enums bổ sung: `OrderItemStatus`, `BillStatus`, `SessionStatus`, `ServiceRequestStatus` + `PaymentMethod` (CASH only Phase 2A)
+- 3 transition matrices (`ALLOWED_ORDER_TRANSITIONS`, `ALLOWED_BILL_TRANSITIONS`, `ALLOWED_SERVICE_REQUEST_TRANSITIONS`) làm shared FE+BE state machine
+- Định nghĩa tập **WebSocket event types** tương thích với BFF Direct (`order.created` → `OrderCreatedEvent`, `service.requested` → `ServiceRequestedEvent`, `OrderStatusChangedEvent`) + **Kafka payload type** (`OrderConfirmedEvent` cho topic `order.confirmed`) + data shape `KDSTicket` cho UI render
 
-**Chi tiết field các entity/interface:**
+**Chi tiết field các entity/type:**
 
 ```
-IOrder { id, tenantId, tableId, sessionId, status, totalAmount, idempotencyKey, createdAt, updatedAt }
-IOrderItem { id, orderId, menuItemId, quantity, price, note, status }
-IBill { id, tenantId, sessionId, subotal, total, status, paymentMethod, roundingAmount }
-ISession { tableId, startedAt, status, lastActivity }
-ICartItem { menuItemId, qty, note?, price, version }
-IServiceRequest { id, tenantId, tableId, sessionId, type, status, createdAt }
+Order { id, tenantId, tableId, tableName, sessionId, items: OrderItem[], status, totalAmount, idempotencyKey,
+        notes?, confirmedAt?, confirmedByUserId?, cancelledAt?, cancelledByUserId?, cancelReason?, createdAt, updatedAt }
+OrderItem { id, orderId, menuItemId, menuItemName, quantity, unitPrice, note?, status, createdAt, updatedAt }
+Bill { id, tenantId, sessionId, orderIds[], subtotal, total, roundingAmount, paymentMethod?, status, closedAt?, paidAt?, createdAt, updatedAt }
+Session { id, tenantId, tableId, tableName, status, startedAt, lastActivity, closedAt?, orderCount }
+CartItem { menuItemId, menuItemName, quantity, unitPrice, note?, version }
+ServiceRequest { id, tenantId, tableId, sessionId, type, status, note?, acknowledgedAt?, acknowledgedByUserId?, resolvedAt?, createdAt, updatedAt }
 
+Enums:
 OrderStatus { DRAFT, PENDING, PROCESSING, READY, SERVED, COMPLETED, CANCELED }
+OrderItemStatus { PROCESSING, READY, SERVED, CANCELED }
+BillStatus { OPEN, PENDING_PAYMENT, PAID }
+SessionStatus { ACTIVE, CLOSED }
 ServiceRequestType { CALL_STAFF, REQUEST_BILL, GENERAL_HELP }
+ServiceRequestStatus { PENDING, ACKNOWLEDGED, RESOLVED }
+PaymentMethod { CASH }    // Phase 3 sẽ thêm CARD, MOMO, ZALOPAY, BANK_TRANSFER
 
-WebSocket Event Types:
-IOrderCreatedEvent { orderId, tableId, items: IOrderItem[] }
-IOrderStatusEvent { orderId, status: OrderStatus }
-IKDSTicket { ticketId, tableId, items, priority: boolean }
+Realtime/Event Types:
+OrderCreatedEvent       { tenantId, orderId, tableId, tableName, sessionId, items, totalAmount, timestamp }       // BFF Direct
+OrderStatusChangedEvent { tenantId, orderId, fromStatus, toStatus, changedByUserId?, timestamp }                  // BFF Direct
+ServiceRequestedEvent   { tenantId, requestId, tableId, tableName, sessionId, type, note?, timestamp }            // BFF Direct
+OrderConfirmedEvent     { tenantId, orderId, sessionId, items, totalAmount, confirmedAt, confirmedByUserId }      // Kafka order.confirmed
+KDSTicket               { ticketId, tenantId, orderId, tableId, tableName, items, priority, createdAt, slaSeconds }  // Data shape
+
+State Machine Matrices (encoded trong types lib, shared FE+BE):
+ALLOWED_ORDER_TRANSITIONS, ALLOWED_BILL_TRANSITIONS, ALLOWED_SERVICE_REQUEST_TRANSITIONS
 ```
 
-**Verify:** Frontend và backend compile/import cùng bộ type; contract event có thể liệt kê trong review (tên event + payload tối thiểu)
+**Verify:** Frontend và backend compile/import cùng bộ type; transition matrices import được; contract event có thể liệt kê trong review (tên event + payload tối thiểu)
+
+> **Spec & Plan reference:** [`docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md`](../superpowers/specs/2026-04-19-step-2.3-shared-types-design.md)
 
 ### Step 2.4 — Order Service backend, Redis, Kafka, BFF Direct
 

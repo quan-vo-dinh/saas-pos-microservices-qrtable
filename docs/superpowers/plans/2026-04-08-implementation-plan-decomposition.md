@@ -19,7 +19,7 @@
 | File                                         | Purpose                        |
 | -------------------------------------------- | ------------------------------ |
 | `docs/phases/phase-0-foundation.md`          | Phase 0 plan (✅ DONE)         |
-| `docs/phases/phase-1-catalog.md`             | Phase 1 plan (🔶 IN PROGRESS)  |
+| `docs/phases/phase-1-catalog.md`             | Phase 1 plan (✅ DONE)         |
 | `docs/phases/phase-2a-order-kafka.md`        | Pre-Phase 2 + Phase 2A plan    |
 | `docs/phases/phase-2b-kitchen-websocket.md`  | Phase 2B plan                  |
 | `docs/phases/phase-3-payment.md`             | Phase 3 plan                   |
@@ -403,7 +403,7 @@ Create `docs/phases/phase-1-catalog.md` with the following content:
 
 > **Mục tiêu:** Khách quét QR → thấy menu. Staff quản lý menu/bàn trên Dashboard.
 > **Ước lượng:** ~2-3 tuần
-> **Trạng thái:** 🔶 IN PROGRESS (Step 1.4 DONE — next: Step 1.45)
+> **Trạng thái:** ✅ DONE (Steps 1.1–1.6) — đồng bộ với `docs/phases/phase-1-catalog.md`
 
 ## Prerequisites
 
