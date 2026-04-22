@@ -1,8 +1,8 @@
-import type { Category } from '@einvoice/types';
 import { Button } from '@einvoice/frontend-ui';
+import type { CustomerCategoryTab } from '../hooks/use-menu-query';
 
 type CategoryTabsProps = {
-  categories: Category[];
+  categories: CustomerCategoryTab[];
   activeId: string | null;
   onSelect: (id: string | null) => void;
 };

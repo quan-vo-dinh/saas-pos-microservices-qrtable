@@ -1,10 +1,10 @@
-import type { MenuItem } from '@einvoice/types';
+import type { PublicMenuItem } from '@einvoice/types';
 import { MenuItemCard } from './menu-item-card';
 
 type MenuItemsGridProps = {
-  items: MenuItem[];
-  onItemTap: (item: MenuItem) => void;
-  onQuickAdd: (item: MenuItem) => void;
+  items: PublicMenuItem[];
+  onItemTap: (item: PublicMenuItem) => void;
+  onQuickAdd: (item: PublicMenuItem) => void;
 };
 
 export function MenuItemsGrid({

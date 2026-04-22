@@ -1,4 +1,4 @@
-import type { Order, OrderStatus } from '@einvoice/types';
+import { OrderStatus, type Order } from '@einvoice/types';
 import {
   Card,
   CardContent,
@@ -17,13 +17,17 @@ type OrderSummaryCardProps = {
 
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 
-const STATUS_BADGE: Record<OrderStatus, { label: string; variant: BadgeVariant }> = {
-  pending: { label: 'Chờ xác nhận', variant: 'outline' },
-  confirmed: { label: 'Đã xác nhận', variant: 'secondary' },
-  preparing: { label: 'Đang chế biến', variant: 'default' },
-  ready: { label: 'Sẵn sàng', variant: 'default' },
-  served: { label: 'Đã phục vụ', variant: 'secondary' },
-  cancelled: { label: 'Đã hủy', variant: 'destructive' },
+const STATUS_BADGE: Record<
+  (typeof OrderStatus)[keyof typeof OrderStatus],
+  { label: string; variant: BadgeVariant }
+> = {
+  [OrderStatus.DRAFT]: { label: 'Nháp', variant: 'outline' },
+  [OrderStatus.PENDING]: { label: 'Chờ xác nhận', variant: 'outline' },
+  [OrderStatus.PROCESSING]: { label: 'Đang xử lý', variant: 'default' },
+  [OrderStatus.READY]: { label: 'Sẵn sàng', variant: 'default' },
+  [OrderStatus.SERVED]: { label: 'Đã phục vụ', variant: 'secondary' },
+  [OrderStatus.COMPLETED]: { label: 'Hoàn tất', variant: 'secondary' },
+  [OrderStatus.CANCELED]: { label: 'Đã hủy', variant: 'destructive' },
 };
 
 export function OrderSummaryCard({

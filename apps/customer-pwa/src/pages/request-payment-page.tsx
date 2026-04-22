@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { PaymentMethod } from '@einvoice/types';
+import { OrderStatus, PaymentMethod } from '@einvoice/types';
 import { getOrdersBySession } from '@einvoice/mock-data';
 import { useSession } from '@/features/session/context/session-provider';
 import { ROUTES } from '@/constants/routes';
@@ -10,22 +10,21 @@ import { PaymentConfirmButton } from '@/features/payment/components/payment-conf
 import { PaymentSuccessCard } from '@/features/payment/components/payment-success-card';
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
-  cash: 'Tiền mặt',
-  card: 'Thẻ ngân hàng',
-  momo: 'MoMo',
-  zalopay: 'ZaloPay',
-  bank_transfer: 'Chuyển khoản',
+  [PaymentMethod.CASH]: 'Tiền mặt',
 };
 
 export function RequestPaymentPage() {
   const navigate = useNavigate();
   const { session, isActive } = useSession();
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
   const [isSuccess, setIsSuccess] = useState(false);
 
   const sessionId = session?.sessionId ?? 'session-001';
   const orders = getOrdersBySession(sessionId);
-  const unpaidOrders = orders.filter((o) => o.paymentStatus === 'unpaid');
+  /** Mock: chưa có Bill API (Step 2.4+) — coi đơn chưa COMPLETED/CANCELED là còn phải thanh toán */
+  const unpaidOrders = orders.filter(
+    (o) => o.status !== OrderStatus.COMPLETED && o.status !== OrderStatus.CANCELED,
+  );
   const totalAmount = unpaidOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
   if (!isActive && !session) {

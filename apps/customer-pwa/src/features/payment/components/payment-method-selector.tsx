@@ -1,6 +1,6 @@
-import type { PaymentMethod } from '@einvoice/types';
+import { PaymentMethod } from '@einvoice/types';
 import type { LucideIcon } from 'lucide-react';
-import { Banknote, CreditCard, Smartphone, Building2 } from 'lucide-react';
+import { Banknote } from 'lucide-react';
 import { cn } from '@einvoice/frontend-utils';
 
 type PaymentMethodSelectorProps = {
@@ -8,12 +8,9 @@ type PaymentMethodSelectorProps = {
   onChange: (method: PaymentMethod) => void;
 };
 
+/** Phase 2A: chỉ CASH — Phase 3 mở rộng theo `bill.types.ts` */
 const METHODS: { value: PaymentMethod; label: string; icon: LucideIcon }[] = [
-  { value: 'cash', label: 'Tiền mặt', icon: Banknote },
-  { value: 'card', label: 'Thẻ ngân hàng', icon: CreditCard },
-  { value: 'momo', label: 'MoMo', icon: Smartphone },
-  { value: 'zalopay', label: 'ZaloPay', icon: Smartphone },
-  { value: 'bank_transfer', label: 'Chuyển khoản', icon: Building2 },
+  { value: PaymentMethod.CASH, label: 'Tiền mặt', icon: Banknote },
 ];
 
 export function PaymentMethodSelector({

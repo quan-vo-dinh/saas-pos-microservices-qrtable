@@ -508,9 +508,11 @@ Retry Policy:
 
 ---
 
-## 8. STATE MACHINE - VÒNGqĐỜI ĐƠN HÀNG
+## 8. STATE MACHINE - VÒNG ĐỜI ĐƠN HÀNG
 
 Quản lý trạng thái đơn hàng từ lúc tạo đến hoàn thành.
+
+> **Enum casing convention:** Diagram + rules dưới đây dùng **Title Case** (`Draft`, `Pending`, `Processing`, `Ready`, `Served`, `Completed`, `Canceled`) cho readability. Enum values canonical là **UPPERCASE** (`DRAFT`, `PENDING`, ...) — xem `libs/shared/types/src/lib/order.types.ts` và `docs/phases/phase-2a-order-kafka.md` Step 2.3. Ánh xạ 1-1 (`Draft` ↔ `DRAFT`, v.v.).
 
 ### A. Order State Diagram
 
@@ -559,6 +561,16 @@ Draft → Pending:
     - Create order record
     - Notify staff (sound + push notification)
     - Lock cart (prevent editing)
+
+Draft → Canceled:
+  Trigger: Customer đóng trình duyệt / bỏ cart / explicit clear
+  Actor: Customer (self, implicit)
+  Condition:
+    - cart chưa submit (order chưa tồn tại như record)
+  Action:
+    - Release Redis cart key (TTL expiry hoặc explicit DEL)
+    - KHÔNG tạo order record (nothing to cancel formally)
+  Note: Transition này KHÔNG persist vì Draft chưa tạo DB row; code-level check trong ALLOWED_ORDER_TRANSITIONS cho FE disable "Submit" + cho BE reject replay nếu cart đã clear.
 
 Pending → Processing:
   Trigger: Staff nhấn "Xác nhận"
@@ -630,7 +642,7 @@ Served → Completed:
 
 Định nghĩa rõ ràng quyền hạn của từng vai trò trong hệ thống SaaS Multi-Tenant.
 
-> **Kiến trúc Actor:** Hệ thống có 4 Actors chính theo mô hình SaaS Platform.
+> **Kiến trúc Actor:** Mô tả theo **nhóm vai (business language)**; ma trận RBAC thực tế (6 roles × 51 permissions) là canonical tại [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md) §6.
 
 ### A. Actor Hierarchy & Roles
 
@@ -650,28 +662,31 @@ Served → Completed:
 
 ---
 
-#### **2. Restaurant Owner/Manager (Merchant Admin)**
+#### **2. Restaurant Owner (Merchant Admin)**
 
-**Phạm vi:** Một hoặc nhiều Tenants (Nhà hàng) mà họ sở hữu
+**Phạm vi:** Tenant mà họ sở hữu
 
-- **Vai trò:** Chủ nhà hàng/Quản lý nhà hàng
-- **Sub-roles:**
-  - **Owner**: Toàn quyền trong tenant
-  - **Manager**: Quản lý vận hành ca làm việc, có thể override một số quyền của Staff
+- **Vai trò:** Chủ nhà hàng — toàn quyền vận hành + HR (bao gồm xóa nhân viên)
+- **Keycloak role:** `OWNER`
+- **Permissions:** full operational (CRUD menu, tables, orders, payment, KDS) + `USER_DELETE` (phân biệt duy nhất với MANAGER)
 
-- **Quyền hạn chính:**
-  - Quản lý Menu: CRUD món ăn, categories, pricing
-  - Quản lý Tables & QR: Tạo sơ đồ bàn, sinh QR codes
-  - Quản lý Staff: Mời/Xóa nhân viên, phân quyền
-  - Xem Analytics: Doanh thu, món bán chạy, hiệu suất
-  - Cấu hình nhà hàng: Giờ mở cửa, thông tin liên hệ
-  - Quản lý Inventory: Nhập/xuất nguyên liệu (nếu có module)
-
-**Microservice tương ứng:** Restaurant Service, Catalog Service, Analytics Service
+**Microservice tương ứng:** User-Access Service, Catalog Service, Order Service
 
 ---
 
-#### **3. Staff (Restaurant Employees)**
+#### **3. Manager (Operational Lead)**
+
+**Phạm vi:** Tenant mà họ được phân công
+
+- **Vai trò:** Quản lý vận hành ca làm việc — same as OWNER trừ `USER_DELETE`
+- **Keycloak role:** `MANAGER`
+- **Khác với OWNER:** không được xóa user (HR action giữ cho OWNER)
+
+**Microservice tương ứng:** Same as OWNER (User-Access, Catalog, Order)
+
+---
+
+#### **4. Staff (Restaurant Employees)**
 
 **Phạm vi:** Tenant mà họ được thuê
 
@@ -680,7 +695,6 @@ Served → Completed:
   - **Waiter/Server (Phục vụ)**: Xác nhận đơn, xử lý thanh toán, chuyển bàn
   - **Chef (Bếp trưởng)**: Xem & cập nhật KDS món ăn
   - **Barista/Bartender (Pha chế)**: Xem & cập nhật KDS đồ uống
-  - **Inventory Staff (Thủ kho)**: Cập nhật tồn kho thực tế
 
 - **Quyền hạn chính:**
   - Xác nhận đơn hàng từ Customer
@@ -695,7 +709,7 @@ Served → Completed:
 
 ---
 
-#### **4. Customer (End User - Diner)**
+#### **5. Customer (End User - Diner)**
 
 **Phạm vi:** Chỉ Session/Table của chính họ
 
@@ -716,7 +730,9 @@ Served → Completed:
 
 ---
 
-### B. Permission Matrix (4 Actors Chính)
+### B. Permission Matrix (Business-Language Summary)
+
+> **Canonical source:** Chi tiết đầy đủ 6 roles × 51 permissions xem [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md#6-canonical-permission-matrix-6--51). Bảng dưới đây là **tóm lược business-language** cho 5 nhóm actor, KHÔNG phải source of truth cho RBAC guard check.
 
 | Tính năng                       | Super Admin | Restaurant Owner | Staff (Waiter) | Staff (Chef/Bar) | Customer |
 | ------------------------------- | ----------- | ---------------- | -------------- | ---------------- | -------- |

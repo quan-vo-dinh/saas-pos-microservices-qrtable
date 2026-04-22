@@ -10,7 +10,7 @@
 
 1. [Tổng Quan Hệ Thống Auth](#1-tổng-quan-hệ-thống-auth)
 2. [Kiến Trúc Tổng Thể](#2-kiến-trúc-tổng-thể)
-3. [5 Actors/Roles Chính Của Hệ Thống](#3-5-actorsroles-chính-của-hệ-thống)
+3. [6 Roles Chính Của Hệ Thống](#3-6-roles-chính-của-hệ-thống)
 4. [Luồng Xử Lý Request (Request Lifecycle)](#4-luồng-xử-lý-request-request-lifecycle)
 5. [Chi Tiết Từng Guard](#5-chi-tiết-từng-guard)
 6. [Decorators & Metadata](#6-decorators-metadata)
@@ -136,7 +136,7 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
 
 ---
 
-## 3. 5 Actors/Roles Chính Của Hệ Thống
+## 3. 6 Roles Chính Của Hệ Thống
 
 ### 3.1 Bảng Tóm Lược 6 Roles (Bao gồm Super Admin)
 
@@ -158,6 +158,8 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
 - **Được xác thực** bằng SessionGuard → random session ID trong Redis
 - **Tenant binding**: Tenant từ QR code hoặc host/subdomain
 - **Permission**: Chỉ READ catalog (xem menu) + READ invoice (xem hóa đơn)
+
+> Chi tiết CUSTOMER endpoint + SessionGuard scope xem [Permission Matrix §7](../architecture/permission-matrix.md#7-customer-actor-no-db-role).
 
 ---
 

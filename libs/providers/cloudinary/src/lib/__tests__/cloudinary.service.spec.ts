@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
 import { CloudinaryService } from '../cloudinary.service';
 import { CloudinaryValidators } from '../validators/cloudinary.validators';
 import { CLOUDINARY_INJECTION_TOKEN } from '../cloudinary.constants';
@@ -95,25 +95,27 @@ describe('CloudinaryService', () => {
       expect(result.validationWarnings).toBeUndefined();
     });
 
-    it('should throw BadRequestException when file exceeds 5MB', async () => {
+    it('should throw BusinessException when file exceeds 5MB', async () => {
       const largeBuffer = Buffer.alloc(6 * 1024 * 1024, 'a');
 
-      await expect(service.uploadImage(largeBuffer, validOptions)).rejects.toThrow(BadRequestException);
+      await expect(service.uploadImage(largeBuffer, validOptions)).rejects.toThrow(BusinessException);
 
-      await expect(service.uploadImage(largeBuffer, validOptions)).rejects.toThrow('File size exceeds 5MB limit');
+      await expect(service.uploadImage(largeBuffer, validOptions)).rejects.toThrow(
+        'Kích thước tệp vượt quá giới hạn 5MB',
+      );
     });
 
-    it('should throw BadRequestException for invalid MIME type', async () => {
+    it('should throw BusinessException for invalid MIME type', async () => {
       const fileBuffer = Buffer.alloc(1024, 'a');
       const invalidOptions: UploadImageOptions = {
         ...validOptions,
         mimetype: 'application/pdf',
       };
 
-      await expect(service.uploadImage(fileBuffer, invalidOptions)).rejects.toThrow(BadRequestException);
+      await expect(service.uploadImage(fileBuffer, invalidOptions)).rejects.toThrow(BusinessException);
 
       await expect(service.uploadImage(fileBuffer, invalidOptions)).rejects.toThrow(
-        'Invalid file type. Allowed: jpeg, png, webp',
+        'Loại tệp không hợp lệ. Cho phép: jpeg, png, webp',
       );
     });
 
@@ -136,7 +138,7 @@ describe('CloudinaryService', () => {
       expect(uploadCallOptions.folder).toBe('qrtable/550e8400-e29b-41d4-a716-446655440000/menu');
     });
 
-    it('should throw InternalServerErrorException when Cloudinary SDK fails', async () => {
+    it('should throw BusinessException when Cloudinary SDK fails', async () => {
       const fileBuffer = Buffer.alloc(1024, 'a');
 
       mockCloudinary.uploader.upload_stream.mockImplementation(
@@ -149,9 +151,11 @@ describe('CloudinaryService', () => {
         },
       );
 
-      await expect(service.uploadImage(fileBuffer, validOptions)).rejects.toThrow(InternalServerErrorException);
+      await expect(service.uploadImage(fileBuffer, validOptions)).rejects.toThrow(BusinessException);
 
-      await expect(service.uploadImage(fileBuffer, validOptions)).rejects.toThrow('Image upload failed');
+      await expect(service.uploadImage(fileBuffer, validOptions)).rejects.toThrow(
+        'Tải ảnh lên thất bại, vui lòng thử lại',
+      );
     });
   });
 

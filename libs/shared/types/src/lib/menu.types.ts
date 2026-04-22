@@ -6,6 +6,9 @@ export type Category = {
   id: string;
   name: string;
   sortOrder: number;
+  /** Khung giờ bán (catalog); `null` nếu không giới hạn — neo Phase 1 Step 1.2 */
+  timeStart: string | null;
+  timeEnd: string | null;
   status: CategoryStatus;
   itemCount: number;
   createdAt: string;

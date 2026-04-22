@@ -1,10 +1,10 @@
-import type { MenuItem } from '@einvoice/types';
+import type { PublicMenuItem } from '@einvoice/types';
 import { Badge, Button, Card, CardContent } from '@einvoice/frontend-ui';
 import { formatCurrency } from '@einvoice/frontend-utils';
 import { Plus } from 'lucide-react';
 
 type MenuItemCardProps = {
-  item: MenuItem;
+  item: PublicMenuItem;
   onTap: () => void;
   onQuickAdd: () => void;
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { MenuItem } from '@einvoice/types';
+import type { PublicMenuItem } from '@einvoice/types';
 import { formatCurrency } from '@einvoice/frontend-utils';
 import {
   Button,
@@ -16,7 +16,7 @@ import { Minus, Plus } from 'lucide-react';
 import { useCart } from '@/features/cart/context/cart-provider';
 
 type MenuItemDetailDrawerProps = {
-  item: MenuItem | null;
+  item: PublicMenuItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };

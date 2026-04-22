@@ -5,16 +5,20 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
+const reactTsRecommended = [
+  js.configs.recommended,
+  tseslint.configs.recommended,
+  reactHooks.configs.flat.recommended,
+  reactRefresh.configs.vite,
+];
+
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'eslint.config.js']),
+  /** Runtime — `tsconfig.app` (spec exclude khỏi `tsc -b` build) */
   {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      js.configs.recommended,
-      tseslint.configs.recommended,
-      reactHooks.configs.flat.recommended,
-      reactRefresh.configs.vite,
-    ],
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.spec.ts', 'src/**/*.test.ts', 'src/**/__tests__/**'],
+    extends: reactTsRecommended,
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
@@ -25,6 +29,34 @@ export default defineConfig([
     },
     rules: {
       'react-refresh/only-export-components': 'off',
+    },
+  },
+  /** Jest specs */
+  {
+    files: ['src/**/*.spec.ts', 'src/**/*.test.ts', 'src/**/__tests__/**/*.{ts,tsx}'],
+    extends: reactTsRecommended,
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: { ...globals.browser, ...globals.jest },
+      parserOptions: {
+        project: './tsconfig.spec.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  /** Vite config */
+  {
+    files: ['vite.config.ts'],
+    extends: [js.configs.recommended, tseslint.configs.recommended],
+    languageOptions: {
+      parserOptions: {
+        project: './tsconfig.node.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+      globals: globals.node,
     },
   },
 ]);

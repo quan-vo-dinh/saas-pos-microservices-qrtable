@@ -20,6 +20,17 @@
 
 Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc dựng nghiệp vụ đơn hàng và đưa Kafka vào kiến trúc. Hóa đơn (bill) thuộc Order Service — không giao cho Payment Service ở phase này. Chỉ một topic Kafka được phát sinh: `order.confirmed`; các sự kiện cần độ trễ thấp cho UI dùng BFF Direct (AP1) `order.created` và `service.requested` kèm phát WebSocket. Session và giỏ dùng Redis với quy ước key và TTL/idle rõ ràng; tồn kho menu item được bảo vệ bằng khóa bi quan trên PostgreSQL khi xác nhận đơn.
 
+### Step progress (sync với triển khai thực tế)
+
+| Step | Mục tiêu ngắn                              | Trạng thái     |
+| ---- | ------------------------------------------ | -------------- |
+| 2.0  | PERMISSION enum + role seed + matrix       | ✅ Done        |
+| 2.1  | Kafka foundation (khóa học)                | 🟢 Course      |
+| 2.2  | Mock UI Cart / POS / KDS                   | ⬜ Not Started |
+| 2.3  | Shared types + hợp đồng realtime           | ✅ Done        |
+| 2.4  | Order Service + Redis + Kafka + BFF Direct | ⬜ Not Started |
+| 2.5  | Tích hợp FE ↔ BE                          | ⬜ Not Started |
+
 ## Steps
 
 ### Step 2.0 — Mở rộng PERMISSION enum và mapping role
@@ -130,9 +141,13 @@ State Machine Matrices (encoded trong types lib, shared FE+BE):
 ALLOWED_ORDER_TRANSITIONS, ALLOWED_BILL_TRANSITIONS, ALLOWED_SERVICE_REQUEST_TRANSITIONS
 ```
 
+> **ADR — Const-object pattern thay vì TS `enum`:** Tất cả 7 enums (`OrderStatus`, `OrderItemStatus`, `BillStatus`, `SessionStatus`, `ServiceRequestType`, `ServiceRequestStatus`, `PaymentMethod`) triển khai bằng `const object + type alias` (`export const X = { ... } as const; export type X = typeof X[keyof typeof X]`) — KHÔNG phải TS `enum`. Lý do: `erasableSyntaxOnly` trong `customer-pwa` tsconfig không chấp nhận TS `enum` (sinh runtime code). `class-validator` `@IsEnum(OrderStatus)` vẫn hoạt động với const-object từ v0.14+. Chi tiết: xem header comment trong `libs/shared/types/src/lib/order.types.ts`.
+
 **Verify:** Frontend và backend compile/import cùng bộ type; transition matrices import được; contract event có thể liệt kê trong review (tên event + payload tối thiểu)
 
-> **Spec & Plan reference:** [`docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md`](../superpowers/specs/2026-04-19-step-2.3-shared-types-design.md)
+> **Spec & Plan reference:** [Step 2.3 spec](../superpowers/specs/2026-04-19-step-2.3-shared-types-design.md) · [Step 2.3 plan](../superpowers/plans/2026-04-19-step-2.3-shared-types.md)
+
+> **Status:** ✅ Done (2026-04-19, commit `5089d41`) — shared types + transition matrices + realtime/Kafka contract types trong `libs/shared/types/`.
 
 ### Step 2.4 — Order Service backend, Redis, Kafka, BFF Direct
 

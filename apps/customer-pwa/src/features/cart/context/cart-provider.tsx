@@ -1,8 +1,8 @@
 import { createContext, useContext, useReducer, type ReactNode } from 'react';
-import type { MenuItem } from '@einvoice/types';
+import type { PublicMenuItem } from '@einvoice/types';
 
 type CartItem = {
-  menuItem: MenuItem;
+  menuItem: PublicMenuItem;
   quantity: number;
   note: string;
 };
@@ -14,7 +14,7 @@ type CartState = {
 };
 
 type CartAction =
-  | { type: 'ADD_ITEM'; payload: { menuItem: MenuItem; quantity?: number; note?: string } }
+  | { type: 'ADD_ITEM'; payload: { menuItem: PublicMenuItem; quantity?: number; note?: string } }
   | { type: 'REMOVE_ITEM'; payload: { menuItemId: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { menuItemId: string; quantity: number } }
   | { type: 'UPDATE_NOTE'; payload: { menuItemId: string; note: string } }
@@ -75,7 +75,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 const INITIAL_STATE: CartState = { items: [], totalAmount: 0, totalItems: 0 };
 
 type CartContextValue = CartState & {
-  addItem: (menuItem: MenuItem, quantity?: number, note?: string) => void;
+  addItem: (menuItem: PublicMenuItem, quantity?: number, note?: string) => void;
   removeItem: (menuItemId: string) => void;
   updateQuantity: (menuItemId: string, quantity: number) => void;
   updateNote: (menuItemId: string, note: string) => void;
