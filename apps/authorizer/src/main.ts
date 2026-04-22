@@ -3,7 +3,7 @@
  * This is only a minimal backend to get started.
  */
 
-// dùng connectMicroservices để tạo microservice TCP, sau đó startAllMicroservices để chạy nó song song với HTTP server. Cấu hình TCP lấy từ AppModule.CONFIGURATION.TCP_SERV.TCP_INVOICE_SERVICE.options.host và port được lấy từ configuration đã setup ở AppModule. Sau đó app.listen để chạy HTTP server như bình thường.
+// connectMicroservices tạo microservice TCP/gRPC, sau đó startAllMicroservices chạy nó song song với HTTP server. Cấu hình lấy từ AppModule.CONFIGURATION. Sau đó app.listen chạy HTTP server.
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';

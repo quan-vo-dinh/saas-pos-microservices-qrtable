@@ -1,7 +1,6 @@
 import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { CONFIGURATION, TConfiguration } from '../configuration';
-import { InvoiceModules } from './modules/invoice/invoice.module';
 import { LoggerMiddleware } from '@common/middlewares/logger.middleware';
 import { TenantMiddleware } from '@common/middlewares/tenant.middleware';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
@@ -23,7 +22,6 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [() => CONFIGURATION] }),
-    InvoiceModules,
     ProductModule,
     CatalogModule,
     SaasModule,

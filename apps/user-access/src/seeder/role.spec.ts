@@ -11,8 +11,6 @@ const EXPECTED_MATRIX: Record<string, Set<string>> = {
     PERMISSION.CATALOG_GET_LIST,
     PERMISSION.CATALOG_UPDATE,
     PERMISSION.CATALOG_DELETE,
-    PERMISSION.INVOICE_GET_BY_ID,
-    PERMISSION.INVOICE_GET_ALL,
     PERMISSION.USER_CREATE,
     PERMISSION.USER_GET_BY_ID,
     PERMISSION.USER_GET_ALL,
@@ -45,8 +43,6 @@ const EXPECTED_MATRIX: Record<string, Set<string>> = {
     PERMISSION.CATALOG_GET_LIST,
     PERMISSION.CATALOG_UPDATE,
     PERMISSION.CATALOG_DELETE,
-    PERMISSION.INVOICE_GET_BY_ID,
-    PERMISSION.INVOICE_GET_ALL,
     PERMISSION.USER_CREATE,
     PERMISSION.USER_GET_BY_ID,
     PERMISSION.USER_GET_ALL,
@@ -76,8 +72,6 @@ const EXPECTED_MATRIX: Record<string, Set<string>> = {
   WAITER: new Set<string>([
     PERMISSION.CATALOG_GET_BY_ID,
     PERMISSION.CATALOG_GET_LIST,
-    PERMISSION.INVOICE_GET_BY_ID,
-    PERMISSION.INVOICE_GET_ALL,
     PERMISSION.ORDER_CONFIRM,
     PERMISSION.ORDER_GET_LIST,
     PERMISSION.ORDER_GET_BY_ID,
@@ -143,7 +137,7 @@ describe('role.json — canonical permission matrix', () => {
 
   it('SUPER_ADMIN has ALL 51 permissions from PERMISSION enum', () => {
     const role = roleSeed.data.find((r) => r.name === 'SUPER_ADMIN')!;
-    expect(role.permissions).toHaveLength(51);
+    expect(role.permissions).toHaveLength(45);
     expect(new Set(role.permissions)).toEqual(ALL_PERMISSIONS_VALUES);
   });
 
