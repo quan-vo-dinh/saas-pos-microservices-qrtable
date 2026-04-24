@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import { AppShell } from '@/components/layout/app-shell';
 
+/** Full-bleed KDS shell (no management sidebar) — navigate via KDS header links. */
 export default function KdsLayout({ children }: { children: ReactNode }) {
   return (
-    <div data-surface="kds" className="min-h-0 flex-1 bg-[var(--bg)] text-[var(--ink)]">
-      <AppShell>{children}</AppShell>
+    <div data-surface="kds" className="min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+      {children}
     </div>
   );
 }

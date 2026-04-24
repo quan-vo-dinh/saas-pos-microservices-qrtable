@@ -1,11 +1,5 @@
-import { FeaturePlaceholder } from '@einvoice/frontend-ui';
+import { KdsBoard } from '@/components/kds/kds-board';
 
 export default function KdsBarPage() {
-  return (
-    <FeaturePlaceholder
-      section="KDS / Bar"
-      title="Bar Board Skeleton"
-      description="Placeholder for drink preparation queue and status updates for barista workflows."
-    />
-  );
+  return <KdsBoard station="BAR" />;
 }

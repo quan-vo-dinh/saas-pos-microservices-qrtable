@@ -6,6 +6,7 @@ import { useMockStore } from '@/mocks/store';
 import { OrderDetailPanel } from '@/components/pos/order-detail-panel';
 import { TableDetailPanel } from '@/components/pos/table-detail-panel';
 import { CashBillPanel } from '@/components/pos/cash-bill-panel';
+import { ServiceRequestDetailPanel } from '@/components/pos/service-request-detail-panel';
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -23,6 +24,7 @@ export function PosRightInspector() {
   const selectedRowId = useMockStore((s) => s.selectedRowId);
   const selectedTableId = useMockStore((s) => s.selectedTableId);
   const selectedBillId = useMockStore((s) => s.selectedBillId);
+  const selectedServiceRequestId = useMockStore((s) => s.selectedServiceRequestId);
 
   if (pathname === ROUTES.POS || pathname === `${ROUTES.POS}/`) {
     if (!selectedRowId) {
@@ -46,9 +48,10 @@ export function PosRightInspector() {
   }
 
   if (pathname.startsWith(ROUTES.POS_SERVICE_REQUESTS)) {
-    return (
-      <EmptyState message="Inbox ở cột trái: PENDING → Nhận → chuyển tab Đã nhận → Xong. HoverCard trên ghi chú." />
-    );
+    if (!selectedServiceRequestId) {
+      return <EmptyState message="Chọn một dòng yêu cầu để xem chi tiết và sparkline mật độ." />;
+    }
+    return <ServiceRequestDetailPanel requestId={selectedServiceRequestId} />;
   }
 
   return <EmptyState message="Chọn mục." />;

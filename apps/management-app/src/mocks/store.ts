@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { BillStatus, OrderStatus, PaymentMethod, ServiceRequestStatus } from '@einvoice/types';
-import type { Bill, Order, RestaurantTable, ServiceRequest } from '@einvoice/types';
+import type { Bill, Order, OrderItem, RestaurantTable, ServiceRequest } from '@einvoice/types';
 import type { ColumnStatus, KDSTicketMock } from './kds-ticket';
 import { buildSeed, type MockStaffUser, type TablePresence } from './seed';
 
@@ -37,6 +37,10 @@ type MockState = {
   selectedTableId: string | null;
   /** Cash bills tab */
   selectedBillId: string | null;
+  /** Service requests tab — syncs with right inspector */
+  selectedServiceRequestId: string | null;
+  /** Mock tenant label (UI only) */
+  activeMockTenantName: string;
   /** UI-only flag for staff "ưu tiên" — Order entity has no field until Step 2.4 */
   orderPriority: Record<string, boolean>;
   posViewFilter: PosViewFilter;
@@ -50,6 +54,8 @@ type MockActions = {
   selectRow: (id: string | null) => void;
   selectTable: (id: string | null) => void;
   selectBill: (id: string | null) => void;
+  selectServiceRequest: (id: string | null) => void;
+  setActiveMockTenantName: (name: string) => void;
   confirmOrder: (id: string, userId: string) => void;
   cancelOrder: (id: string, reason: string, userId: string) => void;
   acknowledgeRequest: (id: string, userId: string) => void;
@@ -58,6 +64,8 @@ type MockActions = {
   markTableClean: (id: string) => void;
   setTableStatus: (id: string, status: RestaurantTable['status']) => void;
   advanceTicket: (id: string) => void;
+  setKdsTicketColumn: (ticketId: string, columnStatus: ColumnStatus) => void;
+  updateKdsTicketItemStatus: (ticketId: string, itemId: string, status: OrderItem['status']) => void;
   recallTicket: (id: string, reason: string, userId: string, userName: string) => void;
   payCash: (billId: string, received: number) => void;
   pushNotification: (kind: NotificationKind, preview: string) => void;
@@ -94,6 +102,8 @@ export const useMockStore = create<MockStore>()(
       selectedRowId: null,
       selectedTableId: null,
       selectedBillId: null,
+      selectedServiceRequestId: null,
+      activeMockTenantName: 'Phở Tầm Anh',
       orderPriority: {},
       posViewFilter: 'all',
       notifications: [],
@@ -104,6 +114,8 @@ export const useMockStore = create<MockStore>()(
       selectRow: (id) => set({ selectedRowId: id }),
       selectTable: (id) => set({ selectedTableId: id }),
       selectBill: (id) => set({ selectedBillId: id }),
+      selectServiceRequest: (id) => set({ selectedServiceRequestId: id }),
+      setActiveMockTenantName: (name) => set({ activeMockTenantName: name }),
 
       confirmOrder: (id, userId) => {
         const ts = Date.now();
@@ -239,6 +251,44 @@ export const useMockStore = create<MockStore>()(
             t.ticketId === id ? { ...t, columnStatus: nextColumn(t.columnStatus) } : t,
           ),
         }));
+      },
+
+      setKdsTicketColumn: (ticketId, columnStatus) => {
+        set((s) => ({
+          kdsTickets: s.kdsTickets.map((t) => (t.ticketId === ticketId ? { ...t, columnStatus } : t)),
+        }));
+      },
+
+      updateKdsTicketItemStatus: (ticketId, itemId, status) => {
+        const ts = Date.now();
+        set((s) => {
+          const target = s.kdsTickets.find((k) => k.ticketId === ticketId);
+          const orderId = target?.orderId;
+          return {
+            kdsTickets: s.kdsTickets.map((t) => {
+              if (t.ticketId !== ticketId) return t;
+              return {
+                ...t,
+                items: t.items.map((it) =>
+                  it.id === itemId ? { ...it, status, updatedAt: new Date(ts).toISOString() } : it,
+                ),
+              };
+            }),
+            liveOrders: orderId
+              ? s.liveOrders.map((o) =>
+                  o.id === orderId
+                    ? {
+                        ...o,
+                        items: o.items.map((it) =>
+                          it.id === itemId ? { ...it, status, updatedAt: new Date(ts).toISOString() } : it,
+                        ),
+                        updatedAt: new Date(ts).toISOString(),
+                      }
+                    : o,
+                )
+              : s.liveOrders,
+          };
+        });
       },
 
       recallTicket: (id, reason, userId, userName) => {

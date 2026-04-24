@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { cn } from '@/lib/utils';
 import { useMockStore } from '@/mocks/store';
 
 function typeIcon(t: ServiceRequest['type']) {
@@ -48,6 +49,8 @@ export function ServiceRequestTable() {
   const mockUsers = useMockStore((s) => s.mockUsers);
   const ack = useMockStore((s) => s.acknowledgeRequest);
   const resolve = useMockStore((s) => s.resolveRequest);
+  const selectedServiceRequestId = useMockStore((s) => s.selectedServiceRequestId);
+  const selectServiceRequest = useMockStore((s) => s.selectServiceRequest);
 
   const tableName = useCallback(
     (id: string) => tables.find((t) => t.id === id)?.name ?? id,
@@ -207,7 +210,15 @@ export function ServiceRequestTable() {
           <TableBody>
             {t.getRowModel().rows.length ? (
               t.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="h-8">
+                <TableRow
+                  key={row.id}
+                  data-state={selectedServiceRequestId === row.original.id ? 'selected' : undefined}
+                  className={cn(
+                    'h-8 cursor-pointer',
+                    selectedServiceRequestId === row.original.id && 'bg-muted/40',
+                  )}
+                  onClick={() => selectServiceRequest(row.original.id)}
+                >
                   {row.getVisibleCells().map((c) => (
                     <TableCell key={c.id} className="p-1">
                       {flexRender(c.column.columnDef.cell, c.getContext())}
