@@ -1,10 +1,30 @@
 {
   "version": 1,
   "skills": {
-    "shadcn": {
-      "source": "shadcn/ui",
+    "frontend-design": {
+      "source": "affaan-m/everything-claude-code",
       "sourceType": "github",
-      "computedHash": "507f011a70e8b3ae242bdc0bb5b39fd91a1d4049a0f3c281991ccf84973d591c"
+      "computedHash": "68950c001f80b99a7a19e9d71b9323925e8f947e0473cc0adb19456ebbdfba25"
+    },
+    "frontend-patterns": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "github",
+      "computedHash": "b06e633e783acfc364cf08cf44ee0fe48ece7e8c727457b188046e5ece25836f"
+    },
+    "shadcn": {
+      "source": "shadcn-ui/ui",
+      "sourceType": "github",
+      "computedHash": "2bc6cf38ec7b4a5778a43fabb3e87642c9897ad45e9eb42438b57fd2def6cca8"
+    },
+    "shadcn-component-discovery": {
+      "source": "mattbx/shadcn-skills",
+      "sourceType": "github",
+      "computedHash": "2ecd1e4d93981e2a191eab004e6616926d6553af691e6abfd095741cd9b13ec6"
+    },
+    "shadcn-component-review": {
+      "source": "mattbx/shadcn-skills",
+      "sourceType": "github",
+      "computedHash": "49e24a030e85a951fa8bf8f0e45baa2f1ed7ec1cc5e927868164455b55f0aa15"
     }
   }
 }
