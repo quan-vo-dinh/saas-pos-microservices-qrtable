@@ -237,6 +237,10 @@ qrtable/
 └── package.json
 ```
 
+#### 4.2.1 Hiện trạng `libs/shared/types` (đồng bộ tài liệu — 2026-04)
+
+Sơ đồ §4.2 phía trên mô tả **mục tiêu** “contract chung FE & BE”. **Trong codebase hiện tại**, `libs/shared/types` (`@einvoice/types`) chủ yếu được **customer-pwa**, **management-app**, **libs/shared/mock-data** và **libs/shared/constants** import; các service NestJS trong monorepo dùng **`@common/*`** (interfaces, entities, DTO) cho tầng HTTP/TCP. Hướng tiếp theo (OpenAPI client, package types được BFF validate, v.v.) nên được lên kế hoạch riêng khi siết hợp đồng FE–BE.
+
 ### 4.3 Frontend Tech Stack (Chi tiết)
 
 **Chiến lược 2 ứng dụng:** Thay vì 4 app riêng biệt, hệ thống frontend được tổ chức thành **2 app độc lập** trong Nx Monorepo — tối ưu khối lượng phát triển, dùng chung shared libraries, trong khi vẫn tách biệt rõ ràng giữa Customer (anonymous) và Internal (authenticated).
@@ -293,6 +297,7 @@ qrtable/
 
 - **2-App Separation**: Customer (anonymous, PWA) tách riêng; mọi authenticated actors gộp vào 1 Management App với role-based routing.
 - **Role-based routing (không phải role-based app)**: Dùng Next.js middleware + Keycloak role để điều hướng — cùng 1 app, khác layout/pages theo role.
+- **Phân tầng phân quyền (tạm thời, Phase 2.x):** UI (`management-app`) dùng **role → vùng route + sidebar**; BFF vẫn enforce **permission từng API** (canonical matrix). Chi tiết: [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md) §9.
 - **BFF as single API**: mọi request đều qua BFF, không gọi trực tiếp microservice.
 - **Real-time first**: staff/kitchen ưu tiên WebSocket, customer ưu tiên REST + cache.
 - **Offline-first (Customer PWA)**: cache menu + queue hành động offline.
@@ -1005,6 +1010,10 @@ Kết luận quan trọng:
 │  ⚠ Không cần Keycloak — zero-friction customer UX      │
 └────────────────────────────────────────────────────────┘
 ```
+
+#### 8.1.2 Management App (Next.js): điều hướng vs kiểm tra API
+
+`management-app` áp dụng **middleware + sidebar** theo **role** (OWNER, MANAGER, WAITER, …) để user chỉ thấy các **nhánh URL / tab** phù hợp. Đây **không** thay cho `PermissionGuard` trên BFF: mọi thao tác ghi/đọc nhạy cảm vẫn phải pass permission trong JWT/cache Authorizer. Chuẩn mô tả đầy đủ: [`architecture/permission-matrix.md`](architecture/permission-matrix.md) §9.
 
 ### 8.2 Guard Chain Architecture
 

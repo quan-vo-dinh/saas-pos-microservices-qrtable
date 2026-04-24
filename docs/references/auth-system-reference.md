@@ -1,7 +1,7 @@
 # Tài Liệu Chi Tiết Hệ Thống Authentication, Authorization, Role & Permission
 
 **Phiên bản:** Step 0.6B  
-**Ngày cập nhật:** Tháng 3, 2026  
+**Ngày cập nhật:** Tháng 4, 2026 (bổ sung §1.2 — điều hướng `management-app` vs BFF)  
 **Trạng thái:** Tài liệu tham khảo toàn bộ hệ thống auth
 
 ---
@@ -56,6 +56,10 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
 - Nếu route có `@Authorization({ secured: true })` → yêu cầu JWT từ UserGuard
 - Nếu route không có decorator → SessionGuard có thể tạo/tái sử dụng session anonymous
 - TenantGuard enforce tenant isolation cho cả 2 loại actor
+
+### 1.2 Điều hướng FE (Management App) vs kiểm tra Permission (BFF)
+
+Ứng dụng Next.js `management-app` dùng **middleware + sidebar theo role** để người dùng chỉ thấy các **khu vực** (dashboard, POS, KDS, admin) phù hợp persona. **Đây không phải layer thay thế PermissionGuard:** mọi API staff vẫn phải khớp `permissions[]` từ Authorizer theo ma trận canonical. Mô tả đầy đủ, bảng so sánh và TODO tinh chỉnh: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md) §9 · `AGENTS.md` (mục Frontend RBAC).
 
 ---
 

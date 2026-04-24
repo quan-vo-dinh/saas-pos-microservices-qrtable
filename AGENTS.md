@@ -49,6 +49,12 @@ All HTTP responses are wrapped by `ExceptionInterceptor`:
 
 Keycloak (OAuth2/OIDC) → JWT in Authorization header → BFF UserGuard → gRPC to Authorizer → Redis cache (30min TTL)
 
+### Frontend RBAC vs BFF permissions (`management-app`)
+
+- **BFF:** Source of truth — mỗi endpoint dùng `PermissionGuard` + `@Permissions([...])` theo matrix (`docs/architecture/permission-matrix.md` §6).
+- **Management App (Phase 2.x):** **Điều hướng + sidebar theo role** (prefix route + filter nav), đồng bộ với `role-routing.ts`. Đây là lớp **thô** (UX), không thay thế kiểm tra permission trên API.
+- **Tech debt (sau):** có thể map từng control UI ↔ `session.user.permissions` khi cần phân quyền trong cùng một màn hình. Chi tiết & nguyên tắc đồng bộ: `docs/architecture/permission-matrix.md` §9.
+
 ## Service Ports Quick Reference
 
 - BFF: HTTP 3000

@@ -94,6 +94,8 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 
 **Lưu ý quan trọng:** Mock phải phản ánh các trạng thái sẽ map sang `OrderStatus` và hàng đợi bếp — không chỉ layout tĩnh
 
+**Phân quyền UI (Phase 2.x):** Mock POS/KDS trên `management-app` tuân **điều hướng theo role** (middleware + sidebar). Kiểm tra quyền thật trên API vẫn là **permission** ở BFF — mô tả hai tầng: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md) §9. Blueprint chi tiết: [`docs/ui-blueprint-step-2.2.md`](../ui-blueprint-step-2.2.md).
+
 **Verify:** Demo được luồng khách đặt → staff thấy đơn → bếp/bar thấy ticket trên mock
 
 > **Status:** ⬜ Not Started — Step 2.2 chưa được triển khai. Thứ tự thực hiện thực tế: Step 2.0 → 2.3 → (**2.2 pending**) → 2.4 → 2.5. Spec/plan canonical sẽ được tạo mới khi bắt đầu, dựa trên shared types đã khóa từ Step 2.3.

@@ -644,6 +644,8 @@ Served → Completed:
 
 > **Kiến trúc Actor:** Mô tả theo **nhóm vai (business language)**; ma trận RBAC thực tế (6 roles × 51 permissions) là canonical tại [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md) §6.
 
+> **Điều hướng ứng dụng quản trị:** `management-app` (Phase 2.x) dùng **role → tab/route** cho UX; **BFF** vẫn enforce **permission** từng endpoint. Xem [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md) §9 (nguyên tắc đồng bộ + tech debt).
+
 ### A. Actor Hierarchy & Roles
 
 #### **1. Super Admin (Platform Administrator)**

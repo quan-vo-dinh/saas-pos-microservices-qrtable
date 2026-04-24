@@ -1,7 +1,7 @@
 # Permission Matrix — QRTable
 
-> **Status:** ✅ Active (Step 2.0 — 2026-04-19)
-> **Version:** 1.0
+> **Status:** ✅ Active (Step 2.0 — 2026-04-19) · §9 cập nhật 2026-04-24 (FE navigation vs BFF)
+> **Version:** 1.1
 > **Single source of truth** cho role-permission mapping. Mọi thay đổi `PERMISSION` enum, `role.json`, hoặc test cases PHẢI được phản ánh ở đây trước.
 
 ## 1. Mục đích & Nguyên tắc
@@ -178,7 +178,7 @@ Legend: ✅ = granted; (blank) = not granted.
 
 ### Pragmatic decisions explained (Why)
 
-- **OWNER + MANAGER có FULL `ORDER_*`, `KITCHEN_*`, `PAYMENT_*`, `TABLE_*`, `SERVICE_REQUEST_*`:** quản lý vận hành cần permissions toàn diện. Bỏ SAAS*\* (platform admin), ROLE*_ (RBAC self-service không có UI), PRODUCT\__ (legacy template).
+- **OWNER + MANAGER có FULL `ORDER_*`, `KITCHEN_*`, `PAYMENT_*`, `TABLE_*`, `SERVICE_REQUEST_*`:** quản lý vận hành cần permissions toàn diện. Bỏ SAAS*\* (platform admin), ROLE*\_ (RBAC self-service không có UI), PRODUCT\_\_ (legacy template).
 - **OWNER + MANAGER chỉ có `invoice.get_by_id`, `invoice.get_all`:** Bills thuộc Order Service per Phase 2A spec; INVOICE\_\* là legacy template không có endpoint thật trong QRTable.
 - **MANAGER không có `user.delete`:** Manager là operational role; xóa user là HR action thuộc Owner.
 - **WAITER có `payment.get_history`:** Waiter ở quầy POS cần đọc lịch sử bill khi customer hỏi.
@@ -241,3 +241,22 @@ Layer 3 prerequisites:
 
 - Stack chạy: `pnpm dev:bff-auth` (BFF + Authorizer)
 - DB seeded (Step 8 đã chạy)
+
+## 9. Frontend navigation (Management App) vs API enforcement
+
+> **Status (Phase 2.x trước UI-permission):** Được dùng cho Step 2.2+ và các sprint tạo UI mock / POS / KDS **trước** khi map từng nút UI ↔ permission.
+
+**Hai tầng tách bạch:**
+
+| Tầng                           | Trách nhiệm                                                                                                                                                                                       | Nguồn sự thật                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **BFF / microservices**        | Mỗi HTTP endpoint được bảo vệ bởi `UserGuard` → `TenantGuard` → `PermissionGuard`; kiểm tra **permission** (chuỗi `domain.action`, xem §4–§6).                                                    | §6 matrix + `role.json` + `@Permissions` trên controller                                                           |
+| **`management-app` (Next.js)** | **Điều hướng & sidebar theo role** (JWT session `realm_access` / profile): user chỉ thấy **nhóm tab / prefix route** tương ứng khu vực họ được vào; middleware redirect nếu URL không thuộc role. | `apps/management-app/src/lib/auth/role-routing.ts` + `components/layout/data/sidebar-data.ts` (lọc theo cùng rule) |
+
+**Nguyên tắc:**
+
+- **FE không thay thế BFF:** Ẩn menu chỉ là UX; gọi API sai quyền vẫn phải nhận **403** từ BFF.
+- **Đồng bộ nghĩa là:** mỗi **vùng route** (`/dashboard`, `/pos`, `/kds/...`, `/admin`) phải **không** cho phép role nào thấy tab mà **toàn bộ** API cần cho tab đó nằm ngoài permission của role đó (tránh “vào được nhưng toàn 403”). Khi siết permission chi tiết hơn trong cùng một trang, cần bổ sung **ẩn/disable nút** hoặc xử lý 403 ở UI.
+- **TODO (tech debt, sau Step 2.2+):** tùy chọn map **mục menu / hành động** ↔ `permissions[]` từ session (tinh chỉnh theo matrix từng dòng) — xem discussion trong `AGENTS.md` (Frontend RBAC).
+
+**Cross-reference:** Kiến trúc tổng thể & monorepo: `docs/technical-architecture.md` §4.2.1, §8.1.2 · Blueprint UI: `docs/ui-blueprint-step-2.2.md` §0.
