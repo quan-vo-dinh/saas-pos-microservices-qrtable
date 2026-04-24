@@ -5,6 +5,8 @@ import { QUERY_CONFIG } from '@einvoice/shared-constants';
 import './index.css';
 import App from './App.tsx';
 
+document.documentElement.setAttribute('data-surface', 'pwa');
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

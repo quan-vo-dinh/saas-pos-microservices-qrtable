@@ -1,0 +1,12 @@
+:where([data-surface='pos']) {
+  --bg: #0b0e14;
+  --ink: #e8ecf4;
+  --accent: #06b6d4;
+  --accent-alt: #f43f8e;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --motion-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-card: 0 1px 0 rgb(0 0 0 / 0.2), 0 8px 24px -12px rgb(0 0 0 / 0.45);
+}

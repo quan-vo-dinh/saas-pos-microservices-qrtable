@@ -1,0 +1,284 @@
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
+import { BillStatus, OrderStatus, PaymentMethod, ServiceRequestStatus } from '@einvoice/types';
+import type { Bill, Order, RestaurantTable, ServiceRequest } from '@einvoice/types';
+import type { ColumnStatus, KDSTicketMock } from './kds-ticket';
+import { buildSeed, type MockStaffUser, type TablePresence } from './seed';
+
+export type NotificationKind = 'order' | 'service' | 'system';
+
+export type MockNotification = {
+  id: string;
+  kind: NotificationKind;
+  createdAt: number;
+  preview: string;
+};
+
+export type RecallEntry = {
+  id: string;
+  createdAt: number;
+  ticketId: string;
+  userId: string;
+  userName: string;
+  reason: string;
+  resolved: boolean;
+};
+
+type MockState = {
+  liveOrders: Order[];
+  bills: Bill[];
+  tables: RestaurantTable[];
+  serviceRequests: ServiceRequest[];
+  kdsTickets: KDSTicketMock[];
+  selectedRowId: string | null;
+  notifications: MockNotification[];
+  recallLog: RecallEntry[];
+  mockPresence: TablePresence[];
+  mockUsers: MockStaffUser[];
+};
+
+type MockActions = {
+  selectRow: (id: string | null) => void;
+  confirmOrder: (id: string, userId: string) => void;
+  cancelOrder: (id: string, reason: string, userId: string) => void;
+  acknowledgeRequest: (id: string, userId: string) => void;
+  resolveRequest: (id: string, userId: string) => void;
+  transferTable: (fromId: string, toId: string) => void;
+  markTableClean: (id: string) => void;
+  advanceTicket: (id: string) => void;
+  recallTicket: (id: string, reason: string, userId: string, userName: string) => void;
+  payCash: (billId: string, received: number) => void;
+  pushNotification: (kind: NotificationKind, preview: string) => void;
+  appendLiveOrder: (order: Order) => void;
+  appendServiceRequest: (req: ServiceRequest) => void;
+  updateOrderStatus: (orderId: string, toStatus: Order['status'], changedByUserId?: string) => void;
+};
+
+export type MockStore = MockState & MockActions;
+
+const initialSeed = buildSeed();
+
+const nextColumn = (c: ColumnStatus): ColumnStatus => {
+  if (c === 'WAITING') return 'IN_PROGRESS';
+  if (c === 'IN_PROGRESS') return 'DONE';
+  return 'DONE';
+};
+
+function findTable(tables: RestaurantTable[], id: string) {
+  return tables.find((t) => t.id === id);
+}
+
+export const useMockStore = create<MockStore>()(
+  devtools(
+    (set, get) => ({
+      liveOrders: initialSeed.mockLiveOrders,
+      bills: initialSeed.mockBills,
+      tables: initialSeed.mockTables,
+      serviceRequests: initialSeed.mockServiceRequests,
+      kdsTickets: initialSeed.mockKDSTickets,
+      selectedRowId: null,
+      notifications: [],
+      recallLog: [],
+      mockPresence: initialSeed.mockPresence,
+      mockUsers: initialSeed.mockUsers,
+
+      selectRow: (id) => set({ selectedRowId: id }),
+
+      confirmOrder: (id, userId) => {
+        const ts = Date.now();
+        set((s) => ({
+          liveOrders: s.liveOrders.map((o) =>
+            o.id === id && o.status === OrderStatus.PENDING
+              ? {
+                  ...o,
+                  status: OrderStatus.PROCESSING,
+                  confirmedAt: new Date(ts).toISOString(),
+                  confirmedByUserId: userId,
+                  updatedAt: new Date(ts).toISOString(),
+                }
+              : o,
+          ),
+        }));
+      },
+
+      cancelOrder: (id, reason, userId) => {
+        const ts = Date.now();
+        set((s) => ({
+          liveOrders: s.liveOrders.map((o) =>
+            o.id === id
+              ? {
+                  ...o,
+                  status: OrderStatus.CANCELED,
+                  cancelReason: reason,
+                  cancelledAt: new Date(ts).toISOString(),
+                  cancelledByUserId: userId,
+                  updatedAt: new Date(ts).toISOString(),
+                }
+              : o,
+          ),
+        }));
+      },
+
+      acknowledgeRequest: (id, userId) => {
+        const ts = Date.now();
+        set((s) => ({
+          serviceRequests: s.serviceRequests.map((r) =>
+            r.id === id && r.status === ServiceRequestStatus.PENDING
+              ? {
+                  ...r,
+                  status: ServiceRequestStatus.ACKNOWLEDGED,
+                  acknowledgedAt: new Date(ts).toISOString(),
+                  acknowledgedByUserId: userId,
+                  updatedAt: new Date(ts).toISOString(),
+                }
+              : r,
+          ),
+        }));
+      },
+
+      resolveRequest: (id, userId) => {
+        const ts = Date.now();
+        set((s) => ({
+          serviceRequests: s.serviceRequests.map((r) =>
+            r.id === id && r.status === ServiceRequestStatus.ACKNOWLEDGED
+              ? {
+                  ...r,
+                  status: ServiceRequestStatus.RESOLVED,
+                  resolvedAt: new Date(ts).toISOString(),
+                  updatedAt: new Date(ts).toISOString(),
+                }
+              : r,
+          ),
+        }));
+        void userId;
+      },
+
+      transferTable: (fromId, toId) => {
+        const ts = Date.now();
+        const { tables, liveOrders } = get();
+        const from = findTable(tables, fromId);
+        const to = findTable(tables, toId);
+        if (!from || !to || to.status !== 'available') return;
+        const sessionId = from.sessionId;
+        if (!sessionId) return;
+        set({
+          tables: tables.map((t) => {
+            if (t.id === fromId) {
+              return {
+                ...t,
+                status: 'available' as const,
+                sessionId: null,
+              };
+            }
+            if (t.id === toId) {
+              return {
+                ...t,
+                status: 'occupied' as const,
+                sessionId,
+              };
+            }
+            return t;
+          }),
+          liveOrders: liveOrders.map((o) =>
+            o.tableId === fromId
+              ? {
+                  ...o,
+                  tableId: toId,
+                  tableName: `${to.name} — ${to.areaName}`,
+                  updatedAt: new Date(ts).toISOString(),
+                }
+              : o,
+          ),
+        });
+      },
+
+      markTableClean: (id) => {
+        set((s) => ({
+          tables: s.tables.map((t) => (t.id === id ? { ...t, status: 'available' as const, sessionId: null } : t)),
+        }));
+      },
+
+      advanceTicket: (id) => {
+        set((s) => ({
+          kdsTickets: s.kdsTickets.map((t) =>
+            t.ticketId === id ? { ...t, columnStatus: nextColumn(t.columnStatus) } : t,
+          ),
+        }));
+      },
+
+      recallTicket: (id, reason, userId, userName) => {
+        const ts = Date.now();
+        const entry: RecallEntry = {
+          id: `rc-${ts}`,
+          createdAt: ts,
+          ticketId: id,
+          userId,
+          userName,
+          reason,
+          resolved: false,
+        };
+        set((s) => ({
+          recallLog: [entry, ...s.recallLog].slice(0, 200),
+          kdsTickets: s.kdsTickets.map((t) => (t.ticketId === id ? { ...t, columnStatus: 'IN_PROGRESS' as const } : t)),
+        }));
+      },
+
+      payCash: (billId, received) => {
+        const ts = Date.now();
+        const bill = get().bills.find((b) => b.id === billId);
+        if (!bill || received < bill.total) return;
+        set((s) => ({
+          bills: s.bills.map((b) =>
+            b.id === billId
+              ? {
+                  ...b,
+                  status: BillStatus.PAID,
+                  paymentMethod: PaymentMethod.CASH,
+                  paidAt: new Date(ts).toISOString(),
+                  updatedAt: new Date(ts).toISOString(),
+                }
+              : b,
+          ),
+          tables: s.tables.map((t) =>
+            t.sessionId === bill.sessionId ? { ...t, status: 'cleaning' as const, sessionId: null } : t,
+          ),
+        }));
+      },
+
+      pushNotification: (kind, preview) => {
+        const ts = Date.now();
+        set((s) => ({
+          notifications: [
+            { id: `ntf-${ts}-${s.notifications.length}`, kind, createdAt: ts, preview },
+            ...s.notifications,
+          ].slice(0, 100),
+        }));
+      },
+
+      appendLiveOrder: (order) => {
+        set((s) => ({ liveOrders: [order, ...s.liveOrders] }));
+      },
+
+      appendServiceRequest: (req) => {
+        set((s) => ({ serviceRequests: [req, ...s.serviceRequests] }));
+      },
+
+      updateOrderStatus: (orderId, toStatus, changedByUserId) => {
+        const ts = Date.now();
+        set((s) => ({
+          liveOrders: s.liveOrders.map((o) =>
+            o.id === orderId
+              ? {
+                  ...o,
+                  status: toStatus,
+                  updatedAt: new Date(ts).toISOString(),
+                  confirmedByUserId: o.confirmedByUserId ?? changedByUserId,
+                }
+              : o,
+          ),
+        }));
+      },
+    }),
+    { name: 'qrtable-mock-pos' },
+  ),
+);
