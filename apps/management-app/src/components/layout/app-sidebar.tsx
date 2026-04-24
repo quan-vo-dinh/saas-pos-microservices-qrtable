@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/sidebar';
 import { sidebarData } from '@/components/layout/data/sidebar-data';
 import { NavGroup } from '@/components/layout/nav-group';
+import { SidebarTodayCharts } from '@/components/layout/sidebar-today-charts';
 import { filterSidebarNavByRoles } from '@/lib/navigation/filter-sidebar-nav';
 import { parseRoles } from '@/lib/auth/role-routing';
 
@@ -69,6 +70,7 @@ export function AppSidebar() {
         {navGroups.map((group) => (
           <NavGroup key={group.title} {...group} />
         ))}
+        <SidebarTodayCharts />
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border/60 pt-2">

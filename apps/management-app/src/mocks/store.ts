@@ -24,6 +24,8 @@ export type RecallEntry = {
   resolved: boolean;
 };
 
+export type PosViewFilter = 'all' | 'PENDING' | 'PROCESSING' | 'READY' | 'OVERDUE' | 'OCCUPIED_TABLE';
+
 type MockState = {
   liveOrders: Order[];
   bills: Bill[];
@@ -31,6 +33,13 @@ type MockState = {
   serviceRequests: ServiceRequest[];
   kdsTickets: KDSTicketMock[];
   selectedRowId: string | null;
+  /** Right pane: Tables tab */
+  selectedTableId: string | null;
+  /** Cash bills tab */
+  selectedBillId: string | null;
+  /** UI-only flag for staff "ưu tiên" — Order entity has no field until Step 2.4 */
+  orderPriority: Record<string, boolean>;
+  posViewFilter: PosViewFilter;
   notifications: MockNotification[];
   recallLog: RecallEntry[];
   mockPresence: TablePresence[];
@@ -39,12 +48,15 @@ type MockState = {
 
 type MockActions = {
   selectRow: (id: string | null) => void;
+  selectTable: (id: string | null) => void;
+  selectBill: (id: string | null) => void;
   confirmOrder: (id: string, userId: string) => void;
   cancelOrder: (id: string, reason: string, userId: string) => void;
   acknowledgeRequest: (id: string, userId: string) => void;
   resolveRequest: (id: string, userId: string) => void;
   transferTable: (fromId: string, toId: string) => void;
   markTableClean: (id: string) => void;
+  setTableStatus: (id: string, status: RestaurantTable['status']) => void;
   advanceTicket: (id: string) => void;
   recallTicket: (id: string, reason: string, userId: string, userName: string) => void;
   payCash: (billId: string, received: number) => void;
@@ -52,6 +64,9 @@ type MockActions = {
   appendLiveOrder: (order: Order) => void;
   appendServiceRequest: (req: ServiceRequest) => void;
   updateOrderStatus: (orderId: string, toStatus: Order['status'], changedByUserId?: string) => void;
+  updateOrderItemStatus: (orderId: string, itemId: string, status: Order['items'][number]['status']) => void;
+  toggleOrderPriority: (orderId: string) => void;
+  setPosViewFilter: (f: PosViewFilter) => void;
 };
 
 export type MockStore = MockState & MockActions;
@@ -77,12 +92,18 @@ export const useMockStore = create<MockStore>()(
       serviceRequests: initialSeed.mockServiceRequests,
       kdsTickets: initialSeed.mockKDSTickets,
       selectedRowId: null,
+      selectedTableId: null,
+      selectedBillId: null,
+      orderPriority: {},
+      posViewFilter: 'all',
       notifications: [],
       recallLog: [],
       mockPresence: initialSeed.mockPresence,
       mockUsers: initialSeed.mockUsers,
 
       selectRow: (id) => set({ selectedRowId: id }),
+      selectTable: (id) => set({ selectedTableId: id }),
+      selectBill: (id) => set({ selectedBillId: id }),
 
       confirmOrder: (id, userId) => {
         const ts = Date.now();
@@ -198,6 +219,20 @@ export const useMockStore = create<MockStore>()(
         }));
       },
 
+      setTableStatus: (id, status) => {
+        set((s) => ({
+          tables: s.tables.map((t) =>
+            t.id === id
+              ? {
+                  ...t,
+                  status,
+                  sessionId: status === 'available' || status === 'cleaning' ? null : t.sessionId,
+                }
+              : t,
+          ),
+        }));
+      },
+
       advanceTicket: (id) => {
         set((s) => ({
           kdsTickets: s.kdsTickets.map((t) =>
@@ -278,6 +313,27 @@ export const useMockStore = create<MockStore>()(
           ),
         }));
       },
+
+      updateOrderItemStatus: (orderId, itemId, status) => {
+        const ts = Date.now();
+        set((s) => ({
+          liveOrders: s.liveOrders.map((o) => {
+            if (o.id !== orderId) return o;
+            const nextItems = o.items.map((it) =>
+              it.id === itemId ? { ...it, status, updatedAt: new Date(ts).toISOString() } : it,
+            );
+            return { ...o, items: nextItems, updatedAt: new Date(ts).toISOString() };
+          }),
+        }));
+      },
+
+      toggleOrderPriority: (orderId) => {
+        set((s) => ({
+          orderPriority: { ...s.orderPriority, [orderId]: !s.orderPriority[orderId] },
+        }));
+      },
+
+      setPosViewFilter: (f) => set({ posViewFilter: f }),
     }),
     { name: 'qrtable-mock-pos' },
   ),

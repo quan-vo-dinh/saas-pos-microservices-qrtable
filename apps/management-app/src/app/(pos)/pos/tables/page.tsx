@@ -1,11 +1,16 @@
-import { FeaturePlaceholder } from '@einvoice/frontend-ui';
+import { Suspense } from 'react';
+import { TableMapGrid } from '@/components/pos/table-map-grid';
 
 export default function PosTablesPage() {
   return (
-    <FeaturePlaceholder
-      section="POS / Tables"
-      title="Table Map Skeleton"
-      description="Placeholder for live table state transitions and quick table actions."
-    />
+    <Suspense
+      fallback={
+        <div className="text-sm text-muted-foreground" data-slot="pos-tables-fallback">
+          Đang tải sơ đồ bàn…
+        </div>
+      }
+    >
+      <TableMapGrid />
+    </Suspense>
   );
 }
