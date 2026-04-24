@@ -27,6 +27,7 @@ type PwaState = {
   activityFeed: CartActivityEvent[];
   order: Order | null;
   billLockActive: boolean;
+  serviceRequestOpen: boolean;
 };
 
 type PwaActions = {
@@ -49,6 +50,7 @@ type PwaActions = {
   toggleBillLock: () => void;
   pushActivity: (entry: CartActivityEvent) => void;
   patchMenuItem: (menuItemId: string, patch: Partial<Pick<MenuItem, 'status' | 'stock'>>) => void;
+  setServiceRequestOpen: (open: boolean) => void;
 };
 
 export type PwaMockStore = PwaState & PwaActions;
@@ -66,6 +68,7 @@ export const usePwaMockStore = create<PwaMockStore>()(
       activityFeed: [...mockCartActivity].slice(0, 10),
       order: null,
       billLockActive: false,
+      serviceRequestOpen: false,
 
       addItem: (input) => {
         const lineId = newLineId();
@@ -171,11 +174,19 @@ export const usePwaMockStore = create<PwaMockStore>()(
                 : next === OrderStatus.SERVED
                   ? OrderItemStatus.SERVED
                   : OrderItemStatus.PROCESSING;
+          let confirmedAt = s.order.confirmedAt;
+          let confirmedByUserId = s.order.confirmedByUserId;
+          if (next === OrderStatus.PROCESSING && !confirmedAt) {
+            confirmedAt = ts;
+            confirmedByUserId = 'waiter-mock';
+          }
           return {
             order: {
               ...s.order,
               status: next,
               updatedAt: ts,
+              confirmedAt,
+              confirmedByUserId,
               items: s.order.items.map((it) => ({
                 ...it,
                 updatedAt: ts,
@@ -199,6 +210,8 @@ export const usePwaMockStore = create<PwaMockStore>()(
           menu: s.menu.map((m) => (m.id === menuItemId ? { ...m, ...patch } : m)),
         }));
       },
+
+      setServiceRequestOpen: (open) => set({ serviceRequestOpen: open }),
     }),
     { name: 'qrtable-mock-pwa' },
   ),

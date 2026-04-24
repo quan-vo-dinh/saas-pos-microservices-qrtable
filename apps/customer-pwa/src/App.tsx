@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { ROUTES } from '@/constants/routes';
@@ -10,7 +11,7 @@ import { MenuPage } from '@/pages/menu-page';
 import { OrderTrackingPage } from '@/pages/order-tracking-page';
 import { RequestPaymentPage } from '@/pages/request-payment-page';
 
-function App() {
+function App(): ReactElement {
   return (
     <ErrorBoundary>
       <SessionProvider>

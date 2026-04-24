@@ -11,6 +11,8 @@ type CartState = {
   items: CartItem[];
   totalAmount: number;
   totalItems: number;
+  /** Optimistic-lock mock — đồng bộ với Step 2.2 PWA mock store */
+  version: number;
 };
 
 type CartAction =
@@ -18,7 +20,8 @@ type CartAction =
   | { type: 'REMOVE_ITEM'; payload: { menuItemId: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { menuItemId: string; quantity: number } }
   | { type: 'UPDATE_NOTE'; payload: { menuItemId: string; note: string } }
-  | { type: 'CLEAR' };
+  | { type: 'CLEAR' }
+  | { type: 'BUMP_VERSION' };
 
 function calculateTotals(items: CartItem[]): Pick<CartState, 'totalAmount' | 'totalItems'> {
   return {
@@ -42,37 +45,39 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         items = [...state.items, { menuItem, quantity, note }];
       }
 
-      return { items, ...calculateTotals(items) };
+      return { items, ...calculateTotals(items), version: state.version + 1 };
     }
     case 'REMOVE_ITEM': {
       const items = state.items.filter((item) => item.menuItem.id !== action.payload.menuItemId);
-      return { items, ...calculateTotals(items) };
+      return { items, ...calculateTotals(items), version: state.version + 1 };
     }
     case 'UPDATE_QUANTITY': {
       const { menuItemId, quantity } = action.payload;
       if (quantity <= 0) {
         const items = state.items.filter((item) => item.menuItem.id !== menuItemId);
-        return { items, ...calculateTotals(items) };
+        return { items, ...calculateTotals(items), version: state.version + 1 };
       }
       const items = state.items.map((item) =>
         item.menuItem.id === menuItemId ? { ...item, quantity } : item,
       );
-      return { items, ...calculateTotals(items) };
+      return { items, ...calculateTotals(items), version: state.version + 1 };
     }
     case 'UPDATE_NOTE': {
       const items = state.items.map((item) =>
         item.menuItem.id === action.payload.menuItemId ? { ...item, note: action.payload.note } : item,
       );
-      return { items, ...calculateTotals(items) };
+      return { items, ...calculateTotals(items), version: state.version + 1 };
     }
     case 'CLEAR':
-      return INITIAL_STATE;
+      return { ...INITIAL_STATE, version: state.version + 1 };
+    case 'BUMP_VERSION':
+      return { ...state, version: state.version + 1 };
     default:
       return state;
   }
 }
 
-const INITIAL_STATE: CartState = { items: [], totalAmount: 0, totalItems: 0 };
+const INITIAL_STATE: CartState = { items: [], totalAmount: 0, totalItems: 0, version: 1 };
 
 type CartContextValue = CartState & {
   addItem: (menuItem: PublicMenuItem, quantity?: number, note?: string) => void;
@@ -80,6 +85,7 @@ type CartContextValue = CartState & {
   updateQuantity: (menuItemId: string, quantity: number) => void;
   updateNote: (menuItemId: string, note: string) => void;
   clear: () => void;
+  bumpVersion: () => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -96,6 +102,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'UPDATE_QUANTITY', payload: { menuItemId, quantity } }),
     updateNote: (menuItemId, note) => dispatch({ type: 'UPDATE_NOTE', payload: { menuItemId, note } }),
     clear: () => dispatch({ type: 'CLEAR' }),
+    bumpVersion: () => dispatch({ type: 'BUMP_VERSION' }),
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
