@@ -1,11 +1,6 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger, Skeleton } from '@einvoice/frontend-ui';
-import { Header } from '@/components/layout/header';
-import { Main } from '@/components/layout/main';
-import { Search } from '@/components/search';
-import { ThemeSwitch } from '@/components/theme-switch';
-import { ProfileDropdown } from '@/components/profile-dropdown';
 import { MenuProvider } from './components/menu-provider';
 import { MenuPrimaryButtons } from './components/menu-primary-buttons';
 import { CategoriesTable } from './components/categories-table';
@@ -19,15 +14,7 @@ export function MenuPage() {
 
   return (
     <MenuProvider>
-      <Header fixed>
-        <Search />
-        <div className="ms-auto flex items-center gap-4">
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
-
-      <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
+      <div className="flex flex-1 flex-col gap-4 sm:gap-6">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Menu Management</h2>
@@ -66,7 +53,7 @@ export function MenuPage() {
             )}
           </TabsContent>
         </Tabs>
-      </Main>
+      </div>
 
       <MenuDialogs />
     </MenuProvider>

@@ -13,11 +13,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { Header } from '@/components/layout/header';
-import { Main } from '@/components/layout/main';
-import { Search } from '@/components/search';
-import { ThemeSwitch } from '@/components/theme-switch';
-import { ProfileDropdown } from '@/components/profile-dropdown';
 import { TablesProvider } from './components/tables-provider';
 import { TablesPrimaryButtons } from './components/tables-primary-buttons';
 import { TablesTable } from './components/tables-table';
@@ -36,35 +31,20 @@ export function TablesPage() {
   if (isPending) {
     return (
       <TablesProvider>
-        <Header fixed>
-          <Search />
-          <div className="ms-auto flex items-center gap-4">
-            <ThemeSwitch />
-            <ProfileDropdown />
-          </div>
-        </Header>
-        <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
+        <div className="flex flex-1 flex-col gap-4 sm:gap-6">
           <div className="space-y-3">
             <div className="h-8 w-48 animate-pulse rounded bg-muted" />
             <div className="h-10 w-full animate-pulse rounded bg-muted" />
             <div className="h-[500px] w-full animate-pulse rounded bg-muted" />
           </div>
-        </Main>
+        </div>
       </TablesProvider>
     );
   }
 
   return (
     <TablesProvider>
-      <Header fixed>
-        <Search />
-        <div className="ms-auto flex items-center gap-4">
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
-
-      <Main className="flex flex-1 flex-col gap-4 sm:gap-6">
+      <div className="flex flex-1 flex-col gap-4 sm:gap-6">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
@@ -101,7 +81,7 @@ export function TablesPage() {
             </TabsContent>
           ))}
         </Tabs>
-      </Main>
+      </div>
 
       <TablesDialogs />
     </TablesProvider>

@@ -1,10 +1,14 @@
 'use client';
 
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@einvoice/frontend-ui'
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@einvoice/frontend-ui';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
-;
-;
 
 export function ModeToggle() {
   const { setTheme } = useTheme();

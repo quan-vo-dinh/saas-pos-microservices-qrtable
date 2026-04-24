@@ -8,23 +8,25 @@ import { AppTopbar } from '@/components/layout/app-topbar';
 import { getManagementPageTitle } from '@/lib/navigation/page-titles';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
-type AppShellProps = {
-  /** Falls back to route-based title from {@link getManagementPageTitle} when omitted. */
-  title?: string;
+type ManagementWorkspaceLayoutProps = {
   children: ReactNode;
+  /** Command menu + table search — used on owner/manager dashboard surfaces. */
   showGlobalSearch?: boolean;
 };
 
-export function AppShell({ title, children, showGlobalSearch = false }: AppShellProps) {
+export function ManagementWorkspaceLayout({
+  children,
+  showGlobalSearch = false,
+}: ManagementWorkspaceLayoutProps) {
   const pathname = usePathname();
-  const resolvedTitle = title ?? getManagementPageTitle(pathname);
+  const title = getManagementPageTitle(pathname);
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <AppTopbar title={resolvedTitle} showGlobalSearch={showGlobalSearch} />
-        <main className="flex-1 space-y-4 p-4 md:p-6">{children}</main>
+        <AppTopbar title={title} showGlobalSearch={showGlobalSearch} />
+        <div className="flex flex-1 flex-col space-y-4 p-4 md:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

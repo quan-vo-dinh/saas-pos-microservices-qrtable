@@ -15,6 +15,8 @@ export const ROUTES = {
   // POS
   POS: '/pos',
   POS_TABLES: '/pos/tables',
+  POS_SERVICE_REQUESTS: '/pos/service-requests',
+  POS_BILLS: '/pos/bills',
   POS_PAYMENT: '/pos/payment',
 
   // KDS
