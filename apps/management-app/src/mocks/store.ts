@@ -46,6 +46,10 @@ type MockState = {
   posViewFilter: PosViewFilter;
   notifications: MockNotification[];
   recallLog: RecallEntry[];
+  /** KDS: highlight tickets sharing this menu item name (batching tap) */
+  kdsHighlightedItemName: string | null;
+  /** KDS: keyboard shortcut target */
+  kdsSelectedTicketId: string | null;
   mockPresence: TablePresence[];
   mockUsers: MockStaffUser[];
 };
@@ -75,6 +79,9 @@ type MockActions = {
   updateOrderItemStatus: (orderId: string, itemId: string, status: Order['items'][number]['status']) => void;
   toggleOrderPriority: (orderId: string) => void;
   setPosViewFilter: (f: PosViewFilter) => void;
+  setKdsHighlightedItemName: (name: string | null) => void;
+  selectKdsTicket: (ticketId: string | null) => void;
+  markRecallResolved: (entryId: string) => void;
 };
 
 export type MockStore = MockState & MockActions;
@@ -108,6 +115,8 @@ export const useMockStore = create<MockStore>()(
       posViewFilter: 'all',
       notifications: [],
       recallLog: [],
+      kdsHighlightedItemName: null,
+      kdsSelectedTicketId: null,
       mockPresence: initialSeed.mockPresence,
       mockUsers: initialSeed.mockUsers,
 
@@ -384,6 +393,16 @@ export const useMockStore = create<MockStore>()(
       },
 
       setPosViewFilter: (f) => set({ posViewFilter: f }),
+
+      setKdsHighlightedItemName: (name) => set({ kdsHighlightedItemName: name }),
+
+      selectKdsTicket: (ticketId) => set({ kdsSelectedTicketId: ticketId }),
+
+      markRecallResolved: (entryId) => {
+        set((s) => ({
+          recallLog: s.recallLog.map((e) => (e.id === entryId ? { ...e, resolved: true } : e)),
+        }));
+      },
     }),
     { name: 'qrtable-mock-pos' },
   ),

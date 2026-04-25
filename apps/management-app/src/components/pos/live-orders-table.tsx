@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   flexRender,
   getCoreRowModel,
@@ -258,6 +259,16 @@ export function LiveOrdersTable() {
 
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
 
+  const scrollParentRef = useRef<HTMLDivElement>(null);
+  const useVirtual = rows.length > 50;
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollParentRef.current,
+    estimateSize: () => 28,
+    overscan: 12,
+    enabled: useVirtual,
+  });
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" data-slot="pos-live-orders">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -284,9 +295,17 @@ export function LiveOrdersTable() {
         </div>
       </div>
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border border-border/50">
-        <Table>
-          <TableHeader>
+      <div
+        ref={scrollParentRef}
+        className="min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border border-border/50"
+      >
+        <Table className={useVirtual ? 'table-fixed' : undefined}>
+          <colgroup>
+            {table.getHeaderGroups()[0]?.headers.map((h) => (
+              <col key={h.id} style={{ width: `${h.getSize()}px` }} />
+            ))}
+          </colgroup>
+          <TableHeader className={useVirtual ? 'sticky top-0 z-10 bg-background' : undefined}>
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id} className="h-7 hover:bg-transparent">
                 {hg.headers.map((h) => (
@@ -297,41 +316,83 @@ export function LiveOrdersTable() {
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
+          <TableBody
+            className={cn(useVirtual && 'relative block')}
+            style={useVirtual ? { height: `${rowVirtualizer.getTotalSize()}px` } : undefined}
+          >
             {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => {
-                const o = row.original;
-                return (
-                  <OrderRowContextMenu
-                    key={o.id}
-                    orderId={o.id}
-                    onCancelClick={() => {
-                      setCancelId(o.id);
-                      selectRow(o.id);
-                    }}
-                  >
-                    <motion.tr
-                      layout
-                      data-state={selectedRowId === o.id ? 'selected' : undefined}
-                      onClick={() => void selectRow(o.id)}
-                      className={cn(
-                        'h-7 cursor-pointer border-b border-border/30 text-sm leading-tight',
-                        selectedRowId === o.id && 'bg-muted/60',
-                      )}
+              useVirtual ? (
+                rowVirtualizer.getVirtualItems().map((vr) => {
+                  const row = table.getRowModel().rows[vr.index];
+                  const o = row.original;
+                  return (
+                    <OrderRowContextMenu
+                      key={o.id}
+                      orderId={o.id}
+                      onCancelClick={() => {
+                        setCancelId(o.id);
+                        selectRow(o.id);
+                      }}
                     >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          className="p-1"
-                          style={{ maxWidth: cell.column.getSize() }}
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </motion.tr>
-                  </OrderRowContextMenu>
-                );
-              })
+                      <TableRow
+                        ref={rowVirtualizer.measureElement}
+                        data-index={vr.index}
+                        data-state={selectedRowId === o.id ? 'selected' : undefined}
+                        onClick={() => void selectRow(o.id)}
+                        className={cn(
+                          'absolute left-0 top-0 box-border h-7 w-full cursor-pointer border-b border-border/30 text-sm leading-tight',
+                          selectedRowId === o.id && 'bg-muted/60',
+                        )}
+                        style={{ transform: `translateY(${vr.start}px)` }}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell
+                            key={cell.id}
+                            className="p-1"
+                            style={{ maxWidth: cell.column.getSize(), width: cell.column.getSize() }}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </OrderRowContextMenu>
+                  );
+                })
+              ) : (
+                table.getRowModel().rows.map((row) => {
+                  const o = row.original;
+                  return (
+                    <OrderRowContextMenu
+                      key={o.id}
+                      orderId={o.id}
+                      onCancelClick={() => {
+                        setCancelId(o.id);
+                        selectRow(o.id);
+                      }}
+                    >
+                      <motion.tr
+                        layout
+                        data-state={selectedRowId === o.id ? 'selected' : undefined}
+                        onClick={() => void selectRow(o.id)}
+                        className={cn(
+                          'h-7 cursor-pointer border-b border-border/30 text-sm leading-tight',
+                          selectedRowId === o.id && 'bg-muted/60',
+                        )}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell
+                            key={cell.id}
+                            className="p-1"
+                            style={{ maxWidth: cell.column.getSize() }}
+                          >
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </motion.tr>
+                    </OrderRowContextMenu>
+                  );
+                })
+              )
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="p-4 text-center text-sm text-muted-foreground">

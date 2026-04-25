@@ -1,10 +1,11 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { OrderItemStatus, OrderStatus, type OrderItem } from '@einvoice/types';
 import { Link2, ChefHat, Wine } from 'lucide-react';
 import { toast } from 'sonner';
-import { PolarAngleAxis, RadialBar, RadialBarChart, ResponsiveContainer } from 'recharts';
+import { effectiveSlaSeconds, readKdsSlaCapMinutes } from '@/lib/kds-station-prefs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -32,6 +33,11 @@ import {
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useMockStore } from '@/mocks/store';
 import type { KDSStation } from '@/mocks/kds-ticket';
+
+const KdsSlaRadial = dynamic(
+  () => import('@/components/kds/kds-sla-radial').then((m) => m.KdsSlaRadial),
+  { ssr: false, loading: () => <div className="h-44 animate-pulse rounded-md bg-white/5" aria-hidden /> },
+);
 
 type Props = {
   ticketId: string | null;
@@ -64,14 +70,16 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
     if (!ticket) {
       return { ratio: 0, pct: 0, chartData: [{ name: 'sla', value: 0, fill: 'var(--lime)' }] };
     }
+    const capMin = readKdsSlaCapMinutes(station);
     const created = new Date(ticket.createdAt).getTime();
     const t = now ?? created;
     const elapsed = (t - created) / 1000;
-    const r = elapsed / Math.max(1, ticket.slaSeconds);
+    const eff = effectiveSlaSeconds(ticket.slaSeconds, capMin);
+    const r = elapsed / eff;
     const p = Math.min(100, Math.round(r * 100));
     const f = r < 0.6 ? 'var(--lime)' : r < 0.9 ? 'var(--amber)' : 'var(--pink)';
     return { ratio: r, pct: p, chartData: [{ name: 'sla', value: p, fill: f }] };
-  }, [now, ticket]);
+  }, [now, station, ticket]);
 
   const timelineNow = now == null ? '—' : new Date(now).toLocaleTimeString('vi-VN');
 
@@ -109,7 +117,12 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
             </div>
             <HoverCard>
               <HoverCardTrigger asChild>
-                <Button type="button" variant="outline" size="sm" className="border-white/20 text-[0.7rem]">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-white/20 text-[0.7rem] active:bg-white/10"
+                >
                   <Link2 className="size-4" aria-hidden />
                   Liên kết đơn
                 </Button>
@@ -193,20 +206,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
 
           <section className="flex flex-col gap-2">
             <p className="text-[0.65rem] font-medium uppercase text-white/50">SLA gauge</p>
-            <div className="h-44 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadialBarChart
-                  innerRadius="68%"
-                  outerRadius="100%"
-                  data={chartData}
-                  startAngle={90}
-                  endAngle={-270}
-                >
-                  <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                  <RadialBar dataKey="value" cornerRadius={6} background={{ fill: 'rgba(255,255,255,0.06)' }} />
-                </RadialBarChart>
-              </ResponsiveContainer>
-            </div>
+            <KdsSlaRadial chartData={chartData} />
             <p className="text-center font-mono text-xs text-white/60">
               {ratio < 0.6 ? 'Trong ngưỡng an toàn' : ratio < 0.9 ? 'Cảnh báo amber' : 'Vượt SLA — ưu tiên xử lý'}
             </p>
@@ -217,7 +217,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              className="bg-[var(--lime)] text-black hover:bg-[var(--lime)]/90"
+              className="bg-[var(--lime)] text-black active:bg-[var(--lime)]/90"
               onClick={() => {
                 updateOrderStatus(ticket.orderId, OrderStatus.READY, 'staff-chef-1');
                 toast('Đã đánh dấu Ready (mock)');
@@ -228,7 +228,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
             <Button
               type="button"
               variant="outline"
-              className="border-[var(--pink)]/50 text-[var(--pink)] hover:bg-[var(--pink)]/10"
+              className="border-[var(--pink)]/50 text-[var(--pink)] active:bg-[var(--pink)]/10"
               onClick={() => {
                 recallTicket(ticket.ticketId, 'Sheet recall', 'staff-chef-1', 'Chị Lan');
                 toast('Recall (mock)');
@@ -252,7 +252,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
                 <AlertDialogFooter>
                   <AlertDialogCancel className="border-white/20">Huỷ</AlertDialogCancel>
                   <AlertDialogAction
-                    className="bg-[var(--pink)] text-black hover:bg-[var(--pink)]/90"
+                    className="bg-[var(--pink)] text-black active:bg-[var(--pink)]/90"
                     onClick={() => {
                       const first = ticket.items[0];
                       if (first) updateItem(ticket.ticketId, first.id, OrderItemStatus.CANCELED);

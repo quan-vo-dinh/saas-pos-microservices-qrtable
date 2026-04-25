@@ -55,7 +55,7 @@ export function KdsHeader({ station, tickets, onOpenRecall, onOpenSettings }: Pr
       data-slot="kds-header"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-3">
-        <Button variant="ghost" size="sm" className="h-8 gap-1 text-[var(--ink)] hover:bg-white/10" asChild>
+        <Button variant="ghost" size="sm" className="h-8 gap-1 text-[var(--ink)] active:bg-white/15" asChild>
           <Link href={ROUTES.POS}>
             <ArrowLeft className="size-4" aria-hidden />
             <span className="hidden sm:inline">POS</span>
@@ -95,7 +95,7 @@ export function KdsHeader({ station, tickets, onOpenRecall, onOpenSettings }: Pr
           type="button"
           variant="outline"
           size="sm"
-          className="h-8 border-white/20 bg-black/30 text-[0.7rem] text-[var(--ink)] hover:bg-white/10"
+          className="h-8 border-white/20 bg-black/30 text-[0.7rem] text-[var(--ink)] active:bg-white/15"
           onClick={() => onOpenRecall?.()}
         >
           <History data-icon="inline-start" aria-hidden />
@@ -105,7 +105,7 @@ export function KdsHeader({ station, tickets, onOpenRecall, onOpenSettings }: Pr
           type="button"
           variant="outline"
           size="icon-sm"
-          className="border-white/20 bg-black/30 text-[var(--ink)] hover:bg-white/10"
+          className="border-white/20 bg-black/30 text-[var(--ink)] active:bg-white/15"
           aria-label="Cài đặt trạm"
           onClick={() => onOpenSettings?.()}
         >
