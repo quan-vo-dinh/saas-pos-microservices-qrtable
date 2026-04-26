@@ -3,6 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { orderItemStatusVi, orderStatusVi } from '@einvoice/shared-constants';
 import { OrderItemStatus, OrderStatus } from '@einvoice/types';
 import { Check, UserRound } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@einvoice/frontend-ui';
@@ -16,27 +17,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CancelOrderDialog } from '@/components/pos/cancel-order-dialog';
 import { useMockStore } from '@/mocks/store';
 import { formatVnd } from '@/lib/format-vnd';
+import { orderItemStatusChipClass, orderStatusChipClass } from '@/lib/pos-status-chips';
 import { cn } from '@/lib/utils';
 
-function statusLabel(s: string) {
-  return s;
-}
-
-function orderStatusBadgeClass(s: OrderStatus) {
-  switch (s) {
-    case OrderStatus.PENDING:
-      return 'bg-amber-500/20 text-amber-200';
-    case OrderStatus.PROCESSING:
-      return 'bg-cyan-500/20 text-cyan-200';
-    case OrderStatus.READY:
-      return 'bg-violet-500/20 text-violet-200';
-    case OrderStatus.SERVED:
-      return 'bg-emerald-500/20 text-emerald-200';
-    case OrderStatus.CANCELED:
-      return 'bg-destructive/20 text-destructive';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
+/** Mock ảnh món — map theo seed menu; fallback deterministic cho id lạ (vd. realtime mock). */
+function mockOrderItemImageUrl(menuItemId: string): string {
+  const byId: Record<string, string> = {
+    'mi-pho':
+      'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=128&h=128&q=80&auto=format&fit=crop',
+    'mi-bun':
+      'https://images.unsplash.com/photo-1559314809-0d155014e29e?w=128&h=128&q=80&auto=format&fit=crop',
+    'mi-com':
+      'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=128&h=128&q=80&auto=format&fit=crop',
+    'mi-tra':
+      'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=128&h=128&q=80&auto=format&fit=crop',
+    'mi-nuoc':
+      'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=128&h=128&q=80&auto=format&fit=crop',
+  };
+  return (
+    byId[menuItemId] ??
+    `https://picsum.photos/seed/${encodeURIComponent(menuItemId)}/96/96`
+  );
 }
 
 export function OrderDetailPanel({ orderId }: { orderId: string }) {
@@ -62,7 +63,10 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
         text: 'Xác nhận bởi nhân viên',
       });
     }
-    e.push({ at: order.updatedAt, text: `Cập nhật trạng thái ${order.status} (OrderStatusChangedEvent mock)` });
+    e.push({
+      at: order.updatedAt,
+      text: `Cập nhật trạng thái ${orderStatusVi(order.status)} (OrderStatusChangedEvent mock)`,
+    });
     return e.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
   }, [order]);
 
@@ -90,10 +94,8 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
           </div>
           <AnimatePresence mode="wait">
             <motion.div key={order.status} layout>
-              <Badge
-                className={cn('border-0 font-normal', orderStatusBadgeClass(order.status as OrderStatus))}
-              >
-                {statusLabel(order.status)}
+              <Badge className={cn('border-0 font-normal', orderStatusChipClass(order.status))}>
+                {orderStatusVi(order.status)}
               </Badge>
             </motion.div>
           </AnimatePresence>
@@ -166,15 +168,29 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
                       />
                     </TableCell>
                     <TableCell>
-                      <div className="flex min-w-0 max-w-44 flex-col gap-0.5">
-                        <span className="truncate text-xs font-medium">{it.menuItemName}</span>
-                        {it.note ? <em className="text-[0.7rem] leading-tight text-muted-foreground">{it.note}</em> : null}
+                      <div className="flex min-w-0 max-w-[min(100%,14rem)] items-start gap-2">
+                        <Avatar className="size-10 shrink-0 rounded-md border border-border/50 after:rounded-md">
+                          <AvatarImage
+                            src={mockOrderItemImageUrl(it.menuItemId)}
+                            alt={it.menuItemName}
+                            className="rounded-md object-cover"
+                          />
+                          <AvatarFallback className="rounded-md text-[0.6rem]">
+                            {it.menuItemName.slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span className="truncate text-xs font-medium">{it.menuItemName}</span>
+                          {it.note ? (
+                            <em className="text-[0.7rem] leading-tight text-muted-foreground">{it.note}</em>
+                          ) : null}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-end font-mono text-xs tabular-nums">{it.quantity}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="px-1 font-mono text-[0.65rem]">
-                        {it.status}
+                      <Badge className={cn('px-1 font-mono text-[0.65rem]', orderItemStatusChipClass(it.status))}>
+                        {orderItemStatusVi(it.status)}
                       </Badge>
                     </TableCell>
                   </TableRow>

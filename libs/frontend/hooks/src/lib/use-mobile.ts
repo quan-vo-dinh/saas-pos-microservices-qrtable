@@ -1,18 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { BREAKPOINTS } from '@einvoice/shared-constants';
 
+function subscribe(onStoreChange: () => void) {
+  const mql = window.matchMedia(`(max-width: ${BREAKPOINTS.MOBILE - 1}px)`);
+  mql.addEventListener('change', onStoreChange);
+  return () => mql.removeEventListener('change', onStoreChange);
+}
+
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = useState<boolean | undefined>(undefined);
-
-  useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${BREAKPOINTS.MOBILE - 1}px)`);
-    const onChange = () => {
-      setIsMobile(window.innerWidth < BREAKPOINTS.MOBILE);
-    };
-    mql.addEventListener('change', onChange);
-    setIsMobile(window.innerWidth < BREAKPOINTS.MOBILE);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-
-  return !!isMobile;
+  return useSyncExternalStore(
+    subscribe,
+    () => window.innerWidth < BREAKPOINTS.MOBILE,
+    () => false,
+  );
 }

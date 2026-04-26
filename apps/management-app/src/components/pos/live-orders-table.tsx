@@ -10,6 +10,7 @@ import {
 } from '@tanstack/react-table';
 import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
+import { orderItemStatusVi, orderStatusVi } from '@einvoice/shared-constants';
 import { OrderStatus } from '@einvoice/types';
 import type { Order } from '@einvoice/types';
 import { MessageSquareText } from 'lucide-react';
@@ -22,28 +23,9 @@ import { OrderRowContextMenu } from '@/components/pos/order-row-context-menu';
 import { CancelOrderDialog } from '@/components/pos/cancel-order-dialog';
 import { useMockStore, type PosViewFilter } from '@/mocks/store';
 import { formatVnd } from '@/lib/format-vnd';
+import { orderItemStatusChipClass, orderStatusChipClass } from '@/lib/pos-status-chips';
+import { useNowMs, waitMinutes } from '@/lib/use-now-ms';
 import { cn } from '@/lib/utils';
-
-function waitMinutes(createdAt: string) {
-  return (Date.now() - new Date(createdAt).getTime()) / 60_000;
-}
-
-function useLiveTick(createdAt: string) {
-  const [, setT] = useState(0);
-  useEffect(() => {
-    const i = setInterval(() => setT((x) => x + 1), 10_000);
-    return () => clearInterval(i);
-  }, [createdAt]);
-  return waitMinutes(createdAt);
-}
-
-function orderStatusBadge(s: string) {
-  if (s === OrderStatus.PENDING) return 'bg-amber-500/25 text-amber-100';
-  if (s === OrderStatus.PROCESSING) return 'bg-cyan-500/25 text-cyan-100';
-  if (s === OrderStatus.READY) return 'bg-violet-500/25 text-violet-100';
-  if (s === OrderStatus.SERVED) return 'bg-emerald-500/25 text-emerald-200';
-  return 'bg-muted text-muted-foreground';
-}
 
 function posFilterChipsToView(filter: string): PosViewFilter {
   if (filter === 'P') return 'PENDING';
@@ -76,6 +58,7 @@ export function LiveOrdersTable() {
 
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [chip, setChip] = useState('ALL');
+  const nowMs = useNowMs();
   useEffect(() => {
     if (posViewFilter === 'PENDING') setChip('P');
     else if (posViewFilter === 'PROCESSING') setChip('D');
@@ -93,7 +76,7 @@ export function LiveOrdersTable() {
       tables.filter((t) => t.status === 'occupied' || t.status === 'billing').map((t) => t.id),
     );
     return base.filter((o) => {
-      const w = waitMinutes(o.createdAt);
+      const w = waitMinutes(o.createdAt, nowMs);
       switch (posViewFilter) {
         case 'PENDING':
           return o.status === OrderStatus.PENDING;
@@ -109,7 +92,7 @@ export function LiveOrdersTable() {
           return true;
       }
     });
-  }, [liveOrders, tables, posViewFilter]);
+  }, [liveOrders, tables, posViewFilter, nowMs]);
 
   const columns: ColumnDef<Order>[] = useMemo(
     () => [
@@ -150,7 +133,9 @@ export function LiveOrdersTable() {
                   {o.items.slice(0, 6).map((it) => (
                     <li key={it.id} className="flex items-center justify-between gap-1">
                       <span className="truncate">{it.menuItemName}</span>
-                      <Badge className="shrink-0 px-1 text-[0.6rem]">{it.status}</Badge>
+                      <Badge className={cn('shrink-0 px-1 text-[0.6rem]', orderItemStatusChipClass(it.status))}>
+                        {orderItemStatusVi(it.status)}
+                      </Badge>
                     </li>
                   ))}
                 </ul>
@@ -171,8 +156,8 @@ export function LiveOrdersTable() {
         id: 'status',
         header: 'TT',
         cell: ({ row }) => (
-          <Badge className={cn('h-5 px-1.5 text-[0.6rem] font-medium', orderStatusBadge(row.original.status))}>
-            {row.original.status}
+          <Badge className={cn('h-5 px-1.5 text-[0.6rem] font-medium', orderStatusChipClass(row.original.status))}>
+            {orderStatusVi(row.original.status)}
           </Badge>
         ),
         size: 100,
@@ -180,7 +165,7 @@ export function LiveOrdersTable() {
       {
         id: 'wait',
         header: 'Chờ',
-        cell: ({ row }) => <WaitCell createdAt={row.original.createdAt} />,
+        cell: ({ row }) => <WaitCell createdAt={row.original.createdAt} nowMs={nowMs} />,
         size: 64,
       },
       {
@@ -254,7 +239,7 @@ export function LiveOrdersTable() {
         size: 150,
       },
     ],
-    [confirmOrder, selectRow, userId],
+    [confirmOrder, selectRow, userId, nowMs],
   );
 
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
@@ -415,8 +400,8 @@ export function LiveOrdersTable() {
   );
 }
 
-function WaitCell({ createdAt }: { createdAt: string }) {
-  const m = useLiveTick(createdAt);
+function WaitCell({ createdAt, nowMs }: { createdAt: string; nowMs: number }) {
+  const m = waitMinutes(createdAt, nowMs);
   const c =
     m <= 8
       ? 'from-emerald-500/20 to-transparent'

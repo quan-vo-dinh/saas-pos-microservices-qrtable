@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
+import { orderItemStatusVi, orderStatusVi } from '@einvoice/shared-constants';
 import { OrderItemStatus, OrderStatus, type OrderItem } from '@einvoice/types';
 import { Link2, ChefHat, Wine } from 'lucide-react';
 import { toast } from 'sonner';
@@ -132,7 +133,8 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
                 <p className="break-all font-mono">{ticket.orderId}</p>
                 {order ? (
                   <p className="mt-2 text-muted-foreground">
-                    Trạng thái đơn: <span className="text-foreground">{order.status}</span> · {order.items.length} dòng
+                    Trạng thái đơn: <span className="text-foreground">{orderStatusVi(order.status)}</span> ·{' '}
+                    {order.items.length} dòng
                   </p>
                 ) : (
                   <p className="mt-2 text-muted-foreground">Không tìm thấy đơn mock.</p>
@@ -176,10 +178,18 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
                           </SelectTrigger>
                           <SelectContent>
                             <SelectGroup>
-                              <SelectItem value={OrderItemStatus.PROCESSING}>PROCESSING</SelectItem>
-                              <SelectItem value={OrderItemStatus.READY}>READY</SelectItem>
-                              <SelectItem value={OrderItemStatus.SERVED}>SERVED</SelectItem>
-                              <SelectItem value={OrderItemStatus.CANCELED}>CANCELED</SelectItem>
+                              <SelectItem value={OrderItemStatus.PROCESSING}>
+                                {orderItemStatusVi(OrderItemStatus.PROCESSING)}
+                              </SelectItem>
+                              <SelectItem value={OrderItemStatus.READY}>
+                                {orderItemStatusVi(OrderItemStatus.READY)}
+                              </SelectItem>
+                              <SelectItem value={OrderItemStatus.SERVED}>
+                                {orderItemStatusVi(OrderItemStatus.SERVED)}
+                              </SelectItem>
+                              <SelectItem value={OrderItemStatus.CANCELED}>
+                                {orderItemStatusVi(OrderItemStatus.CANCELED)}
+                              </SelectItem>
                             </SelectGroup>
                           </SelectContent>
                         </Select>
@@ -196,7 +206,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
             <ol className="flex flex-col gap-2 border-s border-white/15 ps-3 text-[0.75rem]">
               <li>
                 <span className="font-mono text-white/50">{new Date(ticket.createdAt).toLocaleTimeString('vi-VN')}</span>{' '}
-                Ticket tạo từ đơn đang PROCESSING
+                Ticket tạo từ đơn ({orderStatusVi(OrderStatus.PROCESSING)})
               </li>
               <li>
                 <span className="font-mono text-white/50">{timelineNow}</span> SLA đạt {pct}%

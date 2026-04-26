@@ -2,9 +2,8 @@
 
 import { Button, Popover, PopoverContent, PopoverTrigger, Separator } from '@einvoice/frontend-ui'
 import { Armchair, Pencil, QrCode, Trash2, Users } from 'lucide-react';
+import { tableStatusVi } from '@einvoice/shared-constants';
 import { cn } from '@/lib/utils';
-;
-;
 import type { RestaurantTable, TableStatus } from '../data/schema';
 import { TableStatusBadge, statusConfig } from './table-status-badge';
 import { useTables } from './tables-provider';
@@ -35,20 +34,18 @@ export function TableFloorPlan({ tables }: TableFloorPlanProps) {
     <div className="flex flex-col gap-4">
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        {(Object.entries(statusConfig) as [TableStatus, { label: string; className: string }][]).map(
-          ([status, config]) => (
-            <div key={status} className="flex items-center gap-1.5">
-              <div
-                className={cn(
-                  'size-3 rounded-sm border',
-                  statusBorderColors[status],
-                  statusBgColors[status]
-                )}
-              />
-              <span>{config.label}</span>
-            </div>
-          )
-        )}
+        {(Object.keys(statusConfig) as TableStatus[]).map((status) => (
+          <div key={status} className="flex items-center gap-1.5">
+            <div
+              className={cn(
+                'size-3 rounded-sm border',
+                statusBorderColors[status],
+                statusBgColors[status],
+              )}
+            />
+            <span>{tableStatusVi(status)}</span>
+          </div>
+        ))}
       </div>
 
       {/* Floor Plan Grid */}

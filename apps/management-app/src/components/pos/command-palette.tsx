@@ -39,9 +39,6 @@ export function CommandPalette() {
   return (
     <>
       <div className="pointer-events-none fixed end-3 top-16 z-30 hidden md:block">
-        <Badge variant="secondary" className="pointer-events-auto text-[0.65rem] font-mono">
-          ⌘K
-        </Badge>
       </div>
       <CommandDialog open={open} onOpenChange={setOpen} title="POS Command" description="Bàn, đơn, thao tác nhanh">
         <Command className="rounded-lg border-0">

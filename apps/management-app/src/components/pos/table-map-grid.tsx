@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { tableStatusVi } from '@einvoice/shared-constants';
 import { useMockStore } from '@/mocks/store';
 import { formatVnd } from '@/lib/format-vnd';
 import { cn } from '@/lib/utils';
@@ -98,11 +99,8 @@ export function TableMapGrid() {
                         <CardHeader className="p-1.5 pb-0">
                           <div className="flex items-center justify-between gap-1">
                             <span className="truncate text-xs font-semibold">{t.name}</span>
-                            <Badge
-                              variant="outline"
-                              className="h-4 border-0 px-1 text-[0.6rem] uppercase"
-                            >
-                              {t.status}
+                            <Badge variant="outline" className="h-4 border-0 px-1 text-[0.6rem]">
+                              {tableStatusVi(t.status)}
                             </Badge>
                           </div>
                         </CardHeader>

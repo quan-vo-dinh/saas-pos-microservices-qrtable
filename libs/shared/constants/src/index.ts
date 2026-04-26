@@ -12,3 +12,13 @@ export {
   PAYMENT_METHODS,
 } from './lib/status';
 export { QUERY_CONFIG, BREAKPOINTS, PAGINATION_DEFAULTS } from './lib/config';
+export {
+  orderStatusVi,
+  orderItemStatusVi,
+  tableStatusVi,
+  billStatusVi,
+  serviceRequestStatusVi,
+  serviceRequestTypeVi,
+  sessionStatusVi,
+  paymentMethodVi,
+} from './lib/vi-domain-labels';

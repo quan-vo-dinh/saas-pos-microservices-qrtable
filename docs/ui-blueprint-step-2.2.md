@@ -78,18 +78,20 @@ Tài liệu này là blueprint kim chỉ nam cho việc viết code thực thi (
 └─────────────────────────────────────────┘
 ```
 
+> **Wireframe vs code:** Ký tự trong khung ASCII (`≡`, `⏱`, `👥`, …) chỉ mô tả **vị trí**. Trong implementation dùng **icon component** theo §5.6 — không nhúng Unicode emoji làm affordance UI (nút, badge trạng thái, station header).
+
 ### 2.2 Component mapping
 
-| Logic nghiệp vụ (BL ref)                             | Component shadcn / Radix                                                                                                           | Ghi chú implementation                                                                              |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| §4.A.1 Khởi tạo phiên (Table badge, timer, presence) | `Badge` + custom `SessionTimer` (countdown) + `AvatarGroup` placeholder                                                            | Presence dùng emoji avatar mock (Quan, Minh, Anh)                                                   |
-| §4.A.2 Lựa chọn món                                  | Custom `MenuItemCard` + `Dialog` (chi tiết món, image carousel `Carousel`)                                                         | Dialog có `Tabs`: Mô tả · Topping (disabled, tooltip "Phase sau") · Đánh giá mock                   |
-| §4.A.3 Quản lý giỏ                                   | `Sheet` side="bottom" (Cart drawer) + `ScrollArea` cho list + `Stepper` custom cho qty                                             | Mỗi item có `Popover` "Ghi chú" (textarea + chip suggestions: "Không cay", "Ít muối", "Không hành") |
-| Shared cart presence (D4)                            | `HoverCard` trên avatar nhỏ trong Cart header                                                                                      | Hover → "Quan • thêm Phở bò × 1 lúc 14:32" — activity feed 5 dòng gần nhất                          |
-| §4.A.4 Submit                                        | `Button` "Đặt món" với inline `Spinner` → success animation (Motion `AnimatePresence` confetti chip)                               | Idempotency key = `crypto.randomUUID()` lưu vào Zustand, persist localStorage                       |
-| §4.A.6 Order tracking                                | `pages/order-tracking-page.tsx` — `Stepper` custom horizontal mobile (DRAFT → PENDING → PROCESSING → READY → SERVED)               | Mỗi step có timestamp + estimated next; status PROCESSING có pulsing dot                            |
-| §III Service request                                 | Bottom sheet `Drawer` (Vaul) trigger từ floating action: 3 button lớn `CALL_STAFF`, `REQUEST_BILL`, `GENERAL_HELP` + textarea note | Sau submit → toast `Sonner` "Đã gọi nhân viên · sẽ đến trong ~2 phút"                               |
-| §6.A Yêu cầu thanh toán (lock cart)                  | `Alert` variant="warning" sticky top khi `BillStatus === PENDING_PAYMENT`                                                          | Disable cart `+`, message "Bàn đang thanh toán — không thể đặt thêm"                                |
+| Logic nghiệp vụ (BL ref)                             | Component shadcn / Radix                                                                                                           | Ghi chú implementation                                                                                                                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §4.A.1 Khởi tạo phiên (Table badge, timer, presence) | `Badge` + custom `SessionTimer` (countdown) + `AvatarGroup` placeholder                                                            | Presence: `Avatar` + chữ cái đầu / màu nền deterministic (mock "Khách 1"…); **không** dùng emoji làm avatar. Timer badge: icon `Timer` hoặc `Clock` từ `lucide-react` (§5.6). |
+| §4.A.2 Lựa chọn món                                  | Custom `MenuItemCard` + `Dialog` (chi tiết món, image carousel `Carousel`)                                                         | Dialog có `Tabs`: Mô tả · Topping (disabled, tooltip "Phase sau") · Đánh giá mock                                                                                             |
+| §4.A.3 Quản lý giỏ                                   | `Sheet` side="bottom" (Cart drawer) + `ScrollArea` cho list + `Stepper` custom cho qty                                             | Mỗi item có `Popover` "Ghi chú" (textarea + chip suggestions: "Không cay", "Ít muối", "Không hành")                                                                           |
+| Shared cart presence (D4)                            | `HoverCard` trên avatar nhỏ trong Cart header                                                                                      | Hover → "Quan • thêm Phở bò × 1 lúc 14:32" — activity feed 5 dòng gần nhất                                                                                                    |
+| §4.A.4 Submit                                        | `Button` "Đặt món" với inline `Spinner` → success animation (Motion `AnimatePresence` confetti chip)                               | Idempotency key = `crypto.randomUUID()` lưu vào Zustand, persist localStorage                                                                                                 |
+| §4.A.6 Order tracking                                | `pages/order-tracking-page.tsx` — `Stepper` custom horizontal mobile (DRAFT → PENDING → PROCESSING → READY → SERVED)               | Mỗi step có timestamp + estimated next; status PROCESSING có pulsing dot                                                                                                      |
+| §III Service request                                 | Bottom sheet `Drawer` (Vaul) trigger từ floating action: 3 button lớn `CALL_STAFF`, `REQUEST_BILL`, `GENERAL_HELP` + textarea note | Sau submit → toast `Sonner` "Đã gọi nhân viên · sẽ đến trong ~2 phút"                                                                                                         |
+| §6.A Yêu cầu thanh toán (lock cart)                  | `Alert` variant="warning" sticky top khi `BillStatus === PENDING_PAYMENT`                                                          | Disable cart `+`, message "Bàn đang thanh toán — không thể đặt thêm"                                                                                                          |
 
 ### 2.3 Information density — bấm vào đâu hiển thị gì?
 
@@ -118,7 +120,7 @@ Tài liệu này là blueprint kim chỉ nam cho việc viết code thực thi (
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ Sidebar(sidebar.tsx)│        Top bar: Search ⌘K · TenantSwitcher · 🔔3 · Avatar │
+│ Sidebar(sidebar.tsx)│ Top bar: Search ⌘K · TenantSwitcher · Bell+Badge(3) · Avatar │
 │ ┌───────────────┐  ├─────────────────────────────────────────────────────────┤
 │ │ Live Orders ●│  │  Tabs: [Live Orders 7] [Tables] [Service Requests 2] [Bills] │
 │ │ Tables       │  ├─────────────────────────────────────────────────────────┤
@@ -148,7 +150,7 @@ Tài liệu này là blueprint kim chỉ nam cho việc viết code thực thi (
 | **Tables tab**                | `ToggleGroup` view: [Grid] [Map]. Grid = `Card` matrix; Map = SVG floor plan (mock, drag pan)                                                                                                                    | Mỗi card hiển thị: số bàn, status `Badge` (color-coded — green Available / amber Occupied / red Billing / blue Cleaning), người đang ngồi (avatar group), tổng tab hiện tại, idle time                                                    |
 | Table card hover              | `HoverCard` 320px                                                                                                                                                                                                | Header: bàn + sức chứa; Body: mini timeline 5 events gần nhất + button quick "Chuyển bàn" mở `Dialog` chọn bàn đích                                                                                                                       |
 | Transfer table                | `Dialog` + `Command` chọn bàn đích                                                                                                                                                                               | Validation inline: "Bàn 8 đang Cleaning" disabled                                                                                                                                                                                         |
-| **Service Requests inbox**    | `DataTable` + `Tabs`: [PENDING] [ACKNOWLEDGED] [RESOLVED]                                                                                                                                                        | Row có icon theo `ServiceRequestType` (hand-up / receipt / question), waiter assign `Avatar`                                                                                                                                              |
+| **Service Requests inbox**    | `DataTable` + `Tabs`: [PENDING] [ACKNOWLEDGED] [RESOLVED]                                                                                                                                                        | Row: icon `lucide-react` theo type — `CALL_STAFF` → `UserRound` hoặc `HandHelping`; `REQUEST_BILL` → `Receipt`; `GENERAL_HELP` → `CircleHelp`. Waiter: `Avatar`.                                                                          |
 | Service request action        | `Button` "Acknowledge" → `Button` "Resolve" inline                                                                                                                                                               | Confirm bằng `Toast` undo 5s                                                                                                                                                                                                              |
 | **Bills (cash)**              | Right pane khi chọn table có `BillStatus === PENDING_PAYMENT`                                                                                                                                                    | Form: Tổng tiền (read-only, monospace lớn), Tiền nhận (`Input` numeric với suggested chips 100k/200k/500k), Tiền thừa auto-calc, button "Đã thu — đóng phiên"                                                                             |
 | Sticky KPI strip              | 4 tiles: Đơn chờ xác nhận / TB phục vụ / Đơn quá SLA / Bàn occupied %                                                                                                                                            | Tile click → filter table tương ứng                                                                                                                                                                                                       |
@@ -156,24 +158,24 @@ Tài liệu này là blueprint kim chỉ nam cho việc viết code thực thi (
 
 ### 3.3 Information density — bấm vào đâu hiển thị gì?
 
-| Element                | Action                   | Reveal                                                                                                             |
-| ---------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| OrderID cell           | Tap                      | Right pane Order detail (3 tab)                                                                                    |
-| OrderID cell           | Long-press / right-click | `ContextMenu`: Copy ID · Print KOT · Mark priority · Force-cancel (Manager only — disabled với role badge tooltip) |
-| Items count badge      | Hover                    | `HoverCard` list 5 món + `Badge` per item status (PROCESSING / READY)                                              |
-| Customer notes icon    | Hover                    | `HoverCard` show full note: "Phở: không hành, Trà sữa: ít đường"                                                   |
-| Wait time cell         | —                        | Bg-color gradient theo SLA: 0–8' xanh, 8–15' amber, >15' đỏ + pulse                                                |
-| Table card             | Tap                      | Right pane Table detail: occupant timeline, total bill running, all current orders, transfer + close session       |
-| Table card             | Long-press               | `ContextMenu`: Đánh dấu sạch · Khoá bàn · Gắn note "VIP"                                                           |
-| Service request row    | Hover                    | `HoverCard`: full note khách viết + thời gian, "Đã ngồi 47 phút"                                                   |
-| KPI tile "Đơn quá SLA" | Tap                      | Filter table + scroll-to first overdue                                                                             |
-| ⌘K palette             | Type "Bàn 12"            | Show 3 results: bàn 12 (jump), Order #84A1 (ở bàn 12), confirm latest order ở bàn 12                               |
-| Notification bell      | Tap                      | `Popover` 480px với 3 tab; mỗi item có `Avatar` source + 1-line preview + "2 phút trước"                           |
-| Avatar (top-right)     | Tap                      | `DropdownMenu` Profile · Switch role (mock) · Theme · Logout                                                       |
+| Element                | Action                   | Reveal                                                                                                                                       |
+| ---------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| OrderID cell           | Tap                      | Right pane Order detail (3 tab)                                                                                                              |
+| OrderID cell           | Long-press / right-click | `ContextMenu`: Copy ID · Print KOT · Mark priority · Force-cancel (Manager only — disabled với role badge tooltip)                           |
+| Items count badge      | Hover                    | `HoverCard` list 5 món + `Badge` per item status (PROCESSING / READY)                                                                        |
+| Customer notes icon    | Hover                    | Ô cột dùng `<StickyNote />` hoặc `<MessageSquareText />` + `aria-label` phù hợp; `HoverCard` full note: "Phở: không hành, Trà sữa: ít đường" |
+| Wait time cell         | —                        | Bg-color gradient theo SLA: 0–8' xanh, 8–15' amber, >15' đỏ + pulse                                                                          |
+| Table card             | Tap                      | Right pane Table detail: occupant timeline, total bill running, all current orders, transfer + close session                                 |
+| Table card             | Long-press               | `ContextMenu`: Đánh dấu sạch · Khoá bàn · Gắn note "VIP"                                                                                     |
+| Service request row    | Hover                    | `HoverCard`: full note khách viết + thời gian, "Đã ngồi 47 phút"                                                                             |
+| KPI tile "Đơn quá SLA" | Tap                      | Filter table + scroll-to first overdue                                                                                                       |
+| ⌘K palette             | Type "Bàn 12"            | Show 3 results: bàn 12 (jump), Order #84A1 (ở bàn 12), confirm latest order ở bàn 12                                                         |
+| Notification bell      | Tap                      | `Popover` 480px với 3 tab; mỗi item có `Avatar` source + 1-line preview + "2 phút trước"                                                     |
+| Avatar (top-right)     | Tap                      | `DropdownMenu` Profile · Switch role (mock) · Theme · Logout                                                                                 |
 
 ### 3.4 Realtime / animation
 
-- New order arrives: row slides in from top (Motion `layout` prop), `Badge` "NEW" pulses 3s, `🔔` chime 200ms.
+- New order arrives: row slides in from top (Motion `layout` prop), `Badge` "NEW" pulses 3s; **âm thanh** bell ngắn (Web Audio / mock) — UI trigger dùng `<Bell />` + `Badge`, không dùng emoji chuông trong copy cố định.
 - Status change: row's `Status` badge morphs colour with `AnimatePresence`.
 - Sheet detail: slide from right 280ms, content stagger reveal.
 - Confirm action: button → check icon → row removes from PENDING filter (`AnimatePresence exit`).
@@ -186,7 +188,7 @@ Tài liệu này là blueprint kim chỉ nam cho việc viết code thực thi (
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ Header: 🍳 KITCHEN · 14:38 · 5 ticket chờ · ⏱ avg 6m12s · [Recall log]     │
+│ Header: ChefHat+KITCHEN · clock · stats · Recall log · Settings (xem §5.6) │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────────────────────┐ │
 │ │ CHỜ (3)    │ │ ĐANG LÀM(2)│ │ HOÀN THÀNH │ │ BATCHING — gom theo món  │ │
@@ -197,21 +199,23 @@ Tài liệu này là blueprint kim chỉ nam cho việc viết code thực thi (
 │ │ │ Bàn 12 │ │ │ │ Bàn 03 │ │ │            │ │                          │ │
 │ │ │ ...    │ │ │ │ ...    │ │ │            │ │ ───────────────────────  │ │
 │ │ └────────┘ │ │ └────────┘ │ │            │ │ SLA Watch                │ │
-│ │            │ │            │ │            │ │ #079 · 16:22 · 12m 🔴    │ │
+│ │            │ │            │ │            │ │ #079 · 16:22 · 12m SLA    │ │
 │ └────────────┘ └────────────┘ └────────────┘ └──────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+SLA Watch row: severity = màu token + icon Lucide (`AlertCircle` / `AlertTriangle`) + text — không dùng emoji trạng thái.
+
 ### 4.2 Component mapping
 
-| Block                     | Component                                                                | Notes                                                                                                                                             |
-| ------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Header                    | Custom flex with `Badge` clock + `Tabs` (KITCHEN / BAR — switch route)   | "Recall log" trigger `Sheet` side="right" — full audit recall events 24h                                                                          |
-| Column container          | 3 columns flex 1, 4th column fixed 360px                                 | Drag-and-drop bằng `@dnd-kit` (mock visual only) — kéo ticket giữa cột tương ứng status update                                                    |
-| Ticket card (`KDSTicket`) | Custom card 220×260, large 24px ticket #, bàn 36px font, items list 18px | Color band trái theo SLA (lime → amber → hot pink). Footer: hai button to "Bắt đầu" / "Xong" (44dp tap target) hoặc "Recall" khi ở cột Hoàn thành |
-| Ticket items              | `Checkbox` per item (chéo qua khi xong từng món riêng)                   | Note inline italic font Mono                                                                                                                      |
-| Batching panel            | List `Progress`-style bars + counter                                     | Tap → highlight các ticket cùng món bằng outline lime                                                                                             |
-| SLA Watch panel           | Live list ordered by `createdAt` desc, color-coded                       | Tap → focus ticket trong cột tương ứng (scroll + flash)                                                                                           |
+| Block                     | Component                                                                | Notes                                                                                                                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Header                    | Custom flex with `Badge` clock + `Tabs` (KITCHEN / BAR — switch route)   | Trạng thái station: `<ChefHat />` + label KITCHEN / `<Wine />` + label BAR (đổi glyph nếu PM chốt khác — vẫn trong Lucide). "Recall log" / settings: `ScrollText` hoặc `History`, `<Settings />`. Sheet recall full audit 24h |
+| Column container          | 3 columns flex 1, 4th column fixed 360px                                 | Drag-and-drop bằng `@dnd-kit` (mock visual only) — kéo ticket giữa cột tương ứng status update                                                                                                                                |
+| Ticket card (`KDSTicket`) | Custom card 220×260, large 24px ticket #, bàn 36px font, items list 18px | Color band trái theo SLA (lime → amber → hot pink). Footer: hai button to "Bắt đầu" / "Xong" (44dp tap target) hoặc "Recall" khi ở cột Hoàn thành                                                                             |
+| Ticket items              | `Checkbox` per item (chéo qua khi xong từng món riêng)                   | Note inline italic font Mono                                                                                                                                                                                                  |
+| Batching panel            | List `Progress`-style bars + counter                                     | Tap → highlight các ticket cùng món bằng outline lime                                                                                                                                                                         |
+| SLA Watch panel           | Live list ordered by `createdAt` desc, color-coded                       | Tap → focus ticket trong cột tương ứng (scroll + flash)                                                                                                                                                                       |
 
 ### 4.3 Ticket card detail (D4 — click ticket)
 
@@ -228,15 +232,15 @@ Click ticket → `Sheet` side="right" 480px:
 
 ### 4.4 Information density & micro-interactions
 
-| Element        | Action            | Reveal                                                                            |
-| -------------- | ----------------- | --------------------------------------------------------------------------------- |
-| Ticket         | Tap title bar     | `Sheet` chi tiết (4.3)                                                            |
-| Ticket         | Tap "Bắt đầu"     | Card slide CHỜ → ĐANG LÀM, color band shifts                                      |
-| Ticket footer  | Long-press "Xong" | Confirm halo 600ms (chống miss-tap) — chỉ commit nếu giữ 600ms                    |
-| Batching bar   | Tap               | Outline tất cả tickets cùng món + scroll-into-view                                |
-| SLA red ticket | —                 | Whole card pulse 2s loop, header counter `🔴` blink                               |
-| Recall log     | Tap               | `Sheet` data table: timestamp · ticket # · who · reason · resolved                |
-| Header clock   | Tap               | `Popover` station settings: SLA threshold (slider 5–20m), font size, sound on/off |
+| Element        | Action            | Reveal                                                                                                                                     |
+| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Ticket         | Tap title bar     | `Sheet` chi tiết (4.3)                                                                                                                     |
+| Ticket         | Tap "Bắt đầu"     | Card slide CHỜ → ĐANG LÀM, color band shifts                                                                                               |
+| Ticket footer  | Long-press "Xong" | Confirm halo 600ms (chống miss-tap) — chỉ commit nếu giữ 600ms                                                                             |
+| Batching bar   | Tap               | Outline tất cả tickets cùng món + scroll-into-view                                                                                         |
+| SLA red ticket | —                 | Whole card pulse 2s loop; badge severity dùng `<AlertCircle className="text-[var(--pink)]" />` + text "Quá SLA" (không dùng chấm đỏ emoji) |
+| Recall log     | Tap               | `Sheet` data table: timestamp · ticket # · who · reason · resolved                                                                         |
+| Header clock   | Tap               | `Popover` station settings: SLA threshold (slider 5–20m), font size, sound on/off                                                          |
 
 ### 4.5 Audio / haptic
 
@@ -293,7 +297,7 @@ apps/management-app/src/mocks/
 
 - Cart drawer: focus trap (Radix native), ESC close.
 - KDS: keyboard shortcuts `1` (start), `2` (done), `3` (recall) khi ticket focused; visible focus ring 3px lime.
-- Color không phải affordance duy nhất: SLA cũng có icon (🟢🟡🔴) + text "12m".
+- Color không phải affordance duy nhất: SLA kèm **glyph Lucide** (ví dụ `<Circle className="fill-emerald-500" />` / `<AlertTriangle className="text-amber-400" />` / `<AlertCircle className="text-pink-500" />`) **và** text đo thời gian ("12m", "Quá hạn") — không dùng emoji 🟢🟡🔴 làm icon trạng thái.
 - WCAG AA contrast trên cả 3 theme (đã chọn palette với pairs ≥ 4.5:1).
 
 ### 5.5 Performance budget (mock phase)
@@ -303,6 +307,38 @@ apps/management-app/src/mocks/
 | PWA Menu render 60 items    | LCP < 2.5s, CLS < 0.05                               |
 | POS DataTable 500 mock rows | TTI < 1.5s, virtualize via `@tanstack/react-virtual` |
 | KDS 50 tickets render       | 60fps, no layout thrash khi drag                     |
+
+### 5.6 Icon stack & quy tắc cho agent implement
+
+**Nguồn chuẩn (Step 2.2):** `lucide-react` — import **named** từng icon (`import { Bell, Timer } from 'lucide-react'`). Mỗi icon là SVG inline; tùy chỉnh qua props `size`, `color`, `strokeWidth` và các thuộc tính SVG hợp lệ (theo tài liệu Lucide; Context7: `/lucide-icons/lucide`). Có thể dùng `LucideProvider` để set mặc định `size`/`strokeWidth`/`color` cho subtree (override từng icon khi cần). Mặc định icon mang tính trang trí (`aria-hidden`); **bổ sung `aria-label`** (hoặc text visible bên cạnh) khi icon một mình diễn đạt hành ý (cột ghi chú, nút icon-only).
+
+**Tra cứu glyph:** [lucide.dev/icons](https://lucide.dev/icons) trước khi thêm dependency mới.
+
+**Đồng bộ monorepo:** `apps/customer-pwa`, `apps/management-app`, `libs/frontend/ui` đều đã khai báo `lucide-react` — ưu tiên bộ stroke này cho toàn bộ mock UI Step 2.2 để khớp shadcn/ui.
+
+**@einvoice/frontend-ui:** Nếu lib export pattern/icon wrapper đã dùng trong app, **ưu tiên** tái sử dụng để đồng nhất theme; không nhân đôi cùng một ý nghĩa bằng hai bộ icon khác họ.
+
+**Cấm trong UI production (Step 2.2):** Unicode emoji làm icon hoặc trạng thái (🍳, 🔔, ⏱, 🟢, 🔴, 👥, …) trong JSX / label cố định. Wireframe ASCII trong blueprint chỉ minh họa — map sang bảng dưới đây.
+
+**Thư viện khác (chỉ sau ADR / design review):** `@tabler/icons-react` hoặc `@phosphor-icons/react` nếu thiếu glyph đặc thù; `@mui/icons-material` (filled Material) **không** khuyến nghị trộn cùng hàng toolbar shadcn outline trừ khi toàn surface chuyển Material.
+
+**Bảng map nhanh (ý / wireframe → Lucide):**
+
+| Ý / vùng UI                 | Gợi ý `lucide-react`                                                        |
+| --------------------------- | --------------------------------------------------------------------------- |
+| Mở menu / sidebar           | `PanelLeft`, `Menu`                                                         |
+| Đếm phiên / thời gian phiên | `Timer`, `Clock`                                                            |
+| Khách cùng bàn / count      | `Users`                                                                     |
+| Thông báo                   | `Bell` (+ `Badge` số)                                                       |
+| Ghi chú khách (cell / nút)  | `StickyNote`, `MessageSquareText`                                           |
+| Kitchen                     | `ChefHat` (thay `UtensilsCrossed` nếu cần)                                  |
+| Bar                         | `Wine`, `GlassWater`                                                        |
+| Cài đặt                     | `Settings`                                                                  |
+| Trợ giúp chung              | `CircleHelp`                                                                |
+| SLA nhẹ / cảnh báo / breach | `Circle` (fill + màu token), `AlertTriangle`, `AlertCircle` — luôn kèm text |
+| Service types               | `UserRound` / `HandHelping`, `Receipt`, `CircleHelp`                        |
+| Xoá / giỏ                   | `Trash2`, `ShoppingCart`                                                    |
+| Chi tiết / mở rộng          | `ChevronRight`, `ExternalLink`                                              |
 
 ---
 
@@ -324,6 +360,7 @@ apps/management-app/src/mocks/
 - KDS: Ticket detail sheet với timeline + radial SLA.
 - All: Mock realtime events tuân `realtime-events.types.ts` payload schema.
 - All: Light/dark/contrast themes đạt WCAG AA.
+- All: Icon policy §5.6 — affordance UI dùng `lucide-react` (và re-export `@einvoice/frontend-ui` nếu có); không dùng Unicode emoji làm icon/avatar/status dot trong JSX.
 
 ---
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { useSession } from 'next-auth/react';
 import {
   Avatar,
@@ -34,14 +34,20 @@ import { signOut } from 'next-auth/react';
 
 export function AppSidebar() {
   const { data: session, status } = useSession();
+  /** Same first paint as SSR, then true — avoids nav tree size mismatch (Radix useId) without effect setState. */
+  const hasClientMounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
 
   const navGroups = useMemo(() => {
     const roles = parseRoles(session?.user?.roles);
-    if (status === 'loading') {
+    if (!hasClientMounted || status === 'loading') {
       return sidebarData.navGroups;
     }
     return filterSidebarNavByRoles(sidebarData.navGroups, roles);
-  }, [session?.user?.roles, status]);
+  }, [session?.user?.roles, status, hasClientMounted]);
 
   return (
     <Sidebar collapsible="icon" variant="inset">

@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { CircleHelp, Clock, Receipt, UserRound } from 'lucide-react';
+import { serviceRequestStatusVi } from '@einvoice/shared-constants';
 import { ServiceRequestStatus, ServiceRequestType } from '@einvoice/types';
-import type { ServiceRequest } from '@einvoice/types';
 import { toast } from 'sonner';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import { Avatar, AvatarFallback } from '@einvoice/frontend-ui';
@@ -12,12 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useMockStore } from '@/mocks/store';
-
-function statusLabel(s: ServiceRequest['status']) {
-  if (s === ServiceRequestStatus.PENDING) return 'Chờ nhận';
-  if (s === ServiceRequestStatus.ACKNOWLEDGED) return 'Đã nhận';
-  return 'Đã xong';
-}
 
 function hashSeed(id: string) {
   let h = 0;
@@ -89,7 +83,7 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
             <p className="text-[0.7rem] text-muted-foreground">{table?.areaName ?? '—'}</p>
           </div>
           <Badge variant="outline" className="shrink-0 text-[0.65rem]">
-            {statusLabel(request.status)}
+            {serviceRequestStatusVi(request.status)}
           </Badge>
         </div>
         <div className="flex items-center gap-2 text-[0.7rem] text-muted-foreground">

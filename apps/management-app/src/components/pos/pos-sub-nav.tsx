@@ -22,7 +22,7 @@ export function PosSubNav() {
 
   return (
     <nav
-      className="flex flex-wrap items-center gap-1 rounded-lg border border-border/50 bg-card/30 p-1"
+      className="inline-flex w-fit max-w-full flex-wrap items-center gap-1 self-start rounded-lg border border-border/50 bg-card/30 p-1"
       aria-label="POS sections"
     >
       {links.map((l) => {

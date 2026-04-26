@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TransferTableDialog } from '@/components/pos/transfer-table-dialog';
 import { useMockStore } from '@/mocks/store';
 import { formatVnd } from '@/lib/format-vnd';
+import { orderStatusVi, tableStatusVi } from '@einvoice/shared-constants';
 import { OrderStatus } from '@einvoice/types';
 
 function statusVariant(s: string) {
@@ -48,8 +49,8 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
             <h2 className="text-sm font-semibold">{table.name}</h2>
             <p className="text-[0.7rem] text-muted-foreground">{table.areaName}</p>
           </div>
-          <Badge variant={statusVariant(table.status)} className="shrink-0 uppercase">
-            {table.status}
+          <Badge variant={statusVariant(table.status)} className="shrink-0">
+            {tableStatusVi(table.status)}
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground">Sức chứa {table.capacity} · Phiên {table.sessionId ?? '—'}</p>
@@ -90,7 +91,7 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
             orders.map((o) => (
               <TableRow key={o.id} className="h-6 text-xs">
                 <TableCell className="p-1 font-mono">…{o.id.slice(-4)}</TableCell>
-                <TableCell className="p-1">{o.status}</TableCell>
+                <TableCell className="p-1">{orderStatusVi(o.status)}</TableCell>
                 <TableCell className="p-1 text-end font-mono tabular-nums">{formatVnd(o.totalAmount)}</TableCell>
               </TableRow>
             ))
