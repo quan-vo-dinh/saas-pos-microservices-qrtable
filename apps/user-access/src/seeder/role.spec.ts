@@ -18,7 +18,8 @@ const EXPECTED_MATRIX: Record<string, Set<string>> = {
     PERMISSION.USER_DELETE,
     PERMISSION.ORDER_CREATE,
     PERMISSION.ORDER_CONFIRM,
-    PERMISSION.ORDER_CANCEL,
+    PERMISSION.ORDER_CANCEL_PENDING,
+    PERMISSION.ORDER_CANCEL_PROCESSING,
     PERMISSION.ORDER_GET_LIST,
     PERMISSION.ORDER_GET_BY_ID,
     PERMISSION.KITCHEN_GET_QUEUE,
@@ -50,7 +51,8 @@ const EXPECTED_MATRIX: Record<string, Set<string>> = {
     // NOTE: USER_DELETE intentionally excluded — Manager is operational, not HR
     PERMISSION.ORDER_CREATE,
     PERMISSION.ORDER_CONFIRM,
-    PERMISSION.ORDER_CANCEL,
+    PERMISSION.ORDER_CANCEL_PENDING,
+    PERMISSION.ORDER_CANCEL_PROCESSING,
     PERMISSION.ORDER_GET_LIST,
     PERMISSION.ORDER_GET_BY_ID,
     PERMISSION.KITCHEN_GET_QUEUE,
@@ -73,6 +75,7 @@ const EXPECTED_MATRIX: Record<string, Set<string>> = {
     PERMISSION.CATALOG_GET_BY_ID,
     PERMISSION.CATALOG_GET_LIST,
     PERMISSION.ORDER_CONFIRM,
+    PERMISSION.ORDER_CANCEL_PENDING,
     PERMISSION.ORDER_GET_LIST,
     PERMISSION.ORDER_GET_BY_ID,
     PERMISSION.PAYMENT_CONFIRM_CASH,
@@ -135,9 +138,9 @@ describe('role.json — canonical permission matrix', () => {
     expect(invalidPerms).toEqual([]);
   });
 
-  it('SUPER_ADMIN has ALL 51 permissions from PERMISSION enum', () => {
+  it('SUPER_ADMIN has every PERMISSION enum value (role.json in sync)', () => {
     const role = roleSeed.data.find((r) => r.name === 'SUPER_ADMIN')!;
-    expect(role.permissions).toHaveLength(45);
+    expect(role.permissions).toHaveLength(ALL_PERMISSIONS_VALUES.size);
     expect(new Set(role.permissions)).toEqual(ALL_PERMISSIONS_VALUES);
   });
 

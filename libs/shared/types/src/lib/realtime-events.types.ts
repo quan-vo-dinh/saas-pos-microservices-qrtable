@@ -6,6 +6,9 @@
  *   - OrderCreatedEvent       → emit khi customer submit order thành công
  *   - OrderStatusChangedEvent → emit khi order status thay đổi
  *   - ServiceRequestedEvent   → emit khi customer trigger service request
+ *   - CartUpdatedEvent        → cart mutation / lock (Step 2.4)
+ *   - BillRequestedEvent      → explicit bill request (Step 2.4)
+ *   - TableTransferredEvent   → transfer table saga hoàn tất (Step 2.4)
  *
  * Kafka (4 Producers — domain events post-confirmation):
  *   - OrderConfirmedEvent     → topic `order.confirmed` cho cross-service consumers
@@ -15,9 +18,11 @@
  *
  * @see docs/guides/kafka-qrtable.md (4P+2AP rationale)
  * @see docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md
+ * @see docs/business-logic-step-2.4-spec.vi.md §15
  */
 
 import type { OrderItem, OrderStatus } from './order.types';
+import type { PreparationStation } from './menu.types';
 import type { ServiceRequestType } from './service-request.types';
 
 // ─── BFF Direct WebSocket events ────────────────────
@@ -69,6 +74,42 @@ export type ServiceRequestedEvent = {
   timestamp: string;
 };
 
+/** BFF Direct — shared cart / lock state (Step 2.4 §15.3) */
+export type CartUpdatedEvent = {
+  tenantId: string;
+  sessionId: string;
+  cartVersion: number;
+  /** ACTIVE | LOCKED (bill request) — string để mở rộng sau */
+  status: 'ACTIVE' | 'LOCKED';
+  items: OrderItem[];
+  updatedAt: string;
+  changedBySessionClientId?: string;
+};
+
+/** BFF Direct — sau explicit bill request thành công */
+export type BillRequestedEvent = {
+  tenantId: string;
+  billId: string;
+  sessionId: string;
+  tableId: string;
+  tableName: string;
+  status: 'PENDING_PAYMENT';
+  total: number;
+  requestedAt: string;
+};
+
+/** BFF Direct — transfer table saga hoàn tất */
+export type TableTransferredEvent = {
+  tenantId: string;
+  sessionId: string;
+  fromTableId: string;
+  fromTableName: string;
+  toTableId: string;
+  toTableName: string;
+  transferredByUserId: string;
+  timestamp: string;
+};
+
 // ─── Kafka topic payload ────────────────────────────
 
 /**
@@ -81,16 +122,28 @@ export type ServiceRequestedEvent = {
  *
  * Partition key: tenantId (per Kafka ADR partition strategy).
  */
+/** Payload item cho Kafka — có station cho KDS routing */
+export type OrderConfirmedEventItem = OrderItem & {
+  station?: PreparationStation;
+};
+
 export type OrderConfirmedEvent = {
+  eventId: string;
+  schemaVersion: 1;
   tenantId: string;
   orderId: string;
   sessionId: string;
-  items: OrderItem[];
+  tableId: string;
+  tableName: string;
+  items: OrderConfirmedEventItem[];
   totalAmount: number;
   /** ISO 8601 — confirmation time */
   confirmedAt: string;
   /** Staff Keycloak sub */
   confirmedByUserId: string;
+  /** ISO 8601 — wall-clock event time */
+  occurredAt: string;
+  correlationId?: string;
 };
 
 // ─── Derived data shapes (not events) ───────────────

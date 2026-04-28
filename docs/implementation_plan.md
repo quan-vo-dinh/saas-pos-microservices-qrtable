@@ -18,6 +18,7 @@
 | 4   | Simplified Outbox  | outbox_events table + cron poll. Full CDC (Debezium) = post-thesis                                                                                                                                                                                                                                                                                                                                                            | [§12](technical-architecture.md)      |
 | 5   | BFF Direct Pattern | BFF emit WebSocket + invalidate cache sau TCP response cho UI-layer events                                                                                                                                                                                                                                                                                                                                                    | [§7.3](technical-architecture.md)     |
 | 6   | Template-First     | Services khóa học giữ nguyên làm living templates, không sửa                                                                                                                                                                                                                                                                                                                                                                  | Phase 0 strategy                      |
+| 7   | Step 2.4 business  | Đặc tả nghiệp vụ đã chốt (stock Catalog TCP, deduct khi confirm, bill submit đầu tiên, transfer saga, session PG+Redis, RBAC cancel, WS/event scope, `MenuItem.station`, ranh giới thanh toán) — [`business-logic-step-2.4-spec.vi.md`](business-logic-step-2.4-spec.vi.md)                                                                                                                                                   | Audit Q1–Q12 → spec                   |
 
 ---
 
@@ -111,12 +112,13 @@ Cột **Phạm vi tích lũy (P0→Pn @100%)** = tổng trọng số từ **Phas
 
 ## Tài Liệu Liên Quan
 
-| Tài liệu                                                                   | Mô tả                                                              |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| [technical-architecture.md](technical-architecture.md)                     | Kiến trúc tổng thể, microservices, Kafka, WebSocket, Auth, Payment |
-| [business-logic.md](business-logic.md)                                     | Business rules, state machines, tenant isolation                   |
-| [references/auth-system-reference.md](references/auth-system-reference.md) | Chi tiết hệ thống auth đã triển khai                               |
-| [.github/copilot-instructions.md](../.github/copilot-instructions.md)      | Project guidelines, conventions, tech stack                        |
+| Tài liệu                                                                   | Mô tả                                                                           |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [technical-architecture.md](technical-architecture.md)                     | Kiến trúc tổng thể, microservices, Kafka, WebSocket, Auth, Payment              |
+| [business-logic.md](business-logic.md)                                     | Business rules, state machines, tenant isolation                                |
+| [business-logic-step-2.4-spec.vi.md](business-logic-step-2.4-spec.vi.md)   | Đặc tả Step 2.4 đã chốt (Q1–Q12); xung đột với tài liệu khác → ưu tiên file này |
+| [references/auth-system-reference.md](references/auth-system-reference.md) | Chi tiết hệ thống auth đã triển khai                                            |
+| [.github/copilot-instructions.md](../.github/copilot-instructions.md)      | Project guidelines, conventions, tech stack                                     |
 
 ---
 

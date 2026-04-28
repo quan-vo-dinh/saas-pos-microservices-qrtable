@@ -4,7 +4,10 @@
  *
  * @see docs/phases/phase-2a-order-kafka.md §8 (state machine)
  * @see docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md
+ * @see docs/business-logic-step-2.4-spec.vi.md §14 (station snapshot)
  */
+
+import type { PreparationStation } from './menu.types';
 
 // ─── Enums ──────────────────────────────────────────
 // Using const-object + type alias pattern (instead of TS `enum`) to satisfy
@@ -57,6 +60,8 @@ export type OrderItem = {
   unitPrice: number;
   note?: string;
   status: OrderItemStatus;
+  /** Catalog `MenuItem.station` snapshot at submit/confirm — Step 2.4 */
+  station?: PreparationStation;
   /** ISO 8601 */
   createdAt: string;
   /** ISO 8601 */

@@ -5,7 +5,8 @@ export type { ApiResponse, ApiErrorResponse, PaginatedResponse, PaginationParams
 export type { UserProfile, UserSession } from './lib/user.types';
 
 // ─── Menu ───────────────────────────────────────────
-export type { Category, MenuItem, CategoryStatus, MenuItemStatus } from './lib/menu.types';
+export type { Category, MenuItem, CategoryStatus, MenuItemStatus, PreparationStation } from './lib/menu.types';
+export { PreparationStation } from './lib/menu.types';
 
 // ─── Table ──────────────────────────────────────────
 export type { Area, RestaurantTable, TableStatus } from './lib/table.types';
@@ -35,7 +36,11 @@ export type {
   OrderCreatedEvent,
   OrderStatusChangedEvent,
   ServiceRequestedEvent,
+  CartUpdatedEvent,
+  BillRequestedEvent,
+  TableTransferredEvent,
   OrderConfirmedEvent,
+  OrderConfirmedEventItem,
   KDSTicket,
 } from './lib/realtime-events.types';
 

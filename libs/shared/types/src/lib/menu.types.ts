@@ -2,6 +2,13 @@ export type CategoryStatus = 'active' | 'inactive';
 
 export type MenuItemStatus = 'available' | 'out_of_stock';
 
+/** KDS routing — Catalog canonical (Step 2.4 Q11-A) */
+export const PreparationStation = {
+  KITCHEN: 'KITCHEN',
+  BAR: 'BAR',
+} as const;
+export type PreparationStation = (typeof PreparationStation)[keyof typeof PreparationStation];
+
 export type Category = {
   id: string;
   name: string;
@@ -25,5 +32,7 @@ export type MenuItem = {
   stock: number;
   sortOrder: number;
   status: MenuItemStatus;
+  /** Required for orderable items once Catalog migration completes; optional for transitional reads */
+  station?: PreparationStation;
   createdAt: string;
 };

@@ -27,9 +27,9 @@ echo ""
 # Format per role: "username:password:expected_role:must_have_csv:must_not_have_csv"
 declare -a TEST_CASES=(
   "superadmin.1700000001@gmail.com:superadmin123:SUPER_ADMIN:saas.create,role.create,product.create,order.create:"
-  "owner.1700000002@gmail.com:owner:OWNER:catalog.create,user.delete,table.delete,order.cancel:saas.create,role.create,product.create"
-  "manager.1700000003@gmail.com:manager123:MANAGER:catalog.create,user.update,order.cancel,payment.refund:saas.create,user.delete,role.create,product.create"
-  "waiter.1700000004@gmail.com:waiter123:WAITER:order.confirm,payment.confirm_cash,payment.get_history,table.transfer,service_request.acknowledge:order.create,order.cancel,kitchen.get_queue,user.create,catalog.create"
+  "owner.1700000002@gmail.com:owner:OWNER:catalog.create,user.delete,table.delete,order.cancel_pending,order.cancel_processing:saas.create,role.create,product.create"
+  "manager.1700000003@gmail.com:manager123:MANAGER:catalog.create,user.update,order.cancel_pending,order.cancel_processing,payment.refund:saas.create,user.delete,role.create,product.create"
+  "waiter.1700000004@gmail.com:waiter123:WAITER:order.confirm,order.cancel_pending,payment.confirm_cash,payment.get_history,table.transfer,service_request.acknowledge:order.create,order.cancel_processing,kitchen.get_queue,user.create,catalog.create"
   "chef.1700000005@gmail.com:chef123:CHEF:catalog.get_list,kitchen.get_queue,kitchen.recall:order.confirm,payment.confirm_cash,catalog.create"
   "barista.1700000006@gmail.com:barista123:BARISTA:catalog.get_list,kitchen.update_ticket,kitchen.recall:order.confirm,payment.confirm_cash,catalog.create"
 )

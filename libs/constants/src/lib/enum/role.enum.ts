@@ -43,10 +43,13 @@ export enum PERMISSION {
   PRODUCT_UPDATE = 'product.update',
   PRODUCT_DELETE = 'product.delete',
 
-  /* ORDER (Phase 2A) */
+  /* ORDER (Phase 2A) — cancel split Step 2.4 (Q7-C) */
   ORDER_CREATE = 'order.create',
   ORDER_CONFIRM = 'order.confirm',
-  ORDER_CANCEL = 'order.cancel',
+  /** Reject/cancel đơn `PENDING` — OWNER, MANAGER, WAITER */
+  ORDER_CANCEL_PENDING = 'order.cancel_pending',
+  /** Cancel đơn đã confirm (`PROCESSING`+) + lý do — OWNER, MANAGER */
+  ORDER_CANCEL_PROCESSING = 'order.cancel_processing',
   ORDER_GET_LIST = 'order.get_list',
   ORDER_GET_BY_ID = 'order.get_by_id',
 

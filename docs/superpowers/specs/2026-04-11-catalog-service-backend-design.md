@@ -125,6 +125,7 @@ Table: menu_items
 ├── image_public_id: VARCHAR(255) NULLABLE    ← Cloudinary public_id for delete
 ├── stock: INTEGER DEFAULT 0
 ├── sort_order: INTEGER DEFAULT 0
+├── station: ENUM('KITCHEN', 'BAR') NOT NULL DEFAULT 'KITCHEN'   ← Step 2.4 / Q11-A — KDS routing canonical
 ├── status: ENUM('available', 'out_of_stock') DEFAULT 'available'
 ├── deleted_at: TIMESTAMP NULLABLE             ← soft delete
 ├── created_at: TIMESTAMP
@@ -186,6 +187,11 @@ Delete behavior:
 - Area delete → reject if has Tables
 - MenuItem → soft delete (set deleted_at)
 - Table delete → reject if session_id NOT NULL OR status != 'available'
+
+### 3.8 Catalog ↔ Order (Step 2.4 — stock & station ownership)
+
+- **Stock:** mọi deduct/release cho lifecycle đơn hàng thực hiện trong **transaction PostgreSQL của Catalog** (pessimistic lock trên `menu_items`), được Order Service gọi qua TCP — xem `docs/business-logic-step-2.4-spec.vi.md` §14.3 và `libs/constants/.../tcp-request-message.ts` (`MENU_ITEM.STOCK_DEDUCT_FOR_ORDER`, `STOCK_RELEASE_FOR_ORDER`, `VALIDATE_ORDERABLE`).
+- **Station:** trường `station` trên `menu_items` là nguồn canonical cho `order.confirmed` / KDS; shared type `PreparationStation` trong `libs/shared/types`.
 
 ### 3.7 Schema Verification vs Business Logic
 

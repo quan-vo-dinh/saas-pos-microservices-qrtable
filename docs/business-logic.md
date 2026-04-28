@@ -197,17 +197,13 @@ Cleaning → Available:
 
   ```
   Transfer Table Logic:
-    Validate: new_table_status == "Available"
+    Validate: destination table Available (Catalog); active session có orders/bill (Order).
 
-    BEGIN TRANSACTION
-      UPDATE orders SET table_id = new_table_id WHERE table_id = old_table_id
-      UPDATE sessions SET table_id = new_table_id WHERE table_id = old_table_id
-
-      UPDATE tables SET status = "Available" WHERE id = old_table_id
-      UPDATE tables SET status = "Occupied" WHERE id = new_table_id
-
-      Notify KDS: "Bàn [old] → Bàn [new]"
-    COMMIT
+    Luồng Step 2.4 (saga + transfer lock — không một transaction ACID xuyên Order PG + Catalog PG + Redis):
+      - Khóa transfer + cập nhật orders/session trong Order DB
+      - Catalog TCP: cập nhật `tables.status` và binding bàn
+      - Redis: session/cart metadata (`table_id` / hiển thị)
+      - Compensation nếu bước giữa fail; realtime qua BFF Direct (không topic Kafka rename bàn)
   ```
 
 - **Giới hạn Gói cước:** Số lượng bàn tối đa được tạo bị giới hạn theo gói dịch vụ đã mua.
@@ -275,18 +271,16 @@ Quy trình từ lúc khách quét QR đến khi đơn hàng được gửi đế
 - **Xử lý Tồn kho Concurrent (Race Condition):**
 
   ```
-  BEGIN TRANSACTION (Pessimistic Locking)
-    SELECT stock FROM menu_items WHERE id = X FOR UPDATE
-    IF stock >= requested_quantity THEN
-      UPDATE stock = stock - requested_quantity
-      CREATE order_item
-      COMMIT
-    ELSE
-      ROLLBACK
-      RETURN error "Món đã hết, vui lòng chọn món khác"
-  END TRANSACTION
+  Submit (customer): chỉ kiểm tra snapshot availability — KHÔNG trừ tồn kho.
 
-  Broadcast real-time stock update to all active clients
+  Confirm (staff, PENDING → PROCESSING):
+    Catalog Service (sở hữu menu_items): pessimistic lock + deduct trong transaction Catalog
+      (qua lệnh TCP transactional — Order Service không UPDATE trực tiếp DB Catalog)
+    Order Service: cập nhật order status + phát Kafka order.confirmed sau commit (+ simplified outbox)
+
+    Nếu không đủ tồn → lỗi có cấu trúc cho nhân viên (khách đã submit trước đó chỉ là pending)
+
+  Broadcast stock/menu updates: Catalog/BFF như kiến trúc realtime (menu cache / WS).
   ```
 
   **Timestamp:** Sử dụng `server_timestamp` (UTC), KHÔNG dùng `client_timestamp`.
@@ -512,6 +506,8 @@ Retry Policy:
 
 Quản lý trạng thái đơn hàng từ lúc tạo đến hoàn thành.
 
+> **Đặc tả Step 2.4 (canonical Q1–Q12):** [`business-logic-step-2.4-spec.vi.md`](business-logic-step-2.4-spec.vi.md) — bổ sung ownership service, bill request explicit, transfer saga, RBAC cancel tách quyền. Mục §8 giữ vai trò tổng quan; khi lệch, ưu tiên đặc tả Step 2.4.
+
 > **Enum casing convention:** Diagram + rules dưới đây dùng **Title Case** (`Draft`, `Pending`, `Processing`, `Ready`, `Served`, `Completed`, `Canceled`) cho readability. Enum values canonical là **UPPERCASE** (`DRAFT`, `PENDING`, ...) — xem `libs/shared/types/src/lib/order.types.ts` và `docs/phases/phase-2a-order-kafka.md` Step 2.3. Ánh xạ 1-1 (`Draft` ↔ `DRAFT`, v.v.).
 
 ### A. Order State Diagram
@@ -558,9 +554,10 @@ Draft → Pending:
     - cart_items.length > 0
     - all_items.status == "Available"
   Action:
-    - Create order record
+    - Create order record (persist từ PENDING — Draft không có DB row)
+    - Lần submit đầu tiên trong session: tạo bill OPEN nếu chưa có (Step 2.4)
     - Notify staff (sound + push notification)
-    - Lock cart (prevent editing)
+    - Clear cart sau submit thành công
 
 Draft → Canceled:
   Trigger: Customer đóng trình duyệt / bỏ cart / explicit clear
@@ -574,31 +571,31 @@ Draft → Canceled:
 
 Pending → Processing:
   Trigger: Staff nhấn "Xác nhận"
-  Actor: Staff, Manager
+  Actor: Staff, Manager (RBAC chi tiết: permission-matrix §6 / §6.1)
   Validation:
     - order_status == "Pending"
-    - all_items still Available (check stock)
+    - Catalog TCP: đủ tồn kho tại thời điểm confirm
   Action:
+    - Catalog deduct stock (trong DB Catalog)
     - Update order_status = "Processing"
-    - Route to KDS (Kitchen/Bar)
+    - Route to KDS (Kafka order.confirmed + station từ `MenuItem.station`)
     - Print KOT if printer connected
-    - Deduct stock quantity
 
 Pending → Canceled:
   Trigger: Customer or Staff cancel
-  Actor: Customer (self), Staff, Manager
+  Actor: Customer (self), Staff (reject pending — `order.cancel_pending`), Manager
   Condition:
     - order_status == "Pending"
     - confirmed == false
   Action:
     - Soft delete (set deleted_at, keep audit)
     - Log cancellation reason
-    - Restore stock
+    - Không restore stock (chưa deduct khi pending — đặc tả Step 2.4 Q2)
     - Notify customer
 
 Processing → Canceled:
-  Trigger: Manager cancel
-  Actor: Manager only
+  Trigger: Manager cancel (+ Owner); optional policy restore stock qua Catalog
+  Actor: Manager / Owner (`order.cancel_processing`)
   Condition:
     - order_status == "Processing"
     - Require cancellation reason
@@ -606,7 +603,7 @@ Processing → Canceled:
     - Update order_status = "Canceled"
     - Log audit trail (who, when, why)
     - Notify kitchen to stop
-    - Restore stock
+    - Restore/adjust stock qua Catalog (đã deduct lúc confirm)
     - Flag for revenue report exclusion
 
 Processing → Ready:
@@ -626,10 +623,10 @@ Ready → Served:
     - Enable payment request
 
 Served → Completed:
-  Trigger: Payment completed and bill closed
+  Trigger: Payment completed (Phase 3)
   Condition:
     - payment_status == "Paid"
-    - bill_status == "Closed"
+    - bill canonical: `BillStatus` **PAID** (văn prose "Closed/Completed" = đã kết thúc thanh toán)
   Action:
     - Update order_status = "Completed"
     - Archive to read-only storage

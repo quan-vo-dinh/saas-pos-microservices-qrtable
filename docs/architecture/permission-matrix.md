@@ -1,7 +1,7 @@
 # Permission Matrix — QRTable
 
-> **Status:** ✅ Active (Step 2.0 — 2026-04-19) · §9 cập nhật 2026-04-24 (FE navigation vs BFF)
-> **Version:** 1.1
+> **Status:** ✅ Active · §6 cập nhật 2026-04-28 (`order.cancel_*` + ma trận 52 dòng) · §9 cập nhật 2026-04-26
+> **Version:** 1.4
 > **Single source of truth** cho role-permission mapping. Mọi thay đổi `PERMISSION` enum, `role.json`, hoặc test cases PHẢI được phản ánh ở đây trước.
 
 ## 1. Mục đích & Nguyên tắc
@@ -45,7 +45,7 @@ File này là **canonical reference** cho RBAC trong QRTable. Quy trình thay đ
 | **BARISTA**          | Single-tenant           | Bar staff — manage drink tickets in KDS                                      | Bound to `tenant_id` claim                          |
 | **CUSTOMER** (actor) | Session-scoped          | Anonymous diner — session via QR scan, no role.json entry                    | Tenant from QR token (HMAC) + session lock in Redis |
 
-## 4. Permission Catalog (51 values)
+## 4. Permission Catalog (52 values)
 
 Tất cả permissions in format `domain.action_snake_case`:
 
@@ -85,30 +85,31 @@ Tất cả permissions in format `domain.action_snake_case`:
 | `PRODUCT_UPDATE`    | `product.update`    | Legacy                                                   |
 | `PRODUCT_DELETE`    | `product.delete`    | Legacy                                                   |
 
-### NEW in Step 2.0 (20 values)
+### NEW in Step 2.0 (21 values — Step 2.4 thay `order.cancel` bằng hai quyền)
 
-| Enum                          | Value                         | Description                                                            |
-| ----------------------------- | ----------------------------- | ---------------------------------------------------------------------- |
-| `ORDER_CREATE`                | `order.create`                | Customer creates order (via SessionGuard at endpoint level)            |
-| `ORDER_CONFIRM`               | `order.confirm`               | Staff confirms pending order → triggers Kafka `order.confirmed`        |
-| `ORDER_CANCEL`                | `order.cancel`                | Cancel order (Customer self-cancel pending; Manager cancel processing) |
-| `ORDER_GET_LIST`              | `order.get_list`              | List orders (POS view)                                                 |
-| `ORDER_GET_BY_ID`             | `order.get_by_id`             | Get order detail                                                       |
-| `KITCHEN_GET_QUEUE`           | `kitchen.get_queue`           | Get KDS queue (food/drink tickets)                                     |
-| `KITCHEN_UPDATE_TICKET`       | `kitchen.update_ticket`       | Update ticket status (Pending → Processing → Ready)                    |
-| `KITCHEN_RECALL`              | `kitchen.recall`              | Recall completed ticket (mistake handling)                             |
-| `PAYMENT_CREATE`              | `payment.create`              | Initiate payment (e.g., Stripe checkout session)                       |
-| `PAYMENT_CONFIRM_CASH`        | `payment.confirm_cash`        | Staff confirms cash received                                           |
-| `PAYMENT_REFUND`              | `payment.refund`              | Refund payment (Manager override)                                      |
-| `PAYMENT_GET_HISTORY`         | `payment.get_history`         | View payment history (Waiter needs for "last bill" queries)            |
-| `TABLE_CREATE`                | `table.create`                | Create table layout entry                                              |
-| `TABLE_UPDATE`                | `table.update`                | Update table config (capacity, area)                                   |
-| `TABLE_DELETE`                | `table.delete`                | Delete table                                                           |
-| `TABLE_TRANSFER`              | `table.transfer`              | Transfer order/session between tables                                  |
-| `TABLE_UPDATE_STATUS`         | `table.update_status`         | Mark table Available → Occupied → Billing → Cleaning                   |
-| `SERVICE_REQUEST_CREATE`      | `service_request.create`      | Customer/Staff create service request                                  |
-| `SERVICE_REQUEST_ACKNOWLEDGE` | `service_request.acknowledge` | Staff acknowledges request                                             |
-| `SERVICE_REQUEST_RESOLVE`     | `service_request.resolve`     | Staff marks request resolved                                           |
+| Enum                          | Value                         | Description                                                     |
+| ----------------------------- | ----------------------------- | --------------------------------------------------------------- |
+| `ORDER_CREATE`                | `order.create`                | Customer creates order (via SessionGuard at endpoint level)     |
+| `ORDER_CONFIRM`               | `order.confirm`               | Staff confirms pending order → triggers Kafka `order.confirmed` |
+| `ORDER_CANCEL_PENDING`        | `order.cancel_pending`        | Staff reject / cancel đơn `PENDING` (WAITER, MANAGER, OWNER)    |
+| `ORDER_CANCEL_PROCESSING`     | `order.cancel_processing`     | Manager/Owner cancel đơn đã confirm (`PROCESSING`+) + lý do     |
+| `ORDER_GET_LIST`              | `order.get_list`              | List orders (POS view)                                          |
+| `ORDER_GET_BY_ID`             | `order.get_by_id`             | Get order detail                                                |
+| `KITCHEN_GET_QUEUE`           | `kitchen.get_queue`           | Get KDS queue (food/drink tickets)                              |
+| `KITCHEN_UPDATE_TICKET`       | `kitchen.update_ticket`       | Update ticket status (Pending → Processing → Ready)             |
+| `KITCHEN_RECALL`              | `kitchen.recall`              | Recall completed ticket (mistake handling)                      |
+| `PAYMENT_CREATE`              | `payment.create`              | Initiate payment (e.g., Stripe checkout session)                |
+| `PAYMENT_CONFIRM_CASH`        | `payment.confirm_cash`        | Staff confirms cash received                                    |
+| `PAYMENT_REFUND`              | `payment.refund`              | Refund payment (Manager override)                               |
+| `PAYMENT_GET_HISTORY`         | `payment.get_history`         | View payment history (Waiter needs for "last bill" queries)     |
+| `TABLE_CREATE`                | `table.create`                | Create table layout entry                                       |
+| `TABLE_UPDATE`                | `table.update`                | Update table config (capacity, area)                            |
+| `TABLE_DELETE`                | `table.delete`                | Delete table                                                    |
+| `TABLE_TRANSFER`              | `table.transfer`              | Transfer order/session between tables                           |
+| `TABLE_UPDATE_STATUS`         | `table.update_status`         | Mark table Available → Occupied → Billing → Cleaning            |
+| `SERVICE_REQUEST_CREATE`      | `service_request.create`      | Customer/Staff create service request                           |
+| `SERVICE_REQUEST_ACKNOWLEDGE` | `service_request.acknowledge` | Staff acknowledges request                                      |
+| `SERVICE_REQUEST_RESOLVE`     | `service_request.resolve`     | Staff marks request resolved                                    |
 
 ## 5. Removed in Step 2.0
 
@@ -117,7 +118,7 @@ Tất cả permissions in format `domain.action_snake_case`:
 | `ROLE.ADMINISTRATOR = 'administrator'` | Legacy template role; 0 references in codebase                                       |
 | `ROLE.ACCOUNTANT = 'accountant'`       | Legacy template role; 1 reference in `user.repository.ts:84` (fallback) — also fixed |
 
-## 6. Canonical Permission Matrix (6 × 51)
+## 6. Canonical Permission Matrix (6 × 52)
 
 Legend: ✅ = granted; (blank) = not granted.
 
@@ -156,33 +157,38 @@ Legend: ✅ = granted; (blank) = not granted.
 | 31        | `product.delete`              |     ✅      |        |         |        |       |         |
 | 32        | `order.create`                |     ✅      |   ✅   |   ✅    |        |       |         |
 | 33        | `order.confirm`               |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 34        | `order.cancel`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 35        | `order.get_list`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 36        | `order.get_by_id`             |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 37        | `kitchen.get_queue`           |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 38        | `kitchen.update_ticket`       |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 39        | `kitchen.recall`              |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 40        | `payment.create`              |     ✅      |   ✅   |   ✅    |        |       |         |
-| 41        | `payment.confirm_cash`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 42        | `payment.refund`              |     ✅      |   ✅   |   ✅    |        |       |         |
-| 43        | `payment.get_history`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 44        | `table.create`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 45        | `table.update`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 46        | `table.delete`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 47        | `table.transfer`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 48        | `table.update_status`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 49        | `service_request.create`      |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 50        | `service_request.acknowledge` |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 51        | `service_request.resolve`     |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| **Total** |                               |   **51**    | **32** | **31**  | **14** | **5** |  **5**  |
+| 34        | `order.cancel_pending`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 35        | `order.cancel_processing`     |     ✅      |   ✅   |   ✅    |        |       |         |
+| 36        | `order.get_list`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 37        | `order.get_by_id`             |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 38        | `kitchen.get_queue`           |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
+| 39        | `kitchen.update_ticket`       |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
+| 40        | `kitchen.recall`              |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
+| 41        | `payment.create`              |     ✅      |   ✅   |   ✅    |        |       |         |
+| 42        | `payment.confirm_cash`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 43        | `payment.refund`              |     ✅      |   ✅   |   ✅    |        |       |         |
+| 44        | `payment.get_history`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 45        | `table.create`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 46        | `table.update`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 47        | `table.delete`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 48        | `table.transfer`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 49        | `table.update_status`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 50        | `service_request.create`      |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 51        | `service_request.acknowledge` |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 52        | `service_request.resolve`     |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| **Total** |                               |   **46**    | **31** | **30**  | **13** | **5** |  **5**  |
 
 ### Pragmatic decisions explained (Why)
 
-- **OWNER + MANAGER có FULL `ORDER_*`, `KITCHEN_*`, `PAYMENT_*`, `TABLE_*`, `SERVICE_REQUEST_*`:** quản lý vận hành cần permissions toàn diện. Bỏ SAAS*\* (platform admin), ROLE*\_ (RBAC self-service không có UI), PRODUCT\_\_ (legacy template).
+- **OWNER + MANAGER có FULL `ORDER_*` (trừ không áp dụng), `KITCHEN_*`, `PAYMENT_*`, `TABLE_*`, `SERVICE_REQUEST_*`:** quản lý vận hành cần permissions toàn diện; cancel tách `order.cancel_pending` / `order.cancel_processing` (Step 2.4). Bỏ SAAS*\* (platform admin), ROLE*\_ (RBAC self-service không có UI), PRODUCT\_\_ (legacy template).
 - **OWNER + MANAGER chỉ có `invoice.get_by_id`, `invoice.get_all`:** Bills thuộc Order Service per Phase 2A spec; INVOICE\_\* là legacy template không có endpoint thật trong QRTable.
 - **MANAGER không có `user.delete`:** Manager là operational role; xóa user là HR action thuộc Owner.
 - **WAITER có `payment.get_history`:** Waiter ở quầy POS cần đọc lịch sử bill khi customer hỏi.
 - **CHEF/BARISTA chỉ có CATALOG*GET + KITCHEN*\*:** không cần xem orders raw, chỉ làm tickets từ KDS view (Kitchen Service consumes Kafka `order.confirmed` và route ticket xuống bếp/bar).
+
+### 6.1 Step 2.4 — Cancel theo trạng thái đơn (đã triển khai trong `libs/constants` + `role.json`)
+
+Đã thay `order.cancel` bằng **`order.cancel_pending`** (WAITER + MANAGER + OWNER) và **`order.cancel_processing`** (MANAGER + OWNER). Customer self-cancel pending vẫn qua `SessionGuard`, không dùng các permission này.
 
 ## 7. CUSTOMER Actor (No DB Role)
 
@@ -244,7 +250,7 @@ Layer 3 prerequisites:
 
 ## 9. Frontend navigation (Management App) vs API enforcement
 
-> **Status (Phase 2.x trước UI-permission):** Được dùng cho Step 2.2+ và các sprint tạo UI mock / POS / KDS **trước** khi map từng nút UI ↔ permission.
+> **Status (Phase 2.x — hai tầng FE vs BFF):** Step **2.2** mock POS/KDS/PWA đã triển khai; §9 vẫn mô tả **điều hướng theo role** + **API theo permission** cho đến khi có work map từng nút UI ↔ `permissions[]` (tech debt, thường sau Step 2.5).
 
 **Hai tầng tách bạch:**
 
@@ -257,6 +263,6 @@ Layer 3 prerequisites:
 
 - **FE không thay thế BFF:** Ẩn menu chỉ là UX; gọi API sai quyền vẫn phải nhận **403** từ BFF.
 - **Đồng bộ nghĩa là:** mỗi **vùng route** (`/dashboard`, `/pos`, `/kds/...`, `/admin`) phải **không** cho phép role nào thấy tab mà **toàn bộ** API cần cho tab đó nằm ngoài permission của role đó (tránh “vào được nhưng toàn 403”). Khi siết permission chi tiết hơn trong cùng một trang, cần bổ sung **ẩn/disable nút** hoặc xử lý 403 ở UI.
-- **TODO (tech debt, sau Step 2.2+):** tùy chọn map **mục menu / hành động** ↔ `permissions[]` từ session (tinh chỉnh theo matrix từng dòng) — xem discussion trong `AGENTS.md` (Frontend RBAC).
+- **TODO (tech debt):** tùy chọn map **mục menu / hành động** ↔ `permissions[]` từ session (tinh chỉnh theo matrix từng dòng) — thường sau khi Step 2.5 nối API ổn định; xem `AGENTS.md` (Frontend RBAC).
 
 **Cross-reference:** Kiến trúc tổng thể & monorepo: `docs/technical-architecture.md` §4.2.1, §8.1.2 · Blueprint UI: `docs/ui-blueprint-step-2.2.md` §0.

@@ -11,6 +11,8 @@ type SessionData = {
   tenantId?: string;
   createdAt: number;
   lastActivityAt: number;
+  /** When > 0, idle timeout does not evict session (Step 2.4 / audit C15) — set by Order flows when wired */
+  orderCount?: number;
 };
 
 @Injectable()
@@ -34,19 +36,33 @@ export class SessionGuard implements CanActivate {
     const tenantId = request[MetadataKey.TENANT_ID] as string | undefined;
 
     if (existingSessionId) {
-      const cacheKey = getSessionCacheKey(existingSessionId);
-      const existingSession = await this.cacheManager.get<SessionData>(cacheKey);
+      const cacheKey = getSessionCacheKey(existingSessionId, tenantId);
+      let existingSession = await this.cacheManager.get<SessionData>(cacheKey);
+
+      // Legacy key migration: try non–tenant-scoped key if tenant-scoped miss
+      if (!existingSession && tenantId) {
+        const legacyKey = getSessionCacheKey(existingSessionId);
+        existingSession = await this.cacheManager.get<SessionData>(legacyKey);
+
+        if (existingSession) {
+          await this.cacheManager.del(legacyKey);
+        }
+      }
 
       if (existingSession) {
         const now = Date.now();
         const idleTime = now - (existingSession.lastActivityAt || existingSession.createdAt);
+        const orderCount = existingSession.orderCount ?? 0;
+        const withinIdleWindow = idleTime <= SESSION_POLICY.IDLE_TIMEOUT_MS;
+        const hasOrdersKeepAlive = orderCount > 0 && idleTime > SESSION_POLICY.IDLE_TIMEOUT_MS;
 
-        if (idleTime <= SESSION_POLICY.IDLE_TIMEOUT_MS) {
+        if (withinIdleWindow || hasOrdersKeepAlive) {
           await this.cacheManager.set(
             cacheKey,
             {
               ...existingSession,
               lastActivityAt: now,
+              tenantId: existingSession.tenantId || tenantId,
             },
             SESSION_POLICY.TTL_MS,
           );
@@ -64,7 +80,7 @@ export class SessionGuard implements CanActivate {
 
     const now = Date.now();
     const sessionId = this.generateSessionId();
-    const cacheKey = getSessionCacheKey(sessionId);
+    const cacheKey = getSessionCacheKey(sessionId, tenantId);
 
     await this.cacheManager.set(
       cacheKey,
@@ -72,6 +88,7 @@ export class SessionGuard implements CanActivate {
         tenantId,
         createdAt: now,
         lastActivityAt: now,
+        orderCount: 0,
       },
       SESSION_POLICY.TTL_MS,
     );

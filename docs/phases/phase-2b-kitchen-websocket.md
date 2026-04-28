@@ -32,7 +32,7 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
 - **Kitchen Service (Redis-only, không database):**
   - Consumer Kafka `order.confirmed` → tạo/cập nhật ticket KDS trong Redis
   - Hàng đợi FIFO dùng Redis Sorted Set: `kds:{tenant_id}:kitchen`, `kds:{tenant_id}:bar` (score = thứ tự ưu tiên thời gian / sequence đã thống nhất contract)
-  - Routing theo loại món (phân loại dựa trên category type của menu item): food → `kds:{tid}:kitchen`, drink → `kds:{tid}:bar`
+  - Routing ticket: **`MenuItem.station`** canonical (`KITCHEN` \| `BAR`) — đặc tả Phase 2A Step 2.4; có thể fallback category chỉ khi migration
   - Batching: gom cùng món từ các order khác nhau — hiển thị tổng số lượng cần chuẩn bị, giảm nhiễu trên màn KDS và phản ánh cách bếp làm thực tế
   - SLA: timer theo ticket; khi vượt ngưỡng (ví dụ 15 phút, configurable per tenant) → emit `kitchen.sla_warning` + cảnh báo UI (đổi màu vàng → đỏ)
   - Producer Kafka `kitchen.sla_warning` (ưu tiên P2): do timer nội bộ Kitchen Service, không block confirm đơn

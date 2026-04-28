@@ -149,16 +149,18 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
     │       └── Redis cache hit? → trả về cache : query PostgreSQL → cache → trả về
     │
     ├──→ Order Service (TCP): submit order
-    │       ├── Pessimistic lock: SELECT ... FOR UPDATE (stock check)
-    │       ├── Persist order → PostgreSQL
+    │       ├── Validate availability snapshot (submit ≠ deduct stock; persisted row starts at `PENDING`)
+    │       ├── Persist order (+ bill on first submit per session) → PostgreSQL Order DB
     │       └── Return response → BFF
     │           └── BFF Direct: emit WebSocket → notify Staff POS (AP1)
     │
-    ├──→ Order confirm → Emit Kafka: "order.confirmed" (P1+P2)
-    │       └── Kitchen Service (Kafka consumer):
-    │           ├── Route ticket: food → KDS Bếp, drink → KDS Bar
-    │           ├── Redis Sorted Set (FIFO queue)
-    │           └── BFF Direct: emit WebSocket → KDS screens (sau TCP confirm response)
+    └──→ Staff confirm (Order Service TCP orchestrates)
+            ├── Catalog Service (TCP): transactional stock deduct (Catalog owns `menu_items`)
+            ├── Order DB commit + simplified outbox → Kafka: `order.confirmed` (P1+P2), payload enriched — đặc tả Step 2.4
+            └── Kitchen Service (Kafka consumer):
+                    ├── Route ticket (e.g. `MenuItem.station`): KITCHEN vs BAR
+                    ├── Redis Sorted Set (FIFO queue)
+                    └── … → BFF Direct WebSocket → KDS screens (Phase 2B hoàn thiện gateway)
     │
     └──→ Payment Service (TCP): process payment
             ├── Stripe Checkout Session → webhook → verify → update status
@@ -533,17 +535,17 @@ File Storage Level:
 
 ### 6.1 Service Catalog
 
-| #   | Service                  | Transport     | Database               | Vai trò                                                     |
-| --- | ------------------------ | ------------- | ---------------------- | ----------------------------------------------------------- |
-| 1   | **BFF Service**          | HTTP + WS     | — (stateless)          | API Gateway, WebSocket Gateway, Guard chain, Swagger        |
-| 2   | **Auth Service**         | gRPC          | — (Keycloak external)  | JWT verification, token introspection, user info retrieval  |
-| 3   | **SaaS Mgmt Service**    | TCP           | PG: `qrtable_saas`     | Tenant CRUD, Subscription lifecycle, Pricing Plans          |
-| 4   | **Catalog Service**      | TCP           | PG: `qrtable_catalog`  | Menu (Category + Item), Table & Area, QR token management   |
-| 5   | **Order Service**        | TCP           | PG: `qrtable_order`    | Order state machine, Cart/Session, Stock locking            |
-| 6   | **Kitchen Service**      | TCP + Kafka   | Redis only             | KDS ticket routing, FIFO queue, SLA monitoring, batching    |
-| 7   | **Payment Service**      | TCP + Webhook | PG: `qrtable_payment`  | Stripe Checkout, Cash flow, Payment records, Reconciliation |
-| 8   | **Notification Service** | Kafka         | Mongo: `qrtable_notif` | Email (SMTP), Push events, Audit log                        |
-| 9   | **User-Access Service**  | TCP           | Mongo: `qrtable_auth`  | User profile, Role mapping, Staff management                |
+| #   | Service                  | Transport     | Database               | Vai trò                                                                                                     |
+| --- | ------------------------ | ------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1   | **BFF Service**          | HTTP + WS     | — (stateless)          | API Gateway, WebSocket Gateway, Guard chain, Swagger                                                        |
+| 2   | **Auth Service**         | gRPC          | — (Keycloak external)  | JWT verification, token introspection, user info retrieval                                                  |
+| 3   | **SaaS Mgmt Service**    | TCP           | PG: `qrtable_saas`     | Tenant CRUD, Subscription lifecycle, Pricing Plans                                                          |
+| 4   | **Catalog Service**      | TCP           | PG: `qrtable_catalog`  | Menu (Category + Item), Table & Area, QR token management                                                   |
+| 5   | **Order Service**        | TCP           | PG: `qrtable_order`    | Order state machine, Cart/Session cache, bills; stock **không** ghi trực tiếp — gọi Catalog TCP khi confirm |
+| 6   | **Kitchen Service**      | TCP + Kafka   | Redis only             | KDS ticket routing, FIFO queue, SLA monitoring, batching                                                    |
+| 7   | **Payment Service**      | TCP + Webhook | PG: `qrtable_payment`  | Stripe Checkout, Cash flow, Payment records, Reconciliation                                                 |
+| 8   | **Notification Service** | Kafka         | Mongo: `qrtable_notif` | Email (SMTP), Push events, Audit log                                                                        |
+| 9   | **User-Access Service**  | TCP           | Mongo: `qrtable_auth`  | User profile, Role mapping, Staff management                                                                |
 
 ### 6.2 Chi tiết theo Domain
 
@@ -634,7 +636,8 @@ Trách nhiệm:
   - QR Token: sinh HMAC-SHA256 token, validate, re-generate
   - Table State Machine: Available → Occupied → Billing → Cleaning
   - Sort ordering (drag & drop), time-based category visibility
-  - Table transfer logic (atomic transaction)
+  - **Stock mutations for orders:** endpoint/command TCP transactional (reserve/deduct/release) — Order Service **không** ghi trực tiếp `menu_items` (Phase 2A Step 2.4)
+  - Table status updates: nhận lệnh từ Order/BFF flow (bill request, transfer saga) trong transaction của Catalog
   - Delete constraints:
     → Không cho xóa MenuItem nếu tồn tại order_item
       với status IN (Pending, Processing, Ready) liên kết đến menu_item_id đó
@@ -662,21 +665,22 @@ Caching (Redis):
 
 ```
 Trách nhiệm:
-  - Session Management: create/join/close session (stored in Redis)
-  - Shared Cart: multi-device cart qua Redis Hash
-  - Order State Machine: Draft → Pending → Processing → Ready → Served → Completed
-  - Stock validation: Pessimistic Locking (SELECT ... FOR UPDATE)
-  - Order cancellation (soft delete + audit log)
-  - Bill aggregation: merge multiple orders into single bill per session
-  - Service Request: nhận yêu cầu phục vụ từ khách (gọi nhân viên, yêu cầu thanh toán, hỗ trợ)
+  - Session Management: durable session trong PostgreSQL (Order DB); Redis là active cache/TTL cho fast path
+  - Shared Cart: multi-device cart qua Redis Hash + cart version toàn cục (optimistic concurrency)
+  - Order State Machine: persist từ `PENDING` trở lên; `DRAFT` chỉ cart/UI — xem docs/business-logic-step-2.4-spec.vi.md §3.1
+  - Stock: Order Service **không** mutate `menu_items`; khi confirm (`PENDING → PROCESSING`) gọi Catalog Service (TCP) để deduct trong transaction của Catalog
+  - Order cancellation (soft delete + audit log); RBAC cancel theo state — permission-matrix §6.1
+  - Bill aggregation: một bill/session; tạo ở submit order đầu tiên; `OPEN → PENDING_PAYMENT` trong Step 2.4; `PAID` → Phase 3
+  - Service Request: nhận yêu cầu phục vụ từ khách (gọi nhân viên, yêu cầu thanh toán, hỗ trợ); bill request là explicit command, `REQUEST_BILL` có thể là side effect thông báo
 
 Validation Rules:
   - max_orders_per_session = 20 items (chống spam/đơn ảo)
   - Mọi timestamp dùng server UTC (Date.now()), KHÔNG dùng client timestamp
-  - Cart validation: all items must be Available trước khi submit
-  - Stock check: double-check tại thời điểm confirm (Pessimistic Locking)
+  - Cart validation: all items must be Available trước khi submit (availability snapshot)
+  - Stock deduct + pessimistic rules **trong Catalog** tại thời điểm staff confirm
 
 Entities (PostgreSQL):
+  - sessions: durable session rows (tenant_id, table_id, …) — canonical theo Step 2.4
   - orders: id, tenant_id, table_id, session_id, status, total_amount,
             idempotency_key, created_at, updated_at, deleted_at
   - order_items: id, order_id, menu_item_id, quantity, price, note, status
@@ -687,46 +691,35 @@ Entities (PostgreSQL):
                       status (enum: PENDING | ACKNOWLEDGED | RESOLVED),
                       created_at
 
-Session State (Redis):
-  - session:{tenant_id}:{session_id} → { table_id, started_at, status, last_activity }
+Redis (active cache — đồng bộ với durable session):
+  - session:{tenant_id}:{session_id} → cache mirror + TTL/idle metadata
     → TTL: 2 giờ (session lifetime)
-    → Idle check: nếu last_activity > 30 phút VÀ order_count == 0 → auto-close
-  - cart:{tenant_id}:{session_id} → Hash { item_id: { qty, note, price, version } }
+    → Idle check: nếu last_activity > 30 phút VÀ order_count == 0 → auto-close (session có đơn thì không đóng)
+  - cart:{tenant_id}:{session_id} → Hash + cart-level version + line ids — xem đặc tả Step 2.4
     → TTL: bound to session TTL
 
 Events emitted (Kafka):
-  - order.confirmed → route to Kitchen Service (P1+P2)
+  - order.confirmed → Kitchen Service (P1+P2); publish qua simplified outbox — implementation_plan §4
   - order.completed → analytics pipeline (future)
 
 BFF Direct Side-Effects (AP1 — không qua Kafka, xem §7.3):
   - order.created → BFF emit WS tới tenant:{tid}:staff
-  - order.ready → BFF emit WS tới tenant:{tid}:staff + session:{sid}:customer
+  - order.status_changed → staff + session rooms (confirm/cancel/ready/served)
+  - cart.updated → session:{sid}:customer (Step 2.4 contract)
+  - table.transferred → staff + session rooms (transfer hoàn tất)
+  - order.ready → BFF emit WS tới tenant:{tid}:staff + session:{sid}:customer (khi Kitchen TCP/BFF bridge)
   - service.requested → BFF emit WS tới tenant:{tid}:staff
 
-Table Transfer (Atomic Transaction):
+Table Transfer (saga-style — không ACID xuyên Order PG + Catalog PG + Redis):
   Trigger: Staff/Manager chuyển bàn
-  Validation: new_table_status == "Available"
-  BEGIN TRANSACTION
-    UPDATE orders SET table_id = new_table_id
-      WHERE table_id = old_table_id AND session_id = current_session
-    UPDATE sessions SET table_id = new_table_id
-      WHERE table_id = old_table_id
-    UPDATE tables SET status = "Available" WHERE id = old_table_id
-    UPDATE tables SET status = "Occupied" WHERE id = new_table_id
-    Notify KDS via Kafka: "Bàn [old] → Bàn [new]"
-  COMMIT
+  - Transfer lock + cập nhật Order DB (orders/session rows), Redis cart/session payload, Catalog TCP (table status Available/Occupied)
+  - Compensation khi bước giữa fail
+  - UI/KDS được cập nhật qua BFF Direct / status events — **không** thêm Kafka topic cho rename bàn (registry §7.2)
 
-Stock Locking Pattern:
-  BEGIN TRANSACTION
-    SELECT stock FROM menu_items WHERE id = :item_id FOR UPDATE
-    IF stock >= requested_qty THEN
-      UPDATE menu_items SET stock = stock - requested_qty
-      INSERT INTO order_items (...)
-      COMMIT
-    ELSE
-      ROLLBACK → return "Món đã hết"
-  END
-  → Broadcast stock update via WebSocket
+Stock / confirm flow (cross-service):
+  Order (trong transaction DB của Order): khóa/kèm validate order `PENDING`
+  → Catalog TCP: deduct/reserve stock idempotent trong DB Catalog
+  → success: Order `PROCESSING`, ghi outbox → Kafka `order.confirmed`
 ```
 
 #### 6.2.6 Kitchen Service (KDS)
@@ -734,7 +727,7 @@ Stock Locking Pattern:
 ```
 Trách nhiệm:
   - Kafka consumer: nhận order.confirmed events
-  - Ticket routing: food items → kitchen queue, drink items → bar queue
+  - Ticket routing: từ `MenuItem.station` (KITCHEN / BAR) trên payload — xem Step 2.4
   - FIFO queue management: Redis Sorted Set (score = timestamp)
   - Batching logic: group same items across tables
   - SLA monitoring: cảnh báo khi ticket quá threshold (e.g., 15 min)
@@ -896,6 +889,10 @@ BFF Controller (pseudo-code):
 | Trigger (TCP response tại BFF) | WebSocket Room                                  | Cache Action                  |
 | ------------------------------ | ----------------------------------------------- | ----------------------------- |
 | Order created                  | `tenant:{tid}:staff`                            | —                             |
+| Order status changed           | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                             |
+| Cart updated / conflict        | `session:{sid}:customer`                        | —                             |
+| Bill requested (explicit)      | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                             |
+| Table transferred              | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                             |
 | Menu item CRUD                 | `tenant:{tid}:*` (broadcast all customers)      | `DEL menu:{tid}`              |
 | Table status changed           | `tenant:{tid}:staff`                            | `SET table:{tid}:{id}:status` |
 | Kitchen item ready             | `tenant:{tid}:staff` + `session:{sid}:customer` | —                             |
@@ -922,7 +919,7 @@ Dùng Kafka khi cùng 1 event cần trigger phản ứng nghiệp vụ ở **nhi
 **P4 — Atomicity Safeguard (Transactional Outbox):**
 Khi domain event là kết quả của DB write, event **PHẢI** được ghi cùng database transaction (Outbox Pattern) để tránh Dual-Write Problem. Background process poll outbox → publish Kafka.
 
-> ⚠️ Known Limitation (Thesis Scope): P4 được document nhưng chưa implement full Outbox. Simplified version sẽ được triển khai ở Phase 4A (Saga + Hardening).
+> **Step 2.4:** `order.confirmed` dùng **simplified outbox** (bảng `outbox_events` + cron poll) như `implementation_plan.md` §4 — khớp P4 cho luồng confirm. Full CDC / transactional outbox cứng → Phase 4A (Saga + Hardening).
 
 #### Exclusion Anti-patterns (Khi nào KHÔNG dùng Kafka)
 
@@ -1281,28 +1278,26 @@ On Menu Update (admin changes price/availability):
 
 Áp dụng cho các business flow phức tạp yêu cầu nhiều service phối hợp với compensation khi thất bại.
 
-**Order Confirmation Saga:**
+**Order Confirmation Saga (Phase 2A — chốt Step 2.4):**
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                  ORDER CONFIRMATION SAGA                  │
 ├──────────────────────────────────────────────────────────┤
 │                                                          │
-│  Step 1: Validate & Lock Stock (Order Service)           │
-│    → SELECT ... FOR UPDATE → deduct stock               │
-│    ✗ Compensation: restore stock                         │
+│  Step 1: Lock/validate order row trong Order DB (PENDING) │
 │                                                          │
-│  Step 2: Update Order Status → Processing                │
-│    ✗ Compensation: revert to Pending                     │
+│  Step 2: Catalog Service (TCP): deduct stock trong TX    │
+│    Catalog — pessimistic lock trên menu_items tại đó    │
+│    ✗ Compensation: release stock (Catalog command)       │
 │                                                          │
-│  Step 3: Route to KDS (Kitchen Service via Kafka)        │
-│    → Emit order.confirmed event                          │
-│    ✗ Compensation: đồng bộ hủy/ghi nhận với Kitchen       │
-│      (TCP hoặc lệnh nội bộ) — không Kafka topic mới      │
-│      ngoài registry §7.2                                 │
+│  Step 3: Order Service → status PROCESSING, outbox row   │
+│    ✗ Compensation: revert order + Catalog release        │
 │                                                          │
-│  IF all steps succeed → COMMIT                           │
-│  IF any step fails → execute compensations in reverse    │
+│  Step 4: Publish Kafka order.confirmed (simplified       │
+│    outbox poll) → Kitchen consumer                       │
+│                                                          │
+│  IF any step fails → compensations / idempotent retry      │
 │                                                          │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -1442,18 +1437,18 @@ docker compose -f docker-compose.prod.yaml up -d    # Full stack
 
 ### 15.1 Danh sách Thách thức & Giải pháp
 
-| #   | Thách thức                                                  | Giải pháp                                                                                                      | Độ phức tạp |
-| --- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------- |
-| 1   | **Real-time multi-client sync** (KDS, order tracking, menu) | NestJS WebSocket Gateway + Socket.io + Kafka → WS bridge + Redis Adapter cho horizontal scale                  | Cao         |
-| 2   | **Multi-tenant data isolation**                             | Discriminator column + TypeORM Subscriber + Guard middleware auto-inject                                       | Cao         |
-| 3   | **Shared Cart concurrent modification**                     | Redis Hash + Optimistic Concurrency (version field) + WebSocket broadcast on change                            | Trung bình  |
-| 4   | **Stock race condition** (nhiều người đặt cùng món)         | PostgreSQL Pessimistic Locking (`SELECT ... FOR UPDATE`) + immediate WS broadcast                              | Trung bình  |
-| 5   | **KDS FIFO + Batching + SLA**                               | Redis Sorted Set (score=timestamp) + GROUP BY item_id + scheduled SLA check                                    | Trung bình  |
-| 6   | **Anonymous Customer auth** (zero-friction)                 | Session-based auth via Redis + HMAC token validation + separate Guard chain                                    | Trung bình  |
-| 7   | **Session lifecycle** (dual timeout, multi-device)          | Session lifetime = 2h (Redis TTL), idle timeout = 30min (cron check `last_activity`) + cart sync via WebSocket | Trung bình  |
-| 8   | **Offline resilience** (PWA cho customer & POS)             | Service Worker + IndexedDB queue + idempotency key + exponential backoff retry                                 | Cao         |
-| 9   | **Distributed transaction** (order confirm saga)            | Saga Orchestration pattern + compensation steps + idempotent operations                                        | Trung bình  |
-| 10  | **Subscription feature gating**                             | SaaS Service + feature flag in tenant context + middleware check limits                                        | Nhỏ         |
+| #   | Thách thức                                                  | Giải pháp                                                                                                                                | Độ phức tạp |
+| --- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | **Real-time multi-client sync** (KDS, order tracking, menu) | NestJS WebSocket Gateway + Socket.io + Kafka → WS bridge + Redis Adapter cho horizontal scale                                            | Cao         |
+| 2   | **Multi-tenant data isolation**                             | Discriminator column + TypeORM Subscriber + Guard middleware auto-inject                                                                 | Cao         |
+| 3   | **Shared Cart concurrent modification**                     | Redis Hash + Optimistic Concurrency (version field) + WebSocket broadcast on change                                                      | Trung bình  |
+| 4   | **Stock race condition** (nhiều người đặt cùng món)         | Catalog Service sở hữu `menu_items`: khóa + deduct trong transaction Catalog; Order gọi TCP idempotent khi confirm (xem đặc tả Step 2.4) | Trung bình  |
+| 5   | **KDS FIFO + Batching + SLA**                               | Redis Sorted Set (score=timestamp) + GROUP BY item_id + scheduled SLA check                                                              | Trung bình  |
+| 6   | **Anonymous Customer auth** (zero-friction)                 | Session-based auth via Redis + HMAC token validation + separate Guard chain                                                              | Trung bình  |
+| 7   | **Session lifecycle** (dual timeout, multi-device)          | Session lifetime = 2h (Redis TTL), idle timeout = 30min (cron check `last_activity`) + cart sync via WebSocket                           | Trung bình  |
+| 8   | **Offline resilience** (PWA cho customer & POS)             | Service Worker + IndexedDB queue + idempotency key + exponential backoff retry                                                           | Cao         |
+| 9   | **Distributed transaction** (order confirm saga)            | Saga Orchestration pattern + compensation steps + idempotent operations                                                                  | Trung bình  |
+| 10  | **Subscription feature gating**                             | SaaS Service + feature flag in tenant context + middleware check limits                                                                  | Nhỏ         |
 
 ### 15.2 Ưu tiên Triển khai (Phased)
 

@@ -2,7 +2,7 @@ import { MetadataKey } from '@common/constants/common.constant';
 import { SESSION_POLICY, TENANT_POLICY } from '@common/constants/request-context.constant';
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { CanActivate, ExecutionContext, Inject, Injectable, Logger, HttpStatus } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable, HttpStatus } from '@nestjs/common';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Cache } from 'cache-manager';
@@ -11,6 +11,8 @@ import { getSessionCacheKey } from '@common/utils/request.util';
 type SessionData = {
   tenantId?: string;
   createdAt: number;
+  lastActivityAt?: number;
+  orderCount?: number;
 };
 
 @Injectable()
@@ -49,8 +51,13 @@ export class TenantGuard implements CanActivate {
     const sessionId = request[MetadataKey.SESSION_ID] as string | undefined;
 
     if (sessionId) {
-      const cacheKey = getSessionCacheKey(sessionId);
-      const session = await this.cacheManager.get<SessionData>(cacheKey);
+      const cacheKey = getSessionCacheKey(sessionId, tenantId);
+      let session = await this.cacheManager.get<SessionData>(cacheKey);
+
+      if (!session) {
+        const legacyKey = getSessionCacheKey(sessionId);
+        session = await this.cacheManager.get<SessionData>(legacyKey);
+      }
 
       if (!session) {
         throw new BusinessException(ErrorCode.TENANT_SESSION_NOT_FOUND, HttpStatus.FORBIDDEN);

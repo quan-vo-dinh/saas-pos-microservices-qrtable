@@ -44,6 +44,12 @@ enum MENU_ITEM {
   UPDATE = 'menu_item.update',
   SOFT_DELETE = 'menu_item.soft_delete',
   UPDATE_IMAGE = 'menu_item.update_image',
+  /** Step 2.4 — validate item status/price/station at cart submit (Catalog-owned) */
+  VALIDATE_ORDERABLE = 'menu_item.validate_orderable',
+  /** Step 2.4 — pessimistic deduct in Catalog DB when staff confirms order */
+  STOCK_DEDUCT_FOR_ORDER = 'menu_item.stock_deduct_for_order',
+  /** Step 2.4 — restore stock on processing cancel when policy allows */
+  STOCK_RELEASE_FOR_ORDER = 'menu_item.stock_release_for_order',
 }
 
 enum AREA {

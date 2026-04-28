@@ -1,8 +1,8 @@
 # Phase 2A — Permissions + Order + Kafka
 
-> **Mục tiêu:** Mở rộng RBAC cho toàn bộ luồng đặt món, bếp/bar, thanh toán (tiền mặt), bàn và yêu cầu phục vụ; triển khai Order Service (PostgreSQL) với giỏ hàng/session Redis, state machine đơn hàng, khóa tồn kho, hóa đơn theo phiên; đưa Kafka vào vòng đời với topic `order.confirmed`, đồng thời giữ realtime UI qua BFF Direct (`order.created`, `service.requested`).
+> **Mục tiêu:** Mở rộng RBAC cho toàn bộ luồng đặt món, bếp/bar, bill/request payment (đến `PENDING_PAYMENT`; **xác nhận tiền mặt → Phase 3**), bàn và yêu cầu phục vụ; triển khai Order Service (PostgreSQL) với giỏ hàng/session Redis + session durable, state machine đơn hàng, **tồn kho qua Catalog TCP** khi confirm, hóa đơn theo phiên; đưa Kafka vào vòng đời với topic `order.confirmed`, đồng thời giữ realtime UI qua BFF Direct (minimal WS Step 2.4 — xem `docs/business-logic-step-2.4-spec.vi.md`).
 > **Ước lượng:** ~2–2,5 tuần (gồm Pre-Phase 2 khoảng 0,5–1 ngày)
-> **Trạng thái:** ⬜ TODO
+> **Trạng thái:** 🟡 Đang triển khai — **2.0 ✅ · 2.1 🟢 (khóa học) · 2.2 ✅ · 2.3 ✅** · **2.4 ⬜ (tiếp theo)** · 2.5 ⬜
 
 ## Prerequisites
 
@@ -11,14 +11,15 @@
 
 ## Tham Chiếu
 
-| Tài liệu                  | Section liên quan                                                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| technical-architecture.md | §6.2.5 Order Service, §7.2 Kafka Topic Registry, §7.3 BFF Direct Side-Effects, §7.4 Async Messaging (4P+2AP), §12 Xử lý giao dịch phân tán |
-| business-logic.md         | §4 Luồng đặt món tại bàn, §8 State machine vòng đời đơn hàng                                                                               |
+| Tài liệu                           | Section liên quan                                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| technical-architecture.md          | §6.2.5 Order Service, §7.2 Kafka Topic Registry, §7.3 BFF Direct Side-Effects, §7.4 Async Messaging (4P+2AP), §12 Xử lý giao dịch phân tán |
+| business-logic.md                  | §4 Luồng đặt món tại bàn, §8 State machine vòng đời đơn hàng                                                                               |
+| business-logic-step-2.4-spec.vi.md | Đặc tả đã chốt Q1–Q12 (ownership stock, deduct timing, bill, transfer saga, RBAC cancel, events, scope payment)                            |
 
 ## Tổng Quan
 
-Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc dựng nghiệp vụ đơn hàng và đưa Kafka vào kiến trúc. Hóa đơn (bill) thuộc Order Service — không giao cho Payment Service ở phase này. Chỉ một topic Kafka được phát sinh: `order.confirmed`; các sự kiện cần độ trễ thấp cho UI dùng BFF Direct (AP1) `order.created` và `service.requested` kèm phát WebSocket. Session và giỏ dùng Redis với quy ước key và TTL/idle rõ ràng; tồn kho menu item được bảo vệ bằng khóa bi quan trên PostgreSQL khi xác nhận đơn.
+Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc dựng nghiệp vụ đơn hàng và đưa Kafka vào kiến trúc. Hóa đơn (bill) thuộc Order Service — không giao cho Payment Service ở phase này. Chỉ một topic Kafka được phát sinh: `order.confirmed`; các sự kiện cần độ trễ thấp cho UI dùng BFF Direct (AP1). Session **durable trong PostgreSQL (Order)** + Redis cache; giỏ Redis với **cart version** và broadcast; **Catalog Service** sở hữu `menu_items` và thực hiện deduct/stock lock qua **lệnh TCP transactional** khi staff confirm — không khóa trực tiếp bảng Catalog từ Order DB (đặc tả Step 2.4).
 
 ### Step progress (sync với triển khai thực tế)
 
@@ -26,7 +27,7 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 | ---- | ------------------------------------------ | -------------- |
 | 2.0  | PERMISSION enum + role seed + matrix       | ✅ Done        |
 | 2.1  | Kafka foundation (khóa học)                | 🟢 Course      |
-| 2.2  | Mock UI Cart / POS / KDS                   | ⬜ Not Started |
+| 2.2  | Mock UI Cart / POS / KDS                   | ✅ Done        |
 | 2.3  | Shared types + hợp đồng realtime           | ✅ Done        |
 | 2.4  | Order Service + Redis + Kafka + BFF Direct | ⬜ Not Started |
 | 2.5  | Tích hợp FE ↔ BE                          | ⬜ Not Started |
@@ -39,8 +40,8 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 
 **Yêu cầu chính:**
 
-- Bổ sung enum permission: `ORDER_CREATE`, `ORDER_CONFIRM`, `ORDER_CANCEL`, `ORDER_GET_LIST`, `ORDER_GET_BY_ID`, `KITCHEN_GET_QUEUE`, `KITCHEN_UPDATE_TICKET`, `KITCHEN_RECALL`, `PAYMENT_CREATE`, `PAYMENT_CONFIRM_CASH`, `PAYMENT_REFUND`, `PAYMENT_GET_HISTORY`, `TABLE_CREATE`, `TABLE_UPDATE`, `TABLE_DELETE`, `TABLE_TRANSFER`, `TABLE_UPDATE_STATUS`, `SERVICE_REQUEST_CREATE`, `SERVICE_REQUEST_ACKNOWLEDGE`, `SERVICE_REQUEST_RESOLVE`
-- Mapping role → permission: **OWNER** (full trừ các quyền `SAAS_*`, `ROLE_*`, `PRODUCT_*`), **MANAGER** (tương tự OWNER, không gồm `USER_DELETE`), **WAITER** (`ORDER_CONFIRM`, `ORDER_GET_*`, `PAYMENT_CONFIRM_CASH`, `PAYMENT_GET_HISTORY`, `TABLE_TRANSFER`, `TABLE_UPDATE_STATUS`, `SERVICE_REQUEST_*`, `CATALOG_GET_*`, `INVOICE_GET_*`), **CHEF/BARISTA** (`KITCHEN_*`, `CATALOG_GET_*`), **CUSTOMER** không gán qua matrix này — kiểm soát ở tầng controller bằng `SessionGuard` (table/session scope). Canonical matrix: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md).
+- Bổ sung enum permission: `ORDER_CREATE`, `ORDER_CONFIRM`, `ORDER_CANCEL_PENDING`, `ORDER_CANCEL_PROCESSING`, `ORDER_GET_LIST`, `ORDER_GET_BY_ID`, `KITCHEN_GET_QUEUE`, `KITCHEN_UPDATE_TICKET`, `KITCHEN_RECALL`, `PAYMENT_CREATE`, `PAYMENT_CONFIRM_CASH`, `PAYMENT_REFUND`, `PAYMENT_GET_HISTORY`, `TABLE_CREATE`, `TABLE_UPDATE`, `TABLE_DELETE`, `TABLE_TRANSFER`, `TABLE_UPDATE_STATUS`, `SERVICE_REQUEST_CREATE`, `SERVICE_REQUEST_ACKNOWLEDGE`, `SERVICE_REQUEST_RESOLVE`
+- Mapping role → permission: **OWNER** (full trừ các quyền `SAAS_`_, `ROLE_`_, `PRODUCT_*`), **MANAGER** (tương tự OWNER, không gồm `USER_DELETE`), **WAITER** (`ORDER_CONFIRM`, `ORDER_GET_`_, `PAYMENT_CONFIRM_CASH`, `PAYMENT_GET_HISTORY`, `TABLE_TRANSFER`, `TABLE_UPDATE_STATUS`, `SERVICE*REQUEST*_`, `CATALOG*GET*_`, `INVOICE*GET*_`), **CHEF/BARISTA** (`KITCHEN*`*, `CATALOG_GET*`*), **CUSTOMER** không gán qua matrix này — kiểm soát ở tầng controller bằng `SessionGuard`(table/session scope). Canonical matrix:`[docs/architecture/permission-matrix.md](../architecture/permission-matrix.md)`.
 - Chuỗi guard cho endpoint staff: `UserGuard` → `TenantGuard` → `PermissionGuard` (thứ tự bắt buộc theo kiến trúc platform)
 
 **Lưu ý quan trọng:**
@@ -94,11 +95,11 @@ Phase 2A gộp việc bổ sung quyền chi tiết (Pre-Phase 2) với việc d�
 
 **Lưu ý quan trọng:** Mock phải phản ánh các trạng thái sẽ map sang `OrderStatus` và hàng đợi bếp — không chỉ layout tĩnh
 
-**Phân quyền UI (Phase 2.x):** Mock POS/KDS trên `management-app` tuân **điều hướng theo role** (middleware + sidebar). Kiểm tra quyền thật trên API vẫn là **permission** ở BFF — mô tả hai tầng: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md) §9. Blueprint chi tiết: [`docs/ui-blueprint-step-2.2.md`](../ui-blueprint-step-2.2.md).
+**Phân quyền UI (Phase 2.x):** Mock POS/KDS trên `management-app` tuân **điều hướng theo role** (middleware + sidebar). Kiểm tra quyền thật trên API vẫn là **permission** ở BFF — mô tả hai tầng: `[docs/architecture/permission-matrix.md](../architecture/permission-matrix.md)` §9. Blueprint chi tiết: `[docs/ui-blueprint-step-2.2.md](../ui-blueprint-step-2.2.md)`.
 
 **Verify:** Demo được luồng khách đặt → staff thấy đơn → bếp/bar thấy ticket trên mock
 
-> **Status:** ⬜ Not Started — Step 2.2 chưa được triển khai. Thứ tự thực hiện thực tế: Step 2.0 → 2.3 → (**2.2 pending**) → 2.4 → 2.5. Spec/plan canonical sẽ được tạo mới khi bắt đầu, dựa trên shared types đã khóa từ Step 2.3.
+> **Status:** ✅ Done (đóng 2026-04-26) — mock UI bám `[docs/ui-blueprint-step-2.2.md](../ui-blueprint-step-2.2.md)`, dữ liệu & fake realtime tách trong `apps/customer-pwa/src/mocks/` và `apps/management-app/src/mocks/` (`use-fake-realtime`, Zustand + seed). Types hiển thị lấy từ `libs/shared/types` (Step 2.3). **Thứ tự thực tế đã làm:** 2.0 → 2.3 → 2.2 → **2.4** → 2.5. Kế hoạch triển khai: `[docs/superpowers/plans/2026-04-24-step-2.2-mock-ui.md](../superpowers/plans/2026-04-24-step-2.2-mock-ui.md)` · tổng kết handoff: `[docs/superpowers/handoffs/2026-04-25-step-2.2-batch-5-handoff.md](../superpowers/handoffs/2026-04-25-step-2.2-batch-5-handoff.md)`.
 
 ### Step 2.3 — Shared types & hợp đồng realtime
 
@@ -153,39 +154,31 @@ ALLOWED_ORDER_TRANSITIONS, ALLOWED_BILL_TRANSITIONS, ALLOWED_SERVICE_REQUEST_TRA
 
 ### Step 2.4 — Order Service backend, Redis, Kafka, BFF Direct
 
-**Mục tiêu:** Order Service là nguồn sự thật cho đơn, dòng món, **hóa đơn (bill)**, yêu cầu phục vụ; đồng bộ tồn kho với Catalog an toàn khi xác nhận; phát `order.confirmed` cho consumer tương lai; BFF phát realtime tức thì cho UI.
+**Canonical business spec:** [`docs/business-logic-step-2.4-spec.vi.md`](../business-logic-step-2.4-spec.vi.md) (quyết định Q1–Q12). Phần dưới là **tóm tắt triển khai** cùng hướng với đặc tả.
+
+**Prerequisites (đã đáp ứng):** Step 2.3 và Step 2.2 như trên.
+
+**Mục tiêu:** Order Service là source of truth cho đơn, dòng món, bill, service request; Catalog là source of truth cho stock và trạng thái bàn; Redis cho cart và cache session hoạt động; Kafka `order.confirmed` sau confirm; BFF Direct + WebSocket tối thiểu cho realtime Step 2.4/2.5.
 
 **Yêu cầu chính:**
 
-- Persistence **PostgreSQL** cho toàn bộ aggregate order domain (không dùng Mongo cho entities nghiệp vụ này)
-- Vùng dữ liệu: đơn (`orders`), dòng món (`order_items`), **hóa đơn (`bills`) thuộc Order Service** — Payment Service phase sau chỉ tiêu thụ/kết nối thanh toán, không là owner bill
-- Phiên khách: Redis key `session:{tenant_id}:{session_id}`, TTL **2 giờ**, **idle 30 phút**. Rule auto-close: nếu `last_activity` > 30 phút VÀ `order_count == 0` → tự đóng session; nếu đã có đơn (`order_count > 0`) thì chỉ gia hạn idle timer, không tự đóng
-- Giỏ chung: Redis key `cart:{tenant_id}:{session_id}` dạng **Hash** kèm field **version** (optimistic locking). Khi update cart: kiểm tra version match trước khi ghi — nếu conflict → trả lỗi để client retry với dữ liệu mới nhất. Broadcast cart changes tới các device khác cùng session qua WebSocket
-- **Order state machine** khớp §8; mọi chuyển trạng thái có guard nghiệp vụ — validation rules per transition: ai được phép trigger transition nào (Customer chỉ cancel từ PENDING; Manager/Owner có thể cancel từ PROCESSING; chỉ Staff Waiter/Manager mới confirm được)
-- **Khóa tồn kho:** pessimistic lock trên PostgreSQL (**SELECT … FOR UPDATE**) trên dòng tồn/menu item liên quan khi confirm. Flow: nếu `stock >= requested` → deduct stock + create order_item + COMMIT; nếu không đủ → ROLLBACK → trả "Món đã hết" cho client — tránh oversell
-- **Tổng hợp bill theo session:** merge nhiều orders thành 1 bill per session; **chuyển bàn** thực hiện **atomic**: validate bàn đích status == Available → BEGIN → cập nhật orders, sessions, cart, bàn cũ → Available, bàn mới → Occupied → COMMIT → notify KDS về sự thay đổi
-- **Service request:** entity lưu trạng thái phục vụ — type: `CALL_STAFF` | `REQUEST_BILL` | `GENERAL_HELP`; status flow: `PENDING` → `ACKNOWLEDGED` → `RESOLVED`
-- **Kafka:** chỉ producer topic `**order.confirmed`\*\* trong phase này (đúng registry §7.2)
-- **BFF Direct (AP1, không Kafka):** sau tác vụ thành công, emit `**order.created`** và `**service.requested\*\*` → gateway WebSocket tới client
-- Môi trường dev: broker Kafka + Zookeeper chạy cùng stack container với các service khác
-- Module client Kafka dùng chung (producer config, error handling, observability cơ bản)
+- Persistence **PostgreSQL** Order DB: `orders`, `order_items`, `bills`, `service_requests`, **`sessions` (durable)** — không Mongo cho các entity này
+- Submit order: persist từ **`PENDING`**; **`DRAFT`** chỉ cart/UI — không tạo row order cho draft
+- Session: PostgreSQL là **chuẩn**; Redis `session:{tenant_id}:{session_id}` TTL **2h**, idle **30 phút**; đóng khi idle **và** `order_count == 0`; có đơn thì **không** auto-close khi idle
+- Cart: `cart:{tenant_id}:{session_id}`, Hash + **`cartVersion` toàn cục** + line ids; conflict → 409 + snapshot; **`CartUpdatedEvent`** (contract Step 2.4); WS không thay REST làm source of truth sau reconnect
+- **Stock:** submit chỉ **snapshot availability**; **deduct khi staff confirm** (`PENDING → PROCESSING`) qua **Catalog TCP** (transactional commands); Order **không** `UPDATE menu_items`
+- **Bill:** tạo lần **submit order đầu tiên** trong session; `BillStatus` `OPEN → PENDING_PAYMENT` trong Step 2.4; **`PAID` / xác nhận tiền mặt → Phase 3**. Bill request: **explicit command** + khóa đặt món; `REQUEST_BILL` có thể là side effect thông báo
+- **Chuyển bàn:** **saga + transfer lock + compensation** giữa Order, Catalog, Redis — không một ACID transaction xuyên mọi store; sau thành công emit realtime (BFF Direct), **không** thêm Kafka topic rename bàn
+- **Kafka:** chỉ producer `order.confirmed` (registry §7.2); payload **enriched** (`tableId`, station, metadata — Q8); publish qua **simplified outbox** (`implementation_plan.md`)
+- **BFF Direct:** tối thiểu `order.created`, `order.status_changed`, `service.requested`, `cart.updated`, `table.transferred` (+ gateway Step 2.4); Phase 2B harden WS scale
+- **RBAC:** tách **`order.cancel_pending`** / **`order.cancel_processing`** (permission-matrix §6.1); customer self-cancel pending qua SessionGuard
 
-**Lưu ý quan trọng:**
+**BFF REST (mở rộng so với checklist tối thiểu — đồng bộ mock Step 2.2):**
 
-- Mọi query/command Order Service **lọc `tenant_id`**; TCP/BFF payload mang tenant context nhất quán
-- Idempotency và biên saga với Catalog/Payment giai đoạn sau — tham chiếu §12 khi thiết kế bước bù trừ
+- Order submit / confirm / cancel · Cart CRUD · Service request CRUD + acknowledge **resolve**
+- Bill get / explicit bill-request · Transfer table · Staff order list/detail · Endpoint hỗ trợ KDS/serve status (theo blueprint)
 
-**BFF REST Endpoints:**
-
-- Order submit — Customer, SessionGuard
-- Order confirm — Staff, UserGuard + ORDER_CONFIRM
-- Order cancel — Customer (Pending only) hoặc Manager (Processing)
-- Order list/detail query — Staff ORDER_GET_LIST / Staff+Customer ORDER_GET_BY_ID
-- Cart CRUD — Customer, SessionGuard
-- Service request submit — Customer, SessionGuard
-- Service request acknowledge — Staff, SERVICE_REQUEST_ACKNOWLEDGE
-
-**Verify:** Confirm đơn → tồn giảm đúng, không double-sell dưới concurrency; `order.confirmed` xuất hiện trên topic; UI nhận WS từ `order.created` / `service.requested`; chuyển bàn không mất cart/order
+**Verify:** Confirm → tồn Catalog giảm đúng; không oversell dưới concurrency; `order.confirmed` trên topic; WS/lỗi cart như đặc tả; transfer không orphan session/cart; bill dừng đúng ranh giới Phase 3 cho cash
 
 ### Step 2.5 — Tích hợp FE ↔ BE
 
@@ -197,19 +190,19 @@ ALLOWED_ORDER_TRANSITIONS, ALLOWED_BILL_TRANSITIONS, ALLOWED_SERVICE_REQUEST_TRA
 - Customer PWA: thay mock bằng API + session hợp lệ; optimistic updates cho cart. Order submit: loading → success animation → redirect tới tracking page. Service Request buttons gọi API thực
 - Management POS: **polling** danh sách đơn/live view (WebSocket chuyển sang ở Phase 2B). Actions: confirm/cancel → API calls cập nhật trạng thái đơn
 
-**Verify:** Khách thêm giỏ hàng → submit đơn → Staff thấy đơn mới trên POS. Stock lock: 2 khách cùng đặt món cuối → 1 nhận "Hết hàng". Không lộ dữ liệu cross-tenant
+**Verify:** Khách thêm giỏ hàng → submit đơn → Staff thấy đơn mới trên POS. Stock: hai luồng confirm tranh món cuối → một luồng nhận lỗi tồn từ Catalog khi confirm. Không lộ dữ liệu cross-tenant
 
 ## Acceptance Criteria
 
 - Enum permission Step 2.0 đầy đủ; role seed MongoDB khớp mapping OWNER / MANAGER / WAITER / CHEF / BARISTA
 - Endpoint staff đi qua `UserGuard` → `TenantGuard` → `PermissionGuard`; CUSTOMER bọc `SessionGuard` đúng scope
 - `OrderStatus` và chuyển trạng thái khớp §8 (kể cả nhánh CANCELED)
-- Redis: `session:{tid}:{sid}` TTL 2h, idle 30 phút; `cart:{tid}:{sid}` Hash có version, cập nhật không ghi đè lẫn nhau khi conflict
-- Bill thuộc Order Service (PostgreSQL), không nằm Payment Service
-- Kafka: có message hợp lệ trên topic duy nhất `**order.confirmed`\*\*
-- BFF Direct: `**order.created**` và `**service.requested**` dẫn tới emit WebSocket cho client
-- Xác nhận đơn dùng pessimistic lock tồn kho; stress đơn giản không oversell
-- Chuyển bàn atomic; không orphan order/cart
+- Redis session cache + PostgreSQL sessions đồng bộ semantics Step 2.4; cart version + conflict
+- Bill Order DB; Payment Service không owner bill
+- Kafka: `order.confirmed` + outbox; payload đủ KDS routing
+- BFF Direct: các direct events theo §7.3 và đặc tả Step 2.4 (bao gồm cart / status / transfer)
+- Confirm → deduct trong Catalog; stress không oversell
+- Chuyển bàn saga nhất quán từ góc nhìn UX; không yêu cầu ACID một DB duy nhất
 - Customer PWA và POS dùng API thật; multi-tenant cô lập
 
 ## Outputs cho Phase tiếp theo

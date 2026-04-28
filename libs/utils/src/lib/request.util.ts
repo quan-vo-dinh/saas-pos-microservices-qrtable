@@ -27,7 +27,15 @@ export function getHeaderValue(value: string | string[] | undefined): string | u
   return value.trim();
 }
 
-export function getSessionCacheKey(sessionId: string): string {
+/**
+ * Redis session key. Canonical Step 2.4 / audit C14: `session:{tenantId}:{sessionId}` when tenant is known.
+ * Falls back to `session:{sessionId}` only if `tenantId` is missing (legacy / pre-middleware).
+ */
+export function getSessionCacheKey(sessionId: string, tenantId?: string): string {
+  if (tenantId && tenantId.trim()) {
+    return `${SESSION_POLICY.CACHE_PREFIX}:${tenantId.trim()}:${sessionId}`;
+  }
+
   return `${SESSION_POLICY.CACHE_PREFIX}:${sessionId}`;
 }
 

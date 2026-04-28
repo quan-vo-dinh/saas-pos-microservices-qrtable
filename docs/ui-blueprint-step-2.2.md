@@ -1,6 +1,6 @@
 # UI/UX Blueprint — Step 2.2 Mock UI: Cart, POS, KDS
 
-> **Status:** Draft for review · **Owner:** PM/UI-UX Architect · **Date:** 2026-04-24
+> **Status:** ✅ Implemented (đồng bộ phase doc 2026-04-26) · **Owner:** PM/UI-UX Architect · **Blueprint dated:** 2026-04-24
 > **Phase ref:** `[docs/phases/phase-2a-order-kafka.md](phases/phase-2a-order-kafka.md)` §Step 2.2
 > **Business ref:** `[docs/business-logic.md](business-logic.md)` §3 (Table state), §4 (Customer ordering), §5 (KDS), §6 (Payment), §8 (Order lifecycle), §III (Service requests)
 > **Shared types ref:** `libs/shared/types/src/lib/{order,bill,session,service-request,realtime-events}.types.ts` (Step 2.3 ✅ Done)
@@ -13,14 +13,14 @@ Tài liệu này là blueprint kim chỉ nam cho việc viết code thực thi (
 
 ## 0. Decisions đã chốt (ADR cho Step 2.2)
 
-| #   | Quyết định                                                                                                                                                           | Lý do                                                                                                                    |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| D1  | **Tách 3 personality** cho 3 surface (PWA editorial-warm / POS dashboard-dense / KDS industrial-contrast), share design tokens (radius, motion curve, spacing scale) | Mỗi surface dùng trong ngữ cảnh khác nhau (mobile khách / desktop quầy / màn hình bếp 24"+). Đồng nhất visual = giảm UX. |
-| D2  | **POS full scope** — mock đủ Live Orders + Table Map + Bill/Cash drawer + Service Request inbox                                                                      | Tránh rework Step 2.5; Step 2.4 BE đã yêu cầu confirm cash + acknowledge service request.                                |
-| D3  | \*\*KDSTicket mock thêm field `station: 'KITCHEN'                                                                                                                    | 'BAR'`** + log tech-debt bổ sung` MenuItem.station` ở Catalog Service trong Step 2.4                                     |
-| D4  | **4 density layers**: mini charts (POS), presence + activity feed (PWA Cart), ticket detail sheet (KDS), global ⌘K palette (POS)                                     | Thoả "information density dày đặc, đa dạng component" + tận dụng shared types có sẵn.                                    |
-| D5  | **Mock data sống trong `apps/<app>/src/mocks/`** — Zustand store + faker seeded; fake WebSocket bằng `setInterval` trong custom hook `useFakeRealtime()`             | Tách rõ ranh giới mock/real, dễ swap sang TanStack Query + WebSocket thật ở Step 2.5.                                    |
-| D6  | **RBAC UI tạm theo role (tab / route)** — đồng bộ với `role-routing` + sidebar; enforcement chi tiết ở BFF theo §9 matrix                                            | Tránh block Step 2.2 mock; tinh chỉnh permission-per-control sau.                                                        |
+| #   | Quyết định                                                                                                                                                           | Lý do                                                                                                                                                                     |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | **Tách 3 personality** cho 3 surface (PWA editorial-warm / POS dashboard-dense / KDS industrial-contrast), share design tokens (radius, motion curve, spacing scale) | Mỗi surface dùng trong ngữ cảnh khác nhau (mobile khách / desktop quầy / màn hình bếp 24"+). Đồng nhất visual = giảm UX.                                                  |
+| D2  | **POS full scope** — mock đủ Live Orders + Table Map + Bill/Cash drawer + Service Request inbox                                                                      | Tránh rework Step 2.5; Step 2.4 BE: bill đến `PENDING_PAYMENT` + explicit bill-request; **xác nhận tiền mặt → Phase 3**; acknowledge/resolve service request theo matrix. |
+| D3  | \*\*KDSTicket mock thêm field `station: 'KITCHEN'                                                                                                                    | 'BAR'`** + log tech-debt bổ sung` MenuItem.station` ở Catalog Service trong Step 2.4                                                                                      |
+| D4  | **4 density layers**: mini charts (POS), presence + activity feed (PWA Cart), ticket detail sheet (KDS), global ⌘K palette (POS)                                     | Thoả "information density dày đặc, đa dạng component" + tận dụng shared types có sẵn.                                                                                     |
+| D5  | **Mock data sống trong `apps/<app>/src/mocks/`** — Zustand store + faker seeded; fake WebSocket bằng `setInterval` trong custom hook `useFakeRealtime()`             | Tách rõ ranh giới mock/real, dễ swap sang TanStack Query + WebSocket thật ở Step 2.5.                                                                                     |
+| D6  | **RBAC UI tạm theo role (tab / route)** — đồng bộ với `role-routing` + sidebar; enforcement chi tiết ở BFF theo §9 matrix                                            | Tránh block Step 2.2 mock; tinh chỉnh permission-per-control sau.                                                                                                         |
 
 > **Tech-debt log (xử lý ở Step 2.4):**
 >

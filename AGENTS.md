@@ -53,6 +53,7 @@ Keycloak (OAuth2/OIDC) → JWT in Authorization header → BFF UserGuard → gRP
 
 - **BFF:** Source of truth — mỗi endpoint dùng `PermissionGuard` + `@Permissions([...])` theo matrix (`docs/architecture/permission-matrix.md` §6).
 - **Management App (Phase 2.x):** **Điều hướng + sidebar theo role** (prefix route + filter nav), đồng bộ với `role-routing.ts`. Đây là lớp **thô** (UX), không thay thế kiểm tra permission trên API.
+- **Mock UI Step 2.2:** Đã có trong `apps/customer-pwa` và `apps/management-app` (`src/mocks/`, fake realtime); Phase 2A Step 2.5 sẽ thay mock bằng API + WS/polling thật.
 - **Tech debt (sau):** có thể map từng control UI ↔ `session.user.permissions` khi cần phân quyền trong cùng một màn hình. Chi tiết & nguyên tắc đồng bộ: `docs/architecture/permission-matrix.md` §9.
 
 ## Service Ports Quick Reference
