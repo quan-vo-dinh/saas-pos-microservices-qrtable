@@ -11,6 +11,30 @@
       "sourceType": "github",
       "computedHash": "b06e633e783acfc364cf08cf44ee0fe48ece7e8c727457b188046e5ece25836f"
     },
+    "microservices-architect": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/microservices-architect/SKILL.md",
+      "computedHash": "cbbf8c2dfcca7343a51dbbf32f7003ec635d29d95c30a948045693c13786beac"
+    },
+    "microservices-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/backend-development/skills/microservices-patterns/SKILL.md",
+      "computedHash": "ad3f082b4d343294249d4407f1019d98004d659c5d1b4a1bd5feb5ee0378589e"
+    },
+    "nestjs-patterns": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-patterns/SKILL.md",
+      "computedHash": "0ff35d7a72bb462f51629b38dcb525ab0368ff755cbd1cf121c144e7d05f12a1"
+    },
+    "nx-workspace-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-essentials/skills/nx-workspace-patterns/SKILL.md",
+      "computedHash": "c998c269c46455ad2bd9a1b61fb7db9ced887ddca40c2f3e54a610c6d9f9b09c"
+    },
     "shadcn": {
       "source": "shadcn-ui/ui",
       "sourceType": "github",
