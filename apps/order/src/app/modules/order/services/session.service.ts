@@ -56,6 +56,22 @@ export class SessionService {
     }
   }
 
+  /** Updates cached session hash after table transfer (same session id / cart key). */
+  async patchSessionTableInRedis(
+    tenantId: string,
+    sessionId: string,
+    tableId: string,
+    tableName: string,
+  ): Promise<void> {
+    const redis = this.redisClient.getClient();
+    const key = this.sessionKey(tenantId, sessionId);
+    if ((await redis.exists(key)) !== 1) {
+      return;
+    }
+    await redis.hset(key, { tableId, tableName });
+    await redis.pexpire(key, SESSION_POLICY.TTL_MS);
+  }
+
   private async resolveActiveSession(tenantId: string, sessionId: string): Promise<Session | null> {
     const redis = this.redisClient.getClient();
     const key = this.sessionKey(tenantId, sessionId);

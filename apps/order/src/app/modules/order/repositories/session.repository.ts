@@ -16,6 +16,10 @@ export class SessionRepository {
     return this.repo.findOne({ where: { id, tenantId, status: SessionStatus.ACTIVE } });
   }
 
+  async updateTableSnapshot(id: string, tenantId: string, tableId: string, tableName: string): Promise<void> {
+    await this.repo.update({ id, tenantId }, { tableId, tableName, lastActivity: new Date() });
+  }
+
   async updateLastActivity(id: string, tenantId: string, at: Date): Promise<void> {
     await this.repo.update({ id, tenantId }, { lastActivity: at });
   }

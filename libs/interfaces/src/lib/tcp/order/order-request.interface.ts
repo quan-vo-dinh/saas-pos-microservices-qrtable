@@ -39,6 +39,14 @@ export type StaffOrderActionTcpRequest = OrderIdTcpRequest & {
   processId?: string;
 };
 
+/** Customer-only: session must own the PENDING order. */
+export type CustomerCancelPendingTcpRequest = {
+  tenantId: string;
+  sessionId: string;
+  orderId: string;
+  reason?: string;
+};
+
 export type ListOrdersTcpRequest = {
   tenantId: string;
   status?: string;

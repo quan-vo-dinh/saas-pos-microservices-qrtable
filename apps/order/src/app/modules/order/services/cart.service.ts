@@ -85,6 +85,26 @@ export class CartService {
     return this.toCartUpdatedEvent(next);
   }
 
+  /** Staff reopen bill (OPEN) — restore cart from LOCKED to ACTIVE without clearing lines. */
+  async unlockCartForBillReopen(tenantId: string, sessionId: string): Promise<CartUpdatedEvent> {
+    await this.sessionService.getActiveSessionOrThrow(tenantId, sessionId);
+    const redis = this.redisClient.getClient();
+    const key = this.cartKey(tenantId, sessionId);
+    const snapshot = await this.loadSnapshot(redis, tenantId, sessionId);
+    if (snapshot.status !== 'LOCKED') {
+      return this.toCartUpdatedEvent(snapshot);
+    }
+    const next: CartSnapshot = {
+      ...snapshot,
+      status: 'ACTIVE',
+      cartVersion: snapshot.cartVersion + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.persistAtomic(redis, key, next);
+    await this.sessionService.touchAfterCartMutation(tenantId, sessionId);
+    return this.toCartUpdatedEvent(next);
+  }
+
   private toCartUpdatedEvent(snapshot: CartSnapshot, changedBySessionClientId?: string): CartUpdatedEvent {
     return {
       tenantId: snapshot.tenantId,

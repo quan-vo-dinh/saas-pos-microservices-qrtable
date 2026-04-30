@@ -1,7 +1,7 @@
 import { Order } from '@common/entities/order.entity';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 
 @Injectable()
 export class OrderRepository {
@@ -23,5 +23,27 @@ export class OrderRepository {
       .where('ord.id = :id', { id })
       .andWhere('ord.tenantId = :tenantId', { tenantId })
       .getOne();
+  }
+
+  findBySessionIdAndTenant(sessionId: string, tenantId: string): Promise<Order[]> {
+    return this.repo.find({ where: { sessionId, tenantId } });
+  }
+
+  findByIdsAndTenant(ids: string[], tenantId: string): Promise<Order[]> {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.repo.find({ where: { id: In(ids), tenantId } });
+  }
+
+  async updateTableForSession(
+    sessionId: string,
+    tenantId: string,
+    tableId: string,
+    tableName: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const r = manager ? manager.getRepository(Order) : this.repo;
+    await r.update({ sessionId, tenantId }, { tableId, tableName });
   }
 }

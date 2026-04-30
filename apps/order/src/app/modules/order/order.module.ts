@@ -16,10 +16,13 @@ import { OrderRepository } from './repositories/order.repository';
 import { OutboxEventRepository } from './repositories/outbox-event.repository';
 import { ServiceRequestRepository } from './repositories/service-request.repository';
 import { SessionRepository } from './repositories/session.repository';
+import { BillService } from './services/bill.service';
+import { CartService } from './services/cart.service';
 import { OrderService } from './services/order.service';
 import { OutboxPublisherService } from './services/outbox-publisher.service';
+import { ServiceRequestService } from './services/service-request.service';
 import { SessionService } from './services/session.service';
-import { CartService } from './services/cart.service';
+import { TransferService } from './services/transfer.service';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import { CartService } from './services/cart.service';
   controllers: [OrderController],
   providers: [
     OrderService,
+    BillService,
+    ServiceRequestService,
+    TransferService,
     OutboxPublisherService,
     SessionService,
     CartService,

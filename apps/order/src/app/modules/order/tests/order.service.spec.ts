@@ -188,4 +188,94 @@ describe('OrderService', () => {
 
     expect(managerSave).not.toHaveBeenCalled();
   });
+
+  it('requires reason for processing cancel', async () => {
+    await expect(
+      service.cancelProcessing({ tenantId: 't1', orderId: 'o1', userId: 'manager-1' }),
+    ).rejects.toMatchObject({ errorCode: ErrorCode.ORDER_CANCEL_REASON_REQUIRED });
+  });
+
+  it('rejects customer cancel for another session order', async () => {
+    const pendingOrder = {
+      id: 'o1',
+      tenantId: 't1',
+      sessionId: 'sess-other',
+      tableId: 'tbl',
+      tableName: 'A1',
+      status: OrderStatus.PENDING,
+      totalAmount: 1000,
+      idempotencyKey: 'k',
+      notes: null,
+      confirmedAt: null,
+      confirmedByUserId: null,
+      cancelledAt: null,
+      cancelledByUserId: null,
+      cancelReason: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Order;
+
+    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
+    const manager = { save: jest.fn(), findOne: jest.fn() };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    await expect(
+      service.customerCancelPending({
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        orderId: 'o1',
+        reason: 'CUSTOMER_REQUESTED',
+      }),
+    ).rejects.toMatchObject({ errorCode: ErrorCode.TENANT_MISMATCH_SESSION });
+  });
+
+  it('lets customer cancel only own pending order', async () => {
+    const now = new Date();
+    const pendingOrder = {
+      id: 'o1',
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      tableId: 'tbl',
+      tableName: 'A1',
+      status: OrderStatus.PENDING,
+      totalAmount: 1000,
+      idempotencyKey: 'k',
+      notes: null,
+      confirmedAt: null,
+      confirmedByUserId: null,
+      cancelledAt: null,
+      cancelledByUserId: null,
+      cancelReason: null,
+      createdAt: now,
+      updatedAt: now,
+    } as Order;
+
+    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
+    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([]);
+    billRepository.findByIdAndTenantForUpdate.mockResolvedValue(null);
+
+    const managerSave = jest.fn().mockImplementation((_entity, row: Order) => {
+      if (row.status === OrderStatus.CANCELED) {
+        Object.assign(pendingOrder, row);
+      }
+      return Promise.resolve(row);
+    });
+    const manager = { save: managerSave, findOne: jest.fn() };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    const result = await service.customerCancelPending({
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      orderId: 'o1',
+      reason: 'CUSTOMER_REQUESTED',
+    });
+
+    expect(result.order.status).toBe(OrderStatus.CANCELED);
+    expect(result.events.orderStatusChanged).toEqual(
+      expect.objectContaining({
+        fromStatus: OrderStatus.PENDING,
+        toStatus: OrderStatus.CANCELED,
+      }),
+    );
+  });
 });

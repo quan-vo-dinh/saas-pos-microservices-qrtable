@@ -10,9 +10,13 @@ import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Request } from '@common/interfaces/tcp/common/request.interface';
 import type { ResponseType } from '@common/interfaces/tcp/common/response.interface';
 import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
-import type { StockDeductForOrderTcpRequest } from '@common/interfaces/tcp/catalog/menu-item-request.interface';
+import type {
+  StockDeductForOrderTcpRequest,
+  StockReleaseForOrderTcpRequest,
+} from '@common/interfaces/tcp/catalog/menu-item-request.interface';
 import type { StockMutationResult } from '@common/interfaces/tcp/catalog/menu-item-response.interface';
 import type {
+  CustomerCancelPendingTcpRequest,
   StaffOrderActionTcpRequest,
   SubmitOrderTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
@@ -31,10 +35,11 @@ import {
 } from '@einvoice/types';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { CONFIGURATION } from '../../../../configuration';
 import { buildOrderConfirmedKafkaPayload } from '../order-confirmed-payload';
+import { recalculateBillTotals } from '../utils/recalculate-bill-totals';
 import { BillRepository } from '../repositories/bill.repository';
 import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
@@ -127,7 +132,7 @@ export class OrderService {
 
       const orderIds = [...(bill.orderIds ?? []).filter(Boolean), order.id];
       bill.orderIds = orderIds;
-      await this.recalculateBillTotals(manager, bill, dto.tenantId);
+      await recalculateBillTotals(manager, bill, dto.tenantId);
       await manager.save(Bill, bill);
 
       session.orderCount += 1;
@@ -290,6 +295,144 @@ export class OrderService {
     };
   }
 
+  async customerCancelPending(dto: CustomerCancelPendingTcpRequest): Promise<OrderActionTcpResponse> {
+    const reason = (dto.reason ?? 'CUSTOMER_REQUESTED').trim().slice(0, 255) || 'CUSTOMER_REQUESTED';
+    const { order, items, bill } = await this.runPendingCancelTransaction(
+      dto.tenantId,
+      dto.orderId,
+      dto.sessionId,
+      null,
+      reason,
+    );
+    return this.buildCancelResponse(dto.tenantId, order, items, bill, OrderStatus.PENDING, undefined);
+  }
+
+  async cancelPendingStaff(dto: StaffOrderActionTcpRequest): Promise<OrderActionTcpResponse> {
+    const reason = (dto.reason ?? 'STAFF_CANCELLED').trim().slice(0, 255) || 'STAFF_CANCELLED';
+    const { order, items, bill } = await this.runPendingCancelTransaction(
+      dto.tenantId,
+      dto.orderId,
+      undefined,
+      dto.userId,
+      reason,
+    );
+    return this.buildCancelResponse(dto.tenantId, order, items, bill, OrderStatus.PENDING, dto.userId);
+  }
+
+  async cancelProcessing(dto: StaffOrderActionTcpRequest): Promise<OrderActionTcpResponse> {
+    if (!dto.reason?.trim()) {
+      throw new BusinessException(ErrorCode.ORDER_CANCEL_REASON_REQUIRED, HttpStatus.BAD_REQUEST);
+    }
+    const reason = dto.reason.trim().slice(0, 255);
+    const { order, items, bill } = await this.dataSource.transaction(async (manager) => {
+      const ord = await this.orderRepository.findByIdAndTenantForUpdate(dto.orderId, dto.tenantId, manager);
+      if (!ord) {
+        throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
+      }
+      if (ord.status !== OrderStatus.PROCESSING) {
+        throw new BusinessException(ErrorCode.ORDER_INVALID_STATE, HttpStatus.CONFLICT);
+      }
+
+      const lines = await this.orderItemRepository.findByOrderIdAndTenantWithManager(
+        dto.orderId,
+        dto.tenantId,
+        manager,
+      );
+
+      await this.callCatalogStockRelease({
+        tenantId: dto.tenantId,
+        orderId: ord.id,
+        idempotencyKey: `cancel-processing:${ord.id}`,
+        items: lines.map((it) => ({ menuItemId: it.menuItemId, quantity: it.quantity })),
+      });
+
+      const now = new Date();
+      ord.status = OrderStatus.CANCELED;
+      ord.cancelledAt = now;
+      ord.cancelledByUserId = dto.userId;
+      ord.cancelReason = reason;
+      await manager.save(Order, ord);
+
+      for (const line of lines) {
+        line.status = OrderItemStatus.CANCELED;
+        await manager.save(OrderItem, line);
+      }
+
+      const bill = await this.loadBillForSessionOrder(manager, ord.sessionId, dto.tenantId, ord.id);
+      if (bill) {
+        await recalculateBillTotals(manager, bill, dto.tenantId);
+        await manager.save(Bill, bill);
+      }
+
+      return { order: ord, items: lines, bill };
+    });
+
+    return this.buildCancelResponse(dto.tenantId, order, items, bill, OrderStatus.PROCESSING, dto.userId);
+  }
+
+  private buildCancelResponse(
+    tenantId: string,
+    order: Order,
+    items: OrderItem[],
+    bill: Bill | null,
+    fromStatus: OrderStatus,
+    changedBy: string | null,
+  ): OrderActionTcpResponse {
+    const orderDto = this.toOrderDto(order, items);
+    const billDto = bill ? this.toBillDto(bill) : undefined;
+    const orderStatusChanged: OrderStatusChangedEvent = {
+      tenantId,
+      orderId: order.id,
+      fromStatus,
+      toStatus: OrderStatus.CANCELED,
+      changedByUserId: changedBy ?? undefined,
+      timestamp: (order.cancelledAt ?? new Date()).toISOString(),
+    };
+    return { order: orderDto, bill: billDto, events: { orderStatusChanged } };
+  }
+
+  private async runPendingCancelTransaction(
+    tenantId: string,
+    orderId: string,
+    enforceSessionId: string | undefined,
+    cancelledByUserId: string | null,
+    cancelReason: string,
+  ): Promise<{ order: Order; items: OrderItem[]; bill: Bill | null }> {
+    return this.dataSource.transaction(async (manager) => {
+      const order = await this.orderRepository.findByIdAndTenantForUpdate(orderId, tenantId, manager);
+      if (!order) {
+        throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
+      }
+      if (enforceSessionId && order.sessionId !== enforceSessionId) {
+        throw new BusinessException(ErrorCode.TENANT_MISMATCH_SESSION, HttpStatus.FORBIDDEN);
+      }
+      if (order.status !== OrderStatus.PENDING) {
+        throw new BusinessException(ErrorCode.ORDER_INVALID_STATE, HttpStatus.CONFLICT);
+      }
+
+      const now = new Date();
+      order.status = OrderStatus.CANCELED;
+      order.cancelledAt = now;
+      order.cancelledByUserId = cancelledByUserId;
+      order.cancelReason = cancelReason;
+      await manager.save(Order, order);
+
+      const items = await this.orderItemRepository.findByOrderIdAndTenantWithManager(orderId, tenantId, manager);
+      for (const line of items) {
+        line.status = OrderItemStatus.CANCELED;
+        await manager.save(OrderItem, line);
+      }
+
+      const bill = await this.loadBillForSessionOrder(manager, order.sessionId, tenantId, order.id);
+      if (bill) {
+        await recalculateBillTotals(manager, bill, tenantId);
+        await manager.save(Bill, bill);
+      }
+
+      return { order, items, bill };
+    });
+  }
+
   private async lockSession(manager: EntityManager, sessionId: string, tenantId: string): Promise<Session | null> {
     return manager
       .getRepository(Session)
@@ -328,19 +471,6 @@ export class OrderService {
     return bill;
   }
 
-  private async recalculateBillTotals(manager: EntityManager, bill: Bill, tenantId: string): Promise<void> {
-    const ids = (bill.orderIds ?? []).filter(Boolean);
-    if (ids.length === 0) {
-      bill.subtotal = 0;
-      bill.total = bill.roundingAmount;
-      return;
-    }
-    const orders = await manager.find(Order, { where: { id: In(ids), tenantId } });
-    const byId = new Map(orders.map((o) => [o.id, o]));
-    bill.subtotal = ids.reduce((sum, id) => sum + (byId.get(id)?.totalAmount ?? 0), 0);
-    bill.total = bill.subtotal + bill.roundingAmount;
-  }
-
   private async resolveBillForOrder(sessionId: string, tenantId: string, orderId: string): Promise<Bill | null> {
     const session = await this.sessionRepository.findByIdAndTenant(sessionId, tenantId);
     if (!session?.currentBillId) {
@@ -376,6 +506,33 @@ export class OrderService {
         this.catalogClient.send<ResponseType<StockMutationResult[]>, StockDeductForOrderTcpRequest>(
           TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_DEDUCT_FOR_ORDER,
           new Request<StockDeductForOrderTcpRequest>({ tenantId: payload.tenantId, data: payload }),
+        ),
+      );
+      if (response.statusCode >= 400) {
+        throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, response.statusCode as HttpStatus);
+      }
+      const data = response.data;
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      if (e instanceof BusinessException) {
+        throw e;
+      }
+      if (e instanceof RpcException) {
+        const err = e.getError() as { code?: number; errorCode?: ErrorCode; message?: string };
+        if (err?.errorCode) {
+          throw new BusinessException(err.errorCode, (err.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
+        }
+      }
+      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
+    }
+  }
+
+  private async callCatalogStockRelease(payload: StockReleaseForOrderTcpRequest): Promise<StockMutationResult[]> {
+    try {
+      const response = await firstValueFrom(
+        this.catalogClient.send<ResponseType<StockMutationResult[]>, StockReleaseForOrderTcpRequest>(
+          TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_RELEASE_FOR_ORDER,
+          new Request<StockReleaseForOrderTcpRequest>({ tenantId: payload.tenantId, data: payload }),
         ),
       );
       if (response.statusCode >= 400) {

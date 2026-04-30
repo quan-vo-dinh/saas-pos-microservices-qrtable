@@ -45,11 +45,12 @@ export type ServiceRequestCreatedTcpResponse = {
 
 export type BillRequestedTcpResponse = {
   bill: Bill;
-  request: ServiceRequest;
+  /** Present when a new service request row is created (explicit bill request). */
+  request?: ServiceRequest;
   cart: CartSnapshot;
   events: {
-    billRequested: BillRequestedEvent;
-    serviceRequested: ServiceRequestedEvent;
+    billRequested?: BillRequestedEvent;
+    serviceRequested?: ServiceRequestedEvent;
     cartUpdated: CartUpdatedEvent;
   };
 };
