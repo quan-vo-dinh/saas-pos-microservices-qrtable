@@ -75,6 +75,13 @@ export type CreateServiceRequestTcpRequest = {
   note?: string;
 };
 
+export type ListServiceRequestsTcpRequest = {
+  tenantId: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+};
+
 export type ServiceRequestActionTcpRequest = {
   tenantId: string;
   requestId: string;

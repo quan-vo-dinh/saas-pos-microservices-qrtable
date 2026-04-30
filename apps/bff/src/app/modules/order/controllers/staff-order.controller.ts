@@ -17,6 +17,7 @@ import type { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import type {
   BillSessionTcpRequest,
   ListOrdersTcpRequest,
+  ListServiceRequestsTcpRequest,
   OrderIdTcpRequest,
   ServiceRequestActionTcpRequest,
   StaffOrderActionTcpRequest,
@@ -27,6 +28,7 @@ import type {
   OrderActionTcpResponse,
   OrderTcpResponse,
   ServiceRequestCreatedTcpResponse,
+  ServiceRequestListTcpResponse,
   TableTransferredTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
 import { buildTcpRequestContext } from '@common/utils/request.util';
@@ -222,6 +224,41 @@ export class StaffOrderController {
       this.realtimeEvents.emitOrderStatusChanged(tcp.data.events.orderStatusChanged, tcp.data.order.sessionId);
     }
     return new ResponseDto<OrderActionTcpResponse>({
+      data: tcp.data,
+      statusCode: tcp.statusCode,
+      message: tcp.code as HTTP_MESSAGE,
+      processID: processId,
+    });
+  }
+
+  @Get('service-requests')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.SERVICE_REQUEST_ACKNOWLEDGE])
+  @ApiOkResponse({ type: ResponseDto })
+  @ApiOperation({ summary: 'List service requests' })
+  async listServiceRequests(
+    @ProcessId() processId: string,
+    @Req() req: Request,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ): Promise<ResponseDto<ServiceRequestListTcpResponse>> {
+    const tenantId = req[MetadataKey.TENANT_ID] as string;
+    const payload: ListServiceRequestsTcpRequest = {
+      tenantId,
+      status,
+      limit: limit !== undefined ? Number.parseInt(limit, 10) : undefined,
+      offset: offset !== undefined ? Number.parseInt(offset, 10) : undefined,
+    };
+    const tcp = await firstValueFrom(
+      this.orderClient
+        .send<
+          ServiceRequestListTcpResponse,
+          ListServiceRequestsTcpRequest
+        >(TCP_REQUEST_MESSAGE.ORDER.SERVICE_REQUEST_GET_LIST, buildTcpRequestContext<ListServiceRequestsTcpRequest>(req, processId, payload))
+        .pipe(map((r) => r)),
+    );
+    return new ResponseDto<ServiceRequestListTcpResponse>({
       data: tcp.data,
       statusCode: tcp.statusCode,
       message: tcp.code as HTTP_MESSAGE,

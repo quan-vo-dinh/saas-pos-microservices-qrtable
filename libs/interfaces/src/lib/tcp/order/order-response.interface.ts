@@ -18,6 +18,8 @@ export type CartTcpResponse = CartSnapshot;
 export type BillTcpResponse = Bill;
 export type ServiceRequestTcpResponse = ServiceRequest;
 
+export type ServiceRequestListTcpResponse = ServiceRequest[];
+
 export type SubmitOrderTcpResponse = {
   order: Order;
   bill: Bill;

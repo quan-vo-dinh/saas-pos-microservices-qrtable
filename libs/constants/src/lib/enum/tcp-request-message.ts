@@ -102,6 +102,7 @@ enum ORDER {
   CANCEL_PROCESSING = 'order.cancel_processing',
   CUSTOMER_CANCEL_PENDING = 'order.customer_cancel_pending',
   SERVICE_REQUEST_CREATE = 'order.service_request_create',
+  SERVICE_REQUEST_GET_LIST = 'order.service_request_get_list',
   SERVICE_REQUEST_ACKNOWLEDGE = 'order.service_request_acknowledge',
   SERVICE_REQUEST_RESOLVE = 'order.service_request_resolve',
   BILL_GET_CURRENT = 'order.bill_get_current',

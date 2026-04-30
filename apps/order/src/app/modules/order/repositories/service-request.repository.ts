@@ -21,6 +21,19 @@ export class ServiceRequestRepository {
       .getOne();
   }
 
+  findStaffList(tenantId: string, opts: { status?: string; limit: number; offset: number }): Promise<ServiceRequest[]> {
+    const qb = this.repo
+      .createQueryBuilder('sr')
+      .where('sr.tenantId = :tenantId', { tenantId })
+      .orderBy('sr.createdAt', 'DESC')
+      .take(opts.limit)
+      .skip(opts.offset);
+    if (opts.status) {
+      qb.andWhere('sr.status = :status', { status: opts.status });
+    }
+    return qb.getMany();
+  }
+
   save(entity: ServiceRequest): Promise<ServiceRequest> {
     return this.repo.save(entity);
   }

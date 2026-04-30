@@ -1,8 +1,11 @@
 import { ServiceRequest } from '@common/entities/service-request.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
-import type { CreateServiceRequestTcpRequest } from '@common/interfaces/tcp/order/order-request.interface';
-import type { ServiceRequestActionTcpRequest } from '@common/interfaces/tcp/order/order-request.interface';
+import type {
+  CreateServiceRequestTcpRequest,
+  ListServiceRequestsTcpRequest,
+  ServiceRequestActionTcpRequest,
+} from '@common/interfaces/tcp/order/order-request.interface';
 import type { ServiceRequestCreatedTcpResponse } from '@common/interfaces/tcp/order/order-response.interface';
 import type { ServiceRequest as ServiceRequestDto } from '@einvoice/types';
 import { ServiceRequestedEvent, ServiceRequestStatus, ServiceRequestType } from '@einvoice/types';
@@ -20,6 +23,17 @@ export class ServiceRequestService {
     private readonly sessionRepository: SessionRepository,
     private readonly billService: BillService,
   ) {}
+
+  async list(dto: ListServiceRequestsTcpRequest): Promise<ServiceRequestDto[]> {
+    const limit = Math.min(Math.max(dto.limit ?? 50, 1), 200);
+    const offset = Math.max(dto.offset ?? 0, 0);
+    const rows = await this.serviceRequestRepository.findStaffList(dto.tenantId, {
+      status: dto.status,
+      limit,
+      offset,
+    });
+    return rows.map((r) => this.toDto(r));
+  }
 
   async create(dto: CreateServiceRequestTcpRequest): Promise<ServiceRequestCreatedTcpResponse> {
     if (dto.type === ServiceRequestType.REQUEST_BILL) {

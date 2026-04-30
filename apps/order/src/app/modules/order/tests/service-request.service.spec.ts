@@ -12,13 +12,13 @@ describe('ServiceRequestService', () => {
   let billService: { requestBill: jest.Mock };
   let dataSource: { transaction: jest.Mock };
   let sessionRepository: { findActiveByIdAndTenant: jest.Mock };
-  let srRepo: { findByIdAndTenantForUpdate: jest.Mock };
+  let srRepo: { findByIdAndTenantForUpdate: jest.Mock; findStaffList: jest.Mock };
 
   beforeEach(async () => {
     billService = { requestBill: jest.fn() };
     dataSource = { transaction: jest.fn() };
     sessionRepository = { findActiveByIdAndTenant: jest.fn() };
-    srRepo = { findByIdAndTenantForUpdate: jest.fn() };
+    srRepo = { findByIdAndTenantForUpdate: jest.fn(), findStaffList: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -93,5 +93,17 @@ describe('ServiceRequestService', () => {
     await expect(service.resolve({ tenantId: 't1', requestId: 'r1', userId: 'u1' })).rejects.toMatchObject({
       errorCode: ErrorCode.SERVICE_REQUEST_INVALID_STATE,
     });
+  });
+
+  it('list always scopes repository query by tenantId', async () => {
+    srRepo.findStaffList.mockResolvedValue([]);
+    await service.list({ tenantId: 'tenant-a' });
+    expect(srRepo.findStaffList).toHaveBeenCalledWith('tenant-a', expect.objectContaining({ limit: 50, offset: 0 }));
+  });
+
+  it('list passes optional status and clamps pagination like staff orders', async () => {
+    srRepo.findStaffList.mockResolvedValue([]);
+    await service.list({ tenantId: 't1', status: 'PENDING', limit: 999, offset: -3 });
+    expect(srRepo.findStaffList).toHaveBeenCalledWith('t1', { status: 'PENDING', limit: 200, offset: 0 });
   });
 });
