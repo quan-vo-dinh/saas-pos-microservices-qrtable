@@ -17,6 +17,8 @@ import { OutboxEventRepository } from './repositories/outbox-event.repository';
 import { ServiceRequestRepository } from './repositories/service-request.repository';
 import { SessionRepository } from './repositories/session.repository';
 import { OrderService } from './services/order.service';
+import { SessionService } from './services/session.service';
+import { CartService } from './services/cart.service';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { OrderService } from './services/order.service';
   controllers: [OrderController],
   providers: [
     OrderService,
+    SessionService,
+    CartService,
     OrderRepository,
     OrderItemRepository,
     SessionRepository,
