@@ -1,7 +1,7 @@
 import { ChevronUp } from 'lucide-react';
 import { formatCurrency } from '@einvoice/frontend-utils';
 import { Button } from '@einvoice/frontend-ui';
-import { usePwaMockStore } from '@/mocks/store';
+import { useCustomerCartQuery } from '@/features/order/hooks/use-order-query';
 
 type CartPillProps = {
   drawerOpen: boolean;
@@ -9,9 +9,11 @@ type CartPillProps = {
 };
 
 export function CartPill({ drawerOpen, onOpenDrawer }: CartPillProps): React.ReactElement | null {
-  const cart = usePwaMockStore((s) => s.cart);
-  const totalItems = cart.items.reduce((sum, l) => sum + l.quantity, 0);
-  const totalAmount = cart.items.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const { data: cart } = useCustomerCartQuery();
+  const items = cart?.items ?? [];
+
+  const totalItems = items.reduce((sum, l) => sum + l.quantity, 0);
+  const totalAmount = items.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
 
   if (drawerOpen || totalItems === 0) return null;
 

@@ -1,21 +1,10 @@
 import { customerApi } from '@/lib/api-client';
 import { API_CONFIG } from '@/constants/api';
 
-type PaymentRequestPayload = {
-  sessionId: string;
-  paymentMethod: string;
-};
-
-type PaymentRequestResponse = {
-  id: string;
-  status: string;
-  totalAmount: number;
-};
-
+/** Step 2.4 — staff/session bill lock uses Redis cart + orders; customer triggers via BFF POST /customer/bill/request (headers only). */
 export const paymentService = {
-  requestBill: (data: PaymentRequestPayload) =>
-    customerApi<PaymentRequestResponse>(API_CONFIG.ENDPOINTS.PAYMENT_REQUEST, {
+  requestBill: () =>
+    customerApi<unknown>(API_CONFIG.ENDPOINTS.BILL_REQUEST, {
       method: 'POST',
-      body: JSON.stringify(data),
     }),
 };

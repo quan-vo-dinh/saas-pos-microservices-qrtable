@@ -9,15 +9,18 @@ jest.mock('@/constants/api', () => ({
   API_CONFIG: {
     DEFAULT_BASE_URL: 'http://localhost:3300/api/v1',
     TENANT_ID: 'tenant_a',
+    ENDPOINTS: {},
   },
 }));
 
-import { customerApi } from '../api-client';
-
-// ─── Tests ──────────────────────────────────────────────
+import { customerApi, setCustomerSessionId, setCustomerTenantId } from '../api-client';
 
 describe('customerApi', () => {
-  afterEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    jest.clearAllMocks();
+    setCustomerSessionId(null);
+    setCustomerTenantId(null);
+  });
 
   it('calls apiClient with correct BFF base URL', async () => {
     mockApiClient.mockResolvedValue({ ok: true });
@@ -40,6 +43,45 @@ describe('customerApi', () => {
 
     const callArgs = mockApiClient.mock.calls[0][1];
     expect(callArgs.headers).toEqual(expect.objectContaining({ 'x-tenant-id': 'tenant_a' }));
+  });
+
+  it('uses tenant from joined session when activeTenantId is set', async () => {
+    mockApiClient.mockResolvedValue([]);
+    setCustomerTenantId('tenant_joined');
+
+    await customerApi('/customer/cart');
+
+    const callArgs = mockApiClient.mock.calls[0][1];
+    expect(callArgs.headers).toEqual(expect.objectContaining({ 'x-tenant-id': 'tenant_joined' }));
+  });
+
+  it('adds x-session-id after Order session is activated', async () => {
+    mockApiClient.mockResolvedValue({});
+    setCustomerSessionId('550e8400-e29b-41d4-a716-446655440000');
+
+    await customerApi('/customer/cart');
+
+    const callArgs = mockApiClient.mock.calls[0][1];
+    expect(callArgs.headers).toEqual(
+      expect.objectContaining({
+        'x-tenant-id': 'tenant_a',
+        'x-session-id': '550e8400-e29b-41d4-a716-446655440000',
+      }),
+    );
+  });
+
+  it('omitSessionHeader skips x-session-id even when session is set', async () => {
+    mockApiClient.mockResolvedValue({});
+    setCustomerSessionId('550e8400-e29b-41d4-a716-446655440000');
+
+    await customerApi('/customer/sessions/join', {
+      method: 'POST',
+      body: '{}',
+      omitSessionHeader: true,
+    });
+
+    const callArgs = mockApiClient.mock.calls[0][1];
+    expect(callArgs.headers['x-session-id']).toBeUndefined();
   });
 
   it('preserves caller-provided options (method, body)', async () => {

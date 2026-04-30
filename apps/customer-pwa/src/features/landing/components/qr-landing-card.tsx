@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import { QrCode, CheckCircle2, XCircle, Users } from 'lucide-react';
 import {
   Button,
@@ -10,7 +11,8 @@ import {
   Skeleton,
 } from '@einvoice/frontend-ui';
 import { useVerifyQrMutation } from '@/features/landing/hooks/use-verify-qr';
-import { useSession } from '@/features/session/context/session-provider';
+import { sessionEntityToInfo, useSession } from '@/features/session/context/session-provider';
+import { sessionService } from '@/features/landing/services/session.service';
 import { ROUTES } from '@/constants/routes';
 
 export function QrLandingCard() {
@@ -23,6 +25,10 @@ export function QrLandingCard() {
 
   const verifyMutation = useVerifyQrMutation();
 
+  const joinMutation = useMutation({
+    mutationFn: () => sessionService.joinSession({ tableId: table!, qrToken: token! }),
+  });
+
   useEffect(() => {
     if (!table || !token) return;
     verifyMutation.mutate({ tableId: table, qrToken: token });
@@ -30,17 +36,14 @@ export function QrLandingCard() {
   }, [table, token]);
 
   const handleEnterMenu = (): void => {
-    if (!verifyMutation.data) return;
-
-    const tableData = verifyMutation.data;
-    startSession({
-      sessionId: tableData.sessionId ?? tableData.id,
-      tableId: tableData.id,
-      tableName: tableData.name,
-      restaurantName: tableData.name,
+    if (!table || !token) return;
+    joinMutation.mutate(undefined, {
+      onSuccess: (sess) => {
+        const tableLabel = verifyMutation.data?.name ?? sess.tableName;
+        startSession(sessionEntityToInfo(sess, tableLabel));
+        navigate(ROUTES.MENU);
+      },
     });
-
-    navigate(ROUTES.MENU);
   };
 
   if (!table || !token) {
@@ -51,9 +54,7 @@ export function QrLandingCard() {
           <CardTitle>Quét mã QR</CardTitle>
         </CardHeader>
         <CardContent className="text-center">
-          <p className="text-muted-foreground">
-            Quét mã QR tại bàn để bắt đầu đặt món
-          </p>
+          <p className="text-muted-foreground">Quét mã QR tại bàn để bắt đầu đặt món</p>
         </CardContent>
       </Card>
     );
@@ -83,9 +84,7 @@ export function QrLandingCard() {
           <CardTitle className="text-destructive">Lỗi xác thực</CardTitle>
         </CardHeader>
         <CardContent className="text-center">
-          <p className="text-muted-foreground">
-            Mã QR không hợp lệ hoặc đã hết hạn
-          </p>
+          <p className="text-muted-foreground">Mã QR không hợp lệ hoặc đã hết hạn</p>
         </CardContent>
       </Card>
     );
@@ -102,19 +101,20 @@ export function QrLandingCard() {
         <div className="bg-muted/50 space-y-2 rounded-lg p-4">
           <div className="flex items-center gap-2">
             <QrCode className="text-muted-foreground size-4" />
-            <span className="font-medium">
-              Bàn {tableData?.name}
-            </span>
+            <span className="font-medium">Bàn {tableData?.name}</span>
           </div>
           <div className="flex items-center gap-2">
             <Users className="text-muted-foreground size-4" />
-            <span className="text-muted-foreground text-sm">
-              Sức chứa: {tableData?.capacity} người
-            </span>
+            <span className="text-muted-foreground text-sm">Sức chứa: {tableData?.capacity} người</span>
           </div>
         </div>
-        <Button className="w-full" size="lg" onClick={handleEnterMenu}>
-          Vào Menu
+        {joinMutation.isError ? (
+          <p className="text-center text-sm text-destructive">
+            Không thể tham gia phiên đặt món. Vui lòng thử lại.
+          </p>
+        ) : null}
+        <Button className="w-full" size="lg" disabled={joinMutation.isPending} onClick={() => handleEnterMenu()}>
+          {joinMutation.isPending ? 'Đang vào phiên…' : 'Vào Menu'}
         </Button>
       </CardContent>
     </Card>

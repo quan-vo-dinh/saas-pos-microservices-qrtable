@@ -17,7 +17,7 @@ export default defineConfig([
   /** Runtime — `tsconfig.app` (spec exclude khỏi `tsc -b` build) */
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/**/*.spec.ts', 'src/**/*.test.ts', 'src/**/__tests__/**'],
+    ignores: ['src/**/*.spec.ts', 'src/**/*.spec.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/__tests__/**'],
     extends: reactTsRecommended,
     languageOptions: {
       ecmaVersion: 2020,
@@ -33,7 +33,13 @@ export default defineConfig([
   },
   /** Jest specs */
   {
-    files: ['src/**/*.spec.ts', 'src/**/*.test.ts', 'src/**/__tests__/**/*.{ts,tsx}'],
+    files: [
+      'src/**/*.spec.ts',
+      'src/**/*.spec.tsx',
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      'src/**/__tests__/**/*.{ts,tsx}',
+    ],
     extends: reactTsRecommended,
     languageOptions: {
       ecmaVersion: 2020,

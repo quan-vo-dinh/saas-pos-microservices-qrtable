@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import type { MenuItem } from '@einvoice/types';
 import { Button } from '@einvoice/frontend-ui';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -7,31 +8,22 @@ import { MenuItemDialog } from '@/components/menu/menu-item-dialog';
 import { CartPill } from '@/components/menu/cart-pill';
 import { CartDrawer } from '@/pages/cart/cart-drawer';
 import { useSession } from '@/features/session/context/session-provider';
+import { useCartMutations } from '@/features/order/hooks/use-order-query';
 import { usePwaMockStore } from '@/mocks/store';
+import { ROUTES } from '@/constants/routes';
+
 type Tab = { id: string; name: string; sortOrder: number };
 
 export function MenuPage(): React.ReactElement {
-  const { isActive, startSession } = useSession();
+  const { session, hydrated } = useSession();
   const menu = usePwaMockStore((s) => s.menu);
   const billLockActive = usePwaMockStore((s) => s.billLockActive);
-  const addItem = usePwaMockStore((s) => s.addItem);
-  const mockSession = usePwaMockStore((s) => s.session);
+  const { addItem, isUpdating } = useCartMutations();
 
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isActive) {
-      startSession({
-        sessionId: mockSession.sessionId,
-        tableId: mockSession.tableId,
-        tableName: mockSession.tableName,
-        restaurantName: 'QRTable (mock)',
-      });
-    }
-  }, [isActive, mockSession.sessionId, mockSession.tableId, mockSession.tableName, startSession]);
 
   const categories: Tab[] = useMemo(() => {
     const map = new Map<string, Tab>();
@@ -54,14 +46,17 @@ export function MenuPage(): React.ReactElement {
   };
 
   const handleQuickAdd = (item: MenuItem): void => {
-    if (billLockActive) return;
-    addItem({
-      menuItemId: item.id,
-      menuItemName: item.name,
-      unitPrice: item.price,
-      quantity: 1,
-    });
+    if (billLockActive || isUpdating || item.status !== 'available' || (item.stock ?? 0) <= 0) return;
+    addItem(item, 1);
   };
+
+  if (!hydrated) {
+    return <div className="py-16 text-center text-sm text-muted-foreground">Đang tải phiên…</div>;
+  }
+
+  if (!session?.sessionId) {
+    return <Navigate to={ROUTES.LANDING} replace />;
+  }
 
   return (
     <div className="flex flex-col gap-4 pb-28">
@@ -103,7 +98,7 @@ export function MenuPage(): React.ReactElement {
             item={item}
             onOpenDetail={handleOpenDetail}
             onQuickAdd={handleQuickAdd}
-            disabled={billLockActive}
+            disabled={billLockActive || isUpdating}
           />
         ))}
       </div>

@@ -5,8 +5,15 @@ export const API_CONFIG = {
   ENDPOINTS: {
     MENU: '/menu',
     VALIDATE_QR: '/menu/validate-qr',
-    ORDER_CREATE: '/customer/orders',
-    ORDER_STATUS: '/customer/orders/status',
-    PAYMENT_REQUEST: '/customer/payment/request',
+    SESSION_JOIN: '/customer/sessions/join',
+    CART: '/customer/cart',
+    ORDERS: '/customer/orders',
+    ORDER_BY_ID: (id: string) => `/customer/orders/${encodeURIComponent(id)}`,
+    SERVICE_REQUESTS: '/customer/service-requests',
+    BILL_REQUEST: '/customer/bill/request',
+    BILL_CURRENT: '/customer/bill/current',
   },
 } as const;
+
+/** Persisted Order session (after successful POST /customer/sessions/join). */
+export const PWA_SESSION_STORAGE_KEY = 'qrtable:pwa:order-session';
