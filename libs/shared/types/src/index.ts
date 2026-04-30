@@ -5,8 +5,13 @@ export type { ApiResponse, ApiErrorResponse, PaginatedResponse, PaginationParams
 export type { UserProfile, UserSession } from './lib/user.types';
 
 // ─── Menu ───────────────────────────────────────────
-export type { Category, MenuItem, CategoryStatus, MenuItemStatus, PreparationStation } from './lib/menu.types';
-export { PreparationStation } from './lib/menu.types';
+export {
+  PreparationStation,
+  type Category,
+  type MenuItem,
+  type CategoryStatus,
+  type MenuItemStatus,
+} from './lib/menu.types';
 
 // ─── Table ──────────────────────────────────────────
 export type { Area, RestaurantTable, TableStatus } from './lib/table.types';
@@ -20,7 +25,7 @@ export type { Bill } from './lib/bill.types';
 export { BillStatus, PaymentMethod, ALLOWED_BILL_TRANSITIONS } from './lib/bill.types';
 
 // ─── Session & Cart (Phase 2A) ──────────────────────
-export type { Session, CartItem } from './lib/session.types';
+export type { Session, CartItem, CartLine, CartSnapshot } from './lib/session.types';
 export { SessionStatus } from './lib/session.types';
 
 // ─── Service Request (Phase 2A) ─────────────────────

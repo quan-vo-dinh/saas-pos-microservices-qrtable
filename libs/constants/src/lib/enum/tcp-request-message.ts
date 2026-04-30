@@ -89,6 +89,27 @@ enum SAAS {
   HEALTH = 'saas.health',
 }
 
+enum ORDER {
+  SESSION_JOIN = 'order.session_join',
+  CART_GET = 'order.cart_get',
+  CART_MUTATE = 'order.cart_mutate',
+  CART_CLEAR = 'order.cart_clear',
+  SUBMIT = 'order.submit',
+  GET_LIST = 'order.get_list',
+  GET_BY_ID = 'order.get_by_id',
+  CONFIRM = 'order.confirm',
+  CANCEL_PENDING = 'order.cancel_pending',
+  CANCEL_PROCESSING = 'order.cancel_processing',
+  CUSTOMER_CANCEL_PENDING = 'order.customer_cancel_pending',
+  SERVICE_REQUEST_CREATE = 'order.service_request_create',
+  SERVICE_REQUEST_ACKNOWLEDGE = 'order.service_request_acknowledge',
+  SERVICE_REQUEST_RESOLVE = 'order.service_request_resolve',
+  BILL_GET_CURRENT = 'order.bill_get_current',
+  BILL_REQUEST = 'order.bill_request',
+  BILL_REOPEN = 'order.bill_reopen',
+  TABLE_TRANSFER = 'order.table_transfer',
+}
+
 export const TCP_REQUEST_MESSAGE = {
   PRODUCT,
   USER,
@@ -101,4 +122,5 @@ export const TCP_REQUEST_MESSAGE = {
   MENU,
   CATALOG,
   SAAS,
+  ORDER,
 };

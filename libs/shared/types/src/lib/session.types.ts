@@ -8,6 +8,8 @@
  * @see docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md
  */
 
+import type { PreparationStation } from './menu.types';
+
 // ─── Enums ──────────────────────────────────────────
 // Using const-object + type alias pattern (see order.types.ts header note).
 
@@ -53,4 +55,25 @@ export type CartItem = {
    * Conflict → BE trả lỗi → client refresh + retry.
    */
   version: number;
+};
+
+/** Step 2.4 — cart line with stable id + line version for Redis cart (spec §15) */
+export type CartLine = {
+  cartLineId: string;
+  menuItemId: string;
+  menuItemName: string;
+  quantity: number;
+  unitPrice: number;
+  note?: string;
+  station?: PreparationStation;
+  lineVersion: number;
+};
+
+export type CartSnapshot = {
+  tenantId: string;
+  sessionId: string;
+  cartVersion: number;
+  status: 'ACTIVE' | 'LOCKED';
+  updatedAt: string;
+  items: CartLine[];
 };

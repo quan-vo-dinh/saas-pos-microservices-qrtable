@@ -24,6 +24,7 @@
 import type { OrderItem, OrderStatus } from './order.types';
 import type { PreparationStation } from './menu.types';
 import type { ServiceRequestType } from './service-request.types';
+import type { CartLine } from './session.types';
 
 // ─── BFF Direct WebSocket events ────────────────────
 
@@ -81,7 +82,7 @@ export type CartUpdatedEvent = {
   cartVersion: number;
   /** ACTIVE | LOCKED (bill request) — string để mở rộng sau */
   status: 'ACTIVE' | 'LOCKED';
-  items: OrderItem[];
+  items: CartLine[];
   updatedAt: string;
   changedBySessionClientId?: string;
 };
@@ -129,6 +130,7 @@ export type OrderConfirmedEventItem = OrderItem & {
 
 export type OrderConfirmedEvent = {
   eventId: string;
+  eventType: 'order.confirmed';
   schemaVersion: 1;
   tenantId: string;
   orderId: string;

@@ -1,0 +1,15 @@
+{
+  "name": "providers-redis-client",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/providers/redis-client/src",
+  "projectType": "library",
+  "tags": ["scope:shared", "type:provider"],
+  "// targets": "to see all targets run: nx show project providers-redis-client --web",
+  "targets": {
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@ import {
   ServiceRequestStatus,
   PaymentMethod,
 } from '../../index';
+import type { CartUpdatedEvent, OrderConfirmedEvent } from '../realtime-events.types';
 
 describe('Enum completeness — canonical values per Step 2.3 spec', () => {
   it('OrderStatus has exactly 7 values per phase doc §8', () => {
@@ -72,5 +73,50 @@ describe('Enum completeness — canonical values per Step 2.3 spec', () => {
         expect(key).toBe(value);
       });
     });
+  });
+});
+
+describe('Step 2.4 realtime contract compile checks', () => {
+  it('accepts cart.updated payload with cart line ids', () => {
+    const event: CartUpdatedEvent = {
+      tenantId: 'tenant-1',
+      sessionId: 'sess-1',
+      cartVersion: 2,
+      status: 'ACTIVE',
+      updatedAt: '2026-04-28T00:00:00.000Z',
+      items: [
+        {
+          cartLineId: 'line-1',
+          menuItemId: 'item-1',
+          menuItemName: 'Pho bo',
+          quantity: 1,
+          unitPrice: 65000,
+          lineVersion: 1,
+        },
+      ],
+    };
+
+    expect(event.items[0].cartLineId).toBe('line-1');
+  });
+
+  it('accepts canonical order.confirmed event metadata', () => {
+    const event: OrderConfirmedEvent = {
+      eventId: 'event-1',
+      eventType: 'order.confirmed',
+      schemaVersion: 1,
+      tenantId: 'tenant-1',
+      orderId: 'order-1',
+      sessionId: 'sess-1',
+      tableId: 'table-1',
+      tableName: 'Ban 01',
+      items: [],
+      totalAmount: 0,
+      confirmedAt: '2026-04-28T00:00:00.000Z',
+      confirmedByUserId: 'user-1',
+      occurredAt: '2026-04-28T00:00:00.000Z',
+      correlationId: 'process-1',
+    };
+
+    expect(event.eventType).toBe('order.confirmed');
   });
 });

@@ -28,6 +28,7 @@
       "@common/guards/*": ["libs/guards/src/lib/*"],
       "@common/error-messages/*": ["libs/error-messages/src/lib/*"],
       "@common/providers/cloudinary/*": ["libs/providers/cloudinary/src/lib/*"],
+      "@common/providers/redis-client/*": ["libs/providers/redis-client/src/lib/*"],
       "@einvoice/types": ["libs/shared/types/src/index.ts"],
       "@einvoice/shared-constants": ["libs/shared/constants/src/index.ts"],
       "@einvoice/frontend-ui": ["libs/frontend/ui/src/index.ts"],
