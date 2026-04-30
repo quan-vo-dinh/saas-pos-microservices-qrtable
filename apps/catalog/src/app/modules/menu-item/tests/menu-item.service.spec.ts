@@ -5,11 +5,15 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Category } from '@common/entities/category.entity';
 import { MenuItem } from '@common/entities/menu-item.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { MENU_ITEM_STATUS, PREPARATION_STATION } from '@common/constants/enum/catalog.enum';
+import { DataSource } from 'typeorm';
 
 describe('MenuItemService', () => {
   let service: MenuItemService;
   let repository: jest.Mocked<MenuItemRepository>;
   let categoryRepo: { findOne: jest.Mock };
+  let dataSource: { transaction: jest.Mock };
 
   const mockMenuItem = {
     id: 'item-1',
@@ -22,13 +26,12 @@ describe('MenuItemService', () => {
     imagePublicId: null as string | null,
     stock: 10,
     sortOrder: 0,
-    status: 'available' as const,
+    status: MENU_ITEM_STATUS.AVAILABLE,
+    station: PREPARATION_STATION.KITCHEN,
     deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   } as unknown as MenuItem;
-
-  const mockMenuItemPlain = mockMenuItem;
 
   const mockCategory = {
     id: 'cat-1',
@@ -43,17 +46,21 @@ describe('MenuItemService', () => {
       create: jest.fn(),
       findAllByTenant: jest.fn(),
       findByIdAndTenant: jest.fn(),
+      findManyByIdsAndTenant: jest.fn(),
+      findByIdsForUpdate: jest.fn(),
       updateByIdAndTenant: jest.fn(),
       softDelete: jest.fn(),
     };
 
     categoryRepo = { findOne: jest.fn() };
+    dataSource = { transaction: jest.fn((fn: (m: unknown) => Promise<unknown>) => fn({})) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MenuItemService,
         { provide: MenuItemRepository, useValue: mockMenuItemRepository },
         { provide: getRepositoryToken(Category), useValue: categoryRepo },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 
@@ -76,6 +83,26 @@ describe('MenuItemService', () => {
       expect(categoryRepo.findOne).toHaveBeenCalledWith({
         where: { id: 'cat-1', tenantId: 'tenant-1' },
       });
+    });
+
+    it('should persist station when creating a menu item', async () => {
+      categoryRepo.findOne.mockResolvedValue(mockCategory);
+      repository.create.mockResolvedValue({ ...mockMenuItem, station: PREPARATION_STATION.BAR } as MenuItem);
+
+      await service.create({
+        tenantId: 'tenant-1',
+        categoryId: 'cat-1',
+        name: 'Iced Tea',
+        price: 25000,
+        station: PREPARATION_STATION.BAR,
+      });
+
+      expect(repository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 'tenant-1',
+          station: PREPARATION_STATION.BAR,
+        }),
+      );
     });
 
     it('should throw BusinessException for invalid category', async () => {
@@ -169,6 +196,116 @@ describe('MenuItemService', () => {
         imageUrl: 'https://cdn.example.com/img.jpg',
         imagePublicId: 'img-pub-123',
       });
+    });
+  });
+
+  describe('validateOrderable', () => {
+    it('returns snapshots with station', async () => {
+      repository.findManyByIdsAndTenant.mockResolvedValue([mockMenuItem]);
+
+      const result = await service.validateOrderable({
+        tenantId: 'tenant-1',
+        items: [{ menuItemId: 'item-1', quantity: 2 }],
+      });
+
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          menuItemId: 'item-1',
+          menuItemName: 'Spring Rolls',
+          station: PREPARATION_STATION.KITCHEN,
+        }),
+      );
+    });
+
+    it('throws when item is not available', async () => {
+      repository.findManyByIdsAndTenant.mockResolvedValue([
+        { ...mockMenuItem, status: MENU_ITEM_STATUS.OUT_OF_STOCK } as MenuItem,
+      ]);
+
+      await expect(
+        service.validateOrderable({
+          tenantId: 'tenant-1',
+          items: [{ menuItemId: 'item-1', quantity: 1 }],
+        }),
+      ).rejects.toMatchObject({ errorCode: ErrorCode.CATALOG_MENU_ITEM_NOT_ORDERABLE });
+    });
+  });
+
+  describe('deductForOrder', () => {
+    it('decreases stock within a transaction', async () => {
+      const inventory = { ...mockMenuItem, stock: 10 } as MenuItem;
+      const manager = {
+        save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)),
+      };
+      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
+      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
+
+      const result = await service.deductForOrder({
+        tenantId: 'tenant-1',
+        orderId: 'order-1',
+        idempotencyKey: 'idem-1',
+        items: [
+          { menuItemId: 'item-1', quantity: 2 },
+          { menuItemId: 'item-1', quantity: 1 },
+        ],
+      });
+
+      expect(result[0].remainingStock).toBe(7);
+      expect(result[0].status).toBe(MENU_ITEM_STATUS.AVAILABLE);
+      expect(manager.save).toHaveBeenCalled();
+    });
+
+    it('marks out of stock when stock hits zero', async () => {
+      const inventory = { ...mockMenuItem, stock: 2 } as MenuItem;
+      const manager = { save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)) };
+      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
+      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
+
+      const result = await service.deductForOrder({
+        tenantId: 'tenant-1',
+        orderId: 'order-1',
+        idempotencyKey: 'idem-2',
+        items: [{ menuItemId: 'item-1', quantity: 2 }],
+      });
+
+      expect(result[0].remainingStock).toBe(0);
+      expect(result[0].status).toBe(MENU_ITEM_STATUS.OUT_OF_STOCK);
+    });
+
+    it('throws when insufficient stock', async () => {
+      const inventory = { ...mockMenuItem, stock: 1 } as MenuItem;
+      const manager = { save: jest.fn() };
+      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
+      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
+
+      await expect(
+        service.deductForOrder({
+          tenantId: 'tenant-1',
+          orderId: 'order-1',
+          idempotencyKey: 'idem-3',
+          items: [{ menuItemId: 'item-1', quantity: 5 }],
+        }),
+      ).rejects.toMatchObject({ errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT });
+      expect(manager.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('releaseForOrder', () => {
+    it('restores stock and sets available when releasing from zero', async () => {
+      const inventory = { ...mockMenuItem, stock: 0, status: MENU_ITEM_STATUS.OUT_OF_STOCK } as MenuItem;
+      const manager = { save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)) };
+      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
+      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
+
+      const result = await service.releaseForOrder({
+        tenantId: 'tenant-1',
+        orderId: 'order-1',
+        idempotencyKey: 'idem-4',
+        items: [{ menuItemId: 'item-1', quantity: 2 }],
+      });
+
+      expect(result[0].remainingStock).toBe(2);
+      expect(result[0].status).toBe(MENU_ITEM_STATUS.AVAILABLE);
     });
   });
 });

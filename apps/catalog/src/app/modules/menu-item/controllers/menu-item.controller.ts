@@ -10,6 +10,11 @@ import {
   UpdateMenuItemTcpRequest,
   SoftDeleteMenuItemTcpRequest,
   UpdateMenuItemImageTcpRequest,
+  ValidateOrderableTcpRequest,
+  StockDeductForOrderTcpRequest,
+  StockReleaseForOrderTcpRequest,
+  type OrderableMenuItemSnapshot,
+  type StockMutationResult,
 } from '@common/interfaces/tcp/catalog';
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
@@ -54,5 +59,27 @@ export class MenuItemController {
   async updateImage(@RequestParams() body: UpdateMenuItemImageTcpRequest): Promise<Response<MenuItemTcpResponse>> {
     const result = await this.menuItemService.updateImage(body);
     return Response.success<MenuItemTcpResponse>(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.MENU_ITEM.VALIDATE_ORDERABLE)
+  async validateOrderable(
+    @RequestParams() body: ValidateOrderableTcpRequest,
+  ): Promise<Response<OrderableMenuItemSnapshot[]>> {
+    const result = await this.menuItemService.validateOrderable(body);
+    return Response.success<OrderableMenuItemSnapshot[]>(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_DEDUCT_FOR_ORDER)
+  async deductForOrder(@RequestParams() body: StockDeductForOrderTcpRequest): Promise<Response<StockMutationResult[]>> {
+    const result = await this.menuItemService.deductForOrder(body);
+    return Response.success<StockMutationResult[]>(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_RELEASE_FOR_ORDER)
+  async releaseForOrder(
+    @RequestParams() body: StockReleaseForOrderTcpRequest,
+  ): Promise<Response<StockMutationResult[]>> {
+    const result = await this.menuItemService.releaseForOrder(body);
+    return Response.success<StockMutationResult[]>(result);
   }
 }

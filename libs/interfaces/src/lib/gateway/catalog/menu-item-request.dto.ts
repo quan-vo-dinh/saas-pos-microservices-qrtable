@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
-import { MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
+import { MENU_ITEM_STATUS, PREPARATION_STATION } from '@common/constants/enum/catalog.enum';
 
 export class CreateMenuItemRequestDto {
   @ApiProperty()
@@ -33,6 +33,11 @@ export class CreateMenuItemRequestDto {
   @Min(0)
   @IsOptional()
   sortOrder?: number;
+
+  @ApiPropertyOptional({ enum: PREPARATION_STATION })
+  @IsEnum(PREPARATION_STATION)
+  @IsOptional()
+  station?: PREPARATION_STATION;
 }
 
 export class UpdateMenuItemRequestDto {
@@ -73,4 +78,9 @@ export class UpdateMenuItemRequestDto {
   @IsEnum(MENU_ITEM_STATUS)
   @IsOptional()
   status?: MENU_ITEM_STATUS;
+
+  @ApiPropertyOptional({ enum: PREPARATION_STATION })
+  @IsEnum(PREPARATION_STATION)
+  @IsOptional()
+  station?: PREPARATION_STATION;
 }

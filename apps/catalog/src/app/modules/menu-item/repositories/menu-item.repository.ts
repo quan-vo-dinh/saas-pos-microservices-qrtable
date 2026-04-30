@@ -1,7 +1,7 @@
 import { MenuItem } from '@common/entities/menu-item.entity';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 
 @Injectable()
 export class MenuItemRepository {
@@ -26,6 +26,31 @@ export class MenuItemRepository {
 
   findByIdAndTenant(id: string, tenantId: string): Promise<MenuItem | null> {
     return this.repo.findOne({ where: { id, tenantId, deletedAt: IsNull() } });
+  }
+
+  findManyByIdsAndTenant(tenantId: string, ids: string[]): Promise<MenuItem[]> {
+    if (ids.length === 0) {
+      return Promise.resolve([]);
+    }
+    const uniqueIds = [...new Set(ids)];
+    return this.repo.find({
+      where: { tenantId, id: In(uniqueIds), deletedAt: IsNull() },
+    });
+  }
+
+  async findByIdsForUpdate(tenantId: string, ids: string[], manager: EntityManager): Promise<MenuItem[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    return manager
+      .getRepository(MenuItem)
+      .createQueryBuilder('menuItem')
+      .setLock('pessimistic_write')
+      .where('menuItem.tenantId = :tenantId', { tenantId })
+      .andWhere('menuItem.id IN (:...ids)', { ids })
+      .andWhere('menuItem.deletedAt IS NULL')
+      .orderBy('menuItem.id', 'ASC')
+      .getMany();
   }
 
   async updateByIdAndTenant(id: string, tenantId: string, data: Partial<MenuItem>): Promise<MenuItem | null> {

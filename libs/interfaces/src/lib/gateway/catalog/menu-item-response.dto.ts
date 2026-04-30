@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BaseResponseDto } from '../common/base-response.dto';
-import { MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
+import { MENU_ITEM_STATUS, PREPARATION_STATION } from '@common/constants/enum/catalog.enum';
 
 export class MenuItemResponseDto extends BaseResponseDto {
   @ApiProperty()
@@ -32,4 +32,7 @@ export class MenuItemResponseDto extends BaseResponseDto {
 
   @ApiProperty({ enum: MENU_ITEM_STATUS })
   status: MENU_ITEM_STATUS;
+
+  @ApiProperty({ enum: PREPARATION_STATION })
+  station: PREPARATION_STATION;
 }
