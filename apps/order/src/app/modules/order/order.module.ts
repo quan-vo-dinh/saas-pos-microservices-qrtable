@@ -17,6 +17,7 @@ import { OutboxEventRepository } from './repositories/outbox-event.repository';
 import { ServiceRequestRepository } from './repositories/service-request.repository';
 import { SessionRepository } from './repositories/session.repository';
 import { OrderService } from './services/order.service';
+import { OutboxPublisherService } from './services/outbox-publisher.service';
 import { SessionService } from './services/session.service';
 import { CartService } from './services/cart.service';
 
@@ -29,6 +30,7 @@ import { CartService } from './services/cart.service';
   controllers: [OrderController],
   providers: [
     OrderService,
+    OutboxPublisherService,
     SessionService,
     CartService,
     OrderRepository,

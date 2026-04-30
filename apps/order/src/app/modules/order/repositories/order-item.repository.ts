@@ -1,7 +1,7 @@
 import { OrderItem } from '@common/entities/order-item.entity';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 @Injectable()
 export class OrderItemRepository {
@@ -9,5 +9,9 @@ export class OrderItemRepository {
 
   findByOrderIdAndTenant(orderId: string, tenantId: string): Promise<OrderItem[]> {
     return this.repo.find({ where: { orderId, tenantId } });
+  }
+
+  findByOrderIdAndTenantWithManager(orderId: string, tenantId: string, manager: EntityManager): Promise<OrderItem[]> {
+    return manager.getRepository(OrderItem).find({ where: { orderId, tenantId } });
   }
 }
