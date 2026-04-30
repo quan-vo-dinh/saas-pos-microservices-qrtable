@@ -1,16 +1,16 @@
-# Step 2.4 Order Service Implementation Plan
+# Kế hoạch triển khai Step 2.4 cho Order Service
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Dành cho agent tự động:** BẮT BUỘC dùng kỹ năng phụ: `superpowers:subagent-driven-development` (khuyến nghị) hoặc `superpowers:executing-plans` để triển khai kế hoạch theo từng task. Các bước dùng cú pháp checkbox (`- [ ]`) để theo dõi.
 
-**Goal:** Build Phase 2A Step 2.4 backend: Order Service, Redis cart/session, Catalog-owned stock commands, Kafka `order.confirmed` outbox, and BFF Direct REST/WebSocket integration.
+**Mục tiêu:** Xây dựng backend Phase 2A Step 2.4: Order Service, Redis cart/session, các lệnh tồn kho do Catalog sở hữu, outbox Kafka `order.confirmed`, và tích hợp REST/WebSocket trực tiếp với BFF.
 
-**Architecture:** Implement a logical Database-per-Service boundary first: Order Service owns order/session/bill/request tables and never queries Catalog tables directly; Catalog owns menu/table/stock and exposes TCP commands. Kafka is used only for cross-context `order.confirmed`; BFF Direct emits UI events after successful TCP responses. Physical PostgreSQL database split and TypeORM migrations are deferred to separate hardening plans.
+**Kiến trúc:** Trước hết triển khai ranh giới Database-per-Service ở mức logic: Order Service sở hữu các bảng order/session/bill/request và không truy vấn trực tiếp bảng Catalog; Catalog sở hữu menu/table/stock và cung cấp lệnh TCP. Kafka chỉ dùng cho sự kiện liên ngữ cảnh `order.confirmed`; BFF Direct phát sự kiện UI sau khi nhận TCP response thành công. Việc tách database PostgreSQL vật lý và migration TypeORM được hoãn sang kế hoạch hardening riêng.
 
-**Tech Stack:** Nx, NestJS, TypeORM, PostgreSQL, Redis cache-manager config reused from `libs/configuration` plus direct Redis command client (`ioredis`) for atomic cart/locks, Nest TCP microservices, Kafka (`kafkajs`), Nest WebSockets + Socket.IO, Jest.
+**Ngăn xếp công nghệ:** Nx, NestJS, TypeORM, PostgreSQL, cấu hình Redis cache-manager tái sử dụng từ `libs/configuration` kèm Redis command client trực tiếp (`ioredis`) cho cart/lock atomic, Nest TCP microservices, Kafka (`kafkajs`), Nest WebSockets + Socket.IO, Jest.
 
 ---
 
-## Locked Decisions
+## Các quyết định đã chốt
 
 - Canonical spec: `docs/business-logic-step-2.4-spec.vi.md`.
 - Architecture decision note: `docs/superpowers/specs/2026-04-28-step-2.4-architecture-decisions.md`.
@@ -28,9 +28,9 @@
 - Do not copy `apps/saas` as a structure reference for this step; it currently
   mixes legacy top-level folders with module folders.
 
-## File Structure
+## Cấu trúc tệp
 
-### Create
+### Tạo mới
 
 - `apps/order/project.json` — Nx target config for Order Service.
 - `apps/order/webpack.config.js` — webpack app build config.
@@ -82,7 +82,7 @@
 - `apps/bff/src/app/modules/realtime/gateways/order-events.gateway.ts`
 - `apps/bff/src/app/modules/realtime/services/realtime-events.service.ts`
 
-### Modify
+### Chỉnh sửa
 
 - `package.json` / `pnpm-lock.yaml` — Kafka/WebSocket/Redis direct dependencies.
 - `.env`, `.env.example` — Order ports and Kafka env.
@@ -111,9 +111,9 @@
 
 ---
 
-## Task 1: Install Runtime Dependencies And Environment Keys
+## Task 1: Cài dependency runtime và biến môi trường
 
-**Files:**
+**Tệp liên quan:**
 
 - Modify: `package.json`
 - Modify: `pnpm-lock.yaml`
@@ -125,19 +125,19 @@
 - Create: `libs/providers/redis-client/src/index.ts`
 - Create: `libs/providers/redis-client/src/lib/redis-client.module.ts`
 - Create: `libs/providers/redis-client/src/lib/redis-client.service.ts`
-- **Step 1: Install dependencies**
+- **Bước 1: Cài dependencies**
 
-Run:
+Chạy:
 
 ```bash
 pnpm add kafkajs @nestjs/websockets @nestjs/platform-socket.io socket.io ioredis
 ```
 
-Expected: `package.json` includes the five packages and `pnpm-lock.yaml` updates.
+Kỳ vọng: `package.json` có đủ 5 package và `pnpm-lock.yaml` được cập nhật.
 
-- **Step 2: Add Order and Kafka env keys**
+- **Bước 2: Thêm biến môi trường cho Order và Kafka**
 
-Add to `.env` and `.env.example`:
+Thêm vào `.env` và `.env.example`:
 
 ```env
 ORDER_PORT=3301
@@ -149,9 +149,9 @@ KAFKA_CLIENT_ID=qrtable-order-service
 KAFKA_ORDER_CONFIRMED_TOPIC=order.confirmed
 ```
 
-Expected: existing service env keys remain unchanged.
+Kỳ vọng: các biến môi trường của service hiện có không bị thay đổi.
 
-- **Step 3: Add Kafka configuration helper**
+- **Bước 3: Thêm helper cấu hình Kafka**
 
 Create `libs/configuration/src/lib/kafka.config.ts`:
 
@@ -183,7 +183,7 @@ export class KafkaConfiguration {
 }
 ```
 
-- **Step 4: Add direct Redis command client provider**
+- **Bước 4: Thêm provider Redis command client trực tiếp**
 
 The repo already has cache-manager Redis wiring in
 `libs/configuration/src/lib/redis.config.ts`. Do not replace or duplicate that
@@ -262,23 +262,23 @@ export * from './lib/redis-client.module';
 export * from './lib/redis-client.service';
 ```
 
-- **Step 5: Add path alias**
+- **Bước 5: Thêm path alias**
 
-Modify `tsconfig.base.json` paths:
+Chỉnh sửa phần `paths` trong `tsconfig.base.json`:
 
 ```json
 "@common/providers/redis-client/*": ["libs/providers/redis-client/src/lib/*"]
 ```
 
-- **Step 6: Verify install and TypeScript path**
+- **Bước 6: Kiểm tra cài đặt và đường dẫn TypeScript**
 
-Run:
+Chạy:
 
 ```bash
 npx nx build bff --configuration=development
 ```
 
-Expected: PASS. If it fails only because the new provider lib lacks generated
+Kỳ vọng: PASS. Nếu chỉ lỗi vì provider lib mới thiếu tệp TS config được tạo sẵn,
 TS config files, add `libs/providers/redis-client/tsconfig.json`,
 `libs/providers/redis-client/tsconfig.lib.json`, and
 `libs/providers/redis-client/tsconfig.spec.json` following
@@ -286,15 +286,15 @@ TS config files, add `libs/providers/redis-client/tsconfig.json`,
 
 ---
 
-## Task 2: Align Shared Types With Step 2.4 Contracts
+## Task 2: Căn chỉnh Shared Types theo contract Step 2.4
 
-**Files:**
+**Tệp liên quan:**
 
 - Modify: `libs/shared/types/src/lib/session.types.ts`
 - Modify: `libs/shared/types/src/lib/realtime-events.types.ts`
 - Modify: `libs/shared/types/src/index.ts`
 - Test: `libs/shared/types/src/lib/__tests__/enum-completeness.spec.ts`
-- **Step 1: Extend cart types**
+- **Bước 1: Mở rộng kiểu dữ liệu cart**
 
 Modify `libs/shared/types/src/lib/session.types.ts` to add:
 
@@ -322,7 +322,7 @@ export type CartSnapshot = {
 
 Keep the existing `CartItem` export during transition so Step 2.2 mock UI does not break.
 
-- **Step 2: Fix realtime payloads**
+- **Bước 2: Chỉnh payload realtime**
 
 Modify `libs/shared/types/src/lib/realtime-events.types.ts`:
 
@@ -357,7 +357,7 @@ export type OrderConfirmedEvent = {
 };
 ```
 
-- **Step 3: Export new cart types**
+- **Bước 3: Export kiểu dữ liệu cart mới**
 
 Modify `libs/shared/types/src/index.ts`:
 
@@ -365,7 +365,7 @@ Modify `libs/shared/types/src/index.ts`:
 export type { Session, CartItem, CartLine, CartSnapshot } from './lib/session.types';
 ```
 
-- **Step 4: Add shared type regression test**
+- **Bước 4: Thêm regression test cho shared types**
 
 Append to `libs/shared/types/src/lib/__tests__/enum-completeness.spec.ts`:
 
@@ -418,21 +418,21 @@ describe('Step 2.4 realtime contract compile checks', () => {
 });
 ```
 
-- **Step 5: Verify shared types**
+- **Bước 5: Kiểm tra shared types**
 
-Run:
+Chạy:
 
 ```bash
 npx nx test shared-types
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 3: Add Catalog Station Field And Admin DTO Wiring
+## Task 3: Thêm trường station cho Catalog và nối Admin DTO
 
-**Files:**
+**Tệp liên quan:**
 
 - Modify: `libs/constants/src/lib/enum/catalog.enum.ts`
 - Modify: `libs/entities/src/lib/menu-item.entity.ts`
@@ -441,7 +441,7 @@ Expected: PASS.
 - Modify: `libs/interfaces/src/lib/gateway/catalog/menu-item-response.dto.ts`
 - Modify: `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts`
 - Test: `apps/catalog/src/app/modules/menu-item/tests/menu-item.service.spec.ts`
-- **Step 1: Add station enum**
+- **Bước 1: Thêm enum station**
 
 Modify `libs/constants/src/lib/enum/catalog.enum.ts`:
 
@@ -452,7 +452,7 @@ export enum PREPARATION_STATION {
 }
 ```
 
-- **Step 2: Add station column**
+- **Bước 2: Thêm cột station**
 
 Modify `libs/entities/src/lib/menu-item.entity.ts`:
 
@@ -465,7 +465,7 @@ station: PREPARATION_STATION;
 
 Place the column after `status`. Keep default `KITCHEN` so current seed data remains orderable during dev sync.
 
-- **Step 3: Add station to TCP request interfaces**
+- **Bước 3: Thêm station vào TCP request interfaces**
 
 Modify `libs/interfaces/src/lib/tcp/catalog/menu-item-request.interface.ts`:
 
@@ -497,7 +497,7 @@ export type UpdateMenuItemTcpRequest = {
 };
 ```
 
-- **Step 4: Add station to gateway DTOs**
+- **Bước 4: Thêm station vào gateway DTO**
 
 Modify `libs/interfaces/src/lib/gateway/catalog/menu-item-request.dto.ts`:
 
@@ -520,7 +520,7 @@ import { PREPARATION_STATION } from '@common/constants/enum/catalog.enum';
 station: PREPARATION_STATION;
 ```
 
-- **Step 5: Persist station in Catalog service**
+- **Bước 5: Lưu station trong Catalog service**
 
 Modify `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts`:
 
@@ -534,7 +534,7 @@ Add to update payload:
 if (data.station !== undefined) updatePayload.station = data.station;
 ```
 
-- **Step 6: Update Catalog service tests**
+- **Bước 6: Cập nhật test cho Catalog service**
 
 Modify `mockMenuItem` in `apps/catalog/src/app/modules/menu-item/tests/menu-item.service.spec.ts`:
 
@@ -566,28 +566,28 @@ it('should persist station when creating a menu item', async () => {
 });
 ```
 
-- **Step 7: Verify Catalog station**
+- **Bước 7: Kiểm tra station của Catalog**
 
-Run:
+Chạy:
 
 ```bash
 npx nx test catalog --testPathPattern=menu-item.service.spec.ts
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 4: Implement Catalog Orderability And Stock TCP Contracts
+## Task 4: Triển khai contract TCP cho khả năng đặt món và tồn kho của Catalog
 
-**Files:**
+**Tệp liên quan:**
 
 - Modify: `libs/interfaces/src/lib/tcp/catalog/menu-item-request.interface.ts`
 - Modify: `apps/catalog/src/app/modules/menu-item/controllers/menu-item.controller.ts`
 - Modify: `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts`
 - Modify: `apps/catalog/src/app/modules/menu-item/repositories/menu-item.repository.ts`
 - Test: `apps/catalog/src/app/modules/menu-item/tests/menu-item.service.spec.ts`
-- **Step 1: Add TCP request/response types**
+- **Bước 1: Thêm kiểu request/response TCP**
 
 Append to `libs/interfaces/src/lib/tcp/catalog/menu-item-request.interface.ts`:
 
@@ -634,7 +634,7 @@ export type StockMutationResult = {
 };
 ```
 
-- **Step 2: Add repository lock helper**
+- **Bước 2: Thêm helper lock ở repository**
 
 Modify `apps/catalog/src/app/modules/menu-item/repositories/menu-item.repository.ts` to expose:
 
@@ -653,7 +653,7 @@ async findByIdsForUpdate(tenantId: string, ids: string[], manager: EntityManager
 
 Import `EntityManager`.
 
-- **Step 3: Add service methods**
+- **Bước 3: Thêm phương thức service**
 
 Add methods to `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts`:
 
@@ -685,7 +685,7 @@ async validateOrderable(data: ValidateOrderableTcpRequest): Promise<OrderableMen
 
 Add `deductForOrder` and `releaseForOrder` using `this.dataSource.transaction(...)`, `findByIdsForUpdate`, sorted item IDs, tenant filtering, and `manager.save(item)`. Deduct must throw `CATALOG_STOCK_INSUFFICIENT` when any requested quantity exceeds stock. Release must increase stock and set status back to `AVAILABLE` when stock becomes positive.
 
-- **Step 4: Add TCP handlers**
+- **Bước 4: Thêm TCP handlers**
 
 Modify `apps/catalog/src/app/modules/menu-item/controllers/menu-item.controller.ts`:
 
@@ -709,7 +709,7 @@ async releaseForOrder(@RequestParams() body: StockReleaseForOrderTcpRequest): Pr
 }
 ```
 
-- **Step 5: Add error codes**
+- **Bước 5: Thêm mã lỗi**
 
 Modify `libs/error-messages/src/lib/error-code.enum.ts`:
 
@@ -721,7 +721,7 @@ CATALOG_STOCK_LOCK_TIMEOUT = 'CATALOG_STOCK_LOCK_TIMEOUT',
 
 Add English/Vietnamese messages in `error-messages.en.ts` and `error-messages.vi.ts`.
 
-- **Step 6: Add stock tests**
+- **Bước 6: Thêm test tồn kho**
 
 Add tests to `menu-item.service.spec.ts`:
 
@@ -748,29 +748,29 @@ describe('validateOrderable', () => {
 
 Add transaction tests with a mocked `DataSource` in a separate describe block for `deductForOrder` and `releaseForOrder`.
 
-- **Step 7: Verify Catalog stock contracts**
+- **Bước 7: Kiểm tra contract tồn kho của Catalog**
 
-Run:
+Chạy:
 
 ```bash
 npx nx test catalog --testPathPattern=menu-item.service.spec.ts
 npx nx build catalog --configuration=development
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 5: Add Order TCP Constants And Interfaces
+## Task 5: Thêm hằng số TCP và interface cho Order
 
-**Files:**
+**Tệp liên quan:**
 
 - Modify: `libs/constants/src/lib/enum/tcp-request-message.ts`
 - Create: `libs/interfaces/src/lib/tcp/order/order-request.interface.ts`
 - Create: `libs/interfaces/src/lib/tcp/order/order-response.interface.ts`
 - Create: `libs/interfaces/src/lib/tcp/order/index.ts`
 - Modify: `libs/interfaces/src/lib/tcp/index.ts` if a barrel exists.
-- **Step 1: Add ORDER TCP enum**
+- **Bước 1: Thêm enum TCP cho ORDER**
 
 Modify `libs/constants/src/lib/enum/tcp-request-message.ts`:
 
@@ -799,7 +799,7 @@ enum ORDER {
 
 Add `ORDER` to `TCP_REQUEST_MESSAGE`.
 
-- **Step 2: Add request interfaces**
+- **Bước 2: Thêm request interface**
 
 Create `libs/interfaces/src/lib/tcp/order/order-request.interface.ts` with tenant/session/user-scoped command types:
 
@@ -882,7 +882,7 @@ export type TransferTableTcpRequest = {
 };
 ```
 
-- **Step 3: Add response interfaces**
+- **Bước 3: Thêm response interface**
 
 Create `libs/interfaces/src/lib/tcp/order/order-response.interface.ts`:
 
@@ -951,7 +951,7 @@ export type TableTransferredTcpResponse = {
 };
 ```
 
-- **Step 4: Add barrel export**
+- **Bước 4: Thêm barrel export**
 
 Create `libs/interfaces/src/lib/tcp/order/index.ts`:
 
@@ -960,21 +960,21 @@ export * from './order-request.interface';
 export * from './order-response.interface';
 ```
 
-- **Step 5: Verify interfaces compile**
+- **Bước 5: Kiểm tra biên dịch interface**
 
-Run:
+Chạy:
 
 ```bash
 npx nx build interfaces
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 6: Scaffold Order Service App
+## Task 6: Khởi tạo khung ứng dụng Order Service
 
-**Files:**
+**Tệp liên quan:**
 
 - Create: `apps/order/project.json`
 - Create: `apps/order/webpack.config.js`
@@ -984,7 +984,7 @@ Expected: PASS.
 - Create: `apps/order/src/app/app.module.ts`
 - Modify: `libs/configuration/src/lib/tcp.config.ts`
 - Modify: `package.json`
-- **Step 1: Generate or manually scaffold the app**
+- **Bước 1: Sinh hoặc dựng thủ công khung ứng dụng**
 
 Preferred command:
 
@@ -994,7 +994,7 @@ npx nx g @nx/nest:app order --directory=apps/order --tags=type:app,scope:order
 
 If the generator changes unrelated files excessively, revert only generated noise after review and manually mirror `apps/catalog` structure.
 
-- **Step 2: Add Order TCP service config**
+- **Bước 2: Thêm cấu hình TCP service cho Order**
 
 Modify `libs/configuration/src/lib/tcp.config.ts`:
 
@@ -1011,7 +1011,7 @@ export enum TCP_SERVICES {
 
 The existing constructor should derive `ORDER_SERVICE_HOST` and `TCP_ORDER_SERVICE_PORT`.
 
-- **Step 3: Add Order config**
+- **Bước 3: Thêm cấu hình Order**
 
 Create `apps/order/src/configuration/index.ts`:
 
@@ -1061,7 +1061,7 @@ export type TConfiguration = typeof CONFIGURATION;
 CONFIGURATION.validate();
 ```
 
-- **Step 4: Add main bootstrap**
+- **Bước 4: Thêm bootstrap `main`**
 
 Create `apps/order/src/main.ts` mirroring Catalog TCP bootstrap:
 
@@ -1093,7 +1093,7 @@ async function bootstrap() {
 bootstrap();
 ```
 
-- **Step 5: Add package script**
+- **Bước 5: Thêm script trong package**
 
 Modify `package.json` scripts:
 
@@ -1101,21 +1101,21 @@ Modify `package.json` scripts:
 "dev:bff-order": "pnpm dev --projects=bff,order,catalog"
 ```
 
-- **Step 6: Verify scaffold**
+- **Bước 6: Kiểm tra scaffold**
 
-Run:
+Chạy:
 
 ```bash
 npx nx build order --configuration=development
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 7: Add Order Domain Entities
+## Task 7: Thêm entity cho miền nghiệp vụ Order
 
-**Files:**
+**Tệp liên quan:**
 
 - Create: `libs/entities/src/lib/session.entity.ts`
 - Create: `libs/entities/src/lib/order.entity.ts`
@@ -1123,7 +1123,7 @@ Expected: PASS.
 - Create: `libs/entities/src/lib/bill.entity.ts`
 - Create: `libs/entities/src/lib/service-request.entity.ts`
 - Create: `libs/entities/src/lib/outbox-event.entity.ts`
-- **Step 1: Add session entity**
+- **Bước 1: Thêm session entity**
 
 Create `libs/entities/src/lib/session.entity.ts`:
 
@@ -1167,21 +1167,21 @@ export class Session extends BaseEntity {
 }
 ```
 
-- **Step 2: Add order and order item entities**
+- **Bước 2: Thêm order entity và order item entity**
 
 Create `order.entity.ts` with columns: `tenant_id`, `table_id`, `table_name`, `session_id`, `status`, `total_amount`, `idempotency_key`, `notes`, `confirmed_at`, `confirmed_by_user_id`, `cancelled_at`, `cancelled_by_user_id`, `cancel_reason`. Add unique index on `tenantId`, `sessionId`, `idempotencyKey`.
 
 Create `order-item.entity.ts` with columns: `tenant_id`, `order_id`, `menu_item_id`, `menu_item_name`, `quantity`, `unit_price`, `note`, `status`, `station`.
 
-- **Step 3: Add bill entity**
+- **Bước 3: Thêm bill entity**
 
 Create `bill.entity.ts` with columns: `tenant_id`, `session_id`, `order_ids` as `simple-array`, `subtotal`, `total`, `rounding_amount`, `payment_method`, `status`, `closed_at`, `paid_at`. Add unique index on active bill by `tenantId/sessionId/status` as far as TypeORM/Postgres can support in current convention; enforce active-bill uniqueness in service as well.
 
-- **Step 4: Add service request entity**
+- **Bước 4: Thêm service request entity**
 
 Create `service-request.entity.ts` with columns: `tenant_id`, `table_id`, `table_name`, `session_id`, `type`, `status`, `note`, `acknowledged_at`, `acknowledged_by_user_id`, `resolved_at`.
 
-- **Step 5: Add outbox entity**
+- **Bước 5: Thêm outbox entity**
 
 Create `outbox-event.entity.ts`:
 
@@ -1224,22 +1224,22 @@ export class OutboxEvent extends BaseEntity {
 }
 ```
 
-- **Step 6: Verify entities compile**
+- **Bước 6: Kiểm tra biên dịch entities**
 
-Run:
+Chạy:
 
 ```bash
 npx nx build entities
 npx nx build order --configuration=development
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 8: Implement Order Service Repositories And Module Wiring
+## Task 8: Triển khai repository và nối module cho Order Service
 
-**Files:**
+**Tệp liên quan:**
 
 - Create: `apps/order/src/app/modules/order/order.module.ts`
 - Create: `apps/order/src/app/modules/order/repositories/order.repository.ts`
@@ -1249,7 +1249,7 @@ Expected: PASS.
 - Create: `apps/order/src/app/modules/order/repositories/service-request.repository.ts`
 - Create: `apps/order/src/app/modules/order/repositories/outbox-event.repository.ts`
 - Modify: `apps/order/src/app/app.module.ts`
-- **Step 1: Add repository providers**
+- **Bước 1: Thêm provider cho repository**
 
 Each repository wraps a TypeORM repository and exposes tenant-scoped methods only.
 Entity class names should follow the existing shared entity convention
@@ -1281,7 +1281,7 @@ export class OrderRepository {
 }
 ```
 
-- **Step 2: Wire Order module**
+- **Bước 2: Nối Order module**
 
 Create `order.module.ts`:
 
@@ -1312,7 +1312,7 @@ Create `order.module.ts`:
 export class OrderModule {}
 ```
 
-- **Step 3: Wire app module**
+- **Bước 3: Nối app module**
 
 Modify `apps/order/src/app/app.module.ts`:
 
@@ -1330,26 +1330,26 @@ export class AppModule {
 }
 ```
 
-- **Step 4: Verify module wiring**
+- **Bước 4: Kiểm tra wiring module**
 
-Run:
+Chạy:
 
 ```bash
 npx nx build order --configuration=development
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 9: Implement Redis Session And Cart Services
+## Task 9: Triển khai service Session và Cart trên Redis
 
-**Files:**
+**Tệp liên quan:**
 
 - Create: `apps/order/src/app/modules/order/services/session.service.ts`
 - Create: `apps/order/src/app/modules/order/services/cart.service.ts`
 - Test: `apps/order/src/app/modules/order/tests/cart.service.spec.ts`
-- **Step 1: Write cart conflict test**
+- **Bước 1: Viết test xung đột cart**
 
 Create `cart.service.spec.ts` with a mocked Redis client:
 
@@ -1375,7 +1375,7 @@ it('rejects cart mutation when expectedCartVersion does not match', async () => 
 });
 ```
 
-- **Step 2: Implement key helpers**
+- **Bước 2: Triển khai key helper**
 
 In `cart.service.ts`:
 
@@ -1389,7 +1389,7 @@ private sessionKey(tenantId: string, sessionId: string): string {
 }
 ```
 
-- **Step 3: Implement cart snapshot storage**
+- **Bước 3: Triển khai lưu trữ cart snapshot**
 
 Use Redis Hash fields:
 
@@ -1404,7 +1404,7 @@ items
 
 `items` is JSON string of `CartLine[]`. Every successful mutation increments global `cartVersion` by 1 and refreshes TTL to `SESSION_POLICY.TTL_MS`.
 
-- **Step 4: Implement mutation semantics**
+- **Bước 4: Triển khai ngữ nghĩa mutation**
 
 `CartService.mutate` must:
 
@@ -1419,7 +1419,7 @@ items
 9. Save snapshot atomically via Redis transaction.
 10. Return `CartUpdatedEvent`.
 
-- **Step 5: Implement session hydration**
+- **Bước 5: Triển khai session hydration**
 
 `SessionService` must:
 
@@ -1429,27 +1429,27 @@ items
 4. Enforce idle close only when `orderCount === 0`.
 5. Preserve active sessions with orders even when idle timeout passed.
 
-- **Step 6: Verify cart/session services**
+- **Bước 6: Kiểm tra service cart/session**
 
-Run:
+Chạy:
 
 ```bash
 npx nx test order --testPathPattern=cart.service.spec.ts
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 10: Implement Order Submit And Bill Creation
+## Task 10: Triển khai gửi đơn hàng và tạo hóa đơn
 
-**Files:**
+**Tệp liên quan:**
 
 - Create/Modify: `apps/order/src/app/modules/order/services/order.service.ts`
 - Create/Modify: `apps/order/src/app/modules/order/services/bill.service.ts`
 - Create: `apps/order/src/app/modules/order/controllers/order.controller.ts`
 - Test: `apps/order/src/app/modules/order/tests/order.service.spec.ts`
-- **Step 1: Write submit idempotency test**
+- **Bước 1: Viết test idempotency cho submit**
 
 Create or extend `order.service.spec.ts`:
 
@@ -1469,7 +1469,7 @@ it('returns existing order for duplicate idempotency key', async () => {
 });
 ```
 
-- **Step 2: Implement submit preconditions**
+- **Bước 2: Triển khai điều kiện tiên quyết khi submit**
 
 `OrderService.submitOrder` must reject:
 
@@ -1492,7 +1492,7 @@ SESSION_CLOSED;
 BILL_ORDERING_LOCKED;
 ```
 
-- **Step 3: Implement transaction**
+- **Bước 3: Triển khai transaction**
 
 Inside one Order DB transaction:
 
@@ -1504,7 +1504,7 @@ Inside one Order DB transaction:
 6. Increment session `orderCount`.
 7. Update session `currentBillId`.
 
-- **Step 4: Clear cart and create direct events**
+- **Bước 4: Xóa cart và tạo sự kiện trực tiếp**
 
 After DB commit:
 
@@ -1512,7 +1512,7 @@ After DB commit:
 2. Increment cart version.
 3. Return `cart.updated` and `order.created` event payloads.
 
-- **Step 5: Add TCP handler**
+- **Bước 5: Thêm TCP handler**
 
 In `order.controller.ts`:
 
@@ -1524,27 +1524,27 @@ async submit(@RequestParams() body: SubmitOrderTcpRequest): Promise<Response<Sub
 }
 ```
 
-- **Step 6: Verify submit**
+- **Bước 6: Kiểm tra submit**
 
-Run:
+Chạy:
 
 ```bash
 npx nx test order --testPathPattern=order.service.spec.ts
 npx nx build order --configuration=development
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 11: Implement Confirm, Stock Deduct, And Outbox Publish
+## Task 11: Triển khai xác nhận, trừ tồn kho và publish outbox
 
-**Files:**
+**Tệp liên quan:**
 
 - Modify: `apps/order/src/app/modules/order/services/order.service.ts`
 - Create/Modify: `apps/order/src/app/modules/order/services/outbox-publisher.service.ts`
 - Test: `apps/order/src/app/modules/order/tests/order.service.spec.ts`
-- **Step 1: Write confirm insufficient-stock test**
+- **Bước 1: Viết test confirm khi thiếu tồn kho**
 
 ```ts
 it('keeps order pending when Catalog deduct reports insufficient stock', async () => {
@@ -1563,7 +1563,7 @@ it('keeps order pending when Catalog deduct reports insufficient stock', async (
 });
 ```
 
-- **Step 2: Implement confirm flow**
+- **Bước 2: Triển khai luồng confirm**
 
 `confirmOrder` must:
 
@@ -1578,7 +1578,7 @@ it('keeps order pending when Catalog deduct reports insufficient stock', async (
 9. Commit.
 10. Return `order.status_changed` event.
 
-- **Step 3: Build canonical Kafka payload**
+- **Bước 3: Xây dựng Kafka payload chuẩn**
 
 Payload must match:
 
@@ -1603,7 +1603,7 @@ Payload must match:
 
 Partition key: `tenantId`.
 
-- **Step 4: Implement outbox publisher**
+- **Bước 4: Triển khai outbox publisher**
 
 `OutboxPublisherService` must:
 
@@ -1612,22 +1612,22 @@ Partition key: `tenantId`.
 3. Mark published rows `PUBLISHED`.
 4. On error, increment `attemptCount`, set `status = FAILED` after 5 attempts, store `lastError`.
 
-- **Step 5: Verify confirm/outbox**
+- **Bước 5: Kiểm tra confirm/outbox**
 
-Run:
+Chạy:
 
 ```bash
 npx nx test order --testPathPattern=order.service.spec.ts
 npx nx build order --configuration=development
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 12: Implement Cancellation, Service Requests, Bill Request, And Transfer
+## Task 12: Triển khai hủy đơn, yêu cầu phục vụ, yêu cầu hóa đơn và chuyển bàn
 
-**Files:**
+**Tệp liên quan:**
 
 - Modify: `apps/order/src/app/modules/order/services/order.service.ts`
 - Modify: `apps/order/src/app/modules/order/services/bill.service.ts`
@@ -1638,7 +1638,7 @@ Expected: PASS.
 - Test: `apps/order/src/app/modules/order/tests/bill.service.spec.ts`
 - Test: `apps/order/src/app/modules/order/tests/service-request.service.spec.ts`
 - Test: `apps/order/src/app/modules/order/tests/transfer.service.spec.ts`
-- **Step 1: Add state-flow tests**
+- **Bước 1: Thêm test luồng trạng thái**
 
 Cover these cases:
 
@@ -1756,7 +1756,7 @@ it('uses transfer locks before changing session table metadata', async () => {
 });
 ```
 
-- **Step 2: Implement pending cancel**
+- **Bước 2: Triển khai hủy đơn ở trạng thái pending**
 
 Customer/staff pending cancel:
 
@@ -1768,7 +1768,7 @@ Customer/staff pending cancel:
 6. Do not call stock release.
 7. Return `order.status_changed`.
 
-- **Step 3: Implement processing cancel**
+- **Bước 3: Triển khai hủy đơn ở trạng thái processing**
 
 Manager/Owner processing cancel:
 
@@ -1779,7 +1779,7 @@ Manager/Owner processing cancel:
 5. Recalculate bill.
 6. Return `order.status_changed`.
 
-- **Step 4: Implement service request lifecycle**
+- **Bước 4: Triển khai vòng đời service request**
 
 `ServiceRequestService`:
 
@@ -1788,7 +1788,7 @@ Manager/Owner processing cancel:
 - Acknowledge only `PENDING -> ACKNOWLEDGED`.
 - Resolve only `ACKNOWLEDGED -> RESOLVED`.
 - Always scope by `tenantId`.
-- **Step 5: Implement explicit bill request**
+- **Bước 5: Triển khai bill request tường minh**
 
 `BillService.requestBill`:
 
@@ -1802,7 +1802,7 @@ Manager/Owner processing cancel:
 8. Create `REQUEST_BILL` service request.
 9. Return `bill.requested`, `service.requested`, and `cart.updated`.
 
-- **Step 6: Implement transfer saga**
+- **Bước 6: Triển khai saga chuyển bàn**
 
 `TransferService.transferTable`:
 
@@ -1820,9 +1820,9 @@ Manager/Owner processing cancel:
 7. Release locks.
 8. Return `table.transferred`.
 
-- **Step 7: Verify state flows**
+- **Bước 7: Kiểm tra các luồng trạng thái**
 
-Run:
+Chạy:
 
 ```bash
 npx nx test order --testPathPattern=order.service.spec.ts
@@ -1832,13 +1832,13 @@ npx nx test order --testPathPattern=transfer.service.spec.ts
 npx nx build order --configuration=development
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 13: Add BFF Gateway DTOs, REST Controllers, And Direct WebSocket Gateway
+## Task 13: Thêm DTO Gateway phía BFF, REST Controller và WebSocket Gateway trực tiếp
 
-**Files:**
+**Tệp liên quan:**
 
 - Create: `libs/interfaces/src/lib/gateway/order/order-request.dto.ts`
 - Create: `libs/interfaces/src/lib/gateway/order/order-response.dto.ts`
@@ -1850,7 +1850,7 @@ Expected: PASS.
 - Create: `apps/bff/src/app/modules/order/controllers/customer-order.controller.ts`
 - Create: `apps/bff/src/app/modules/order/controllers/staff-order.controller.ts`
 - Modify: `apps/bff/src/app/app.module.ts`
-- **Step 1: Add gateway DTOs**
+- **Bước 1: Thêm gateway DTO**
 
 Create DTOs with class-validator:
 
@@ -1893,7 +1893,7 @@ export class CartMutateRequestDto {
 }
 ```
 
-- **Step 2: Add realtime gateway**
+- **Bước 2: Thêm realtime gateway**
 
 Create `order-events.gateway.ts`:
 
@@ -1930,7 +1930,7 @@ emitBillRequested(event: BillRequestedEvent): void;
 emitTableTransferred(event: TableTransferredEvent): void;
 ```
 
-- **Step 3: Add customer controller**
+- **Bước 3: Thêm customer controller**
 
 Routes:
 
@@ -1949,7 +1949,7 @@ GET /customer/bill/current
 
 No `@Authorization({ secured: true })`. BFF forwards `tenantId` and `sessionId` from request metadata.
 
-- **Step 4: Add staff controller**
+- **Bước 4: Thêm staff controller**
 
 Routes:
 
@@ -1983,7 +1983,7 @@ Map permissions:
 - service request resolve: `SERVICE_REQUEST_RESOLVE`
 - transfer: `TABLE_TRANSFER`
 - bill reopen: `TABLE_UPDATE_STATUS`
-- **Step 5: Emit direct events after TCP responses**
+- **Bước 5: Emit sự kiện trực tiếp sau TCP response**
 
 After successful `SubmitOrderTcpResponse`, call:
 
@@ -1994,7 +1994,7 @@ this.realtimeEvents.emitOrderCreated(result.data.events.orderCreated);
 
 Apply the same pattern for status change, service request, bill request, and transfer responses.
 
-- **Step 6: Wire modules**
+- **Bước 6: Nối các module**
 
 Modify `apps/bff/src/app/app.module.ts` imports:
 
@@ -2003,26 +2003,26 @@ OrderModule,
 RealtimeModule,
 ```
 
-- **Step 7: Verify BFF build**
+- **Bước 7: Kiểm tra build BFF**
 
-Run:
+Chạy:
 
 ```bash
 npx nx build bff --configuration=development
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
 ---
 
-## Task 14: End-To-End Verification Checklist
+## Task 14: Danh sách kiểm tra xác minh End-to-End
 
-**Files:**
+**Tệp liên quan:**
 
 - Modify only when verification exposes compile/runtime gaps.
-- **Step 1: Run focused unit tests**
+- **Bước 1: Chạy unit test trọng tâm**
 
-Run:
+Chạy:
 
 ```bash
 npx nx test shared-types
@@ -2031,11 +2031,11 @@ npx nx test order
 npx nx test bff
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
-- **Step 2: Run backend builds**
+- **Bước 2: Chạy build backend**
 
-Run:
+Chạy:
 
 ```bash
 npx nx build catalog --configuration=development
@@ -2043,34 +2043,34 @@ npx nx build order --configuration=development
 npx nx build bff --configuration=development
 ```
 
-Expected: PASS.
+Kỳ vọng: PASS.
 
-- **Step 3: Start infrastructure**
+- **Bước 3: Khởi động hạ tầng**
 
-Run:
+Chạy:
 
 ```bash
 docker compose -f docker-compose.provider.yaml up -d postgres redis kafka
 ```
 
-Expected: PostgreSQL, Redis, Kafka containers are healthy.
+Kỳ vọng: các container PostgreSQL, Redis, Kafka hoạt động bình thường.
 
-- **Step 4: Start services**
+- **Bước 4: Khởi động các service**
 
-Run:
+Chạy:
 
 ```bash
 pnpm dev:bff-order
 ```
 
-Expected:
+Kỳ vọng:
 
 - BFF on `http://localhost:3300/api/v1`
 - Catalog on `http://localhost:3005/api/v1`
 - Order on `http://localhost:3301/api/v1`
 - Catalog TCP on `3205`
 - Order TCP on `3201`
-- **Step 5: Manual flow: submit then confirm**
+- **Bước 5: Luồng thủ công: submit rồi confirm**
 
 Use REST client or Swagger:
 
@@ -2083,14 +2083,14 @@ Use REST client or Swagger:
 7. Verify outbox row becomes `PUBLISHED`.
 8. Verify Kafka topic `order.confirmed` contains enriched event.
 
-- **Step 6: Manual flow: cart conflict**
+- **Bước 6: Luồng thủ công: xung đột cart**
 
 1. Read cart version `N`.
 2. Send mutation A with `expectedCartVersion=N`.
 3. Send mutation B again with `expectedCartVersion=N`.
 4. Verify mutation B returns `409 CART_VERSION_CONFLICT` and latest snapshot.
 
-- **Step 7: Manual flow: no oversell**
+- **Bước 7: Luồng thủ công: không oversell**
 
 1. Set a menu item stock to `1`.
 2. Create two pending orders for quantity `1`.
@@ -2098,7 +2098,7 @@ Use REST client or Swagger:
 4. Verify one succeeds and one returns `CATALOG_STOCK_INSUFFICIENT`.
 5. Verify final stock is `0`, never `-1`.
 
-- **Step 8: Manual flow: bill request**
+- **Bước 8: Luồng thủ công: yêu cầu hóa đơn**
 
 1. Move active non-canceled orders to `SERVED` using service/test fixture.
 2. Ensure cart is empty.
@@ -2108,7 +2108,7 @@ Use REST client or Swagger:
 6. Verify table status becomes `billing`.
 7. Verify no cash payment confirmation exists in Step 2.4.
 
-- **Step 9: Manual flow: transfer**
+- **Bước 9: Luồng thủ công: chuyển bàn**
 
 1. Start active session on table A.
 2. Transfer to available table B.
@@ -2119,7 +2119,7 @@ Use REST client or Swagger:
 
 ---
 
-## Deferred Work
+## Công việc hoãn lại
 
 These are intentionally excluded from Step 2.4:
 
@@ -2130,7 +2130,7 @@ These are intentionally excluded from Step 2.4:
 - Socket.IO Redis Adapter for multi-instance gateway.
 - Cash payment confirmation, refunds, split bill, Stripe/bank transfer.
 
-## Self-Review Checklist
+## Danh sách tự rà soát
 
 - Spec coverage:
   - Session PG + Redis active cache: Tasks 7-9.

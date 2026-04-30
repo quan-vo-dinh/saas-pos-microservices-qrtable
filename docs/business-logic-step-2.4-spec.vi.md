@@ -1,10 +1,10 @@
-# Bước 2.4 — Đặc tả Business Logic cuối cùng
+# Bước 2.4 — Đặc tả Luồng nghiệp vụ cuối cùng
 
-> **Phase:** 2A — Permissions + Order + Kafka  
-> **Step:** 2.4 — Order Service backend, Redis, Kafka, BFF Direct  
+> **Giai đoạn:** 2A — Phân quyền + Đơn hàng + Kafka  
+> **Bước:** 2.4 — Backend Order Service, Redis, Kafka, BFF trực tiếp  
 > **Date:** 2026-04-27  
-> **Status:** Chốt từ các quyết định audit Q1–Q12  
-> **Purpose:** Tài liệu này là đầu vào business-logic chuẩn tắc cho phiên lập kế hoạch triển khai tiếp theo. Đây không phải implementation plan và không chứa breakdown tác vụ code.
+> **Trạng thái:** Chốt từ các quyết định rà soát Q1–Q12  
+> **Mục đích:** Tài liệu này là đầu vào đặc tả nghiệp vụ chuẩn cho phiên lập kế hoạch triển khai tiếp theo. Đây không phải kế hoạch triển khai và không chứa phân rã tác vụ code.
 
 ---
 
@@ -12,20 +12,20 @@
 
 Đặc tả này chốt các câu hỏi mở từ `docs/superpowers/audits/step-2.4-audit-report.md` như sau:
 
-| Question | Selected | Decision                                                                                                                                                                                               |
-| -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Q1       | **B**    | Catalog Service sở hữu locking/deduction stock thông qua transactional TCP commands. Order Service không được mutate trực tiếp stock menu item do Catalog sở hữu.                                      |
-| Q2       | **B**    | Stock được deduct khi staff confirm order: `PENDING → PROCESSING`. Hành động submit của customer chỉ validate availability snapshot.                                                                   |
-| Q3       | **B**    | Bill được tạo ở lần submit order đầu tiên trong session. Bill bắt đầu ở trạng thái `OPEN` và aggregate tất cả order không bị canceled trong session.                                                   |
-| Q4       | **C**    | Thêm explicit bill request command. `REQUEST_BILL` service request là side effect cho notification, không phải business command duy nhất.                                                              |
-| Q5       | **B**    | Transfer table dùng saga-style consistency với transfer lock và compensation giữa Order, Catalog và Redis. Từ góc nhìn user/client là atomic, nhưng không phải một ACID transaction xuyên kho dữ liệu. |
-| Q6       | **B**    | Session được persist trong PostgreSQL của Order Service, Redis dùng làm active/session-cache layer.                                                                                                    |
-| Q7       | **C**    | Tách quyền cancel theo state: pending cancel và processing cancel. Cần cập nhật RBAC trước hoặc trong quá trình implementation planning Step 2.4.                                                      |
-| Q8       | **B**    | Mở rộng `OrderConfirmedEvent` với table snapshot, event metadata và station route/item metadata.                                                                                                       |
-| Q9       | **A**    | Thêm shared cart realtime contract: `CartUpdatedEvent` và conflict semantics.                                                                                                                          |
-| Q10      | **A**    | Triển khai minimal BFF WebSocket gateway ngay cho direct events Step 2.4/2.5. Phase 2B sẽ harden/scale bằng Redis Adapter và Kafka bridge.                                                             |
-| Q11      | **A**    | Thêm `station` vào Catalog `MenuItem` làm nguồn canonical cho KDS routing.                                                                                                                             |
-| Q12      | **A**    | Step 2.4 dừng ở bill `PENDING_PAYMENT`; chưa có cash payment confirmation. Payment execution để lại cho Phase 3.                                                                                       |
+| Câu hỏi | Lựa chọn | Quyết định                                                                                                                                                                                             |
+| ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Q1      | **B**    | Catalog Service sở hữu locking/deduction stock thông qua transactional TCP commands. Order Service không được mutate trực tiếp stock menu item do Catalog sở hữu.                                      |
+| Q2      | **B**    | Stock được deduct khi staff confirm order: `PENDING → PROCESSING`. Hành động submit của customer chỉ validate availability snapshot.                                                                   |
+| Q3      | **B**    | Bill được tạo ở lần submit order đầu tiên trong session. Bill bắt đầu ở trạng thái `OPEN` và aggregate tất cả order không bị canceled trong session.                                                   |
+| Q4      | **C**    | Thêm explicit bill request command. `REQUEST_BILL` service request là side effect cho notification, không phải business command duy nhất.                                                              |
+| Q5      | **B**    | Transfer table dùng saga-style consistency với transfer lock và compensation giữa Order, Catalog và Redis. Từ góc nhìn user/client là atomic, nhưng không phải một ACID transaction xuyên kho dữ liệu. |
+| Q6      | **B**    | Session được persist trong PostgreSQL của Order Service, Redis dùng làm active/session-cache layer.                                                                                                    |
+| Q7      | **C**    | Tách quyền cancel theo state: pending cancel và processing cancel. Cần cập nhật RBAC trước hoặc trong quá trình implementation planning Step 2.4.                                                      |
+| Q8      | **B**    | Mở rộng `OrderConfirmedEvent` với table snapshot, event metadata và station route/item metadata.                                                                                                       |
+| Q9      | **A**    | Thêm shared cart realtime contract: `CartUpdatedEvent` và conflict semantics.                                                                                                                          |
+| Q10     | **A**    | Triển khai minimal BFF WebSocket gateway ngay cho direct events Step 2.4/2.5. Phase 2B sẽ harden/scale bằng Redis Adapter và Kafka bridge.                                                             |
+| Q11     | **A**    | Thêm `station` vào Catalog `MenuItem` làm nguồn canonical cho KDS routing.                                                                                                                             |
+| Q12     | **A**    | Step 2.4 dừng ở bill `PENDING_PAYMENT`; chưa có cash payment confirmation. Payment execution để lại cho Phase 3.                                                                                       |
 
 ---
 
@@ -33,21 +33,21 @@
 
 ### 1.1 Trong phạm vi
 
-Step 2.4 định nghĩa business logic backend cho:
+Step 2.4 định nghĩa luồng nghiệp vụ backend cho:
 
-1. **Customer session lifecycle**
+1. **Vòng đời phiên khách hàng**
 
 - Session được persist trong Order PostgreSQL.
 - Redis active cache để customer truy cập nhanh và lưu idle/TTL metadata.
 - Validate session ownership theo phạm vi QR/table.
 
-2. **Shared cart**
+2. **Giỏ hàng dùng chung**
 
 - Redis cart theo session.
 - Global cart version cho optimistic locking.
 - Broadcast cart update tới tất cả thiết bị trong session.
 
-3. **Order submit**
+3. **Gửi đơn hàng**
 
 - Customer submit cart để tạo order ở trạng thái `PENDING`.
 - Cart được clear sau khi submit thành công.
@@ -55,21 +55,21 @@ Step 2.4 định nghĩa business logic backend cho:
 - Lần submit đầu tiên tạo session bill nếu chưa có.
 - BFF emit `order.created` tới staff room.
 
-4. **Order confirmation**
+4. **Xác nhận đơn hàng**
 
 - Staff confirm `PENDING → PROCESSING`.
 - Order Service gọi transactional stock deduct command của Catalog Service.
 - Thành công thì order sang `PROCESSING` và `order.confirmed` được publish lên Kafka.
 - Event payload đủ self-contained cho KDS routing.
 
-5. **Order cancellation**
+5. **Hủy đơn hàng**
 
 - Customer có thể cancel order `PENDING` của chính mình.
 - Staff có pending-cancel permission có thể cancel/reject order `PENDING`.
 - Manager/Owner có processing-cancel permission có thể cancel order `PROCESSING` kèm reason.
 - Tổng bill không bao gồm canceled orders.
 
-6. **Bill aggregation**
+6. **Tổng hợp hóa đơn**
 
 - Một bill cho mỗi active session.
 - Được tạo ở lần submit order đầu tiên.
@@ -77,7 +77,7 @@ Step 2.4 định nghĩa business logic backend cho:
 - `OPEN → PENDING_PAYMENT` trong Step 2.4.
 - `PAID` dành cho Phase 3.
 
-7. **Explicit bill request**
+7. **Yêu cầu gọi hóa đơn tường minh**
 
 - Customer gọi bill-request command.
 - Backend validate payment preconditions.
@@ -86,25 +86,25 @@ Step 2.4 định nghĩa business logic backend cho:
 - Table chuyển sang `billing` qua table-status command của Catalog.
 - Tạo `REQUEST_BILL` service request như side effect cho notification/audit.
 
-8. **Service requests**
+8. **Yêu cầu phục vụ**
 
 - Customer tạo request `CALL_STAFF`, `GENERAL_HELP` và `REQUEST_BILL` (side effect bill-request).
 - Staff acknowledge và resolve service requests.
 - BFF emit `service.requested` tới staff room.
 
-9. **Transfer table**
+9. **Chuyển bàn**
 
 - Staff chuyển active session cùng open orders/bill/cart từ bàn này sang bàn khác.
 - Dùng transfer lock và saga/compensation.
 - Cập nhật Order DB, Redis session/cart metadata và Catalog table statuses.
 - Emit realtime transfer/status event.
 
-10. **Minimal BFF WebSocket gateway**
+10. **Cổng BFF WebSocket tối thiểu**
 
 - Hỗ trợ direct events cho Step 2.4/2.5.
 - Phase 2B mở rộng khả năng scale/hardening cho gateway.
 
-11. **Catalog station metadata**
+11. **Metadata station của Catalog**
 
 - `MenuItem.station` là trường canonical cho KDS routing: `KITCHEN` hoặc `BAR`.
 
@@ -112,36 +112,36 @@ Step 2.4 định nghĩa business logic backend cho:
 
 Step 2.4 **không** triển khai hoặc chốt hành vi cuối cùng cho:
 
-1. Cash payment confirmation.
-2. Stripe hoặc bank transfer payment.
+1. Xác nhận thanh toán tiền mặt.
+2. Thanh toán qua Stripe hoặc chuyển khoản ngân hàng.
 3. Refunds.
 4. Split bill.
 5. Tích hợp Payment Service đầy đủ.
-6. Scale đầy đủ WebSocket Gateway Redis Adapter.
-7. Kitchen Service consumer implementation.
+6. Mở rộng đầy đủ WebSocket Gateway Redis Adapter.
+7. Triển khai consumer của Kitchen Service.
 8. KDS ticket persistence ngoài contract `order.confirmed`.
-9. Saga hardening đầy đủ và full outbox/CDC ngoài minimal reliable approach đã chọn.
-10. Offline queued writes trong customer/POS apps. Step 2.4 chỉ định nghĩa backend semantics tương thích idempotency.
+9. Hoàn thiện saga (hardening) đầy đủ và outbox/CDC hoàn chỉnh ngoài hướng tiếp cận tối thiểu đã chọn.
+10. Ghi hàng đợi offline trong ứng dụng customer/POS. Step 2.4 chỉ định nghĩa ngữ nghĩa backend tương thích idempotency.
 
 ---
 
-## 2. Canonical domain ownership
+## 2. Quyền sở hữu miền chuẩn
 
-### 2.1 Service ownership
+### 2.1 Quyền sở hữu theo service
 
-| Domain concept                            | Source of truth | Storage                               | Notes                                                                                        |
-| ----------------------------------------- | --------------- | ------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Menu item name/price/status/stock/station | Catalog Service | Catalog PostgreSQL                    | Catalog sở hữu stock locking và deduct/release.                                              |
-| Table/area/QR token/table status          | Catalog Service | Catalog PostgreSQL                    | Order Service phải gọi Catalog khi đổi table status.                                         |
-| Customer session                          | Order Service   | Order PostgreSQL + Redis active cache | PostgreSQL là durable source; Redis là active/session cache.                                 |
-| Cart                                      | Order Service   | Redis                                 | Ephemeral nhưng business-critical trong active session. Snapshot nằm trong events/responses. |
-| Order/order items                         | Order Service   | Order PostgreSQL                      | DB orders bắt đầu ở `PENDING`; `DRAFT` chỉ thuộc cart/UI.                                    |
-| Bill                                      | Order Service   | Order PostgreSQL                      | Một active bill cho mỗi session; payment completion để lại Phase 3.                          |
-| Service request                           | Order Service   | Order PostgreSQL                      | Notification side effects được emit bởi BFF.                                                 |
-| Kafka `order.confirmed`                   | Order Service   | Kafka via simplified outbox           | Payload self-contained cho Kitchen/Notification/Analytics.                                   |
-| WebSocket UI events                       | BFF             | Runtime                               | BFF phát trực tiếp sau TCP response thành công.                                              |
+| Khái niệm miền                            | Nguồn dữ liệu chuẩn | Nơi lưu trữ                           | Ghi chú                                                                                      |
+| ----------------------------------------- | ------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Menu item name/price/status/stock/station | Catalog Service     | Catalog PostgreSQL                    | Catalog sở hữu stock locking và deduct/release.                                              |
+| Table/area/QR token/table status          | Catalog Service     | Catalog PostgreSQL                    | Order Service phải gọi Catalog khi đổi table status.                                         |
+| Customer session                          | Order Service       | Order PostgreSQL + Redis active cache | PostgreSQL là durable source; Redis là active/session cache.                                 |
+| Cart                                      | Order Service       | Redis                                 | Ephemeral nhưng business-critical trong active session. Snapshot nằm trong events/responses. |
+| Order/order items                         | Order Service       | Order PostgreSQL                      | DB orders bắt đầu ở `PENDING`; `DRAFT` chỉ thuộc cart/UI.                                    |
+| Bill                                      | Order Service       | Order PostgreSQL                      | Một active bill cho mỗi session; payment completion để lại Phase 3.                          |
+| Service request                           | Order Service       | Order PostgreSQL                      | Notification side effects được emit bởi BFF.                                                 |
+| Kafka `order.confirmed`                   | Order Service       | Kafka via simplified outbox           | Payload self-contained cho Kitchen/Notification/Analytics.                                   |
+| WebSocket UI events                       | BFF                 | Runtime                               | BFF phát trực tiếp sau TCP response thành công.                                              |
 
-### 2.2 Quy tắc boundary nghiêm ngặt
+### 2.2 Quy tắc ranh giới nghiêm ngặt
 
 1. Order Service không được update trực tiếp stock hoặc table status do Catalog sở hữu.
 2. Order Service lưu denormalized snapshots cho hiển thị và historical audit:
@@ -157,9 +157,9 @@ Step 2.4 **không** triển khai hoặc chốt hành vi cuối cùng cho:
 
 ---
 
-## 3. Canonical state machines
+## 3. Máy trạng thái chuẩn
 
-### 3.1 Order state machine
+### 3.1 Máy trạng thái đơn hàng
 
 Giá trị canonical dùng chung:
 
@@ -170,7 +170,7 @@ DRAFT → PENDING → PROCESSING → READY → SERVED → COMPLETED
 
 Diễn giải trong Step 2.4:
 
-| State        | Persisted in DB?                                | Meaning                                                                                                                       |
+| Trạng thái   | Có lưu DB không?                                | Ý nghĩa                                                                                                                       |
 | ------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `DRAFT`      | No                                              | Trạng thái chỉ thuộc cart/UI trước submit. Chưa có DB order row.                                                              |
 | `PENDING`    | Yes                                             | Customer đã submit order; đang chờ staff confirm. Stock chưa bị deduct.                                                       |
@@ -180,9 +180,9 @@ Diễn giải trong Step 2.4:
 | `COMPLETED`  | Yes, but Phase 3 payment completion drives this | Payment hoàn tất và bill đã thanh toán.                                                                                       |
 | `CANCELED`   | Yes                                             | Trạng thái hủy kết thúc.                                                                                                      |
 
-### 3.2 Allowed order transitions trong Step 2.4
+### 3.2 Chuyển trạng thái đơn hàng được phép trong Step 2.4
 
-| Transition              | Actor         | Permission / guard                               | Step 2.4 behavior                                                      |
+| Chuyển trạng thái       | Tác nhân      | Quyền / guard                                    | Hành vi trong Step 2.4                                                 |
 | ----------------------- | ------------- | ------------------------------------------------ | ---------------------------------------------------------------------- |
 | Cart/DRAFT → `PENDING`  | Customer      | `SessionGuard → TenantGuard` + session ownership | Tạo order và order items từ cart snapshot.                             |
 | `PENDING → PROCESSING`  | Staff         | `ORDER_CONFIRM`                                  | Deduct stock qua Catalog, confirm order, emit Kafka.                   |
@@ -192,7 +192,7 @@ Diễn giải trong Step 2.4:
 
 Các transition `PROCESSING → READY`, `READY → SERVED`, `SERVED → COMPLETED` vẫn tương thích shared types nhưng chủ yếu hoàn thiện ở Phase 2B/3. Step 2.4 không được cản các phase sau dùng những transition này.
 
-### 3.3 Bill state machine
+### 3.3 Máy trạng thái hóa đơn
 
 Giá trị canonical:
 
@@ -203,25 +203,25 @@ OPEN → PENDING_PAYMENT → PAID
 
 Diễn giải trong Step 2.4:
 
-| State             | Meaning in Step 2.4                                                        |
+| Trạng thái        | Ý nghĩa trong Step 2.4                                                     |
 | ----------------- | -------------------------------------------------------------------------- |
 | `OPEN`            | Session có ít nhất một submitted order và vẫn nhận order mới.              |
 | `PENDING_PAYMENT` | Customer đã request payment; ordering bị khóa; table ở trạng thái billing. |
 | `PAID`            | Dành cho Phase 3 sau khi Payment Service confirm payment.                  |
 
-### 3.4 Service request state machine
+### 3.4 Máy trạng thái yêu cầu phục vụ
 
 ```txt
 PENDING → ACKNOWLEDGED → RESOLVED
 ```
 
-| Transition                | Actor    | Permission / guard                            |
+| Chuyển trạng thái         | Tác nhân | Quyền / guard                                 |
 | ------------------------- | -------- | --------------------------------------------- |
 | Create request            | Customer | `SessionGuard → TenantGuard` + active session |
 | `PENDING → ACKNOWLEDGED`  | Staff    | `SERVICE_REQUEST_ACKNOWLEDGE`                 |
 | `ACKNOWLEDGED → RESOLVED` | Staff    | `SERVICE_REQUEST_RESOLVE`                     |
 
-### 3.5 Tương tác với table state machine
+### 3.5 Tương tác với máy trạng thái bàn
 
 Các table statuses canonical dùng chữ thường:
 
@@ -231,7 +231,7 @@ available → occupied → billing → cleaning → available
 
 Step 2.4 dùng Catalog Service commands để đổi table statuses:
 
-| Trigger                            | Table transition                                | Owner                                                |
+| Tác nhân kích hoạt                 | Chuyển trạng thái bàn                           | Bên sở hữu                                           |
 | ---------------------------------- | ----------------------------------------------- | ---------------------------------------------------- |
 | QR/session bắt đầu ở bàn available | `available → occupied`                          | Catalog command, khởi tạo từ BFF/Order session flow  |
 | Customer request bill              | `occupied → billing`                            | Catalog command, khởi tạo từ Order bill request flow |
@@ -241,17 +241,17 @@ Payment completion và `billing → cleaning` thuộc Phase 3.
 
 ---
 
-## 4. Session lifecycle
+## 4. Vòng đời phiên
 
-### 4.1 Session storage model
+### 4.1 Mô hình lưu trữ phiên
 
 Do chọn Q6-B, sessions là durable entities trong Order domain.
 
-#### PostgreSQL session record
+#### Bản ghi phiên trong PostgreSQL
 
 Một session record tối thiểu nên có:
 
-| Field             | Purpose                                                                    |
+| Trường            | Mục đích                                                                   |
 | ----------------- | -------------------------------------------------------------------------- |
 | `id`              | Session ID.                                                                |
 | `tenant_id`       | Tenant isolation.                                                          |
@@ -265,15 +265,15 @@ Một session record tối thiểu nên có:
 | `current_bill_id` | Con trỏ trực tiếp tới session bill sau khi tạo; null trước lần submit đầu. |
 | `version`         | Optimistic version cho transfer/session metadata updates.                  |
 
-#### Redis active session key
+#### Khóa phiên đang hoạt động trong Redis
 
-Canonical active cache key:
+Khóa bộ nhớ đệm đang hoạt động chuẩn:
 
 ```txt
 session:{tenantId}:{sessionId}
 ```
 
-Minimum payload:
+Payload tối thiểu:
 
 ```json
 {
@@ -291,7 +291,7 @@ Minimum payload:
 ```
 
 TTL: **2 giờ**.  
-Idle rule: **30 phút**.
+Quy tắc nhàn rỗi: **30 phút**.
 
 ### 4.2 Quy tắc xử lý idle
 
@@ -310,7 +310,7 @@ Idle rule: **30 phút**.
 3. Redis expiry không phải source of truth cho việc đóng session. PostgreSQL session status mới là authoritative.
 4. Nếu thiếu Redis key nhưng PostgreSQL session vẫn active, backend rehydrate Redis sau khi validate tenant/table/session ownership.
 
-### 4.3 Quy tắc tạo/join session
+### 4.3 Quy tắc tạo/tham gia phiên
 
 Khi customer quét QR hoặc vào table flow:
 
@@ -336,9 +336,9 @@ Khi customer quét QR hoặc vào table flow:
 
 - Từ chối ordering và hiển thị “Bàn đang dọn dẹp”.
 
-### 4.4 Quy tắc customer ownership
+### 4.4 Quy tắc quyền sở hữu của khách hàng
 
-Cho mọi customer command:
+Cho mọi lệnh của khách hàng:
 
 1. Request phải có session ID hợp lệ.
 2. Session phải tồn tại trong PostgreSQL và ở trạng thái `ACTIVE`, trừ endpoint chỉ đọc tracking/bill view.
@@ -348,11 +348,11 @@ Cho mọi customer command:
 
 ---
 
-## 5. Shared cart business logic
+## 5. Luồng nghiệp vụ giỏ hàng dùng chung
 
-### 5.1 Cart storage
+### 5.1 Lưu trữ giỏ hàng
 
-Canonical Redis key:
+Khóa Redis chuẩn:
 
 ```txt
 cart:{tenantId}:{sessionId}
@@ -360,7 +360,7 @@ cart:{tenantId}:{sessionId}
 
 Cart có phạm vi session và là dữ liệu ephemeral. Cart chưa là DB order cho tới khi submit.
 
-Minimum cart snapshot:
+Ảnh chụp giỏ hàng tối thiểu:
 
 ```json
 {
@@ -384,7 +384,7 @@ Minimum cart snapshot:
 }
 ```
 
-### 5.2 Cart line identity
+### 5.2 Định danh dòng giỏ hàng
 
 `cartLineId` là bắt buộc vì cùng một menu item có thể xuất hiện nhiều lần với note khác nhau.
 
@@ -397,7 +397,7 @@ Line B: Phở bò x1, note = "thêm hành"
 
 Các dòng này không được ghi đè lẫn nhau.
 
-### 5.3 Cart versioning
+### 5.3 Phiên bản giỏ hàng
 
 Step 2.4 dùng **global cart version** làm optimistic lock canonical.
 
@@ -420,24 +420,24 @@ Quy tắc:
 
 `lineVersion` theo từng dòng được phép để phục vụ display/debug, nhưng thẩm quyền conflict vẫn thuộc global `cartVersion`.
 
-### 5.4 Cart conflict response
+### 5.4 Phản hồi xung đột giỏ hàng
 
-Conflict response semantics:
+Ngữ nghĩa phản hồi xung đột:
 
 ```txt
 HTTP status or wrapped app code: 409 CART_VERSION_CONFLICT
 Recoverable: true
 Payload: latest cart snapshot
-Client behavior: replace local cart, show “Người cùng bàn vừa đổi giỏ — đã đồng bộ”, let user retry
+Hành vi phía client: thay giỏ cục bộ bằng bản mới nhất, hiển thị “Người cùng bàn vừa đổi giỏ — đã đồng bộ”, cho phép người dùng thử lại
 ```
 
 Step 2.4 không cho phép hành vi last-write-wins.
 
-### 5.5 Cart mutations
+### 5.5 Các thao tác thay đổi giỏ hàng
 
 Các thao tác hỗ trợ:
 
-| Operation    | Rules                                                                                                                                                             |
+| Thao tác     | Quy tắc                                                                                                                                                           |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Add item     | Validate menu item tồn tại, cùng tenant, status là available, table không ở trạng thái billing. Snapshot name/price/station hiện tại.                             |
 | Set quantity | Quantity phải dương. Quantity = 0 nên biểu diễn bằng thao tác remove.                                                                                             |
@@ -445,7 +445,7 @@ Các thao tác hỗ trợ:
 | Remove line  | Remove theo `cartLineId`.                                                                                                                                         |
 | Clear cart   | Chỉ delete/empty cart khi cart chưa bị lock.                                                                                                                      |
 
-### 5.6 Cart submit lock
+### 5.6 Khóa khi gửi giỏ hàng
 
 Khi customer submit order:
 
@@ -460,7 +460,7 @@ Cart không bị khóa vĩnh viễn sau một lần submit order. Customer vẫn
 
 ---
 
-## 6. Order submit flow
+## 6. Luồng gửi đơn hàng
 
 ### 6.1 Ý nghĩa nghiệp vụ
 
@@ -470,7 +470,7 @@ Hành động này **không** deduct stock.
 Hành động này **không** gửi order tới KDS.  
 Hành động này có notify cho staff/POS rằng có order mới đang chờ xác nhận.
 
-### 6.2 Preconditions
+### 6.2 Điều kiện tiên quyết
 
 1. Session tồn tại và đang active.
 2. Session tenant khớp request tenant.
@@ -515,7 +515,7 @@ Hành động này có notify cho staff/POS rằng có order mới đang chờ x
 14. Trả order và bill summary cho BFF.
 15. BFF emit `order.created` tới staff room.
 
-### 6.4 Idempotency
+### 6.4 Tính lặp an toàn (Idempotency)
 
 Order submit bắt buộc có idempotency key.
 
@@ -535,9 +535,9 @@ Quy tắc:
 
 - Trả idempotency conflict.
 
-### 6.5 Các trường hợp submit thất bại
+### 6.5 Các trường hợp gửi đơn thất bại
 
-| Failure                   | Result                                                 |
+| Lỗi                       | Kết quả                                                |
 | ------------------------- | ------------------------------------------------------ |
 | Empty cart                | Reject, không ghi DB.                                  |
 | Cart version conflict     | Reject kèm latest cart snapshot.                       |
@@ -549,7 +549,7 @@ Quy tắc:
 
 ---
 
-## 7. Order confirmation và stock deduction
+## 7. Xác nhận đơn hàng và trừ tồn kho
 
 ### 7.1 Ý nghĩa nghiệp vụ
 
@@ -557,9 +557,9 @@ Staff confirmation chuyển submitted order thành order đang được kitchen 
 
 Đây là thời điểm stock bị deduct và Kafka `order.confirmed` được phát sinh.
 
-### 7.2 Preconditions
+### 7.2 Điều kiện tiên quyết
 
-1. Actor là staff/owner/manager đã xác thực và có `ORDER_CONFIRM`.
+1. Tác nhân là staff/owner/manager đã xác thực và có `ORDER_CONFIRM`.
 2. Order tồn tại trong cùng tenant.
 3. Order status là `PENDING`.
 4. Session active hoặc ít nhất chưa closed/paid.
@@ -567,17 +567,17 @@ Staff confirmation chuyển submitted order thành order đang được kitchen 
 6. Table không ở `billing`.
 7. Mọi item vẫn tồn tại và có thể deduct stock trong Catalog.
 
-### 7.3 Catalog stock deduct contract
+### 7.3 Hợp đồng trừ tồn kho với Catalog
 
 Do chọn Q1-B, Order Service gọi Catalog Service để deduct stock.
 
-Catalog command semantics:
+Ngữ nghĩa lệnh Catalog:
 
 ```txt
 catalog.stock.deduct_for_order
 ```
 
-Minimum request:
+Yêu cầu tối thiểu:
 
 ```json
 {
@@ -593,7 +593,7 @@ Minimum request:
 }
 ```
 
-Minimum response success:
+Phản hồi thành công tối thiểu:
 
 ```json
 {
@@ -609,7 +609,7 @@ Minimum response success:
 }
 ```
 
-Minimum response failure:
+Phản hồi thất bại tối thiểu:
 
 ```json
 {
@@ -626,7 +626,7 @@ Minimum response failure:
 }
 ```
 
-Catalog internal rule:
+Quy tắc nội bộ của Catalog:
 
 1. Sort item IDs theo thứ tự xác định trước khi lock để giảm deadlock.
 2. Lock các `menu_items` rows liên quan bằng `SELECT ... FOR UPDATE` trong Catalog DB transaction.
@@ -662,11 +662,11 @@ Catalog internal rule:
 11. Trả confirmed order response cho BFF.
 12. BFF emit `order.status_changed` tới staff và customer rooms.
 
-### 7.5 Confirm retry và idempotency
+### 7.5 Thử lại xác nhận và idempotency
 
 Nếu confirm request được retry:
 
-| Current state                                   | Behavior                                         |
+| Trạng thái hiện tại                             | Hành vi                                          |
 | ----------------------------------------------- | ------------------------------------------------ |
 | `PENDING` và chưa có deduct thành công trước đó | Thử confirm bình thường.                         |
 | `PROCESSING` và cùng actor/request correlation  | Trả existing confirmed order; không deduct lại.  |
@@ -680,7 +680,7 @@ Catalog deduct command phải idempotent theo order ID hoặc confirm idempotenc
 Nếu Catalog stock lock timeout:
 
 1. Không update Order status.
-2. Trả retryable error:
+2. Trả lỗi có thể thử lại:
 
 - `STOCK_LOCK_TIMEOUT`
 - `recoverable = true`
@@ -694,9 +694,9 @@ Nếu Order DB row lock timeout:
 
 ---
 
-## 8. Kafka `order.confirmed` event contract
+## 8. Hợp đồng sự kiện Kafka `order.confirmed`
 
-### 8.1 Mục đích event
+### 8.1 Mục đích sự kiện
 
 `order.confirmed` là một cross-context domain event.
 
@@ -708,9 +708,9 @@ Các consumers gồm:
 
 Event phải đủ self-contained để Kitchen tạo initial tickets mà không cần query đồng bộ sang Order Service để lấy table name hoặc station routes.
 
-### 8.2 Extended payload
+### 8.2 Payload mở rộng
 
-Canonical payload cho Step 2.4:
+Payload chuẩn cho Step 2.4:
 
 ```json
 {
@@ -756,7 +756,7 @@ Lý do:
 - Giữ thứ tự theo phạm vi tenant.
 - Phù hợp nguyên tắc tenant isolation trong Kafka guide.
 
-### 8.4 Event reliability
+### 8.4 Độ tin cậy sự kiện
 
 Reliability tối thiểu chấp nhận cho Step 2.4:
 
@@ -781,9 +781,9 @@ Kitchen không được tạo duplicate KDS tickets nếu cùng event `order.con
 
 ---
 
-## 9. Bill aggregation
+## 9. Tổng hợp hóa đơn
 
-### 9.1 Bill creation
+### 9.1 Tạo hóa đơn
 
 Bill được tạo khi order đầu tiên trong session submit thành công.
 
@@ -794,7 +794,7 @@ Quy tắc:
 3. Bill chứa submitted order ID.
 4. Tổng bill do server tính từ các order chưa bị cancel.
 
-### 9.2 Bill total calculation
+### 9.2 Tính tổng hóa đơn
 
 Trong Step 2.4:
 
@@ -843,7 +843,7 @@ Recompute bill totals khi:
 3. Order item bị cancel hoặc điều chỉnh bởi authorized manager flow.
 4. Áp dụng payment rounding ở Phase 3.
 
-### 9.5 Edge case khi order đầu tiên bị hủy
+### 9.5 Trường hợp biên khi đơn đầu tiên bị hủy
 
 Nếu order đầu tiên tạo bill rồi bị cancel trước khi có order khác:
 
@@ -855,7 +855,7 @@ Không thêm trạng thái bill `VOID` trong Step 2.4.
 
 ---
 
-## 10. Explicit bill request flow
+## 10. Luồng yêu cầu gọi hóa đơn tường minh
 
 ### 10.1 Ý nghĩa nghiệp vụ
 
@@ -863,7 +863,7 @@ Bill request là ý định rõ ràng của customer muốn dừng gọi món v�
 
 Do chọn Q4-C, đây không chỉ là service request. Đây là business command có service-request notification làm side effect.
 
-### 10.2 Preconditions
+### 10.2 Điều kiện tiên quyết
 
 1. Customer session đang active.
 2. Session có bill ở trạng thái `OPEN`.
@@ -872,7 +872,7 @@ Do chọn Q4-C, đây không chỉ là service request. Đây là business comma
 5. Cart phải rỗng. Nếu cart có item chưa submit, reject bill request và yêu cầu customer submit hoặc clear cart trước.
 6. Payment readiness condition đã thỏa.
 
-### 10.3 Payment readiness condition
+### 10.3 Điều kiện sẵn sàng thanh toán
 
 Trong Step 2.4, chọn quy tắc canonical:
 
@@ -937,17 +937,17 @@ Hành vi reopen này được cho phép bởi `ALLOWED_BILL_TRANSITIONS` hiện 
 
 ---
 
-## 11. Service request logic
+## 11. Luồng nghiệp vụ yêu cầu phục vụ
 
-### 11.1 Request types
+### 11.1 Loại yêu cầu
 
-| Type           | Meaning                                              | Business side effects                                                            |
+| Loại           | Ý nghĩa                                              | Tác dụng phụ nghiệp vụ                                                           |
 | -------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `CALL_STAFF`   | Customer gọi staff tới bàn.                          | Tạo request và notify staff.                                                     |
 | `GENERAL_HELP` | Customer yêu cầu hỗ trợ chung.                       | Tạo request và notify staff.                                                     |
 | `REQUEST_BILL` | Notification/audit sinh ra từ explicit bill request. | Nên được tạo bởi bill-request command, không là standalone payment lock command. |
 
-### 11.2 Standalone service request submit
+### 11.2 Gửi yêu cầu phục vụ độc lập
 
 Với `CALL_STAFF` và `GENERAL_HELP`:
 
@@ -965,7 +965,7 @@ Với `CALL_STAFF` và `GENERAL_HELP`:
 
 Khuyến nghị: route sang explicit bill request command để tránh duplicate UI behavior.
 
-### 11.4 Acknowledge / Resolve
+### 11.4 Xác nhận đã nhận / Hoàn tất xử lý
 
 Acknowledge:
 
@@ -981,13 +981,13 @@ Resolve:
 
 ---
 
-## 12. Order cancellation
+## 12. Hủy đơn hàng
 
-### 12.1 Permission model
+### 12.1 Mô hình phân quyền
 
 Do chọn Q7-C, Step 2.4 yêu cầu tách quyền:
 
-| New permission            | Purpose                              | Suggested roles        |
+| Quyền mới                 | Mục đích                             | Vai trò đề xuất        |
 | ------------------------- | ------------------------------------ | ---------------------- |
 | `order.cancel_pending`    | Cancel/reject order `PENDING`        | OWNER, MANAGER, WAITER |
 | `order.cancel_processing` | Cancel order `PROCESSING` kèm reason | OWNER, MANAGER         |
@@ -998,13 +998,13 @@ Do chọn Q7-C, Step 2.4 yêu cầu tách quyền:
 
 Customer chỉ được cancel pending order của chính mình.
 
-Preconditions:
+Điều kiện tiên quyết:
 
 1. Session sở hữu order.
 2. Order status là `PENDING`.
 3. Order chưa được confirm.
 
-Effects:
+Tác động:
 
 1. Set order `CANCELED`.
 2. Set `cancelledAt`.
@@ -1014,7 +1014,7 @@ Effects:
 6. Không cần restore stock vì stock chưa bị deduct.
 7. BFF emit `order.status_changed` tới staff và customer rooms.
 
-### 12.3 Staff reject pending
+### 12.3 Nhân viên từ chối đơn chờ xác nhận
 
 Staff có pending-cancel permission có thể reject/cancel pending order.
 
@@ -1026,7 +1026,7 @@ Effects:
 4. Recompute bill.
 5. Notify customer qua `order.status_changed`.
 
-### 12.4 Manager cancel processing
+### 12.4 Quản lý hủy đơn đang xử lý
 
 Manager/Owner có processing-cancel permission có thể cancel processing order.
 
@@ -1034,7 +1034,7 @@ Preconditions:
 
 1. Order status là `PROCESSING`.
 2. Bắt buộc có cancel reason.
-3. Actor là Manager/Owner hoặc có processing-cancel permission rõ ràng.
+3. Tác nhân là Manager/Owner hoặc có processing-cancel permission rõ ràng.
 
 Effects:
 
@@ -1044,7 +1044,7 @@ Effects:
 4. Gọi Catalog stock release/restore command nếu business stock policy cho phép restore prepared stock.
 5. Notify KDS/clients qua status event.
 
-### 12.5 Stock restore policy
+### 12.5 Chính sách hoàn trả tồn kho
 
 Mặc định cho Step 2.4:
 
@@ -1058,7 +1058,7 @@ Ingredient wastage/no-restore policy nằm ngoài Step 2.4 và không được o
 
 ---
 
-## 13. Transfer table flow
+## 13. Luồng chuyển bàn
 
 ### 13.1 Ý nghĩa nghiệp vụ
 
@@ -1075,9 +1075,9 @@ Phải bảo toàn:
 
 Cart key vẫn là `cart:{tenantId}:{sessionId}` vì session không đổi.
 
-### 13.2 Preconditions
+### 13.2 Điều kiện tiên quyết
 
-1. Actor có `TABLE_TRANSFER`.
+1. Tác nhân có `TABLE_TRANSFER`.
 2. Bàn cũ thuộc tenant.
 3. Bàn mới thuộc tenant.
 4. Bàn mới có status `available`.
@@ -1107,7 +1107,7 @@ Quy tắc:
 3. Lock được release sau thành công/thất bại.
 4. Expired locks phải recover được bằng cách kiểm tra DB state.
 
-### 13.4 Saga steps
+### 13.4 Các bước saga
 
 Thứ tự khuyến nghị:
 
@@ -1131,9 +1131,9 @@ Thứ tự khuyến nghị:
 8. Emit realtime transfer/table status event.
 9. Release transfer lock.
 
-### 13.5 Compensation
+### 13.5 Bù trừ
 
-| Failure point                                      | Compensation                                                                            |
+| Điểm lỗi                                           | Cơ chế bù trừ                                                                           |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Catalog destination reservation thất bại           | Abort; không mutate Order.                                                              |
 | Order DB update thất bại sau Catalog reservation   | Release Catalog reservation / revert destination table.                                 |
@@ -1141,7 +1141,7 @@ Thứ tự khuyến nghị:
 | Redis update lỗi sau DB/Catalog thành công         | Rehydrate Redis từ PostgreSQL ở request kế tiếp; emit warning log.                      |
 | WS emit lỗi                                        | Không rollback business transaction; clients refetch/poll.                              |
 
-### 13.6 Customer QR sau transfer
+### 13.6 QR của khách hàng sau khi chuyển bàn
 
 Sau transfer:
 
@@ -1152,9 +1152,9 @@ Sau transfer:
 
 ---
 
-## 14. Catalog changes bắt buộc theo business logic
+## 14. Thay đổi Catalog bắt buộc theo luồng nghiệp vụ
 
-### 14.1 MenuItem Station
+### 14.1 Station của MenuItem
 
 Do chọn Q11-A, Catalog `MenuItem` cần trường station canonical.
 
@@ -1177,37 +1177,37 @@ Quy tắc:
 3. Order item snapshot lưu station tại thời điểm submit.
 4. `order.confirmed` include station cho từng item.
 
-### 14.2 Catalog availability vs stock
+### 14.2 Trạng thái khả dụng của Catalog và tồn kho
 
 Catalog expose đồng thời:
 
 - display status: `available` / `out_of_stock`,
 - numeric stock.
 
-Business rules:
+Quy tắc nghiệp vụ:
 
 1. Customer chỉ add/submit được item `available`.
 2. Staff confirm có thể fail nếu numeric stock không đủ.
 3. Sau deduct làm stock về `0`, Catalog nên mark/expose item out of stock theo Catalog policy.
 4. BFF/clients nên nhận menu stock update qua cơ chế cập nhật menu hiện có/tương lai.
 
-### 14.3 Catalog stock commands
+### 14.3 Các lệnh tồn kho của Catalog
 
-Các internal commands bắt buộc:
+Các lệnh nội bộ bắt buộc:
 
-| Command                         | Purpose                                                         |
+| Lệnh                            | Mục đích                                                        |
 | ------------------------------- | --------------------------------------------------------------- |
 | `stock.deduct_for_order`        | Deduct stock khi confirm order.                                 |
 | `stock.release_for_order`       | Restore stock khi cancel processing nếu policy cho phép.        |
 | `menu_items.validate_orderable` | Validate current item status/price/station tại lúc submit cart. |
 
-Tên TCP message chính xác có thể chốt ở implementation planning, nhưng business capabilities này là bắt buộc.
+Tên TCP message chính xác có thể chốt ở giai đoạn lập kế hoạch triển khai, nhưng các năng lực nghiệp vụ này là bắt buộc.
 
 ---
 
-## 15. WebSocket / Realtime contract
+## 15. Hợp đồng WebSocket / Realtime
 
-### 15.1 Phạm vi minimal BFF Gateway
+### 15.1 Phạm vi Cổng BFF tối thiểu
 
 Do chọn Q10-A, Step 2.4 bao gồm minimal BFF WebSocket gateway đủ dùng cho tích hợp FE Step 2.5.
 
@@ -1218,11 +1218,11 @@ Phase 2B sẽ thêm:
 - KDS-specific rooms và scaling,
 - SLA warning bridge.
 
-### 15.2 Rooms
+### 15.2 Nhóm nhận tin (Room)
 
-Rooms tối thiểu:
+Các room tối thiểu:
 
-| Room                           | Members                                        |
+| Room                           | Thành viên                                     |
 | ------------------------------ | ---------------------------------------------- |
 | `tenant:{tenantId}:staff`      | Owner/Manager/Waiter POS clients của tenant.   |
 | `session:{sessionId}:customer` | Customer devices cùng chia sẻ table session.   |
@@ -1235,7 +1235,7 @@ tenant:{tenantId}:kds:kitchen
 tenant:{tenantId}:kds:bar
 ```
 
-### 15.3 WebSocket events
+### 15.3 Sự kiện WebSocket
 
 #### `order.created`
 
@@ -1264,7 +1264,7 @@ Nguồn: BFF direct sau TCP response submit order thành công.
 
 #### `order.status_changed`
 
-Rooms:
+Các room:
 
 ```txt
 tenant:{tenantId}:staff
@@ -1366,9 +1366,9 @@ Payload:
 }
 ```
 
-### 15.4 WebSocket reliability model
+### 15.4 Mô hình độ tin cậy WebSocket
 
-WebSocket events là tín hiệu gợi ý (hints), không phải source of truth.
+Các sự kiện WebSocket là tín hiệu gợi ý (hints), không phải nguồn dữ liệu chuẩn.
 
 Quy tắc:
 
@@ -1379,13 +1379,13 @@ Quy tắc:
 
 ---
 
-## 16. Endpoint / Command inventory
+## 16. Danh mục Endpoint / Command
 
-Mục này liệt kê business capabilities cần cho Step 2.4. Exact paths sẽ chốt ở implementation planning.
+Mục này liệt kê các năng lực nghiệp vụ cần cho Step 2.4. Đường dẫn chính xác sẽ chốt ở giai đoạn lập kế hoạch triển khai.
 
-### 16.1 Customer commands
+### 16.1 Lệnh của khách hàng
 
-| Capability                  | Guard                              | Required behavior                                               |
+| Năng lực                    | Guard                              | Hành vi bắt buộc                                                |
 | --------------------------- | ---------------------------------- | --------------------------------------------------------------- |
 | Get/join session            | Session/customer QR guard + tenant | Tạo hoặc join active table session.                             |
 | Get cart                    | Session + tenant                   | Trả cart snapshot/version.                                      |
@@ -1397,9 +1397,9 @@ Mục này liệt kê business capabilities cần cho Step 2.4. Exact paths sẽ
 | Request bill                | Session + tenant                   | Explicit bill request command.                                  |
 | Get current bill            | Session + tenant                   | Chỉ bill của session hiện tại.                                  |
 
-### 16.2 Staff commands
+### 16.2 Lệnh của nhân viên
 
-| Capability                  | Guard/permission                                                                 | Required behavior                                             |
+| Năng lực                    | Guard/quyền                                                                      | Hành vi bắt buộc                                              |
 | --------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | List orders                 | `ORDER_GET_LIST`                                                                 | Tenant-scoped POS list.                                       |
 | Get order detail            | `ORDER_GET_BY_ID`                                                                | Tenant-scoped.                                                |
@@ -1412,7 +1412,7 @@ Mục này liệt kê business capabilities cần cho Step 2.4. Exact paths sẽ
 | Reopen bill before payment  | `TABLE_UPDATE_STATUS` + bill ownership trong cùng tenant; OWNER, MANAGER, WAITER | `PENDING_PAYMENT → OPEN`.                                     |
 | Get bill/list pending bills | Existing/future bill/payment read permission                                     | Cần cho POS Bills view.                                       |
 
-### 16.3 Yêu cầu cập nhật permission
+### 16.3 Yêu cầu cập nhật quyền
 
 Do chọn Q7-C, Step 2.4 yêu cầu cập nhật RBAC docs/code trước khi triển khai endpoint:
 
@@ -1434,7 +1434,7 @@ Khuyến nghị mapping:
 
 ---
 
-## 17. Data consistency và recovery
+## 17. Nhất quán dữ liệu và khôi phục
 
 ### 17.1 Tenant isolation
 
@@ -1442,7 +1442,7 @@ Mọi persistent query phải có `tenant_id`.
 
 Mọi Redis key phải có tenant ID, trừ legacy/global guard keys đã được migrate hoặc cô lập rõ ràng.
 
-Canonical keys:
+Các khóa chuẩn:
 
 ```txt
 session:{tenantId}:{sessionId}
@@ -1451,13 +1451,13 @@ transfer:{tenantId}:{sessionId}
 idempotency:order-submit:{tenantId}:{sessionId}:{key}
 ```
 
-### 17.2 Server time
+### 17.2 Thời gian máy chủ
 
 Mọi timestamp phải được sinh server-side theo UTC.
 
 Client timestamps không bao giờ là authoritative.
 
-### 17.3 Saga recovery principles
+### 17.3 Nguyên tắc khôi phục theo saga
 
 Với các thao tác multi-service:
 
@@ -1475,7 +1475,7 @@ Các thao tác cần saga/recovery:
 
 ### 17.4 Tóm tắt idempotency
 
-| Command               | Idempotency key                                 |
+| Lệnh                  | Khóa idempotency                                |
 | --------------------- | ----------------------------------------------- |
 | Submit order          | FE-generated key scoped theo tenant/session.    |
 | Confirm order         | `confirm-order:{orderId}` hoặc request key.     |
@@ -1486,25 +1486,25 @@ Các thao tác cần saga/recovery:
 
 ---
 
-## 18. Error semantics
+## 18. Ngữ nghĩa lỗi
 
-### 18.1 Business error categories
+### 18.1 Nhóm lỗi nghiệp vụ
 
-| Error                      | Meaning                                        | Recoverable?    | Client behavior                                             |
-| -------------------------- | ---------------------------------------------- | --------------- | ----------------------------------------------------------- |
-| `CART_VERSION_CONFLICT`    | Cart thay đổi so với client snapshot.          | Yes             | Replace cart bằng latest snapshot rồi retry.                |
-| `ITEM_UNAVAILABLE`         | Menu item không còn order được.                | Yes             | Remove/disable item.                                        |
-| `PRICE_CHANGED`            | Giá thay đổi so với cart snapshot.             | Yes             | Hiển thị giá mới nhất và yêu cầu user xác nhận.             |
-| `INSUFFICIENT_STOCK`       | Confirm thất bại do thiếu stock.               | Yes             | Staff/customer chọn món thay thế hoặc cancel pending order. |
-| `STOCK_LOCK_TIMEOUT`       | Timeout khi lock stock đồng thời.              | Yes             | Retry confirm.                                              |
-| `INVALID_ORDER_TRANSITION` | State transition không hợp lệ.                 | Usually no      | Refetch state.                                              |
-| `BILL_NOT_READY`           | Customer request payment quá sớm.              | Yes             | Cho biết order/item nào chưa served.                        |
-| `TABLE_NOT_AVAILABLE`      | Destination table cho transfer không sẵn sàng. | Yes             | Chọn bàn khác.                                              |
-| `TRANSFER_IN_PROGRESS`     | Đang có transfer khác chạy.                    | Yes             | Retry sau một khoảng ngắn.                                  |
-| `SESSION_CLOSED`           | Session không còn active.                      | No for mutation | Quét lại QR hoặc nhờ staff.                                 |
-| `TENANT_MISMATCH`          | Sai khác tenant/session xuyên miền.            | No              | Security error.                                             |
+| Mã lỗi                     | Ý nghĩa                                        | Có thể phục hồi? | Hành vi phía client                                         |
+| -------------------------- | ---------------------------------------------- | ---------------- | ----------------------------------------------------------- |
+| `CART_VERSION_CONFLICT`    | Cart thay đổi so với client snapshot.          | Yes              | Replace cart bằng latest snapshot rồi retry.                |
+| `ITEM_UNAVAILABLE`         | Menu item không còn order được.                | Yes              | Remove/disable item.                                        |
+| `PRICE_CHANGED`            | Giá thay đổi so với cart snapshot.             | Yes              | Hiển thị giá mới nhất và yêu cầu user xác nhận.             |
+| `INSUFFICIENT_STOCK`       | Confirm thất bại do thiếu stock.               | Yes              | Staff/customer chọn món thay thế hoặc cancel pending order. |
+| `STOCK_LOCK_TIMEOUT`       | Timeout khi lock stock đồng thời.              | Yes              | Retry confirm.                                              |
+| `INVALID_ORDER_TRANSITION` | State transition không hợp lệ.                 | Usually no       | Refetch state.                                              |
+| `BILL_NOT_READY`           | Customer request payment quá sớm.              | Yes              | Cho biết order/item nào chưa served.                        |
+| `TABLE_NOT_AVAILABLE`      | Destination table cho transfer không sẵn sàng. | Yes              | Chọn bàn khác.                                              |
+| `TRANSFER_IN_PROGRESS`     | Đang có transfer khác chạy.                    | Yes              | Retry sau một khoảng ngắn.                                  |
+| `SESSION_CLOSED`           | Session không còn active.                      | No for mutation  | Quét lại QR hoặc nhờ staff.                                 |
+| `TENANT_MISMATCH`          | Sai khác tenant/session xuyên miền.            | No               | Security error.                                             |
 
-### 18.2 Response wrapping
+### 18.2 Cơ chế bọc phản hồi
 
 HTTP responses vẫn dùng cấu trúc wrap của `ExceptionInterceptor`:
 
@@ -1522,9 +1522,9 @@ Business errors vẫn cần chứa machine-readable error details có cấu trú
 
 ---
 
-## 19. Acceptance criteria cho business logic
+## 19. Tiêu chí chấp nhận cho luồng nghiệp vụ
 
-Step 2.4 được coi là business-complete khi toàn bộ tiêu chí bên dưới được thỏa về mặt khái niệm và có thể kiểm chứng bằng tests/manual flows trong lúc triển khai.
+Step 2.4 được coi là hoàn tất về nghiệp vụ khi toàn bộ tiêu chí bên dưới được thỏa ở mức khái niệm và có thể kiểm chứng bằng test/luồng chạy tay trong lúc triển khai.
 
 ### 19.1 Session và Cart
 
@@ -1535,7 +1535,7 @@ Step 2.4 được coi là business-complete khi toàn bộ tiêu chí bên dư�
 - Cart conflict trả latest snapshot.
 - Cart updates emit `cart.updated` tới session customer room.
 
-### 19.2 Order Submit
+### 19.2 Gửi đơn hàng
 
 - Customer submit tạo order `PENDING`.
 - Không deduct stock khi submit.
@@ -1544,7 +1544,7 @@ Step 2.4 được coi là business-complete khi toàn bộ tiêu chí bên dư�
 - Submit trùng với cùng idempotency key không tạo duplicate order.
 - BFF emit `order.created`.
 
-### 19.3 Order Confirm
+### 19.3 Xác nhận đơn hàng
 
 - Staff confirm yêu cầu `ORDER_CONFIRM`.
 - Confirm gọi transactional stock deduct command của Catalog.
@@ -1554,7 +1554,7 @@ Step 2.4 được coi là business-complete khi toàn bộ tiêu chí bên dư�
 - Confirm thành công phát enriched `order.confirmed` event.
 - BFF emit `order.status_changed`.
 
-### 19.4 Bill Request
+### 19.4 Yêu cầu gọi hóa đơn
 
 - Bill tồn tại sau submit đầu tiên.
 - Customer bill request dùng explicit command.
@@ -1572,7 +1572,7 @@ Step 2.4 được coi là business-complete khi toàn bộ tiêu chí bên dư�
 - Bill total loại canceled orders.
 - Processing cancel gọi Catalog stock release theo stock policy của Step 2.4.
 
-### 19.6 Transfer Table
+### 19.6 Chuyển bàn
 
 - Transfer yêu cầu `TABLE_TRANSFER`.
 - Destination table phải là `available`.
@@ -1590,7 +1590,7 @@ Step 2.4 được coi là business-complete khi toàn bộ tiêu chí bên dư�
 - Permission matrix có phân biệt pending cancel và processing cancel.
 - Chef/Barista không được nhận raw order permissions thông qua Step 2.4.
 
-### 19.8 Event Contracts
+### 19.8 Hợp đồng sự kiện
 
 - `order.created`, `order.status_changed`, `service.requested`, `cart.updated`, `bill.requested`, và `table.transferred` có payload ổn định trước FE integration.
 - `order.confirmed` bao gồm table và station snapshots.
@@ -1598,22 +1598,22 @@ Step 2.4 được coi là business-complete khi toàn bộ tiêu chí bên dư�
 
 ---
 
-## 20. Cập nhật tài liệu bắt buộc trước implementation planning
+## 20. Cập nhật tài liệu bắt buộc trước khi lập kế hoạch triển khai
 
-Các mục sau **đã được đồng bộ trong repo** (2026-04-28); implementation Order/BFF vẫn cần wiring endpoint/service theo đặc tả:
+Các mục sau **đã được đồng bộ trong repo** (2026-04-28); phần triển khai Order/BFF vẫn cần nối endpoint/service theo đặc tả:
 
 1. `docs/architecture/permission-matrix.md` — ma trận §6 (52 quyền) + §6.1 mô tả cancel tách quyền.
 2. `libs/constants/src/lib/enum/role.enum.ts` — `ORDER_CANCEL_PENDING` / `ORDER_CANCEL_PROCESSING` (đã thay `ORDER_CANCEL`).
 3. `apps/user-access/src/seeder/role.json` + `role.spec.ts` + `apps/bff/.../permission.guard.spec.ts` + `tools/verify-permission-matrix.sh` — mapping WAITER pending cancel.
 4. `libs/shared/types/src/lib/realtime-events.types.ts` — `OrderConfirmedEvent` enrich, `CartUpdatedEvent`, `BillRequestedEvent`, `TableTransferredEvent`.
 5. `libs/shared/types/src/lib/menu.types.ts` + `order.types.ts` — `PreparationStation` / snapshot `station` trên order item.
-6. `docs/superpowers/specs/2026-04-11-catalog-service-backend-design.md` — cột `station` + §3.8 TCP stock semantics; migration DB Catalog **TODO** khi implement.
+6. `docs/superpowers/specs/2026-04-11-catalog-service-backend-design.md` — cột `station` + §3.8 ngữ nghĩa TCP stock; migration DB Catalog **TODO** khi triển khai.
 7. `libs/utils/request.util.ts` + `SessionGuard` + `TenantGuard` — key `session:{tenantId}:{sessionId}`, optional `orderCount` idle (C14/C15); `docs/references/auth-system-reference.md` + `technical-architecture.md` đã cập nhật tương ứng.
 8. `libs/constants/.../tcp-request-message.ts` — pattern `MENU_ITEM.VALIDATE_ORDERABLE`, `STOCK_DEDUCT_FOR_ORDER`, `STOCK_RELEASE_FOR_ORDER`.
 
 ---
 
-## 21. Final canonical defaults
+## 21. Mặc định chuẩn cuối cùng
 
 Trừ khi có tài liệu được phê duyệt sau này thay thế đặc tả này, Step 2.4 dùng các mặc định sau:
 
@@ -1635,8 +1635,8 @@ Trừ khi có tài liệu được phê duyệt sau này thay thế đặc tả 
 
 ---
 
-## 22. Stop Gate
+## 22. Điểm dừng
 
-Tài liệu này chốt business logic cho Step 2.4 và sẵn sàng làm đầu vào cho implementation plan trong tương lai.
+Tài liệu này chốt luồng nghiệp vụ cho Step 2.4 và sẵn sàng làm đầu vào cho kế hoạch triển khai trong tương lai.
 
-Các prerequisite RBAC / shared types / TCP pattern / session cache đã được merge trong repo; tài liệu này vẫn không chứa implementation plan đầy đủ cho Order Service.
+Các phần tiền đề RBAC / shared types / TCP pattern / session cache đã được merge trong repo; tài liệu này vẫn không chứa kế hoạch triển khai đầy đủ cho Order Service.
