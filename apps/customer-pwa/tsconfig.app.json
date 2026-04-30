@@ -23,6 +23,7 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
+    "allowUmdGlobalAccess": true,
     "noEmit": true,
     "jsx": "react-jsx",
 
