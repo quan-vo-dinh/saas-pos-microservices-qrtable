@@ -6,6 +6,17 @@ export type JoinSessionTcpRequest = {
   qrToken: string;
 };
 
+export type CartGetTcpRequest = {
+  tenantId: string;
+  sessionId: string;
+};
+
+export type CartClearTcpRequest = {
+  tenantId: string;
+  sessionId: string;
+  expectedCartVersion: number;
+};
+
 export type CartMutationOperation = 'ADD_ITEM' | 'SET_QUANTITY' | 'UPDATE_NOTE' | 'REMOVE_LINE' | 'CLEAR';
 
 export type CartMutateTcpRequest = {
@@ -31,6 +42,8 @@ export type SubmitOrderTcpRequest = {
 export type OrderIdTcpRequest = {
   tenantId: string;
   orderId: string;
+  /** BFF customer flows: must match order.sessionId */
+  sessionId?: string;
 };
 
 export type StaffOrderActionTcpRequest = OrderIdTcpRequest & {

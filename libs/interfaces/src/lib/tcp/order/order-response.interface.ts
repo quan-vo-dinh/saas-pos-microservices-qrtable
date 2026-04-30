@@ -61,3 +61,9 @@ export type TableTransferredTcpResponse = {
     tableTransferred: TableTransferredEvent;
   };
 };
+
+/** Current bill for session (may be null before first submit). */
+export type BillCurrentTcpResponse = {
+  bill: Bill | null;
+  cart: CartSnapshot;
+};

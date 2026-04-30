@@ -5,4 +5,6 @@ export enum MetadataKey {
   USER_DATA = 'userData',
   TENANT_ID = 'tenantId',
   SESSION_ID = 'sessionId',
+  /** Customer order routes: require `x-session-id` (Order service session UUID); do not mint BFF `sid_` sessions. */
+  SKIP_BFF_SESSION_GUARD = 'skipBffSessionGuard',
 }

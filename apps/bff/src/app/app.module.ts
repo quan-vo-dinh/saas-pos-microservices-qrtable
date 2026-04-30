@@ -11,6 +11,7 @@ import { AuthorizerModule } from './modules/authorizer/authorizer.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { SaasModule } from './modules/saas/saas.module';
 import { HealthModule } from './modules/health/health.module';
+import { OrderModule } from './modules/order/order.module';
 import { UserGuard } from '@common/guards/user.guard';
 import { PermissionGuard } from '@common/guards/permission.guard';
 import { SessionGuard } from '@common/guards/session.guard';
@@ -24,6 +25,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
     ConfigModule.forRoot({ isGlobal: true, load: [() => CONFIGURATION] }),
     ProductModule,
     CatalogModule,
+    OrderModule,
     SaasModule,
     HealthModule,
     UserModule,

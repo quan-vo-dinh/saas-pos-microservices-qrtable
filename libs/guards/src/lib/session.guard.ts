@@ -1,7 +1,9 @@
 import { MetadataKey } from '@common/constants/common.constant';
 import { REQUEST_HEADERS, SESSION_POLICY } from '@common/constants/request-context.constant';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Cache } from 'cache-manager';
 import { randomUUID } from 'crypto';
@@ -29,6 +31,20 @@ export class SessionGuard implements CanActivate {
     const authOptions = this.reflector.get<{ secured: boolean }>(MetadataKey.SECURED, context.getHandler());
 
     if (authOptions?.secured) {
+      return true;
+    }
+
+    const skipBffSession = this.reflector.getAllAndOverride<boolean>(MetadataKey.SKIP_BFF_SESSION_GUARD, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (skipBffSession === true) {
+      const headerSessionId = getSessionIdFromRequest(request);
+      if (!headerSessionId?.trim()) {
+        throw new BusinessException(ErrorCode.TENANT_SESSION_NOT_FOUND, HttpStatus.BAD_REQUEST);
+      }
+      request[MetadataKey.SESSION_ID] = headerSessionId.trim();
+      request.res?.setHeader(REQUEST_HEADERS.SESSION_ID, headerSessionId.trim());
       return true;
     }
 

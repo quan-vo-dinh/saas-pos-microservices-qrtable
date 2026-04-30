@@ -46,4 +46,23 @@ export class OrderRepository {
     const r = manager ? manager.getRepository(Order) : this.repo;
     await r.update({ sessionId, tenantId }, { tableId, tableName });
   }
+
+  findStaffList(
+    tenantId: string,
+    opts: { status?: string; tableId?: string; limit: number; offset: number },
+  ): Promise<Order[]> {
+    const qb = this.repo
+      .createQueryBuilder('o')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .orderBy('o.createdAt', 'DESC')
+      .take(opts.limit)
+      .skip(opts.offset);
+    if (opts.status) {
+      qb.andWhere('o.status = :status', { status: opts.status });
+    }
+    if (opts.tableId) {
+      qb.andWhere('o.tableId = :tableId', { tableId: opts.tableId });
+    }
+    return qb.getMany();
+  }
 }

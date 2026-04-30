@@ -11,7 +11,10 @@ import type { ResponseType } from '@common/interfaces/tcp/common/response.interf
 import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import type { UpdateTableStatusTcpRequest } from '@common/interfaces/tcp/catalog/table-request.interface';
 import type { BillSessionTcpRequest } from '@common/interfaces/tcp/order/order-request.interface';
-import type { BillRequestedTcpResponse } from '@common/interfaces/tcp/order/order-response.interface';
+import type {
+  BillCurrentTcpResponse,
+  BillRequestedTcpResponse,
+} from '@common/interfaces/tcp/order/order-response.interface';
 import type { Bill as BillDto, ServiceRequest as ServiceRequestDto } from '@einvoice/types';
 import {
   BillRequestedEvent,
@@ -44,6 +47,17 @@ export class BillService {
     private readonly sessionService: SessionService,
     @Inject(TCP_SERVICES.CATALOG_SERVICE) private readonly catalogClient: TcpClient,
   ) {}
+
+  async getCurrentBill(dto: BillSessionTcpRequest): Promise<BillCurrentTcpResponse> {
+    await this.sessionService.getActiveSessionOrThrow(dto.tenantId, dto.sessionId);
+    const session = await this.sessionRepository.findActiveByIdAndTenant(dto.sessionId, dto.tenantId);
+    const cart = await this.cartService.getSnapshot(dto.tenantId, dto.sessionId);
+    if (!session?.currentBillId) {
+      return { bill: null, cart };
+    }
+    const bill = await this.billRepository.findByIdAndTenant(session.currentBillId, dto.tenantId);
+    return { bill: bill ? this.toBillDto(bill) : null, cart };
+  }
 
   async requestBill(dto: BillSessionTcpRequest): Promise<BillRequestedTcpResponse> {
     await this.sessionService.getActiveSessionOrThrow(dto.tenantId, dto.sessionId);

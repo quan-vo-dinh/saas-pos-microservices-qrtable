@@ -4,23 +4,36 @@ import { TcpLoggingInterceptor } from '@common/interceptors/tcpLogging.intercept
 import { Response } from '@common/interfaces/tcp/common/response.interface';
 import type {
   BillSessionTcpRequest,
+  CartClearTcpRequest,
+  CartGetTcpRequest,
+  CartMutateTcpRequest,
   CreateServiceRequestTcpRequest,
   CustomerCancelPendingTcpRequest,
+  JoinSessionTcpRequest,
+  ListOrdersTcpRequest,
+  ListServiceRequestsTcpRequest,
+  OrderIdTcpRequest,
   ServiceRequestActionTcpRequest,
   StaffOrderActionTcpRequest,
   SubmitOrderTcpRequest,
   TransferTableTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
 import type {
+  BillCurrentTcpResponse,
   BillRequestedTcpResponse,
+  CartTcpResponse,
   OrderActionTcpResponse,
+  OrderTcpResponse,
   ServiceRequestCreatedTcpResponse,
+  ServiceRequestListTcpResponse,
+  SessionTcpResponse,
   SubmitOrderTcpResponse,
   TableTransferredTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { BillService } from '../services/bill.service';
+import { CartService } from '../services/cart.service';
 import { OrderService } from '../services/order.service';
 import { ServiceRequestService } from '../services/service-request.service';
 import { TransferService } from '../services/transfer.service';
@@ -31,9 +44,71 @@ export class OrderController {
   constructor(
     private readonly orderService: OrderService,
     private readonly billService: BillService,
+    private readonly cartService: CartService,
     private readonly serviceRequestService: ServiceRequestService,
     private readonly transferService: TransferService,
   ) {}
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.SESSION_JOIN)
+  async sessionJoin(@RequestParams() body: JoinSessionTcpRequest): Promise<Response<SessionTcpResponse>> {
+    const data = await this.orderService.joinSession(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.CART_GET)
+  async cartGet(@RequestParams() body: CartGetTcpRequest): Promise<Response<CartTcpResponse>> {
+    const data = await this.cartService.getSnapshot(body.tenantId, body.sessionId);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.CART_MUTATE)
+  async cartMutate(@RequestParams() body: CartMutateTcpRequest): Promise<Response<CartTcpResponse>> {
+    const ev = await this.cartService.mutate(body);
+    return Response.success({
+      tenantId: ev.tenantId,
+      sessionId: ev.sessionId,
+      cartVersion: ev.cartVersion,
+      status: ev.status,
+      updatedAt: ev.updatedAt,
+      items: ev.items,
+    });
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.CART_CLEAR)
+  async cartClear(@RequestParams() body: CartClearTcpRequest): Promise<Response<CartTcpResponse>> {
+    const ev = await this.cartService.mutate({
+      tenantId: body.tenantId,
+      sessionId: body.sessionId,
+      expectedCartVersion: body.expectedCartVersion,
+      operation: 'CLEAR',
+    });
+    return Response.success({
+      tenantId: ev.tenantId,
+      sessionId: ev.sessionId,
+      cartVersion: ev.cartVersion,
+      status: ev.status,
+      updatedAt: ev.updatedAt,
+      items: ev.items,
+    });
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.GET_LIST)
+  async getList(@RequestParams() body: ListOrdersTcpRequest): Promise<Response<OrderTcpResponse[]>> {
+    const data = await this.orderService.listOrdersForStaff(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.GET_BY_ID)
+  async getById(@RequestParams() body: OrderIdTcpRequest): Promise<Response<OrderTcpResponse>> {
+    const data = await this.orderService.getOrderById(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_CURRENT)
+  async billGetCurrent(@RequestParams() body: BillSessionTcpRequest): Promise<Response<BillCurrentTcpResponse>> {
+    const data = await this.billService.getCurrentBill(body);
+    return Response.success(data);
+  }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.SUBMIT)
   async submit(@RequestParams() body: SubmitOrderTcpRequest): Promise<Response<SubmitOrderTcpResponse>> {
@@ -72,6 +147,14 @@ export class OrderController {
     @RequestParams() body: CreateServiceRequestTcpRequest,
   ): Promise<Response<ServiceRequestCreatedTcpResponse>> {
     const data = await this.serviceRequestService.create(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.SERVICE_REQUEST_GET_LIST)
+  async serviceRequestGetList(
+    @RequestParams() body: ListServiceRequestsTcpRequest,
+  ): Promise<Response<ServiceRequestListTcpResponse>> {
+    const data = await this.serviceRequestService.list(body);
     return Response.success(data);
   }
 

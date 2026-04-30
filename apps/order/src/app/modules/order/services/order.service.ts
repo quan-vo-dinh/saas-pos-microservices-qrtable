@@ -4,7 +4,9 @@ import { Order } from '@common/entities/order.entity';
 import { OutboxEvent } from '@common/entities/outbox-event.entity';
 import { Session } from '@common/entities/session.entity';
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
+import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { Table } from '@common/entities/table.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Request } from '@common/interfaces/tcp/common/request.interface';
@@ -16,15 +18,29 @@ import type {
 } from '@common/interfaces/tcp/catalog/menu-item-request.interface';
 import type { StockMutationResult } from '@common/interfaces/tcp/catalog/menu-item-response.interface';
 import type {
+  UpdateTableStatusTcpRequest,
+  ValidateQrTokenTcpRequest,
+} from '@common/interfaces/tcp/catalog/table-request.interface';
+import type {
   CustomerCancelPendingTcpRequest,
+  JoinSessionTcpRequest,
+  ListOrdersTcpRequest,
+  OrderIdTcpRequest,
   StaffOrderActionTcpRequest,
   SubmitOrderTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
 import type {
   OrderActionTcpResponse,
+  OrderTcpResponse,
+  SessionTcpResponse,
   SubmitOrderTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
-import type { Bill as BillDto, Order as OrderDto, OrderItem as OrderItemDto } from '@einvoice/types';
+import type {
+  Bill as BillDto,
+  Order as OrderDto,
+  OrderItem as OrderItemDto,
+  Session as SessionDto,
+} from '@einvoice/types';
 import {
   BillStatus,
   OrderCreatedEvent,
@@ -67,6 +83,60 @@ export class OrderService {
     private readonly sessionService: SessionService,
     @Inject(TCP_SERVICES.CATALOG_SERVICE) private readonly catalogClient: TcpClient,
   ) {}
+
+  async joinSession(dto: JoinSessionTcpRequest): Promise<SessionTcpResponse> {
+    const table = await this.callCatalogValidateQrToken(dto);
+    const now = new Date();
+    const row = new Session();
+    row.tenantId = dto.tenantId;
+    row.tableId = table.id;
+    row.tableName = table.name;
+    row.status = SessionStatus.ACTIVE;
+    row.startedAt = now;
+    row.lastActivity = now;
+    row.closedAt = null;
+    row.orderCount = 0;
+    row.currentBillId = null;
+    row.version = 1;
+    const saved = await this.sessionRepository.save(row);
+    await this.sessionService.getActiveSessionOrThrow(dto.tenantId, saved.id);
+    await this.callCatalogUpdateTableStatus({
+      id: table.id,
+      tenantId: dto.tenantId,
+      status: TABLE_STATUS.OCCUPIED,
+      sessionId: saved.id,
+    });
+    return this.toSessionDto(saved);
+  }
+
+  async listOrdersForStaff(dto: ListOrdersTcpRequest): Promise<OrderTcpResponse[]> {
+    const limit = Math.min(Math.max(dto.limit ?? 50, 1), 200);
+    const offset = Math.max(dto.offset ?? 0, 0);
+    const rows = await this.orderRepository.findStaffList(dto.tenantId, {
+      status: dto.status,
+      tableId: dto.tableId,
+      limit,
+      offset,
+    });
+    const out: OrderTcpResponse[] = [];
+    for (const r of rows) {
+      const items = await this.orderItemRepository.findByOrderIdAndTenant(r.id, dto.tenantId);
+      out.push(this.toOrderDto(r, items));
+    }
+    return out;
+  }
+
+  async getOrderById(dto: OrderIdTcpRequest): Promise<OrderTcpResponse> {
+    const order = await this.orderRepository.findByIdAndTenant(dto.orderId, dto.tenantId);
+    if (!order) {
+      throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    if (dto.sessionId !== undefined && order.sessionId !== dto.sessionId) {
+      throw new BusinessException(ErrorCode.TENANT_MISMATCH_SESSION, HttpStatus.FORBIDDEN);
+    }
+    const items = await this.orderItemRepository.findByOrderIdAndTenant(order.id, dto.tenantId);
+    return this.toOrderDto(order, items);
+  }
 
   async submitOrder(dto: SubmitOrderTcpRequest): Promise<SubmitOrderTcpResponse> {
     await this.sessionService.getActiveSessionOrThrow(dto.tenantId, dto.sessionId);
@@ -607,6 +677,74 @@ export class OrderService {
       paidAt: entity.paidAt?.toISOString(),
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
+    };
+  }
+
+  private async callCatalogValidateQrToken(dto: JoinSessionTcpRequest): Promise<Table> {
+    try {
+      const response = await firstValueFrom(
+        this.catalogClient.send<ResponseType<Table>, ValidateQrTokenTcpRequest>(
+          TCP_REQUEST_MESSAGE.TABLE.VALIDATE_QR_TOKEN,
+          new Request<ValidateQrTokenTcpRequest>({
+            tenantId: dto.tenantId,
+            data: { tableId: dto.tableId, token: dto.qrToken, tenantId: dto.tenantId },
+          }),
+        ),
+      );
+      if (response.statusCode >= 400 || !response.data) {
+        throw new BusinessException(ErrorCode.CATALOG_TABLE_INVALID_QR_TOKEN, HttpStatus.FORBIDDEN);
+      }
+      return response.data as unknown as Table;
+    } catch (e) {
+      if (e instanceof BusinessException) {
+        throw e;
+      }
+      if (e instanceof RpcException) {
+        const err = e.getError() as { code?: number; errorCode?: ErrorCode; message?: string };
+        if (err?.errorCode) {
+          throw new BusinessException(err.errorCode, (err.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
+        }
+      }
+      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
+    }
+  }
+
+  private async callCatalogUpdateTableStatus(payload: UpdateTableStatusTcpRequest): Promise<void> {
+    try {
+      const response = await firstValueFrom(
+        this.catalogClient.send<ResponseType<Table>, UpdateTableStatusTcpRequest>(
+          TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS,
+          new Request<UpdateTableStatusTcpRequest>({ tenantId: payload.tenantId, data: payload }),
+        ),
+      );
+      if (response.statusCode >= 400) {
+        throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, response.statusCode as HttpStatus);
+      }
+    } catch (e) {
+      if (e instanceof BusinessException) {
+        throw e;
+      }
+      if (e instanceof RpcException) {
+        const err = e.getError() as { code?: number; errorCode?: ErrorCode; message?: string };
+        if (err?.errorCode) {
+          throw new BusinessException(err.errorCode, (err.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
+        }
+      }
+      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
+    }
+  }
+
+  private toSessionDto(row: Session): SessionDto {
+    return {
+      id: row.id,
+      tenantId: row.tenantId,
+      tableId: row.tableId,
+      tableName: row.tableName,
+      status: row.status as SessionDto['status'],
+      startedAt: row.startedAt.toISOString(),
+      lastActivity: row.lastActivity.toISOString(),
+      closedAt: row.closedAt?.toISOString(),
+      orderCount: row.orderCount,
     };
   }
 }

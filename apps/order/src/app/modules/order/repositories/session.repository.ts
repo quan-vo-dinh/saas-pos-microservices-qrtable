@@ -33,4 +33,8 @@ export class SessionRepository {
       },
     );
   }
+
+  save(entity: Session): Promise<Session> {
+    return this.repo.save(entity);
+  }
 }
