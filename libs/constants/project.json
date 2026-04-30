@@ -3,7 +3,20 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/constants/src",
   "projectType": "library",
-  "tags": [],
+  "tags": ["scope:shared", "type:util"],
   "// targets": "to see all targets run: nx show project constants --web",
-  "targets": { "test": { "skipTest": true } }
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/constants",
+        "main": "libs/constants/src/index.ts",
+        "tsConfig": "libs/constants/tsconfig.lib.json"
+      }
+    },
+    "test": {
+      "skipTest": true
+    }
+  }
 }
