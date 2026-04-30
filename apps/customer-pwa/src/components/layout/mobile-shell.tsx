@@ -1,15 +1,20 @@
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Headphones } from 'lucide-react';
 import { Button } from '@einvoice/frontend-ui';
 import { MobileHeader } from '@/components/layout/mobile-header';
-import { ServiceRequestDrawer } from '@/pages/service-request-drawer';
-import { usePwaMockStore } from '@/mocks/store';
-import { usePwaFakeRealtime } from '@/mocks/use-fake-realtime';
+import { useCustomerOrderRealtime } from '@/features/order/hooks/use-customer-order-realtime';
+import { OPEN_SERVICE_REQUEST_EVENT, ServiceRequestDrawer } from '@/pages/service-request-drawer';
 
 export function MobileShell(): React.ReactElement {
-  usePwaFakeRealtime();
-  const serviceOpen = usePwaMockStore((s) => s.serviceRequestOpen);
-  const setServiceRequestOpen = usePwaMockStore((s) => s.setServiceRequestOpen);
+  const [serviceOpen, setServiceRequestOpen] = useState(false);
+  useCustomerOrderRealtime();
+
+  useEffect(() => {
+    const onOpen = () => setServiceRequestOpen(true);
+    window.addEventListener(OPEN_SERVICE_REQUEST_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SERVICE_REQUEST_EVENT, onOpen);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -30,7 +35,7 @@ export function MobileShell(): React.ReactElement {
         </Button>
       )}
 
-      <ServiceRequestDrawer />
+      <ServiceRequestDrawer open={serviceOpen} onOpenChange={setServiceRequestOpen} />
     </div>
   );
 }

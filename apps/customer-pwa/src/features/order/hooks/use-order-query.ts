@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@einvoice/frontend-utils';
-import type { CartSnapshot, MenuItem } from '@einvoice/types';
+import type { Bill, CartSnapshot, MenuItem, ServiceRequestType } from '@einvoice/types';
 import { useSession } from '@/features/session/context/session-provider';
+import { createAndPersistIdempotencyKey } from '@/lib/idempotency';
 import { orderService, type CartMutateOperation } from '../services/order.service';
 
 export const cartKeys = {
@@ -15,8 +16,19 @@ export const orderKeys = {
     [...orderKeys.all, 'detail', tenantId, sessionId, orderId] as const,
 };
 
+export const billKeys = {
+  all: ['customer-bill'] as const,
+  current: (tenantId: string, sessionId: string) => [...billKeys.all, 'current', tenantId, sessionId] as const,
+};
+
 function isCartConflict(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 409 || err.errorCode === 'CART_VERSION_CONFLICT');
+}
+
+function invalidateOrderDomainQueries(queryClient: ReturnType<typeof useQueryClient>): void {
+  void queryClient.invalidateQueries({ queryKey: cartKeys.all });
+  void queryClient.invalidateQueries({ queryKey: orderKeys.all });
+  void queryClient.invalidateQueries({ queryKey: billKeys.all });
 }
 
 export function useCustomerCartQuery() {
@@ -28,6 +40,32 @@ export function useCustomerCartQuery() {
   return useQuery({
     queryKey: key,
     queryFn: () => orderService.getCart(),
+    enabled: !!tenantId && !!sessionId,
+  });
+}
+
+export function useOrderDetailQuery(orderId?: string) {
+  const { session } = useSession();
+  const tenantId = session?.tenantId;
+  const sessionId = session?.sessionId;
+  const key = orderKeys.detail(tenantId ?? '', sessionId ?? '', orderId ?? '');
+
+  return useQuery({
+    queryKey: key,
+    queryFn: () => orderService.getOrderById(orderId ?? ''),
+    enabled: !!tenantId && !!sessionId && !!orderId,
+  });
+}
+
+export function useCurrentBillQuery() {
+  const { session } = useSession();
+  const tenantId = session?.tenantId;
+  const sessionId = session?.sessionId;
+  const key = billKeys.current(tenantId ?? '', sessionId ?? '');
+
+  return useQuery({
+    queryKey: key,
+    queryFn: () => orderService.getCurrentBill(),
     enabled: !!tenantId && !!sessionId,
   });
 }
@@ -116,6 +154,97 @@ function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
     updatedAt: now,
     cartVersion: prev.cartVersion + 1,
   };
+}
+
+type SubmitOrderVars = {
+  notes?: string;
+  idempotencyKey?: string;
+};
+
+export function useSubmitOrderMutation() {
+  const queryClient = useQueryClient();
+  const { session } = useSession();
+  const tenantId = session?.tenantId ?? '';
+  const sessionId = session?.sessionId ?? '';
+  const cartKey = cartKeys.snapshot(tenantId, sessionId);
+  const currentBillKey = billKeys.current(tenantId, sessionId);
+
+  return useMutation({
+    mutationFn: async (vars: SubmitOrderVars) => {
+      const snap = queryClient.getQueryData<CartSnapshot>(cartKey);
+      if (!snap) {
+        throw new Error('Cart not loaded');
+      }
+      return orderService.submitOrder({
+        expectedCartVersion: snap.cartVersion,
+        idempotencyKey: vars.idempotencyKey ?? createAndPersistIdempotencyKey(),
+        notes: vars.notes,
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(cartKey, data.cart);
+      queryClient.setQueryData(orderKeys.detail(tenantId, sessionId, data.order.id), data.order);
+      queryClient.setQueryData(currentBillKey, { bill: data.bill, cart: data.cart });
+      invalidateOrderDomainQueries(queryClient);
+    },
+  });
+}
+
+type CancelOrderVars = {
+  orderId: string;
+  reason?: string;
+};
+
+export function useCancelCustomerOrderMutation() {
+  const queryClient = useQueryClient();
+  const { session } = useSession();
+  const tenantId = session?.tenantId ?? '';
+  const sessionId = session?.sessionId ?? '';
+
+  return useMutation({
+    mutationFn: ({ orderId, reason }: CancelOrderVars) => orderService.cancelOrder(orderId, reason),
+    onSuccess: (data) => {
+      queryClient.setQueryData(orderKeys.detail(tenantId, sessionId, data.order.id), data.order);
+      invalidateOrderDomainQueries(queryClient);
+    },
+  });
+}
+
+type CreateServiceRequestVars = {
+  type: ServiceRequestType;
+  note?: string;
+};
+
+export function useCreateServiceRequestMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateServiceRequestVars) => orderService.createServiceRequest(payload),
+    onSuccess: () => {
+      invalidateOrderDomainQueries(queryClient);
+    },
+  });
+}
+
+export function useRequestBillMutation() {
+  const queryClient = useQueryClient();
+  const { session } = useSession();
+  const tenantId = session?.tenantId ?? '';
+  const sessionId = session?.sessionId ?? '';
+  const cartKey = cartKeys.snapshot(tenantId, sessionId);
+  const currentBillKey = billKeys.current(tenantId, sessionId);
+
+  return useMutation({
+    mutationFn: () => orderService.requestBill(),
+    onSuccess: (data) => {
+      queryClient.setQueryData<CartSnapshot>(cartKey, data.cart);
+      queryClient.setQueryData<{ bill: Bill; cart: CartSnapshot }>(currentBillKey, {
+        bill: data.bill,
+        cart: data.cart,
+      });
+      invalidateOrderDomainQueries(queryClient);
+    },
+  });
 }
 
 export function useCartMutations() {

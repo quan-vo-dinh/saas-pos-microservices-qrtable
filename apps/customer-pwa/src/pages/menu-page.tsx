@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import type { MenuItem } from '@einvoice/types';
+import { BillStatus } from '@einvoice/types';
 import { Button } from '@einvoice/frontend-ui';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { MenuItemCard } from '@/components/menu/menu-item-card';
@@ -8,7 +9,7 @@ import { MenuItemDialog } from '@/components/menu/menu-item-dialog';
 import { CartPill } from '@/components/menu/cart-pill';
 import { CartDrawer } from '@/pages/cart/cart-drawer';
 import { useSession } from '@/features/session/context/session-provider';
-import { useCartMutations } from '@/features/order/hooks/use-order-query';
+import { useCartMutations, useCurrentBillQuery, useCustomerCartQuery } from '@/features/order/hooks/use-order-query';
 import { usePwaMockStore } from '@/mocks/store';
 import { ROUTES } from '@/constants/routes';
 
@@ -17,8 +18,10 @@ type Tab = { id: string; name: string; sortOrder: number };
 export function MenuPage(): React.ReactElement {
   const { session, hydrated } = useSession();
   const menu = usePwaMockStore((s) => s.menu);
-  const billLockActive = usePwaMockStore((s) => s.billLockActive);
+  const { data: cart } = useCustomerCartQuery();
+  const { data: currentBill } = useCurrentBillQuery();
   const { addItem, isUpdating } = useCartMutations();
+  const billLockActive = cart?.status === 'LOCKED' || currentBill?.bill?.status === BillStatus.PENDING_PAYMENT;
 
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
@@ -63,7 +66,7 @@ export function MenuPage(): React.ReactElement {
       {billLockActive && (
         <Alert variant="default" className="border-amber-500/60 bg-amber-500/10">
           <AlertTitle>Bàn đang thanh toán</AlertTitle>
-          <AlertDescription>Không thể đặt thêm món trong lúc chờ thanh toán (mock).</AlertDescription>
+          <AlertDescription>Không thể đặt thêm món trong lúc chờ thanh toán.</AlertDescription>
         </Alert>
       )}
 

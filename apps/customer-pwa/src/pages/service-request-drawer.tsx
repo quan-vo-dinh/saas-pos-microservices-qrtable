@@ -11,9 +11,10 @@ import {
   DrawerTitle,
   Textarea,
 } from '@einvoice/frontend-ui';
-import { usePwaMockStore } from '@/mocks/store';
+import { useCreateServiceRequestMutation } from '@/features/order/hooks/use-order-query';
 
 type RequestType = 'CALL_STAFF' | 'REQUEST_BILL' | 'GENERAL_HELP';
+export const OPEN_SERVICE_REQUEST_EVENT = 'customer:open-service-request-drawer';
 
 const ACTIONS: {
   type: RequestType;
@@ -26,36 +27,46 @@ const ACTIONS: {
   { type: 'GENERAL_HELP', label: 'Trợ giúp', description: 'Câu hỏi chung', icon: CircleHelp },
 ];
 
-export function ServiceRequestDrawer(): React.ReactElement {
-  const open = usePwaMockStore((s) => s.serviceRequestOpen);
-  const setOpen = usePwaMockStore((s) => s.setServiceRequestOpen);
+type ServiceRequestDrawerProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
+
+export function ServiceRequestDrawer({ open, onOpenChange }: ServiceRequestDrawerProps): React.ReactElement {
   const [type, setType] = useState<RequestType>('CALL_STAFF');
   const [note, setNote] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const createRequest = useCreateServiceRequestMutation();
+  const submitting = createRequest.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     if (note.length > 200) {
       toast.error('Ghi chú tối đa 200 ký tự');
       return;
     }
-    setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 400));
-    toast.success('Đã gọi nhân viên · sẽ đến trong ~2 phút', {
-      description: `${type}${note.trim() ? ` · ${note.trim()}` : ''}`,
-    });
-    setNote('');
-    setType('CALL_STAFF');
-    setSubmitting(false);
-    setOpen(false);
+    try {
+      await createRequest.mutateAsync({
+        type,
+        note: note.trim() || undefined,
+      });
+      toast.success('Đã gửi yêu cầu hỗ trợ', {
+        description: `${type}${note.trim() ? ` · ${note.trim()}` : ''}`,
+      });
+      setNote('');
+      setType('CALL_STAFF');
+      onOpenChange(false);
+    } catch (err) {
+      toast.error((err as Error).message || 'Không thể gửi yêu cầu. Vui lòng thử lại.');
+    }
   };
 
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
+    <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
         <DrawerHeader className="text-left">
           <DrawerTitle>Cần hỗ trợ?</DrawerTitle>
-          <DrawerDescription>Chọn loại yêu cầu và gửi ghi chú tùy chọn (mock).</DrawerDescription>
+          <DrawerDescription>Chọn loại yêu cầu và gửi ghi chú tùy chọn.</DrawerDescription>
         </DrawerHeader>
         <form onSubmit={(ev) => void handleSubmit(ev)} className="flex flex-col gap-4 px-4 pb-6">
           <div className="grid grid-cols-1 gap-3">
@@ -95,7 +106,7 @@ export function ServiceRequestDrawer(): React.ReactElement {
           </div>
           <DrawerFooter className="px-0 pb-0">
             <Button type="submit" className="h-12 w-full" disabled={submitting}>
-              Gửi yêu cầu
+              {submitting ? 'Đang gửi yêu cầu…' : 'Gửi yêu cầu'}
             </Button>
           </DrawerFooter>
         </form>

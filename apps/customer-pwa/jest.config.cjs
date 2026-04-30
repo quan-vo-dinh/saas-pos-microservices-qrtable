@@ -5,6 +5,7 @@ module.exports = {
   transform: {
     '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },
+  setupFiles: ['<rootDir>/src/test/setup.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/apps/customer-pwa',
   moduleNameMapper: {

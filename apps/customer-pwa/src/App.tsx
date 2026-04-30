@@ -21,6 +21,7 @@ function App(): ReactElement {
               <Route path={ROUTES.LANDING} element={<LandingPage />} />
               <Route path={ROUTES.MENU} element={<MenuPage />} />
               <Route path={ROUTES.ORDER_TRACKING} element={<OrderTrackingPage />} />
+              <Route path={ROUTES.ORDER_TRACKING_WITH_ID} element={<OrderTrackingPage />} />
               <Route path={ROUTES.REQUEST_PAYMENT} element={<RequestPaymentPage />} />
             </Route>
             <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />

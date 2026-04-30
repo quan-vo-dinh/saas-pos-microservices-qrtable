@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@einvoice/frontend-utils';
+import { toast } from 'sonner';
 import {
   Button,
   Drawer,
@@ -18,7 +20,13 @@ import {
   Textarea,
 } from '@einvoice/frontend-ui';
 import { PresenceAvatars } from '@/components/session/presence-avatars';
-import { useCustomerCartQuery, useCartMutations } from '@/features/order/hooks/use-order-query';
+import { ROUTES } from '@/constants/routes';
+import {
+  useCartMutations,
+  useCustomerCartQuery,
+  useSubmitOrderMutation,
+} from '@/features/order/hooks/use-order-query';
+import { createAndPersistIdempotencyKey } from '@/lib/idempotency';
 import { usePwaMockStore } from '@/mocks/store';
 
 const NOTE_CHIPS = ['Không cay', 'Ít muối', 'Không hành'] as const;
@@ -29,17 +37,41 @@ type CartDrawerProps = {
 };
 
 export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.ReactElement {
+  const navigate = useNavigate();
   const { data: cart, isLoading } = useCustomerCartQuery();
   const { setQuantity, updateNote, removeLine, clearCart, isUpdating } = useCartMutations();
+  const submitOrder = useSubmitOrderMutation();
 
   const presence = usePwaMockStore((s) => s.presence);
   const activityFeed = usePwaMockStore((s) => s.activityFeed);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const submitInFlightRef = useRef(false);
 
   const items = cart?.items ?? [];
   const totalAmount = items.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
   const totalItems = items.reduce((s, l) => s + l.quantity, 0);
+  const isSubmittingOrder = submitOrder.isPending;
+
+  const handleSubmitOrder = async (): Promise<void> => {
+    if (items.length === 0 || submitInFlightRef.current || isSubmittingOrder) {
+      return;
+    }
+
+    submitInFlightRef.current = true;
+    try {
+      const data = await submitOrder.mutateAsync({
+        idempotencyKey: createAndPersistIdempotencyKey(),
+      });
+      onOpenChange(false);
+      toast.success('Đơn đã được gửi');
+      navigate(ROUTES.ORDER_TRACKING_DETAIL(data.order.id));
+    } catch (err) {
+      toast.error((err as Error).message || 'Không thể gửi đơn. Vui lòng thử lại.');
+    } finally {
+      submitInFlightRef.current = false;
+    }
+  };
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -201,17 +233,17 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                 </div>
                 <Button
                   className="h-12 w-full text-base"
-                  disabled
-                  title="Gửi đơn sẽ được bật ở bước tích hợp tiếp theo"
+                  disabled={items.length === 0 || isUpdating || isSubmittingOrder}
+                  onClick={() => void handleSubmitOrder()}
                 >
-                  Đặt món (sắp có)
+                  {isSubmittingOrder ? 'Đang gửi đơn…' : 'Đặt món'}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  disabled={isUpdating || items.length === 0}
+                  disabled={isUpdating || isSubmittingOrder || items.length === 0}
                   onClick={() => {
                     if (items.length === 0) return;
                     clearCart();

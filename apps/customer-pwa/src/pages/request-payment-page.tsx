@@ -1,51 +1,58 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { OrderStatus, PaymentMethod } from '@einvoice/types';
-import { getOrdersBySession } from '@einvoice/mock-data';
+import { BillStatus } from '@einvoice/types';
+import { toast } from 'sonner';
+import { Button } from '@einvoice/frontend-ui';
 import { useSession } from '@/features/session/context/session-provider';
 import { ROUTES } from '@/constants/routes';
-import { PaymentSummaryCard } from '@/features/payment/components/payment-summary-card';
-import { PaymentMethodSelector } from '@/features/payment/components/payment-method-selector';
-import { PaymentConfirmButton } from '@/features/payment/components/payment-confirm-button';
-import { PaymentSuccessCard } from '@/features/payment/components/payment-success-card';
-
-const METHOD_LABELS: Record<PaymentMethod, string> = {
-  [PaymentMethod.CASH]: 'Tiền mặt',
-};
+import { useCurrentBillQuery, useRequestBillMutation } from '@/features/order/hooks/use-order-query';
 
 export function RequestPaymentPage() {
   const navigate = useNavigate();
-  const { session, isActive } = useSession();
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const { isActive } = useSession();
+  const { data, isLoading, isError, refetch } = useCurrentBillQuery();
+  const requestBill = useRequestBillMutation();
 
-  const sessionId = session?.sessionId ?? 'session-001';
-  const orders = getOrdersBySession(sessionId);
-  /** Mock: chưa có Bill API (Step 2.4+) — coi đơn chưa COMPLETED/CANCELED là còn phải thanh toán */
-  const unpaidOrders = orders.filter(
-    (o) => o.status !== OrderStatus.COMPLETED && o.status !== OrderStatus.CANCELED,
-  );
-  const totalAmount = unpaidOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const bill = data?.bill ?? null;
+  const cart = data?.cart;
+  const cartTotal = (cart?.items ?? []).reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const total = bill?.total ?? cartTotal;
+  const billPending = bill?.status === BillStatus.PENDING_PAYMENT;
+  const lockActive = cart?.status === 'LOCKED' || billPending;
 
-  if (!isActive && !session) {
+  const onRequestBill = async (): Promise<void> => {
+    if (billPending || requestBill.isPending) return;
+    try {
+      await requestBill.mutateAsync();
+      toast.success('Đã gửi yêu cầu thanh toán');
+    } catch (err) {
+      toast.error((err as Error).message || 'Không thể gửi yêu cầu thanh toán.');
+    }
+  };
+
+  if (!isActive) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20">
         <p className="text-muted-foreground">Chưa có phiên đặt món</p>
-        <button onClick={() => navigate(ROUTES.LANDING)}>
+        <Button onClick={() => navigate(ROUTES.LANDING)}>
           Quay về trang chủ
-        </button>
+        </Button>
       </div>
     );
   }
 
-  if (isSuccess) {
+  if (isLoading) {
     return (
-      <div className="flex flex-col gap-6 py-8">
-        <PaymentSuccessCard
-          totalAmount={totalAmount}
-          paymentMethod={METHOD_LABELS[paymentMethod]}
-          onBackToMenu={() => navigate(ROUTES.MENU)}
-        />
+      <div className="flex flex-col items-center justify-center gap-4 py-20">
+        <p className="text-muted-foreground">Đang tải thông tin hóa đơn…</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-20">
+        <p className="text-center text-muted-foreground">Không thể tải thông tin hóa đơn hiện tại.</p>
+        <Button onClick={() => void refetch()}>Thử lại</Button>
       </div>
     );
   }
@@ -53,13 +60,27 @@ export function RequestPaymentPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Thanh toán</h1>
-      <PaymentSummaryCard orders={unpaidOrders} />
-      <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
-      <PaymentConfirmButton
-        totalAmount={totalAmount}
-        disabled={unpaidOrders.length === 0}
-        onConfirm={() => setIsSuccess(true)}
-      />
+      <div className="rounded-lg border border-border/80 bg-card/40 p-4">
+        <p className="text-sm text-muted-foreground">Trạng thái bill</p>
+        <p className="mt-1 text-base font-semibold">
+          {billPending ? 'Đang chờ thanh toán' : bill ? bill.status : 'Chưa tạo bill'}
+        </p>
+        <p className="mt-3 text-sm text-muted-foreground">Tổng tạm tính</p>
+        <p className="text-2xl font-bold tabular-nums">{new Intl.NumberFormat('vi-VN').format(total)} đ</p>
+      </div>
+
+      {lockActive ? (
+        <div className="rounded-lg border border-amber-500/60 bg-amber-500/10 p-3 text-sm">
+          Bàn đang trong trạng thái chờ thanh toán. Tạm thời không thể đặt thêm món.
+        </div>
+      ) : null}
+
+      <Button className="w-full" size="lg" onClick={() => void onRequestBill()} disabled={requestBill.isPending || billPending}>
+        {billPending ? 'Đã gửi yêu cầu thanh toán' : requestBill.isPending ? 'Đang gửi yêu cầu…' : 'Yêu cầu thanh toán'}
+      </Button>
+      <Button variant="outline" onClick={() => navigate(ROUTES.MENU)}>
+        Quay lại menu
+      </Button>
     </div>
   );
 }
