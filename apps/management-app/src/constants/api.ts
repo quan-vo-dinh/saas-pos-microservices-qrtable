@@ -10,6 +10,7 @@ export const API_CONFIG = {
     AREAS_REORDER: '/admin/areas/reorder',
     TABLES: '/admin/tables',
     ADMIN_ORDERS: '/admin/orders',
+    ADMIN_SERVICE_REQUESTS: '/admin/service-requests',
     ADMIN_TABLES_TRANSFER: '/admin/tables/transfer',
     ADMIN_BILLS_REOPEN: '/admin/bills',
   },

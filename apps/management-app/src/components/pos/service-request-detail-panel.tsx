@@ -1,17 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { CircleHelp, Clock, Receipt, UserRound } from 'lucide-react';
 import { serviceRequestStatusVi } from '@einvoice/shared-constants';
 import { ServiceRequestStatus, ServiceRequestType } from '@einvoice/types';
-import { toast } from 'sonner';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
-import { Avatar, AvatarFallback } from '@einvoice/frontend-ui';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { useMockStore } from '@/mocks/store';
+import {
+  useAcknowledgeServiceRequestMutation,
+  useResolveServiceRequestMutation,
+  useServiceRequestsQuery,
+} from '@/features/service-requests/hooks/use-service-request-query';
+import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 
 function hashSeed(id: string) {
   let h = 0;
@@ -22,16 +24,13 @@ function hashSeed(id: string) {
 }
 
 export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) {
-  const { data: session } = useSession();
-  const userId = session?.user?.id ?? 'staff-waiter-1';
-  const requests = useMockStore((s) => s.serviceRequests);
-  const tables = useMockStore((s) => s.tables);
-  const mockUsers = useMockStore((s) => s.mockUsers);
-  const ack = useMockStore((s) => s.acknowledgeRequest);
-  const resolve = useMockStore((s) => s.resolveRequest);
+  const requestsQuery = useServiceRequestsQuery({ limit: 100, offset: 0 });
+  const tablesQuery = useTablesQuery();
+  const acknowledgeMutation = useAcknowledgeServiceRequestMutation();
+  const resolveMutation = useResolveServiceRequestMutation();
 
-  const request = requests.find((r) => r.id === requestId);
-  const table = request ? tables.find((t) => t.id === request.tableId) : undefined;
+  const request = requestsQuery.data?.find((r) => r.id === requestId);
+  const table = request ? tablesQuery.data?.find((t) => t.id === request.tableId) : undefined;
 
   const [waitMin, setWaitMin] = useState(0);
   useEffect(() => {
@@ -57,7 +56,7 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
   if (!request) {
     return (
       <p className="p-2 text-sm text-muted-foreground" data-slot="service-detail-missing">
-        Không tìm thấy yêu cầu.
+        {requestsQuery.isLoading ? 'Đang tải yêu cầu…' : 'Không tìm thấy yêu cầu.'}
       </p>
     );
   }
@@ -102,7 +101,7 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
       </div>
 
       <div className="flex flex-col gap-1">
-        <p className="text-[0.65rem] font-medium uppercase text-muted-foreground">Mật độ yêu cầu (mock)</p>
+        <p className="text-[0.65rem] font-medium uppercase text-muted-foreground">Mật độ yêu cầu</p>
         <div className="h-24 w-full min-w-0 rounded-md border border-border/40 bg-background/40">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={spark} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -115,7 +114,7 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
               <XAxis dataKey="t" tick={{ fontSize: 9 }} stroke="currentColor" className="text-muted-foreground" />
               <Tooltip
                 contentStyle={{ fontSize: 11 }}
-                formatter={(v) => [`${typeof v === 'number' ? v : '—'} req/h`, 'mock']}
+                formatter={(v) => [`${typeof v === 'number' ? v : '—'} req/h`, 'ước tính']}
                 labelFormatter={(l) => `${l}`}
               />
               <Area type="monotone" dataKey="v" stroke="var(--accent)" fill={`url(#${fillId})`} strokeWidth={1.5} />
@@ -126,25 +125,13 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
 
       <Separator />
 
-      <div className="flex items-center gap-2">
-        <Avatar className="size-8">
-          <AvatarFallback className="text-xs">{mockUsers[0]?.name[0] ?? 'N'}</AvatarFallback>
-        </Avatar>
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-xs font-medium">{mockUsers[0]?.name ?? 'Nhân viên'}</span>
-          <span className="text-[0.65rem] text-muted-foreground">Phụ trách inbox (mock)</span>
-        </div>
-      </div>
-
       <div className="mt-auto flex flex-col gap-2 border-t border-border/40 pt-2">
         {request.status === ServiceRequestStatus.PENDING ? (
           <Button
             type="button"
             className="w-full"
-            onClick={() => {
-              ack(request.id, userId);
-              toast('Đã nhận yêu cầu');
-            }}
+            disabled={acknowledgeMutation.isPending}
+            onClick={() => acknowledgeMutation.mutate(request.id)}
           >
             Nhận xử lý
           </Button>
@@ -154,10 +141,8 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
             type="button"
             variant="secondary"
             className="w-full"
-            onClick={() => {
-              resolve(request.id, userId);
-              toast('Đã đóng yêu cầu');
-            }}
+            disabled={resolveMutation.isPending}
+            onClick={() => resolveMutation.mutate(request.id)}
           >
             Hoàn tất
           </Button>

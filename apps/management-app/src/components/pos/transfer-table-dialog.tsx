@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -12,20 +11,24 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { useMockStore } from '@/mocks/store';
+import { useTransferTableMutation } from '@/features/order/hooks/use-order-query';
+import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 
 type Props = {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  fromTableId: string;
+  fromTableId?: string | null;
+  sessionId?: string | null;
+  requestId?: string;
 };
 
-export function TransferTableDialog({ open, onOpenChange, fromTableId }: Props) {
-  const tables = useMockStore((s) => s.tables);
-  const transferTable = useMockStore((s) => s.transferTable);
+export function TransferTableDialog({ open, onOpenChange, fromTableId, sessionId, requestId }: Props) {
+  const tablesQuery = useTablesQuery();
+  const transferMutation = useTransferTableMutation();
+  const canTransfer = Boolean(sessionId && fromTableId);
   const available = useMemo(
-    () => tables.filter((t) => t.id !== fromTableId && t.status === 'available'),
-    [tables, fromTableId],
+    () => (tablesQuery.data ?? []).filter((t) => t.id !== fromTableId && t.status === 'available'),
+    [tablesQuery.data, fromTableId],
   );
 
   return (
@@ -34,23 +37,37 @@ export function TransferTableDialog({ open, onOpenChange, fromTableId }: Props) 
         <DialogHeader>
           <DialogTitle>Chuyển bàn</DialogTitle>
           <DialogDescription>
-            Chỉ bàn <span className="font-medium">available</span> hiển thị. Các bàn bận/bếp/dọn không hợp lệ ở mock
-            này.
+            Chỉ bàn <span className="font-medium">available</span> hiển thị. Cần có phiên bàn đang mở để chuyển.
           </DialogDescription>
         </DialogHeader>
         <Command className="rounded-lg border">
-          <CommandInput placeholder="Tìm bàn…" />
+          <CommandInput placeholder="Tìm bàn…" disabled={!canTransfer || transferMutation.isPending} />
           <CommandList>
-            <CommandEmpty>Không có bàn trống phù hợp.</CommandEmpty>
+            <CommandEmpty>
+              {canTransfer ? 'Không có bàn trống phù hợp.' : 'Không đủ thông tin phiên để chuyển bàn.'}
+            </CommandEmpty>
             <CommandGroup heading="Bàn trống">
               {available.map((t) => (
                 <CommandItem
                   key={t.id}
                   value={`${t.name} ${t.areaName}`}
+                  disabled={!canTransfer || transferMutation.isPending}
                   onSelect={() => {
-                    transferTable(fromTableId, t.id);
-                    toast.success('Đã chuyển bàn (mock)');
-                    onOpenChange(false);
+                    if (!sessionId || !fromTableId) {
+                      return;
+                    }
+
+                    transferMutation.mutate(
+                      {
+                        sessionId,
+                        fromTableId,
+                        toTableId: t.id,
+                        requestId,
+                      },
+                      {
+                        onSuccess: () => onOpenChange(false),
+                      },
+                    );
                   }}
                 >
                   {t.name} — {t.areaName}

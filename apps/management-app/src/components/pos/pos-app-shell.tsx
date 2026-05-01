@@ -13,6 +13,7 @@ import { KpiTiles } from '@/components/pos/kpi-tiles';
 import { CommandPalette } from '@/components/pos/command-palette';
 import { NonOrderRouteReset } from '@/components/pos/non-order-route-reset';
 import { useOrderUiState } from '@/features/order/hooks/use-order-ui-state';
+import { useStaffOrderRealtime } from '@/features/order/hooks/use-staff-order-realtime';
 import { ROUTES } from '@/constants/routes';
 import { usePathname } from 'next/navigation';
 
@@ -24,6 +25,7 @@ export function PosAppShell({ children }: Props) {
   const pathname = usePathname();
   const title = getManagementPageTitle(pathname);
   const clearSelectedOrder = useOrderUiState((s) => s.selectOrder);
+  useStaffOrderRealtime();
 
   useEffect(() => {
     const onLiveOrders = pathname === ROUTES.POS || pathname === `${ROUTES.POS}/`;

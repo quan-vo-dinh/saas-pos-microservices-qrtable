@@ -106,7 +106,7 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
       </Table>
       <p className="text-sm font-mono">Tổng chạy: {formatVnd(total)}</p>
       <div className="mt-auto flex flex-col gap-1.5">
-        <Button type="button" className="w-full" onClick={() => setTransferOpen(true)} disabled={table.status === 'available'}>
+        <Button type="button" className="w-full" onClick={() => setTransferOpen(true)} disabled>
           Chuyển bàn
         </Button>
         <Button
@@ -138,7 +138,12 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
           Đánh dấu sạch
         </Button>
       </div>
-      <TransferTableDialog open={transferOpen} onOpenChange={setTransferOpen} fromTableId={table.id} />
+      <TransferTableDialog
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        fromTableId={null}
+        sessionId={null}
+      />
     </div>
   );
 }

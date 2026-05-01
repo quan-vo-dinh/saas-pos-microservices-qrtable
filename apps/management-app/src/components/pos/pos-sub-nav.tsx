@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ServiceRequestStatus } from '@einvoice/types';
 import { cn } from '@/lib/utils';
 import { ROUTES } from '@/constants/routes';
 import { useMockStore } from '@/mocks/store';
+import { useServiceRequestsQuery } from '@/features/service-requests/hooks/use-service-request-query';
 
 const links = [
   { href: ROUTES.POS, label: 'Live Orders' },
@@ -15,9 +17,12 @@ const links = [
 
 export function PosSubNav() {
   const pathname = usePathname();
-  const servicePending = useMockStore(
-    (s) => s.serviceRequests.filter((r) => r.status === 'PENDING').length,
-  );
+  const serviceRequestsQuery = useServiceRequestsQuery({
+    status: ServiceRequestStatus.PENDING,
+    limit: 100,
+    offset: 0,
+  });
+  const servicePending = serviceRequestsQuery.data?.length ?? 0;
   const billsPending = useMockStore((s) => s.bills.filter((b) => b.status === 'PENDING_PAYMENT').length);
 
   return (

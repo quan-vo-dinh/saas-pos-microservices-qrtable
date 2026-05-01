@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { useSession } from 'next-auth/react';
 import {
   flexRender,
   getCoreRowModel,
@@ -11,25 +10,23 @@ import {
 import { ServiceRequestStatus, ServiceRequestType } from '@einvoice/types';
 import type { ServiceRequest } from '@einvoice/types';
 import { CircleHelp, Clock, Receipt, UserRound } from 'lucide-react';
-import { toast } from 'sonner';
-import { Avatar, AvatarFallback } from '@einvoice/frontend-ui';
 import { Button } from '@/components/ui/button';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import { useMockStore } from '@/mocks/store';
+import {
+  useAcknowledgeServiceRequestMutation,
+  useResolveServiceRequestMutation,
+  useServiceRequestsQuery,
+} from '@/features/service-requests/hooks/use-service-request-query';
+import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 
 function typeIcon(t: ServiceRequest['type']) {
   if (t === ServiceRequestType.CALL_STAFF) return UserRound;
   if (t === ServiceRequestType.REQUEST_BILL) return Receipt;
   return CircleHelp;
-}
-
-function statusTab(s: ServiceRequestStatus) {
-  if (s === ServiceRequestStatus.PENDING) return 'PENDING' as const;
-  if (s === ServiceRequestStatus.ACKNOWLEDGED) return 'ACKNOWLEDGED' as const;
-  return 'RESOLVED' as const;
 }
 
 function waitM(iso: string) {
@@ -41,25 +38,23 @@ function sessionMinutes(sessionId: string) {
 }
 
 export function ServiceRequestTable() {
-  const { data: session } = useSession();
-  const userId = session?.user?.id ?? 'staff-waiter-1';
   const [tab, setTab] = useState<'PENDING' | 'ACKNOWLEDGED' | 'RESOLVED'>('PENDING');
-  const requests = useMockStore((s) => s.serviceRequests);
-  const tables = useMockStore((s) => s.tables);
-  const mockUsers = useMockStore((s) => s.mockUsers);
-  const ack = useMockStore((s) => s.acknowledgeRequest);
-  const resolve = useMockStore((s) => s.resolveRequest);
   const selectedServiceRequestId = useMockStore((s) => s.selectedServiceRequestId);
   const selectServiceRequest = useMockStore((s) => s.selectServiceRequest);
+  const status = ServiceRequestStatus[tab];
+  const requestsQuery = useServiceRequestsQuery({ status, limit: 100, offset: 0 });
+  const tablesQuery = useTablesQuery();
+  const acknowledgeMutation = useAcknowledgeServiceRequestMutation();
+  const resolveMutation = useResolveServiceRequestMutation();
 
   const tableName = useCallback(
-    (id: string) => tables.find((t) => t.id === id)?.name ?? id,
-    [tables],
+    (id: string) => tablesQuery.data?.find((t) => t.id === id)?.name ?? id,
+    [tablesQuery.data],
   );
 
   const data = useMemo(
-    () => requests.filter((r) => statusTab(r.status) === tab).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [requests, tab],
+    () => (requestsQuery.data ?? []).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [requestsQuery.data],
   );
 
   const columns: ColumnDef<ServiceRequest>[] = useMemo(
@@ -93,7 +88,7 @@ export function ServiceRequestTable() {
               </HoverCardTrigger>
               <HoverCardContent className="w-64 text-xs" side="right">
                 <p>{n || 'Không có'}</p>
-                <p className="mt-1 text-[0.65rem] text-muted-foreground">Đã ngồi ~{sessionMinutes(r.sessionId)} phút (mock)</p>
+                <p className="mt-1 text-[0.65rem] text-muted-foreground">Đã ngồi ~{sessionMinutes(r.sessionId)} phút</p>
               </HoverCardContent>
             </HoverCard>
           );
@@ -115,14 +110,11 @@ export function ServiceRequestTable() {
       {
         id: 'staff',
         header: 'NV',
-        cell: () => {
-          const u = mockUsers[0];
-          return (
-            <Avatar className="size-6">
-              <AvatarFallback className="text-[0.5rem]">{u.name[0]}</AvatarFallback>
-            </Avatar>
-          );
-        },
+        cell: ({ row }) => (
+          <span className="font-mono text-[0.65rem] text-muted-foreground">
+            {row.original.acknowledgedByUserId?.slice(0, 6) ?? '—'}
+          </span>
+        ),
       },
       {
         id: 'actions',
@@ -135,13 +127,8 @@ export function ServiceRequestTable() {
                 <Button
                   type="button"
                   className="h-7 px-2 text-[0.7rem]"
-                  onClick={() => {
-                    void ack(r.id, userId);
-                    toast('Đã xác nhận', {
-                      action: { label: 'Gỡ', onClick: () => void toast('Undo mock: không hỗ trợ') },
-                    });
-                    setTab('ACKNOWLEDGED');
-                  }}
+                  disabled={acknowledgeMutation.isPending}
+                  onClick={() => acknowledgeMutation.mutate(r.id)}
                 >
                   Nhận
                 </Button>
@@ -155,11 +142,8 @@ export function ServiceRequestTable() {
                   type="button"
                   variant="secondary"
                   className="h-7 px-2 text-[0.7rem]"
-                  onClick={() => {
-                    void resolve(r.id, userId);
-                    toast('Đã xong');
-                    setTab('RESOLVED');
-                  }}
+                  disabled={resolveMutation.isPending}
+                  onClick={() => resolveMutation.mutate(r.id)}
                 >
                   Xong
                 </Button>
@@ -170,7 +154,7 @@ export function ServiceRequestTable() {
         },
       },
     ],
-    [ack, mockUsers, resolve, tableName, userId],
+    [acknowledgeMutation, resolveMutation, tableName],
   );
 
   const t = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
@@ -232,7 +216,7 @@ export function ServiceRequestTable() {
                   colSpan={columns.length}
                   className="h-20 text-center text-sm text-muted-foreground"
                 >
-                  Không có yêu cầu ở tab này.
+                  {requestsQuery.isLoading ? 'Đang tải yêu cầu…' : 'Không có yêu cầu ở tab này.'}
                 </TableCell>
               </TableRow>
             )}
