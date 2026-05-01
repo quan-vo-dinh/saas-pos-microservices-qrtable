@@ -9,6 +9,9 @@ export const API_CONFIG = {
     AREAS: '/admin/areas',
     AREAS_REORDER: '/admin/areas/reorder',
     TABLES: '/admin/tables',
+    ADMIN_ORDERS: '/admin/orders',
+    ADMIN_TABLES_TRANSFER: '/admin/tables/transfer',
+    ADMIN_BILLS_REOPEN: '/admin/bills',
   },
 } as const;
 

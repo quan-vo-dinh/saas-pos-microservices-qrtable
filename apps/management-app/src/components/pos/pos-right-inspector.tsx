@@ -2,11 +2,9 @@
 
 import { usePathname } from 'next/navigation';
 import { ROUTES } from '@/constants/routes';
-import { useMockStore } from '@/mocks/store';
+import { useOrderUiState } from '@/features/order/hooks/use-order-ui-state';
 import { OrderDetailPanel } from '@/components/pos/order-detail-panel';
-import { TableDetailPanel } from '@/components/pos/table-detail-panel';
-import { CashBillPanel } from '@/components/pos/cash-bill-panel';
-import { ServiceRequestDetailPanel } from '@/components/pos/service-request-detail-panel';
+import { NonOrderRightInspector } from '@/components/pos/non-order-right-inspector';
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -21,10 +19,7 @@ function EmptyState({ message }: { message: string }) {
 
 export function PosRightInspector() {
   const pathname = usePathname();
-  const selectedRowId = useMockStore((s) => s.selectedRowId);
-  const selectedTableId = useMockStore((s) => s.selectedTableId);
-  const selectedBillId = useMockStore((s) => s.selectedBillId);
-  const selectedServiceRequestId = useMockStore((s) => s.selectedServiceRequestId);
+  const selectedRowId = useOrderUiState((s) => s.selectedOrderId);
 
   if (pathname === ROUTES.POS || pathname === `${ROUTES.POS}/`) {
     if (!selectedRowId) {
@@ -33,26 +28,5 @@ export function PosRightInspector() {
     return <OrderDetailPanel orderId={selectedRowId} />;
   }
 
-  if (pathname.startsWith(ROUTES.POS_TABLES)) {
-    if (!selectedTableId) {
-      return <EmptyState message="Chọn một bàn từ lưới / bản đồ." />;
-    }
-    return <TableDetailPanel tableId={selectedTableId} />;
-  }
-
-  if (pathname.startsWith(ROUTES.POS_BILLS)) {
-    if (!selectedBillId) {
-      return <EmptyState message="Chọn hóa đơn PENDING ở danh sách bên trái." />;
-    }
-    return <CashBillPanel billId={selectedBillId} />;
-  }
-
-  if (pathname.startsWith(ROUTES.POS_SERVICE_REQUESTS)) {
-    if (!selectedServiceRequestId) {
-      return <EmptyState message="Chọn một dòng yêu cầu để xem chi tiết và sparkline mật độ." />;
-    }
-    return <ServiceRequestDetailPanel requestId={selectedServiceRequestId} />;
-  }
-
-  return <EmptyState message="Chọn mục." />;
+  return <NonOrderRightInspector />;
 }

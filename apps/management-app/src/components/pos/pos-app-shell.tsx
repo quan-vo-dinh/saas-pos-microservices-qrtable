@@ -11,8 +11,8 @@ import { PosSubNav } from '@/components/pos/pos-sub-nav';
 import { PosRightInspector } from '@/components/pos/pos-right-inspector';
 import { KpiTiles } from '@/components/pos/kpi-tiles';
 import { CommandPalette } from '@/components/pos/command-palette';
-import { useFakeRealtime } from '@/mocks/use-fake-realtime';
-import { useMockStore } from '@/mocks/store';
+import { NonOrderRouteReset } from '@/components/pos/non-order-route-reset';
+import { useOrderUiState } from '@/features/order/hooks/use-order-ui-state';
 import { ROUTES } from '@/constants/routes';
 import { usePathname } from 'next/navigation';
 
@@ -23,19 +23,16 @@ type Props = {
 export function PosAppShell({ children }: Props) {
   const pathname = usePathname();
   const title = getManagementPageTitle(pathname);
-  useFakeRealtime();
+  const clearSelectedOrder = useOrderUiState((s) => s.selectOrder);
 
   useEffect(() => {
-    const s = useMockStore.getState();
-    if (!pathname.startsWith(ROUTES.POS_TABLES)) s.selectTable(null);
-    if (!pathname.startsWith(ROUTES.POS_BILLS)) s.selectBill(null);
-    if (!pathname.startsWith(ROUTES.POS_SERVICE_REQUESTS)) s.selectServiceRequest(null);
     const onLiveOrders = pathname === ROUTES.POS || pathname === `${ROUTES.POS}/`;
-    if (!onLiveOrders) s.selectRow(null);
-  }, [pathname]);
+    if (!onLiveOrders) clearSelectedOrder(null);
+  }, [clearSelectedOrder, pathname]);
 
   return (
     <SidebarProvider>
+      <NonOrderRouteReset />
       <AppSidebar />
       <SidebarInset className="min-h-0">
         <AppTopbar title={title} />

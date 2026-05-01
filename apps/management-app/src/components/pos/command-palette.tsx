@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { OrderStatus } from '@einvoice/types';
 import { ChefHat } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import {
   Command,
   CommandDialog,
@@ -15,15 +15,19 @@ import {
   CommandSeparator,
 } from '@/components/ui/command';
 import { ROUTES } from '@/constants/routes';
-import { useMockStore } from '@/mocks/store';
+import { useConfirmOrderMutation, useOrdersQuery } from '@/features/order/hooks/use-order-query';
+import { useOrderUiState } from '@/features/order/hooks/use-order-ui-state';
+import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const tables = useMockStore((s) => s.tables);
-  const liveOrders = useMockStore((s) => s.liveOrders);
-  const selectRow = useMockStore((s) => s.selectRow);
-  const confirmOrder = useMockStore((s) => s.confirmOrder);
+  const tablesQuery = useTablesQuery();
+  const tables = tablesQuery.data ?? [];
+  const liveOrdersQuery = useOrdersQuery();
+  const liveOrders = liveOrdersQuery.data ?? [];
+  const selectRow = useOrderUiState((s) => s.selectOrder);
+  const confirmOrderMutation = useConfirmOrderMutation();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -81,8 +85,8 @@ export function CommandPalette() {
               <CommandItem
                 value="xác nhận đơn mới pending"
                 onSelect={() => {
-                  const p = liveOrders.find((o) => o.status === 'PENDING');
-                  if (p) void confirmOrder(p.id, 'cmdk');
+                  const p = liveOrders.find((o) => o.status === OrderStatus.PENDING);
+                  if (p) confirmOrderMutation.mutate(p.id);
                   setOpen(false);
                 }}
               >

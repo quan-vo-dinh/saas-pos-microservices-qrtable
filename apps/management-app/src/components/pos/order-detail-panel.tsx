@@ -1,11 +1,10 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { orderItemStatusVi, orderStatusVi } from '@einvoice/shared-constants';
 import { OrderItemStatus, OrderStatus } from '@einvoice/types';
-import { Check, UserRound } from 'lucide-react';
+import { UserRound } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@einvoice/frontend-ui';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,8 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CancelOrderDialog } from '@/components/pos/cancel-order-dialog';
-import { useMockStore } from '@/mocks/store';
+import { useConfirmOrderMutation, useOrderDetailQuery } from '@/features/order/hooks/use-order-query';
+import { getErrorDisplayMessage } from '@einvoice/frontend-utils';
 import { formatVnd } from '@/lib/format-vnd';
 import { orderItemStatusChipClass, orderStatusChipClass } from '@/lib/pos-status-chips';
 import { cn } from '@/lib/utils';
@@ -41,34 +41,51 @@ function mockOrderItemImageUrl(menuItemId: string): string {
 }
 
 export function OrderDetailPanel({ orderId }: { orderId: string }) {
-  const { data: session } = useSession();
-  const userId = session?.user?.id ?? 'staff-waiter-1';
-  const order = useMockStore((s) => s.liveOrders.find((o) => o.id === orderId));
-  const mockUsers = useMockStore((s) => s.mockUsers);
-  const orderPriority = useMockStore((s) => s.orderPriority[orderId]);
-  const confirmOrder = useMockStore((s) => s.confirmOrder);
-  const updateItem = useMockStore((s) => s.updateOrderItemStatus);
-
+  const orderDetailQuery = useOrderDetailQuery(orderId);
+  const confirmOrderMutation = useConfirmOrderMutation();
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [justConfirmed, setJustConfirmed] = useState(false);
+  const order = orderDetailQuery.data;
 
   const events = useMemo(() => {
     if (!order) return [];
     const e: { at: string; text: string }[] = [
-      { at: order.createdAt, text: 'Đơn tạo (mock OrderCreatedEvent)' },
+      { at: order.createdAt, text: 'Đơn đã được tạo' },
     ];
     if (order.confirmedAt) {
       e.push({
         at: order.confirmedAt,
-        text: 'Xác nhận bởi nhân viên',
+        text: order.confirmedByUserId ? `Xác nhận bởi ${order.confirmedByUserId}` : 'Xác nhận bởi nhân viên',
       });
     }
-    e.push({
-      at: order.updatedAt,
-      text: `Cập nhật trạng thái ${orderStatusVi(order.status)} (OrderStatusChangedEvent mock)`,
-    });
+    if (order.cancelReason && order.cancelledAt) {
+      e.push({
+        at: order.cancelledAt,
+        text: `Huỷ đơn: ${order.cancelReason}`,
+      });
+    } else if (order.updatedAt !== order.createdAt) {
+      e.push({
+        at: order.updatedAt,
+        text: `Cập nhật trạng thái ${orderStatusVi(order.status)}`,
+      });
+    }
     return e.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
   }, [order]);
+
+  if (orderDetailQuery.isLoading) {
+    return (
+      <p className="p-2 text-sm text-muted-foreground" data-slot="pos-order-loading">
+        Đang tải chi tiết đơn...
+      </p>
+    );
+  }
+
+  if (orderDetailQuery.isError) {
+    return (
+      <p className="p-2 text-sm text-destructive" data-slot="pos-order-error">
+        {getErrorDisplayMessage(orderDetailQuery.error as Error)}
+      </p>
+    );
+  }
 
   if (!order) {
     return (
@@ -79,7 +96,8 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
   }
 
   const canConfirm = order.status === OrderStatus.PENDING;
-  const waiter = mockUsers[0];
+  const canCancel = order.status === OrderStatus.PENDING || order.status === OrderStatus.PROCESSING;
+  const isConfirming = confirmOrderMutation.isPending && confirmOrderMutation.variables === order.id;
 
   return (
     <div
@@ -100,23 +118,18 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
             </motion.div>
           </AnimatePresence>
         </div>
-        {orderPriority ? <Badge className="w-fit border-fuchsia-500/40 bg-fuchsia-500/15">Ưu tiên</Badge> : null}
         <div className="flex flex-wrap items-center gap-1.5">
           {canConfirm ? (
             <Button
               type="button"
               size="sm"
-              onClick={() => {
-                confirmOrder(order.id, userId);
-                setJustConfirmed(true);
-                window.setTimeout(() => setJustConfirmed(false), 1200);
-              }}
+              onClick={() => confirmOrderMutation.mutate(order.id)}
+              disabled={isConfirming}
             >
-              {justConfirmed ? <Check className="size-4" data-icon="inline-start" /> : null}
-              Xác nhận
+              {isConfirming ? 'Đang xác nhận...' : 'Xác nhận'}
             </Button>
           ) : null}
-          {order.status !== OrderStatus.CANCELED && order.status !== OrderStatus.COMPLETED ? (
+          {canCancel ? (
             <Button type="button" size="sm" variant="outline" onClick={() => setCancelOpen(true)}>
               Huỷ
             </Button>
@@ -156,14 +169,7 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
                     <TableCell>
                       <Checkbox
                         checked={it.status === OrderItemStatus.SERVED}
-                        disabled={it.status === OrderItemStatus.CANCELED}
-                        onCheckedChange={() => {
-                          const next =
-                            it.status === OrderItemStatus.SERVED
-                              ? OrderItemStatus.READY
-                              : OrderItemStatus.SERVED;
-                          updateItem(order.id, it.id, next);
-                        }}
+                        disabled
                         aria-label={`Đánh dấu đã phục vụ ${it.menuItemName}`}
                       />
                     </TableCell>
@@ -225,17 +231,29 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
             </Avatar>
             <div className="flex min-w-0 flex-col">
               <span>Phiên {order.sessionId}</span>
-              <span className="text-muted-foreground">12 đơn từ trước đến giờ (mock loyalty)</span>
+              <span className="text-muted-foreground">
+                {order.confirmedByUserId ? `Nhân viên xác nhận: ${order.confirmedByUserId}` : 'Chưa có nhân viên xác nhận'}
+              </span>
             </div>
             <div className="ms-auto text-end">
-              <p className="text-[0.65rem] text-muted-foreground">Phục vụ (mock)</p>
-              <p className="font-medium">{waiter.name}</p>
+              <p className="text-[0.65rem] text-muted-foreground">Cập nhật gần nhất</p>
+              <p className="font-medium">
+                {new Date(order.updatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
           </div>
         </TabsContent>
       </Tabs>
 
-      <CancelOrderDialog open={cancelOpen} onOpenChange={setCancelOpen} orderId={order.id} userId={userId} />
+      {cancelOpen ? (
+        <CancelOrderDialog
+          key={order.id}
+          open={cancelOpen}
+          onOpenChange={setCancelOpen}
+          orderId={order.id}
+          orderStatus={order.status}
+        />
+      ) : null}
     </div>
   );
 }

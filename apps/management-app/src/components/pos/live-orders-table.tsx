@@ -8,12 +8,13 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table';
-import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
+import { getErrorDisplayMessage } from '@einvoice/frontend-utils';
 import { orderItemStatusVi, orderStatusVi } from '@einvoice/shared-constants';
 import { OrderStatus } from '@einvoice/types';
 import type { Order } from '@einvoice/types';
 import { MessageSquareText } from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
@@ -21,13 +22,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { OrderRowContextMenu } from '@/components/pos/order-row-context-menu';
 import { CancelOrderDialog } from '@/components/pos/cancel-order-dialog';
-import { useMockStore, type PosViewFilter } from '@/mocks/store';
+import { useConfirmOrderMutation, useOrdersQuery } from '@/features/order/hooks/use-order-query';
+import { useOrderUiState, type OrderViewFilter } from '@/features/order/hooks/use-order-ui-state';
+import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 import { formatVnd } from '@/lib/format-vnd';
 import { orderItemStatusChipClass, orderStatusChipClass } from '@/lib/pos-status-chips';
 import { useNowMs, waitMinutes } from '@/lib/use-now-ms';
 import { cn } from '@/lib/utils';
 
-function posFilterChipsToView(filter: string): PosViewFilter {
+function posFilterChipsToView(filter: string): OrderViewFilter {
   if (filter === 'P') return 'PENDING';
   if (filter === 'R') return 'READY';
   if (filter === 'D') return 'PROCESSING';
@@ -46,19 +49,34 @@ const QUICK: { id: string; label: string; value: string }[] = [
 ];
 
 export function LiveOrdersTable() {
-  const { data: session } = useSession();
-  const userId = session?.user?.id ?? 'staff-waiter-1';
-  const liveOrders = useMockStore((s) => s.liveOrders);
-  const tables = useMockStore((s) => s.tables);
-  const posViewFilter = useMockStore((s) => s.posViewFilter);
-  const setPosViewFilter = useMockStore((s) => s.setPosViewFilter);
-  const selectRow = useMockStore((s) => s.selectRow);
-  const selectedRowId = useMockStore((s) => s.selectedRowId);
-  const confirmOrder = useMockStore((s) => s.confirmOrder);
+  const posViewFilter = useOrderUiState((s) => s.viewFilter);
+  const setPosViewFilter = useOrderUiState((s) => s.setViewFilter);
+  const selectRow = useOrderUiState((s) => s.selectOrder);
+  const selectedRowId = useOrderUiState((s) => s.selectedOrderId);
+  const confirmOrderMutation = useConfirmOrderMutation();
+  const tablesQuery = useTablesQuery();
 
-  const [cancelId, setCancelId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{ orderId: string; orderStatus: OrderStatus } | null>(null);
   const [chip, setChip] = useState('ALL');
   const nowMs = useNowMs();
+
+  const orderQueryParams = useMemo(() => {
+    switch (posViewFilter) {
+      case 'PENDING':
+        return { status: OrderStatus.PENDING } as const;
+      case 'PROCESSING':
+        return { status: OrderStatus.PROCESSING } as const;
+      case 'READY':
+        return { status: OrderStatus.READY } as const;
+      default:
+        return undefined;
+    }
+  }, [posViewFilter]);
+  const ordersQuery = useOrdersQuery(orderQueryParams);
+  const liveOrders = ordersQuery.data ?? [];
+  const tables = tablesQuery.data ?? [];
+  const confirmingOrderId = confirmOrderMutation.isPending ? confirmOrderMutation.variables : null;
+
   useEffect(() => {
     if (posViewFilter === 'PENDING') setChip('P');
     else if (posViewFilter === 'PROCESSING') setChip('D');
@@ -206,6 +224,7 @@ export function LiveOrdersTable() {
         header: '',
         cell: ({ row }) => {
           const o = row.original;
+          const isConfirming = confirmingOrderId === o.id;
           if (o.status === OrderStatus.PENDING) {
             return (
               <div
@@ -216,16 +235,17 @@ export function LiveOrdersTable() {
                 <Button
                   type="button"
                   className="h-7 px-2 text-[0.7rem]"
-                  onClick={() => void confirmOrder(o.id, userId)}
+                  onClick={() => confirmOrderMutation.mutate(o.id)}
+                  disabled={isConfirming}
                 >
-                  Nhận
+                  {isConfirming ? 'Đang nhận...' : 'Nhận'}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   className="h-7 px-2 text-[0.7rem]"
                   onClick={() => {
-                    setCancelId(o.id);
+                    setCancelTarget({ orderId: o.id, orderStatus: o.status });
                     selectRow(o.id);
                   }}
                 >
@@ -239,7 +259,7 @@ export function LiveOrdersTable() {
         size: 150,
       },
     ],
-    [confirmOrder, selectRow, userId, nowMs],
+    [confirmOrderMutation, confirmingOrderId, selectRow, nowMs],
   );
 
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
@@ -257,8 +277,13 @@ export function LiveOrdersTable() {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" data-slot="pos-live-orders">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">Live (mock) · {rows.length} hiển thị</p>
-        <div className="inline-flex min-w-0 max-w-full flex-1 items-center justify-end">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <p className="text-xs text-muted-foreground">Live API · {rows.length} hiển thị</p>
+          {ordersQuery.isError ? (
+            <p className="text-xs text-destructive">{getErrorDisplayMessage(ordersQuery.error as Error)}</p>
+          ) : null}
+        </div>
+        <div className="inline-flex min-w-0 max-w-full items-center justify-end">
           <ToggleGroup
             type="single"
             className="flex h-auto min-w-0 max-w-full flex-wrap justify-end gap-0.5 p-0.5"
@@ -315,7 +340,11 @@ export function LiveOrdersTable() {
                       key={o.id}
                       orderId={o.id}
                       onCancelClick={() => {
-                        setCancelId(o.id);
+                        if (o.status !== OrderStatus.PENDING && o.status !== OrderStatus.PROCESSING) {
+                          toast.error('Chỉ hỗ trợ huỷ đơn đang chờ hoặc đang xử lý.');
+                          return;
+                        }
+                        setCancelTarget({ orderId: o.id, orderStatus: o.status });
                         selectRow(o.id);
                       }}
                     >
@@ -351,7 +380,11 @@ export function LiveOrdersTable() {
                       key={o.id}
                       orderId={o.id}
                       onCancelClick={() => {
-                        setCancelId(o.id);
+                        if (o.status !== OrderStatus.PENDING && o.status !== OrderStatus.PROCESSING) {
+                          toast.error('Chỉ hỗ trợ huỷ đơn đang chờ hoặc đang xử lý.');
+                          return;
+                        }
+                        setCancelTarget({ orderId: o.id, orderStatus: o.status });
                         selectRow(o.id);
                       }}
                     >
@@ -381,19 +414,19 @@ export function LiveOrdersTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="p-4 text-center text-sm text-muted-foreground">
-                  Không có dòng nào khớp bộ lọc.
+                  {ordersQuery.isLoading ? 'Đang tải live orders...' : 'Không có dòng nào khớp bộ lọc.'}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      {cancelId ? (
+      {cancelTarget ? (
         <CancelOrderDialog
-          open={!!cancelId}
-          onOpenChange={(open) => !open && setCancelId(null)}
-          orderId={cancelId}
-          userId={userId}
+          open={!!cancelTarget}
+          onOpenChange={(open) => !open && setCancelTarget(null)}
+          orderId={cancelTarget.orderId}
+          orderStatus={cancelTarget.orderStatus}
         />
       ) : null}
     </div>

@@ -11,15 +11,19 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useMockStore } from '@/mocks/store';
+import { useOrdersQuery } from '@/features/order/hooks/use-order-query';
+import { useOrderUiState } from '@/features/order/hooks/use-order-ui-state';
+import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 import { useNowMs, waitMinutes } from '@/lib/use-now-ms';
 import { cn } from '@/lib/utils';
 
 export function KpiTiles() {
-  const liveOrders = useMockStore((s) => s.liveOrders);
-  const tables = useMockStore((s) => s.tables);
-  const posViewFilter = useMockStore((s) => s.posViewFilter);
-  const setPosViewFilter = useMockStore((s) => s.setPosViewFilter);
+  const liveOrdersQuery = useOrdersQuery();
+  const tablesQuery = useTablesQuery();
+  const liveOrders = liveOrdersQuery.data ?? [];
+  const tables = tablesQuery.data ?? [];
+  const posViewFilter = useOrderUiState((s) => s.viewFilter);
+  const setPosViewFilter = useOrderUiState((s) => s.setViewFilter);
   const nowMs = useNowMs();
 
   const { pending, avgMin, overdue, occPct } = useMemo(() => {
@@ -36,40 +40,50 @@ export function KpiTiles() {
     const pct = tot ? Math.round((occ / tot) * 100) : 0;
     return { pending: pend.length, avgMin: avg, overdue: ovd, occPct: pct };
   }, [liveOrders, tables, nowMs]);
+  const hasDataError = liveOrdersQuery.isError || tablesQuery.isError;
+  const pendingValue = hasDataError ? '—' : String(pending);
+  const avgValue = hasDataError ? '—' : Number.isFinite(avgMin) ? formatMinutes(avgMin) : '—';
+  const overdueValue = hasDataError ? '—' : String(overdue);
+  const occPctValue = hasDataError ? '—' : `${occPct}%`;
 
   return (
-    <div className="flex flex-nowrap items-stretch gap-1.5" data-slot="pos-kpi">
-      <Kpi
-        label="Chờ xác nhận"
-        value={String(pending)}
-        icon={Clock3Icon}
-        active={posViewFilter === 'PENDING'}
-        onClick={() => setPosViewFilter('PENDING')}
-        cta="Mở danh sách"
-      />
-      <Kpi
-        label="TB phục vụ (demo)"
-        value={Number.isFinite(avgMin) ? formatMinutes(avgMin) : '—'}
-        icon={CircleCheckBigIcon}
-        active={false}
-        cta="Theo dõi"
-      />
-      <Kpi
-        label="Quá SLA 15′"
-        value={String(overdue)}
-        icon={AlertTriangleIcon}
-        active={posViewFilter === 'OVERDUE'}
-        onClick={() => setPosViewFilter('OVERDUE')}
-        cta="Ưu tiên xử lý"
-      />
-      <Kpi
-        label="Bàn bận"
-        value={`${occPct}%`}
-        icon={ArmchairIcon}
-        active={posViewFilter === 'OCCUPIED_TABLE'}
-        onClick={() => setPosViewFilter('OCCUPIED_TABLE')}
-        cta="Xem bàn"
-      />
+    <div className="flex flex-col gap-1.5" data-slot="pos-kpi">
+      {hasDataError ? (
+        <p className="text-xs text-destructive">Không thể tải KPI POS. Kiểm tra kết nối hoặc quyền truy cập.</p>
+      ) : null}
+      <div className="flex flex-nowrap items-stretch gap-1.5">
+        <Kpi
+          label="Chờ xác nhận"
+          value={pendingValue}
+          icon={Clock3Icon}
+          active={posViewFilter === 'PENDING'}
+          onClick={() => setPosViewFilter('PENDING')}
+          cta="Mở danh sách"
+        />
+        <Kpi
+          label="TB phục vụ (demo)"
+          value={avgValue}
+          icon={CircleCheckBigIcon}
+          active={false}
+          cta="Theo dõi"
+        />
+        <Kpi
+          label="Quá SLA 15′"
+          value={overdueValue}
+          icon={AlertTriangleIcon}
+          active={posViewFilter === 'OVERDUE'}
+          onClick={() => setPosViewFilter('OVERDUE')}
+          cta="Ưu tiên xử lý"
+        />
+        <Kpi
+          label="Bàn bận"
+          value={occPctValue}
+          icon={ArmchairIcon}
+          active={posViewFilter === 'OCCUPIED_TABLE'}
+          onClick={() => setPosViewFilter('OCCUPIED_TABLE')}
+          cta="Xem bàn"
+        />
+      </div>
     </div>
   );
 }

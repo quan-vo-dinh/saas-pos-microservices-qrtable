@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { z } from 'zod';
+import { OrderStatus } from '@einvoice/types';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useMockStore } from '@/mocks/store';
+import { useCancelOrderMutation } from '@/features/order/hooks/use-order-query';
 import { cn } from '@/lib/utils';
 
 const reasons = [
@@ -30,14 +31,14 @@ export function CancelOrderDialog({
   open,
   onOpenChange,
   orderId,
-  userId,
+  orderStatus,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   orderId: string;
-  userId: string;
+  orderStatus: OrderStatus;
 }) {
-  const cancelOrder = useMockStore((s) => s.cancelOrder);
+  const cancelOrderMutation = useCancelOrderMutation();
   const [reason, setReason] = useState<string>(reasons[0].value);
   const [detail, setDetail] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -50,10 +51,17 @@ export function CancelOrderDialog({
     }
     const r = parsed.data;
     const full = r.reason === 'Khác' && r.detail ? r.detail : r.reason;
-    cancelOrder(orderId, full, userId);
-    onOpenChange(false);
-    setDetail('');
-    setErr(null);
+    cancelOrderMutation.mutate({
+      orderId,
+      status: orderStatus,
+      reason: full,
+    }, {
+      onSuccess: () => {
+        onOpenChange(false);
+        setDetail('');
+        setErr(null);
+      },
+    });
   };
 
   return (
@@ -103,11 +111,11 @@ export function CancelOrderDialog({
           {err ? <p className="text-sm text-destructive">{err}</p> : null}
         </div>
         <AlertDialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={cancelOrderMutation.isPending}>
             Đóng
           </Button>
-          <Button type="button" variant="destructive" onClick={onConfirm}>
-            Xác nhận huỷ
+          <Button type="button" variant="destructive" onClick={onConfirm} disabled={cancelOrderMutation.isPending}>
+            {cancelOrderMutation.isPending ? 'Đang huỷ...' : 'Xác nhận huỷ'}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
