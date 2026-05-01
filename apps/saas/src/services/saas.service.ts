@@ -40,6 +40,24 @@ export class SaasService {
     return tenant;
   }
 
+  async getBySlug(rawSlug: string): Promise<TenantTcpResponse> {
+    const slug = this.makeSlug(rawSlug || '');
+    if (!slug) {
+      throw new BusinessException(ErrorCode.SAAS_TENANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    const tenant = await this.saasRepository.findBySlug(slug);
+    if (!tenant) {
+      throw new BusinessException(ErrorCode.SAAS_TENANT_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+
+    if (!tenant.isActive) {
+      throw new BusinessException(ErrorCode.SAAS_TENANT_INACTIVE, HttpStatus.FORBIDDEN);
+    }
+
+    return tenant;
+  }
+
   async update(data: UpdateTenantTcpRequest): Promise<TenantTcpResponse> {
     const tenant = await this.getById(data.id);
     const name = data.name?.trim() || tenant.name;
@@ -68,7 +86,7 @@ export class SaasService {
     return value
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/[^a-z0-9_\s-]/g, '')
       .replace(/\s+/g, '-');
   }
 }

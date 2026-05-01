@@ -26,6 +26,10 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.TRANSFER_LOCK_FAILED]: 'Could not acquire transfer locks; retry shortly',
   [ErrorCode.TRANSFER_SESSION_TABLE_MISMATCH]: 'Session is not seated at the source table',
   [ErrorCode.TRANSFER_DESTINATION_INVALID]: 'Destination table is not available for transfer',
+  [ErrorCode.ORDER_JOIN_TABLE_BILLING]: 'Table is in billing; cannot start ordering session',
+  [ErrorCode.ORDER_JOIN_TABLE_CLEANING]: 'Table is being cleaned; cannot start ordering session',
+  [ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE]:
+    'Table session state is inconsistent; ask staff to refresh table status',
   [ErrorCode.CATALOG_CATEGORY_DUPLICATE_NAME]: 'Category name already exists',
   [ErrorCode.CATALOG_CATEGORY_NOT_FOUND]: 'Category not found',
   [ErrorCode.CATALOG_CATEGORY_HAS_ACTIVE_ITEMS]: 'Cannot delete category with active menu items',
@@ -49,6 +53,7 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.SAAS_TENANT_NAME_REQUIRED]: 'Tenant name is required',
   [ErrorCode.SAAS_TENANT_ALREADY_EXISTS]: 'Tenant already exists',
   [ErrorCode.SAAS_TENANT_NOT_FOUND]: 'Tenant not found',
+  [ErrorCode.SAAS_TENANT_INACTIVE]: 'Tenant is inactive or unavailable',
   [ErrorCode.UPLOAD_FILE_REQUIRED]: 'File is required',
   [ErrorCode.UPLOAD_FILE_TOO_LARGE]: 'File size exceeds 5MB limit',
   [ErrorCode.UPLOAD_INVALID_FILE_TYPE]: 'Invalid file type. Allowed: jpeg, png, webp',

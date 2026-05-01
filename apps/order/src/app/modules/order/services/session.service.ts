@@ -56,6 +56,11 @@ export class SessionService {
     }
   }
 
+  /** Updates activity timestamps when a guest rejoins an occupied table via QR (no cart mutation). */
+  async touchCustomerSessionActivity(tenantId: string, sessionId: string): Promise<void> {
+    await this.touchAfterCartMutation(tenantId, sessionId);
+  }
+
   /** Updates cached session hash after table transfer (same session id / cart key). */
   async patchSessionTableInRedis(
     tenantId: string,

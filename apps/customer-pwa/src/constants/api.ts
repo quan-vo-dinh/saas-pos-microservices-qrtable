@@ -6,6 +6,7 @@ export const API_CONFIG = {
     MENU: '/menu',
     VALIDATE_QR: '/menu/validate-qr',
     SESSION_JOIN: '/customer/sessions/join',
+    PUBLIC_TENANT: (slug: string) => `/public/tenants/${encodeURIComponent(slug)}`,
     CART: '/customer/cart',
     ORDERS: '/customer/orders',
     ORDER_BY_ID: (id: string) => `/customer/orders/${encodeURIComponent(id)}`,

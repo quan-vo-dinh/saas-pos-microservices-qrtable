@@ -23,6 +23,8 @@ export function getCustomerTenantId(): string | null {
 export type CustomerApiOptions = RequestInit & {
   /** Join and similar calls must not send a stale Order session id. */
   omitSessionHeader?: boolean;
+  /** Skip `x-tenant-id` (e.g. public tenant resolver before slug → id is known). */
+  skipTenantHeader?: boolean;
 };
 
 /**
@@ -31,13 +33,17 @@ export type CustomerApiOptions = RequestInit & {
  * and sends `x-session-id` when an Order session is active.
  */
 export function customerApi<T>(path: string, options?: CustomerApiOptions): Promise<T> {
-  const { omitSessionHeader, headers: optsHeaders, ...rest } = options ?? {};
-  const tenantId = activeTenantId ?? API_CONFIG.TENANT_ID;
+  const { omitSessionHeader, skipTenantHeader, headers: optsHeaders, ...rest } = options ?? {};
+  const fallbackTenant = API_CONFIG.TENANT_ID;
+  const tenantId = skipTenantHeader ? undefined : (activeTenantId ?? fallbackTenant);
 
   const headers: Record<string, string> = {
-    'x-tenant-id': tenantId,
     ...(optsHeaders as Record<string, string> | undefined),
   };
+
+  if (tenantId) {
+    headers['x-tenant-id'] = tenantId;
+  }
 
   const sid = activeSessionId;
   if (sid && !omitSessionHeader) {

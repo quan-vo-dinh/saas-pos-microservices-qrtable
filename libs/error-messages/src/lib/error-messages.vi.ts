@@ -26,6 +26,10 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.TRANSFER_LOCK_FAILED]: 'Không thể khóa chuyển bàn; vui lòng thử lại',
   [ErrorCode.TRANSFER_SESSION_TABLE_MISMATCH]: 'Phiên không ngồi tại bàn nguồn',
   [ErrorCode.TRANSFER_DESTINATION_INVALID]: 'Bàn đích không khả dụng để chuyển',
+  [ErrorCode.ORDER_JOIN_TABLE_BILLING]: 'Bàn đang thanh toán, không thể vào phiên đặt món',
+  [ErrorCode.ORDER_JOIN_TABLE_CLEANING]: 'Bàn đang được dọn, không thể vào phiên đặt món',
+  [ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE]:
+    'Trạng thái bàn và phiên không khớp; vui lòng nhờ nhân viên kiểm tra',
   [ErrorCode.CATALOG_CATEGORY_DUPLICATE_NAME]: 'Tên danh mục đã tồn tại',
   [ErrorCode.CATALOG_CATEGORY_NOT_FOUND]: 'Danh mục không tìm thấy',
   [ErrorCode.CATALOG_CATEGORY_HAS_ACTIVE_ITEMS]: 'Không thể xóa danh mục đang có món hoạt động',
@@ -49,6 +53,7 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.SAAS_TENANT_NAME_REQUIRED]: 'Tên cửa hàng là bắt buộc',
   [ErrorCode.SAAS_TENANT_ALREADY_EXISTS]: 'Cửa hàng đã tồn tại',
   [ErrorCode.SAAS_TENANT_NOT_FOUND]: 'Cửa hàng không tìm thấy',
+  [ErrorCode.SAAS_TENANT_INACTIVE]: 'Cửa hàng đã tạm ngưng hoặc không khả dụng',
   [ErrorCode.UPLOAD_FILE_REQUIRED]: 'Vui lòng chọn tệp để tải lên',
   [ErrorCode.UPLOAD_FILE_TOO_LARGE]: 'Kích thước tệp vượt quá giới hạn 5MB',
   [ErrorCode.UPLOAD_INVALID_FILE_TYPE]: 'Loại tệp không hợp lệ. Cho phép: jpeg, png, webp',

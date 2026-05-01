@@ -32,4 +32,8 @@ export class SaasRepository {
     const count = await this.repo.count({ where: { slug } });
     return count > 0;
   }
+
+  findBySlug(slug: string): Promise<Tenant | null> {
+    return this.repo.findOne({ where: { slug } });
+  }
 }

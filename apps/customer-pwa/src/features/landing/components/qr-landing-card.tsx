@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
+import { ApiError } from '@einvoice/frontend-utils';
 import { QrCode, CheckCircle2, XCircle, Users } from 'lucide-react';
 import {
   Button,
@@ -14,26 +15,64 @@ import { useVerifyQrMutation } from '@/features/landing/hooks/use-verify-qr';
 import { sessionEntityToInfo, useSession } from '@/features/session/context/session-provider';
 import { sessionService } from '@/features/landing/services/session.service';
 import { ROUTES } from '@/constants/routes';
+import { useResolveTenantQuery } from '@/features/landing/hooks/use-resolve-tenant';
+import { setCustomerTenantId } from '@/lib/api-client';
+
+function joinBlockedMessage(err: unknown): string {
+  const code = err instanceof ApiError ? err.errorCode : undefined;
+  if (code === 'ORDER_JOIN_TABLE_BILLING') {
+    return 'Bàn đang thanh toán. Vui lòng nhờ nhân viên hỗ trợ.';
+  }
+  if (code === 'ORDER_JOIN_TABLE_CLEANING') {
+    return 'Bàn đang được dọn. Vui lòng chờ nhân viên mở lại.';
+  }
+  if (code === 'ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE') {
+    return 'Phiên bàn không khớp. Vui lòng nhờ nhân viên làm mới trạng thái bàn.';
+  }
+  return 'Không thể tham gia phiên đặt món. Vui lòng thử lại.';
+}
 
 export function QrLandingCard() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { startSession } = useSession();
 
+  const tenantSlug = searchParams.get('tenant');
   const table = searchParams.get('table');
   const token = searchParams.get('token');
 
+  const tenantQuery = useResolveTenantQuery(tenantSlug);
   const verifyMutation = useVerifyQrMutation();
+  const verifyOnceRef = useRef(false);
+
+  useEffect(() => {
+    verifyOnceRef.current = false;
+  }, [table, token, tenantSlug]);
+
+  useEffect(() => {
+    if (!table || !token || verifyOnceRef.current) return;
+
+    if (tenantSlug?.trim()) {
+      if (tenantQuery.isPending) return;
+      if (tenantQuery.isError || !tenantQuery.data?.isActive) return;
+      setCustomerTenantId(tenantQuery.data.id);
+    }
+
+    verifyOnceRef.current = true;
+    verifyMutation.mutate({ tableId: table, qrToken: token });
+  }, [
+    table,
+    token,
+    tenantSlug,
+    tenantQuery.isPending,
+    tenantQuery.isError,
+    tenantQuery.data,
+    verifyMutation,
+  ]);
 
   const joinMutation = useMutation({
     mutationFn: () => sessionService.joinSession({ tableId: table!, qrToken: token! }),
   });
-
-  useEffect(() => {
-    if (!table || !token) return;
-    verifyMutation.mutate({ tableId: table, qrToken: token });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [table, token]);
 
   const handleEnterMenu = (): void => {
     if (!table || !token) return;
@@ -55,6 +94,34 @@ export function QrLandingCard() {
         </CardHeader>
         <CardContent className="text-center">
           <p className="text-muted-foreground">Quét mã QR tại bàn để bắt đầu đặt món</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (tenantSlug?.trim() && tenantQuery.isPending) {
+    return (
+      <Card className="mx-auto max-w-sm shadow-md">
+        <CardHeader className="text-center">
+          <CardTitle>Đang xác định nhà hàng…</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-5 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (tenantSlug?.trim() && tenantQuery.isError) {
+    return (
+      <Card className="mx-auto max-w-sm border-destructive/50 shadow-md">
+        <CardHeader className="text-center">
+          <XCircle className="text-destructive mx-auto mb-2 size-12" />
+          <CardTitle className="text-destructive">Liên kết không hợp lệ</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center">
+          <p className="text-muted-foreground">Không tìm thấy nhà hàng hoặc nhà hàng đã tạm ngưng.</p>
         </CardContent>
       </Card>
     );
@@ -91,6 +158,7 @@ export function QrLandingCard() {
   }
 
   const tableData = verifyMutation.data;
+
   return (
     <Card className="mx-auto max-w-sm shadow-md">
       <CardHeader className="text-center">
@@ -109,9 +177,7 @@ export function QrLandingCard() {
           </div>
         </div>
         {joinMutation.isError ? (
-          <p className="text-center text-sm text-destructive">
-            Không thể tham gia phiên đặt món. Vui lòng thử lại.
-          </p>
+          <p className="text-center text-sm text-destructive">{joinBlockedMessage(joinMutation.error)}</p>
         ) : null}
         <Button className="w-full" size="lg" disabled={joinMutation.isPending} onClick={() => handleEnterMenu()}>
           {joinMutation.isPending ? 'Đang vào phiên…' : 'Vào Menu'}

@@ -84,6 +84,21 @@ describe('customerApi', () => {
     expect(callArgs.headers['x-session-id']).toBeUndefined();
   });
 
+  it('skipTenantHeader omits x-tenant-id for public bootstrap calls', async () => {
+    mockApiClient.mockResolvedValue({});
+    setCustomerTenantId('tenant_joined');
+
+    await customerApi('/public/tenants/acme', {
+      method: 'GET',
+      omitSessionHeader: true,
+      skipTenantHeader: true,
+    });
+
+    const callArgs = mockApiClient.mock.calls[0][1];
+    expect(callArgs.headers['x-tenant-id']).toBeUndefined();
+    expect(callArgs.headers['x-session-id']).toBeUndefined();
+  });
+
   it('preserves caller-provided options (method, body)', async () => {
     mockApiClient.mockResolvedValue({ id: 'order-1' });
 

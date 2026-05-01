@@ -86,6 +86,30 @@ export class OrderService {
 
   async joinSession(dto: JoinSessionTcpRequest): Promise<SessionTcpResponse> {
     const table = await this.callCatalogValidateQrToken(dto);
+
+    if (table.status === TABLE_STATUS.BILLING) {
+      throw new BusinessException(ErrorCode.ORDER_JOIN_TABLE_BILLING, HttpStatus.CONFLICT);
+    }
+    if (table.status === TABLE_STATUS.CLEANING) {
+      throw new BusinessException(ErrorCode.ORDER_JOIN_TABLE_CLEANING, HttpStatus.CONFLICT);
+    }
+
+    if (table.status === TABLE_STATUS.OCCUPIED) {
+      if (!table.sessionId) {
+        throw new BusinessException(ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE, HttpStatus.CONFLICT);
+      }
+      const existing = await this.sessionRepository.findActiveByIdAndTenant(table.sessionId, dto.tenantId);
+      if (!existing) {
+        throw new BusinessException(ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE, HttpStatus.CONFLICT);
+      }
+      await this.sessionService.touchCustomerSessionActivity(dto.tenantId, existing.id);
+      const refreshed = await this.sessionRepository.findActiveByIdAndTenant(existing.id, dto.tenantId);
+      if (!refreshed) {
+        throw new BusinessException(ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE, HttpStatus.CONFLICT);
+      }
+      return this.toSessionDto(refreshed);
+    }
+
     const now = new Date();
     const row = new Session();
     row.tenantId = dto.tenantId;

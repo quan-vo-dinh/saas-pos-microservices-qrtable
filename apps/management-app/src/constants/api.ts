@@ -1,6 +1,8 @@
 /** Environment-aware BFF API configuration. */
 export const API_CONFIG = {
   DEFAULT_BFF_URL: process.env.NEXT_PUBLIC_BFF_URL ?? 'http://localhost:3300/api/v1',
+  /** Customer PWA origin for QR links (no trailing path). */
+  CUSTOMER_PWA_ORIGIN: process.env.NEXT_PUBLIC_CUSTOMER_PWA_URL ?? 'http://localhost:5173',
   ENDPOINTS: {
     AUTHORIZER_ME: '/authorizer/me',
     CATEGORIES: '/admin/categories',
@@ -13,6 +15,7 @@ export const API_CONFIG = {
     ADMIN_SERVICE_REQUESTS: '/admin/service-requests',
     ADMIN_TABLES_TRANSFER: '/admin/tables/transfer',
     ADMIN_BILLS_REOPEN: '/admin/bills',
+    ADMIN_CURRENT_TENANT: '/admin/tenant/current',
   },
 } as const;
 

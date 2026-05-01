@@ -83,6 +83,7 @@ enum CATALOG {
 enum SAAS {
   CREATE = 'saas.create',
   GET_BY_ID = 'saas.get_by_id',
+  GET_BY_SLUG = 'saas.get_by_slug',
   GET_LIST = 'saas.get_list',
   UPDATE = 'saas.update',
   DELETE = 'saas.delete',

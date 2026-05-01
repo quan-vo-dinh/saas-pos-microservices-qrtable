@@ -5,16 +5,15 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Area } from '@common/entities/area.entity';
 import { Table } from '@common/entities/table.entity';
 import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
-import { ConfigService } from '@nestjs/config';
 import { BusinessException } from '@common/error-messages/business.exception';
-import { createHmac } from 'crypto';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+
+const SAMPLE_QR_TOKEN = 'a'.repeat(64);
 
 describe('TableService', () => {
   let service: TableService;
   let repository: jest.Mocked<TableRepository>;
   let areaRepo: { findOne: jest.Mock };
-
-  const TEST_SECRET = 'test-secret';
 
   const mockTable = {
     id: 'table-1',
@@ -23,7 +22,7 @@ describe('TableService', () => {
     name: 'Table 1',
     capacity: 4,
     status: TABLE_STATUS.AVAILABLE,
-    qrToken: 'some-token',
+    qrToken: SAMPLE_QR_TOKEN,
     sessionId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -54,7 +53,6 @@ describe('TableService', () => {
         TableService,
         { provide: TableRepository, useValue: mockTableRepository },
         { provide: getRepositoryToken(Area), useValue: areaRepo },
-        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(TEST_SECRET) } },
       ],
     }).compile();
 
@@ -63,11 +61,11 @@ describe('TableService', () => {
   });
 
   describe('create', () => {
-    it('should create a table with auto-generated QR token', async () => {
+    it('should create a table with opaque QR token', async () => {
       areaRepo.findOne.mockResolvedValue(mockArea);
       repository.existsByName.mockResolvedValue(false);
       repository.create.mockResolvedValue(mockTable);
-      const updatedTable = { ...mockTable, qrToken: 'generated-token' } as unknown as Table;
+      const updatedTable = { ...mockTable, qrToken: SAMPLE_QR_TOKEN } as unknown as Table;
       repository.updateByIdAndTenant.mockResolvedValue(updatedTable);
 
       const result = await service.create({
@@ -77,7 +75,13 @@ describe('TableService', () => {
       });
       expect(result).toEqual(updatedTable);
       expect(repository.create).toHaveBeenCalled();
-      expect(repository.updateByIdAndTenant).toHaveBeenCalled();
+      expect(repository.updateByIdAndTenant).toHaveBeenCalledWith(
+        'table-1',
+        'tenant-1',
+        expect.objectContaining({
+          qrToken: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
+      );
     });
 
     it('should throw BusinessException for invalid area', async () => {
@@ -164,28 +168,61 @@ describe('TableService', () => {
   });
 
   describe('validateQrToken', () => {
-    it('should return table for correct token', async () => {
-      const expectedToken = createHmac('sha256', TEST_SECRET).update('table-1tenant-1').digest('hex');
-      repository.findByIdAndTenant.mockResolvedValue(mockTable);
+    it('should return table when token matches stored qrToken', async () => {
+      const tableWithToken = { ...mockTable, qrToken: SAMPLE_QR_TOKEN } as unknown as Table;
+      repository.findByIdAndTenant.mockResolvedValue(tableWithToken);
 
       const result = await service.validateQrToken({
         tableId: 'table-1',
         tenantId: 'tenant-1',
-        token: expectedToken,
+        token: SAMPLE_QR_TOKEN,
       });
-      expect(result).toEqual(mockTable);
+      expect(result).toEqual(tableWithToken);
     });
 
-    it('should throw BusinessException for wrong token', async () => {
-      const wrongToken = createHmac('sha256', 'wrong-secret').update('table-1tenant-1').digest('hex');
+    it('should throw when token does not match stored value', async () => {
+      const tableWithToken = { ...mockTable, qrToken: SAMPLE_QR_TOKEN } as unknown as Table;
+      repository.findByIdAndTenant.mockResolvedValue(tableWithToken);
+      const otherToken = 'b'.repeat(64);
 
       await expect(
         service.validateQrToken({
           tableId: 'table-1',
           tenantId: 'tenant-1',
-          token: wrongToken,
+          token: otherToken,
         }),
       ).rejects.toThrow(BusinessException);
+    });
+
+    it('should throw when token is not 64 hex chars', async () => {
+      repository.findByIdAndTenant.mockResolvedValue(mockTable);
+
+      await expect(
+        service.validateQrToken({
+          tableId: 'table-1',
+          tenantId: 'tenant-1',
+          token: 'short',
+        }),
+      ).rejects.toMatchObject({ errorCode: ErrorCode.CATALOG_TABLE_INVALID_QR_TOKEN });
+    });
+  });
+
+  describe('regenerateQrToken', () => {
+    it('should replace qrToken with a new opaque value', async () => {
+      repository.findByIdAndTenant.mockResolvedValue(mockTable);
+      const nextToken = 'c'.repeat(64);
+      repository.updateByIdAndTenant.mockResolvedValue({ ...mockTable, qrToken: nextToken } as unknown as Table);
+
+      const result = await service.regenerateQrToken({ id: 'table-1', tenantId: 'tenant-1' });
+
+      expect(result.qrToken).toBe(nextToken);
+      expect(repository.updateByIdAndTenant).toHaveBeenCalledWith(
+        'table-1',
+        'tenant-1',
+        expect.objectContaining({
+          qrToken: expect.stringMatching(/^[a-f0-9]{64}$/),
+        }),
+      );
     });
   });
 });

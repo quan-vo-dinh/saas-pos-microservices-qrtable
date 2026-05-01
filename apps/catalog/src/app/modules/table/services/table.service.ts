@@ -1,8 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
-import { ConfigService } from '@nestjs/config';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { randomBytes, timingSafeEqual } from 'crypto';
 import { TableRepository } from '../repositories/table.repository';
 import { Table } from '@common/entities/table.entity';
 import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
@@ -29,19 +28,14 @@ const VALID_TRANSITIONS: Record<TABLE_STATUS, TABLE_STATUS[]> = {
 
 @Injectable()
 export class TableService {
-  private readonly qrTokenSecret: string;
-
   constructor(
     private readonly tableRepository: TableRepository,
     @InjectRepository(Area)
     private readonly areaRepo: Repository<Area>,
-    private readonly configService: ConfigService,
-  ) {
-    this.qrTokenSecret = this.configService.get<string>('QR_TOKEN_SECRET', 'default-secret-change-me');
-  }
+  ) {}
 
-  private generateQrToken(tableId: string, tenantId: string): string {
-    return createHmac('sha256', this.qrTokenSecret).update(`${tableId}${tenantId}`).digest('hex');
+  private generateQrToken(): string {
+    return randomBytes(32).toString('hex');
   }
 
   async create(data: CreateTableTcpRequest): Promise<Table> {
@@ -67,8 +61,7 @@ export class TableService {
       sessionId: null,
     });
 
-    // Generate QR token with actual table ID
-    const qrToken = this.generateQrToken(table.id, data.tenantId);
+    const qrToken = this.generateQrToken();
     const updated = await this.tableRepository.updateByIdAndTenant(table.id, data.tenantId, { qrToken });
     return updated!;
   }
@@ -156,26 +149,29 @@ export class TableService {
   }
 
   async validateQrToken(data: ValidateQrTokenTcpRequest): Promise<Table> {
-    const expectedToken = this.generateQrToken(data.tableId, data.tenantId);
-
-    const tokenBuffer = Buffer.from(data.token, 'hex');
-    const expectedBuffer = Buffer.from(expectedToken, 'hex');
-
-    if (tokenBuffer.length !== expectedBuffer.length || !timingSafeEqual(tokenBuffer, expectedBuffer)) {
-      throw new BusinessException(ErrorCode.CATALOG_TABLE_INVALID_QR_TOKEN, HttpStatus.FORBIDDEN);
-    }
-
     const table = await this.tableRepository.findByIdAndTenant(data.tableId, data.tenantId);
     if (!table) {
       throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
+
+    if (!/^[a-f0-9]{64}$/i.test(data.token) || !/^[a-f0-9]{64}$/i.test(table.qrToken)) {
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_INVALID_QR_TOKEN, HttpStatus.FORBIDDEN);
+    }
+
+    const tokenBuffer = Buffer.from(data.token, 'hex');
+    const storedBuffer = Buffer.from(table.qrToken, 'hex');
+
+    if (tokenBuffer.length !== storedBuffer.length || !timingSafeEqual(tokenBuffer, storedBuffer)) {
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_INVALID_QR_TOKEN, HttpStatus.FORBIDDEN);
+    }
+
     return table;
   }
 
   async regenerateQrToken(data: RegenerateQrTokenTcpRequest): Promise<Table> {
     await this.getById({ id: data.id, tenantId: data.tenantId });
 
-    const newToken = this.generateQrToken(data.id, data.tenantId);
+    const newToken = this.generateQrToken();
     const updated = await this.tableRepository.updateByIdAndTenant(data.id, data.tenantId, { qrToken: newToken });
     if (!updated) {
       throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);

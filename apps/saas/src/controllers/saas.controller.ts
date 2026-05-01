@@ -6,6 +6,7 @@ import {
   CreateTenantTcpRequest,
   DeleteTenantTcpRequest,
   GetTenantByIdTcpRequest,
+  GetTenantBySlugTcpRequest,
   TenantTcpResponse,
   UpdateTenantTcpRequest,
 } from '@common/interfaces/tcp/saas';
@@ -41,6 +42,12 @@ export class SaasController {
   @MessagePattern(TCP_REQUEST_MESSAGE.SAAS.GET_BY_ID)
   async getById(@RequestParams() body: GetTenantByIdTcpRequest): Promise<Response<TenantTcpResponse>> {
     const result = await this.saasService.getById(body.id);
+    return Response.success<TenantTcpResponse>(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SAAS.GET_BY_SLUG)
+  async getBySlug(@RequestParams() body: GetTenantBySlugTcpRequest): Promise<Response<TenantTcpResponse>> {
+    const result = await this.saasService.getBySlug(body.slug);
     return Response.success<TenantTcpResponse>(result);
   }
 

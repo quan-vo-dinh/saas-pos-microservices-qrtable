@@ -4,10 +4,11 @@ import { customerApi } from '@/lib/api-client';
 import { API_CONFIG } from '@/constants/api';
 
 export const sessionService = {
+  /** BFF expects `{ tableId, token }` (ValidateQrTokenRequestDto); shared type uses `qrToken` for clarity at call sites. */
   validateQr: (data: ValidateQrRequest): Promise<ValidateQrResponse> =>
     customerApi<ValidateQrResponse>(API_CONFIG.ENDPOINTS.VALIDATE_QR, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ tableId: data.tableId, token: data.qrToken }),
       omitSessionHeader: true,
     }),
 

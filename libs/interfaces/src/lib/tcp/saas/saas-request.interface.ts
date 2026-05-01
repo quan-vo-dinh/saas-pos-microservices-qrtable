@@ -6,6 +6,10 @@ export type GetTenantByIdTcpRequest = {
   id: string;
 };
 
+export type GetTenantBySlugTcpRequest = {
+  slug: string;
+};
+
 export type UpdateTenantTcpRequest = UpdateTenantRequestDto & {
   id: string;
 };
