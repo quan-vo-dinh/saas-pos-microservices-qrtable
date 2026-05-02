@@ -15,10 +15,10 @@
     "username": "owner.1700000002@gmail.com",
     "email": "owner.1700000002@gmail.com",
     "firstName": "owner",
-    "lastName": "tenant_a",
+    "lastName": "pho-viet",
     "password": "owner123",
     "role": "OWNER",
-    "tenantId": "tenant_a",
+    "tenantId": "023772bb-391b-401c-936a-ed7034b69cec",
     "subRole": "OWNER"
   },
   {
@@ -26,10 +26,10 @@
     "username": "manager.1700000003@gmail.com",
     "email": "manager.1700000003@gmail.com",
     "firstName": "manager",
-    "lastName": "tenant_a",
+    "lastName": "pho-viet",
     "password": "manager123",
     "role": "MANAGER",
-    "tenantId": "tenant_a",
+    "tenantId": "023772bb-391b-401c-936a-ed7034b69cec",
     "subRole": "MANAGER"
   },
   {
@@ -37,10 +37,10 @@
     "username": "waiter.1700000004@gmail.com",
     "email": "waiter.1700000004@gmail.com",
     "firstName": "waiter",
-    "lastName": "tenant_a",
+    "lastName": "pho-viet",
     "password": "waiter123",
     "role": "WAITER",
-    "tenantId": "tenant_a",
+    "tenantId": "023772bb-391b-401c-936a-ed7034b69cec",
     "subRole": "WAITER"
   },
   {
@@ -48,10 +48,10 @@
     "username": "chef.1700000005@gmail.com",
     "email": "chef.1700000005@gmail.com",
     "firstName": "chef",
-    "lastName": "tenant_a",
+    "lastName": "pho-viet",
     "password": "chef123",
     "role": "CHEF",
-    "tenantId": "tenant_a",
+    "tenantId": "023772bb-391b-401c-936a-ed7034b69cec",
     "subRole": "CHEF"
   },
   {
@@ -59,10 +59,10 @@
     "username": "barista.1700000006@gmail.com",
     "email": "barista.1700000006@gmail.com",
     "firstName": "barista",
-    "lastName": "tenant_a",
+    "lastName": "pho-viet",
     "password": "barista123",
     "role": "BARISTA",
-    "tenantId": "tenant_a",
+    "tenantId": "023772bb-391b-401c-936a-ed7034b69cec",
     "subRole": "BARISTA"
   }
 ]

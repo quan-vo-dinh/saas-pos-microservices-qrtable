@@ -25,7 +25,7 @@ describe('[Integration] Areas CRUD', () => {
 
     expect(status).toBe(200);
     expect(data.name).toBe(`IT-Area-${uid}`);
-    expect(data.tenantId).toBe('tenant_a');
+    expect(data.tenantId).toBe('023772bb-391b-401c-936a-ed7034b69cec');
     createdId = data.id;
   });
 

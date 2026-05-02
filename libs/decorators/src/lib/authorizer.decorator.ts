@@ -13,7 +13,7 @@ export const Authorization = ({ secured = false }: { secured?: boolean }) => {
       ApiHeader({
         name: REQUEST_HEADERS.TENANT_ID,
         required: false,
-        description: 'Tenant context for local/dev requests. Example: tenant_a',
+        description: 'Tenant context for local/dev requests. Example: 023772bb-391b-401c-936a-ed7034b69cec',
       }),
     ];
     return applyDecorators(...decorators, setMetadata);

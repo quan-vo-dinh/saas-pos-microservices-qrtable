@@ -9,6 +9,11 @@ KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-qrtable-bff}"
 KEYCLOAK_CLIENT_SECRET="${KEYCLOAK_CLIENT_SECRET:-change-me}"
 KEYCLOAK_MASTER_SSL_REQUIRED="${KEYCLOAK_MASTER_SSL_REQUIRED:-none}"
 KEYCLOAK_REALM_SSL_REQUIRED="${KEYCLOAK_REALM_SSL_REQUIRED:-none}"
+# Must match Keycloakify theme id (apps/keycloak-theme/src/kc.gen.tsx → themeNames)
+KEYCLOAK_LOGIN_THEME="${KEYCLOAK_LOGIN_THEME:-keycloak-theme}"
+KEYCLOAK_CLEAN_REALM="${KEYCLOAK_CLEAN_REALM:-false}"
+MANAGEMENT_APP_CLIENT_ID="${MANAGEMENT_APP_CLIENT_ID:-management-app}"
+MANAGEMENT_APP_CLIENT_SECRET="${MANAGEMENT_APP_CLIENT_SECRET:-RHRjKOPDywQxSG7qjcGM1XsfmE6ikR8B}"
 AUTH_BOOTSTRAP_USERS_FILE="${AUTH_BOOTSTRAP_USERS_FILE:-tools/auth-bootstrap-users.json}"
 
 required_cmds=(curl jq)
@@ -18,6 +23,20 @@ for cmd in "${required_cmds[@]}"; do
     exit 1
   fi
 done
+
+assert_local_keycloak_host() {
+  local parsed_host
+  parsed_host="$(node -e "try { console.log(new URL(process.argv[1]).hostname) } catch { process.exit(1) }" "${KEYCLOAK_HOST}")"
+
+  if [[ "${parsed_host}" != "localhost" && "${parsed_host}" != "127.0.0.1" && "${parsed_host}" != "::1" ]]; then
+    echo "Refusing to clean non-local Keycloak host: ${KEYCLOAK_HOST}"
+    exit 1
+  fi
+}
+
+if [[ "${KEYCLOAK_CLEAN_REALM}" == "true" ]]; then
+  assert_local_keycloak_host
+fi
 
 get_admin_token() {
   curl -sS -X POST "${KEYCLOAK_HOST}/realms/master/protocol/openid-connect/token" \
@@ -42,38 +61,130 @@ fi
 auth_header=(-H "Authorization: Bearer ${ADMIN_TOKEN}")
 json_header=(-H 'Content-Type: application/json')
 
+if [[ "${KEYCLOAK_CLEAN_REALM}" == "true" ]]; then
+  clean_code="$(curl -sS -o /dev/null -w '%{http_code}' "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}" "${auth_header[@]}")"
+  if [[ "${clean_code}" == "200" ]]; then
+    echo "Deleting realm for clean bootstrap: ${KEYCLOAK_REALM}"
+    delete_code="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}" "${auth_header[@]}")"
+    if [[ "${delete_code}" != "204" && "${delete_code}" != "200" ]]; then
+      echo "Unable to delete realm during clean bootstrap: ${KEYCLOAK_REALM} (HTTP ${delete_code})"
+      exit 1
+    fi
+  elif [[ "${clean_code}" != "404" ]]; then
+    echo "Unable to confirm realm before clean bootstrap: ${KEYCLOAK_REALM} (HTTP ${clean_code})"
+    exit 1
+  fi
+fi
+
 echo "Ensuring master realm sslRequired=${KEYCLOAK_MASTER_SSL_REQUIRED}"
+master_realm_payload="$(jq -n \
+  --arg sslRequired "${KEYCLOAK_MASTER_SSL_REQUIRED}" \
+  '{realm:"master",sslRequired:$sslRequired}')"
 curl -sS -X PUT "${KEYCLOAK_HOST}/admin/realms/master" \
   "${auth_header[@]}" "${json_header[@]}" \
-  -d "{\"realm\":\"master\",\"sslRequired\":\"${KEYCLOAK_MASTER_SSL_REQUIRED}\"}" >/dev/null
+  -d "${master_realm_payload}" >/dev/null
 
 realm_exists_code="$(curl -sS -o /dev/null -w '%{http_code}' "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}" "${auth_header[@]}")"
 if [[ "${realm_exists_code}" == "404" ]]; then
   echo "Creating realm: ${KEYCLOAK_REALM}"
+  realm_create_payload="$(jq -n \
+    --arg realm "${KEYCLOAK_REALM}" \
+    --arg sslRequired "${KEYCLOAK_REALM_SSL_REQUIRED}" \
+    --arg loginTheme "${KEYCLOAK_LOGIN_THEME}" \
+    '{realm:$realm,enabled:true,sslRequired:$sslRequired,loginTheme:$loginTheme}')"
   curl -sS -X POST "${KEYCLOAK_HOST}/admin/realms" \
     "${auth_header[@]}" "${json_header[@]}" \
-    -d "{\"realm\":\"${KEYCLOAK_REALM}\",\"enabled\":true,\"sslRequired\":\"${KEYCLOAK_REALM_SSL_REQUIRED}\"}" >/dev/null
+    -d "${realm_create_payload}" >/dev/null
 else
   echo "Realm already exists: ${KEYCLOAK_REALM}"
 fi
 
-echo "Ensuring realm ${KEYCLOAK_REALM} sslRequired=${KEYCLOAK_REALM_SSL_REQUIRED}"
+echo "Ensuring realm ${KEYCLOAK_REALM} sslRequired=${KEYCLOAK_REALM_SSL_REQUIRED} loginTheme=${KEYCLOAK_LOGIN_THEME}"
+realm_current="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}" "${auth_header[@]}")"
+realm_update_merged="$(echo "${realm_current}" | jq \
+  --arg ssl "${KEYCLOAK_REALM_SSL_REQUIRED}" \
+  --arg loginTheme "${KEYCLOAK_LOGIN_THEME}" \
+  '.sslRequired = $ssl | .loginTheme = $loginTheme')"
 curl -sS -X PUT "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}" \
   "${auth_header[@]}" "${json_header[@]}" \
-  -d "{\"realm\":\"${KEYCLOAK_REALM}\",\"sslRequired\":\"${KEYCLOAK_REALM_SSL_REQUIRED}\"}" >/dev/null
+  -d "${realm_update_merged}" >/dev/null
 
-client_id_internal="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${KEYCLOAK_CLIENT_ID}" "${auth_header[@]}" | jq -r '.[0].id // empty')"
-if [[ -z "${client_id_internal}" ]]; then
-  echo "Creating client: ${KEYCLOAK_CLIENT_ID}"
-  curl -sS -X POST "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients" \
-    "${auth_header[@]}" "${json_header[@]}" \
-    -d "{\"clientId\":\"${KEYCLOAK_CLIENT_ID}\",\"enabled\":true,\"publicClient\":false,\"protocol\":\"openid-connect\",\"serviceAccountsEnabled\":true,\"directAccessGrantsEnabled\":true,\"standardFlowEnabled\":true,\"secret\":\"${KEYCLOAK_CLIENT_SECRET}\"}" >/dev/null
+ensure_user_profile_attribute() {
+  local attribute_name="$1"
 
-  client_id_internal="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${KEYCLOAK_CLIENT_ID}" "${auth_header[@]}" | jq -r '.[0].id // empty')"
-fi
+  local profile
+  profile="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/users/profile" "${auth_header[@]}")"
+
+  local attribute_exists
+  attribute_exists="$(echo "${profile}" | jq -r --arg name "${attribute_name}" '.attributes[]? | select(.name == $name) | .name')"
+
+  if [[ -z "${attribute_exists}" ]]; then
+    echo "Creating user profile attribute: ${attribute_name}"
+    local updated_profile
+    updated_profile="$(echo "${profile}" | jq --arg name "${attribute_name}" '.attributes += [{
+      name: $name,
+      displayName: $name,
+      permissions: { view: ["admin", "user"], edit: ["admin"] },
+      multivalued: false
+    }]')"
+
+    curl -sS -X PUT "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/users/profile" \
+      "${auth_header[@]}" "${json_header[@]}" \
+      -d "${updated_profile}" >/dev/null
+  fi
+}
+
+ensure_user_profile_attribute "tenant_id"
+ensure_user_profile_attribute "sub_role"
+
+ensure_oidc_client() {
+  local client_id="$1"
+  local client_secret="$2"
+  local public_client="$3"
+
+  local internal_id
+  internal_id="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${client_id}" "${auth_header[@]}" | jq -r '.[0].id // empty')"
+
+  if [[ -z "${internal_id}" ]]; then
+    echo "Creating client: ${client_id}" >&2
+    local client_payload
+    client_payload="$(jq -n \
+      --arg clientId "${client_id}" \
+      --arg secret "${client_secret}" \
+      --argjson publicClient "${public_client}" \
+      '{
+        clientId: $clientId,
+        enabled: true,
+        publicClient: $publicClient,
+        protocol: "openid-connect",
+        serviceAccountsEnabled: true,
+        directAccessGrantsEnabled: true,
+        standardFlowEnabled: true,
+        secret: $secret,
+        redirectUris: ["http://localhost:3000/*"],
+        webOrigins: ["http://localhost:3000"]
+      }')"
+
+    curl -sS -X POST "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients" \
+      "${auth_header[@]}" "${json_header[@]}" \
+      -d "${client_payload}" >/dev/null
+
+    internal_id="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${client_id}" "${auth_header[@]}" | jq -r '.[0].id // empty')"
+  fi
+
+  echo "${internal_id}"
+}
+
+client_id_internal="$(ensure_oidc_client "${KEYCLOAK_CLIENT_ID}" "${KEYCLOAK_CLIENT_SECRET}" "false")"
+mgmt_client_internal="$(ensure_oidc_client "${MANAGEMENT_APP_CLIENT_ID}" "${MANAGEMENT_APP_CLIENT_SECRET}" "false")"
 
 if [[ -z "${client_id_internal}" ]]; then
   echo "Unable to resolve Keycloak internal client id"
+  exit 1
+fi
+
+if [[ -z "${mgmt_client_internal}" ]]; then
+  echo "Unable to resolve Management App internal client id"
   exit 1
 fi
 
@@ -103,9 +214,10 @@ for role in "${roles[@]}"; do
   role_code="$(curl -sS -o /dev/null -w '%{http_code}' "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/roles/${role}" "${auth_header[@]}")"
   if [[ "${role_code}" == "404" ]]; then
     echo "Creating role: ${role}"
+    role_create_payload="$(jq -n --arg name "${role}" '{name:$name}')"
     curl -sS -X POST "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/roles" \
       "${auth_header[@]}" "${json_header[@]}" \
-      -d "{\"name\":\"${role}\"}" >/dev/null
+      -d "${role_create_payload}" >/dev/null
   fi
 done
 
@@ -119,9 +231,28 @@ ensure_user_attribute_mapper() {
 
   if [[ -z "${mapper_exists}" ]]; then
     echo "Creating protocol mapper: ${mapper_name}"
+    local mapper_payload
+    mapper_payload="$(jq -n \
+      --arg name "${mapper_name}" \
+      --arg userAttribute "${user_attribute}" \
+      --arg claimName "${claim_name}" \
+      '{
+        name: $name,
+        protocol: "openid-connect",
+        protocolMapper: "oidc-usermodel-attribute-mapper",
+        config: {
+          "access.token.claim": "true",
+          "id.token.claim": "true",
+          "userinfo.token.claim": "true",
+          "user.attribute": $userAttribute,
+          "claim.name": $claimName,
+          "jsonType.label": "String"
+        }
+      }')"
+
     curl -sS -X POST "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${client_id_internal}/protocol-mappers/models" \
       "${auth_header[@]}" "${json_header[@]}" \
-      -d "{\"name\":\"${mapper_name}\",\"protocol\":\"openid-connect\",\"protocolMapper\":\"oidc-usermodel-attribute-mapper\",\"config\":{\"access.token.claim\":\"true\",\"id.token.claim\":\"true\",\"userinfo.token.claim\":\"true\",\"user.attribute\":\"${user_attribute}\",\"claim.name\":\"${claim_name}\",\"jsonType.label\":\"String\"}}" >/dev/null
+      -d "${mapper_payload}" >/dev/null
   fi
 }
 
@@ -130,14 +261,11 @@ ensure_user_attribute_mapper "tenant_id-claim" "tenant_id" "tenant_id"
 ensure_user_attribute_mapper "sub_role-claim" "sub_role" "sub_role"
 
 # Add same mappers to management-app client so JWT tokens include tenant_id
-mgmt_client_internal="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=management-app" "${auth_header[@]}" | jq -r '.[0].id // empty')"
-if [[ -n "${mgmt_client_internal}" ]]; then
-  saved_client_id="${client_id_internal}"
-  client_id_internal="${mgmt_client_internal}"
-  ensure_user_attribute_mapper "tenant_id-claim" "tenant_id" "tenant_id"
-  ensure_user_attribute_mapper "sub_role-claim" "sub_role" "sub_role"
-  client_id_internal="${saved_client_id}"
-fi
+saved_client_id="${client_id_internal}"
+client_id_internal="${mgmt_client_internal}"
+ensure_user_attribute_mapper "tenant_id-claim" "tenant_id" "tenant_id"
+ensure_user_attribute_mapper "sub_role-claim" "sub_role" "sub_role"
+client_id_internal="${saved_client_id}"
 
 ensure_user_for_role() {
   local user_id="$1"
@@ -193,9 +321,12 @@ ensure_user_for_role() {
     "${auth_header[@]}" "${json_header[@]}" \
     -d "${update_payload}" >/dev/null
 
+  local password_payload
+  password_payload="$(jq -n --arg value "${password}" '{type:"password",value:$value,temporary:false}')"
+
   curl -sS -X PUT "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/users/${found_user_id}/reset-password" \
     "${auth_header[@]}" "${json_header[@]}" \
-    -d "{\"type\":\"password\",\"value\":\"${password}\",\"temporary\":false}" >/dev/null
+    -d "${password_payload}" >/dev/null
 
   local role_payload
   role_payload="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/roles/${role_name}" "${auth_header[@]}")"

@@ -32,7 +32,7 @@ import { authApiClient } from '../authenticated-client';
 const TEST_PROFILE: UserProfile = {
   userId: '1',
   email: 'test@test.com',
-  tenantId: 'tenant_a',
+  tenantId: '023772bb-391b-401c-936a-ed7034b69cec',
   roles: ['OWNER'],
   permissions: [],
 };
@@ -69,7 +69,7 @@ describe('authApiClient', () => {
     await authApiClient('/menu');
 
     const [, opts] = mockApiClient.mock.calls[0];
-    expect(opts.headers).toHaveProperty('x-tenant-id', 'tenant_a');
+    expect(opts.headers).toHaveProperty('x-tenant-id', '023772bb-391b-401c-936a-ed7034b69cec');
   });
 
   // ── 3. No Authorization when token absent ──────────────────────
@@ -121,7 +121,7 @@ describe('authApiClient', () => {
     // Caller-supplied Authorization should override the store-based one
     expect(opts.headers['Authorization']).toBe('Bearer override-token');
     // Auth-store tenant header should still be present
-    expect(opts.headers['x-tenant-id']).toBe('tenant_a');
+    expect(opts.headers['x-tenant-id']).toBe('023772bb-391b-401c-936a-ed7034b69cec');
     // Custom header should be forwarded
     expect(opts.headers['x-custom']).toBe('custom-value');
   });

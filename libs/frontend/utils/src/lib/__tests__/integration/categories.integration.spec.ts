@@ -30,7 +30,7 @@ describe('[Integration] Categories CRUD', () => {
     expect(data).toBeDefined();
     expect(data.name).toBe(`IT-Cat-${uid}`);
     expect(data.status).toBe('active');
-    expect(data.tenantId).toBe('tenant_a');
+    expect(data.tenantId).toBe('023772bb-391b-401c-936a-ed7034b69cec');
     expect(data.id).toBeDefined();
     createdId = data.id;
   });
@@ -97,7 +97,7 @@ describe('[Integration] Categories CRUD', () => {
 
   it('should return 401 without auth token', async () => {
     const res = await fetch('http://localhost:3300/api/v1/admin/categories', {
-      headers: { 'x-tenant-id': 'tenant_a' },
+      headers: { 'x-tenant-id': '023772bb-391b-401c-936a-ed7034b69cec' },
     });
 
     expect(res.status).toBe(401);

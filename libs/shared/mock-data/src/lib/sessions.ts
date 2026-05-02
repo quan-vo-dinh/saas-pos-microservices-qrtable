@@ -1,7 +1,7 @@
 import type { Session } from '@einvoice/types';
 import { SessionStatus } from '@einvoice/types';
 
-const TENANT_A = 'tenant_a';
+const CANONICAL_TENANT_ID = '023772bb-391b-401c-936a-ed7034b69cec';
 
 /**
  * Mock-only extension to Session type — adds fields needed for mock UI rendering
@@ -20,7 +20,7 @@ export type MockSessionExtended = Session & {
 export const sessions: MockSessionExtended[] = [
   {
     id: 'session-001',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-001',
     tableName: 'T1',
     status: SessionStatus.ACTIVE,
@@ -34,7 +34,7 @@ export const sessions: MockSessionExtended[] = [
   },
   {
     id: 'session-002',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-005',
     tableName: 'T5',
     status: SessionStatus.ACTIVE,
@@ -48,7 +48,7 @@ export const sessions: MockSessionExtended[] = [
   },
   {
     id: 'session-003',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-008',
     tableName: 'L3',
     status: SessionStatus.CLOSED,

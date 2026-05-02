@@ -17,7 +17,7 @@ jest.mock('@/lib/auth/auth-store', () => ({
   useAuthStore: {
     getState: () => ({
       accessToken: 'test-access-token',
-      profile: { tenantId: 'tenant_a' },
+      profile: { tenantId: '023772bb-391b-401c-936a-ed7034b69cec' },
     }),
   },
 }));
@@ -292,7 +292,7 @@ describe('menuService', () => {
         file: mockFile,
         headers: {
           Authorization: 'Bearer test-access-token',
-          'x-tenant-id': 'tenant_a',
+          'x-tenant-id': '023772bb-391b-401c-936a-ed7034b69cec',
         },
         onProgress: undefined,
       });

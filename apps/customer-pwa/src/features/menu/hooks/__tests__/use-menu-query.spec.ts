@@ -2,7 +2,7 @@
 jest.mock('@/constants/api', () => ({
   API_CONFIG: {
     DEFAULT_BASE_URL: 'http://localhost:3300/api/v1',
-    TENANT_ID: 'tenant_a',
+    TENANT_ID: '023772bb-391b-401c-936a-ed7034b69cec',
     ENDPOINTS: { MENU: '/menu' },
   },
 }));
@@ -12,7 +12,7 @@ jest.mock('../../services/menu.service', () => ({
 }));
 
 import type { PublicMenuCategory, PublicMenuItem } from '@einvoice/types';
-import { extractCategories, extractItems } from '../use-menu-query';
+import { customerMenuKeys, extractCategories, extractItems } from '../use-menu-query';
 
 // ─── Fixtures ────────────────────────────────────────────
 
@@ -65,6 +65,12 @@ describe('extractCategories', () => {
 
   it('returns empty array for empty menu', () => {
     expect(extractCategories([])).toEqual([]);
+  });
+});
+
+describe('customerMenuKeys', () => {
+  it('scopes full menu cache by tenant id', () => {
+    expect(customerMenuKeys.fullMenu('tenant-a')).toEqual(['customer-menu', 'tenant-a', 'full']);
   });
 });
 

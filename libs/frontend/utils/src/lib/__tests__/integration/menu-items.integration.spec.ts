@@ -62,7 +62,7 @@ describe('[Integration] Menu Items CRUD', () => {
     expect(data.categoryId).toBe(categoryId);
     expect(data.stock).toBe(100);
     expect(data.status).toBe('available');
-    expect(data.tenantId).toBe('tenant_a');
+    expect(data.tenantId).toBe('023772bb-391b-401c-936a-ed7034b69cec');
     itemId = data.id;
   });
 

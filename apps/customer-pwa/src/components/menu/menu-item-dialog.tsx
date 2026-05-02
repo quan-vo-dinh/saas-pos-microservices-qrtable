@@ -1,12 +1,22 @@
 import { faker } from '@faker-js/faker';
-import type { MenuItem } from '@einvoice/types';
-import { Badge, Dialog, DialogContent, DialogHeader, DialogTitle, Tabs, TabsContent, TabsList, TabsTrigger } from '@einvoice/frontend-ui';
+import type { PublicMenuItem } from '@einvoice/types';
+import {
+  Badge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@einvoice/frontend-ui';
 import { Star } from 'lucide-react';
 import { formatCurrency } from '@einvoice/frontend-utils';
 import { deriveMenuItemFlags } from '@/components/menu/menu-item-card';
 
 type MenuItemDialogProps = {
-  item: MenuItem | null;
+  item: PublicMenuItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
@@ -15,11 +25,7 @@ function StarRow({ value }: { value: number }): React.ReactElement {
   return (
     <div className="flex items-center gap-0.5" aria-label={`Đánh giá trung bình ${value} trên 5`}>
       {Array.from({ length: 5 }, (_, i) => (
-        <Star
-          key={i}
-          className={cnStar(i < Math.round(value))}
-          aria-hidden
-        />
+        <Star key={i} className={cnStar(i < Math.round(value))} aria-hidden />
       ))}
     </div>
   );
@@ -36,7 +42,7 @@ export function MenuItemDialog({ item, open, onOpenChange }: MenuItemDialogProps
   const flags = deriveMenuItemFlags(item.id);
   const calories = faker.number.int({ min: 180, max: 720 });
   const todayOrders = faker.number.int({ min: 3, max: 40 });
-  const avgRating = Math.round((3.8 + ((item.id.length % 12) / 10)) * 10) / 10;
+  const avgRating = Math.round((3.8 + (item.id.length % 12) / 10) * 10) / 10;
 
   const reviews = [
     { author: 'Minh A.', text: 'Rất ngon, vừa miệng.', stars: 5 },

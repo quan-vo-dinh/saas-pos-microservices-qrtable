@@ -8,7 +8,14 @@ import { ErrorCode } from '@common/error-messages/error-code.enum';
 
 describe('SessionService', () => {
   let service: SessionService;
-  let redis: { hgetall: jest.Mock; pexpire: jest.Mock; del: jest.Mock; hset: jest.Mock; exists: jest.Mock };
+  let redis: {
+    hgetall: jest.Mock;
+    pexpire: jest.Mock;
+    del: jest.Mock;
+    hset: jest.Mock;
+    exists: jest.Mock;
+    type: jest.Mock;
+  };
   let sessionRepo: { findActiveByIdAndTenant: jest.Mock; updateLastActivity: jest.Mock; markClosed: jest.Mock };
 
   beforeEach(async () => {
@@ -18,6 +25,7 @@ describe('SessionService', () => {
       del: jest.fn().mockResolvedValue(1),
       hset: jest.fn().mockResolvedValue(1),
       exists: jest.fn().mockResolvedValue(0),
+      type: jest.fn().mockResolvedValue('none'),
     };
     sessionRepo = {
       findActiveByIdAndTenant: jest.fn(),
@@ -84,6 +92,29 @@ describe('SessionService', () => {
     expect(row).toEqual(entity);
     expect(redis.hset).toHaveBeenCalled();
     expect(redis.pexpire).toHaveBeenCalled();
+  });
+
+  it('deletes a wrong-type Redis session key and hydrates the Order session from PostgreSQL', async () => {
+    const wrongType = new Error('WRONGTYPE Operation against a key holding the wrong kind of value');
+    redis.hgetall.mockRejectedValueOnce(wrongType).mockResolvedValueOnce({});
+    const entity = {
+      id: 'sess-1',
+      tenantId: 'tenant-1',
+      tableId: '00000000-0000-4000-8000-000000000001',
+      tableName: 'T1',
+      status: SessionStatus.ACTIVE,
+      startedAt: new Date(),
+      lastActivity: new Date(),
+      closedAt: null,
+      orderCount: 0,
+    } as Session;
+    sessionRepo.findActiveByIdAndTenant.mockResolvedValue(entity);
+
+    const row = await service.getActiveSessionOrThrow('tenant-1', 'sess-1');
+
+    expect(row).toEqual(entity);
+    expect(redis.del).toHaveBeenCalledWith('session:tenant-1:sess-1');
+    expect(redis.hset).toHaveBeenCalled();
   });
 
   it('idle-closes session when orderCount is 0 and lastActivity is stale', async () => {

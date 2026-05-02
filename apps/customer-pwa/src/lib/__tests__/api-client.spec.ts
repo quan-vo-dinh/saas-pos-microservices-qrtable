@@ -8,7 +8,7 @@ jest.mock('@einvoice/frontend-utils', () => ({
 jest.mock('@/constants/api', () => ({
   API_CONFIG: {
     DEFAULT_BASE_URL: 'http://localhost:3300/api/v1',
-    TENANT_ID: 'tenant_a',
+    TENANT_ID: '023772bb-391b-401c-936a-ed7034b69cec',
     ENDPOINTS: {},
   },
 }));
@@ -42,7 +42,9 @@ describe('customerApi', () => {
     await customerApi('/menu');
 
     const callArgs = mockApiClient.mock.calls[0][1];
-    expect(callArgs.headers).toEqual(expect.objectContaining({ 'x-tenant-id': 'tenant_a' }));
+    expect(callArgs.headers).toEqual(
+      expect.objectContaining({ 'x-tenant-id': '023772bb-391b-401c-936a-ed7034b69cec' }),
+    );
   });
 
   it('uses tenant from joined session when activeTenantId is set', async () => {
@@ -64,7 +66,7 @@ describe('customerApi', () => {
     const callArgs = mockApiClient.mock.calls[0][1];
     expect(callArgs.headers).toEqual(
       expect.objectContaining({
-        'x-tenant-id': 'tenant_a',
+        'x-tenant-id': '023772bb-391b-401c-936a-ed7034b69cec',
         'x-session-id': '550e8400-e29b-41d4-a716-446655440000',
       }),
     );
@@ -117,7 +119,7 @@ describe('customerApi', () => {
         body,
         baseUrl: 'http://localhost:3300/api/v1',
         headers: {
-          'x-tenant-id': 'tenant_a',
+          'x-tenant-id': '023772bb-391b-401c-936a-ed7034b69cec',
           'x-custom': 'value',
         },
       }),

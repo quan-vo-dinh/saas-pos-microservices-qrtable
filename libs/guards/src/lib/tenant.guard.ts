@@ -3,6 +3,7 @@ import { SESSION_POLICY, TENANT_POLICY } from '@common/constants/request-context
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { CanActivate, ExecutionContext, Inject, Injectable, HttpStatus } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Cache } from 'cache-manager';
@@ -17,7 +18,10 @@ type SessionData = {
 
 @Injectable()
 export class TenantGuard implements CanActivate {
-  constructor(@Inject(CACHE_MANAGER) private readonly cacheManager: Cache) {}
+  constructor(
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -49,8 +53,12 @@ export class TenantGuard implements CanActivate {
     }
 
     const sessionId = request[MetadataKey.SESSION_ID] as string | undefined;
+    const skipBffSession = this.reflector.getAllAndOverride<boolean>(MetadataKey.SKIP_BFF_SESSION_GUARD, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
-    if (sessionId) {
+    if (sessionId && skipBffSession !== true) {
       const cacheKey = getSessionCacheKey(sessionId, tenantId);
       let session = await this.cacheManager.get<SessionData>(cacheKey);
 

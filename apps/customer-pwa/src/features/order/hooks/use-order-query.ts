@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@einvoice/frontend-utils';
-import type { Bill, CartSnapshot, MenuItem, ServiceRequestType } from '@einvoice/types';
+import type { Bill, CartSnapshot, PublicMenuItem, ServiceRequestType } from '@einvoice/types';
 import { useSession } from '@/features/session/context/session-provider';
 import { createAndPersistIdempotencyKey } from '@/lib/idempotency';
 import { orderService, type CartMutateOperation } from '../services/order.service';
@@ -29,6 +29,21 @@ function invalidateOrderDomainQueries(queryClient: ReturnType<typeof useQueryCli
   void queryClient.invalidateQueries({ queryKey: cartKeys.all });
   void queryClient.invalidateQueries({ queryKey: orderKeys.all });
   void queryClient.invalidateQueries({ queryKey: billKeys.all });
+}
+
+async function ensureCartSnapshot(
+  queryClient: ReturnType<typeof useQueryClient>,
+  key: ReturnType<typeof cartKeys.snapshot>,
+): Promise<CartSnapshot> {
+  const cached = queryClient.getQueryData<CartSnapshot>(key);
+  if (cached) {
+    return cached;
+  }
+
+  return queryClient.fetchQuery({
+    queryKey: key,
+    queryFn: () => orderService.getCart(),
+  });
 }
 
 export function useCustomerCartQuery() {
@@ -77,7 +92,7 @@ type PatchVars = {
   quantity?: number;
   note?: string;
   /** Used only for optimistic ADD_ITEM UI */
-  menuItem?: MenuItem;
+  menuItem?: PublicMenuItem;
 };
 
 function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
@@ -134,7 +149,6 @@ function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
         ...prev,
         items: items.filter((l) => l.cartLineId !== vars.cartLineId),
         updatedAt: now,
-        cartVersion: prev.cartVersion + 1,
       };
     }
     case 'CLEAR':
@@ -142,7 +156,6 @@ function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
         ...prev,
         items: [],
         updatedAt: now,
-        cartVersion: prev.cartVersion + 1,
       };
     default:
       return prev;
@@ -152,7 +165,6 @@ function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
     ...prev,
     items,
     updatedAt: now,
-    cartVersion: prev.cartVersion + 1,
   };
 }
 
@@ -171,10 +183,7 @@ export function useSubmitOrderMutation() {
 
   return useMutation({
     mutationFn: async (vars: SubmitOrderVars) => {
-      const snap = queryClient.getQueryData<CartSnapshot>(cartKey);
-      if (!snap) {
-        throw new Error('Cart not loaded');
-      }
+      const snap = await ensureCartSnapshot(queryClient, cartKey);
       return orderService.submitOrder({
         expectedCartVersion: snap.cartVersion,
         idempotencyKey: vars.idempotencyKey ?? createAndPersistIdempotencyKey(),
@@ -256,10 +265,7 @@ export function useCartMutations() {
 
   const patchCart = useMutation({
     mutationFn: async (vars: PatchVars) => {
-      const snap = queryClient.getQueryData<CartSnapshot>(key);
-      if (!snap) {
-        throw new Error('Cart not loaded');
-      }
+      const snap = await ensureCartSnapshot(queryClient, key);
       return orderService.mutateCart({
         operation: vars.operation,
         menuItemId: vars.menuItemId,
@@ -292,10 +298,7 @@ export function useCartMutations() {
 
   const clearCart = useMutation({
     mutationFn: async () => {
-      const snap = queryClient.getQueryData<CartSnapshot>(key);
-      if (!snap) {
-        throw new Error('Cart not loaded');
-      }
+      const snap = await ensureCartSnapshot(queryClient, key);
       return orderService.clearCart(snap.cartVersion);
     },
     onMutate: async () => {
@@ -321,7 +324,7 @@ export function useCartMutations() {
   const pending = patchCart.isPending || clearCart.isPending;
 
   return {
-    addItem: (menuItem: MenuItem, quantity = 1, note?: string) =>
+    addItem: (menuItem: PublicMenuItem, quantity = 1, note?: string) =>
       patchCart.mutate({
         operation: 'ADD_ITEM',
         menuItemId: menuItem.id,

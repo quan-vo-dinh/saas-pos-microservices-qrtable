@@ -60,7 +60,7 @@ describe('[Integration] Tables CRUD', () => {
     expect(data.capacity).toBe(4);
     expect(data.status).toBe('available');
     expect(data.qrToken).toBeDefined();
-    expect(data.tenantId).toBe('tenant_a');
+    expect(data.tenantId).toBe('023772bb-391b-401c-936a-ed7034b69cec');
     tableId = data.id;
   });
 

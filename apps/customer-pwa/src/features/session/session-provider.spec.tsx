@@ -2,7 +2,7 @@ jest.mock('@/constants/api', () => ({
   PWA_SESSION_STORAGE_KEY: 'qrtable:pwa:order-session-test',
   API_CONFIG: {
     DEFAULT_BASE_URL: 'http://localhost:3300/api/v1',
-    TENANT_ID: 'tenant_a',
+    TENANT_ID: '023772bb-391b-401c-936a-ed7034b69cec',
     ENDPOINTS: {},
   },
 }));

@@ -1,13 +1,13 @@
 import type { Bill } from '@einvoice/types';
 import { BillStatus, PaymentMethod } from '@einvoice/types';
 
-const TENANT_A = 'tenant_a';
+const CANONICAL_TENANT_ID = '023772bb-391b-401c-936a-ed7034b69cec';
 
 export const bills: Bill[] = [
   // Bill cho session-001 (active, đang accumulate orders)
   {
     id: 'bill-001',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     sessionId: 'session-001',
     orderIds: ['order-001', 'order-002'],
     subtotal: 255000, // 195000 + 60000
@@ -20,7 +20,7 @@ export const bills: Bill[] = [
   // Bill cho session-002 (customer requested bill, awaiting staff)
   {
     id: 'bill-002',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     sessionId: 'session-002',
     orderIds: ['order-003'],
     subtotal: 228000,
@@ -34,7 +34,7 @@ export const bills: Bill[] = [
   // Bill cho session-003 (paid + closed — historical)
   {
     id: 'bill-003',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     sessionId: 'session-003',
     orderIds: ['order-004'],
     subtotal: 305000,

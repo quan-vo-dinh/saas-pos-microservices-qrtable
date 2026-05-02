@@ -51,6 +51,16 @@ export class SessionService {
     const redis = this.redisClient.getClient();
     const key = this.sessionKey(tenantId, sessionId);
     if ((await redis.exists(key)) === 1) {
+      const type = await redis.type(key);
+      if (type !== 'hash') {
+        await redis.del(key);
+        const row = await this.sessionRepository.findActiveByIdAndTenant(sessionId, tenantId);
+        if (row) {
+          await this.writeSessionRedis(redis, key, row);
+          await redis.pexpire(key, SESSION_POLICY.TTL_MS);
+        }
+        return;
+      }
       await redis.hset(key, 'lastActivity', now.toISOString());
       await redis.pexpire(key, SESSION_POLICY.TTL_MS);
     }
@@ -73,6 +83,10 @@ export class SessionService {
     if ((await redis.exists(key)) !== 1) {
       return;
     }
+    if ((await redis.type(key)) !== 'hash') {
+      await redis.del(key);
+      return;
+    }
     await redis.hset(key, { tableId, tableName });
     await redis.pexpire(key, SESSION_POLICY.TTL_MS);
   }
@@ -80,7 +94,7 @@ export class SessionService {
   private async resolveActiveSession(tenantId: string, sessionId: string): Promise<Session | null> {
     const redis = this.redisClient.getClient();
     const key = this.sessionKey(tenantId, sessionId);
-    const cached = await redis.hgetall(key);
+    const cached = await this.readSessionHash(redis, key);
     if (cached && Object.keys(cached).length > 0) {
       const hydrated = this.parseSessionFromRedis(cached);
       if (!hydrated) {
@@ -107,6 +121,18 @@ export class SessionService {
     await this.writeSessionRedis(redis, key, row);
     await redis.pexpire(key, SESSION_POLICY.TTL_MS);
     return row;
+  }
+
+  private async readSessionHash(redis: Redis, key: string): Promise<Record<string, string>> {
+    try {
+      return await redis.hgetall(key);
+    } catch (error) {
+      if (this.isWrongTypeRedisError(error)) {
+        await redis.del(key);
+        return {};
+      }
+      throw error;
+    }
   }
 
   private entityToRedisFields(row: Session): SessionRedisFields {
@@ -160,6 +186,10 @@ export class SessionService {
   private async writeSessionRedis(redis: Redis, key: string, row: Session): Promise<void> {
     const f = this.entityToRedisFields(row);
     await redis.hset(key, f as unknown as Record<string, string>);
+  }
+
+  private isWrongTypeRedisError(error: unknown): boolean {
+    return error instanceof Error && error.message.includes('WRONGTYPE');
   }
 
   /**

@@ -1,14 +1,14 @@
 import type { ServiceRequest } from '@einvoice/types';
 import { ServiceRequestType, ServiceRequestStatus } from '@einvoice/types';
 
-const TENANT_A = 'tenant_a';
+const CANONICAL_TENANT_ID = '023772bb-391b-401c-936a-ed7034b69cec';
 const WAITER_USER_ID = '8ec2f6e3-0000-0000-0000-000000000004';
 
 export const serviceRequests: ServiceRequest[] = [
   // Request 1 — Customer call staff, PENDING
   {
     id: 'sr-001',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-001',
     sessionId: 'session-001',
     type: ServiceRequestType.CALL_STAFF,
@@ -19,7 +19,7 @@ export const serviceRequests: ServiceRequest[] = [
   // Request 2 — Customer request bill, ACKNOWLEDGED by waiter
   {
     id: 'sr-002',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-005',
     sessionId: 'session-002',
     type: ServiceRequestType.REQUEST_BILL,
@@ -32,7 +32,7 @@ export const serviceRequests: ServiceRequest[] = [
   // Request 3 — General help, RESOLVED
   {
     id: 'sr-003',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-008',
     sessionId: 'session-003',
     type: ServiceRequestType.GENERAL_HELP,

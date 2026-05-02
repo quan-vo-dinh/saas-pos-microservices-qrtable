@@ -1,12 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import type { CartSnapshot } from '@einvoice/types';
-import { useSubmitOrderMutation, cartKeys } from './use-order-query';
+import type { CartSnapshot, PublicMenuItem } from '@einvoice/types';
+import { useCartMutations, useSubmitOrderMutation, cartKeys } from './use-order-query';
 
 const submitOrderMock = jest.fn();
+const getCartMock = jest.fn();
+const mutateCartMock = jest.fn();
 
 jest.mock('../services/order.service', () => ({
   orderService: {
+    getCart: (...args: unknown[]) => getCartMock(...args),
+    mutateCart: (...args: unknown[]) => mutateCartMock(...args),
     submitOrder: (...args: unknown[]) => submitOrderMock(...args),
   },
 }));
@@ -82,5 +86,91 @@ describe('useSubmitOrderMutation', () => {
       }),
     );
     expect(payload).not.toHaveProperty('items');
+  });
+});
+
+describe('useCartMutations', () => {
+  beforeEach(() => {
+    getCartMock.mockResolvedValue(makeCartSnapshot({ items: [], cartVersion: 0 }));
+    mutateCartMock.mockResolvedValue(makeCartSnapshot({ items: [], cartVersion: 1 }));
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('fetches the cart snapshot before adding an item when the cache is not loaded yet', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const item: PublicMenuItem = {
+      id: '11111111-cccc-4111-8111-111111111111',
+      name: 'Phở bò tái',
+      description: null,
+      price: 65000,
+      imageUrl: null,
+      status: 'available',
+    };
+
+    const { result } = renderHook(() => useCartMutations(), { wrapper });
+
+    act(() => {
+      result.current.addItem(item, 1);
+    });
+
+    await waitFor(() => {
+      expect(mutateCartMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(getCartMock).toHaveBeenCalledTimes(1);
+    expect(mutateCartMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'ADD_ITEM',
+        menuItemId: item.id,
+        quantity: 1,
+        expectedCartVersion: 0,
+      }),
+    );
+  });
+
+  it('keeps the server cart version for ADD_ITEM optimistic state so the mutation sends the pre-mutation version', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    queryClient.setQueryData(
+      cartKeys.snapshot('tenant-1', 'session-1'),
+      makeCartSnapshot({ items: [], cartVersion: 0 }),
+    );
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const item: PublicMenuItem = {
+      id: '11111111-cccc-4111-8111-111111111111',
+      name: 'Phở bò tái',
+      description: null,
+      price: 65000,
+      imageUrl: null,
+      status: 'available',
+    };
+
+    const { result } = renderHook(() => useCartMutations(), { wrapper });
+
+    act(() => {
+      result.current.addItem(item, 1);
+    });
+
+    await waitFor(() => {
+      expect(mutateCartMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mutateCartMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'ADD_ITEM',
+        expectedCartVersion: 0,
+      }),
+    );
   });
 });

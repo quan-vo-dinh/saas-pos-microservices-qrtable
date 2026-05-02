@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import type { MenuItem } from '@einvoice/types';
+import type { PublicMenuItem } from '@einvoice/types';
 import {
   Badge,
   Button,
@@ -30,9 +30,9 @@ export function deriveMenuItemFlags(id: string): MenuItemCardFlags {
 }
 
 type MenuItemCardProps = {
-  item: MenuItem;
-  onOpenDetail: (item: MenuItem) => void;
-  onQuickAdd: (item: MenuItem) => void;
+  item: PublicMenuItem;
+  onOpenDetail: (item: PublicMenuItem) => void;
+  onQuickAdd: (item: PublicMenuItem) => void;
   disabled?: boolean;
 };
 

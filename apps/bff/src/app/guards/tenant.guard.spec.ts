@@ -7,15 +7,22 @@ jest.mock('uuid', () => ({
 }));
 
 describe('TenantGuard', () => {
+  const makeGuard = (cacheManager: { get: jest.Mock; set?: jest.Mock }, skipBffSessionGuard = false) =>
+    new (TenantGuard as any)(cacheManager, {
+      getAllAndOverride: jest.fn().mockReturnValue(skipBffSessionGuard),
+    });
+
   const getContext = (request: Record<string, unknown>) =>
     ({
+      getHandler: () => ({}),
+      getClass: () => ({}),
       switchToHttp: () => ({
         getRequest: () => request,
       }),
     }) as any;
 
   it('passes excluded path without tenant', async () => {
-    const guard = new TenantGuard({ get: jest.fn(), set: jest.fn() } as any);
+    const guard = makeGuard({ get: jest.fn(), set: jest.fn() });
 
     await expect(
       guard.canActivate(
@@ -27,7 +34,7 @@ describe('TenantGuard', () => {
   });
 
   it('throws when tenant claim mismatches request tenant', async () => {
-    const guard = new TenantGuard({ get: jest.fn(), set: jest.fn() } as any);
+    const guard = makeGuard({ get: jest.fn(), set: jest.fn() });
 
     await expect(
       guard.canActivate(
@@ -54,7 +61,7 @@ describe('TenantGuard', () => {
       }),
       set: jest.fn(),
     };
-    const guard = new TenantGuard(cacheManager as any);
+    const guard = makeGuard(cacheManager as any);
 
     await expect(
       guard.canActivate(
@@ -68,7 +75,7 @@ describe('TenantGuard', () => {
   });
 
   it('allows super admin without tenant context', async () => {
-    const guard = new TenantGuard({ get: jest.fn(), set: jest.fn() } as any);
+    const guard = makeGuard({ get: jest.fn(), set: jest.fn() });
 
     await expect(
       guard.canActivate(
@@ -86,5 +93,25 @@ describe('TenantGuard', () => {
         }),
       ),
     ).resolves.toBe(true);
+  });
+
+  it('does not validate Order session ids against BFF cache when route skips BFF session guard', async () => {
+    const cacheManager = {
+      get: jest.fn(),
+      set: jest.fn(),
+    };
+    const guard = makeGuard(cacheManager, true);
+
+    await expect(
+      guard.canActivate(
+        getContext({
+          path: '/customer/cart',
+          [MetadataKey.TENANT_ID]: 'tenant-a',
+          [MetadataKey.SESSION_ID]: 'order-session-uuid',
+        }),
+      ),
+    ).resolves.toBe(true);
+
+    expect(cacheManager.get).not.toHaveBeenCalled();
   });
 });

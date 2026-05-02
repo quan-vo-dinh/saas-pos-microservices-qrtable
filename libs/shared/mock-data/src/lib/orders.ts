@@ -1,14 +1,14 @@
 import type { Order } from '@einvoice/types';
 import { OrderStatus, OrderItemStatus } from '@einvoice/types';
 
-const TENANT_A = 'tenant_a';
+const CANONICAL_TENANT_ID = '023772bb-391b-401c-936a-ed7034b69cec';
 const WAITER_USER_ID = '8ec2f6e3-0000-0000-0000-000000000004';
 
 export const orders: Order[] = [
   // Order 001 — multi-item, mix item statuses (PROCESSING + SERVED)
   {
     id: 'order-001',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-001',
     tableName: 'T1',
     sessionId: 'session-001',
@@ -59,7 +59,7 @@ export const orders: Order[] = [
   // Order 002 — same session as 001, all SERVED
   {
     id: 'order-002',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-001',
     tableName: 'T1',
     sessionId: 'session-001',
@@ -87,7 +87,7 @@ export const orders: Order[] = [
   // Order 003 — different session, PROCESSING (was 'confirmed' in old data)
   {
     id: 'order-003',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-005',
     tableName: 'T5',
     sessionId: 'session-002',
@@ -127,7 +127,7 @@ export const orders: Order[] = [
   // Order 004 — COMPLETED (was 'served' + paid in old data)
   {
     id: 'order-004',
-    tenantId: TENANT_A,
+    tenantId: CANONICAL_TENANT_ID,
     tableId: 'tbl-008',
     tableName: 'L3',
     sessionId: 'session-003',

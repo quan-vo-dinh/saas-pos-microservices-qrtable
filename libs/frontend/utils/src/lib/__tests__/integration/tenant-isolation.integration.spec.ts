@@ -11,11 +11,11 @@ describe('[Integration] Multi-Tenant Isolation', () => {
     expect([400, 403].includes(res.status)).toBe(true);
   });
 
-  it('should scope all category data to tenant_a', async () => {
+  it('should scope all category data to 023772bb-391b-401c-936a-ed7034b69cec', async () => {
     const { data } = await apiFetch<Category[]>('/admin/categories');
 
     for (const cat of data) {
-      expect(cat.tenantId).toBe('tenant_a');
+      expect(cat.tenantId).toBe('023772bb-391b-401c-936a-ed7034b69cec');
     }
   });
 

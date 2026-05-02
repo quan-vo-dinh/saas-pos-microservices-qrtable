@@ -15,6 +15,8 @@
     "dev:bff-auth": "pnpm dev --projects=bff,authorizer",
     "dev:bff-product": "pnpm dev --projects=bff,product",
     "dev:bff-order": "pnpm dev --projects=bff,order,catalog",
+    "dev:reseed": "bash tools/dev-reseed.sh",
+    "dev:verify-seed": "node tools/dev-seed/verify/verify-dev-seed.js",
     "theme:build": "pnpm --dir apps/keycloak-theme run build-keycloak-theme",
     "theme:dev": "pnpm --dir apps/keycloak-theme run dev"
   },

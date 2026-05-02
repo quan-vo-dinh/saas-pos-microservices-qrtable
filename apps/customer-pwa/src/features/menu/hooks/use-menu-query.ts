@@ -12,16 +12,17 @@ export type CustomerCategoryTab = {
 
 export const customerMenuKeys = {
   all: ['customer-menu'] as const,
-  fullMenu: () => [...customerMenuKeys.all, 'full'] as const,
+  fullMenu: (tenantId: string) => [...customerMenuKeys.all, tenantId, 'full'] as const,
 };
 
-export function useFullMenuQuery() {
+export function useFullMenuQuery(tenantId: string | undefined) {
   return useQuery({
-    queryKey: customerMenuKeys.fullMenu(),
+    queryKey: customerMenuKeys.fullMenu(tenantId ?? ''),
     queryFn: async () => {
       const response = await menuService.getFullMenu();
       return response.categories;
     },
+    enabled: !!tenantId,
     staleTime: 5 * 60 * 1000,
   });
 }

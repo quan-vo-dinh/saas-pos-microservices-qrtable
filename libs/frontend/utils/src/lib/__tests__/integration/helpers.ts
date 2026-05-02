@@ -1,6 +1,6 @@
 const BFF_BASE = process.env['BFF_URL'] || 'http://localhost:3300/api/v1';
 const KEYCLOAK_URL = process.env['KEYCLOAK_URL'] || 'http://localhost:8180';
-const TENANT_ID = 'tenant_a';
+const TENANT_ID = '023772bb-391b-401c-936a-ed7034b69cec';
 
 interface TokenCache {
   token: string;
@@ -21,7 +21,7 @@ export async function getOwnerToken(): Promise<string> {
       grant_type: 'password',
       client_id: 'management-app',
       username: 'owner.1700000002@gmail.com',
-      password: 'owner',
+      password: 'owner123',
       scope: 'openid',
     }),
   });
