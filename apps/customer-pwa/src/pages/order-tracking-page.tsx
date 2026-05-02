@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ApiError } from '@einvoice/frontend-utils';
+import { ApiError, formatCurrency } from '@einvoice/frontend-utils';
 import { OrderStatus } from '@einvoice/types';
 import { Button } from '@einvoice/frontend-ui';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { OrderJourneySheet } from '@/components/order/order-journey-sheet';
 import { ROUTES } from '@/constants/routes';
 import {
   useCancelCustomerOrderMutation,
+  useCustomerOrdersQuery,
   useOrderDetailQuery,
 } from '@/features/order/hooks/use-order-query';
 import { useSession } from '@/features/session/context/session-provider';
@@ -19,6 +20,12 @@ export function OrderTrackingPage(): React.ReactElement {
   const navigate = useNavigate();
   const { isActive } = useSession();
   const { data: order, isLoading, isError, error, refetch } = useOrderDetailQuery(orderId);
+  const {
+    data: sessionOrders = [],
+    isLoading: ordersLoading,
+    isError: ordersError,
+    refetch: refetchOrders,
+  } = useCustomerOrdersQuery();
   const cancelOrder = useCancelCustomerOrderMutation();
   const [journeyOpen, setJourneyOpen] = useState(false);
 
@@ -48,9 +55,62 @@ export function OrderTrackingPage(): React.ReactElement {
   }
 
   if (!orderId) {
+    if (ordersLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 px-4 py-16">
+          <p className="text-center text-muted-foreground">Đang tải các đơn trong phiên…</p>
+        </div>
+      );
+    }
+
+    if (ordersError) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-4 px-4 py-16">
+          <p className="text-center text-muted-foreground">Không thể tải các đơn trong phiên.</p>
+          <Button onClick={() => void refetchOrders()}>Thử lại</Button>
+          <Button variant="outline" onClick={() => navigate(ROUTES.MENU)}>
+            Về menu
+          </Button>
+        </div>
+      );
+    }
+
+    if (sessionOrders.length > 0) {
+      return (
+        <div className="flex flex-col gap-4 px-1 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-lg font-semibold tracking-tight">Các đơn trong phiên</h1>
+            <Button variant="outline" size="sm" onClick={() => navigate(ROUTES.MENU)}>
+              Thêm món
+            </Button>
+          </div>
+          <div className="flex flex-col gap-3">
+            {sessionOrders.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                className="rounded-lg border border-border/80 bg-card/40 p-3 text-left transition-colors hover:bg-accent"
+                onClick={() => navigate(ROUTES.ORDER_TRACKING_DETAIL(row.id))}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">#{row.id}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {row.items.length} dòng món · {row.status}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-medium">{formatCurrency(row.totalAmount)}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center gap-4 px-4 py-16">
-        <p className="text-center text-muted-foreground">Chưa có đơn theo dõi — hãy đặt món từ menu.</p>
+        <p className="text-center text-muted-foreground">Chưa có đơn nào trong phiên này — hãy đặt món từ menu.</p>
         <Button onClick={() => navigate(ROUTES.MENU)}>Vào menu</Button>
       </div>
     );

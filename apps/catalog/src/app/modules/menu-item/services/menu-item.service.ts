@@ -126,6 +126,7 @@ export class MenuItemService {
       return {
         menuItemId: item.id,
         menuItemName: item.name,
+        menuItemImageUrl: item.imageUrl ?? null,
         unitPrice: Number(item.price),
         status: item.status,
         stock: item.stock,

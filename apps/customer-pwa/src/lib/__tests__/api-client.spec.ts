@@ -3,9 +3,20 @@ const mockApiClient = jest.fn();
 
 jest.mock('@einvoice/frontend-utils', () => ({
   apiClient: mockApiClient,
+  ApiError: class ApiError extends Error {
+    status: number;
+    errorCode?: string;
+
+    constructor(status: number, errorCode?: string) {
+      super(errorCode ?? String(status));
+      this.status = status;
+      this.errorCode = errorCode;
+    }
+  },
 }));
 
 jest.mock('@/constants/api', () => ({
+  PWA_SESSION_STORAGE_KEY: 'qrtable:pwa:order-session',
   API_CONFIG: {
     DEFAULT_BASE_URL: 'http://localhost:3300/api/v1',
     TENANT_ID: '023772bb-391b-401c-936a-ed7034b69cec',
@@ -13,7 +24,14 @@ jest.mock('@/constants/api', () => ({
   },
 }));
 
-import { customerApi, setCustomerSessionId, setCustomerTenantId } from '../api-client';
+import {
+  CUSTOMER_SESSION_EXPIRED_EVENT,
+  customerApi,
+  getCustomerSessionId,
+  getCustomerTenantId,
+  setCustomerSessionId,
+  setCustomerTenantId,
+} from '../api-client';
 
 describe('customerApi', () => {
   afterEach(() => {
@@ -124,5 +142,24 @@ describe('customerApi', () => {
         },
       }),
     );
+  });
+
+  it('clears stale session state and emits event when API returns SESSION_CLOSED', async () => {
+    const listener = jest.fn();
+    window.addEventListener(CUSTOMER_SESSION_EXPIRED_EVENT, listener);
+    setCustomerSessionId('stale-session');
+    setCustomerTenantId('tenant_joined');
+    localStorage.setItem('qrtable:pwa:order-session', JSON.stringify({ sessionId: 'stale-session' }));
+    mockApiClient.mockRejectedValue(
+      Object.assign(new Error('Phiên đã đóng'), { status: 410, errorCode: 'SESSION_CLOSED' }),
+    );
+
+    await expect(customerApi('/customer/cart')).rejects.toThrow('Phiên đã đóng');
+
+    expect(getCustomerSessionId()).toBeNull();
+    expect(getCustomerTenantId()).toBeNull();
+    expect(localStorage.getItem('qrtable:pwa:order-session')).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener(CUSTOMER_SESSION_EXPIRED_EVENT, listener);
   });
 });

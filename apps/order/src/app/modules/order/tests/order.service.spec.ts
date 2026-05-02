@@ -1,5 +1,6 @@
 import { OrderItem } from '@common/entities/order-item.entity';
 import { Order } from '@common/entities/order.entity';
+import { Bill } from '@common/entities/bill.entity';
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
@@ -21,7 +22,7 @@ import { SessionService } from '../services/session.service';
 describe('OrderService', () => {
   let service: OrderService;
   let dataSource: { transaction: jest.Mock };
-  let orderRepository: { findByIdAndTenantForUpdate: jest.Mock };
+  let orderRepository: { findByIdAndTenantForUpdate: jest.Mock; findBySessionIdAndTenant: jest.Mock };
   let orderItemRepository: { findByOrderIdAndTenant: jest.Mock; findByOrderIdAndTenantWithManager: jest.Mock };
   let billRepository: { findByIdAndTenant: jest.Mock; findByIdAndTenantForUpdate: jest.Mock };
   let sessionRepository: { findByIdAndTenant: jest.Mock; save: jest.Mock; findActiveByIdAndTenant: jest.Mock };
@@ -34,7 +35,7 @@ describe('OrderService', () => {
 
   beforeEach(async () => {
     dataSource = { transaction: jest.fn() };
-    orderRepository = { findByIdAndTenantForUpdate: jest.fn() };
+    orderRepository = { findByIdAndTenantForUpdate: jest.fn(), findBySessionIdAndTenant: jest.fn() };
     orderItemRepository = {
       findByOrderIdAndTenant: jest.fn(),
       findByOrderIdAndTenantWithManager: jest.fn(),
@@ -199,6 +200,181 @@ describe('OrderService', () => {
     await expect(
       service.cancelProcessing({ tenantId: 't1', orderId: 'o1', userId: 'manager-1' }),
     ).rejects.toMatchObject({ errorCode: ErrorCode.ORDER_CANCEL_REASON_REQUIRED });
+  });
+
+  it('lists customer session orders after validating active session', async () => {
+    const now = new Date('2026-05-02T00:00:00.000Z');
+    sessionService.getActiveSessionOrThrow.mockResolvedValue({ id: 'sess-1' });
+    orderRepository.findBySessionIdAndTenant.mockResolvedValue([
+      {
+        id: 'order-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        tableId: 'tbl',
+        tableName: 'A1',
+        status: OrderStatus.PENDING,
+        totalAmount: 65000,
+        idempotencyKey: 'idem-1',
+        notes: null,
+        confirmedAt: null,
+        confirmedByUserId: null,
+        cancelledAt: null,
+        cancelledByUserId: null,
+        cancelReason: null,
+        createdAt: now,
+        updatedAt: now,
+      } as Order,
+    ]);
+    orderItemRepository.findByOrderIdAndTenant.mockResolvedValue([
+      {
+        id: 'item-1',
+        tenantId: 't1',
+        orderId: 'order-1',
+        menuItemId: 'menu-1',
+        menuItemName: 'Phở bò',
+        menuItemImageUrl: 'https://cdn.example.com/pho.jpg',
+        quantity: 1,
+        unitPrice: 65000,
+        note: null,
+        status: OrderItemStatus.PROCESSING,
+        station: null,
+        createdAt: now,
+        updatedAt: now,
+      } as OrderItem,
+    ]);
+
+    const result = await service.listOrdersForCustomerSession({ tenantId: 't1', sessionId: 'sess-1' });
+
+    expect(sessionService.getActiveSessionOrThrow).toHaveBeenCalledWith('t1', 'sess-1');
+    expect(orderRepository.findBySessionIdAndTenant).toHaveBeenCalledWith('sess-1', 't1');
+    expect(result).toHaveLength(1);
+    expect(result[0].items[0].menuItemImageUrl).toBe('https://cdn.example.com/pho.jpg');
+  });
+
+  it('persists order item image snapshot when submitting order', async () => {
+    const now = new Date('2026-05-02T00:00:00.000Z');
+    const session = {
+      id: 'sess-1',
+      tenantId: 't1',
+      tableId: 'tbl',
+      tableName: 'A1',
+      status: SessionStatus.ACTIVE,
+      startedAt: now,
+      lastActivity: now,
+      closedAt: null,
+      orderCount: 0,
+      currentBillId: null,
+      version: 1,
+    } as Session;
+
+    sessionService.getActiveSessionOrThrow.mockResolvedValue(session);
+    cartService.getSnapshot
+      .mockResolvedValueOnce({
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        cartVersion: 0,
+        status: 'ACTIVE',
+        updatedAt: now.toISOString(),
+        items: [
+          {
+            cartLineId: 'line-1',
+            menuItemId: 'menu-1',
+            menuItemName: 'Phở bò',
+            menuItemImageUrl: 'https://cdn.example.com/pho.jpg',
+            quantity: 1,
+            unitPrice: 65000,
+            lineVersion: 1,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        cartVersion: 1,
+        status: 'ACTIVE',
+        updatedAt: now.toISOString(),
+        items: [],
+      });
+    cartService.mutate.mockResolvedValue({
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      cartVersion: 1,
+      status: 'ACTIVE',
+      updatedAt: now.toISOString(),
+      items: [],
+    });
+
+    const savedOrderItems: OrderItem[] = [];
+    const savedBill = {
+      id: 'bill-1',
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      orderIds: [],
+      subtotal: 0,
+      total: 0,
+      roundingAmount: 0,
+      paymentMethod: null,
+      status: BillStatus.OPEN,
+      closedAt: null,
+      paidAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const savedOrder = {
+      id: 'order-1',
+      tenantId: 't1',
+      tableId: 'tbl',
+      tableName: 'A1',
+      sessionId: 'sess-1',
+      status: OrderStatus.PENDING,
+      totalAmount: 65000,
+      idempotencyKey: 'idem-1',
+      notes: null,
+      confirmedAt: null,
+      confirmedByUserId: null,
+      cancelledAt: null,
+      cancelledByUserId: null,
+      cancelReason: null,
+      createdAt: now,
+      updatedAt: now,
+    } as Order;
+
+    const manager = {
+      getRepository: jest.fn(() => ({
+        createQueryBuilder: jest.fn(() => ({
+          setLock: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockResolvedValue(session),
+        })),
+        findOne: jest.fn().mockResolvedValue(null),
+      })),
+      create: jest.fn((ctor: unknown, payload: Record<string, unknown>) => {
+        if (ctor === Order) return { ...savedOrder, ...payload };
+        if (ctor === OrderItem)
+          return { id: `item-${savedOrderItems.length + 1}`, ...payload, createdAt: now, updatedAt: now };
+        if (ctor === Bill) return { ...savedBill, ...payload };
+        return payload;
+      }),
+      save: jest.fn((_ctor: unknown, row: unknown) => {
+        if ((row as OrderItem).menuItemId) {
+          savedOrderItems.push(row as OrderItem);
+        }
+        return Promise.resolve(row);
+      }),
+      find: jest.fn().mockResolvedValue([savedOrder]),
+    };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    const result = await service.submitOrder({
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      expectedCartVersion: 0,
+      idempotencyKey: 'idem-1',
+    });
+
+    expect(savedOrderItems[0].menuItemImageUrl).toBe('https://cdn.example.com/pho.jpg');
+    expect(result.order.items[0].menuItemImageUrl).toBe('https://cdn.example.com/pho.jpg');
   });
 
   it('rejects customer cancel for another session order', async () => {

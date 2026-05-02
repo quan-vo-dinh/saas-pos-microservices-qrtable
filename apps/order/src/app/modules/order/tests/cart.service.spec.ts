@@ -120,6 +120,7 @@ describe('CartService', () => {
             status: 'available',
             stock: 10,
             station: 'KITCHEN',
+            menuItemImageUrl: 'https://cdn.example.com/pho.jpg',
           },
         ],
       }),
@@ -140,6 +141,7 @@ describe('CartService', () => {
     expect(result.items[0].menuItemId).toBe('mi-1');
     expect(result.items[0].quantity).toBe(2);
     expect(result.items[0].unitPrice).toBe(65000);
+    expect(result.items[0].menuItemImageUrl).toBe('https://cdn.example.com/pho.jpg');
     expect(result.cartVersion).toBe(1);
   });
 });

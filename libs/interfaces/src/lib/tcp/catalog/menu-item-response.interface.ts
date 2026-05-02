@@ -6,6 +6,7 @@ export type MenuItemTcpResponse = MenuItem;
 export type OrderableMenuItemSnapshot = {
   menuItemId: string;
   menuItemName: string;
+  menuItemImageUrl: string | null;
   unitPrice: number;
   status: MENU_ITEM_STATUS;
   stock: number;

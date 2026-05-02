@@ -262,6 +262,7 @@ export class CartService {
       cartLineId: randomUUID(),
       menuItemId: row.menuItemId,
       menuItemName: row.menuItemName,
+      menuItemImageUrl: row.menuItemImageUrl ?? null,
       quantity,
       unitPrice: Math.round(Number(row.unitPrice)),
       note: this.normalizeNote(note),

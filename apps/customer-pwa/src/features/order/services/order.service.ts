@@ -73,6 +73,8 @@ export const orderService = {
       body: JSON.stringify(payload),
     }),
 
+  getOrders: (): Promise<Order[]> => customerApi<Order[]>(API_CONFIG.ENDPOINTS.ORDERS),
+
   getOrderById: (orderId: string): Promise<Order> => customerApi<Order>(API_CONFIG.ENDPOINTS.ORDER_BY_ID(orderId)),
 
   cancelOrder: (orderId: string, reason?: string): Promise<CancelOrderResponse> =>

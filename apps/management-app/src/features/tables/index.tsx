@@ -18,8 +18,9 @@ import { TablesPrimaryButtons } from './components/tables-primary-buttons';
 import { TablesTable } from './components/tables-table';
 import { TableFloorPlan } from './components/table-floor-plan';
 import { TablesDialogs } from './components/tables-dialogs';
+import { AreaManagementBar } from './components/area-management-bar';
 import { useAreasQuery, useTablesQuery } from './hooks/use-tables-query';
-import type { RestaurantTable } from '@einvoice/types';
+import type { Area, RestaurantTable } from '@einvoice/types';
 
 export function TablesPage() {
   const { data: areas, isPending: areasPending } = useAreasQuery();
@@ -58,6 +59,8 @@ export function TablesPage() {
         </div>
 
         <Tabs defaultValue={defaultArea} className="flex flex-1 flex-col">
+          <AreaManagementBar areas={areas ?? []} />
+
           <TabsList>
             <TabsTrigger value="all">All Areas</TabsTrigger>
             {(areas ?? []).map((area) => (
@@ -68,7 +71,7 @@ export function TablesPage() {
           </TabsList>
 
           <TabsContent value="all" className="flex flex-1 flex-col mt-4">
-            <SplitView tables={tables ?? []} />
+            <SplitView tables={tables ?? []} areas={areas ?? []} />
           </TabsContent>
 
           {(areas ?? []).map((area) => (
@@ -77,7 +80,7 @@ export function TablesPage() {
               value={area.id}
               className="flex flex-1 flex-col mt-4"
             >
-              <AreaSplitView areaId={area.id} tables={tables ?? []} />
+              <AreaSplitView areaId={area.id} tables={tables ?? []} areas={areas ?? []} />
             </TabsContent>
           ))}
         </Tabs>
@@ -88,20 +91,20 @@ export function TablesPage() {
   );
 }
 
-function AreaSplitView({ areaId, tables }: { areaId: string; tables: RestaurantTable[] }) {
+function AreaSplitView({ areaId, tables, areas }: { areaId: string; tables: RestaurantTable[]; areas: Area[] }) {
   const filtered = useMemo(
     () => tables.filter((t) => t.areaId === areaId),
     [areaId, tables],
   );
-  return <SplitView tables={filtered} />;
+  return <SplitView tables={filtered} areas={areas} />;
 }
 
-function SplitView({ tables }: { tables: RestaurantTable[] }) {
+function SplitView({ tables, areas }: { tables: RestaurantTable[]; areas: Area[] }) {
   return (
     <ResizablePanelGroup className="min-h-[500px]">
       <ResizablePanel defaultSize={40} minSize={30}>
         <ScrollArea className="h-full pr-4">
-          <TablesTable data={tables} />
+          <TablesTable data={tables} areas={areas} />
         </ScrollArea>
       </ResizablePanel>
 

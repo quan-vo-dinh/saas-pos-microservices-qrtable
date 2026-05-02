@@ -97,6 +97,7 @@ enum ORDER {
   CART_CLEAR = 'order.cart_clear',
   SUBMIT = 'order.submit',
   GET_LIST = 'order.get_list',
+  GET_SESSION_LIST = 'order.get_session_list',
   GET_BY_ID = 'order.get_by_id',
   CONFIRM = 'order.confirm',
   CANCEL_PENDING = 'order.cancel_pending',

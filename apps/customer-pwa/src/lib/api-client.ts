@@ -1,8 +1,10 @@
 import { apiClient } from '@einvoice/frontend-utils';
-import { API_CONFIG } from '@/constants/api';
+import { API_CONFIG, PWA_SESSION_STORAGE_KEY } from '@/constants/api';
 
 let activeSessionId: string | null = null;
 let activeTenantId: string | null = null;
+
+export const CUSTOMER_SESSION_EXPIRED_EVENT = 'qrtable:customer-session-expired';
 
 export function setCustomerSessionId(id: string | null): void {
   activeSessionId = id;
@@ -27,12 +29,33 @@ export type CustomerApiOptions = RequestInit & {
   skipTenantHeader?: boolean;
 };
 
+function isSessionClosedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const candidate = error as { status?: unknown; errorCode?: unknown };
+  return candidate.status === 410 || candidate.errorCode === 'SESSION_CLOSED';
+}
+
+function clearCustomerSessionState(): void {
+  activeSessionId = null;
+  activeTenantId = null;
+
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.removeItem(PWA_SESSION_STORAGE_KEY);
+  window.dispatchEvent(new Event(CUSTOMER_SESSION_EXPIRED_EVENT));
+}
+
 /**
  * Pre-configured API client for the Customer PWA.
  * Prepends BFF base URL, resolves tenant header from joined session when set,
  * and sends `x-session-id` when an Order session is active.
  */
-export function customerApi<T>(path: string, options?: CustomerApiOptions): Promise<T> {
+export async function customerApi<T>(path: string, options?: CustomerApiOptions): Promise<T> {
   const { omitSessionHeader, skipTenantHeader, headers: optsHeaders, ...rest } = options ?? {};
   const fallbackTenant = API_CONFIG.TENANT_ID;
   const tenantId = skipTenantHeader ? undefined : (activeTenantId ?? fallbackTenant);
@@ -50,9 +73,16 @@ export function customerApi<T>(path: string, options?: CustomerApiOptions): Prom
     headers['x-session-id'] = sid;
   }
 
-  return apiClient<T>(path, {
-    ...rest,
-    baseUrl: API_CONFIG.DEFAULT_BASE_URL,
-    headers,
-  });
+  try {
+    return await apiClient<T>(path, {
+      ...rest,
+      baseUrl: API_CONFIG.DEFAULT_BASE_URL,
+      headers,
+    });
+  } catch (error) {
+    if (isSessionClosedError(error)) {
+      clearCustomerSessionState();
+    }
+    throw error;
+  }
 }

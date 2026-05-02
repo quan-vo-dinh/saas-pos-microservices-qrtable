@@ -23,6 +23,7 @@ import type {
 } from '@common/interfaces/tcp/catalog/table-request.interface';
 import type {
   CustomerCancelPendingTcpRequest,
+  CustomerListOrdersTcpRequest,
   JoinSessionTcpRequest,
   ListOrdersTcpRequest,
   OrderIdTcpRequest,
@@ -150,6 +151,17 @@ export class OrderService {
     return out;
   }
 
+  async listOrdersForCustomerSession(dto: CustomerListOrdersTcpRequest): Promise<OrderTcpResponse[]> {
+    await this.sessionService.getActiveSessionOrThrow(dto.tenantId, dto.sessionId);
+    const rows = await this.orderRepository.findBySessionIdAndTenant(dto.sessionId, dto.tenantId);
+    const out: OrderTcpResponse[] = [];
+    for (const r of rows) {
+      const items = await this.orderItemRepository.findByOrderIdAndTenant(r.id, dto.tenantId);
+      out.push(this.toOrderDto(r, items));
+    }
+    return out;
+  }
+
   async getOrderById(dto: OrderIdTcpRequest): Promise<OrderTcpResponse> {
     const order = await this.orderRepository.findByIdAndTenant(dto.orderId, dto.tenantId);
     if (!order) {
@@ -214,6 +226,7 @@ export class OrderService {
           orderId: order.id,
           menuItemId: line.menuItemId,
           menuItemName: line.menuItemName,
+          menuItemImageUrl: line.menuItemImageUrl ?? null,
           quantity: line.quantity,
           unitPrice: line.unitPrice,
           note: line.note ?? null,
@@ -676,6 +689,7 @@ export class OrderService {
       orderId: entity.orderId,
       menuItemId: entity.menuItemId,
       menuItemName: entity.menuItemName,
+      menuItemImageUrl: entity.menuItemImageUrl ?? null,
       quantity: entity.quantity,
       unitPrice: entity.unitPrice,
       note: entity.note ?? undefined,

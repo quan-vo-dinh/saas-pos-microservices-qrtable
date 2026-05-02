@@ -55,6 +55,8 @@ export type OrderItem = {
   menuItemId: string;
   /** Denormalized for display — avoids JOIN in POS/KDS rendering */
   menuItemName: string;
+  /** Catalog image URL snapshot at submit time for POS/KDS display */
+  menuItemImageUrl?: string | null;
   quantity: number;
   /** VND integer (no decimals) */
   unitPrice: number;

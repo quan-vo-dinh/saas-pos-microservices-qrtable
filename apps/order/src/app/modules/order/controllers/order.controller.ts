@@ -9,6 +9,7 @@ import type {
   CartMutateTcpRequest,
   CreateServiceRequestTcpRequest,
   CustomerCancelPendingTcpRequest,
+  CustomerListOrdersTcpRequest,
   JoinSessionTcpRequest,
   ListOrdersTcpRequest,
   ListServiceRequestsTcpRequest,
@@ -95,6 +96,12 @@ export class OrderController {
   @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.GET_LIST)
   async getList(@RequestParams() body: ListOrdersTcpRequest): Promise<Response<OrderTcpResponse[]>> {
     const data = await this.orderService.listOrdersForStaff(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.GET_SESSION_LIST)
+  async getSessionList(@RequestParams() body: CustomerListOrdersTcpRequest): Promise<Response<OrderTcpResponse[]>> {
+    const data = await this.orderService.listOrdersForCustomerSession(body);
     return Response.success(data);
   }
 

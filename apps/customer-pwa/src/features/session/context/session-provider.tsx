@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session } from '@einvoice/types';
 import {
+  CUSTOMER_SESSION_EXPIRED_EVENT,
   setCustomerSessionId,
   setCustomerTenantId,
 } from '@/lib/api-client';
@@ -68,6 +69,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } finally {
       setHydrated(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const handleExpired = () => {
+      setSession(null);
+      setCustomerSessionId(null);
+      setCustomerTenantId(null);
+      persistSession(null);
+    };
+
+    window.addEventListener(CUSTOMER_SESSION_EXPIRED_EVENT, handleExpired);
+    return () => window.removeEventListener(CUSTOMER_SESSION_EXPIRED_EVENT, handleExpired);
   }, []);
 
   const startSession = useCallback((info: SessionInfo) => {

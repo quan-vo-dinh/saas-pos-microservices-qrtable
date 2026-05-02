@@ -12,6 +12,7 @@ export const cartKeys = {
 
 export const orderKeys = {
   all: ['customer-orders'] as const,
+  list: (tenantId: string, sessionId: string) => [...orderKeys.all, 'list', tenantId, sessionId] as const,
   detail: (tenantId: string, sessionId: string, orderId: string) =>
     [...orderKeys.all, 'detail', tenantId, sessionId, orderId] as const,
 };
@@ -72,6 +73,19 @@ export function useOrderDetailQuery(orderId?: string) {
   });
 }
 
+export function useCustomerOrdersQuery() {
+  const { session } = useSession();
+  const tenantId = session?.tenantId;
+  const sessionId = session?.sessionId;
+  const key = orderKeys.list(tenantId ?? '', sessionId ?? '');
+
+  return useQuery({
+    queryKey: key,
+    queryFn: () => orderService.getOrders(),
+    enabled: !!tenantId && !!sessionId,
+  });
+}
+
 export function useCurrentBillQuery() {
   const { session } = useSession();
   const tenantId = session?.tenantId;
@@ -108,6 +122,7 @@ function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
         cartLineId: `optimistic-${globalThis.crypto?.randomUUID?.() ?? String(Date.now())}`,
         menuItemId: mi.id,
         menuItemName: mi.name,
+        menuItemImageUrl: mi.imageUrl ?? null,
         quantity: qty,
         unitPrice: mi.price,
         note: vars.note,

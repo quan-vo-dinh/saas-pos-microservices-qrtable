@@ -17,6 +17,9 @@ export class OrderItem extends BaseEntity {
   @Column({ name: 'menu_item_name', type: 'varchar', length: 255 })
   menuItemName: string;
 
+  @Column({ name: 'menu_item_image_url', type: 'varchar', length: 500, nullable: true })
+  menuItemImageUrl: string | null;
+
   @Column({ type: 'int', default: 1 })
   quantity: number;
 

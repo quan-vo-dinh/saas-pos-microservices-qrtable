@@ -24,16 +24,16 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { DataTablePagination, DataTableToolbar } from '@/components/data-table';
-import { areas } from '../data/areas';
-import type { RestaurantTable } from '../data/schema';
+import type { Area, RestaurantTable } from '../data/schema';
 import { tablesColumns as columns } from './tables-columns';
 import { useTables } from './tables-provider';
 
 type TablesTableProps = {
   data: RestaurantTable[];
+  areas: Area[];
 };
 
-export function TablesTable({ data }: TablesTableProps) {
+export function TablesTable({ data, areas }: TablesTableProps) {
   const { selectedTableId, setSelectedTableId } = useTables();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);

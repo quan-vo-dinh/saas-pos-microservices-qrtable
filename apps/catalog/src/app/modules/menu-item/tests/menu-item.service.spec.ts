@@ -201,7 +201,9 @@ describe('MenuItemService', () => {
 
   describe('validateOrderable', () => {
     it('returns snapshots with station', async () => {
-      repository.findManyByIdsAndTenant.mockResolvedValue([mockMenuItem]);
+      repository.findManyByIdsAndTenant.mockResolvedValue([
+        { ...mockMenuItem, imageUrl: 'https://cdn.example.com/spring-rolls.jpg' } as MenuItem,
+      ]);
 
       const result = await service.validateOrderable({
         tenantId: 'tenant-1',
@@ -212,6 +214,7 @@ describe('MenuItemService', () => {
         expect.objectContaining({
           menuItemId: 'item-1',
           menuItemName: 'Spring Rolls',
+          menuItemImageUrl: 'https://cdn.example.com/spring-rolls.jpg',
           station: PREPARATION_STATION.KITCHEN,
         }),
       );

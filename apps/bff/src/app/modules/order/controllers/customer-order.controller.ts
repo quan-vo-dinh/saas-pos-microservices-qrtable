@@ -18,6 +18,7 @@ import type {
   CartMutateTcpRequest,
   CreateServiceRequestTcpRequest,
   CustomerCancelPendingTcpRequest,
+  CustomerListOrdersTcpRequest,
   OrderIdTcpRequest,
   SubmitOrderTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
@@ -199,6 +200,31 @@ export class CustomerOrderController {
       this.realtimeEvents.emitOrderCreated(tcp.data.events.orderCreated);
     }
     return new ResponseDto<SubmitOrderTcpResponse>({
+      data: tcp.data,
+      statusCode: tcp.statusCode,
+      message: tcp.code as HTTP_MESSAGE,
+      processID: processId,
+    });
+  }
+
+  @Get('orders')
+  @ApiOkResponse({ type: ResponseDto })
+  @ApiOperation({ summary: 'List orders for current customer table session' })
+  async listOrders(@ProcessId() processId: string, @Req() req: Request): Promise<ResponseDto<OrderTcpResponse[]>> {
+    const tenantId = req[MetadataKey.TENANT_ID] as string;
+    const sessionId = req[MetadataKey.SESSION_ID] as string;
+    const tcp = await firstValueFrom(
+      this.orderClient
+        .send<OrderTcpResponse[], CustomerListOrdersTcpRequest>(
+          TCP_REQUEST_MESSAGE.ORDER.GET_SESSION_LIST,
+          buildTcpRequestContext<CustomerListOrdersTcpRequest>(req, processId, {
+            tenantId,
+            sessionId,
+          }),
+        )
+        .pipe(map((r) => r)),
+    );
+    return new ResponseDto<OrderTcpResponse[]>({
       data: tcp.data,
       statusCode: tcp.statusCode,
       message: tcp.code as HTTP_MESSAGE,

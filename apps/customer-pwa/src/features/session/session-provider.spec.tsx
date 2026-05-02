@@ -7,9 +7,10 @@ jest.mock('@/constants/api', () => ({
   },
 }));
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { PWA_SESSION_STORAGE_KEY } from '@/constants/api';
 import {
+  CUSTOMER_SESSION_EXPIRED_EVENT,
   setCustomerSessionId,
   setCustomerTenantId,
 } from '@/lib/api-client';
@@ -97,6 +98,37 @@ describe('SessionProvider', () => {
       expect(screen.getByTestId('session-id').textContent).toBe('');
     });
 
+    expect(localStorage.getItem(PWA_SESSION_STORAGE_KEY)).toBeNull();
+  });
+
+  it('clears session when customer session expired event is dispatched', async () => {
+    localStorage.setItem(
+      PWA_SESSION_STORAGE_KEY,
+      JSON.stringify({
+        sessionId: 'stored-sid',
+        tenantId: 'stored-ten',
+        tableId: 'stored-tbl',
+        tableName: 'Bàn stored',
+      }),
+    );
+
+    render(
+      <SessionProvider>
+        <Probe />
+      </SessionProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-id').textContent).toBe('stored-sid');
+    });
+
+    act(() => {
+      window.dispatchEvent(new Event(CUSTOMER_SESSION_EXPIRED_EVENT));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('session-id').textContent).toBe('');
+    });
     expect(localStorage.getItem(PWA_SESSION_STORAGE_KEY)).toBeNull();
   });
 });

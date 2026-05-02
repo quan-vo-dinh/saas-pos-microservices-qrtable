@@ -1,15 +1,17 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { CartSnapshot, PublicMenuItem } from '@einvoice/types';
-import { useCartMutations, useSubmitOrderMutation, cartKeys } from './use-order-query';
+import { useCartMutations, useCustomerOrdersQuery, useSubmitOrderMutation, cartKeys } from './use-order-query';
 
 const submitOrderMock = jest.fn();
 const getCartMock = jest.fn();
+const getOrdersMock = jest.fn();
 const mutateCartMock = jest.fn();
 
 jest.mock('../services/order.service', () => ({
   orderService: {
     getCart: (...args: unknown[]) => getCartMock(...args),
+    getOrders: (...args: unknown[]) => getOrdersMock(...args),
     mutateCart: (...args: unknown[]) => mutateCartMock(...args),
     submitOrder: (...args: unknown[]) => submitOrderMock(...args),
   },
@@ -86,6 +88,32 @@ describe('useSubmitOrderMutation', () => {
       }),
     );
     expect(payload).not.toHaveProperty('items');
+  });
+});
+
+describe('useCustomerOrdersQuery', () => {
+  it('uses a tenant and session scoped query key', async () => {
+    getOrdersMock.mockResolvedValue([]);
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    renderHook(() => useCustomerOrdersQuery(), { wrapper });
+
+    await waitFor(() => {
+      expect(getOrdersMock).toHaveBeenCalledTimes(1);
+    });
+
+    const queries = queryClient.getQueryCache().findAll();
+    expect(queries.map((query) => query.queryKey)).toContainEqual([
+      'customer-orders',
+      'list',
+      'tenant-1',
+      'session-1',
+    ]);
   });
 });
 
@@ -172,5 +200,38 @@ describe('useCartMutations', () => {
         expectedCartVersion: 0,
       }),
     );
+  });
+
+  it('copies menu item image URL into the optimistic cart line', async () => {
+    mutateCartMock.mockImplementation(() => new Promise(() => undefined));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    queryClient.setQueryData(
+      cartKeys.snapshot('tenant-1', 'session-1'),
+      makeCartSnapshot({ items: [], cartVersion: 0 }),
+    );
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const item: PublicMenuItem = {
+      id: '11111111-cccc-4111-8111-111111111111',
+      name: 'Phở bò tái',
+      description: null,
+      price: 65000,
+      imageUrl: 'https://cdn.example.test/menu/pho-bo.jpg',
+      status: 'available',
+    };
+
+    const { result } = renderHook(() => useCartMutations(), { wrapper });
+
+    act(() => {
+      result.current.addItem(item, 1);
+    });
+
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<CartSnapshot>(cartKeys.snapshot('tenant-1', 'session-1'));
+      expect(cached?.items[0]?.menuItemImageUrl).toBe('https://cdn.example.test/menu/pho-bo.jpg');
+    });
   });
 });

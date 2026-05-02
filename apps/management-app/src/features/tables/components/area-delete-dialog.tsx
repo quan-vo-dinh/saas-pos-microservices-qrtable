@@ -13,7 +13,7 @@ export function AreaDeleteDialog() {
       open={open === 'delete-area'}
       onOpenChange={(v) => !v && setOpen(null)}
       title="Xóa khu vực"
-      description={`Bạn có chắc chắn muốn xóa "${currentArea?.name ?? ''}"? Tất cả các bàn trong khu vực này cũng sẽ bị xóa.`}
+      description={`Chỉ có thể xóa khu vực chưa có bàn. Bạn có chắc chắn muốn xóa "${currentArea?.name ?? ''}"?`}
       confirmText="Xóa"
       cancelText="Hủy"
       variant="destructive"

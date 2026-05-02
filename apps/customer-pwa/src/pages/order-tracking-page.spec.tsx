@@ -6,10 +6,12 @@ import { ROUTES } from '@/constants/routes';
 import { OrderTrackingPage } from './order-tracking-page';
 
 const useOrderDetailQueryMock = jest.fn();
+const useCustomerOrdersQueryMock = jest.fn();
 const useSessionMock = jest.fn();
 
 jest.mock('@/features/order/hooks/use-order-query', () => ({
   useOrderDetailQuery: (...args: unknown[]) => useOrderDetailQueryMock(...args),
+  useCustomerOrdersQuery: (...args: unknown[]) => useCustomerOrdersQueryMock(...args),
   useCancelCustomerOrderMutation: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
@@ -52,6 +54,13 @@ describe('OrderTrackingPage routing behavior', () => {
       error: null,
       refetch: jest.fn(),
     });
+    useCustomerOrdersQueryMock.mockReturnValue({
+      data: [makeOrder({ id: 'order-1', tableName: 'Bàn 1', totalAmount: 65000 })],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: jest.fn(),
+    });
   });
 
   afterEach(() => {
@@ -71,7 +80,7 @@ describe('OrderTrackingPage routing behavior', () => {
     expect(screen.getByTestId('order-tracking-stepper')).toBeTruthy();
   });
 
-  it('shows missing-id state at /order-tracking', () => {
+  it('shows session order list at /order-tracking', () => {
     render(
       <MemoryRouter initialEntries={[ROUTES.ORDER_TRACKING]}>
         <Routes>
@@ -81,6 +90,27 @@ describe('OrderTrackingPage routing behavior', () => {
     );
 
     expect(useOrderDetailQueryMock).toHaveBeenCalledWith(undefined);
-    expect(screen.getByText('Chưa có đơn theo dõi — hãy đặt món từ menu.')).toBeTruthy();
+    expect(screen.getByText('Các đơn trong phiên')).toBeTruthy();
+    expect(screen.getByText('#order-1')).toBeTruthy();
+  });
+
+  it('shows empty session order state only when list is empty', () => {
+    useCustomerOrdersQueryMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={[ROUTES.ORDER_TRACKING]}>
+        <Routes>
+          <Route path={ROUTES.ORDER_TRACKING} element={<OrderTrackingPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Chưa có đơn nào trong phiên này — hãy đặt món từ menu.')).toBeTruthy();
   });
 });
