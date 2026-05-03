@@ -12,7 +12,7 @@ export const tablesColumns: ColumnDef<RestaurantTable>[] = [
   {
     accessorKey: 'name',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Table" />
+      <DataTableColumnHeader column={column} title="Bàn" />
     ),
     cell: ({ row }) => (
       <span className="font-medium">{row.getValue('name')}</span>
@@ -21,14 +21,14 @@ export const tablesColumns: ColumnDef<RestaurantTable>[] = [
   {
     accessorKey: 'areaName',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Area" />
+      <DataTableColumnHeader column={column} title="Khu vực" />
     ),
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
   {
     accessorKey: 'capacity',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Capacity" />
+      <DataTableColumnHeader column={column} title="Sức chứa" />
     ),
     cell: ({ row }) => (
       <div className="flex items-center gap-1 text-muted-foreground">
@@ -40,7 +40,7 @@ export const tablesColumns: ColumnDef<RestaurantTable>[] = [
   {
     accessorKey: 'status',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Status" />
+      <DataTableColumnHeader column={column} title="Trạng thái" />
     ),
     cell: ({ row }) => <TableStatusBadge status={row.getValue('status')} />,
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),

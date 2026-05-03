@@ -76,24 +76,24 @@ export function TableMutateDialog() {
     >
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Table' : 'Add Table'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Sửa bàn' : 'Thêm bàn'}</DialogTitle>
           <DialogDescription>
-            {isEdit ? 'Update the table details.' : 'Add a new table to your restaurant.'}
+            {isEdit ? 'Cập nhật thông tin bàn.' : 'Thêm bàn mới vào nhà hàng.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="tbl-name">Name</Label>
-            <Input id="tbl-name" placeholder="e.g. T1, VIP2, SV3" {...form.register('name')} />
+            <Label htmlFor="tbl-name">Tên bàn</Label>
+            <Input id="tbl-name" placeholder="vd. T1, VIP2, SV3" {...form.register('name')} />
             {form.formState.errors.name && (
               <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
             )}
           </div>
           <div className="grid gap-2">
-            <Label>Area</Label>
+            <Label>Khu vực</Label>
             <Select defaultValue={form.getValues('areaId')} onValueChange={(v) => form.setValue('areaId', v)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select area" />
+                <SelectValue placeholder="Chọn khu vực" />
               </SelectTrigger>
               <SelectContent>
                 {(areas ?? []).map((area) => (
@@ -108,7 +108,7 @@ export function TableMutateDialog() {
             )}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="tbl-capacity">Capacity</Label>
+            <Label htmlFor="tbl-capacity">Sức chứa</Label>
             <Input
               id="tbl-capacity"
               type="number"
@@ -122,10 +122,10 @@ export function TableMutateDialog() {
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
-              Cancel
+              Hủy
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Saving...' : isEdit ? 'Save' : 'Add Table'}
+              {isPending ? 'Đang lưu…' : isEdit ? 'Lưu' : 'Thêm bàn'}
             </Button>
           </DialogFooter>
         </form>

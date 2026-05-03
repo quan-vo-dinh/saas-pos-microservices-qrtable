@@ -49,10 +49,10 @@ export function TablesPage() {
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">
-              Table Management
+              Quản lý bàn
             </h2>
             <p className="text-muted-foreground">
-              Manage restaurant areas, tables, and QR codes.
+              Quản lý khu vực, bàn và mã QR đặt món.
             </p>
           </div>
           <TablesPrimaryButtons />
@@ -62,7 +62,7 @@ export function TablesPage() {
           <AreaManagementBar areas={areas ?? []} />
 
           <TabsList>
-            <TabsTrigger value="all">All Areas</TabsTrigger>
+            <TabsTrigger value="all">Tất cả khu</TabsTrigger>
             {(areas ?? []).map((area) => (
               <TabsTrigger key={area.id} value={area.id}>
                 {area.name} ({area.tableCount})

@@ -58,7 +58,7 @@ export function TablesTable({ data, areas }: TablesTableProps) {
     <div className="flex flex-1 flex-col gap-4">
       <DataTableToolbar
         table={table}
-        searchPlaceholder="Filter tables..."
+        searchPlaceholder="Lọc bàn…"
         searchKey="name"
         filters={[
           {

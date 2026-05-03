@@ -5,7 +5,7 @@ export default function PosLayout({ children }: { children: ReactNode }) {
   return (
     <div
       data-surface="pos"
-      className="min-h-0 flex-1 bg-background text-foreground dark:bg-(--bg) dark:text-(--ink)"
+      className="flex h-dvh max-h-dvh min-h-0 w-full flex-col overflow-hidden bg-background text-foreground dark:bg-(--bg) dark:text-(--ink)"
     >
       <PosAppShell>{children}</PosAppShell>
     </div>

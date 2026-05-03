@@ -2,24 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Users } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@einvoice/frontend-ui';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Users, Armchair } from 'lucide-react';
+import {
+  Avatar,
+  AvatarFallback,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@einvoice/frontend-ui';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { tableStatusVi } from '@einvoice/shared-constants';
 import { useMockStore } from '@/mocks/store';
 import { formatVnd } from '@/lib/format-vnd';
 import { cn } from '@/lib/utils';
-
-function statusClass(s: string) {
-  if (s === 'available') return 'border-emerald-500/50 bg-emerald-500/5';
-  if (s === 'occupied') return 'border-amber-500/50 bg-amber-500/5';
-  if (s === 'billing') return 'border-rose-500/50 bg-rose-500/5';
-  return 'border-sky-500/50 bg-sky-500/5';
-}
+import { TableStatusBadge } from '@/features/tables/components/table-status-badge';
+import { TableStatusLegend } from '@/features/tables/components/table-status-legend';
+import { statusBorderColors, statusBgColors } from '@/features/tables/lib/table-surface-styles';
 
 function tableCenter(i: number) {
   const col = i % 6;
@@ -47,8 +46,8 @@ export function TableMapGrid() {
   }, [liveOrders]);
 
   const idleLabel = useCallback((sessionId: string | null) => {
-    if (!sessionId) return "—";
-    return `${12 + (sessionId.length % 20)}'`;
+    if (!sessionId) return '—';
+    return `${12 + (sessionId.length % 20)} phút`;
   }, []);
 
   useEffect(() => {
@@ -58,26 +57,31 @@ export function TableMapGrid() {
   }, [highlight, selectTable]);
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" data-slot="pos-table-map">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">Bàn (mock) · {tables.length}</p>
-        <ToggleGroup
-          type="single"
-          value={view}
-          onValueChange={(v) => v && setView(v as 'grid' | 'map')}
-          className="h-7"
-        >
-          <ToggleGroupItem value="grid" className="h-6 px-2 text-[0.7rem]">
-            Grid
-          </ToggleGroupItem>
-          <ToggleGroupItem value="map" className="h-6 px-2 text-[0.7rem]">
-            Map
-          </ToggleGroupItem>
-        </ToggleGroup>
+    <Tabs
+      value={view}
+      onValueChange={(v) => v && setView(v as 'grid' | 'map')}
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden"
+      data-slot="pos-table-map"
+    >
+      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <TableStatusLegend className="sm:flex-1" />
+        <TabsList className="h-9 w-full shrink-0 grid grid-cols-2 sm:w-auto sm:inline-flex">
+          <TabsTrigger value="grid" className="text-xs">
+            Lưới
+          </TabsTrigger>
+          <TabsTrigger value="map" className="text-xs">
+            Sơ đồ
+          </TabsTrigger>
+        </TabsList>
       </div>
-      {view === 'grid' ? (
-        <ScrollArea className="h-[min(60vh,520px)] pr-2">
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+
+      <TabsContent
+        value="grid"
+        className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden p-0 outline-none data-[state=inactive]:hidden"
+      >
+        {/* min-h-0: flex item có thể co — scroll chỉ ở div này, không đẩy scroll lên panel cha */}
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-1 [-webkit-overflow-scrolling:touch]">
+          <div className="grid grid-cols-2 gap-3 pb-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {tables.map((t) => {
               const pres = mockPresence.find((p) => p.tableId === t.id);
               const occ = orderTotalByTable[t.id] ?? 0;
@@ -88,59 +92,67 @@ export function TableMapGrid() {
                     <button
                       type="button"
                       onClick={() => void selectTable(t.id)}
-                      className={cn('text-start', ring && 'ring-2 ring-cyan-500/60')}
+                      className={cn(
+                        'group relative flex w-full flex-col items-center justify-center gap-1 text-center',
+                        'rounded-xl border-2 p-3 transition-all',
+                        'hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        statusBorderColors[t.status],
+                        statusBgColors[t.status],
+                        ring && 'ring-2 ring-ring ring-offset-2 ring-offset-background shadow-md',
+                      )}
                     >
-                      <Card
-                        className={cn(
-                          'h-full min-h-24 border border-dashed p-0 transition-shadow hover:shadow-sm',
-                          statusClass(t.status),
-                        )}
-                      >
-                        <CardHeader className="p-1.5 pb-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="truncate text-xs font-semibold">{t.name}</span>
-                            <Badge variant="outline" className="h-4 border-0 px-1 text-[0.6rem]">
-                              {tableStatusVi(t.status)}
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-1 p-1.5 pt-0 text-[0.65rem] text-muted-foreground">
-                          <span>∅ {t.capacity} · {idleLabel(t.sessionId)}</span>
-                          {occ > 0 ? <span className="font-mono text-foreground">{formatVnd(occ)}</span> : <span>—</span>}
-                          {pres && pres.guests.length ? (
-                            <div className="flex items-center gap-0.5">
-                              <Users className="size-3 opacity-70" />
-                              <div className="flex gap-0.5">
-                                {pres.guests.slice(0, 3).map((g) => (
-                                  <Avatar key={g.name} className="size-5">
-                                    <AvatarFallback className="text-[0.5rem]">{g.name[0]}</AvatarFallback>
-                                  </Avatar>
-                                ))}
-                              </div>
+                      <Armchair className="size-6 text-muted-foreground transition-colors group-hover:text-foreground" />
+                      <span className="text-sm font-semibold">{t.name}</span>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Users className="size-3" />
+                        <span>{t.capacity}</span>
+                      </div>
+                      <TableStatusBadge status={t.status} className="mt-0.5 text-[10px] px-1.5 py-0" />
+                      <div className="w-full border-t border-border/40 pt-1.5 text-[0.65rem] text-muted-foreground">
+                        <span className="block">
+                          {idleLabel(t.sessionId)}
+                          {occ > 0 ? <span className="ml-1 font-mono text-foreground">{formatVnd(occ)}</span> : null}
+                        </span>
+                        {pres && pres.guests.length ? (
+                          <div className="mt-1 flex items-center justify-center gap-0.5">
+                            <Users className="size-3 opacity-70" />
+                            <div className="flex gap-0.5">
+                              {pres.guests.slice(0, 3).map((g) => (
+                                <Avatar key={g.name} className="size-5">
+                                  <AvatarFallback className="text-[0.5rem]">{g.name[0]}</AvatarFallback>
+                                </Avatar>
+                              ))}
                             </div>
-                          ) : null}
-                        </CardContent>
-                      </Card>
+                          </div>
+                        ) : null}
+                      </div>
                     </button>
                   </HoverCardTrigger>
                   <HoverCardContent className="w-64 text-xs" side="right" align="start">
                     <p className="font-medium">{t.name}</p>
-                    <p className="text-muted-foreground">5 sự kiện gần nhất (wireframe) — bước 2.5 sẽ stream log.</p>
-                    <p className="mt-1 text-[0.65rem]">Chuyển bàn: dùng panel phải.</p>
+                    <p className="text-muted-foreground">Trạng thái: {tableStatusVi(t.status)}</p>
+                    <p className="mt-1 text-[0.65rem] text-muted-foreground">
+                      Chi tiết đơn & chuyển bàn: panel bên phải.
+                    </p>
                   </HoverCardContent>
                 </HoverCard>
               );
             })}
           </div>
-        </ScrollArea>
-      ) : (
-        <div className="relative h-[min(60vh,520px)] overflow-hidden rounded-lg border border-border/50 bg-background/30">
+        </div>
+      </TabsContent>
+
+      <TabsContent
+        value="map"
+        className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden p-0 outline-none data-[state=inactive]:hidden"
+      >
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border-2 border-border/50 bg-muted/10">
           <div className="absolute inset-0 touch-pan-y cursor-grab">
             <svg
-              className="h-full w-full"
+              className="h-full w-full min-h-[200px]"
               viewBox="0 0 520 400"
               role="img"
-              aria-label="Sơ đồ bàn tĩnh (pan kéo)"
+              aria-label="Sơ đồ bàn (preview)"
             >
               <rect x="8" y="8" width="504" height="384" fill="none" stroke="hsl(var(--border))" strokeWidth="1" />
               {tables.map((t, i) => {
@@ -154,7 +166,12 @@ export function TableMapGrid() {
                       className="cursor-pointer fill-card stroke-border"
                       onClick={() => void selectTable(t.id)}
                     />
-                    <text textAnchor="middle" dy="0.3em" className="fill-foreground text-[0.5rem] font-mono" pointerEvents="none">
+                    <text
+                      textAnchor="middle"
+                      dy="0.3em"
+                      className="fill-foreground text-[0.5rem] font-mono"
+                      pointerEvents="none"
+                    >
                       {i + 1}
                     </text>
                   </g>
@@ -163,7 +180,7 @@ export function TableMapGrid() {
             </svg>
           </div>
         </div>
-      )}
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }

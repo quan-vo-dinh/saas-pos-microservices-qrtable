@@ -1,26 +1,13 @@
 'use client';
 
-import { Button, Popover, PopoverContent, PopoverTrigger, Separator } from '@einvoice/frontend-ui'
+import { Button, Popover, PopoverContent, PopoverTrigger, Separator } from '@einvoice/frontend-ui';
 import { Armchair, Pencil, QrCode, Trash2, Users } from 'lucide-react';
-import { tableStatusVi } from '@einvoice/shared-constants';
-import { cn } from '@/lib/utils';
-import type { RestaurantTable, TableStatus } from '../data/schema';
-import { TableStatusBadge, statusConfig } from './table-status-badge';
+import { TableStatusBadge } from './table-status-badge';
+import { TableStatusLegend } from './table-status-legend';
 import { useTables } from './tables-provider';
-
-const statusBorderColors: Record<TableStatus, string> = {
-  available: 'border-emerald-500/40 hover:border-emerald-500',
-  occupied: 'border-amber-500/40 hover:border-amber-500',
-  billing: 'border-blue-500/40 hover:border-blue-500',
-  cleaning: 'border-gray-500/40 hover:border-gray-500',
-};
-
-const statusBgColors: Record<TableStatus, string> = {
-  available: 'bg-emerald-500/5',
-  occupied: 'bg-amber-500/5',
-  billing: 'bg-blue-500/5',
-  cleaning: 'bg-gray-500/5',
-};
+import { cn } from '@/lib/utils';
+import type { RestaurantTable } from '../data/schema';
+import { statusBorderColors, statusBgColors } from '../lib/table-surface-styles';
 
 type TableFloorPlanProps = {
   tables: RestaurantTable[];
@@ -33,20 +20,7 @@ export function TableFloorPlan({ tables }: TableFloorPlanProps) {
   return (
     <div className="flex flex-col gap-4">
       {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        {(Object.keys(statusConfig) as TableStatus[]).map((status) => (
-          <div key={status} className="flex items-center gap-1.5">
-            <div
-              className={cn(
-                'size-3 rounded-sm border',
-                statusBorderColors[status],
-                statusBgColors[status],
-              )}
-            />
-            <span>{tableStatusVi(status)}</span>
-          </div>
-        ))}
-      </div>
+      <TableStatusLegend />
 
       {/* Floor Plan Grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -85,11 +59,11 @@ export function TableFloorPlan({ tables }: TableFloorPlanProps) {
                   <TableStatusBadge status={table.status} />
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Capacity: {table.capacity} • {table.areaName}
+                  Sức chứa: {table.capacity} • {table.areaName}
                 </div>
                 {table.sessionId && (
                   <div className="text-xs text-muted-foreground">
-                    Session: {table.sessionId}
+                    Phiên: {table.sessionId}
                   </div>
                 )}
                 <Separator />
@@ -104,7 +78,7 @@ export function TableFloorPlan({ tables }: TableFloorPlanProps) {
                     }}
                   >
                     <QrCode className="mr-1 size-3" />
-                    QR
+                    Mã QR
                   </Button>
                   <Button
                     variant="ghost"
@@ -116,7 +90,7 @@ export function TableFloorPlan({ tables }: TableFloorPlanProps) {
                     }}
                   >
                     <Pencil className="mr-1 size-3" />
-                    Edit
+                    Sửa
                   </Button>
                   <Button
                     variant="ghost"
@@ -128,7 +102,7 @@ export function TableFloorPlan({ tables }: TableFloorPlanProps) {
                     }}
                   >
                     <Trash2 className="mr-1 size-3" />
-                    Delete
+                    Xóa
                   </Button>
                 </div>
               </div>

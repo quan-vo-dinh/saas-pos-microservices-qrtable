@@ -31,7 +31,7 @@ describe('AreaManagementBar', () => {
   it('opens edit dialog with selected area', () => {
     renderBar(areas);
 
-    fireEvent.click(screen.getByLabelText('Edit area Tầng trệt'));
+    fireEvent.click(screen.getByLabelText('Chỉnh sửa khu Tầng trệt'));
 
     expect(screen.getByTestId('open').textContent).toBe('edit-area');
     expect(screen.getByTestId('current-area').textContent).toBe('area-1');
@@ -40,13 +40,13 @@ describe('AreaManagementBar', () => {
   it('disables delete for areas that still have tables', () => {
     renderBar(areas);
 
-    expect((screen.getByLabelText('Delete area Tầng trệt') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Xóa khu Tầng trệt') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('opens delete dialog for empty area', () => {
     renderBar(areas);
 
-    fireEvent.click(screen.getByLabelText('Delete area Sân vườn'));
+    fireEvent.click(screen.getByLabelText('Xóa khu Sân vườn'));
 
     expect(screen.getByTestId('open').textContent).toBe('delete-area');
     expect(screen.getByTestId('current-area').textContent).toBe('area-2');

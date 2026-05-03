@@ -1,23 +1,23 @@
 import { ROUTES } from '@/constants/routes';
 
 const EXACT: Record<string, string> = {
-  [ROUTES.DASHBOARD]: 'Overview',
-  [ROUTES.MENU]: 'Menu',
-  [ROUTES.TABLES]: 'Tables',
-  [ROUTES.STAFF]: 'Staff',
-  [ROUTES.ORDERS]: 'Orders',
-  [ROUTES.SUBSCRIPTION]: 'Subscription',
-  [ROUTES.POS]: 'Live orders',
-  [ROUTES.POS_TABLES]: 'POS tables',
-  [ROUTES.POS_SERVICE_REQUESTS]: 'Service requests',
-  [ROUTES.POS_BILLS]: 'Bills',
-  [ROUTES.POS_PAYMENT]: 'Payments',
-  [ROUTES.KDS_KITCHEN]: 'Kitchen board',
-  [ROUTES.KDS_BAR]: 'Bar board',
-  [ROUTES.ADMIN]: 'Platform admin',
-  [ROUTES.ADMIN_TENANTS]: 'Tenants',
-  [ROUTES.ADMIN_PLANS]: 'Plans',
-  [ROUTES.ADMIN_ANALYTICS]: 'Analytics',
+  [ROUTES.DASHBOARD]: 'Tổng quan',
+  [ROUTES.MENU]: 'Thực đơn',
+  [ROUTES.TABLES]: 'Quản lý bàn',
+  [ROUTES.STAFF]: 'Nhân sự',
+  [ROUTES.ORDERS]: 'Đơn hàng',
+  [ROUTES.SUBSCRIPTION]: 'Đăng ký gói',
+  [ROUTES.POS]: 'Đơn trực tiếp',
+  [ROUTES.POS_TABLES]: 'Quản lý bàn',
+  [ROUTES.POS_SERVICE_REQUESTS]: 'Yêu cầu phục vụ',
+  [ROUTES.POS_BILLS]: 'Hóa đơn',
+  [ROUTES.POS_PAYMENT]: 'Thanh toán',
+  [ROUTES.KDS_KITCHEN]: 'Bếp',
+  [ROUTES.KDS_BAR]: 'Quầy bar',
+  [ROUTES.ADMIN]: 'Quản trị nền tảng',
+  [ROUTES.ADMIN_TENANTS]: 'Thuê bao',
+  [ROUTES.ADMIN_PLANS]: 'Gói dịch vụ',
+  [ROUTES.ADMIN_ANALYTICS]: 'Thống kê',
 };
 
 /**
@@ -35,5 +35,5 @@ export function getManagementPageTitle(pathname: string): string {
     }
   }
 
-  return 'Workspace';
+  return 'Làm việc';
 }

@@ -55,29 +55,29 @@ export function AreaMutateDialog() {
     >
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Area' : 'Add Area'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Sửa khu vực' : 'Thêm khu vực'}</DialogTitle>
           <DialogDescription>
-            {isEdit ? 'Update the area details.' : 'Create a new seating area for your restaurant.'}
+            {isEdit ? 'Cập nhật thông tin khu vực.' : 'Tạo khu vực ngồi mới trong nhà hàng.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="area-name">Name</Label>
+            <Label htmlFor="area-name">Tên khu</Label>
             <Input id="area-name" placeholder="e.g. Tầng trệt, Lầu 1, Sân vườn" {...form.register('name')} />
             {form.formState.errors.name && (
               <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
             )}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="area-order">Sort Order</Label>
+            <Label htmlFor="area-order">Thứ tự hiển thị</Label>
             <Input id="area-order" type="number" min={0} {...form.register('sortOrder', { valueAsNumber: true })} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
-              Cancel
+              Hủy
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Saving...' : isEdit ? 'Save' : 'Create Area'}
+              {isPending ? 'Đang lưu…' : isEdit ? 'Lưu' : 'Tạo khu vực'}
             </Button>
           </DialogFooter>
         </form>

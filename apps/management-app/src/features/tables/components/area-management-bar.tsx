@@ -64,7 +64,7 @@ export function AreaManagementBar({ areas }: AreaManagementBarProps) {
                     variant="ghost"
                     size="icon"
                     className="size-8"
-                    aria-label={`Edit area ${area.name}`}
+                    aria-label={`Chỉnh sửa khu ${area.name}`}
                     onClick={() => {
                       setCurrentArea(area);
                       setOpen('edit-area');
@@ -77,7 +77,7 @@ export function AreaManagementBar({ areas }: AreaManagementBarProps) {
                     variant="ghost"
                     size="icon"
                     className="size-8 text-destructive"
-                    aria-label={`Delete area ${area.name}`}
+                    aria-label={`Xóa khu ${area.name}`}
                     disabled={area.tableCount > 0}
                     onClick={() => {
                       setCurrentArea(area);

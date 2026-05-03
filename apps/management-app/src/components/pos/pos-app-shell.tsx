@@ -33,16 +33,23 @@ export function PosAppShell({ children }: Props) {
   }, [clearSelectedOrder, pathname]);
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="flex min-h-0 max-h-full flex-1 overflow-hidden">
       <NonOrderRouteReset />
       <AppSidebar />
-      <SidebarInset className="min-h-0">
+      <SidebarInset className="min-h-0 overflow-hidden">
         <AppTopbar title={title} />
-        <div className="flex min-h-0 flex-1 flex-col gap-2 p-3 md:p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3 md:p-4">
           <PosSubNav />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
-            <ResizablePanelGroup orientation="horizontal" className="min-h-[min(70vh,640px)] flex-1 rounded-lg border border-border/40">
-              <ResizablePanel defaultSize={60} minSize={40} className="min-w-0 p-2">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden">
+            <ResizablePanelGroup
+              orientation="horizontal"
+              className="flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-border/40"
+            >
+              <ResizablePanel
+                defaultSize={60}
+                minSize={40}
+                className="flex min-h-0 min-w-0 flex-col overflow-hidden p-2"
+              >
                 {children}
               </ResizablePanel>
               <ResizableHandle withHandle />
@@ -55,7 +62,7 @@ export function PosAppShell({ children }: Props) {
                 </div>
               </ResizablePanel>
             </ResizablePanelGroup>
-            <div className="sticky bottom-0 z-10 border-t border-border/50 bg-background/95 py-1.5 backdrop-blur">
+            <div className="sticky bottom-0 z-10 border-t border-border/50 bg-background/95 py-1 backdrop-blur">
               <KpiTiles />
             </div>
           </div>

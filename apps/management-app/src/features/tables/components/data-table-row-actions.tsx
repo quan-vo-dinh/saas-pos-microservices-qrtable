@@ -1,10 +1,15 @@
 'use client';
 
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@einvoice/frontend-ui'
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@einvoice/frontend-ui';
 import type { Row } from '@tanstack/react-table';
 import { MoreHorizontal, Pencil, QrCode, Trash2 } from 'lucide-react';
-;
-;
 import { useTables } from './tables-provider';
 import type { RestaurantTable } from '../data/schema';
 
@@ -15,7 +20,7 @@ export function TableRowActions({ row }: { row: Row<RestaurantTable> }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="size-8 p-0">
-          <span className="sr-only">Open menu</span>
+          <span className="sr-only">Mở thao tác</span>
           <MoreHorizontal className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -27,7 +32,7 @@ export function TableRowActions({ row }: { row: Row<RestaurantTable> }) {
           }}
         >
           <QrCode className="mr-2 size-4" />
-          View QR Code
+          Xem mã QR
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
@@ -36,7 +41,7 @@ export function TableRowActions({ row }: { row: Row<RestaurantTable> }) {
           }}
         >
           <Pencil className="mr-2 size-4" />
-          Edit
+          Sửa
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -47,7 +52,7 @@ export function TableRowActions({ row }: { row: Row<RestaurantTable> }) {
           }}
         >
           <Trash2 className="mr-2 size-4" />
-          Delete
+          Xóa
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

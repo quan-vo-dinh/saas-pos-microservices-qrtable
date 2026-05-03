@@ -76,9 +76,9 @@ export function QrCodeDialog() {
     <Dialog open={isOpen} onOpenChange={(v) => !v && setOpen(null)}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>QR Code — {currentTable?.name}</DialogTitle>
+          <DialogTitle>Mã QR — {currentTable?.name}</DialogTitle>
           <DialogDescription>
-            Scan this QR code to access the ordering menu for this table.
+            Quét mã QR để khách vào thực đơn đặt món tại bàn này.
           </DialogDescription>
         </DialogHeader>
 
@@ -108,7 +108,7 @@ export function QrCodeDialog() {
               />
 
               <div className="w-full space-y-2">
-                <p className="text-muted-foreground text-xs font-medium">Table URL</p>
+                <p className="text-muted-foreground text-xs font-medium">Liên kết bàn</p>
                 <div className="flex items-center gap-2">
                   <code className="bg-muted flex-1 rounded-md px-3 py-2 font-mono text-xs break-all">
                     {qrUrl}
@@ -132,18 +132,18 @@ export function QrCodeDialog() {
 
         <DialogFooter className="gap-5">
           <Button variant="outline" type="button" disabled={!canShowQr || busy} onClick={() => openPwa()}>
-            Open PWA
+            Mở PWA
           </Button>
           <Button variant="outline" type="button" disabled={busy || !canShowQr} onClick={() => downloadPng()}>
             <Download className="mr-2 size-4" />
-            Download
+            Tải ảnh
           </Button>
           <Button
             type="button"
             disabled={!currentTable || busy}
             onClick={() => handleRegenerate()}
           >
-            Regenerate QR
+            Tạo lại mã QR
           </Button>
         </DialogFooter>
       </DialogContent>

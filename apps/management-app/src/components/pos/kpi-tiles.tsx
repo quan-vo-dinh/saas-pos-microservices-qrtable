@@ -47,11 +47,13 @@ export function KpiTiles() {
   const occPctValue = hasDataError ? '—' : `${occPct}%`;
 
   return (
-    <div className="flex flex-col gap-1.5" data-slot="pos-kpi">
+    <div className="flex flex-col gap-1" data-slot="pos-kpi">
       {hasDataError ? (
-        <p className="text-xs text-destructive">Không thể tải KPI POS. Kiểm tra kết nối hoặc quyền truy cập.</p>
+        <p className="text-[0.65rem] leading-snug text-destructive">
+          Không thể tải KPI POS. Kiểm tra kết nối hoặc quyền truy cập.
+        </p>
       ) : null}
-      <div className="flex flex-nowrap items-stretch gap-1.5">
+      <div className="flex flex-nowrap items-stretch gap-1">
         <Kpi
           label="Chờ xác nhận"
           value={pendingValue}
@@ -121,33 +123,35 @@ function Kpi({
         type="button"
         onClick={onClick}
         disabled={!onClick}
-        className="block w-full min-h-[5.75rem] rounded-lg px-0 py-0 text-start disabled:cursor-default"
+        className="block w-full rounded-lg px-0 py-0 text-start disabled:cursor-default"
       >
-        <CardContent className="grid grid-cols-[1fr_auto] items-start gap-2 p-2">
-          <div className="flex min-w-0 flex-col gap-2">
-            <div
-              className={cn(
-                'rounded-md bg-primary/90 text-primary-foreground flex size-9 items-center justify-center [&_svg]:size-4',
-                active && 'bg-cyan-600',
-              )}
-            >
-              <Icon aria-hidden="true" />
-            </div>
-            <p className="truncate text-[0.62rem] font-medium uppercase tracking-wide text-muted-foreground">
+        <CardContent className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-0 p-1.5 sm:p-2">
+          <div
+            className={cn(
+              'flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/90 text-primary-foreground [&_svg]:size-3.5',
+              active && 'bg-cyan-600',
+            )}
+          >
+            <Icon aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[0.58rem] font-medium uppercase leading-tight tracking-wide text-muted-foreground">
               {label}
             </p>
-            <span className="text-primary inline-flex items-center gap-1 text-[0.68rem] font-medium">
+            <span className="mt-0.5 inline-flex max-w-full items-center gap-0.5 truncate text-[0.62rem] font-medium text-primary">
               {cta}
-              <ChevronRightIcon aria-hidden="true" className="size-3 shrink-0" />
+              <ChevronRightIcon aria-hidden="true" className="size-2.5 shrink-0 opacity-80" />
             </span>
           </div>
           <p
-            className={cn('mt-0.5 font-mono text-lg font-semibold text-foreground tabular-nums', active && 'text-cyan-400')}
+            className={cn(
+              'shrink-0 font-mono text-base font-semibold tabular-nums leading-none text-foreground sm:text-lg',
+              active && 'text-cyan-400',
+            )}
           >
             {value}
           </p>
         </CardContent>
-        
       </button>
     </Card>
   );
