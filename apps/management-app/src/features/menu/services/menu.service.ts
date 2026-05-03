@@ -81,6 +81,11 @@ export const menuService = {
       method: 'DELETE',
     }),
 
+  clearMenuItemImage: (id: string): Promise<MenuItem> =>
+    authApiClient<MenuItem>(`${API_CONFIG.ENDPOINTS.MENU_ITEMS}/${encodeURIComponent(id)}/image`, {
+      method: 'DELETE',
+    }),
+
   uploadMenuItemImage: (id: string, file: File, onProgress?: (percent: number) => void): Promise<UploadResult> => {
     const baseUrl = API_CONFIG.DEFAULT_BFF_URL;
     const url = `${baseUrl}${API_CONFIG.ENDPOINTS.MENU_ITEMS}/${encodeURIComponent(id)}/image`;

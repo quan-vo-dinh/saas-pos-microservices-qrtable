@@ -274,6 +274,19 @@ describe('menuService', () => {
     });
   });
 
+  describe('clearMenuItemImage', () => {
+    it('should DELETE /admin/menu-items/:id/image', async () => {
+      mockAuthApiClient.mockResolvedValue({ id: 'item-1', imageUrl: null });
+
+      await menuService.clearMenuItemImage('item-1');
+
+      expect(mockAuthApiClient).toHaveBeenCalledTimes(1);
+      expect(mockAuthApiClient).toHaveBeenCalledWith(`${MENU_ITEMS}/item-1/image`, {
+        method: 'DELETE',
+      });
+    });
+  });
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Upload
   // ═══════════════════════════════════════════════════════════════════════════

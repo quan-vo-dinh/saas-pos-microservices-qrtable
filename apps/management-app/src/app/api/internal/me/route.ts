@@ -9,7 +9,12 @@ export async function GET() {
     return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   }
 
-  const profile = await fetchAuthorizerMe(session.accessToken, session.user?.tenantId);
+  let profile;
+  try {
+    profile = await fetchAuthorizerMe(session.accessToken, session.user?.tenantId);
+  } catch {
+    return NextResponse.json({ error: 'BFF_UNREACHABLE' }, { status: 503 });
+  }
 
   if (!profile) {
     return NextResponse.json({ error: 'PROFILE_UNAVAILABLE' }, { status: 401 });

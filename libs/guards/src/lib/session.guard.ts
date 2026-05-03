@@ -48,6 +48,14 @@ export class SessionGuard implements CanActivate {
       return true;
     }
 
+    const skipBffSessionMint = this.reflector.getAllAndOverride<boolean>(MetadataKey.SKIP_BFF_SESSION_MINT, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (skipBffSessionMint === true) {
+      return true;
+    }
+
     const existingSessionId = getSessionIdFromRequest(request);
     const tenantId = request[MetadataKey.TENANT_ID] as string | undefined;
 

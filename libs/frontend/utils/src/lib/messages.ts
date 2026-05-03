@@ -14,6 +14,7 @@ const SUCCESS_TEMPLATES: Record<string, string> = {
   deleted: '{{entity}} đã được xóa',
   reordered: 'Đã sắp xếp lại {{entity}}',
   imageUploaded: 'Ảnh đã được tải lên thành công',
+  imageRemoved: 'Đã gỡ ảnh món',
   qrRegenerated: 'Mã QR đã được tạo lại',
   statusUpdated: 'Trạng thái đã được cập nhật',
 };

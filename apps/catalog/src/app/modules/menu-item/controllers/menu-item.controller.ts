@@ -10,6 +10,7 @@ import {
   UpdateMenuItemTcpRequest,
   SoftDeleteMenuItemTcpRequest,
   UpdateMenuItemImageTcpRequest,
+  ClearMenuItemImageTcpRequest,
   ValidateOrderableTcpRequest,
   StockDeductForOrderTcpRequest,
   StockReleaseForOrderTcpRequest,
@@ -58,6 +59,12 @@ export class MenuItemController {
   @MessagePattern(TCP_REQUEST_MESSAGE.MENU_ITEM.UPDATE_IMAGE)
   async updateImage(@RequestParams() body: UpdateMenuItemImageTcpRequest): Promise<Response<MenuItemTcpResponse>> {
     const result = await this.menuItemService.updateImage(body);
+    return Response.success<MenuItemTcpResponse>(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.MENU_ITEM.CLEAR_IMAGE)
+  async clearImage(@RequestParams() body: ClearMenuItemImageTcpRequest): Promise<Response<MenuItemTcpResponse>> {
+    const result = await this.menuItemService.clearImage(body);
     return Response.success<MenuItemTcpResponse>(result);
   }
 

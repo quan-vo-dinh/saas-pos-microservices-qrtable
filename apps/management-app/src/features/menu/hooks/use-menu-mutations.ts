@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { successMessage, getErrorDisplayMessage } from '@einvoice/frontend-utils';
+import type { MenuItem } from '../data/schema';
 import { menuService } from '../services/menu.service';
 import { menuKeys } from './use-menu-query';
 
@@ -124,12 +125,36 @@ export function useDeleteMenuItemMutation() {
   });
 }
 
+export function useClearMenuItemImageMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => menuService.clearMenuItemImage(id),
+    onSuccess: (_data, id) => {
+      queryClient.setQueryData<MenuItem>(menuKeys.item(id), (old) => (old ? { ...old, imageUrl: null } : old));
+      queryClient.setQueriesData<MenuItem[]>({ queryKey: [...menuKeys.all, 'items'] }, (old) =>
+        old?.map((item) => (item.id === id ? { ...item, imageUrl: null } : item)),
+      );
+      void queryClient.invalidateQueries({ queryKey: menuKeys.all });
+      toast.success(successMessage('imageRemoved'));
+    },
+    onError: (error: Error) => {
+      toast.error(getErrorDisplayMessage(error));
+    },
+  });
+}
+
 export function useUploadMenuItemImageMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, file, onProgress }: { id: string; file: File; onProgress?: (percent: number) => void }) =>
       menuService.uploadMenuItemImage(id, file, onProgress),
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData<MenuItem>(menuKeys.item(variables.id), (old) =>
+        old ? { ...old, imageUrl: data.imageUrl } : old,
+      );
+      queryClient.setQueriesData<MenuItem[]>({ queryKey: [...menuKeys.all, 'items'] }, (old) =>
+        old?.map((item) => (item.id === variables.id ? { ...item, imageUrl: data.imageUrl } : item)),
+      );
       void queryClient.invalidateQueries({ queryKey: menuKeys.all });
       toast.success(successMessage('imageUploaded'));
     },

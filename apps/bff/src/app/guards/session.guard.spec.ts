@@ -58,4 +58,26 @@ describe('SessionGuard', () => {
       'sid_00000000-0000-4000-8000-000000000001',
     );
   });
+
+  it('does not mint BFF sid when SKIP_BFF_SESSION_MINT is true (e.g. customer session join)', async () => {
+    const cacheManager = {
+      get: jest.fn(),
+      set: jest.fn(),
+      del: jest.fn(),
+    };
+    reflector.getAllAndOverride.mockImplementation((key: unknown) => key === MetadataKey.SKIP_BFF_SESSION_MINT);
+
+    const request = {
+      headers: {},
+      [MetadataKey.TENANT_ID]: 'tenant-a',
+      res: { setHeader: jest.fn() },
+    };
+    const guard = new SessionGuard(reflector as any, cacheManager as any);
+
+    await expect(guard.canActivate(getContext(request))).resolves.toBe(true);
+
+    expect(cacheManager.set).not.toHaveBeenCalled();
+    expect(request[MetadataKey.SESSION_ID]).toBeUndefined();
+    expect(request.res.setHeader).not.toHaveBeenCalled();
+  });
 });

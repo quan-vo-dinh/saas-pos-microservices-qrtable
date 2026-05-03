@@ -12,6 +12,7 @@ import {
   UpdateMenuItemTcpRequest,
   SoftDeleteMenuItemTcpRequest,
   UpdateMenuItemImageTcpRequest,
+  ClearMenuItemImageTcpRequest,
   ValidateOrderableTcpRequest,
   StockDeductForOrderTcpRequest,
   StockReleaseForOrderTcpRequest,
@@ -103,6 +104,19 @@ export class MenuItemService {
     const updated = await this.menuItemRepository.updateByIdAndTenant(data.id, data.tenantId, {
       imageUrl: data.imageUrl,
       imagePublicId: data.imagePublicId,
+    });
+    if (!updated) {
+      throw new BusinessException(ErrorCode.CATALOG_MENU_ITEM_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    return updated;
+  }
+
+  async clearImage(data: ClearMenuItemImageTcpRequest): Promise<MenuItem> {
+    await this.getById({ id: data.id, tenantId: data.tenantId });
+
+    const updated = await this.menuItemRepository.updateByIdAndTenant(data.id, data.tenantId, {
+      imageUrl: null,
+      imagePublicId: null,
     });
     if (!updated) {
       throw new BusinessException(ErrorCode.CATALOG_MENU_ITEM_NOT_FOUND, HttpStatus.NOT_FOUND);

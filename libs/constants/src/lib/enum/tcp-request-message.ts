@@ -44,6 +44,7 @@ enum MENU_ITEM {
   UPDATE = 'menu_item.update',
   SOFT_DELETE = 'menu_item.soft_delete',
   UPDATE_IMAGE = 'menu_item.update_image',
+  CLEAR_IMAGE = 'menu_item.clear_image',
   /** Step 2.4 — validate item status/price/station at cart submit (Catalog-owned) */
   VALIDATE_ORDERABLE = 'menu_item.validate_orderable',
   /** Step 2.4 — pessimistic deduct in Catalog DB when staff confirms order */

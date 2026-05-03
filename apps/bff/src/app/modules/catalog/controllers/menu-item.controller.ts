@@ -20,6 +20,7 @@ import {
   MenuItemTcpResponse,
   SoftDeleteMenuItemTcpRequest,
   UpdateMenuItemImageTcpRequest,
+  ClearMenuItemImageTcpRequest,
   UpdateMenuItemTcpRequest,
 } from '@common/interfaces/tcp/catalog';
 import { buildTcpRequestContext } from '@common/utils/request.util';
@@ -170,6 +171,56 @@ export class MenuItemAdminController {
             id,
             tenantId,
             ...body,
+          }),
+        )
+        .pipe(
+          map(
+            (response) =>
+              new ResponseDto<MenuItemTcpResponse>({
+                data: response.data,
+                statusCode: response.statusCode,
+                message: response.code as HTTP_MESSAGE,
+              }),
+          ),
+        ),
+    );
+
+    await this.invalidateMenuCache(req);
+    return result;
+  }
+
+  @Delete(':id/image')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.CATALOG_UPDATE])
+  @ApiOkResponse({ type: ResponseDto<MenuItemResponseDto> })
+  @ApiOperation({ summary: 'Remove menu item image (Cloudinary + DB)' })
+  async removeImage(
+    @Param('id') id: string,
+    @ProcessId() processId: string,
+    @Req() req: Request,
+  ): Promise<ResponseDto<MenuItemTcpResponse>> {
+    const tenantId = req[MetadataKey.TENANT_ID] as string;
+
+    const currentItem = await firstValueFrom(
+      this.catalogClient
+        .send<
+          MenuItemTcpResponse,
+          GetMenuItemByIdTcpRequest
+        >(TCP_REQUEST_MESSAGE.MENU_ITEM.GET_BY_ID, buildTcpRequestContext<GetMenuItemByIdTcpRequest>(req, processId, { id, tenantId }))
+        .pipe(map((r) => r.data)),
+    );
+
+    if (currentItem?.imagePublicId) {
+      await this.cloudinaryService.deleteImage(currentItem.imagePublicId);
+    }
+
+    const result = await firstValueFrom(
+      this.catalogClient
+        .send<MenuItemTcpResponse, ClearMenuItemImageTcpRequest>(
+          TCP_REQUEST_MESSAGE.MENU_ITEM.CLEAR_IMAGE,
+          buildTcpRequestContext<ClearMenuItemImageTcpRequest>(req, processId, {
+            id,
+            tenantId,
           }),
         )
         .pipe(

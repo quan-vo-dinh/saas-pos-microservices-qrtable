@@ -18,7 +18,12 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useMenu } from './menu-provider';
 import { useCategoriesQuery } from '../hooks/use-menu-query';
-import { useCreateMenuItemMutation, useUpdateMenuItemMutation, useUploadMenuItemImageMutation } from '../hooks/use-menu-mutations';
+import {
+  useClearMenuItemImageMutation,
+  useCreateMenuItemMutation,
+  useUpdateMenuItemMutation,
+  useUploadMenuItemImageMutation,
+} from '../hooks/use-menu-mutations';
 import { menuItemMutateSchema, type MenuItemMutateInput } from '../data/schema';
 
 export function MenuItemMutateDrawer() {
@@ -30,10 +35,13 @@ export function MenuItemMutateDrawer() {
   const createMutation = useCreateMenuItemMutation();
   const updateMutation = useUpdateMenuItemMutation();
   const uploadMutation = useUploadMenuItemImageMutation();
+  const clearImageMutation = useClearMenuItemImageMutation();
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  /** User removed the existing server image in the UI (persist on Save). */
+  const [stripServerImage, setStripServerImage] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,25 +72,33 @@ export function MenuItemMutateDrawer() {
     }
   }, [isEdit, isOpen, currentItem, form]);
 
-  const derivedImagePreview = imageFile
-    ? imagePreview
-    : isEdit && currentItem?.imageUrl
-      ? currentItem.imageUrl
-      : null;
+  const derivedImagePreview =
+    imageFile && imagePreview
+      ? imagePreview
+      : !stripServerImage && isEdit && currentItem?.imageUrl
+        ? currentItem.imageUrl
+        : null;
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    setStripServerImage(false);
     setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    setImagePreview((prev) => {
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
   }
 
   function clearImage() {
-    setImageFile(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
+    if (imageFile) {
+      setImageFile(null);
+      setImagePreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
     }
+    if (isEdit && currentItem?.imageUrl) setStripServerImage(true);
   }
 
   function onSubmit(data: MenuItemMutateInput) {
@@ -94,8 +110,16 @@ export function MenuItemMutateDrawer() {
             if (imageFile) {
               uploadMutation.mutate(
                 { id: currentItem.id, file: imageFile, onProgress: setUploadProgress },
-                { onSettled: () => { setOpen(null); form.reset(); } },
+                { onSettled: () => { setOpen(null); form.reset(); setStripServerImage(false); } },
               );
+            } else if (stripServerImage) {
+              clearImageMutation.mutate(currentItem.id, {
+                onSettled: () => {
+                  setOpen(null);
+                  form.reset();
+                  setStripServerImage(false);
+                },
+              });
             } else {
               setOpen(null);
               form.reset();
@@ -129,6 +153,11 @@ export function MenuItemMutateDrawer() {
         if (!v) {
           setOpen(null);
           form.reset();
+          setStripServerImage(false);
+          if (imagePreview?.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
+          setImageFile(null);
+          setImagePreview(null);
+          if (fileInputRef.current) fileInputRef.current.value = '';
         }
       }}
     >
@@ -219,21 +248,36 @@ export function MenuItemMutateDrawer() {
           <div className="grid gap-2">
             <Label>Image</Label>
             {derivedImagePreview ? (
-              <div className="relative">
-                <img
-                  src={derivedImagePreview}
-                  alt="Preview"
-                  className="h-32 w-full rounded-md border object-cover"
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-1 right-1 size-6"
-                  onClick={clearImage}
-                >
-                  <X className="size-3" />
-                </Button>
+              <div className="grid gap-2">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="group relative block h-32 w-full overflow-hidden rounded-md border p-0 text-left ring-offset-background transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <img
+                      src={derivedImagePreview}
+                      alt="Preview"
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 bg-black/55 py-1.5 text-center text-xs font-medium text-white">
+                      Click to replace image
+                    </span>
+                  </button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 z-10 size-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearImage();
+                    }}
+                    title="Remove image"
+                  >
+                    <X className="size-3" />
+                  </Button>
+                </div>
               </div>
             ) : (
               <button
@@ -266,7 +310,7 @@ export function MenuItemMutateDrawer() {
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending || uploadMutation.isPending}>
+            <Button type="submit" disabled={isPending || uploadMutation.isPending || clearImageMutation.isPending}>
               {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Item'}
             </Button>
           </SheetFooter>

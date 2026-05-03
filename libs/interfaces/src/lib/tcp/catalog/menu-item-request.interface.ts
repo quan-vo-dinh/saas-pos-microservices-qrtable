@@ -46,6 +46,11 @@ export type UpdateMenuItemImageTcpRequest = {
   imagePublicId: string;
 };
 
+export type ClearMenuItemImageTcpRequest = {
+  id: string;
+  tenantId: string;
+};
+
 export type ValidateOrderableItemInput = {
   menuItemId: string;
   quantity: number;

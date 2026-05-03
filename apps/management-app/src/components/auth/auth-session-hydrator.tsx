@@ -46,7 +46,7 @@ export function AuthSessionHydrator() {
       cache: 'no-store',
     })
       .then(async (response) => {
-        if (response.status === 401) {
+        if (response.status === 401 || response.status === 503) {
           throw new Error('UNAUTHORIZED');
         }
 

@@ -199,6 +199,28 @@ describe('MenuItemService', () => {
     });
   });
 
+  describe('clearImage', () => {
+    it('should clear image url and public id', async () => {
+      const cleared = {
+        ...mockMenuItem,
+        imageUrl: null,
+        imagePublicId: null,
+      } as unknown as MenuItem;
+      repository.findByIdAndTenant.mockResolvedValue(mockMenuItem);
+      repository.updateByIdAndTenant.mockResolvedValue(cleared);
+
+      const result = await service.clearImage({
+        id: 'item-1',
+        tenantId: 'tenant-1',
+      });
+      expect(result).toEqual(cleared);
+      expect(repository.updateByIdAndTenant).toHaveBeenCalledWith('item-1', 'tenant-1', {
+        imageUrl: null,
+        imagePublicId: null,
+      });
+    });
+  });
+
   describe('validateOrderable', () => {
     it('returns snapshots with station', async () => {
       repository.findManyByIdsAndTenant.mockResolvedValue([

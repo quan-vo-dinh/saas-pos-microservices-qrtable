@@ -9,7 +9,7 @@ import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import type { JoinSessionTcpRequest } from '@common/interfaces/tcp/order/order-request.interface';
 import type { SessionTcpResponse } from '@common/interfaces/tcp/order/order-response.interface';
 import { buildTcpRequestContext } from '@common/utils/request.util';
-import { Body, Controller, Inject, Post, Req } from '@nestjs/common';
+import { Body, Controller, Inject, Post, Req, SetMetadata } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { firstValueFrom, map } from 'rxjs';
@@ -20,6 +20,7 @@ export class CustomerSessionController {
   constructor(@Inject(TCP_SERVICES.ORDER_SERVICE) private readonly orderClient: TcpClient) {}
 
   @Post('join')
+  @SetMetadata(MetadataKey.SKIP_BFF_SESSION_MINT, true)
   @ApiOkResponse({ type: ResponseDto })
   @ApiOperation({ summary: 'Join table session via QR validation' })
   async join(
