@@ -38,6 +38,7 @@ describe('customerApi', () => {
     jest.clearAllMocks();
     setCustomerSessionId(null);
     setCustomerTenantId(null);
+    localStorage.clear();
   });
 
   it('calls apiClient with correct BFF base URL', async () => {
@@ -160,6 +161,25 @@ describe('customerApi', () => {
     expect(getCustomerTenantId()).toBeNull();
     expect(localStorage.getItem('qrtable:pwa:order-session')).toBeNull();
     expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener(CUSTOMER_SESSION_EXPIRED_EVENT, listener);
+  });
+
+  it('does not clear a newer joined session when an older in-flight request returns SESSION_CLOSED', async () => {
+    const listener = jest.fn();
+    window.addEventListener(CUSTOMER_SESSION_EXPIRED_EVENT, listener);
+    setCustomerSessionId('stale-session');
+    setCustomerTenantId('tenant_joined');
+    localStorage.setItem('qrtable:pwa:order-session', JSON.stringify({ sessionId: 'fresh-session' }));
+    mockApiClient.mockImplementation(async () => {
+      setCustomerSessionId('fresh-session');
+      return Promise.reject(Object.assign(new Error('Phiên đã đóng'), { status: 410, errorCode: 'SESSION_CLOSED' }));
+    });
+
+    await expect(customerApi('/customer/cart')).rejects.toThrow('Phiên đã đóng');
+
+    expect(getCustomerSessionId()).toBe('fresh-session');
+    expect(localStorage.getItem('qrtable:pwa:order-session')).toBe(JSON.stringify({ sessionId: 'fresh-session' }));
+    expect(listener).not.toHaveBeenCalled();
     window.removeEventListener(CUSTOMER_SESSION_EXPIRED_EVENT, listener);
   });
 });

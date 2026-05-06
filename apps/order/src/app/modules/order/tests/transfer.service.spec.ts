@@ -1,4 +1,5 @@
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
+import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { Test, TestingModule } from '@nestjs/testing';
 import { of } from 'rxjs';
@@ -76,8 +77,25 @@ describe('TransferService', () => {
       currentBillId: null,
     });
 
-    catalogClient.send.mockImplementation((msg: string) => {
+    catalogClient.send.mockImplementation((msg: string, payload: { data: { id: string } }) => {
       if (msg === TCP_REQUEST_MESSAGE.TABLE.GET_BY_ID) {
+        if (payload.data.id === 'table-old') {
+          return of({
+            statusCode: 200,
+            data: {
+              id: 'table-old',
+              tenantId: 'tenant-1',
+              name: 'Old',
+              status: TABLE_STATUS.BILLING,
+              areaId: 'a',
+              capacity: 4,
+              qrToken: 'x',
+              sessionId: 'sess-1',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
+        }
         return of({
           statusCode: 200,
           data: {
@@ -130,5 +148,20 @@ describe('TransferService', () => {
       'New',
       expect.anything(),
     );
+    const updateStatusCalls = catalogClient.send.mock.calls.filter(
+      ([pattern]) => pattern === TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS,
+    );
+    expect(updateStatusCalls[0][1].data).toMatchObject({
+      id: 'table-old',
+      tenantId: 'tenant-1',
+      status: TABLE_STATUS.AVAILABLE,
+      sessionId: 'sess-1',
+    });
+    expect(updateStatusCalls[1][1].data).toMatchObject({
+      id: 'table-new',
+      tenantId: 'tenant-1',
+      status: TABLE_STATUS.OCCUPIED,
+      sessionId: 'sess-1',
+    });
   });
 });

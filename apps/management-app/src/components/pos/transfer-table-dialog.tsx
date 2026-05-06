@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useTransferTableMutation } from '@/features/order/hooks/use-order-query';
+import { createTransferRequestId } from '@/features/order/lib/transfer-request-id';
 import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 
 type Props = {
@@ -62,7 +63,7 @@ export function TransferTableDialog({ open, onOpenChange, fromTableId, sessionId
                         sessionId,
                         fromTableId,
                         toTableId: t.id,
-                        requestId,
+                        requestId: requestId ?? createTransferRequestId(),
                       },
                       {
                         onSuccess: () => onOpenChange(false),

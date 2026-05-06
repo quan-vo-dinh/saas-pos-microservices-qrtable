@@ -61,6 +61,14 @@ export class TransferService {
         throw new BusinessException(ErrorCode.TRANSFER_SESSION_TABLE_MISMATCH, HttpStatus.CONFLICT);
       }
 
+      const fromTable = await this.catalogGetTableById({ id: dto.fromTableId, tenantId: dto.tenantId });
+      if (
+        fromTable.sessionId !== dto.sessionId ||
+        (fromTable.status !== TABLE_STATUS.OCCUPIED && fromTable.status !== TABLE_STATUS.BILLING)
+      ) {
+        throw new BusinessException(ErrorCode.TRANSFER_SESSION_TABLE_MISMATCH, HttpStatus.CONFLICT);
+      }
+
       const toTable = await this.catalogGetTableById({ id: dto.toTableId, tenantId: dto.tenantId });
       if (toTable.status !== TABLE_STATUS.AVAILABLE) {
         throw new BusinessException(ErrorCode.TRANSFER_DESTINATION_INVALID, HttpStatus.CONFLICT);
@@ -93,6 +101,7 @@ export class TransferService {
         id: dto.fromTableId,
         tenantId: dto.tenantId,
         status: TABLE_STATUS.AVAILABLE,
+        sessionId: dto.sessionId,
       });
       await this.catalogUpdateTableStatus({
         id: dto.toTableId,

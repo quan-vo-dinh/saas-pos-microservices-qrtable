@@ -123,8 +123,13 @@ export class TableService {
     const table = await this.getById({ id: data.id, tenantId: data.tenantId });
     const newStatus = data.status;
 
+    const isTransferRelease =
+      (table.status === TABLE_STATUS.OCCUPIED || table.status === TABLE_STATUS.BILLING) &&
+      newStatus === TABLE_STATUS.AVAILABLE &&
+      Boolean(data.sessionId) &&
+      data.sessionId === table.sessionId;
     const allowedTransitions = VALID_TRANSITIONS[table.status];
-    if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
+    if (!isTransferRelease && (!allowedTransitions || !allowedTransitions.includes(newStatus))) {
       throw new BusinessException(ErrorCode.CATALOG_TABLE_INVALID_TRANSITION, HttpStatus.BAD_REQUEST, {
         current: table.status,
         new: newStatus,

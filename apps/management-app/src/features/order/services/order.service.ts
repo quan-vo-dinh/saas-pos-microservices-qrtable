@@ -29,7 +29,7 @@ export type TransferTablePayload = {
   sessionId: string;
   fromTableId: string;
   toTableId: string;
-  requestId?: string;
+  requestId: string;
 };
 
 export type OrderActionResult = {

@@ -38,7 +38,11 @@ function isSessionClosedError(error: unknown): boolean {
   return candidate.status === 410 || candidate.errorCode === 'SESSION_CLOSED';
 }
 
-function clearCustomerSessionState(): void {
+function clearCustomerSessionState(requestSessionId?: string | null): void {
+  if (requestSessionId && activeSessionId && requestSessionId !== activeSessionId) {
+    return;
+  }
+
   activeSessionId = null;
   activeTenantId = null;
 
@@ -68,9 +72,9 @@ export async function customerApi<T>(path: string, options?: CustomerApiOptions)
     headers['x-tenant-id'] = tenantId;
   }
 
-  const sid = activeSessionId;
-  if (sid && !omitSessionHeader) {
-    headers['x-session-id'] = sid;
+  const requestSessionId = activeSessionId;
+  if (requestSessionId && !omitSessionHeader) {
+    headers['x-session-id'] = requestSessionId;
   }
 
   try {
@@ -81,7 +85,7 @@ export async function customerApi<T>(path: string, options?: CustomerApiOptions)
     });
   } catch (error) {
     if (isSessionClosedError(error)) {
-      clearCustomerSessionState();
+      clearCustomerSessionState(requestSessionId);
     }
     throw error;
   }

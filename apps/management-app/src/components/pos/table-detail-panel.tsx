@@ -1,18 +1,18 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { Users } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@einvoice/frontend-ui';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TransferTableDialog } from '@/components/pos/transfer-table-dialog';
-import { useMockStore } from '@/mocks/store';
 import { formatVnd } from '@/lib/format-vnd';
 import { orderStatusVi, tableStatusVi } from '@einvoice/shared-constants';
-import { OrderStatus } from '@einvoice/types';
+import { OrderStatus, type Order } from '@einvoice/types';
+import { getErrorDisplayMessage } from '@einvoice/frontend-utils';
+import { useOrdersQuery } from '@/features/order/hooks/use-order-query';
+import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
+import { useUpdateTableStatusMutation } from '@/features/tables/hooks/use-tables-mutations';
 
 function statusVariant(s: string) {
   if (s === 'available') return 'default';
@@ -21,21 +21,64 @@ function statusVariant(s: string) {
   return 'outline';
 }
 
+function isActiveOrder(o: Order) {
+  return (
+    o.status !== OrderStatus.CANCELED &&
+    o.status !== OrderStatus.COMPLETED &&
+    o.status !== OrderStatus.DRAFT
+  );
+}
+
+function formatActivityTime(iso: string) {
+  try {
+    return new Intl.DateTimeFormat('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
 export function TableDetailPanel({ tableId }: { tableId: string }) {
-  const tables = useMockStore((s) => s.tables);
-  const liveOrders = useMockStore((s) => s.liveOrders);
-  const mockPresence = useMockStore((s) => s.mockPresence);
-  const setTableStatus = useMockStore((s) => s.setTableStatus);
-  const markTableClean = useMockStore((s) => s.markTableClean);
+  const tablesQuery = useTablesQuery();
+  const ordersQuery = useOrdersQuery({ tableId, limit: 50 });
+  const updateStatusMutation = useUpdateTableStatusMutation();
   const [transferOpen, setTransferOpen] = useState(false);
 
-  const table = useMemo(() => tables.find((t) => t.id === tableId), [tables, tableId]);
-  const orders = useMemo(
-    () => liveOrders.filter((o) => o.tableId === tableId && o.status !== OrderStatus.CANCELED),
-    [liveOrders, tableId],
+  const table = useMemo(
+    () => tablesQuery.data?.find((t) => t.id === tableId),
+    [tablesQuery.data, tableId],
   );
-  const pres = mockPresence.find((p) => p.tableId === tableId);
+
+  const orders = useMemo(
+    () => (ordersQuery.data ?? []).filter((o) => o.tableId === tableId && isActiveOrder(o)),
+    [ordersQuery.data, tableId],
+  );
+
+  const activityLines = useMemo(() => {
+    const sorted = [...orders].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+    return sorted.slice(0, 5).map((o) => ({
+      key: o.id,
+      text: `Đơn …${o.id.slice(-4)} · ${orderStatusVi(o.status)} · ${formatActivityTime(o.updatedAt)}`,
+    }));
+  }, [orders]);
+
   const total = orders.reduce((s, o) => s + o.totalAmount, 0);
+
+  if (tablesQuery.isLoading) {
+    return <p className="text-sm text-muted-foreground">Đang tải thông tin bàn...</p>;
+  }
+
+  if (tablesQuery.isError) {
+    return (
+      <p className="text-sm text-destructive">{getErrorDisplayMessage(tablesQuery.error as Error)}</p>
+    );
+  }
 
   if (!table) {
     return <p className="text-sm text-destructive">Không tìm thấy bàn.</p>;
@@ -53,86 +96,82 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
             {tableStatusVi(table.status)}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground">Sức chứa {table.capacity} · Phiên {table.sessionId ?? '—'}</p>
-        {pres && pres.guests.length ? (
-          <div className="flex items-center gap-1">
-            <Users className="size-3.5 text-muted-foreground" />
-            <div className="flex -space-x-1.5">
-              {pres.guests.slice(0, 4).map((g) => (
-                <Avatar key={g.name} className="size-6 border border-border">
-                  <AvatarFallback className="text-[0.6rem]">{g.name.slice(0, 1)}</AvatarFallback>
-                </Avatar>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <p className="text-xs text-muted-foreground">
+          Sức chứa {table.capacity} · Phiên{' '}
+          {table.sessionId ? (
+            <span className="font-mono text-foreground">{table.sessionId}</span>
+          ) : (
+            '—'
+          )}
+        </p>
       </div>
       <Separator />
-      <p className="text-[0.65rem] font-medium text-muted-foreground">Timeline (5 sự kiện gần nhất — mock)</p>
-      <ul className="flex flex-col gap-1 text-[0.7rem] text-foreground/90">
-        {['Phiên mở', 'Khách vào', 'Gọi món', 'Bếp xác nhận', 'Cập nhật bill'].map((e, i) => (
-          <li key={e} className="border-s-2 border-border ps-1.5">
-            {e} · bước {i + 1}
-          </li>
-        ))}
-      </ul>
+      <p className="text-[0.65rem] font-medium text-muted-foreground">Hoạt động gần đây (theo đơn)</p>
+      {activityLines.length ? (
+        <ul className="flex flex-col gap-1 text-[0.7rem] text-foreground/90">
+          {activityLines.map((line) => (
+            <li key={line.key} className="border-s-2 border-border ps-1.5">
+              {line.text}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[0.7rem] text-muted-foreground">Chưa có đơn hoạt động để hiển thị.</p>
+      )}
       <Separator />
       <p className="text-[0.65rem] font-medium text-muted-foreground">Đơn tại bàn</p>
-      <Table>
-        <TableHeader>
-          <TableRow className="h-6">
-            <TableHead className="p-1 text-[0.65rem]">Mã</TableHead>
-            <TableHead className="p-1 text-[0.65rem]">TT</TableHead>
-            <TableHead className="p-1 text-end text-[0.65rem]">Tổng</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {orders.length ? (
-            orders.map((o) => (
-              <TableRow key={o.id} className="h-6 text-xs">
-                <TableCell className="p-1 font-mono">…{o.id.slice(-4)}</TableCell>
-                <TableCell className="p-1">{orderStatusVi(o.status)}</TableCell>
-                <TableCell className="p-1 text-end font-mono tabular-nums">{formatVnd(o.totalAmount)}</TableCell>
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={3} className="p-2 text-center text-[0.7rem] text-muted-foreground">
-                Chưa có đơn.
-              </TableCell>
+      {ordersQuery.isError ? (
+        <p className="text-sm text-destructive">{getErrorDisplayMessage(ordersQuery.error as Error)}</p>
+      ) : ordersQuery.isLoading ? (
+        <p className="text-[0.7rem] text-muted-foreground">Đang tải đơn...</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow className="h-6">
+              <TableHead className="p-1 text-[0.65rem]">Mã</TableHead>
+              <TableHead className="p-1 text-[0.65rem]">TT</TableHead>
+              <TableHead className="p-1 text-end text-[0.65rem]">Tổng</TableHead>
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {orders.length ? (
+              orders.map((o) => (
+                <TableRow key={o.id} className="h-6 text-xs">
+                  <TableCell className="p-1 font-mono">…{o.id.slice(-4)}</TableCell>
+                  <TableCell className="p-1">{orderStatusVi(o.status)}</TableCell>
+                  <TableCell className="p-1 text-end font-mono tabular-nums">{formatVnd(o.totalAmount)}</TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={3} className="p-2 text-center text-[0.7rem] text-muted-foreground">
+                  Chưa có đơn.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      )}
       <p className="text-sm font-mono">Tổng chạy: {formatVnd(total)}</p>
       <div className="mt-auto flex flex-col gap-1.5">
-        <Button type="button" className="w-full" onClick={() => setTransferOpen(true)} disabled>
-          Chuyển bàn
-        </Button>
         <Button
           type="button"
-          variant="secondary"
           className="w-full"
-          onClick={() => {
-            if (table.status === 'available') return;
-            setTableStatus(table.id, 'cleaning');
-            toast('Đã đóng phiên (mock) — bàn dọn');
-          }}
-          disabled={table.status === 'available'}
+          onClick={() => setTransferOpen(true)}
+          disabled={!table.sessionId}
         >
+          Chuyển bàn
+        </Button>
+        <Button type="button" variant="secondary" className="w-full" disabled title="Giai đoạn thanh toán (Phase 3)">
           Đóng phiên
         </Button>
         <Button
           type="button"
           variant="outline"
           className="w-full"
+          disabled={table.status !== 'cleaning' || updateStatusMutation.isPending}
           onClick={() => {
-            if (table.status !== 'cleaning') {
-              toast.error('Chỉ khi bàn ở trạng thái dọn');
-              return;
-            }
-            markTableClean(table.id);
-            toast('Đã sẵn sàng (mock)');
+            updateStatusMutation.mutate({ id: table.id, status: 'available' });
           }}
         >
           Đánh dấu sạch
@@ -141,8 +180,8 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
       <TransferTableDialog
         open={transferOpen}
         onOpenChange={setTransferOpen}
-        fromTableId={null}
-        sessionId={null}
+        fromTableId={table.id}
+        sessionId={table.sessionId}
       />
     </div>
   );

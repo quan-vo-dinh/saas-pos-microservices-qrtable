@@ -1,6 +1,6 @@
 # Step 2.5 Batch Agent Prompts
 
-Use these prompts to run Step 2.5 in six sequential batches. Each batch prompt
+Use these prompts to run Step 2.5 in seven sequential batches. Each batch prompt
 is designed for a fresh implementation agent.
 
 ## Execution Order
@@ -11,6 +11,7 @@ is designed for a fresh implementation agent.
 4. `2026-04-30-step-2.5-batch-4-prompt.md`
 5. `2026-04-30-step-2.5-batch-5-prompt.md`
 6. `2026-05-01-step-2.5-batch-6-prompt.md`
+7. `2026-05-03-step-2.5-batch-7-prompt.md`
 
 ## Handoff Rule
 
@@ -32,10 +33,12 @@ batch prompt, the agent must stop and ask for clarification before editing code.
 
 - `docs/phases/phase-2a-order-kafka.md`
 - `docs/business-logic-step-2.4-spec.vi.md`
+- `docs/technical-architecture.md`
 - `docs/superpowers/specs/2026-04-30-step-2.5-fe-be-integration-design.md`
 - `docs/superpowers/specs/2026-05-01-step-2.5-batch-6-qr-demo-dynamic-tenant-design.md`
 - `docs/superpowers/plans/step-2.5-fe-be-integration-plan.md`
 - `docs/superpowers/plans/2026-05-01-step-2.5-batch-6-qr-demo-dynamic-tenant-plan.md`
+- `docs/superpowers/plans/2026-05-03-step-2.5-batch-7-pos-tables-real-integration-plan.md`
 - `docs/superpowers/plans/2026-04-24-step-2.2-mock-ui.md`
 - `docs/architecture/permission-matrix.md`
 - `docs/references/auth-system-reference.md`
@@ -58,3 +61,6 @@ batch prompt, the agent must stop and ask for clarification before editing code.
 - Batch 6 QR URL uses tenant slug, not internal tenant id.
 - Batch 6 implements query-param tenant slug resolution, not production
   subdomain routing.
+- Batch 7 integrates `/pos/tables` with real Catalog table APIs and existing POS
+  order polling; Bills/payment/KDS/notification history/analytics remain
+  deferred.

@@ -513,3 +513,19 @@ npx nx lint management-app
 - WS integration only invalidates/refetches; polling remains sufficient.
 - KDS mock remains untouched except for avoiding accidental coupling to POS real
   order flow.
+
+## Batch 7 Addendum: POS Tables Real Integration
+
+Batch 7 closes the `/pos/tables` gap found after Batch 6. The table map and
+detail panel must use real Catalog table APIs and existing admin order polling.
+Bills/cash payment, full session close, KDS, notification history, and analytics
+remain out of scope for Step 2.5.
+
+Deferred tech debt:
+
+- Replace POS table presence/timeline with real table/session events in Phase 2B
+  or a dedicated staff realtime batch.
+- Replace POS bills/cash panel in Phase 3 Payment.
+- Replace POS notifications mock history when Notification Service exists.
+- Add a backend table-active-session summary endpoint only if the Order +
+  Catalog composition becomes too expensive in the frontend.

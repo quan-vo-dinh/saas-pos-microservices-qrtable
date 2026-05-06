@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { ROUTES } from '@/constants/routes';
 import { useMockStore } from '@/mocks/store';
+import { usePosTableUiState } from '@/features/tables/hooks/use-pos-table-ui-state';
 import { TableDetailPanel } from '@/components/pos/table-detail-panel';
 import { CashBillPanel } from '@/components/pos/cash-bill-panel';
 import { ServiceRequestDetailPanel } from '@/components/pos/service-request-detail-panel';
@@ -20,7 +21,7 @@ function EmptyState({ message }: { message: string }) {
 
 export function NonOrderRightInspector() {
   const pathname = usePathname();
-  const selectedTableId = useMockStore((s) => s.selectedTableId);
+  const selectedTableId = usePosTableUiState((s) => s.selectedTableId);
   const selectedBillId = useMockStore((s) => s.selectedBillId);
   const selectedServiceRequestId = useMockStore((s) => s.selectedServiceRequestId);
 

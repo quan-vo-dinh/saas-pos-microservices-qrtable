@@ -157,6 +157,63 @@ describe('TableService', () => {
       ).rejects.toThrow(BusinessException);
     });
 
+    it.each([TABLE_STATUS.OCCUPIED, TABLE_STATUS.BILLING])(
+      'should release %s table when transfer passes matching session id',
+      async (sourceStatus) => {
+        const occupiedTable = {
+          ...mockTable,
+          status: sourceStatus,
+          sessionId: 'session-1',
+        } as unknown as Table;
+        const availableTable = {
+          ...mockTable,
+          status: TABLE_STATUS.AVAILABLE,
+          sessionId: null,
+        } as unknown as Table;
+        repository.findByIdAndTenant.mockResolvedValue(occupiedTable);
+        repository.updateByIdAndTenant.mockResolvedValue(availableTable);
+
+        const result = await service.updateStatus({
+          id: 'table-1',
+          tenantId: 'tenant-1',
+          status: TABLE_STATUS.AVAILABLE,
+          sessionId: 'session-1',
+        });
+
+        expect(repository.updateByIdAndTenant).toHaveBeenCalledWith('table-1', 'tenant-1', {
+          status: TABLE_STATUS.AVAILABLE,
+          sessionId: null,
+        });
+        expect(result.status).toBe(TABLE_STATUS.AVAILABLE);
+      },
+    );
+
+    it('should reject occupied → available without matching transfer session id', async () => {
+      const occupiedTable = {
+        ...mockTable,
+        status: TABLE_STATUS.OCCUPIED,
+        sessionId: 'session-1',
+      } as unknown as Table;
+      repository.findByIdAndTenant.mockResolvedValue(occupiedTable);
+
+      await expect(
+        service.updateStatus({
+          id: 'table-1',
+          tenantId: 'tenant-1',
+          status: TABLE_STATUS.AVAILABLE,
+        }),
+      ).rejects.toThrow(BusinessException);
+
+      await expect(
+        service.updateStatus({
+          id: 'table-1',
+          tenantId: 'tenant-1',
+          status: TABLE_STATUS.AVAILABLE,
+          sessionId: 'session-other',
+        }),
+      ).rejects.toThrow(BusinessException);
+    });
+
     it('should reject invalid transition billing → available', async () => {
       const billingTable = { ...mockTable, status: TABLE_STATUS.BILLING } as unknown as Table;
       repository.findByIdAndTenant.mockResolvedValue(billingTable);
