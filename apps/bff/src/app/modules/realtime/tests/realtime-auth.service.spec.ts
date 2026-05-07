@@ -72,6 +72,47 @@ describe('RealtimeAuthService', () => {
     expect(rooms.length).toBe(2);
   });
 
+  it('customer auth payload resolves to customer session room', async () => {
+    cache.get.mockImplementation(async (key: string) => {
+      if (key === getSessionCacheKey('sid_1', 't1')) {
+        return { tenantId: 't1', createdAt: Date.now(), lastActivityAt: Date.now() };
+      }
+      return undefined;
+    });
+
+    const socket = {
+      handshake: {
+        auth: { tenantId: 't1', sessionId: 'sid_1' },
+        headers: {},
+      },
+      data: {},
+    } as unknown as Socket;
+
+    const rooms = await service.resolveConnectionRooms(socket);
+    expect(rooms).toEqual(['session:sid_1:customer']);
+  });
+
+  it('customer prefers handshake.auth tenant/session over conflicting headers', async () => {
+    cache.get.mockImplementation(async (key: string) => {
+      if (key === getSessionCacheKey('sid_auth', 't_auth')) {
+        return { tenantId: 't_auth', createdAt: Date.now(), lastActivityAt: Date.now() };
+      }
+      return undefined;
+    });
+
+    const socket = {
+      handshake: {
+        auth: { tenantId: 't_auth', sessionId: 'sid_auth' },
+        headers: { 'x-tenant-id': 't_header', 'x-session-id': 'sid_header' },
+      },
+      data: {},
+    } as unknown as Socket;
+
+    const rooms = await service.resolveConnectionRooms(socket);
+    expect(rooms).toEqual(['session:sid_auth:customer']);
+    expect(cache.get).toHaveBeenCalledWith(getSessionCacheKey('sid_auth', 't_auth'));
+  });
+
   it('customer requires existing BFF session cache entry', async () => {
     cache.get.mockImplementation(async (key: string) => {
       if (key === getSessionCacheKey('sid_1', 't1')) {

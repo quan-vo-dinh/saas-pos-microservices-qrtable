@@ -20,6 +20,18 @@ function getHandshakeHeader(headers: Record<string, unknown>, name: string): str
   return typeof direct === 'string' ? direct.trim() : undefined;
 }
 
+function getHandshakeAuthString(auth: Record<string, unknown> | undefined, name: string): string | undefined {
+  if (!auth) {
+    return undefined;
+  }
+  const raw = auth[name];
+  if (typeof raw !== 'string') {
+    return undefined;
+  }
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 @Injectable()
 export class RealtimeAuthService implements OnModuleInit {
   private readonly logger = new Logger(RealtimeAuthService.name);
@@ -48,8 +60,9 @@ export class RealtimeAuthService implements OnModuleInit {
     }
 
     const headers = socket.handshake.headers as Record<string, unknown>;
-    const tenantId = getHandshakeHeader(headers, 'x-tenant-id');
-    const sessionId = getHandshakeHeader(headers, 'x-session-id');
+    const handshakeAuth = socket.handshake.auth as Record<string, unknown> | undefined;
+    const tenantId = getHandshakeAuthString(handshakeAuth, 'tenantId') ?? getHandshakeHeader(headers, 'x-tenant-id');
+    const sessionId = getHandshakeAuthString(handshakeAuth, 'sessionId') ?? getHandshakeHeader(headers, 'x-session-id');
     return this.buildCustomerRooms(tenantId, sessionId);
   }
 

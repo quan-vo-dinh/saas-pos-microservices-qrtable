@@ -62,4 +62,11 @@ describe('OrderEventsGateway', () => {
     expect(socket.emit).toHaveBeenCalledWith('events.authError', expect.any(Object));
     expect((socket.join as jest.Mock).mock.calls.length).toBe(0);
   });
+
+  it('join.staff emits auth error without joining client-supplied rooms', () => {
+    const socket = { emit: jest.fn(), join: jest.fn() } as unknown as Socket;
+    gateway.joinStaffLegacy(socket);
+    expect(socket.emit).toHaveBeenCalledWith('events.authError', expect.any(Object));
+    expect((socket.join as jest.Mock).mock.calls.length).toBe(0);
+  });
 });

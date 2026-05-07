@@ -41,14 +41,16 @@ export class OrderEventsGateway implements OnGatewayConnection {
   @SubscribeMessage('join.session')
   joinSessionLegacy(@ConnectedSocket() socket: Socket): void {
     socket.emit('events.authError', {
-      message: 'Room assignment is server-managed; send x-tenant-id and x-session-id on the handshake.',
+      message:
+        'Room assignment is server-managed; send handshake.auth.tenantId and handshake.auth.sessionId (x-tenant-id / x-session-id headers remain supported as a transitional fallback).',
     });
   }
 
   @SubscribeMessage('join.staff')
   joinStaffLegacy(@ConnectedSocket() socket: Socket): void {
     socket.emit('events.authError', {
-      message: 'Room assignment is server-managed; authenticate with Authorization Bearer on the handshake.',
+      message:
+        'Room assignment is server-managed; authenticate with handshake.auth.token or Authorization: Bearer on the handshake.',
     });
   }
 
