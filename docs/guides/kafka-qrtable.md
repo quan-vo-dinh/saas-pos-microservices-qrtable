@@ -1162,7 +1162,7 @@ Ngược lại, khi staff confirm đơn và BFF cần push WebSocket update cho 
 
 Dùng Kafka khi producer không được phép chờ consumer xử lý xong. Có hai trường hợp cụ thể:
 
-_Trường hợp 1 — Long-running consumer:_ Kitchen Service có thể xử lý một batch ticket mất vài giây. Order Service không thể chờ Kitchen xử lý xong mới trả response cho customer — đó là UX tệ và tạo ra coupling về thời gian.
+_Trường hợp 1 — Long-running consumer:_ Kitchen Service có thể xử lý một lượt tạo ticket mất vài giây. Order Service không thể chờ Kitchen xử lý xong mới trả response cho customer — đó là UX tệ và tạo ra coupling về thời gian.
 
 _Trường hợp 2 — Event sinh từ timer nội bộ:_ `kitchen.sla_warning` được sinh bởi timer nội bộ của Kitchen Service khi một ticket quá thời gian threshold. Event này không gắn với bất kỳ HTTP request nào, không có "caller" để trả response về. Không thể dùng TCP hay BFF Direct. → Phải qua Kafka.
 
@@ -1268,9 +1268,9 @@ graph TB
 
 **`order.confirmed` → Kafka (P1 + P2)**
 
-P1: Kitchen Service có business logic độc lập (routing theo loại món, tạo ticket FIFO, batching). Order Service không nên biết điều đó.
+P1: Kitchen Service có business logic độc lập (routing theo loại món, tạo ticket FIFO, ưu tiên và SLA). Order Service không nên biết điều đó.
 
-P2: Order Service không được chờ Kitchen tạo ticket xong. Kitchen có thể xử lý nhiều đơn batch, mất vài giây. Customer phải nhận response "Đơn hàng đã xác nhận" ngay lập tức.
+P2: Order Service không được chờ Kitchen tạo ticket xong. Kitchen có thể xử lý nhiều đơn đồng thời, mất vài giây. Customer phải nhận response "Đơn hàng đã xác nhận" ngay lập tức.
 
 **`payment.completed` → Kafka (P1 + P2 + P3)**
 

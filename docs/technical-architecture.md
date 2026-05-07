@@ -160,7 +160,7 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
             └── Kitchen Service (Kafka consumer):
                     ├── Route ticket (e.g. `MenuItem.station`): KITCHEN vs BAR
                     ├── Redis Sorted Set (FIFO queue)
-                    └── … → BFF Direct WebSocket → KDS screens (Phase 2B hoàn thiện gateway)
+                    └── Publish internal KDS invalidation hint after Redis write → BFF WebSocket → KDS screens
     │
     └──→ Payment Service (TCP): process payment
             ├── Stripe Checkout Session → webhook → verify → update status
@@ -385,7 +385,7 @@ POS
 
 ```
 KDS
-  ├── /kitchen (Kitchen Queue: FIFO + batching)
+  ├── /kitchen (Kitchen Queue: FIFO + priority + SLA)
   ├── /bar (Bar Queue)
   ├── /priority (Priority flagging)
   └── /recall (Recall / undo ready)
@@ -542,7 +542,7 @@ File Storage Level:
 | 3   | **SaaS Mgmt Service**    | TCP           | PG: `qrtable_saas`     | Tenant CRUD, Subscription lifecycle, Pricing Plans                                                          |
 | 4   | **Catalog Service**      | TCP           | PG: `qrtable_catalog`  | Menu (Category + Item), Table & Area, QR token management                                                   |
 | 5   | **Order Service**        | TCP           | PG: `qrtable_order`    | Order state machine, Cart/Session cache, bills; stock **không** ghi trực tiếp — gọi Catalog TCP khi confirm |
-| 6   | **Kitchen Service**      | TCP + Kafka   | Redis only             | KDS ticket routing, FIFO queue, SLA monitoring, batching                                                    |
+| 6   | **Kitchen Service**      | TCP + Kafka   | Redis only             | KDS ticket/item routing, FIFO/priority queue, SLA monitoring; no batching                                   |
 | 7   | **Payment Service**      | TCP + Webhook | PG: `qrtable_payment`  | Stripe Checkout, Cash flow, Payment records, Reconciliation                                                 |
 | 8   | **Notification Service** | Kafka         | Mongo: `qrtable_notif` | Email (SMTP), Push events, Audit log                                                                        |
 | 9   | **User-Access Service**  | TCP           | Mongo: `qrtable_auth`  | User profile, Role mapping, Staff management                                                                |
@@ -559,7 +559,7 @@ Trách nhiệm:
   - Rate limiting (NestJS Throttler + Redis)
   - Global Exception Interceptor (chuẩn hóa error response)
   - Logger Middleware (process ID tracking across services)
-  - WebSocket Gateway: Kafka event bridge (3 topics) + BFF Direct side-effects (6 events)
+  - WebSocket Gateway: Kafka/Internal event bridge + BFF Direct side-effects
   - CORS, Body parser (20mb limit cho image upload)
   - Multer middleware: memory storage, stream to Cloudinary (không lưu disk)
   - Upload endpoint: POST /api/v1/admin/menu-items/:id/image (multipart/form-data)
@@ -570,7 +570,7 @@ Giao tiếp:
   - → Auth Service (gRPC): verify token
   - → Catalog/Order/Payment/SaaS Service (TCP): business operations
   - → Redis: token cache, rate limit counter
-  - → Kafka: subscribe 3 domain events (order.confirmed, kitchen.sla_warning, payment.completed)
+  - → Kafka: subscribe domain events that BFF may bridge (`order.confirmed` → customer session tracking only, `kitchen.sla_warning`, `payment.completed`); BFF must not emit KDS queue changes directly from `order.confirmed`
   - → Cloudinary: stream image upload (menu items)
 
 Không có Database riêng — BFF chỉ là proxy + orchestrator.
@@ -729,7 +729,7 @@ Trách nhiệm:
   - Kafka consumer: nhận order.confirmed events
   - Ticket routing: từ `MenuItem.station` (KITCHEN / BAR) trên payload — xem Step 2.4
   - FIFO queue management: Redis Sorted Set (score = timestamp)
-  - Batching logic: group same items across tables
+  - Ticket/item queue logic: one ticket per `(tenantId, orderId, station)`, ordered by FIFO + priority; no batching/GROUP BY
   - SLA monitoring: cảnh báo khi ticket quá threshold (e.g., 15 min)
   - Status update: Pending → Processing → Ready
   - Recall: rollback Ready → Processing (nhầm tay)
@@ -747,8 +747,8 @@ BFF Direct Side-Effects (AP1 — không qua Kafka, xem §7.3):
   - kitchen.item_ready → BFF emit WS tới tenant:{tid}:staff + session:{sid}:customer
 
 WebSocket push (do BFF xử lý — Kitchen không emit WS trực tiếp):
-  - BFF Direct → tenant:{tid}:kds:kitchen — new ticket, status change
-  - BFF Direct → tenant:{tid}:kds:bar — same for bar
+  - Kitchen Redis mutation → internal `kds.queue_changed` hint → BFF relay tenant:{tid}:kds:kitchen
+  - Kitchen Redis mutation → internal `kds.queue_changed` hint → BFF relay tenant:{tid}:kds:bar
   - BFF Direct → tenant:{tid}:staff — "Bàn 05 — Phở bò đã xong"
   - Kafka bridge → tenant:{tid}:management — kitchen.sla_warning (P2: sinh bởi timer)
 ```
@@ -1108,10 +1108,14 @@ Cấu hình qua Keycloak **Protocol Mapper** (type: User Attribute → Token Cla
 │           ├─ Kafka Consumer Bridge (3 topics):   │
 │           │                                      │
 │  ┌──────────────────────────────────────────┐    │
-│  │  order.confirmed   → tenant:{tid}:kds:* │    │
-│  │  kitchen.sla_warn  → tenant:{tid}:mgmt  │    │
+│  │  order.confirmed → session:{sid}:cust    │    │
+│  │    (customer tracking only; non-KDS)     │    │
+│  │  kitchen.sla_warning → tenant:{tid}:mgmt│    │
 │  │  payment.completed → session:{sid}:cust  │    │
 │  └──────────────────────────────────────────┘    │
+│           │                                      │
+│           ├─ Kitchen internal Redis hint:        │
+│           │  kds.queue_changed → tenant:{tid}:kds:* after Redis write │
 │           │                                      │
 │           ├─ BFF Direct (sau TCP response):      │
 │           │                                      │
@@ -1127,18 +1131,18 @@ Cấu hình qua Keycloak **Protocol Mapper** (type: User Attribute → Token Cla
 
 ### 9.2 Real-time Use Cases
 
-| Use Case                     | Source      | Event                | WebSocket Room             | Nội dung push                        |
-| ---------------------------- | ----------- | -------------------- | -------------------------- | ------------------------------------ |
-| Đơn mới cho Staff            | BFF Direct  | `order.created`      | `tenant:{tid}:staff`       | `{ tableId, items, total }`          |
-| Order tracking (Customer)    | Kafka → BFF | `order.confirmed`    | `session:{sid}:customer`   | `{ orderId, status: "Processing" }`  |
-| KDS ticket mới (Kitchen)     | BFF Direct  | `order.confirmed`    | `tenant:{tid}:kds:kitchen` | `{ ticket: { table, items, time } }` |
-| Món xong → notify waiter     | BFF Direct  | `kitchen.item_ready` | `tenant:{tid}:staff`       | `{ tableId, itemName: "Phở bò" }`    |
-| Menu sync (giá/out of stock) | BFF Direct  | `menu.updated`       | `tenant:{tid}:*` (public)  | `{ itemId, field, newValue }`        |
-| Table status change          | BFF Direct  | `table.status_chg`   | `tenant:{tid}:staff`       | `{ tableId, status: "Billing" }`     |
-| Payment done                 | Kafka → BFF | `payment.completed`  | `session:{sid}:customer`   | `{ status: "Paid", receipt_url }`    |
-| SLA warning (quá giờ)        | Kafka → BFF | `kitchen.sla_warn`   | `tenant:{tid}:management`  | `{ ticketId, waitingMin: 18 }`       |
-| Yêu cầu phục vụ (Customer)   | BFF Direct  | `service.requested`  | `tenant:{tid}:staff`       | `{ tableId, type: "CALL_STAFF" }`    |
-| Refund processed             | Kafka → BFF | `payment.refunded`   | `tenant:{tid}:management`  | `{ paymentId, amount, reason }`      |
+| Use Case                     | Source                   | Event                 | WebSocket Room            | Nội dung push                       |
+| ---------------------------- | ------------------------ | --------------------- | ------------------------- | ----------------------------------- |
+| Đơn mới cho Staff            | BFF Direct               | `order.created`       | `tenant:{tid}:staff`      | `{ tableId, items, total }`         |
+| Order tracking (Customer)    | Kafka → BFF              | `order.confirmed`     | `session:{sid}:customer`  | `{ orderId, status: "Processing" }` |
+| KDS queue changed (Kitchen)  | Kitchen Redis hint → BFF | `kds.queue_changed`   | `tenant:{tid}:kds:*`      | `{ station, revision, reason }`     |
+| Món xong → notify waiter     | BFF Direct               | `kitchen.item_ready`  | `tenant:{tid}:staff`      | `{ tableId, itemName: "Phở bò" }`   |
+| Menu sync (giá/out of stock) | BFF Direct               | `menu.updated`        | `tenant:{tid}:*` (public) | `{ itemId, field, newValue }`       |
+| Table status change          | BFF Direct               | `table.status_chg`    | `tenant:{tid}:staff`      | `{ tableId, status: "Billing" }`    |
+| Payment done                 | Kafka → BFF              | `payment.completed`   | `session:{sid}:customer`  | `{ status: "Paid", receipt_url }`   |
+| SLA warning (quá giờ)        | Kafka → BFF              | `kitchen.sla_warning` | `tenant:{tid}:management` | `{ ticketId, waitingMin: 18 }`      |
+| Yêu cầu phục vụ (Customer)   | BFF Direct               | `service.requested`   | `tenant:{tid}:staff`      | `{ tableId, type: "CALL_STAFF" }`   |
+| Refund processed             | Kafka → BFF              | `payment.refunded`    | `tenant:{tid}:management` | `{ paymentId, amount, reason }`     |
 
 ### 9.3 Scaling Strategy
 
@@ -1443,7 +1447,7 @@ docker compose -f docker-compose.prod.yaml up -d    # Full stack
 | 2   | **Multi-tenant data isolation**                             | Discriminator column + TypeORM Subscriber + Guard middleware auto-inject                                                                 | Cao         |
 | 3   | **Shared Cart concurrent modification**                     | Redis Hash + Optimistic Concurrency (version field) + WebSocket broadcast on change                                                      | Trung bình  |
 | 4   | **Stock race condition** (nhiều người đặt cùng món)         | Catalog Service sở hữu `menu_items`: khóa + deduct trong transaction Catalog; Order gọi TCP idempotent khi confirm (xem đặc tả Step 2.4) | Trung bình  |
-| 5   | **KDS FIFO + Batching + SLA**                               | Redis Sorted Set (score=timestamp) + GROUP BY item_id + scheduled SLA check                                                              | Trung bình  |
+| 5   | **KDS FIFO/Priority + SLA**                                 | Redis Sorted Set (score=priority/time) + ticket/item snapshots + scheduled SLA check; no batching/GROUP BY                               | Trung bình  |
 | 6   | **Anonymous Customer auth** (zero-friction)                 | Session-based auth via Redis + HMAC token validation + separate Guard chain                                                              | Trung bình  |
 | 7   | **Session lifecycle** (dual timeout, multi-device)          | Session lifetime = 2h (Redis TTL), idle timeout = 30min (cron check `last_activity`) + cart sync via WebSocket                           | Trung bình  |
 | 8   | **Offline resilience** (PWA cho customer & POS)             | Service Worker + IndexedDB queue + idempotency key + exponential backoff retry                                                           | Cao         |

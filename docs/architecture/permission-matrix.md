@@ -1,7 +1,7 @@
 # Permission Matrix — QRTable
 
-> **Status:** ✅ Active · §6 cập nhật 2026-04-28 (`order.cancel_*` + ma trận 52 dòng) · §9 cập nhật 2026-04-26
-> **Version:** 1.4
+> **Status:** ✅ Active · §6 cập nhật 2026-05-07 (`kitchen.set_priority` + ma trận 53 dòng) · §9 cập nhật 2026-04-26
+> **Version:** 1.5
 > **Single source of truth** cho role-permission mapping. Mọi thay đổi `PERMISSION` enum, `role.json`, hoặc test cases PHẢI được phản ánh ở đây trước.
 
 ## 1. Mục đích & Nguyên tắc
@@ -45,7 +45,7 @@ File này là **canonical reference** cho RBAC trong QRTable. Quy trình thay đ
 | **BARISTA**          | Single-tenant           | Bar staff — manage drink tickets in KDS                                      | Bound to `tenant_id` claim                          |
 | **CUSTOMER** (actor) | Session-scoped          | Anonymous diner — session via QR scan, no role.json entry                    | Tenant from QR token (HMAC) + session lock in Redis |
 
-## 4. Permission Catalog (52 values)
+## 4. Permission Catalog (53 values)
 
 Tất cả permissions in format `domain.action_snake_case`:
 
@@ -85,7 +85,7 @@ Tất cả permissions in format `domain.action_snake_case`:
 | `PRODUCT_UPDATE`    | `product.update`    | Legacy                                                   |
 | `PRODUCT_DELETE`    | `product.delete`    | Legacy                                                   |
 
-### NEW in Step 2.0 (21 values — Step 2.4 thay `order.cancel` bằng hai quyền)
+### NEW in Step 2.x (22 values — Step 2.4 thay `order.cancel` bằng hai quyền, Step 2.6 thêm priority KDS)
 
 | Enum                          | Value                         | Description                                                     |
 | ----------------------------- | ----------------------------- | --------------------------------------------------------------- |
@@ -98,6 +98,7 @@ Tất cả permissions in format `domain.action_snake_case`:
 | `KITCHEN_GET_QUEUE`           | `kitchen.get_queue`           | Get KDS queue (food/drink tickets)                              |
 | `KITCHEN_UPDATE_TICKET`       | `kitchen.update_ticket`       | Update ticket status (Pending → Processing → Ready)             |
 | `KITCHEN_RECALL`              | `kitchen.recall`              | Recall completed ticket (mistake handling)                      |
+| `KITCHEN_SET_PRIORITY`        | `kitchen.set_priority`        | Set/unset KDS ticket priority; OWNER/MANAGER/SUPER_ADMIN only   |
 | `PAYMENT_CREATE`              | `payment.create`              | Initiate payment (e.g., Stripe checkout session)                |
 | `PAYMENT_CONFIRM_CASH`        | `payment.confirm_cash`        | Staff confirms cash received                                    |
 | `PAYMENT_REFUND`              | `payment.refund`              | Refund payment (Manager override)                               |
@@ -118,7 +119,7 @@ Tất cả permissions in format `domain.action_snake_case`:
 | `ROLE.ADMINISTRATOR = 'administrator'` | Legacy template role; 0 references in codebase                                       |
 | `ROLE.ACCOUNTANT = 'accountant'`       | Legacy template role; 1 reference in `user.repository.ts:84` (fallback) — also fixed |
 
-## 6. Canonical Permission Matrix (6 × 52)
+## 6. Canonical Permission Matrix (6 × 53)
 
 Legend: ✅ = granted; (blank) = not granted.
 
@@ -164,19 +165,20 @@ Legend: ✅ = granted; (blank) = not granted.
 | 38        | `kitchen.get_queue`           |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
 | 39        | `kitchen.update_ticket`       |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
 | 40        | `kitchen.recall`              |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 41        | `payment.create`              |     ✅      |   ✅   |   ✅    |        |       |         |
-| 42        | `payment.confirm_cash`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 43        | `payment.refund`              |     ✅      |   ✅   |   ✅    |        |       |         |
-| 44        | `payment.get_history`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 45        | `table.create`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 46        | `table.update`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 47        | `table.delete`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 48        | `table.transfer`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 49        | `table.update_status`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 50        | `service_request.create`      |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 51        | `service_request.acknowledge` |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 52        | `service_request.resolve`     |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| **Total** |                               |   **46**    | **31** | **30**  | **13** | **5** |  **5**  |
+| 41        | `kitchen.set_priority`        |     ✅      |   ✅   |   ✅    |        |       |         |
+| 42        | `payment.create`              |     ✅      |   ✅   |   ✅    |        |       |         |
+| 43        | `payment.confirm_cash`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 44        | `payment.refund`              |     ✅      |   ✅   |   ✅    |        |       |         |
+| 45        | `payment.get_history`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 46        | `table.create`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 47        | `table.update`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 48        | `table.delete`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 49        | `table.transfer`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 50        | `table.update_status`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 51        | `service_request.create`      |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 52        | `service_request.acknowledge` |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 53        | `service_request.resolve`     |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| **Total** |                               |   **47**    | **32** | **31**  | **13** | **5** |  **5**  |
 
 ### Pragmatic decisions explained (Why)
 
@@ -189,6 +191,10 @@ Legend: ✅ = granted; (blank) = not granted.
 ### 6.1 Step 2.4 — Cancel theo trạng thái đơn (đã triển khai trong `libs/constants` + `role.json`)
 
 Đã thay `order.cancel` bằng **`order.cancel_pending`** (WAITER + MANAGER + OWNER) và **`order.cancel_processing`** (MANAGER + OWNER). Customer self-cancel pending vẫn qua `SessionGuard`, không dùng các permission này.
+
+### 6.2 Step 2.6 — Priority thao tác KDS
+
+Thêm **`kitchen.set_priority`** cho thao tác set/unset priority trên KDS ticket. Quyền này chỉ cấp cho SUPER_ADMIN, OWNER, và MANAGER; CHEF/BARISTA vẫn xử lý ticket theo station nhưng không được thay đổi priority.
 
 ## 7. CUSTOMER Actor (No DB Role)
 

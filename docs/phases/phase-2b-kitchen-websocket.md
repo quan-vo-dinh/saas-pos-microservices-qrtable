@@ -25,7 +25,7 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
 
 ### Step 2.6 — Kitchen Service + WebSocket Gateway (5-7 ngày)
 
-**Mục tiêu:** Có pipeline từ đơn đã confirm tới ticket KDS (FIFO, routing, batching, SLA, ưu tiên) và nền tảng WS đa instance với auth và room theo vai trò.
+**Mục tiêu:** Có pipeline từ đơn đã confirm tới ticket KDS (FIFO, routing, SLA, ưu tiên) và nền tảng WS đa instance với auth và room theo vai trò. Batching/gộp món đã bị superseded và không thuộc Step 2.6 dưới bất kỳ tên gọi nào.
 
 **Yêu cầu chính:**
 
@@ -33,7 +33,7 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
   - Consumer Kafka `order.confirmed` → tạo/cập nhật ticket KDS trong Redis
   - Hàng đợi FIFO dùng Redis Sorted Set: `kds:{tenant_id}:kitchen`, `kds:{tenant_id}:bar` (score = thứ tự ưu tiên thời gian / sequence đã thống nhất contract)
   - Routing ticket: **`MenuItem.station`** canonical (`KITCHEN` \| `BAR`) — đặc tả Phase 2A Step 2.4; có thể fallback category chỉ khi migration
-  - Batching: gom cùng món từ các order khác nhau — hiển thị tổng số lượng cần chuẩn bị, giảm nhiễu trên màn KDS và phản ánh cách bếp làm thực tế
+  - Không batching/gộp món: không tạo batch key, batch DTO/event, `prepSignature`, grouped active quantity, hoặc cross-order batch total
   - SLA: timer theo ticket; khi vượt ngưỡng (ví dụ 15 phút, configurable per tenant) → emit `kitchen.sla_warning` + cảnh báo UI (đổi màu vàng → đỏ)
   - Producer Kafka `kitchen.sla_warning` (ưu tiên P2): do timer nội bộ Kitchen Service, không block confirm đơn
   - Priority flagging: Owner/Manager có thể đánh dấu ưu tiên ticket → đẩy lên đầu queue, ảnh hưởng thứ tự hiển thị/alert trong Redis contract
@@ -47,14 +47,14 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
     - BARISTA → `tenant:{tid}:kds:bar`
     - OWNER / MANAGER → `tenant:{tid}:management`
     - CUSTOMER → `session:{sid}:customer`
-  - **Kafka Consumer Bridge** (3 topic → WS): `order.confirmed` → room KDS/staff liên quan; `kitchen.sla_warning` → `tenant:{tid}:management`; `payment.completed` → `session:{sid}:customer`
+  - **Realtime bridge:** BFF không emit queue KDS trực tiếp từ `order.confirmed`; Kitchen phải ghi Redis trước, rồi publish internal invalidation hint cho BFF emit tới KDS rooms. Kafka bridge xử lý `order.confirmed` → `session:{sid}:customer` cho customer tracking, `kitchen.sla_warning` → `tenant:{tid}:management`, và `payment.completed` → `session:{sid}:customer`
   - **BFF Direct side-effects** (5 sự kiện sau TCP/HTTP thành công):
     - `order.created` → staff room (thông báo đơn mới)
     - `kitchen.item_ready` → staff room + customer session room (món đã xong)
     - `menu.updated` → broadcast tất cả rooms tenant-wide (sync menu + invalidate cache)
     - `table.status_changed` → staff room (cập nhật trạng thái bàn)
     - `service.requested` → staff room (chuông gọi nhân viên)
-  - Reconnection: client disconnect → khi kết nối lại auto re-join room đúng role/session → nhận lại pending events; gateway/bridge đảm bảo không mất trạng thái cần thiết cho UI
+  - Reconnection: client disconnect → khi kết nối lại auto re-join room đúng role/session → refetch REST snapshot; WebSocket event chỉ là invalidation hint, không phải replay/source of truth
 
 **Lưu ý quan trọng:**
 
@@ -91,7 +91,7 @@ Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka 
 
 ## Acceptance Criteria
 
-- [ ] KDS: FIFO đúng thứ tự và batching theo contract (cùng item qua nhiều bàn)
+- [ ] KDS: FIFO/priority đúng thứ tự; không có batching/gộp món dưới bất kỳ tên gọi nào
 - [ ] KDS: routing food → kitchen queue (`kds:{tid}:kitchen`), drink → bar queue (`kds:{tid}:bar`)
 - [ ] Real-time: từ sự kiện order-domain tới broadcast WS < 2 giây (trong điều kiện hạ tầng dev/staging chuẩn)
 - [ ] E2E: order → confirm → KDS → ready → served với cập nhật real-time trên staff + customer
