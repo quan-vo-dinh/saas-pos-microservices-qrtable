@@ -80,3 +80,15 @@ export function deadLetterOrderConfirmedKey(tenantId: string): string {
 export function cleanupDueKey(): string {
   return 'kds:cleanup:due';
 }
+
+export function slaDedupeKey(tenantId: string, ticketId: string, level: 'WARNING' | 'BREACH', bucket: string): string {
+  return `kds:${tenantId}:dedupe:sla:${ticketId}:${level}:${bucket}`;
+}
+
+export function slaClaimKey(member: string): string {
+  return `kds:sla:claim:${member}`;
+}
+
+export function rebuildLockKey(tenantId: string): string {
+  return `lock:kds:rebuild:${tenantId}`;
+}

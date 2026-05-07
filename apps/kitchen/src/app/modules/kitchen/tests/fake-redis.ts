@@ -20,6 +20,34 @@ export class FakeRedis {
     return 'OK';
   }
 
+  async del(...keys: string[]): Promise<number> {
+    let removed = 0;
+    for (const key of keys) {
+      if (this.strings.delete(key)) removed += 1;
+      if (this.hashes.delete(key)) removed += 1;
+      if (this.sets.delete(key)) removed += 1;
+      if (this.sortedSets.delete(key)) removed += 1;
+      if (this.lists.delete(key)) removed += 1;
+    }
+    return removed;
+  }
+
+  async exists(...keys: string[]): Promise<number> {
+    let n = 0;
+    for (const key of keys) {
+      if (
+        this.strings.has(key) ||
+        this.hashes.has(key) ||
+        this.sets.has(key) ||
+        this.sortedSets.has(key) ||
+        this.lists.has(key)
+      ) {
+        n += 1;
+      }
+    }
+    return n;
+  }
+
   async get(key: string): Promise<string | null> {
     return this.strings.get(key) ?? null;
   }

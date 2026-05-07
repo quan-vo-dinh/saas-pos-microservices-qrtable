@@ -13,6 +13,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import {
   KdsTicketItemStatus,
   KdsTicketStatus,
+  type KdsActiveOrderSnapshot,
   type KdsQueueChangedEvent,
   type KdsQueueChangedReason,
   type KdsQueueSnapshot,
@@ -38,8 +39,11 @@ import {
   dedupeTicketKey,
   globalSlaDueKey,
   orderTicketsKey,
+  rebuildLockKey,
   readyQueueKey,
   revisionKey,
+  slaClaimKey,
+  slaDedupeKey,
   slaDueMember,
   sourceEventTicketsKey,
   ticketItemKey,
@@ -74,7 +78,10 @@ export class KdsRedisRepository {
     };
   }
 
-  async createTicketsFromConfirmedOrder(event: OrderConfirmedEvent): Promise<KdsQueueChangedEvent[]> {
+  async createTicketsFromConfirmedOrder(
+    event: OrderConfirmedEvent,
+    options?: { recovered?: boolean },
+  ): Promise<KdsQueueChangedEvent[]> {
     const eventLock = await this.redis.set(
       dedupeEventKey(event.tenantId, event.eventId),
       '1',
@@ -109,6 +116,7 @@ export class KdsRedisRepository {
       const slaDueAtMs = confirmedAtMs + slaSeconds * 1000;
       const breachDueAtMs = confirmedAtMs + (slaSeconds + CONFIGURATION.KDS_CONFIG.BREACH_GRACE_SECONDS) * 1000;
       const slaDueAt = new Date(slaDueAtMs).toISOString();
+      const recovered = Boolean(options?.recovered);
 
       const multi = this.redis.multi();
       multi.hset(ticketKey(event.tenantId, ticketId), {
@@ -135,8 +143,8 @@ export class KdsRedisRepository {
         revision: '0',
         sourceEventId: event.eventId,
         correlationId: event.correlationId || '',
-        recovered: '0',
-        recoveredAt: '',
+        recovered: recovered ? '1' : '0',
+        recoveredAt: recovered ? now : '',
         updatedAt: now,
       });
       multi.sadd(orderTicketsKey(event.tenantId, event.orderId), ticketId);
@@ -175,16 +183,9 @@ export class KdsRedisRepository {
 
       await multi.exec();
       const revision = await this.incrementRevisions(event.tenantId, station);
+      const queueReason: KdsQueueChangedReason = recovered ? 'SNAPSHOT_REBUILT' : 'TICKET_CREATED';
       events.push(
-        this.queueChanged(
-          event.tenantId,
-          station,
-          revision,
-          'TICKET_CREATED',
-          ticketId,
-          event.orderId,
-          event.correlationId,
-        ),
+        this.queueChanged(event.tenantId, station, revision, queueReason, ticketId, event.orderId, event.correlationId),
       );
     }
 
@@ -244,6 +245,8 @@ export class KdsRedisRepository {
       updatedAt: readyAt.toISOString(),
     });
     multi.zrem(activeQueueKey(command.tenantId, command.station), command.ticketId);
+    multi.zrem(globalSlaDueKey(), slaDueMember(command.tenantId, command.station, command.ticketId, 'WARNING'));
+    multi.zrem(globalSlaDueKey(), slaDueMember(command.tenantId, command.station, command.ticketId, 'BREACH'));
     multi.zadd(readyQueueKey(command.tenantId, command.station), readyAt.getTime(), command.ticketId);
     for (const itemId of itemIds) {
       multi.hset(ticketItemKey(command.tenantId, itemId), {
@@ -269,6 +272,9 @@ export class KdsRedisRepository {
 
     const now = new Date().toISOString();
     const itemIds = await this.redis.smembers(ticketItemsKey(command.tenantId, command.ticketId));
+    const slaMeta = await this.redis.hgetall(ticketSlaKey(command.tenantId, command.ticketId));
+    const warningMs = Date.parse(slaMeta.warningDueAt || '');
+    const breachMs = Date.parse(slaMeta.breachDueAt || '');
     const multi = this.redis.multi();
     multi.hset(ticketKey(command.tenantId, command.ticketId), {
       status: KdsTicketStatus.PROCESSING,
@@ -276,6 +282,20 @@ export class KdsRedisRepository {
     });
     multi.zrem(readyQueueKey(command.tenantId, command.station), command.ticketId);
     multi.zadd(activeQueueKey(command.tenantId, command.station), ticket.queueScore, command.ticketId);
+    if (Number.isFinite(warningMs)) {
+      multi.zadd(
+        globalSlaDueKey(),
+        warningMs,
+        slaDueMember(command.tenantId, command.station, command.ticketId, 'WARNING'),
+      );
+    }
+    if (Number.isFinite(breachMs)) {
+      multi.zadd(
+        globalSlaDueKey(),
+        breachMs,
+        slaDueMember(command.tenantId, command.station, command.ticketId, 'BREACH'),
+      );
+    }
     for (const itemId of itemIds) {
       multi.hset(ticketItemKey(command.tenantId, itemId), {
         status: KdsTicketItemStatus.PROCESSING,
@@ -384,8 +404,136 @@ export class KdsRedisRepository {
     return events;
   }
 
+  async getStationRevision(tenantId: string, station: PreparationStation): Promise<number> {
+    return Number((await this.redis.get(revisionKey(tenantId, station))) || 0);
+  }
+
   async claimDueSla(nowMs: number, limit: number): Promise<string[]> {
     return this.redis.zrangebyscore(globalSlaDueKey(), '-inf', nowMs, 'LIMIT', 0, limit);
+  }
+
+  async rebuildMissingTicketsFromSnapshots(
+    snapshots: KdsActiveOrderSnapshot[],
+    stationFilter?: PreparationStation,
+  ): Promise<{ events: KdsQueueChangedEvent[]; rebuiltCount: number }> {
+    const events: KdsQueueChangedEvent[] = [];
+    let rebuiltCount = 0;
+
+    for (const snap of snapshots) {
+      const byStation = new Map<PreparationStation, OrderConfirmedEventItem[]>();
+      for (const item of snap.items) {
+        if (!item.station) {
+          continue;
+        }
+        if (item.status === 'READY' || item.status === 'SERVED' || item.status === 'CANCELED') {
+          continue;
+        }
+        const stationItems = byStation.get(item.station) || [];
+        stationItems.push(item);
+        byStation.set(item.station, stationItems);
+      }
+
+      for (const [station, items] of byStation.entries()) {
+        if (stationFilter && station !== stationFilter) {
+          continue;
+        }
+        const ticketId = this.ticketId(snap.orderId, station);
+        const exists = await this.redis.exists(ticketKey(snap.tenantId, ticketId));
+        if (exists) {
+          continue;
+        }
+
+        const totalAmount = items.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+        const synthetic: OrderConfirmedEvent = {
+          eventId: `rebuild:${snap.tenantId}:${snap.orderId}:${station}`,
+          eventType: 'order.confirmed',
+          schemaVersion: 1,
+          tenantId: snap.tenantId,
+          orderId: snap.orderId,
+          sessionId: snap.sessionId,
+          tableId: snap.tableId,
+          tableName: snap.tableName,
+          items,
+          totalAmount,
+          confirmedAt: snap.confirmedAt,
+          confirmedByUserId: snap.confirmedByUserId || 'system',
+          occurredAt: new Date().toISOString(),
+          correlationId: snap.correlationId,
+        };
+
+        const created = await this.createTicketsFromConfirmedOrder(synthetic, { recovered: true });
+        if (created.length) {
+          rebuiltCount += created.length;
+          events.push(...created);
+        }
+      }
+    }
+
+    return { events, rebuiltCount };
+  }
+
+  async tryAcquireRebuildLock(tenantId: string, token: string, ttlSeconds = 120): Promise<boolean> {
+    const ok = await this.redis.set(rebuildLockKey(tenantId), token, 'EX', ttlSeconds, 'NX');
+    return ok === 'OK';
+  }
+
+  async releaseRebuildLockIfHeld(tenantId: string, token: string): Promise<void> {
+    const key = rebuildLockKey(tenantId);
+    const current = await this.redis.get(key);
+    if (current === token) {
+      await this.redis.del(key);
+    }
+  }
+
+  async acquireSlaClaim(member: string): Promise<boolean> {
+    const ok = await this.redis.set(slaClaimKey(member), '1', 'EX', 30, 'NX');
+    return ok === 'OK';
+  }
+
+  async releaseSlaClaim(member: string): Promise<void> {
+    await this.redis.del(slaClaimKey(member));
+  }
+
+  async trySetSlaDedupe(
+    tenantId: string,
+    ticketId: string,
+    level: 'WARNING' | 'BREACH',
+    bucket: string,
+  ): Promise<boolean> {
+    const key = slaDedupeKey(tenantId, ticketId, level, bucket);
+    const ok = await this.redis.set(key, '1', 'EX', 86400, 'NX');
+    return ok === 'OK';
+  }
+
+  async removeSlaDueMember(member: string): Promise<void> {
+    await this.redis.zrem(globalSlaDueKey(), member);
+  }
+
+  async updateTicketLastWarningLevel(tenantId: string, ticketId: string, level: KdsWarningLevel): Promise<void> {
+    const now = new Date().toISOString();
+    await this.redis.hset(ticketKey(tenantId, ticketId), {
+      lastWarningLevel: level,
+      updatedAt: now,
+    });
+    await this.redis.hset(ticketSlaKey(tenantId, ticketId), {
+      lastWarningLevel: level,
+    });
+  }
+
+  async findTicketForSla(tenantId: string, ticketId: string): Promise<KdsTicketDto | null> {
+    const hash = await this.redis.hgetall(ticketKey(tenantId, ticketId));
+    if (!hash?.ticketId) {
+      return null;
+    }
+    const itemIds = await this.redis.smembers(ticketItemsKey(tenantId, ticketId));
+    const items: KdsTicketItemDto[] = [];
+    for (const itemId of itemIds) {
+      const itemHash = await this.redis.hgetall(ticketItemKey(tenantId, itemId));
+      if (itemHash?.ticketItemId) {
+        items.push(this.toItemDto(itemHash));
+      }
+    }
+    return this.toTicketDto(hash, items, 0);
   }
 
   private async partitionValidItems(

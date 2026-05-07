@@ -16,12 +16,16 @@ import type {
 } from '@common/interfaces/tcp/kitchen';
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
+import { KitchenRecoveryService } from '../services/kitchen-recovery.service';
 import { KdsTicketService } from '../services/kds-ticket.service';
 
 @UseInterceptors(TcpLoggingInterceptor)
 @Controller()
 export class KitchenController {
-  constructor(private readonly ticketService: KdsTicketService) {}
+  constructor(
+    private readonly ticketService: KdsTicketService,
+    private readonly recoveryService: KitchenRecoveryService,
+  ) {}
 
   @MessagePattern(TCP_REQUEST_MESSAGE.KITCHEN.GET_QUEUE)
   async getQueue(@RequestParams() body: KdsGetQueueTcpRequest): Promise<Response<KdsQueueTcpResponse>> {
@@ -64,11 +68,6 @@ export class KitchenController {
   async rebuildTenant(
     @RequestParams() body: KdsRebuildTenantTcpRequest,
   ): Promise<Response<KdsRebuildTenantTcpResponse>> {
-    return Response.success({
-      tenantId: body.tenantId,
-      station: body.station,
-      rebuiltTickets: 0,
-      revision: 0,
-    });
+    return Response.success(await this.recoveryService.rebuildTenant(body));
   }
 }
