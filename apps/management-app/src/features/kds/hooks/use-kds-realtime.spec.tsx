@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
 import type { KdsQueueChangedEvent } from '@einvoice/types';
 import { PreparationStation } from '@einvoice/types';
@@ -8,7 +8,10 @@ import { useKdsRealtime } from './use-kds-realtime';
 
 const ioMock = jest.fn();
 const onMock = jest.fn();
+const offMock = jest.fn();
 const disconnectMock = jest.fn();
+const managerOnMock = jest.fn();
+const managerOffMock = jest.fn();
 
 jest.mock('@/constants/api', () => ({
   API_CONFIG: {
@@ -34,10 +37,19 @@ function createWrapper(queryClient: QueryClient) {
 describe('useKdsRealtime', () => {
   beforeEach(() => {
     onMock.mockReset();
+    offMock.mockReset();
     disconnectMock.mockReset();
+    managerOnMock.mockReset();
+    managerOffMock.mockReset();
+
     ioMock.mockReturnValue({
       on: onMock,
+      off: offMock,
       disconnect: disconnectMock,
+      io: {
+        on: managerOnMock,
+        off: managerOffMock,
+      },
     } as unknown as Socket);
   });
 
@@ -45,7 +57,7 @@ describe('useKdsRealtime', () => {
     jest.clearAllMocks();
   });
 
-  it('uses Bearer handshake and invalidates queue on connect and kdsQueueChanged', () => {
+  it('uses staff auth token and invalidates queue on connect and matching kdsQueueChanged', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -58,6 +70,7 @@ describe('useKdsRealtime', () => {
     expect(ioMock).toHaveBeenCalledWith('http://localhost:3300/orders', {
       auth: { token: 'jwt-token' },
       transports: ['websocket', 'polling'],
+      autoConnect: true,
       reconnection: true,
       timeout: 10_000,
     });
@@ -66,7 +79,9 @@ describe('useKdsRealtime', () => {
     const connectHandler = onCalls.find(([event]) => event === 'connect')?.[1];
     const kdsChangedHandler = onCalls.find(([event]) => event === 'events.kdsQueueChanged')?.[1];
 
-    connectHandler?.();
+    act(() => {
+      connectHandler?.();
+    });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: kdsKeys.queue('tenant-1', PreparationStation.KITCHEN),
     });
@@ -120,6 +135,119 @@ describe('useKdsRealtime', () => {
     expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
+  it('ignores kds events for another station', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useKdsRealtime(PreparationStation.KITCHEN), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    const onCalls = onMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const kdsChangedHandler = onCalls.find(([event]) => event === 'events.kdsQueueChanged')?.[1];
+
+    invalidateSpy.mockClear();
+    kdsChangedHandler?.({
+      eventId: 'e-bar',
+      eventType: 'kds.queue_changed',
+      schemaVersion: 1,
+      tenantId: 'tenant-1',
+      station: PreparationStation.BAR,
+      revision: 3,
+      reason: 'TICKET_STARTED',
+      occurredAt: '2026-05-07T00:00:00.000Z',
+    });
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it('filters kitchenItemReady and kitchenSlaWarning by tenant and station', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useKdsRealtime(PreparationStation.KITCHEN), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    const onCalls = onMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const readyHandler = onCalls.find(([event]) => event === 'events.kitchenItemReady')?.[1];
+    const slaHandler = onCalls.find(([event]) => event === 'events.kitchenSlaWarning')?.[1];
+
+    readyHandler?.({
+      eventId: 'ready-bar',
+      eventType: 'kitchen.item_ready',
+      schemaVersion: 1,
+      tenantId: 'tenant-1',
+      sessionId: 'session-1',
+      tableId: 'table-1',
+      tableName: 'Bàn 1',
+      orderId: 'order-1',
+      ticketId: 'ticket-bar',
+      station: PreparationStation.BAR,
+      readyItems: [],
+      occurredAt: '2026-05-07T00:00:00.000Z',
+    });
+
+    slaHandler?.({
+      eventId: 'sla-bar',
+      eventType: 'kitchen.sla_warning',
+      schemaVersion: 1,
+      tenantId: 'tenant-1',
+      ticketId: 'ticket-bar',
+      orderId: 'order-1',
+      sessionId: 'session-1',
+      tableId: 'table-1',
+      tableName: 'Bàn 1',
+      station: PreparationStation.BAR,
+      level: 'WARNING',
+      waitTimeSeconds: 100,
+      thresholdSeconds: 90,
+      occurredAt: '2026-05-07T00:00:00.000Z',
+    });
+
+    expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it('exposes reconnecting when manager reconnect_attempt fires', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const { result } = renderHook(() => useKdsRealtime(PreparationStation.KITCHEN), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    const managerCalls = managerOnMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const onReconnectAttempt = managerCalls.find(([event]) => event === 'reconnect_attempt')?.[1];
+    expect(onReconnectAttempt).toBeDefined();
+
+    act(() => {
+      onReconnectAttempt?.(1);
+    });
+
+    expect(result.current).toBe('reconnecting');
+  });
+
+  it('unsubscribes socket and manager listeners on unmount', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const { unmount } = renderHook(() => useKdsRealtime(PreparationStation.KITCHEN), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    unmount();
+
+    expect(offMock).toHaveBeenCalled();
+    expect(managerOffMock).toHaveBeenCalled();
+    expect(disconnectMock).toHaveBeenCalled();
+  });
+
   it('does not open a socket when disabled', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -130,5 +258,29 @@ describe('useKdsRealtime', () => {
     });
 
     expect(ioMock).not.toHaveBeenCalled();
+  });
+
+  it('returns idle after disconnecting when the hook becomes disabled', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useKdsRealtime(PreparationStation.KITCHEN, { enabled }),
+      {
+        wrapper: createWrapper(queryClient),
+        initialProps: { enabled: true },
+      },
+    );
+
+    const onCalls = onMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const connectHandler = onCalls.find(([event]) => event === 'connect')?.[1];
+    act(() => {
+      connectHandler?.();
+    });
+    expect(result.current).toBe('connected');
+
+    rerender({ enabled: false });
+    expect(result.current).toBe('idle');
   });
 });

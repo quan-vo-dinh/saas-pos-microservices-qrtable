@@ -1,19 +1,23 @@
 'use client';
 
+import type { ReactElement } from 'react';
 import type { StaffRealtimeStatus } from '@/features/order/hooks/use-staff-order-realtime';
+import type { KdsRealtimeStatus } from '@/features/kds/hooks/use-kds-realtime';
+
+export type RealtimePillStatus = StaffRealtimeStatus | KdsRealtimeStatus;
 
 type Props = {
-  status: StaffRealtimeStatus;
+  status: RealtimePillStatus;
   tone?: 'default' | 'kds';
 };
 
-const labelByStatus: Partial<Record<StaffRealtimeStatus, string>> = {
+const labelByStatus: Partial<Record<RealtimePillStatus, string>> = {
   reconnecting: 'Đang kết nối lại',
   degraded: 'Realtime gián đoạn',
   'auth-error': 'Lỗi phiên realtime',
 };
 
-export function RealtimeStatusPill({ status, tone = 'default' }: Props): React.ReactElement | null {
+export function RealtimeStatusPill({ status, tone = 'default' }: Props): ReactElement | null {
   const label = labelByStatus[status];
   if (!label) return null;
 

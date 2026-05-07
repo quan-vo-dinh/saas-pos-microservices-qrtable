@@ -16,11 +16,8 @@ type Props = {
   onTitleClick: () => void;
   /** SLA seconds used for band math (may be capped by station settings). */
   effectiveSlaSeconds: number;
-  highlightedItemName: string | null;
   isSelected: boolean;
-  flash?: boolean;
   onSelect: () => void;
-  surfaceRef?: (node: HTMLDivElement | null) => void;
   /** When provided, KDS uses live API actions instead of the mock store. */
   liveActions?: {
     advanceTicket: (ticketId: string) => void;
@@ -41,11 +38,8 @@ export function KdsTicketCard({
   ticket,
   onTitleClick,
   effectiveSlaSeconds,
-  highlightedItemName,
   isSelected,
-  flash,
   onSelect,
-  surfaceRef,
   liveActions,
 }: Props) {
   const [now, setNow] = useState<number | null>(null);
@@ -78,14 +72,6 @@ export function KdsTicketCard({
     data: { ticket },
   });
 
-  const mergedRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      setNodeRef(node);
-      surfaceRef?.(node);
-    },
-    [setNodeRef, surfaceRef],
-  );
-
   const style: CSSProperties = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.55 : 1,
@@ -112,7 +98,7 @@ export function KdsTicketCard({
 
   return (
     <div
-      ref={mergedRef}
+      ref={setNodeRef}
       style={style}
       {...attributes}
       onClick={(e) => {
@@ -124,7 +110,6 @@ export function KdsTicketCard({
         'relative flex w-[220px] shrink-0 flex-col overflow-hidden rounded-lg border border-white/15 bg-black/80',
         pulse && 'animate-pulse',
         isSelected && 'ring-2 ring-[var(--lime)] ring-offset-2 ring-offset-black',
-        flash && 'ring-4 ring-[var(--lime)]/70',
       )}
       data-slot="kds-ticket-card"
     >
@@ -167,11 +152,10 @@ export function KdsTicketCard({
       </button>
       <ul className="flex max-h-28 flex-col gap-1 overflow-auto px-2 py-1.5 text-[0.75rem] leading-snug">
         {ticket.items.map((it) => {
-          const hi = highlightedItemName != null && it.menuItemName.trim() === highlightedItemName;
           return (
             <li
               key={it.id}
-              className={cn('flex items-start gap-2 rounded-sm', hi && 'outline outline-2 outline-offset-1 outline-[var(--lime)]')}
+              className="flex items-start gap-2 rounded-sm"
               onPointerDown={(e) => e.stopPropagation()}
             >
               <Checkbox

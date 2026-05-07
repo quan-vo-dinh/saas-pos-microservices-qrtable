@@ -14,7 +14,7 @@ import { KdsColumn } from '@/components/kds/kds-column';
 import { KdsTicketCard } from '@/components/kds/kds-ticket-card';
 import { KdsDndWrapper } from '@/components/kds/kds-dnd-wrapper';
 import { KdsTicketSheet } from '@/components/kds/kds-ticket-sheet';
-import { KdsBatchingPanel } from '@/components/kds/kds-batching-panel';
+import { RealtimeStatusPill } from '@/components/realtime/realtime-status-pill';
 import { RecallLogSheet } from '@/components/kds/recall-log-sheet';
 import { StationSettingsPopover } from '@/components/kds/station-settings-popover';
 import { useFakeRealtime } from '@/mocks/use-fake-realtime';
@@ -53,7 +53,7 @@ export function KdsBoard({ station }: { station: KDSStation }) {
   const { data: snapshot, isLoading: queueLoading, error: queueError } = useKdsQueue(stationEnum, {
     enabled: !USE_KDS_MOCK,
   });
-  useKdsRealtime(stationEnum, { enabled: !USE_KDS_MOCK });
+  const realtimeStatus = useKdsRealtime(stationEnum, { enabled: !USE_KDS_MOCK });
 
   const roles = parseRoles(session?.user?.roles);
   const allowed = roles.length === 0 || roleAllowed(station, roles);
@@ -61,10 +61,8 @@ export function KdsBoard({ station }: { station: KDSStation }) {
   const userName = session?.user?.name ?? 'Đầu bếp mock';
 
   const mockTickets = useMockStore((s) => s.kdsTickets);
-  const highlightedItemName = useMockStore((s) => s.kdsHighlightedItemName);
   const mockSelectedTicketId = useMockStore((s) => s.kdsSelectedTicketId);
   const mockSelectKdsTicket = useMockStore((s) => s.selectKdsTicket);
-  const setKdsHighlightedItemName = useMockStore((s) => s.setKdsHighlightedItemName);
   const mockAdvanceTicket = useMockStore((s) => s.advanceTicket);
   const mockRecallTicket = useMockStore((s) => s.recallTicket);
 
@@ -187,18 +185,10 @@ export function KdsBoard({ station }: { station: KDSStation }) {
   const [recallOpen, setRecallOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prefsTick, setPrefsTick] = useState(0);
-  const [now, setNow] = useState(() => Date.now());
-  const [flashTicketId, setFlashTicketId] = useState<string | null>(null);
 
   const boardRef = useRef<HTMLDivElement>(null);
-  const surfaceRefs = useRef(new Map<string, HTMLDivElement | null>());
 
   useFakeRealtime(USE_KDS_MOCK);
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
 
   /* prefsTick: bump after StationSettings saves so we re-read localStorage caps. */
   const slaCapMinutes = useMemo(
@@ -218,24 +208,6 @@ export function KdsBoard({ station }: { station: KDSStation }) {
   );
 
   const byColumn = (c: ColumnStatus) => mine.filter((t) => t.columnStatus === c);
-
-  const setSurfaceRef = useCallback((ticketId: string, el: HTMLDivElement | null) => {
-    if (el) surfaceRefs.current.set(ticketId, el);
-    else surfaceRefs.current.delete(ticketId);
-  }, []);
-
-  const focusTicket = useCallback(
-    (ticketId: string) => {
-      selectKdsTicket(ticketId);
-      const el = surfaceRefs.current.get(ticketId);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-      setFlashTicketId(ticketId);
-      window.setTimeout(() => {
-        setFlashTicketId((cur) => (cur === ticketId ? null : cur));
-      }, 1800);
-    },
-    [selectKdsTicket],
-  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -338,6 +310,7 @@ export function KdsBoard({ station }: { station: KDSStation }) {
       data-slot="kds-board"
       aria-label="Bảng KDS — phím 1 bắt đầu, 2 xong, 3 recall khi ticket được chọn"
     >
+      <RealtimeStatusPill status={realtimeStatus} tone="kds" />
       <KdsHeader
         station={station}
         tickets={kdsTickets}
@@ -345,7 +318,7 @@ export function KdsBoard({ station }: { station: KDSStation }) {
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden xl:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
         <KdsDndWrapper
           tickets={mine}
           onColumnChange={USE_KDS_MOCK ? undefined : handleLiveColumnChange}
@@ -363,10 +336,7 @@ export function KdsBoard({ station }: { station: KDSStation }) {
                   ticket={t}
                   liveActions={liveActions}
                   effectiveSlaSeconds={effectiveSlaSeconds(t.slaSeconds, slaCapMinutes)}
-                  highlightedItemName={highlightedItemName}
                   isSelected={kdsSelectedTicketId === t.ticketId}
-                  flash={flashTicketId === t.ticketId}
-                  surfaceRef={(el) => setSurfaceRef(t.ticketId, el)}
                   onSelect={() => selectKdsTicket(t.ticketId)}
                   onTitleClick={() => {
                     selectKdsTicket(t.ticketId);
@@ -387,10 +357,7 @@ export function KdsBoard({ station }: { station: KDSStation }) {
                   ticket={t}
                   liveActions={liveActions}
                   effectiveSlaSeconds={effectiveSlaSeconds(t.slaSeconds, slaCapMinutes)}
-                  highlightedItemName={highlightedItemName}
                   isSelected={kdsSelectedTicketId === t.ticketId}
-                  flash={flashTicketId === t.ticketId}
-                  surfaceRef={(el) => setSurfaceRef(t.ticketId, el)}
                   onSelect={() => selectKdsTicket(t.ticketId)}
                   onTitleClick={() => {
                     selectKdsTicket(t.ticketId);
@@ -406,10 +373,7 @@ export function KdsBoard({ station }: { station: KDSStation }) {
                   ticket={t}
                   liveActions={liveActions}
                   effectiveSlaSeconds={effectiveSlaSeconds(t.slaSeconds, slaCapMinutes)}
-                  highlightedItemName={highlightedItemName}
                   isSelected={kdsSelectedTicketId === t.ticketId}
-                  flash={flashTicketId === t.ticketId}
-                  surfaceRef={(el) => setSurfaceRef(t.ticketId, el)}
                   onSelect={() => selectKdsTicket(t.ticketId)}
                   onTitleClick={() => {
                     selectKdsTicket(t.ticketId);
@@ -420,16 +384,6 @@ export function KdsBoard({ station }: { station: KDSStation }) {
             </KdsColumn>
           </div>
         </KdsDndWrapper>
-
-        <KdsBatchingPanel
-          station={station}
-          slaCapMinutes={slaCapMinutes}
-          now={now}
-          className="min-h-[200px] xl:min-h-0"
-          tickets={kdsTickets}
-          onItemTap={(name) => setKdsHighlightedItemName(highlightedItemName === name ? null : name)}
-          onFocusTicket={focusTicket}
-        />
       </div>
 
       <KdsTicketSheet

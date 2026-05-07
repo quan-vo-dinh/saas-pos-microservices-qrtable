@@ -1,13 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, type Socket } from 'socket.io-client';
-import type { KdsQueueChangedEvent, KitchenItemReadyEvent, KitchenSlaWarningEvent } from '@einvoice/types';
-import type { PreparationStation } from '@einvoice/types';
+import type {
+  KdsQueueChangedEvent,
+  KitchenItemReadyEvent,
+  KitchenSlaWarningEvent,
+  PreparationStation,
+} from '@einvoice/types';
 import { API_CONFIG } from '@/constants/api';
 import { useAuthStore } from '@/lib/auth/auth-store';
 import { kdsKeys } from '../kds-keys';
+
+export type KdsRealtimeStatus = 'idle' | 'connected' | 'reconnecting' | 'degraded' | 'auth-error';
 
 function socketNamespaceUrl(apiBaseUrl: string): string {
   try {
@@ -26,15 +32,24 @@ function invalidateKdsQueue(
   void queryClient.invalidateQueries({ queryKey: kdsKeys.queue(tenantId, station) });
 }
 
+function matchesTenantStation(
+  event: { tenantId: string; station: PreparationStation },
+  tenantId: string,
+  station: PreparationStation,
+): boolean {
+  return event.tenantId === tenantId && event.station === station;
+}
+
 /**
  * Subscribes to KDS-related Socket.IO events as invalidation hints; refetches REST snapshot.
- * Uses Bearer auth on the handshake (server-derived rooms). Refetches on reconnect.
+ * Uses staff JWT in `auth.token` (server-derived rooms). Filters by tenant + station.
  */
-export function useKdsRealtime(station: PreparationStation, options?: { enabled?: boolean }): void {
+export function useKdsRealtime(station: PreparationStation, options?: { enabled?: boolean }): KdsRealtimeStatus {
   const enabledHook = options?.enabled !== false;
   const queryClient = useQueryClient();
   const tenantId = useAuthStore((s) => s.profile?.tenantId);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const [status, setStatus] = useState<KdsRealtimeStatus>('idle');
 
   useEffect(() => {
     if (!enabledHook) {
@@ -50,6 +65,7 @@ export function useKdsRealtime(station: PreparationStation, options?: { enabled?
       socket = io(socketNamespaceUrl(API_CONFIG.DEFAULT_BFF_URL), {
         auth: { token: accessToken },
         transports: ['websocket', 'polling'],
+        autoConnect: true,
         reconnection: true,
         timeout: 10_000,
       });
@@ -61,23 +77,61 @@ export function useKdsRealtime(station: PreparationStation, options?: { enabled?
       invalidateKdsQueue(queryClient, tenantId, station);
     };
 
-    socket.on('connect', bump);
-
-    socket.on('events.kdsQueueChanged', (event: KdsQueueChangedEvent) => {
-      if (event.tenantId !== tenantId) return;
+    const onConnect = (): void => {
+      setStatus('connected');
       bump();
-    });
-
-    socket.on('events.kitchenItemReady', (_event: KitchenItemReadyEvent) => {
+    };
+    const onDisconnect = (): void => setStatus('degraded');
+    const onAuthError = (): void => setStatus('auth-error');
+    const onReconnectAttempt = (): void => setStatus('reconnecting');
+    const onReconnect = (): void => {
+      setStatus('connected');
       bump();
-    });
+    };
+    const onReconnectError = (): void => setStatus('degraded');
+    const onReconnectFailed = (): void => setStatus('degraded');
 
-    socket.on('events.kitchenSlaWarning', (_event: KitchenSlaWarningEvent) => {
+    const onKdsQueueChanged = (event: KdsQueueChangedEvent): void => {
+      if (!matchesTenantStation(event, tenantId, station)) return;
       bump();
-    });
+    };
+
+    const onKitchenItemReady = (event: KitchenItemReadyEvent): void => {
+      if (!matchesTenantStation(event, tenantId, station)) return;
+      bump();
+    };
+
+    const onKitchenSlaWarning = (event: KitchenSlaWarningEvent): void => {
+      if (!matchesTenantStation(event, tenantId, station)) return;
+      bump();
+    };
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.on('events.authError', onAuthError);
+    socket.on('events.kdsQueueChanged', onKdsQueueChanged);
+    socket.on('events.kitchenItemReady', onKitchenItemReady);
+    socket.on('events.kitchenSlaWarning', onKitchenSlaWarning);
+    socket.io.on('reconnect_attempt', onReconnectAttempt);
+    socket.io.on('reconnect', onReconnect);
+    socket.io.on('reconnect_error', onReconnectError);
+    socket.io.on('reconnect_failed', onReconnectFailed);
 
     return () => {
-      socket?.disconnect();
+      setStatus('idle');
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.off('events.authError', onAuthError);
+      socket.off('events.kdsQueueChanged', onKdsQueueChanged);
+      socket.off('events.kitchenItemReady', onKitchenItemReady);
+      socket.off('events.kitchenSlaWarning', onKitchenSlaWarning);
+      socket.io.off('reconnect_attempt', onReconnectAttempt);
+      socket.io.off('reconnect', onReconnect);
+      socket.io.off('reconnect_error', onReconnectError);
+      socket.io.off('reconnect_failed', onReconnectFailed);
+      socket.disconnect();
     };
   }, [enabledHook, queryClient, tenantId, accessToken, station]);
+
+  return status;
 }
