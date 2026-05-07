@@ -11,9 +11,12 @@ import type {
   CustomerCancelPendingTcpRequest,
   CustomerListOrdersTcpRequest,
   JoinSessionTcpRequest,
+  KdsActiveOrdersGetTcpRequest,
   ListOrdersTcpRequest,
   ListServiceRequestsTcpRequest,
+  MarkOrderItemsReadyTcpRequest,
   OrderIdTcpRequest,
+  RevertOrderItemsProcessingTcpRequest,
   ServiceRequestActionTcpRequest,
   StaffOrderActionTcpRequest,
   SubmitOrderTcpRequest,
@@ -23,8 +26,11 @@ import type {
   BillCurrentTcpResponse,
   BillRequestedTcpResponse,
   CartTcpResponse,
+  KdsActiveOrdersGetTcpResponse,
+  MarkOrderItemsReadyTcpResponse,
   OrderActionTcpResponse,
   OrderTcpResponse,
+  RevertOrderItemsProcessingTcpResponse,
   ServiceRequestCreatedTcpResponse,
   ServiceRequestListTcpResponse,
   SessionTcpResponse,
@@ -196,6 +202,30 @@ export class OrderController {
   @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.TABLE_TRANSFER)
   async tableTransfer(@RequestParams() body: TransferTableTcpRequest): Promise<Response<TableTransferredTcpResponse>> {
     const data = await this.transferService.transferTable(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.KDS_ACTIVE_ORDERS_GET)
+  async kdsActiveOrdersGet(
+    @RequestParams() body: KdsActiveOrdersGetTcpRequest,
+  ): Promise<Response<KdsActiveOrdersGetTcpResponse>> {
+    const data = await this.orderService.getKdsActiveOrderSnapshots(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.MARK_ITEMS_READY)
+  async markItemsReady(
+    @RequestParams() body: MarkOrderItemsReadyTcpRequest,
+  ): Promise<Response<MarkOrderItemsReadyTcpResponse>> {
+    const data = await this.orderService.markOrderItemsReady(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.REVERT_ITEMS_PROCESSING)
+  async revertItemsProcessing(
+    @RequestParams() body: RevertOrderItemsProcessingTcpRequest,
+  ): Promise<Response<RevertOrderItemsProcessingTcpResponse>> {
+    const data = await this.orderService.revertOrderItemsProcessing(body);
     return Response.success(data);
   }
 }

@@ -124,7 +124,7 @@ describe('TransferService', () => {
       await cb(manager);
     });
 
-    await service.transferTable({
+    const transferResult = await service.transferTable({
       tenantId: 'tenant-1',
       sessionId: 'sess-1',
       fromTableId: 'table-old',
@@ -162,6 +162,13 @@ describe('TransferService', () => {
       tenantId: 'tenant-1',
       status: TABLE_STATUS.OCCUPIED,
       sessionId: 'sess-1',
+    });
+
+    expect(transferResult.kitchenSnapshotPatch).toEqual({
+      tenantId: 'tenant-1',
+      sessionId: 'sess-1',
+      tableId: 'table-new',
+      tableName: 'New',
     });
   });
 });

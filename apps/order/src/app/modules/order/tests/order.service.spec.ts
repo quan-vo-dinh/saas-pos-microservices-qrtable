@@ -22,7 +22,11 @@ import { SessionService } from '../services/session.service';
 describe('OrderService', () => {
   let service: OrderService;
   let dataSource: { transaction: jest.Mock };
-  let orderRepository: { findByIdAndTenantForUpdate: jest.Mock; findBySessionIdAndTenant: jest.Mock };
+  let orderRepository: {
+    findByIdAndTenantForUpdate: jest.Mock;
+    findBySessionIdAndTenant: jest.Mock;
+    findActiveKdsOrders: jest.Mock;
+  };
   let orderItemRepository: { findByOrderIdAndTenant: jest.Mock; findByOrderIdAndTenantWithManager: jest.Mock };
   let billRepository: { findByIdAndTenant: jest.Mock; findByIdAndTenantForUpdate: jest.Mock };
   let sessionRepository: { findByIdAndTenant: jest.Mock; save: jest.Mock; findActiveByIdAndTenant: jest.Mock };
@@ -35,7 +39,11 @@ describe('OrderService', () => {
 
   beforeEach(async () => {
     dataSource = { transaction: jest.fn() };
-    orderRepository = { findByIdAndTenantForUpdate: jest.fn(), findBySessionIdAndTenant: jest.fn() };
+    orderRepository = {
+      findByIdAndTenantForUpdate: jest.fn(),
+      findBySessionIdAndTenant: jest.fn(),
+      findActiveKdsOrders: jest.fn(),
+    };
     orderItemRepository = {
       findByOrderIdAndTenant: jest.fn(),
       findByOrderIdAndTenantWithManager: jest.fn(),
@@ -565,6 +573,311 @@ describe('OrderService', () => {
       await expect(service.joinSession({ tenantId: 't1', tableId: 'tbl-1', qrToken: 'tok' })).rejects.toMatchObject({
         errorCode: ErrorCode.ORDER_JOIN_TABLE_BILLING,
       });
+    });
+  });
+
+  describe('KDS sync TCP helpers', () => {
+    it('getKdsActiveOrderSnapshots maps PROCESSING orders with station-bearing items', async () => {
+      const confirmed = new Date('2026-05-07T12:00:00.000Z');
+      orderRepository.findActiveKdsOrders.mockResolvedValue([
+        {
+          id: 'ord-1',
+          tenantId: 't1',
+          sessionId: 'sess-1',
+          tableId: 'tbl-1',
+          tableName: 'T1',
+          status: OrderStatus.PROCESSING,
+          totalAmount: 100,
+          idempotencyKey: 'k1',
+          notes: null,
+          confirmedAt: confirmed,
+          confirmedByUserId: 'staff-1',
+          cancelledAt: null,
+          cancelledByUserId: null,
+          cancelReason: null,
+          createdAt: confirmed,
+          updatedAt: confirmed,
+        } as Order,
+      ]);
+      orderItemRepository.findByOrderIdAndTenant.mockResolvedValue([
+        {
+          id: 'line-1',
+          tenantId: 't1',
+          orderId: 'ord-1',
+          menuItemId: 'm1',
+          menuItemName: 'Phở',
+          quantity: 1,
+          unitPrice: 50000,
+          note: null,
+          status: OrderItemStatus.PROCESSING,
+          station: 'KITCHEN',
+          menuItemImageUrl: null,
+          createdAt: confirmed,
+          updatedAt: confirmed,
+        } as OrderItem,
+      ]);
+
+      const rows = await service.getKdsActiveOrderSnapshots({ tenantId: 't1' });
+
+      expect(orderRepository.findActiveKdsOrders).toHaveBeenCalledWith('t1', undefined);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].orderId).toBe('ord-1');
+      expect(rows[0].items[0].station).toBe('KITCHEN');
+    });
+
+    it('getKdsActiveOrderSnapshots filters items by station when station is set', async () => {
+      const confirmed = new Date('2026-05-07T12:00:00.000Z');
+      orderRepository.findActiveKdsOrders.mockResolvedValue([
+        {
+          id: 'ord-1',
+          tenantId: 't1',
+          sessionId: 'sess-1',
+          tableId: 'tbl-1',
+          tableName: 'T1',
+          status: OrderStatus.PROCESSING,
+          totalAmount: 100,
+          idempotencyKey: 'k1',
+          notes: null,
+          confirmedAt: confirmed,
+          confirmedByUserId: 'staff-1',
+          cancelledAt: null,
+          cancelledByUserId: null,
+          cancelReason: null,
+          createdAt: confirmed,
+          updatedAt: confirmed,
+        } as Order,
+      ]);
+      orderItemRepository.findByOrderIdAndTenant.mockResolvedValue([
+        {
+          id: 'k-line',
+          tenantId: 't1',
+          orderId: 'ord-1',
+          menuItemId: 'm1',
+          menuItemName: 'Phở',
+          quantity: 1,
+          unitPrice: 50000,
+          note: null,
+          status: OrderItemStatus.PROCESSING,
+          station: 'KITCHEN',
+          menuItemImageUrl: null,
+          createdAt: confirmed,
+          updatedAt: confirmed,
+        } as OrderItem,
+        {
+          id: 'b-line',
+          tenantId: 't1',
+          orderId: 'ord-1',
+          menuItemId: 'm2',
+          menuItemName: 'Cà phê',
+          quantity: 1,
+          unitPrice: 30000,
+          note: null,
+          status: OrderItemStatus.PROCESSING,
+          station: 'BAR',
+          menuItemImageUrl: null,
+          createdAt: confirmed,
+          updatedAt: confirmed,
+        } as OrderItem,
+      ]);
+
+      const rows = await service.getKdsActiveOrderSnapshots({ tenantId: 't1', station: 'BAR' });
+
+      expect(orderRepository.findActiveKdsOrders).toHaveBeenCalledWith('t1', 'BAR');
+      expect(rows[0].items).toHaveLength(1);
+      expect(rows[0].items[0].station).toBe('BAR');
+    });
+
+    it('markOrderItemsReady rejects when item station does not match ticket station', async () => {
+      dataSource.transaction.mockImplementation(async (cb) =>
+        cb({
+          createQueryBuilder: jest.fn(() => ({
+            update: jest.fn().mockReturnThis(),
+            set: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            execute: jest.fn().mockResolvedValue({ affected: 0 }),
+          })),
+          save: jest.fn(),
+        }),
+      );
+
+      orderRepository.findByIdAndTenantForUpdate.mockResolvedValue({
+        id: 'ord-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        tableId: 'tbl',
+        tableName: 'A',
+        status: OrderStatus.PROCESSING,
+        confirmedAt: new Date(),
+      } as Order);
+
+      orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([
+        {
+          id: 'wrong-line',
+          tenantId: 't1',
+          orderId: 'ord-1',
+          menuItemId: 'm1',
+          menuItemName: 'X',
+          quantity: 1,
+          unitPrice: 1,
+          note: null,
+          status: OrderItemStatus.PROCESSING,
+          station: 'BAR',
+          menuItemImageUrl: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as OrderItem,
+      ]);
+
+      await expect(
+        service.markOrderItemsReady({
+          tenantId: 't1',
+          orderId: 'ord-1',
+          ticketId: 'ord-1:KITCHEN',
+          station: 'KITCHEN',
+          orderItemIds: ['wrong-line'],
+          userId: 'chef',
+          requestId: 'r1',
+        }),
+      ).rejects.toMatchObject({ errorCode: ErrorCode.COMMON_VALIDATION_FAILED });
+    });
+
+    it('markOrderItemsReady transitions order to READY when no PROCESSING lines remain', async () => {
+      const confirmed = new Date('2026-05-07T12:00:00.000Z');
+      const orderRow = {
+        id: 'ord-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        tableId: 'tbl',
+        tableName: 'A',
+        status: OrderStatus.PROCESSING,
+        totalAmount: 100,
+        idempotencyKey: 'k',
+        notes: null,
+        confirmedAt: confirmed,
+        confirmedByUserId: 's',
+        cancelledAt: null,
+        cancelledByUserId: null,
+        cancelReason: null,
+        createdAt: confirmed,
+        updatedAt: confirmed,
+      } as Order;
+
+      const line = {
+        id: 'line-1',
+        tenantId: 't1',
+        orderId: 'ord-1',
+        menuItemId: 'm1',
+        menuItemName: 'Phở',
+        quantity: 1,
+        unitPrice: 50000,
+        note: null,
+        status: OrderItemStatus.PROCESSING,
+        station: 'KITCHEN',
+        menuItemImageUrl: null,
+        createdAt: confirmed,
+        updatedAt: confirmed,
+      } as OrderItem;
+
+      orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(orderRow);
+      orderItemRepository.findByOrderIdAndTenantWithManager
+        .mockResolvedValueOnce([line])
+        .mockResolvedValueOnce([{ ...line, status: OrderItemStatus.READY }]);
+
+      const managerMock = {
+        createQueryBuilder: jest.fn(() => ({
+          update: jest.fn().mockReturnThis(),
+          set: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({ affected: 1 }),
+        })),
+        save: jest.fn((_Entity: unknown, o: Order) => Promise.resolve(o)),
+      };
+      dataSource.transaction.mockImplementation(async (cb) => cb(managerMock));
+
+      const result = await service.markOrderItemsReady({
+        tenantId: 't1',
+        orderId: 'ord-1',
+        ticketId: 'ord-1:KITCHEN',
+        station: 'KITCHEN',
+        orderItemIds: ['line-1'],
+        userId: 'chef',
+        requestId: 'r1',
+      });
+
+      expect(result.kitchenItemReady.eventType).toBe('kitchen.item_ready');
+      expect(result.orderStatusChanged?.toStatus).toBe(OrderStatus.READY);
+      expect(managerMock.save).toHaveBeenCalled();
+    });
+
+    it('revertOrderItemsProcessing moves READY order back to PROCESSING when items return to PROCESSING', async () => {
+      const confirmed = new Date('2026-05-07T12:00:00.000Z');
+      const orderRow = {
+        id: 'ord-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        tableId: 'tbl',
+        tableName: 'A',
+        status: OrderStatus.READY,
+        totalAmount: 100,
+        idempotencyKey: 'k',
+        notes: null,
+        confirmedAt: confirmed,
+        confirmedByUserId: 's',
+        cancelledAt: null,
+        cancelledByUserId: null,
+        cancelReason: null,
+        createdAt: confirmed,
+        updatedAt: confirmed,
+      } as Order;
+
+      const readyLine = {
+        id: 'line-1',
+        tenantId: 't1',
+        orderId: 'ord-1',
+        menuItemId: 'm1',
+        menuItemName: 'Phở',
+        quantity: 1,
+        unitPrice: 50000,
+        note: null,
+        status: OrderItemStatus.READY,
+        station: 'KITCHEN',
+        menuItemImageUrl: null,
+        createdAt: confirmed,
+        updatedAt: confirmed,
+      } as OrderItem;
+
+      orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(orderRow);
+      orderItemRepository.findByOrderIdAndTenantWithManager
+        .mockResolvedValueOnce([readyLine])
+        .mockResolvedValueOnce([{ ...readyLine, status: OrderItemStatus.PROCESSING }]);
+
+      const managerMock = {
+        createQueryBuilder: jest.fn(() => ({
+          update: jest.fn().mockReturnThis(),
+          set: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          execute: jest.fn().mockResolvedValue({ affected: 1 }),
+        })),
+        save: jest.fn((_Entity: unknown, o: Order) => Promise.resolve(o)),
+      };
+      dataSource.transaction.mockImplementation(async (cb) => cb(managerMock));
+
+      const result = await service.revertOrderItemsProcessing({
+        tenantId: 't1',
+        orderId: 'ord-1',
+        ticketId: 'ord-1:KITCHEN',
+        station: 'KITCHEN',
+        orderItemIds: ['line-1'],
+        userId: 'chef',
+        requestId: 'r1',
+        reason: 'KITCHEN_RECALL',
+      });
+
+      expect(result.orderStatusChanged?.fromStatus).toBe(OrderStatus.READY);
+      expect(result.orderStatusChanged?.toStatus).toBe(OrderStatus.PROCESSING);
     });
   });
 });

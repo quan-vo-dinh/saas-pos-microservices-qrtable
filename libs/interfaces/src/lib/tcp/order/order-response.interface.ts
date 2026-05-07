@@ -64,6 +64,13 @@ export type TableTransferredTcpResponse = {
   events: {
     tableTransferred: TableTransferredEvent;
   };
+  /** Denormalized for BFF → Kitchen `PATCH_TABLE_SNAPSHOT` without rereading session */
+  kitchenSnapshotPatch: {
+    tenantId: string;
+    sessionId: string;
+    tableId: string;
+    tableName: string;
+  };
 };
 
 /** Current bill for session (may be null before first submit). */

@@ -131,6 +131,12 @@ export class TransferService {
       return {
         session: this.toSessionDto(updated),
         events: { tableTransferred },
+        kitchenSnapshotPatch: {
+          tenantId: dto.tenantId,
+          sessionId: dto.sessionId,
+          tableId: dto.toTableId,
+          tableName: toTable.name,
+        },
       };
     } finally {
       for (const key of acquired) {

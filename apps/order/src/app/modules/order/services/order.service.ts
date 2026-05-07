@@ -25,19 +25,27 @@ import type {
   CustomerCancelPendingTcpRequest,
   CustomerListOrdersTcpRequest,
   JoinSessionTcpRequest,
+  KdsActiveOrdersGetTcpRequest,
   ListOrdersTcpRequest,
+  MarkOrderItemsReadyTcpRequest,
   OrderIdTcpRequest,
+  RevertOrderItemsProcessingTcpRequest,
   StaffOrderActionTcpRequest,
   SubmitOrderTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
 import type {
+  KdsActiveOrdersGetTcpResponse,
+  MarkOrderItemsReadyTcpResponse,
   OrderActionTcpResponse,
   OrderTcpResponse,
+  RevertOrderItemsProcessingTcpResponse,
   SessionTcpResponse,
   SubmitOrderTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
 import type {
   Bill as BillDto,
+  KitchenItemReadyEvent,
+  KdsActiveOrderSnapshot,
   Order as OrderDto,
   OrderItem as OrderItemDto,
   Session as SessionDto,
@@ -53,6 +61,7 @@ import {
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { DataSource, EntityManager } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { firstValueFrom } from 'rxjs';
 import { CONFIGURATION } from '../../../../configuration';
 import { buildOrderConfirmedKafkaPayload } from '../order-confirmed-payload';
@@ -477,6 +486,136 @@ export class OrderService {
     return this.buildCancelResponse(dto.tenantId, order, items, bill, OrderStatus.PROCESSING, dto.userId);
   }
 
+  async getKdsActiveOrderSnapshots(dto: KdsActiveOrdersGetTcpRequest): Promise<KdsActiveOrdersGetTcpResponse> {
+    const orders = await this.orderRepository.findActiveKdsOrders(dto.tenantId, dto.station);
+    const out: KdsActiveOrderSnapshot[] = [];
+    for (const order of orders) {
+      const allItems = await this.orderItemRepository.findByOrderIdAndTenant(order.id, dto.tenantId);
+      const items = dto.station ? allItems.filter((i) => i.station === dto.station) : allItems;
+      if (items.length === 0) {
+        continue;
+      }
+      out.push(this.toKdsActiveOrderSnapshot(order, items));
+    }
+    return out;
+  }
+
+  async markOrderItemsReady(dto: MarkOrderItemsReadyTcpRequest): Promise<MarkOrderItemsReadyTcpResponse> {
+    if (dto.orderItemIds.length === 0) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const order = await this.orderRepository.findByIdAndTenantForUpdate(dto.orderId, dto.tenantId, manager);
+      if (!order) {
+        throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
+      }
+      if (order.status !== OrderStatus.PROCESSING && order.status !== OrderStatus.READY) {
+        throw new BusinessException(ErrorCode.ORDER_INVALID_STATE, HttpStatus.CONFLICT);
+      }
+
+      const items = await this.orderItemRepository.findByOrderIdAndTenantWithManager(
+        dto.orderId,
+        dto.tenantId,
+        manager,
+      );
+      this.assertKdsStationTargets(items, dto.orderItemIds, dto.station);
+
+      await manager
+        .createQueryBuilder()
+        .update(OrderItem)
+        .set({ status: OrderItemStatus.READY, updatedAt: new Date() })
+        .where('tenantId = :tenantId', { tenantId: dto.tenantId })
+        .andWhere('orderId = :orderId', { orderId: dto.orderId })
+        .andWhere('id IN (:...ids)', { ids: dto.orderItemIds })
+        .andWhere('station = :station', { station: dto.station })
+        .andWhere('status = :fromStatus', { fromStatus: OrderItemStatus.PROCESSING })
+        .execute();
+
+      const updatedItems = await this.orderItemRepository.findByOrderIdAndTenantWithManager(
+        dto.orderId,
+        dto.tenantId,
+        manager,
+      );
+
+      let orderStatusChanged: OrderStatusChangedEvent | undefined;
+      if (order.status === OrderStatus.PROCESSING && this.noKitchenProcessingItemsRemaining(updatedItems)) {
+        order.status = OrderStatus.READY;
+        await manager.save(Order, order);
+        orderStatusChanged = {
+          tenantId: dto.tenantId,
+          orderId: order.id,
+          fromStatus: OrderStatus.PROCESSING,
+          toStatus: OrderStatus.READY,
+          changedByUserId: dto.userId,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      const kitchenItemReady = this.buildKitchenItemReadyEvent(order, dto, updatedItems);
+
+      return { kitchenItemReady, orderStatusChanged };
+    });
+  }
+
+  async revertOrderItemsProcessing(
+    dto: RevertOrderItemsProcessingTcpRequest,
+  ): Promise<RevertOrderItemsProcessingTcpResponse> {
+    if (dto.orderItemIds.length === 0) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const order = await this.orderRepository.findByIdAndTenantForUpdate(dto.orderId, dto.tenantId, manager);
+      if (!order) {
+        throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
+      }
+      if (order.status !== OrderStatus.PROCESSING && order.status !== OrderStatus.READY) {
+        throw new BusinessException(ErrorCode.ORDER_INVALID_STATE, HttpStatus.CONFLICT);
+      }
+
+      const items = await this.orderItemRepository.findByOrderIdAndTenantWithManager(
+        dto.orderId,
+        dto.tenantId,
+        manager,
+      );
+      this.assertKdsStationTargets(items, dto.orderItemIds, dto.station);
+
+      await manager
+        .createQueryBuilder()
+        .update(OrderItem)
+        .set({ status: OrderItemStatus.PROCESSING, updatedAt: new Date() })
+        .where('tenantId = :tenantId', { tenantId: dto.tenantId })
+        .andWhere('orderId = :orderId', { orderId: dto.orderId })
+        .andWhere('id IN (:...ids)', { ids: dto.orderItemIds })
+        .andWhere('station = :station', { station: dto.station })
+        .andWhere('status = :fromStatus', { fromStatus: OrderItemStatus.READY })
+        .execute();
+
+      const updatedItems = await this.orderItemRepository.findByOrderIdAndTenantWithManager(
+        dto.orderId,
+        dto.tenantId,
+        manager,
+      );
+
+      let orderStatusChanged: OrderStatusChangedEvent | undefined;
+      if (order.status === OrderStatus.READY && this.hasKitchenProcessingItems(updatedItems)) {
+        order.status = OrderStatus.PROCESSING;
+        await manager.save(Order, order);
+        orderStatusChanged = {
+          tenantId: dto.tenantId,
+          orderId: order.id,
+          fromStatus: OrderStatus.READY,
+          toStatus: OrderStatus.PROCESSING,
+          changedByUserId: dto.userId,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      return { orderStatusChanged };
+    });
+  }
+
   private buildCancelResponse(
     tenantId: string,
     order: Order,
@@ -496,6 +635,88 @@ export class OrderService {
       timestamp: (order.cancelledAt ?? new Date()).toISOString(),
     };
     return { order: orderDto, bill: billDto, events: { orderStatusChanged } };
+  }
+
+  private toKdsActiveOrderSnapshot(order: Order, items: OrderItem[]): KdsActiveOrderSnapshot {
+    if (!order.confirmedAt) {
+      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    return {
+      tenantId: order.tenantId,
+      orderId: order.id,
+      sessionId: order.sessionId,
+      tableId: order.tableId,
+      tableName: order.tableName,
+      confirmedAt: order.confirmedAt.toISOString(),
+      confirmedByUserId: order.confirmedByUserId ?? undefined,
+      items: items.map((it) => ({
+        id: it.id,
+        orderId: it.orderId,
+        menuItemId: it.menuItemId,
+        menuItemName: it.menuItemName,
+        menuItemImageUrl: it.menuItemImageUrl ?? undefined,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        note: it.note ?? undefined,
+        status: it.status,
+        station: it.station ?? undefined,
+        createdAt: it.createdAt.toISOString(),
+        updatedAt: it.updatedAt.toISOString(),
+      })),
+    };
+  }
+
+  private assertKdsStationTargets(items: OrderItem[], targetIds: string[], station: OrderItem['station']): void {
+    const map = new Map(items.map((i) => [i.id, i]));
+    for (const id of targetIds) {
+      const line = map.get(id);
+      if (!line) {
+        throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
+      }
+      if (!line.station || line.station !== station) {
+        throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
+      }
+      if (line.status === OrderItemStatus.CANCELED) {
+        throw new BusinessException(ErrorCode.ORDER_INVALID_STATE, HttpStatus.CONFLICT);
+      }
+    }
+  }
+
+  private noKitchenProcessingItemsRemaining(items: OrderItem[]): boolean {
+    return !items.some((i) => i.status !== OrderItemStatus.CANCELED && i.status === OrderItemStatus.PROCESSING);
+  }
+
+  private hasKitchenProcessingItems(items: OrderItem[]): boolean {
+    return items.some((i) => i.status !== OrderItemStatus.CANCELED && i.status === OrderItemStatus.PROCESSING);
+  }
+
+  private buildKitchenItemReadyEvent(
+    order: Order,
+    dto: MarkOrderItemsReadyTcpRequest,
+    items: OrderItem[],
+  ): KitchenItemReadyEvent {
+    const selected = items.filter((i) => dto.orderItemIds.includes(i.id));
+    return {
+      eventId: randomUUID(),
+      eventType: 'kitchen.item_ready',
+      schemaVersion: 1,
+      tenantId: dto.tenantId,
+      sessionId: order.sessionId,
+      tableId: order.tableId,
+      tableName: order.tableName,
+      orderId: order.id,
+      ticketId: dto.ticketId,
+      station: dto.station,
+      readyItems: selected.map((i) => ({
+        orderItemId: i.id,
+        menuItemId: i.menuItemId,
+        menuItemName: i.menuItemName,
+        quantity: i.quantity,
+        note: i.note ?? undefined,
+      })),
+      occurredAt: new Date().toISOString(),
+      correlationId: dto.correlationId,
+    };
   }
 
   private async runPendingCancelTransaction(

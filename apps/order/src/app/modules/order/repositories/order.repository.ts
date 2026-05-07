@@ -1,6 +1,8 @@
 import { Order } from '@common/entities/order.entity';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import type { PreparationStation } from '@einvoice/types';
+import { OrderStatus } from '@einvoice/types';
 import { EntityManager, In, Repository } from 'typeorm';
 
 @Injectable()
@@ -45,6 +47,29 @@ export class OrderRepository {
   ): Promise<void> {
     const r = manager ? manager.getRepository(Order) : this.repo;
     await r.update({ sessionId, tenantId }, { tableId, tableName });
+  }
+
+  findActiveKdsOrders(tenantId: string, station?: PreparationStation): Promise<Order[]> {
+    const qb = this.repo
+      .createQueryBuilder('o')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.status IN (:...statuses)', {
+        statuses: [OrderStatus.PROCESSING, OrderStatus.READY],
+      });
+
+    if (station) {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1 FROM order_items oi
+          WHERE oi.order_id = o.id
+            AND oi.tenant_id = :tenantId
+            AND oi.station = :station
+        )`,
+        { tenantId, station },
+      );
+    }
+
+    return qb.getMany();
   }
 
   findStaffList(
