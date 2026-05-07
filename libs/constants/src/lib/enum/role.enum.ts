@@ -57,6 +57,7 @@ export enum PERMISSION {
   KITCHEN_GET_QUEUE = 'kitchen.get_queue',
   KITCHEN_UPDATE_TICKET = 'kitchen.update_ticket',
   KITCHEN_RECALL = 'kitchen.recall',
+  KITCHEN_SET_PRIORITY = 'kitchen.set_priority',
 
   /* PAYMENT (Phase 3) */
   PAYMENT_CREATE = 'payment.create',

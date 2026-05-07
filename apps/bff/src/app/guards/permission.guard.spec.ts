@@ -46,6 +46,7 @@ describe('PermissionGuard', () => {
     PERMISSION.KITCHEN_GET_QUEUE,
     PERMISSION.KITCHEN_UPDATE_TICKET,
     PERMISSION.KITCHEN_RECALL,
+    PERMISSION.KITCHEN_SET_PRIORITY,
     PERMISSION.PAYMENT_CREATE,
     PERMISSION.PAYMENT_CONFIRM_CASH,
     PERMISSION.PAYMENT_REFUND,
@@ -222,6 +223,24 @@ describe('PermissionGuard', () => {
         label: 'BARISTA denied PAYMENT_CONFIRM_CASH',
         userPerms: BARISTA_PERMS,
         requiredPerm: PERMISSION.PAYMENT_CONFIRM_CASH,
+        shouldAllow: false,
+      },
+      {
+        label: 'MANAGER allowed KITCHEN_SET_PRIORITY',
+        userPerms: MANAGER_PERMS,
+        requiredPerm: PERMISSION.KITCHEN_SET_PRIORITY,
+        shouldAllow: true,
+      },
+      {
+        label: 'CHEF denied KITCHEN_SET_PRIORITY',
+        userPerms: CHEF_PERMS,
+        requiredPerm: PERMISSION.KITCHEN_SET_PRIORITY,
+        shouldAllow: false,
+      },
+      {
+        label: 'BARISTA denied KITCHEN_SET_PRIORITY',
+        userPerms: BARISTA_PERMS,
+        requiredPerm: PERMISSION.KITCHEN_SET_PRIORITY,
         shouldAllow: false,
       },
 

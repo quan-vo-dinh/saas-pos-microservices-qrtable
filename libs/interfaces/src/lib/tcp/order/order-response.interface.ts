@@ -7,6 +7,8 @@ import type {
   OrderCreatedEvent,
   OrderStatusChangedEvent,
   CartUpdatedEvent,
+  KdsActiveOrderSnapshot,
+  KitchenItemReadyEvent,
   ServiceRequestedEvent,
   BillRequestedEvent,
   TableTransferredEvent,
@@ -68,4 +70,15 @@ export type TableTransferredTcpResponse = {
 export type BillCurrentTcpResponse = {
   bill: Bill | null;
   cart: CartSnapshot;
+};
+
+export type KdsActiveOrdersGetTcpResponse = KdsActiveOrderSnapshot[];
+
+export type MarkOrderItemsReadyTcpResponse = {
+  kitchenItemReady: KitchenItemReadyEvent;
+  orderStatusChanged?: OrderStatusChangedEvent;
+};
+
+export type RevertOrderItemsProcessingTcpResponse = {
+  orderStatusChanged?: OrderStatusChangedEvent;
 };

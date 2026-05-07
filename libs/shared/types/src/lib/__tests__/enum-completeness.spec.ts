@@ -6,7 +6,10 @@ import {
   ServiceRequestType,
   ServiceRequestStatus,
   PaymentMethod,
+  KdsTicketItemStatus,
+  KdsTicketStatus,
 } from '../../index';
+import type { KdsQueueChangedEvent, KitchenSlaWarningEvent } from '../../index';
 import type { CartUpdatedEvent, OrderConfirmedEvent } from '../realtime-events.types';
 
 describe('Enum completeness — canonical values per Step 2.3 spec', () => {
@@ -49,6 +52,8 @@ describe('Enum completeness — canonical values per Step 2.3 spec', () => {
       ServiceRequestType,
       ServiceRequestStatus,
       PaymentMethod,
+      KdsTicketStatus,
+      KdsTicketItemStatus,
     ];
     allEnums.forEach((enumObj) => {
       Object.values(enumObj).forEach((value) => {
@@ -67,12 +72,62 @@ describe('Enum completeness — canonical values per Step 2.3 spec', () => {
       ServiceRequestType,
       ServiceRequestStatus,
       PaymentMethod,
+      KdsTicketStatus,
+      KdsTicketItemStatus,
     ];
     allEnums.forEach((enumObj) => {
       Object.entries(enumObj).forEach(([key, value]) => {
         expect(key).toBe(value);
       });
     });
+  });
+});
+
+describe('Step 2.6 KDS contract compile checks', () => {
+  it('KdsTicketStatus has exactly the Redis-only ticket lifecycle values', () => {
+    expect(Object.values(KdsTicketStatus).sort()).toEqual(
+      ['ARCHIVED', 'PENDING', 'PROCESSING', 'READY', 'VOIDED'].sort(),
+    );
+  });
+
+  it('KdsTicketItemStatus has exactly the item prep lifecycle values', () => {
+    expect(Object.values(KdsTicketItemStatus).sort()).toEqual(['CANCELED', 'PENDING', 'PROCESSING', 'READY'].sort());
+  });
+
+  it('accepts canonical kds.queue_changed event metadata', () => {
+    const event: KdsQueueChangedEvent = {
+      eventId: 'event-1',
+      eventType: 'kds.queue_changed',
+      schemaVersion: 1,
+      tenantId: 'tenant-1',
+      station: 'KITCHEN',
+      revision: 2,
+      reason: 'TICKET_CREATED',
+      occurredAt: '2026-05-07T00:00:00.000Z',
+    };
+
+    expect(event.eventType).toBe('kds.queue_changed');
+  });
+
+  it('accepts canonical kitchen.sla_warning event metadata', () => {
+    const event: KitchenSlaWarningEvent = {
+      eventId: 'event-1',
+      eventType: 'kitchen.sla_warning',
+      schemaVersion: 1,
+      tenantId: 'tenant-1',
+      ticketId: 'ticket-1',
+      orderId: 'order-1',
+      sessionId: 'session-1',
+      tableId: 'table-1',
+      tableName: 'Ban 01',
+      station: 'BAR',
+      level: 'WARNING',
+      waitTimeSeconds: 901,
+      thresholdSeconds: 900,
+      occurredAt: '2026-05-07T00:00:00.000Z',
+    };
+
+    expect(event.eventType).toBe('kitchen.sla_warning');
   });
 });
 

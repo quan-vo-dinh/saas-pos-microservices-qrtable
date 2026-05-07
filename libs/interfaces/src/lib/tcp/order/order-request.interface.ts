@@ -1,4 +1,4 @@
-import type { ServiceRequestType } from '@einvoice/types';
+import type { PreparationStation, ServiceRequestType } from '@einvoice/types';
 
 export type JoinSessionTcpRequest = {
   tenantId: string;
@@ -106,4 +106,24 @@ export type TransferTableTcpRequest = {
   toTableId: string;
   userId: string;
   requestId: string;
+};
+
+export type KdsActiveOrdersGetTcpRequest = {
+  tenantId: string;
+  station?: PreparationStation;
+};
+
+export type MarkOrderItemsReadyTcpRequest = {
+  tenantId: string;
+  orderId: string;
+  ticketId: string;
+  station: PreparationStation;
+  orderItemIds: string[];
+  userId: string;
+  requestId: string;
+  correlationId?: string;
+};
+
+export type RevertOrderItemsProcessingTcpRequest = MarkOrderItemsReadyTcpRequest & {
+  reason: 'KITCHEN_COMPENSATION' | 'KITCHEN_RECALL';
 };

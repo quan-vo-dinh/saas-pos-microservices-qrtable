@@ -112,6 +112,20 @@ enum ORDER {
   BILL_REQUEST = 'order.bill_request',
   BILL_REOPEN = 'order.bill_reopen',
   TABLE_TRANSFER = 'order.table_transfer',
+  KDS_ACTIVE_ORDERS_GET = 'order.kds_active_orders_get',
+  MARK_ITEMS_READY = 'order.mark_items_ready',
+  REVERT_ITEMS_PROCESSING = 'order.revert_items_processing',
+}
+
+enum KITCHEN {
+  GET_QUEUE = 'kitchen.get_queue',
+  START_TICKET = 'kitchen.start_ticket',
+  MARK_READY = 'kitchen.mark_ready',
+  RECALL_TICKET = 'kitchen.recall_ticket',
+  SET_PRIORITY = 'kitchen.set_priority',
+  VOID_BY_ORDER = 'kitchen.void_by_order',
+  PATCH_TABLE_SNAPSHOT = 'kitchen.patch_table_snapshot',
+  REBUILD_TENANT = 'kitchen.rebuild_tenant',
 }
 
 export const TCP_REQUEST_MESSAGE = {
@@ -127,4 +141,5 @@ export const TCP_REQUEST_MESSAGE = {
   CATALOG,
   SAAS,
   ORDER,
+  KITCHEN,
 };

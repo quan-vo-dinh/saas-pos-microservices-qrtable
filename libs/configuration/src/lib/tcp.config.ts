@@ -9,6 +9,7 @@ export enum TCP_SERVICES {
   CATALOG_SERVICE = 'TCP_CATALOG_SERVICE',
   SAAS_SERVICE = 'TCP_SAAS_SERVICE',
   ORDER_SERVICE = 'TCP_ORDER_SERVICE',
+  KITCHEN_SERVICE = 'TCP_KITCHEN_SERVICE',
 }
 
 export class TcpConfiguration {
@@ -36,6 +37,10 @@ export class TcpConfiguration {
   @IsObject()
   TCP_ORDER_SERVICE: TcpClientOptions;
 
+  @IsNotEmpty()
+  @IsObject()
+  TCP_KITCHEN_SERVICE: TcpClientOptions;
+
   constructor() {
     Object.entries(TCP_SERVICES).forEach(([key, serviceName]) => {
       const host = process.env[`${key}_HOST`] || 'localhost';
@@ -56,6 +61,10 @@ export class TcpConfiguration {
   }
 }
 
+function getLegacyServiceHostKey(serviceName: string): string {
+  return serviceName.replace(/^TCP_/, '');
+}
+
 // note: khi custom provider thì phải dùng ClientsModule.registerAsync
 // để có thể inject ConfigService vào factory function
 
@@ -66,7 +75,9 @@ export function TcpProvider(serviceName: keyof TcpConfiguration): ClientsProvide
     imports: [ConfigModule],
     inject: [ConfigService],
     useFactory: async (configService: ConfigService): Promise<TcpClientOptions> => {
-      const host = configService.get<string>(`${serviceName}_HOST`, 'localhost');
+      const host =
+        configService.get<string>(`${serviceName}_HOST`) ??
+        configService.get<string>(`${getLegacyServiceHostKey(serviceName)}_HOST`, 'localhost');
       const port = configService.get<number>(`${serviceName}_PORT`, 3301);
 
       return {

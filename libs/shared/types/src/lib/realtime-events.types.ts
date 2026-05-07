@@ -14,7 +14,7 @@
  *   - OrderConfirmedEvent     → topic `order.confirmed` cho cross-service consumers
  *
  * Data shapes (not events themselves):
- *   - KDSTicket               → derived view cho UI render kitchen/bar tickets
+ *   - KDSTicket               → Phase 2A derived view cho mock/UI render
  *
  * @see docs/guides/kafka-qrtable.md (4P+2AP rationale)
  * @see docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md
@@ -154,8 +154,7 @@ export type OrderConfirmedEvent = {
  * Data structure cho KDS render (kitchen + bar tickets).
  * Derived view từ Order + Menu metadata; không phải standalone event ở Phase 2A.
  *
- * Phase 2B sẽ promote thành Kafka event độc lập (`kitchen.ticket.created`,
- * `bar.ticket.created`) nếu cần per-station routing.
+ * Step 2.6 richer KDS contracts live in `kds.types.ts`.
  */
 export type KDSTicket = {
   /** Initially = orderId; Phase 2B có thể split per-station (kitchen-{orderId}, bar-{orderId}) */

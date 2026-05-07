@@ -49,6 +49,20 @@ export type {
   KDSTicket,
 } from './lib/realtime-events.types';
 
+// ─── KDS (Step 2.6) ────────────────────────────────
+export type {
+  KdsActiveOrderSnapshot,
+  KdsQueueChangedEvent,
+  KdsQueueChangedReason,
+  KdsQueueSnapshot,
+  KdsTicketDto,
+  KdsTicketItemDto,
+  KdsWarningLevel,
+  KitchenItemReadyEvent,
+  KitchenSlaWarningEvent,
+} from './lib/kds.types';
+export { KdsTicketItemStatus, KdsTicketStatus } from './lib/kds.types';
+
 // ─── Public Menu (Customer PWA) ─────────────────────
 export type { PublicMenuResponse, PublicMenuCategory, PublicMenuItem } from './lib/public-menu.types';
 
