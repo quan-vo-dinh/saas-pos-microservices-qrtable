@@ -42,6 +42,7 @@ import {
   rebuildLockKey,
   readyQueueKey,
   revisionKey,
+  sessionTicketsKey,
   slaClaimKey,
   slaDedupeKey,
   slaDueMember,
@@ -148,6 +149,7 @@ export class KdsRedisRepository {
         updatedAt: now,
       });
       multi.sadd(orderTicketsKey(event.tenantId, event.orderId), ticketId);
+      multi.sadd(sessionTicketsKey(event.tenantId, event.sessionId), ticketId);
       multi.sadd(sourceEventTicketsKey(event.tenantId, event.eventId), ticketId);
       multi.zadd(activeQueueKey(event.tenantId, station), score, ticketId);
       multi.hset(ticketSlaKey(event.tenantId, ticketId), {
@@ -349,6 +351,7 @@ export class KdsRedisRepository {
       multi.zrem(readyQueueKey(command.tenantId, ticket.station), ticketId);
       multi.zrem(globalSlaDueKey(), slaDueMember(command.tenantId, ticket.station, ticketId, 'WARNING'));
       multi.zrem(globalSlaDueKey(), slaDueMember(command.tenantId, ticket.station, ticketId, 'BREACH'));
+      multi.srem(sessionTicketsKey(command.tenantId, ticket.sessionId), ticketId);
       multi.zadd(
         cleanupDueKey(),
         Date.now() + CONFIGURATION.KDS_CONFIG.ARCHIVED_TTL_SECONDS * 1000,
@@ -374,7 +377,17 @@ export class KdsRedisRepository {
   }
 
   async patchTableSnapshot(command: KdsPatchTableSnapshotTcpRequest): Promise<KdsQueueChangedEvent[]> {
-    const ticketIds = await this.collectVisibleTicketIds(command.tenantId);
+    const ticketIds = await this.redis.smembers(sessionTicketsKey(command.tenantId, command.sessionId));
+    if (!ticketIds.length) {
+      const visible = await this.collectVisibleTicketIds(command.tenantId);
+      for (const ticketId of visible) {
+        const ticket = await this.getTicket(command.tenantId, ticketId, 0);
+        if (ticket.sessionId === command.sessionId) {
+          ticketIds.push(ticketId);
+        }
+      }
+    }
+
     const events: KdsQueueChangedEvent[] = [];
 
     for (const ticketId of ticketIds) {

@@ -24,6 +24,11 @@ export function orderTicketsKey(tenantId: string, orderId: string): string {
   return `kds:${tenantId}:order:${orderId}:tickets`;
 }
 
+/** Session → active ticket ids (optimizes PATCH_TABLE_SNAPSHOT). */
+export function sessionTicketsKey(tenantId: string, sessionId: string): string {
+  return `kds:${tenantId}:session:${sessionId}:tickets`;
+}
+
 export function activeQueueKey(tenantId: string, station: PreparationStation): string {
   return `kds:${tenantId}:${stationSlug(station)}`;
 }

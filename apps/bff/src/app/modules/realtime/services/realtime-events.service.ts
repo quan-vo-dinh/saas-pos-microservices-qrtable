@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type {
   BillRequestedEvent,
   CartUpdatedEvent,
+  KdsQueueChangedEvent,
+  KitchenItemReadyEvent,
+  KitchenSlaWarningEvent,
   OrderCreatedEvent,
   OrderStatusChangedEvent,
   ServiceRequestedEvent,
@@ -54,5 +57,24 @@ export class RealtimeEventsService {
     const roomStaff = `tenant:${event.tenantId}:staff`;
     this.gateway.emitToRoom(roomCustomer, 'events.tableTransferred', event);
     this.gateway.emitToRoom(roomStaff, 'events.tableTransferred', event);
+  }
+
+  emitKdsQueueChanged(event: KdsQueueChangedEvent): void {
+    const tid = event.tenantId;
+    const stationRoom = event.station === 'KITCHEN' ? `tenant:${tid}:kds:kitchen` : `tenant:${tid}:kds:bar`;
+    this.gateway.emitToRoom(stationRoom, 'events.kdsQueueChanged', event);
+    this.gateway.emitToRoom(`tenant:${tid}:management`, 'events.kdsQueueChanged', event);
+  }
+
+  emitKitchenItemReady(event: KitchenItemReadyEvent): void {
+    this.gateway.emitToRoom(`tenant:${event.tenantId}:staff`, 'events.kitchenItemReady', event);
+    this.gateway.emitToRoom(`session:${event.sessionId}:customer`, 'events.kitchenItemReady', event);
+  }
+
+  emitKitchenSlaWarning(event: KitchenSlaWarningEvent): void {
+    const tid = event.tenantId;
+    const stationRoom = event.station === 'KITCHEN' ? `tenant:${tid}:kds:kitchen` : `tenant:${tid}:kds:bar`;
+    this.gateway.emitToRoom(stationRoom, 'events.kitchenSlaWarning', event);
+    this.gateway.emitToRoom(`tenant:${tid}:management`, 'events.kitchenSlaWarning', event);
   }
 }

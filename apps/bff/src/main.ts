@@ -7,10 +7,17 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { RedisIoAdapter } from './app/modules/realtime/adapters/redis-io.adapter';
 
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
+    const redisHost = AppModule.CONFIGURATION.REDIS_CONFIG.HOST;
+    const redisPort = AppModule.CONFIGURATION.REDIS_CONFIG.PORT;
+    const redisIoAdapter = new RedisIoAdapter(app);
+    await redisIoAdapter.connectToRedis(`redis://${redisHost}:${redisPort}`);
+    app.useWebSocketAdapter(redisIoAdapter);
+
     const globalPrefix = AppModule.CONFIGURATION.GLOBAL_PREFIX;
     app.setGlobalPrefix(globalPrefix);
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

@@ -7,7 +7,10 @@ import { CustomerSessionController } from './controllers/customer-session.contro
 import { StaffOrderController } from './controllers/staff-order.controller';
 
 @Module({
-  imports: [ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.ORDER_SERVICE)]), RealtimeModule],
+  imports: [
+    ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.ORDER_SERVICE), TcpProvider(TCP_SERVICES.KITCHEN_SERVICE)]),
+    RealtimeModule,
+  ],
   controllers: [CustomerSessionController, CustomerOrderController, StaffOrderController],
 })
 export class OrderModule {}

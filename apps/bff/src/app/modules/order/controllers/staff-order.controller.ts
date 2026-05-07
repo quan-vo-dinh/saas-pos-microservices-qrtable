@@ -31,8 +31,9 @@ import type {
   ServiceRequestListTcpResponse,
   TableTransferredTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
+import type { KdsPatchTableSnapshotTcpRequest, KdsVoidByOrderTcpRequest } from '@common/interfaces/tcp/kitchen';
 import { buildTcpRequestContext } from '@common/utils/request.util';
-import { Body, Controller, Get, Inject, Param, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Logger, Param, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { firstValueFrom, map } from 'rxjs';
@@ -41,8 +42,11 @@ import { RealtimeEventsService } from '../../realtime/services/realtime-events.s
 @ApiTags('Orders (Admin)')
 @Controller('admin')
 export class StaffOrderController {
+  private readonly logger = new Logger(StaffOrderController.name);
+
   constructor(
     @Inject(TCP_SERVICES.ORDER_SERVICE) private readonly orderClient: TcpClient,
+    @Inject(TCP_SERVICES.KITCHEN_SERVICE) private readonly kitchenClient: TcpClient,
     private readonly realtimeEvents: RealtimeEventsService,
   ) {}
 
@@ -220,6 +224,27 @@ export class StaffOrderController {
         )
         .pipe(map((r) => r)),
     );
+
+    if (tcp.statusCode === 200) {
+      try {
+        await firstValueFrom(
+          this.kitchenClient
+            .send<unknown, KdsVoidByOrderTcpRequest>(
+              TCP_REQUEST_MESSAGE.KITCHEN.VOID_BY_ORDER,
+              buildTcpRequestContext<KdsVoidByOrderTcpRequest>(req, processId, {
+                tenantId,
+                orderId: id,
+                reason: 'ORDER_CANCELED',
+                correlationId: processId,
+              }),
+            )
+            .pipe(map((r) => r)),
+        );
+      } catch (e) {
+        this.logger.error({ processId, orderId: id, err: e }, 'Kitchen VOID_BY_ORDER failed after cancel-processing');
+      }
+    }
+
     if (tcp.data?.events?.orderStatusChanged && tcp.data.order) {
       this.realtimeEvents.emitOrderStatusChanged(tcp.data.events.orderStatusChanged, tcp.data.order.sessionId);
     }
@@ -399,6 +424,29 @@ export class StaffOrderController {
         >(TCP_REQUEST_MESSAGE.ORDER.TABLE_TRANSFER, buildTcpRequestContext<TransferTableTcpRequest>(req, processId, payload))
         .pipe(map((r) => r)),
     );
+
+    const patch = tcp.data?.kitchenSnapshotPatch;
+    if (patch && tcp.statusCode === 200) {
+      try {
+        await firstValueFrom(
+          this.kitchenClient
+            .send<unknown, KdsPatchTableSnapshotTcpRequest>(
+              TCP_REQUEST_MESSAGE.KITCHEN.PATCH_TABLE_SNAPSHOT,
+              buildTcpRequestContext<KdsPatchTableSnapshotTcpRequest>(req, processId, {
+                tenantId: patch.tenantId,
+                sessionId: patch.sessionId,
+                tableId: patch.tableId,
+                tableName: patch.tableName,
+                correlationId: processId,
+              }),
+            )
+            .pipe(map((r) => r)),
+        );
+      } catch (e) {
+        this.logger.warn({ processId, err: e }, 'Kitchen PATCH_TABLE_SNAPSHOT failed after table transfer');
+      }
+    }
+
     if (tcp.data?.events?.tableTransferred) {
       this.realtimeEvents.emitTableTransferred(tcp.data.events.tableTransferred);
     }

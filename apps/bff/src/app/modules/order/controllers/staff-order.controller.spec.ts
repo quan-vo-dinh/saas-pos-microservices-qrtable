@@ -28,6 +28,10 @@ describe('StaffOrderController', () => {
       providers: [
         { provide: TCP_SERVICES.ORDER_SERVICE, useValue: orderClient },
         {
+          provide: TCP_SERVICES.KITCHEN_SERVICE,
+          useValue: { send: jest.fn().mockReturnValue(of(Response.success(true))) },
+        },
+        {
           provide: RealtimeEventsService,
           useValue: {
             emitOrderStatusChanged: jest.fn(),

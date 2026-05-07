@@ -84,6 +84,20 @@ export class FakeRedis {
     return added;
   }
 
+  async srem(key: string, ...members: string[]): Promise<number> {
+    const set = this.sets.get(key);
+    if (!set) {
+      return 0;
+    }
+    let removed = 0;
+    for (const member of members) {
+      if (set.delete(member)) {
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
   async smembers(key: string): Promise<string[]> {
     return [...(this.sets.get(key) || new Set<string>())];
   }
