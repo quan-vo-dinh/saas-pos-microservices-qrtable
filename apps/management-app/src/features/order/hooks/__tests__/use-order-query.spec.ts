@@ -28,24 +28,24 @@ describe('order query polling', () => {
     mockUseQuery.mockReturnValue({});
   });
 
-  it('uses the fast interval for unfiltered and pending order lists', () => {
+  it('uses the realtime fallback interval for order lists', () => {
     useOrdersQuery();
     let config = mockUseQuery.mock.calls[0][0];
-    expect(config.refetchInterval).toBe(3000);
+    expect(config.refetchInterval).toBe(15_000);
 
     jest.clearAllMocks();
     mockUseQuery.mockReturnValue({});
 
     useOrdersQuery({ status: OrderStatus.PENDING });
     config = mockUseQuery.mock.calls[0][0];
-    expect(config.refetchInterval).toBe(3000);
+    expect(config.refetchInterval).toBe(15_000);
   });
 
-  it('uses the slow interval for non-pending filtered order lists', () => {
+  it('uses the same fallback interval for non-pending filtered order lists', () => {
     useOrdersQuery({ status: OrderStatus.PROCESSING });
 
     const config = mockUseQuery.mock.calls[0][0];
-    expect(config.refetchInterval).toBe(5000);
+    expect(config.refetchInterval).toBe(15_000);
   });
 
   it('stops detail polling for terminal states', () => {

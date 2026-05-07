@@ -46,6 +46,6 @@ describe('service request query polling', () => {
     expect(config.queryFn()).toBe(mockGetServiceRequests.mock.results[0].value);
     expect(mockGetServiceRequests).toHaveBeenCalledWith(params);
     expect(config.enabled).toBe(true);
-    expect(config.refetchInterval).toBe(3000);
+    expect(config.refetchInterval).toBe(15_000);
   });
 });
