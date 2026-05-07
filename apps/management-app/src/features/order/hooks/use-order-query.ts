@@ -8,8 +8,7 @@ import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { tableKeys } from '@/features/tables/hooks/use-tables-query';
 import { orderService, type OrderListParams, type TransferTablePayload } from '../services/order.service';
 
-const ORDER_LIST_FAST_POLL_MS = 3_000;
-const ORDER_LIST_SLOW_POLL_MS = 5_000;
+const ORDER_LIST_REALTIME_FALLBACK_POLL_MS = 15_000;
 const ORDER_DETAIL_POLL_MS = 4_000;
 
 export const orderKeys = {
@@ -39,14 +38,6 @@ async function invalidateOrderQueries(queryClient: ReturnType<typeof useQueryCli
   await Promise.all(invalidations);
 }
 
-function getOrderListPollMs(params?: OrderListParams): number {
-  if (!params?.status || params.status === OrderStatus.PENDING) {
-    return ORDER_LIST_FAST_POLL_MS;
-  }
-
-  return ORDER_LIST_SLOW_POLL_MS;
-}
-
 export function useOrdersQuery(params?: OrderListParams) {
   const authReady = useAuthReadyForBff();
 
@@ -55,7 +46,7 @@ export function useOrdersQuery(params?: OrderListParams) {
     queryFn: () => orderService.getOrders(params),
     enabled: authReady,
     placeholderData: (previousData) => previousData,
-    refetchInterval: getOrderListPollMs(params),
+    refetchInterval: ORDER_LIST_REALTIME_FALLBACK_POLL_MS,
   });
 }
 

@@ -9,6 +9,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { PosSubNav } from '@/components/pos/pos-sub-nav';
 import { PosRightInspector } from '@/components/pos/pos-right-inspector';
+import { RealtimeStatusPill } from '@/components/realtime/realtime-status-pill';
 import { KpiTiles } from '@/components/pos/kpi-tiles';
 import { CommandPalette } from '@/components/pos/command-palette';
 import { NonOrderRouteReset } from '@/components/pos/non-order-route-reset';
@@ -25,7 +26,7 @@ export function PosAppShell({ children }: Props) {
   const pathname = usePathname();
   const title = getManagementPageTitle(pathname);
   const clearSelectedOrder = useOrderUiState((s) => s.selectOrder);
-  useStaffOrderRealtime();
+  const realtimeStatus = useStaffOrderRealtime();
 
   useEffect(() => {
     const onLiveOrders = pathname === ROUTES.POS || pathname === `${ROUTES.POS}/`;
@@ -37,6 +38,7 @@ export function PosAppShell({ children }: Props) {
       <NonOrderRouteReset />
       <AppSidebar />
       <SidebarInset className="min-h-0 overflow-hidden">
+        <RealtimeStatusPill status={realtimeStatus} />
         <AppTopbar title={title} />
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3 md:p-4">
           <PosSubNav />

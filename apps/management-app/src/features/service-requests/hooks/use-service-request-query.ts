@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { serviceRequestService, type ServiceRequestListParams } from '../services/service-request.service';
 
-const SERVICE_REQUEST_LIST_POLL_MS = 3_000;
+const SERVICE_REQUEST_LIST_POLL_MS = 15_000;
 
 export const serviceRequestKeys = {
   all: ['admin-service-requests'] as const,
