@@ -22,8 +22,8 @@ jest.mock('socket.io-client', () => ({
 }));
 
 jest.mock('@/lib/auth/auth-store', () => ({
-  useAuthStore: (selector: (state: { profile: { tenantId: string } }) => unknown) =>
-    selector({ profile: { tenantId: 'tenant-1' } }),
+  useAuthStore: (selector: (state: { profile: { tenantId: string }; accessToken: string }) => unknown) =>
+    selector({ profile: { tenantId: 'tenant-1' }, accessToken: 'jwt-token' }),
 }));
 
 function createWrapper(queryClient: QueryClient) {
@@ -62,6 +62,8 @@ describe('useStaffOrderRealtime', () => {
     const orderCreatedHandler = onCalls.find(([event]) => event === 'events.orderCreated')?.[1];
 
     expect(ioMock).toHaveBeenCalledWith('http://localhost:3300/orders', {
+      auth: { token: 'jwt-token' },
+      transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,
       timeout: 10_000,

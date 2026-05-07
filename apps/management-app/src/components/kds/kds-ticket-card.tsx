@@ -21,6 +21,12 @@ type Props = {
   flash?: boolean;
   onSelect: () => void;
   surfaceRef?: (node: HTMLDivElement | null) => void;
+  /** When provided, KDS uses live API actions instead of the mock store. */
+  liveActions?: {
+    advanceTicket: (ticketId: string) => void;
+    recallTicket: (ticketId: string, reason: string, userId: string, userName: string) => void;
+    updateItem?: (ticketId: string, itemId: string, status: OrderItemStatus) => void;
+  };
 };
 
 const HOLD_MS = 600;
@@ -40,11 +46,16 @@ export function KdsTicketCard({
   flash,
   onSelect,
   surfaceRef,
+  liveActions,
 }: Props) {
   const [now, setNow] = useState<number | null>(null);
-  const advanceTicket = useMockStore((s) => s.advanceTicket);
-  const recallTicket = useMockStore((s) => s.recallTicket);
-  const updateItem = useMockStore((s) => s.updateKdsTicketItemStatus);
+  const advanceMock = useMockStore((s) => s.advanceTicket);
+  const recallMock = useMockStore((s) => s.recallTicket);
+  const updateMock = useMockStore((s) => s.updateKdsTicketItemStatus);
+
+  const advanceTicket = liveActions?.advanceTicket ?? advanceMock;
+  const recallTicket = liveActions?.recallTicket ?? recallMock;
+  const updateItem = liveActions?.updateItem ?? updateMock;
   const holdTimer = useRef<number | null>(null);
 
   useEffect(() => {

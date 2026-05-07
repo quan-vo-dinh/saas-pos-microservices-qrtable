@@ -66,7 +66,9 @@ export class KdsRedisRepository {
   }
 
   async getQueueSnapshot(tenantId: string, station: PreparationStation): Promise<KdsQueueSnapshot> {
-    const ids = await this.redis.zrange(activeQueueKey(tenantId, station), 0, -1);
+    const activeIds = await this.redis.zrange(activeQueueKey(tenantId, station), 0, -1);
+    const readyIds = await this.redis.zrange(readyQueueKey(tenantId, station), 0, -1);
+    const ids = [...activeIds, ...readyIds];
     const tickets = await this.getTicketsByIds(tenantId, ids);
     const revision = Number((await this.redis.get(revisionKey(tenantId, station))) || 0);
 

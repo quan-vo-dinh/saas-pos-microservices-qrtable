@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useMockStore } from '@/mocks/store';
-import type { KDSStation } from '@/mocks/kds-ticket';
+import type { KDSTicketMock, KDSStation } from '@/mocks/kds-ticket';
 
 const KdsSlaRadial = dynamic(
   () => import('@/components/kds/kds-sla-radial').then((m) => m.KdsSlaRadial),
@@ -45,11 +45,16 @@ type Props = {
   station: KDSStation;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Live KDS passes snapshot-derived tickets so the sheet resolves without the mock store. */
+  tickets?: KDSTicketMock[];
+  /** Hides mock-only controls (order mutation, stock demo). */
+  liveMode?: boolean;
 };
 
-export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props) {
+export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets: ticketsProp, liveMode }: Props) {
   const [now, setNow] = useState<number | null>(null);
-  const tickets = useMockStore((s) => s.kdsTickets);
+  const mockTickets = useMockStore((s) => s.kdsTickets);
+  const tickets = ticketsProp ?? mockTickets;
   const liveOrders = useMockStore((s) => s.liveOrders);
   const updateItem = useMockStore((s) => s.updateKdsTicketItemStatus);
   const updateOrderStatus = useMockStore((s) => s.updateOrderStatus);
@@ -92,7 +97,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
         showCloseButton
       >
         {!ticket ? (
-          <div className="p-6 text-sm text-white/60">Không tìm thấy ticket trong store.</div>
+          <div className="p-6 text-sm text-white/60">Không tìm thấy ticket.</div>
         ) : (
           <>
         <SheetHeader className="border-b border-white/10 px-4 py-3">
@@ -169,6 +174,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
                       <TableCell>
                         <Select
                           value={it.status}
+                          disabled={Boolean(liveMode)}
                           onValueChange={(v) =>
                             updateItem(ticket.ticketId, it.id, v as OrderItem['status'])
                           }
@@ -224,6 +230,8 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
         </div>
 
         <div className="mt-auto flex flex-col gap-2 border-t border-white/10 px-4 py-3">
+          {!liveMode ? (
+            <>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -279,6 +287,12 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange }: Props)
           <p className="text-[0.65rem] text-white/45">
             Mở sheet bằng tap vùng tiêu đề ticket · chân nút không mở sheet (blueprint bước 4.3).
           </p>
+            </>
+          ) : (
+            <p className="text-[0.7rem] text-white/50">
+              Luồng live: dùng nút trên thẻ ticket (Bắt đầu / Xong / Recall). Sheet chỉ xem chi tiết.
+            </p>
+          )}
         </div>
           </>
         )}

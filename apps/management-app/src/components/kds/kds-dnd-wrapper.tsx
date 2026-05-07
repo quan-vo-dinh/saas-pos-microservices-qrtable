@@ -24,12 +24,14 @@ function isColumnId(id: unknown): id is ColumnStatus {
 
 type Props = {
   children: ReactNode;
+  tickets: KDSTicketMock[];
+  /** Live/API board supplies callback; mock-only flows omit it and use the mock store. */
+  onColumnChange?: (ticketId: string, column: ColumnStatus) => void;
 };
 
-export function KdsDndWrapper({ children }: Props) {
+export function KdsDndWrapper({ children, tickets, onColumnChange }: Props) {
   const [active, setActive] = useState<KDSTicketMock | null>(null);
-  const setColumn = useMockStore((s) => s.setKdsTicketColumn);
-  const tickets = useMockStore((s) => s.kdsTickets);
+  const setColumnMock = useMockStore((s) => s.setKdsTicketColumn);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -47,7 +49,11 @@ export function KdsDndWrapper({ children }: Props) {
     const ticketId = String(e.active.id);
     const overId = e.over?.id;
     if (isColumnId(overId)) {
-      setColumn(ticketId, overId);
+      if (onColumnChange) {
+        onColumnChange(ticketId, overId);
+      } else {
+        setColumnMock(ticketId, overId);
+      }
       playTap();
     }
     setActive(null);

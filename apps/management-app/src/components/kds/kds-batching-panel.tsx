@@ -51,10 +51,13 @@ type Props = {
   className?: string;
   onItemTap: (itemName: string) => void;
   onFocusTicket: (ticketId: string) => void;
+  /** When provided (live KDS), replaces mock store tickets for this station. */
+  tickets?: KDSTicketMock[];
 };
 
-export function KdsBatchingPanel({ station, slaCapMinutes, now, className, onItemTap, onFocusTicket }: Props) {
-  const kdsTickets = useMockStore((s) => s.kdsTickets);
+export function KdsBatchingPanel({ station, slaCapMinutes, now, className, onItemTap, onFocusTicket, tickets: ticketsProp }: Props) {
+  const mockTickets = useMockStore((s) => s.kdsTickets);
+  const kdsTickets = ticketsProp ?? mockTickets;
   const highlighted = useMockStore((s) => s.kdsHighlightedItemName);
 
   const mine = useMemo(() => kdsTickets.filter((t) => t.station === station), [kdsTickets, station]);

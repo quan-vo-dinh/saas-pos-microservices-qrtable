@@ -49,7 +49,7 @@ function buildSyntheticOrder(): Order {
   };
 }
 
-export function useFakeRealtime() {
+export function useFakeRealtime(enabled = true) {
   const [lastEvent, setLastEvent] = useState<
     OrderCreatedEvent | OrderStatusChangedEvent | ServiceRequestedEvent | null
   >(null);
@@ -67,6 +67,8 @@ export function useFakeRealtime() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
+
     if (pausedRef.current) return;
 
     let cancelled = false;
@@ -180,7 +182,7 @@ export function useFakeRealtime() {
       }
       window.clearInterval(intervalId);
     };
-  }, [epoch]);
+  }, [epoch, enabled]);
 
   return { lastEvent, pause, resume };
 }

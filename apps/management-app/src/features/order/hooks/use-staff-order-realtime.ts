@@ -27,11 +27,14 @@ function socketNamespaceUrl(apiBaseUrl: string): string {
 export function useStaffOrderRealtime(): void {
   const queryClient = useQueryClient();
   const tenantId = useAuthStore((state) => state.profile?.tenantId);
+  const accessToken = useAuthStore((state) => state.accessToken);
 
   useEffect(() => {
-    if (!tenantId) return;
+    if (!tenantId || !accessToken) return;
 
     const socket = io(socketNamespaceUrl(API_CONFIG.DEFAULT_BFF_URL), {
+      auth: { token: accessToken },
+      transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,
       timeout: 10_000,
@@ -85,5 +88,5 @@ export function useStaffOrderRealtime(): void {
     return () => {
       socket.disconnect();
     };
-  }, [queryClient, tenantId]);
+  }, [queryClient, tenantId, accessToken]);
 }

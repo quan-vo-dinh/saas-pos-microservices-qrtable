@@ -16,6 +16,12 @@ export const API_CONFIG = {
     ADMIN_TABLES_TRANSFER: '/admin/tables/transfer',
     ADMIN_BILLS_REOPEN: '/admin/bills',
     ADMIN_CURRENT_TENANT: '/admin/tenant/current',
+    /** Step 2.6 KDS — BFF `KitchenController` */
+    KDS_QUEUE: '/admin/kds/queue',
+    KDS_TICKET_START: (ticketId: string) => `/admin/kds/tickets/${encodeURIComponent(ticketId)}/start`,
+    KDS_TICKET_DONE: (ticketId: string) => `/admin/kds/tickets/${encodeURIComponent(ticketId)}/done`,
+    KDS_TICKET_RECALL: (ticketId: string) => `/admin/kds/tickets/${encodeURIComponent(ticketId)}/recall`,
+    KDS_TICKET_PRIORITY: (ticketId: string) => `/admin/kds/tickets/${encodeURIComponent(ticketId)}/priority`,
   },
 } as const;
 

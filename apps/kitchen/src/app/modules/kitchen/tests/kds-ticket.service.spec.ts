@@ -119,6 +119,30 @@ describe('KdsTicketService', () => {
     expect(JSON.parse(redis.published[0].payload).reason).toBe('TICKET_READY');
   });
 
+  it('includes ready-queue tickets in the queue snapshot', async () => {
+    const { repository, service } = setup();
+    await repository.createTicketsFromConfirmedOrder(event('order-1', '2026-05-07T10:00:00.000Z'));
+    await service.startTicket({
+      tenantId: 'tenant-a',
+      ticketId: 'order-1:KITCHEN',
+      station: 'KITCHEN',
+      userId: 'chef-1',
+      requestId: 'start-1',
+    });
+    await service.markReady({
+      tenantId: 'tenant-a',
+      ticketId: 'order-1:KITCHEN',
+      station: 'KITCHEN',
+      userId: 'chef-1',
+      requestId: 'ready-1',
+    });
+
+    const snapshot = await service.getQueue({ tenantId: 'tenant-a', station: 'KITCHEN' });
+    expect(snapshot.tickets).toHaveLength(1);
+    expect(snapshot.tickets[0].ticketId).toBe('order-1:KITCHEN');
+    expect(snapshot.tickets[0].status).toBe('READY');
+  });
+
   it('recalls ready tickets only inside the recall window', async () => {
     const { redis, repository, service } = setup();
     await repository.createTicketsFromConfirmedOrder(event('order-1', '2026-05-07T10:00:00.000Z'));
