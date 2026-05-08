@@ -1,11 +1,5 @@
-import { FeaturePlaceholder } from '@einvoice/frontend-ui';
+import { PosPaymentClient } from './pos-payment-client';
 
 export default function PosPaymentPage() {
-  return (
-    <FeaturePlaceholder
-      section="POS / Payment"
-      title="Payment Confirmation Skeleton"
-      description="Placeholder for cash and online payment confirmation workflows."
-    />
-  );
+  return <PosPaymentClient />;
 }

@@ -43,6 +43,8 @@ export type Bill = {
   roundingAmount: number;
   /** Set khi staff process payment (Phase 3) */
   paymentMethod?: PaymentMethod;
+  /** Payment aggregate id (Phase 3) — optional until persisted from Payment service */
+  paymentId?: string;
   status: BillStatus;
   /** Audit — set khi OPEN → PENDING_PAYMENT */
   closedAt?: string;

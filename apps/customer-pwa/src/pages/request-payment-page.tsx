@@ -65,6 +65,11 @@ export function RequestPaymentPage() {
         <p className="mt-1 text-base font-semibold">
           {billPending ? 'Đang chờ thanh toán' : bill ? bill.status : 'Chưa tạo bill'}
         </p>
+        {billPending ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            VietQR / chuyển khoản: nhân viên tạo mã tại POS (thanh toán). Màn hình này chỉ hiển thị trạng thái bill.
+          </p>
+        ) : null}
         <p className="mt-3 text-sm text-muted-foreground">Tổng tạm tính</p>
         <p className="text-2xl font-bold tabular-nums">{new Intl.NumberFormat('vi-VN').format(total)} đ</p>
       </div>

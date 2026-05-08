@@ -161,6 +161,7 @@ function buildBills(tables: RestaurantTable[], orders: Order[]): Bill[] {
       total: subtotal + rounding,
       roundingAmount: rounding,
       paymentMethod: PaymentMethod.CASH,
+      paymentId: faker.string.uuid(),
       status: BillStatus.PAID,
       closedAt: iso(t - (i + 1) * 20 * 60_000),
       paidAt: iso(t - (i + 1) * 18 * 60_000),
@@ -169,12 +170,17 @@ function buildBills(tables: RestaurantTable[], orders: Order[]): Bill[] {
     });
   }
   const billingTables = tables.filter((tb) => tb.status === 'billing').slice(0, 3);
+  const pendingBillIds = [
+    '66666666-6666-4666-a666-666666666661',
+    '66666666-6666-4666-a666-666666666662',
+    '66666666-6666-4666-a666-666666666663',
+  ] as const;
   for (let j = 0; j < 3; j++) {
     const tbl = billingTables[j] ?? tables[0];
     const relatedOrders = orders.filter((o) => o.tableId === tbl.id).map((o) => o.id);
     const subtotal = orders.filter((o) => o.tableId === tbl.id).reduce((s, o) => s + o.totalAmount, 184_000);
     bills.push({
-      id: `bill-pending-${j + 1}`,
+      id: pendingBillIds[j] ?? pendingBillIds[0],
       tenantId: mockTenantId,
       sessionId: tbl.sessionId ?? `sess-${tbl.id}`,
       orderIds: relatedOrders.length ? relatedOrders : ['ord-001'],

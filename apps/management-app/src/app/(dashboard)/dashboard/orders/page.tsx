@@ -1,11 +1,9 @@
-import { FeaturePlaceholder } from '@einvoice/frontend-ui';
+import { OrdersRefundSection } from '@/features/payment/components/orders-refund-section';
 
 export default function DashboardOrdersPage() {
   return (
-    <FeaturePlaceholder
-      section="Dashboard / Orders"
-      title="Orders and Billing Timeline Skeleton"
-      description="Placeholder for order timeline, bill status, and reconciliation insights."
-    />
+    <div className="flex flex-col gap-6 p-6">
+      <OrdersRefundSection />
+    </div>
   );
 }
