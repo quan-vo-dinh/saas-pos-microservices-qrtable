@@ -89,3 +89,17 @@ export type MarkOrderItemsReadyTcpResponse = {
 export type RevertOrderItemsProcessingTcpResponse = {
   orderStatusChanged?: OrderStatusChangedEvent;
 };
+
+export type BillPaymentSnapshotTcpResponse = {
+  billId: string;
+  tenantId: string;
+  sessionId: string;
+  status: Bill['status'];
+  rawTotal: number;
+  roundedTotal: number;
+  roundingDelta: number;
+};
+
+export type BillMarkedPaidTcpResponse = {
+  bill: Bill;
+};

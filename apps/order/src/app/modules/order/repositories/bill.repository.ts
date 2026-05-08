@@ -24,4 +24,8 @@ export class BillRepository {
       .andWhere('b.tenantId = :tenantId', { tenantId })
       .getOne();
   }
+
+  save(bill: Bill): Promise<Bill> {
+    return this.repo.save(bill);
+  }
 }

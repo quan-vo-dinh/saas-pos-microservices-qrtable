@@ -18,6 +18,7 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.ORDER_NOT_FOUND]: 'Không tìm thấy đơn hàng',
   [ErrorCode.ORDER_INVALID_STATE]: 'Đơn hàng không ở trạng thái hợp lệ cho thao tác này',
   [ErrorCode.BILL_NOT_OPEN]: 'Hóa đơn hiện tại không mở để thêm đơn',
+  [ErrorCode.BILL_NOT_FOUND]: 'Không tìm thấy hóa đơn',
   [ErrorCode.ORDER_CANCEL_REASON_REQUIRED]: 'Cần lý do khi huỷ đơn ở trạng thái này',
   [ErrorCode.BILL_CART_NOT_EMPTY]: 'Giỏ hàng phải trống trước khi yêu cầu thanh toán',
   [ErrorCode.BILL_ORDERS_NOT_ALL_SERVED]: 'Tất cả món phải được phục vụ trước khi yêu cầu thanh toán',

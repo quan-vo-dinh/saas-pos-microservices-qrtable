@@ -3,6 +3,8 @@ import { RequestParams } from '@common/decorators/request-param.decorator';
 import { TcpLoggingInterceptor } from '@common/interceptors/tcpLogging.interceptor';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
 import type {
+  BillMarkPaidTcpRequest,
+  BillPaymentSnapshotTcpRequest,
   BillSessionTcpRequest,
   CartClearTcpRequest,
   CartGetTcpRequest,
@@ -24,6 +26,8 @@ import type {
 } from '@common/interfaces/tcp/order/order-request.interface';
 import type {
   BillCurrentTcpResponse,
+  BillMarkedPaidTcpResponse,
+  BillPaymentSnapshotTcpResponse,
   BillRequestedTcpResponse,
   CartTcpResponse,
   KdsActiveOrdersGetTcpResponse,
@@ -120,6 +124,20 @@ export class OrderController {
   @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_CURRENT)
   async billGetCurrent(@RequestParams() body: BillSessionTcpRequest): Promise<Response<BillCurrentTcpResponse>> {
     const data = await this.billService.getCurrentBill(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_PAYMENT_SNAPSHOT)
+  async billGetPaymentSnapshot(
+    @RequestParams() body: BillPaymentSnapshotTcpRequest,
+  ): Promise<Response<BillPaymentSnapshotTcpResponse>> {
+    const data = await this.billService.getPaymentSnapshot(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID)
+  async billMarkPaid(@RequestParams() body: BillMarkPaidTcpRequest): Promise<Response<BillMarkedPaidTcpResponse>> {
+    const data = await this.billService.markPaid(body);
     return Response.success(data);
   }
 

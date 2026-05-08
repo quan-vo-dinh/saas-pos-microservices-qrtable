@@ -127,3 +127,17 @@ export type MarkOrderItemsReadyTcpRequest = {
 export type RevertOrderItemsProcessingTcpRequest = MarkOrderItemsReadyTcpRequest & {
   reason: 'KITCHEN_COMPENSATION' | 'KITCHEN_RECALL';
 };
+
+export type BillPaymentSnapshotTcpRequest = {
+  tenantId: string;
+  billId: string;
+};
+
+export type BillMarkPaidTcpRequest = {
+  tenantId: string;
+  billId: string;
+  paymentId: string;
+  method: 'CASH' | 'VIETQR';
+  paidAt: string;
+  processId?: string;
+};

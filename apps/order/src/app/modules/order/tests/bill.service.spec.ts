@@ -2,7 +2,7 @@ import { Bill } from '@common/entities/bill.entity';
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Test, TestingModule } from '@nestjs/testing';
-import { BillStatus, OrderStatus, ServiceRequestStatus, ServiceRequestType } from '@einvoice/types';
+import { BillStatus, OrderStatus, PaymentMethod, ServiceRequestStatus, ServiceRequestType } from '@einvoice/types';
 import { of } from 'rxjs';
 import { DataSource } from 'typeorm';
 import { BillRepository } from '../repositories/bill.repository';
@@ -17,7 +17,7 @@ describe('BillService', () => {
   let service: BillService;
   let sessionService: { getActiveSessionOrThrow: jest.Mock };
   let sessionRepository: { findActiveByIdAndTenant: jest.Mock };
-  let billRepository: { findByIdAndTenant: jest.Mock; findByIdAndTenantForUpdate: jest.Mock };
+  let billRepository: { findByIdAndTenant: jest.Mock; findByIdAndTenantForUpdate: jest.Mock; save: jest.Mock };
   let orderRepository: { findByIdsAndTenant: jest.Mock };
   let cartService: { getSnapshot: jest.Mock; lockCart: jest.Mock; unlockCartForBillReopen: jest.Mock };
   let catalogClient: { send: jest.Mock };
@@ -29,6 +29,7 @@ describe('BillService', () => {
     billRepository = {
       findByIdAndTenant: jest.fn(),
       findByIdAndTenantForUpdate: jest.fn(),
+      save: jest.fn(),
     };
     orderRepository = { findByIdsAndTenant: jest.fn() };
     cartService = {
@@ -181,5 +182,160 @@ describe('BillService', () => {
 
     expect(result.bill.status).toBe(BillStatus.PENDING_PAYMENT);
     expect(catalogClient.send).toHaveBeenCalled();
+  });
+
+  describe('getPaymentSnapshot', () => {
+    it('throws BILL_NOT_FOUND when bill is missing', async () => {
+      billRepository.findByIdAndTenant.mockResolvedValue(null);
+      await expect(service.getPaymentSnapshot({ tenantId: 't1', billId: 'b-missing' })).rejects.toMatchObject({
+        errorCode: ErrorCode.BILL_NOT_FOUND,
+      });
+    });
+
+    it('returns totals and status from bill', async () => {
+      const now = new Date();
+      billRepository.findByIdAndTenant.mockResolvedValue({
+        id: 'bill-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        orderIds: [],
+        status: BillStatus.PENDING_PAYMENT,
+        subtotal: 100,
+        total: 110,
+        roundingAmount: 10,
+        paymentMethod: null,
+        closedAt: null,
+        paidAt: null,
+        createdAt: now,
+        updatedAt: now,
+      } as Bill);
+
+      await expect(service.getPaymentSnapshot({ tenantId: 't1', billId: 'bill-1' })).resolves.toEqual({
+        billId: 'bill-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        status: BillStatus.PENDING_PAYMENT,
+        rawTotal: 100,
+        roundedTotal: 110,
+        roundingDelta: 10,
+      });
+    });
+  });
+
+  describe('markPaid', () => {
+    it('throws BILL_NOT_FOUND when bill is missing', async () => {
+      billRepository.findByIdAndTenant.mockResolvedValue(null);
+      await expect(
+        service.markPaid({
+          tenantId: 't1',
+          billId: 'b1',
+          paymentId: 'pay-1',
+          method: 'CASH',
+          paidAt: '2026-05-08T12:00:00.000Z',
+        }),
+      ).rejects.toMatchObject({
+        errorCode: ErrorCode.BILL_NOT_FOUND,
+      });
+    });
+
+    it('throws BILL_NOT_PENDING_PAYMENT when bill is OPEN', async () => {
+      const now = new Date();
+      billRepository.findByIdAndTenant.mockResolvedValue({
+        id: 'bill-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        orderIds: [],
+        status: BillStatus.OPEN,
+        subtotal: 100,
+        total: 100,
+        roundingAmount: 0,
+        paymentMethod: null,
+        closedAt: null,
+        paidAt: null,
+        createdAt: now,
+        updatedAt: now,
+      } as Bill);
+
+      await expect(
+        service.markPaid({
+          tenantId: 't1',
+          billId: 'bill-1',
+          paymentId: 'pay-1',
+          method: 'CASH',
+          paidAt: '2026-05-08T12:00:00.000Z',
+        }),
+      ).rejects.toMatchObject({
+        errorCode: ErrorCode.BILL_NOT_PENDING_PAYMENT,
+      });
+    });
+
+    it('returns bill without save when already PAID', async () => {
+      const now = new Date();
+      const paidAt = new Date('2026-05-08T11:00:00.000Z');
+      billRepository.findByIdAndTenant.mockResolvedValue({
+        id: 'bill-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        orderIds: [],
+        status: BillStatus.PAID,
+        subtotal: 100,
+        total: 100,
+        roundingAmount: 0,
+        paymentMethod: PaymentMethod.CASH,
+        closedAt: paidAt,
+        paidAt,
+        createdAt: now,
+        updatedAt: now,
+      } as Bill);
+
+      const result = await service.markPaid({
+        tenantId: 't1',
+        billId: 'bill-1',
+        paymentId: 'pay-1',
+        method: 'VIETQR',
+        paidAt: '2026-05-08T12:00:00.000Z',
+      });
+
+      expect(result.bill.status).toBe(BillStatus.PAID);
+      expect(billRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('sets PAID, payment method, paidAt and saves when PENDING_PAYMENT', async () => {
+      const now = new Date();
+      const pending = {
+        id: 'bill-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        orderIds: [],
+        status: BillStatus.PENDING_PAYMENT,
+        subtotal: 100,
+        total: 100,
+        roundingAmount: 0,
+        paymentMethod: null,
+        closedAt: now,
+        paidAt: null,
+        createdAt: now,
+        updatedAt: now,
+      } as Bill;
+      billRepository.findByIdAndTenant.mockResolvedValue(pending);
+      billRepository.save.mockImplementation(async (b: Bill) => Promise.resolve({ ...b }));
+
+      const paidAtIso = '2026-05-08T12:00:00.000Z';
+      const result = await service.markPaid({
+        tenantId: 't1',
+        billId: 'bill-1',
+        paymentId: 'pay-1',
+        method: 'VIETQR',
+        paidAt: paidAtIso,
+      });
+
+      expect(billRepository.save).toHaveBeenCalled();
+      const saved = billRepository.save.mock.calls[0][0] as Bill;
+      expect(saved.status).toBe(BillStatus.PAID);
+      expect(saved.paymentMethod).toBe(PaymentMethod.VIETQR);
+      expect(saved.paidAt).toEqual(new Date(paidAtIso));
+      expect(result.bill.status).toBe(BillStatus.PAID);
+      expect(result.bill.paymentMethod).toBe(PaymentMethod.VIETQR);
+    });
   });
 });

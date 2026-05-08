@@ -10,9 +10,15 @@ import { Request } from '@common/interfaces/tcp/common/request.interface';
 import type { ResponseType } from '@common/interfaces/tcp/common/response.interface';
 import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import type { UpdateTableStatusTcpRequest } from '@common/interfaces/tcp/catalog/table-request.interface';
-import type { BillSessionTcpRequest } from '@common/interfaces/tcp/order/order-request.interface';
+import type {
+  BillMarkPaidTcpRequest,
+  BillPaymentSnapshotTcpRequest,
+  BillSessionTcpRequest,
+} from '@common/interfaces/tcp/order/order-request.interface';
 import type {
   BillCurrentTcpResponse,
+  BillMarkedPaidTcpResponse,
+  BillPaymentSnapshotTcpResponse,
   BillRequestedTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
 import type { Bill as BillDto, ServiceRequest as ServiceRequestDto } from '@einvoice/types';
@@ -20,6 +26,7 @@ import {
   BillRequestedEvent,
   BillStatus,
   OrderStatus,
+  PaymentMethod,
   ServiceRequestedEvent,
   ServiceRequestStatus,
   ServiceRequestType,
@@ -57,6 +64,40 @@ export class BillService {
     }
     const bill = await this.billRepository.findByIdAndTenant(session.currentBillId, dto.tenantId);
     return { bill: bill ? this.toBillDto(bill) : null, cart };
+  }
+
+  async getPaymentSnapshot(dto: BillPaymentSnapshotTcpRequest): Promise<BillPaymentSnapshotTcpResponse> {
+    const bill = await this.billRepository.findByIdAndTenant(dto.billId, dto.tenantId);
+    if (!bill) {
+      throw new BusinessException(ErrorCode.BILL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    return {
+      billId: bill.id,
+      tenantId: bill.tenantId,
+      sessionId: bill.sessionId,
+      status: bill.status,
+      rawTotal: bill.subtotal,
+      roundedTotal: bill.total,
+      roundingDelta: bill.roundingAmount,
+    };
+  }
+
+  async markPaid(dto: BillMarkPaidTcpRequest): Promise<BillMarkedPaidTcpResponse> {
+    const bill = await this.billRepository.findByIdAndTenant(dto.billId, dto.tenantId);
+    if (!bill) {
+      throw new BusinessException(ErrorCode.BILL_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    if (bill.status === BillStatus.PAID) {
+      return { bill: this.toBillDto(bill) };
+    }
+    if (bill.status !== BillStatus.PENDING_PAYMENT) {
+      throw new BusinessException(ErrorCode.BILL_NOT_PENDING_PAYMENT, HttpStatus.CONFLICT);
+    }
+    bill.status = BillStatus.PAID;
+    bill.paymentMethod = dto.method as PaymentMethod;
+    bill.paidAt = new Date(dto.paidAt);
+    await this.billRepository.save(bill);
+    return { bill: this.toBillDto(bill) };
   }
 
   async requestBill(dto: BillSessionTcpRequest): Promise<BillRequestedTcpResponse> {

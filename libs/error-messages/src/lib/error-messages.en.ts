@@ -18,6 +18,7 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.ORDER_NOT_FOUND]: 'Order not found',
   [ErrorCode.ORDER_INVALID_STATE]: 'Order is not in a valid state for this action',
   [ErrorCode.BILL_NOT_OPEN]: 'Current bill is not open for new orders',
+  [ErrorCode.BILL_NOT_FOUND]: 'Bill not found',
   [ErrorCode.ORDER_CANCEL_REASON_REQUIRED]: 'A cancellation reason is required for this order state',
   [ErrorCode.BILL_CART_NOT_EMPTY]: 'Cart must be empty before requesting the bill',
   [ErrorCode.BILL_ORDERS_NOT_ALL_SERVED]: 'All active orders must be served before requesting the bill',
