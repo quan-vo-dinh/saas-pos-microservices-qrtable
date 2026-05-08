@@ -37,6 +37,7 @@ import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { firstValueFrom, map } from 'rxjs';
+import { assertSepayWebhookSecret } from '../verify-sepay-webhook-secret';
 
 @ApiTags('Payment')
 @Controller('payment')
@@ -121,10 +122,9 @@ export class PaymentController {
     @Body() payload: SepayWebhookPayload,
     @ProcessId() processId: string,
   ): Promise<ResponseDto<SepayWebhookTcpResponse>> {
-    const expected = this.configService.get<string>('SEPAY_WEBHOOK_SECRET') || process.env['SEPAY_WEBHOOK_SECRET'];
-    if (!expected || !secretKey || secretKey !== expected) {
-      throw new UnauthorizedException('Invalid webhook secret');
-    }
+    const expected =
+      this.configService.get<string>('SEPAY_WEBHOOK_SECRET') || process.env['SEPAY_WEBHOOK_SECRET'] || '';
+    assertSepayWebhookSecret(secretKey, expected);
     const tcpData: HandleSepayWebhookTcpRequest = { payload, processId };
     const tcp = await firstValueFrom(
       this.paymentClient

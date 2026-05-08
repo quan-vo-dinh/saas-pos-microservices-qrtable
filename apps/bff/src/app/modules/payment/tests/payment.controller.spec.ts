@@ -1,22 +1,20 @@
 import { UnauthorizedException } from '@nestjs/common';
+import { assertSepayWebhookSecret } from '../verify-sepay-webhook-secret';
 
-describe('Payment webhook security', () => {
-  function verify(received: string | undefined, expected: string) {
-    if (!received || received !== expected) {
-      throw new UnauthorizedException('Invalid webhook secret');
-    }
-    return true;
-  }
-
+describe('assertSepayWebhookSecret', () => {
   it('rejects missing secret', () => {
-    expect(() => verify(undefined, 'secret')).toThrow(UnauthorizedException);
+    expect(() => assertSepayWebhookSecret(undefined, 'secret')).toThrow(UnauthorizedException);
   });
 
   it('rejects invalid secret', () => {
-    expect(() => verify('wrong', 'secret')).toThrow(UnauthorizedException);
+    expect(() => assertSepayWebhookSecret('wrong', 'secret')).toThrow(UnauthorizedException);
+  });
+
+  it('rejects empty configured secret', () => {
+    expect(() => assertSepayWebhookSecret('anything', '')).toThrow(UnauthorizedException);
   });
 
   it('accepts matching secret', () => {
-    expect(verify('secret', 'secret')).toBe(true);
+    expect(() => assertSepayWebhookSecret('secret', 'secret')).not.toThrow();
   });
 });
