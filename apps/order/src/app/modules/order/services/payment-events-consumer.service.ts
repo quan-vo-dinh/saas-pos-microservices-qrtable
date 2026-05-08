@@ -10,6 +10,8 @@ export type PaymentCompletedKafkaEvent = {
   tenantId: string;
   billId: string;
   paymentId: string;
+  /** Actual received (VietQR) or rounded total (cash) — spec §8.1 */
+  amount: number;
   method: 'CASH' | 'VIETQR';
   paidAt: string;
   correlationId?: string;
@@ -40,7 +42,8 @@ export function parsePaymentCompletedEvent(raw: string): PaymentCompletedKafkaEv
   const paymentId = typeof o.paymentId === 'string' ? o.paymentId : '';
   const paidAt = typeof o.paidAt === 'string' ? o.paidAt : '';
   const method = safePaymentMethod(o.method);
-  if (!eventId || !tenantId || !billId || !paymentId || !paidAt || !method) {
+  const amount = typeof o.amount === 'number' && Number.isFinite(o.amount) ? o.amount : NaN;
+  if (!eventId || !tenantId || !billId || !paymentId || !paidAt || !method || Number.isNaN(amount)) {
     return null;
   }
   const correlationId = typeof o.correlationId === 'string' ? o.correlationId : undefined;
@@ -50,6 +53,7 @@ export function parsePaymentCompletedEvent(raw: string): PaymentCompletedKafkaEv
     tenantId,
     billId,
     paymentId,
+    amount,
     method,
     paidAt,
     correlationId,
@@ -88,25 +92,30 @@ export class PaymentEventsConsumerService implements OnModuleInit, OnModuleDestr
       await this.consumer.connect();
       await this.consumer.subscribe({ topic: PAYMENT_COMPLETED_TOPIC, fromBeginning: false });
       await this.consumer.run({
-        eachMessage: async ({ message }) => {
+        eachMessage: async ({ message, topic, partition }) => {
           const raw = message.value?.toString();
           if (!raw) {
+            this.logger.warn(
+              `Empty payment.completed message topic=${topic} partition=${partition} offset=${message.offset}`,
+            );
             return;
           }
-          let eventId: string | undefined;
-          let billId: string | undefined;
+          const event = parsePaymentCompletedEvent(raw);
+          if (!event) {
+            this.logger.warn(
+              `Invalid or non-payment.completed payload topic=${topic} partition=${partition} offset=${message.offset} preview=${raw.slice(0, 240)}`,
+            );
+            return;
+          }
           try {
-            const event = parsePaymentCompletedEvent(raw);
-            if (!event) {
-              return;
-            }
-            eventId = event.eventId;
-            billId = event.billId;
             await this.billService.markPaid(paymentCompletedToMarkPaidRequest(event));
           } catch (error) {
+            const err = error as Error;
             this.logger.error(
-              `Payment completion handler failed eventId=${eventId ?? 'n/a'} billId=${billId ?? 'n/a'}: ${(error as Error).message}`,
+              `markPaid failed after payment.completed eventId=${event.eventId} billId=${event.billId}: ${err.message}`,
+              err.stack,
             );
+            throw error;
           }
         },
       });

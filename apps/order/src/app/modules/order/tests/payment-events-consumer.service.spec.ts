@@ -37,6 +37,36 @@ describe('payment-events-consumer helpers', () => {
       ).toBeNull();
     });
 
+    it('returns null when amount is missing or not a finite number', () => {
+      expect(
+        parsePaymentCompletedEvent(
+          JSON.stringify({
+            eventId: 'e1',
+            eventType: 'payment.completed',
+            tenantId: 't1',
+            billId: 'b1',
+            paymentId: 'p1',
+            method: 'VIETQR',
+            paidAt: '2026-01-01T00:00:00.000Z',
+          }),
+        ),
+      ).toBeNull();
+      expect(
+        parsePaymentCompletedEvent(
+          JSON.stringify({
+            eventId: 'e1',
+            eventType: 'payment.completed',
+            tenantId: 't1',
+            billId: 'b1',
+            paymentId: 'p1',
+            method: 'VIETQR',
+            paidAt: '2026-01-01T00:00:00.000Z',
+            amount: 'not-a-number',
+          }),
+        ),
+      ).toBeNull();
+    });
+
     it('returns null when method is not CASH or VIETQR', () => {
       expect(
         parsePaymentCompletedEvent(
@@ -48,6 +78,7 @@ describe('payment-events-consumer helpers', () => {
             paymentId: 'p1',
             method: 'WIRE',
             paidAt: '2026-01-01T00:00:00.000Z',
+            amount: 1000,
           }),
         ),
       ).toBeNull();
@@ -62,6 +93,7 @@ describe('payment-events-consumer helpers', () => {
         paymentId: 'p1',
         method: 'VIETQR',
         paidAt: '2026-01-01T00:00:00.000Z',
+        amount: 128000,
         correlationId: 'corr-1',
       });
       const ev = parsePaymentCompletedEvent(raw);
@@ -71,6 +103,7 @@ describe('payment-events-consumer helpers', () => {
         tenantId: 't1',
         billId: 'b1',
         paymentId: 'p1',
+        amount: 128000,
         method: 'VIETQR',
         paidAt: '2026-01-01T00:00:00.000Z',
         correlationId: 'corr-1',
@@ -86,6 +119,7 @@ describe('payment-events-consumer helpers', () => {
         tenantId: 't1',
         billId: 'b1',
         paymentId: 'p1',
+        amount: 500,
         method: 'CASH',
         paidAt: '2026-01-01T00:00:00.000Z',
         correlationId: 'c1',
