@@ -182,7 +182,9 @@ export class PaymentService {
     });
 
     if (!billReference || payload.transferType !== 'in') {
-      this.logger.warn(`Unmatched or non-incoming SePay webhook: ${JSON.stringify(payload)}`);
+      this.logger.warn(
+        `Unmatched or non-incoming SePay webhook id=${payload.id} transferType=${payload.transferType} amount=${payload.transferAmount}`,
+      );
       return { status: 'success' };
     }
 
