@@ -7,6 +7,10 @@ describe('PaymentReferenceService', () => {
     expect(service.createBillReference('b1a2c3d4-1111-2222-3333-444455556666')).toBe('QRTBLB1A2C3D4');
   });
 
+  it('creates collision fallback from chars 8-16 of bill id without dashes', () => {
+    expect(service.createCollisionFallbackReference('b1a2c3d4-1111-2222-3333-444455556666')).toBe('QRTBL11112222');
+  });
+
   it('extracts reference from code first', () => {
     expect(service.extractBillReference({ code: 'QRTBLABC12345', content: 'QRTBLZZZZ9999' })).toBe('QRTBLABC12345');
   });

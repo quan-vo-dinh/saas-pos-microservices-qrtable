@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 
+const BILL_REFERENCE_REGEX = /QRTBL[A-Z0-9]{8}/i;
+
 @Injectable()
 export class PaymentReferenceService {
-  readonly BILL_REFERENCE_REGEX = /QRTBL[A-Z0-9]{8}/i;
-
   createBillReference(billId: string): string {
     return `QRTBL${billId.replace(/-/g, '').slice(0, 8).toUpperCase()}`;
   }
@@ -15,14 +15,14 @@ export class PaymentReferenceService {
   extractBillReference(input: { code?: string | null; content?: string | null }): string | null {
     const code = input.code?.trim().toUpperCase();
     if (code) {
-      const match = code.match(this.BILL_REFERENCE_REGEX);
+      const match = code.match(BILL_REFERENCE_REGEX);
       if (match) {
         return match[0].toUpperCase();
       }
     }
 
     const content = input.content?.trim() ?? '';
-    return content.match(this.BILL_REFERENCE_REGEX)?.[0]?.toUpperCase() ?? null;
+    return content.match(BILL_REFERENCE_REGEX)?.[0]?.toUpperCase() ?? null;
   }
 
   buildQrUrl(input: { account: string; bank: string; amount: number; description: string }): string {
