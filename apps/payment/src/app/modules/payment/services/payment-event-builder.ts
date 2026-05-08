@@ -1,10 +1,13 @@
-import { randomUUID } from 'crypto';
 import { PaymentEntity } from '../entities/payment.entity';
 import { RefundEntity } from '../entities/refund.entity';
 
-export function buildPaymentCompletedPayload(payment: PaymentEntity, correlationId?: string): Record<string, unknown> {
+export function buildPaymentCompletedPayload(
+  payment: PaymentEntity,
+  eventId: string,
+  correlationId?: string,
+): Record<string, unknown> {
   return {
-    eventId: randomUUID(),
+    eventId,
     eventType: 'payment.completed',
     tenantId: payment.tenantId,
     billId: payment.billId,
@@ -19,10 +22,11 @@ export function buildPaymentCompletedPayload(payment: PaymentEntity, correlation
 export function buildPaymentRefundedPayload(
   payment: PaymentEntity,
   refund: RefundEntity,
+  eventId: string,
   correlationId?: string,
 ): Record<string, unknown> {
   return {
-    eventId: randomUUID(),
+    eventId,
     eventType: 'payment.refunded',
     tenantId: payment.tenantId,
     billId: payment.billId,
