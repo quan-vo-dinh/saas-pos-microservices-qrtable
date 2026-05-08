@@ -20,6 +20,7 @@ import { BillService } from './services/bill.service';
 import { CartService } from './services/cart.service';
 import { OrderService } from './services/order.service';
 import { OutboxPublisherService } from './services/outbox-publisher.service';
+import { PaymentEventsConsumerService } from './services/payment-events-consumer.service';
 import { ServiceRequestService } from './services/service-request.service';
 import { SessionService } from './services/session.service';
 import { TransferService } from './services/transfer.service';
@@ -37,6 +38,7 @@ import { TransferService } from './services/transfer.service';
     ServiceRequestService,
     TransferService,
     OutboxPublisherService,
+    PaymentEventsConsumerService,
     SessionService,
     CartService,
     OrderRepository,
