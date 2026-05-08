@@ -155,6 +155,12 @@ export class OrderController {
     return Response.success(data);
   }
 
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.MARK_SERVED)
+  async markServed(@RequestParams() body: StaffOrderActionTcpRequest): Promise<Response<OrderActionTcpResponse>> {
+    const data = await this.orderService.markOrderServed(body);
+    return Response.success(data);
+  }
+
   @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.SERVICE_REQUEST_CREATE)
   async serviceRequestCreate(
     @RequestParams() body: CreateServiceRequestTcpRequest,

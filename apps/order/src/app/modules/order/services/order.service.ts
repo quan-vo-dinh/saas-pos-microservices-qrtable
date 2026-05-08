@@ -486,6 +486,68 @@ export class OrderService {
     return this.buildCancelResponse(dto.tenantId, order, items, bill, OrderStatus.PROCESSING, dto.userId);
   }
 
+  async markOrderServed(dto: StaffOrderActionTcpRequest): Promise<OrderActionTcpResponse> {
+    const { order, items, bill, fromStatus } = await this.dataSource.transaction(async (manager) => {
+      const ord = await this.orderRepository.findByIdAndTenantForUpdate(dto.orderId, dto.tenantId, manager);
+      if (!ord) {
+        throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
+      }
+
+      const lines = await this.orderItemRepository.findByOrderIdAndTenantWithManager(
+        dto.orderId,
+        dto.tenantId,
+        manager,
+      );
+
+      if (ord.status !== OrderStatus.READY) {
+        throw new BusinessException(ErrorCode.ORDER_INVALID_STATE, HttpStatus.CONFLICT);
+      }
+
+      const activeLines = lines.filter((line) => line.status !== OrderItemStatus.CANCELED);
+      if (activeLines.length === 0 || activeLines.some((line) => line.status !== OrderItemStatus.READY)) {
+        throw new BusinessException(ErrorCode.ORDER_INVALID_STATE, HttpStatus.CONFLICT);
+      }
+
+      const now = new Date();
+      await manager
+        .createQueryBuilder()
+        .update(OrderItem)
+        .set({ status: OrderItemStatus.SERVED, updatedAt: now })
+        .where('tenantId = :tenantId', { tenantId: dto.tenantId })
+        .andWhere('orderId = :orderId', { orderId: dto.orderId })
+        .andWhere('status = :fromStatus', { fromStatus: OrderItemStatus.READY })
+        .execute();
+
+      ord.status = OrderStatus.SERVED;
+      ord.updatedAt = now;
+      await manager.save(Order, ord);
+
+      const updatedItems = await this.orderItemRepository.findByOrderIdAndTenantWithManager(
+        dto.orderId,
+        dto.tenantId,
+        manager,
+      );
+      const currentBill = await this.loadBillForSessionOrder(manager, ord.sessionId, dto.tenantId, ord.id);
+
+      return { order: ord, items: updatedItems, bill: currentBill, fromStatus: OrderStatus.READY };
+    });
+
+    const orderStatusChanged: OrderStatusChangedEvent = {
+      tenantId: dto.tenantId,
+      orderId: order.id,
+      fromStatus,
+      toStatus: OrderStatus.SERVED,
+      changedByUserId: dto.userId,
+      timestamp: order.updatedAt.toISOString(),
+    };
+
+    return {
+      order: this.toOrderDto(order, items),
+      bill: bill ? this.toBillDto(bill) : undefined,
+      events: { orderStatusChanged },
+    };
+  }
+
   async getKdsActiveOrderSnapshots(dto: KdsActiveOrdersGetTcpRequest): Promise<KdsActiveOrdersGetTcpResponse> {
     const orders = await this.orderRepository.findActiveKdsOrders(dto.tenantId, dto.station);
     const out: KdsActiveOrderSnapshot[] = [];

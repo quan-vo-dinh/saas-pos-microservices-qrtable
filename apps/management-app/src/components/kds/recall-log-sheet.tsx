@@ -20,18 +20,18 @@ export function RecallLogSheet({ open, onOpenChange }: Props) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="border-l border-white/10 bg-[#090b10] text-[var(--ink)] sm:max-w-lg"
+        className="border-l border-border bg-background text-foreground sm:max-w-lg"
         data-kds-ignore-shortcuts
       >
         <SheetHeader>
           <SheetTitle>Recall log</SheetTitle>
-          <SheetDescription className="text-white/55">Audit recall trong phiên mock (24h gần nhất).</SheetDescription>
+          <SheetDescription>Audit recall trong phiên mock (24h gần nhất).</SheetDescription>
         </SheetHeader>
         <ScrollArea className="mt-4 max-h-[calc(100vh-8rem)]">
-          <div className="rounded-lg border border-white/10 pe-2">
+          <div className="rounded-lg border border-border pe-2">
             <Table>
               <TableHeader>
-                <TableRow className="border-white/10 hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="w-[140px] text-[0.65rem]">Lúc</TableHead>
                   <TableHead className="text-[0.65rem]">Ticket</TableHead>
                   <TableHead className="text-[0.65rem]">Người</TableHead>
@@ -43,14 +43,14 @@ export function RecallLogSheet({ open, onOpenChange }: Props) {
               <TableBody>
                 {recallLog.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-sm text-white/50">
+                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                       Chưa có recall.
                     </TableCell>
                   </TableRow>
                 ) : (
                   recallLog.map((e) => (
-                    <TableRow key={e.id} className="border-white/10">
-                      <TableCell className="font-mono text-[0.65rem] text-white/80">
+                    <TableRow key={e.id} className="border-border">
+                      <TableCell className="font-mono text-[0.65rem] text-muted-foreground">
                         {new Date(e.createdAt).toLocaleString('vi-VN')}
                       </TableCell>
                       <TableCell className="font-mono text-xs">#{e.ticketId.slice(-4)}</TableCell>
@@ -58,9 +58,9 @@ export function RecallLogSheet({ open, onOpenChange }: Props) {
                       <TableCell className="max-w-[200px] truncate text-[0.75rem]">{e.reason}</TableCell>
                       <TableCell>
                         {e.resolved ? (
-                          <Badge className="bg-emerald-500/20 text-emerald-200">Đã xử lý</Badge>
+                          <Badge variant="secondary">Đã xử lý</Badge>
                         ) : (
-                          <Badge variant="outline" className="border-[var(--pink)]/40 text-[var(--pink)]">
+                          <Badge variant="outline" className="border-destructive/40 text-destructive">
                             Mở
                           </Badge>
                         )}

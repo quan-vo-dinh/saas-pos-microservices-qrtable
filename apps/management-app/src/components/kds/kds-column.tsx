@@ -22,18 +22,18 @@ export function KdsColumn({ columnId, title, accentClass, count, children }: Pro
       ref={setNodeRef}
       data-slot="kds-column"
       className={cn(
-        'flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-white/10 bg-black/40',
-        isOver && 'ring-2 ring-[var(--lime)]/60',
+        'flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-border/60 bg-muted/20',
+        isOver && 'ring-2 ring-ring/50',
       )}
     >
       <div
         className={cn(
-          'flex shrink-0 items-center justify-between border-b border-white/10 px-2 py-1.5',
+          'flex shrink-0 items-center justify-between border-b border-border/60 px-2 py-1.5',
           accentClass,
         )}
       >
-        <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-[var(--ink)]">{title}</span>
-        <Badge variant="secondary" className="h-5 min-w-6 justify-center bg-black/60 font-mono text-[0.65rem]">
+        <span className="text-[0.7rem] font-semibold uppercase tracking-wide text-foreground">{title}</span>
+        <Badge variant="secondary" className="h-5 min-w-6 justify-center bg-background font-mono text-[0.65rem]">
           {count}
         </Badge>
       </div>

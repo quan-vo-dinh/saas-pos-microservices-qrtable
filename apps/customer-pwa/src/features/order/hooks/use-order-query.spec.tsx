@@ -234,4 +234,58 @@ describe('useCartMutations', () => {
       expect(cached?.items[0]?.menuItemImageUrl).toBe('https://cdn.example.test/menu/pho-bo.jpg');
     });
   });
+
+  it('merges ADD_ITEM optimistic state into the matching cart line', async () => {
+    mutateCartMock.mockImplementation(() => new Promise(() => undefined));
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    queryClient.setQueryData(
+      cartKeys.snapshot('tenant-1', 'session-1'),
+      makeCartSnapshot({
+        cartVersion: 0,
+        items: [
+          {
+            cartLineId: 'line-1',
+            menuItemId: '11111111-cccc-4111-8111-111111111111',
+            menuItemName: 'Phở bò tái',
+            quantity: 2,
+            unitPrice: 65000,
+            note: 'no onions',
+            lineVersion: 1,
+          },
+        ],
+      }),
+    );
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const item: PublicMenuItem = {
+      id: '11111111-cccc-4111-8111-111111111111',
+      name: 'Phở bò tái',
+      description: null,
+      price: 65000,
+      imageUrl: null,
+      status: 'available',
+    };
+
+    const { result } = renderHook(() => useCartMutations(), { wrapper });
+
+    act(() => {
+      result.current.addItem(item, 3, ' no onions ');
+    });
+
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<CartSnapshot>(cartKeys.snapshot('tenant-1', 'session-1'));
+      expect(cached?.items).toHaveLength(1);
+      expect(cached?.items[0]).toEqual(
+        expect.objectContaining({
+          cartLineId: 'line-1',
+          quantity: 5,
+          note: 'no onions',
+          lineVersion: 2,
+        }),
+      );
+    });
+  });
 });

@@ -65,7 +65,7 @@ export function AuthSessionHydrator() {
         setProfile({
           userId: profile.userId,
           email: profile.email,
-          tenantId: profile.tenantId,
+          tenantId: profile.tenantId ?? session.user?.tenantId,
           roles: profile.roles ?? [],
           permissions: profile.permissions ?? [],
         });

@@ -1,6 +1,5 @@
 @import 'tailwindcss';
 @import '../styles/pos-tokens.css';
-@import '../styles/kds-tokens.css';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/geist';

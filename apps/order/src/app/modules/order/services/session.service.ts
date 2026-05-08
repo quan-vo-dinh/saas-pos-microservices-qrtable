@@ -212,6 +212,14 @@ export class SessionService {
       return false;
     }
 
+    const durable = await this.sessionRepository.findActiveByIdAndTenant(fields.sessionId, fields.tenantId);
+    if (durable && durable.orderCount > 0) {
+      Object.assign(fields, this.entityToRedisFields(durable));
+      await this.writeSessionRedis(redis, redisKey, durable);
+      await redis.pexpire(redisKey, SESSION_POLICY.TTL_MS);
+      return false;
+    }
+
     const closedAt = new Date();
     await this.sessionRepository.markClosed(fields.sessionId, fields.tenantId, closedAt);
     await redis.del(redisKey);

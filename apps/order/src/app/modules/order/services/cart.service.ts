@@ -150,8 +150,35 @@ export class CartService {
       cartVersion: Number.parseInt(raw['cartVersion'] ?? '0', 10) || 0,
       status: (raw['status'] as CartSnapshot['status']) || 'ACTIVE',
       updatedAt: raw['updatedAt'] || new Date().toISOString(),
-      items,
+      items: this.normalizeCartLines(items),
     };
+  }
+
+  private normalizeCartLines(lines: CartLine[]): CartLine[] {
+    const out: CartLine[] = [];
+    for (const line of lines) {
+      const note = this.normalizeNote(line.note);
+      const idx = out.findIndex(
+        (item) => item.menuItemId === line.menuItemId && this.normalizeNote(item.note) === note,
+      );
+      if (idx < 0) {
+        out.push({ ...line, note });
+        continue;
+      }
+
+      const existing = out[idx];
+      out[idx] = {
+        ...existing,
+        menuItemName: line.menuItemName || existing.menuItemName,
+        menuItemImageUrl: line.menuItemImageUrl ?? existing.menuItemImageUrl,
+        quantity: existing.quantity + line.quantity,
+        unitPrice: line.unitPrice,
+        note,
+        station: line.station ?? existing.station,
+        lineVersion: Math.max(existing.lineVersion, line.lineVersion),
+      };
+    }
+    return out;
   }
 
   private async persistAtomic(redis: Redis, key: string, snapshot: CartSnapshot): Promise<void> {
@@ -177,7 +204,24 @@ export class CartService {
           throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
         }
         const line = await this.buildLineFromCatalog(input.tenantId, input.menuItemId, input.quantity, input.note);
-        items.push(line);
+        const existingIndex = items.findIndex(
+          (item) => item.menuItemId === line.menuItemId && this.normalizeNote(item.note) === line.note,
+        );
+        if (existingIndex >= 0) {
+          const existing = items[existingIndex];
+          items[existingIndex] = {
+            ...existing,
+            menuItemName: line.menuItemName,
+            menuItemImageUrl: line.menuItemImageUrl,
+            quantity: existing.quantity + line.quantity,
+            unitPrice: line.unitPrice,
+            note: line.note,
+            station: line.station,
+            lineVersion: existing.lineVersion + 1,
+          };
+        } else {
+          items.push(line);
+        }
         return { ...snapshot, items };
       }
       case 'SET_QUANTITY': {

@@ -84,6 +84,21 @@ export function useConfirmOrderMutation() {
   });
 }
 
+export function useMarkOrderServedMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (orderId: string) => orderService.markOrderServed(orderId),
+    onSuccess: async (_data, orderId) => {
+      await invalidateOrderQueries(queryClient, orderId);
+      toast.success(successMessage('updated', 'order'));
+    },
+    onError: (error: Error) => {
+      toast.error(getErrorDisplayMessage(error));
+    },
+  });
+}
+
 export function useCancelOrderMutation() {
   const queryClient = useQueryClient();
 

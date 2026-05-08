@@ -48,6 +48,16 @@ describe('orderService', () => {
     });
   });
 
+  it('posts serve to the admin serve endpoint', async () => {
+    mockAuthApiClient.mockResolvedValue({ id: 'order-1' });
+
+    await orderService.markOrderServed('order-1');
+
+    expect(mockAuthApiClient).toHaveBeenCalledWith(`${ADMIN_ORDERS}/order-1/serve`, {
+      method: 'POST',
+    });
+  });
+
   it('posts cancel pending with an optional reason body', async () => {
     mockAuthApiClient.mockResolvedValue({ id: 'order-1' });
 

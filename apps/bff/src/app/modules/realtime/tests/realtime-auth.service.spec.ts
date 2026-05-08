@@ -72,6 +72,37 @@ describe('RealtimeAuthService', () => {
     expect(rooms.length).toBe(2);
   });
 
+  it('staff JWT resolves camelCase proto JWT roles to KDS room', async () => {
+    authorizer.verifyUserToken.mockReturnValue(
+      of({
+        data: {
+          valid: true,
+          metadata: {
+            userId: 'u1',
+            jwt: {
+              tenantId: 't1',
+              realmAccess: { roles: [ROLE.BARISTA] },
+            },
+          },
+        },
+      }),
+    );
+
+    const socket = {
+      handshake: {
+        auth: { token: 'tok' },
+        headers: {},
+      },
+      data: {},
+      join: jest.fn().mockResolvedValue(undefined),
+    } as unknown as Socket;
+
+    const rooms = await service.resolveConnectionRooms(socket);
+
+    expect(rooms).toEqual(expect.arrayContaining(['tenant:t1:staff', 'tenant:t1:kds:bar']));
+    expect(rooms.length).toBe(2);
+  });
+
   it('customer auth payload resolves to customer session room', async () => {
     cache.get.mockImplementation(async (key: string) => {
       if (key === getSessionCacheKey('sid_1', 't1')) {

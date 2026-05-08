@@ -785,6 +785,7 @@ describe('OrderService', () => {
         .mockResolvedValueOnce([{ ...line, status: OrderItemStatus.READY }]);
 
       const managerMock = {
+        findOne: jest.fn().mockResolvedValue(null),
         createQueryBuilder: jest.fn(() => ({
           update: jest.fn().mockReturnThis(),
           set: jest.fn().mockReturnThis(),
@@ -809,6 +810,79 @@ describe('OrderService', () => {
       expect(result.kitchenItemReady.eventType).toBe('kitchen.item_ready');
       expect(result.orderStatusChanged?.toStatus).toBe(OrderStatus.READY);
       expect(managerMock.save).toHaveBeenCalled();
+    });
+
+    it('markOrderServed transitions a READY order and all ready lines to SERVED', async () => {
+      const readyAt = new Date('2026-05-07T12:05:00.000Z');
+      const orderRow = {
+        id: 'ord-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        tableId: 'tbl',
+        tableName: 'A',
+        status: OrderStatus.READY,
+        totalAmount: 100,
+        idempotencyKey: 'k',
+        notes: null,
+        confirmedAt: new Date('2026-05-07T12:00:00.000Z'),
+        confirmedByUserId: 's',
+        cancelledAt: null,
+        cancelledByUserId: null,
+        cancelReason: null,
+        createdAt: new Date('2026-05-07T11:59:00.000Z'),
+        updatedAt: readyAt,
+      } as Order;
+
+      const line = {
+        id: 'line-1',
+        tenantId: 't1',
+        orderId: 'ord-1',
+        menuItemId: 'm1',
+        menuItemName: 'Phở',
+        quantity: 1,
+        unitPrice: 50000,
+        note: null,
+        status: OrderItemStatus.READY,
+        station: 'KITCHEN',
+        menuItemImageUrl: null,
+        createdAt: readyAt,
+        updatedAt: readyAt,
+      } as OrderItem;
+
+      orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(orderRow);
+      orderItemRepository.findByOrderIdAndTenantWithManager
+        .mockResolvedValueOnce([line])
+        .mockResolvedValueOnce([{ ...line, status: OrderItemStatus.SERVED }]);
+
+      const execute = jest.fn().mockResolvedValue({ affected: 1 });
+      const managerMock = {
+        findOne: jest.fn().mockResolvedValue(null),
+        createQueryBuilder: jest.fn(() => ({
+          update: jest.fn().mockReturnThis(),
+          set: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          execute,
+        })),
+        save: jest.fn((_Entity: unknown, o: Order) => Promise.resolve(o)),
+      };
+      dataSource.transaction.mockImplementation(async (cb) => cb(managerMock));
+
+      const result = await service.markOrderServed({
+        tenantId: 't1',
+        orderId: 'ord-1',
+        userId: 'waiter',
+      });
+
+      expect(execute).toHaveBeenCalled();
+      expect(orderRow.status).toBe(OrderStatus.SERVED);
+      expect(result.order.status).toBe(OrderStatus.SERVED);
+      expect(result.order.items[0]?.status).toBe(OrderItemStatus.SERVED);
+      expect(result.events.orderStatusChanged).toMatchObject({
+        fromStatus: OrderStatus.READY,
+        toStatus: OrderStatus.SERVED,
+        changedByUserId: 'waiter',
+      });
     });
 
     it('revertOrderItemsProcessing moves READY order back to PROCESSING when items return to PROCESSING', async () => {

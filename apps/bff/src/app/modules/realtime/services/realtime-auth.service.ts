@@ -10,6 +10,7 @@ import { createHash, randomUUID } from 'crypto';
 import { firstValueFrom } from 'rxjs';
 import type { Socket } from 'socket.io';
 import { getSessionCacheKey } from '@common/utils/request.util';
+import { extractJwtRealmRoles, extractJwtTenantId } from '../../authorizer/utils/jwt-metadata.util';
 
 function getHandshakeHeader(headers: Record<string, unknown>, name: string): string | undefined {
   const lower = name.toLowerCase();
@@ -105,17 +106,14 @@ export class RealtimeAuthService implements OnModuleInit {
     const jwt = user.metadata?.jwt;
     const headers = socket.handshake.headers as Record<string, unknown>;
     const headerTenant = getHandshakeHeader(headers, 'x-tenant-id');
-    const tenantRaw =
-      (jwt?.tenant_id as string | undefined) ||
-      ((jwt as Record<string, unknown> | undefined)?.['tenantId'] as string | undefined) ||
-      headerTenant;
+    const tenantRaw = extractJwtTenantId(jwt) || headerTenant;
     const tenantId = tenantRaw?.trim();
     if (!tenantId) {
       this.logger.warn('Staff WS rejected: missing tenant on JWT and x-tenant-id');
       throw new UnauthorizedException();
     }
 
-    const roles = jwt?.realm_access?.roles ?? [];
+    const roles = extractJwtRealmRoles(jwt);
     const rooms = new Set<string>();
     rooms.add(`tenant:${tenantId}:staff`);
     if (roles.includes(ROLE.CHEF)) {

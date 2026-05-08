@@ -4,6 +4,7 @@ import { OrderItemStatus, OrderStatus } from '@einvoice/types';
 
 const mockUseOrdersQuery = jest.fn();
 const mockUseConfirmOrderMutation = jest.fn();
+const mockUseMarkOrderServedMutation = jest.fn();
 const mockUseCancelOrderMutation = jest.fn();
 const mockUseTablesQuery = jest.fn();
 
@@ -41,6 +42,7 @@ jest.mock('@/components/pos/order-row-context-menu', () => ({
 jest.mock('@/features/order/hooks/use-order-query', () => ({
   useOrdersQuery: (...args: unknown[]) => mockUseOrdersQuery(...args),
   useConfirmOrderMutation: (...args: unknown[]) => mockUseConfirmOrderMutation(...args),
+  useMarkOrderServedMutation: (...args: unknown[]) => mockUseMarkOrderServedMutation(...args),
   useCancelOrderMutation: (...args: unknown[]) => mockUseCancelOrderMutation(...args),
 }));
 
@@ -92,6 +94,12 @@ describe('POS live order UI', () => {
       isPending: false,
       variables: null,
     });
+    mockUseMarkOrderServedMutation.mockReturnValue({
+      mutate: jest.fn(),
+      mutateAsync: jest.fn(),
+      isPending: false,
+      variables: null,
+    });
     mockUseCancelOrderMutation.mockReturnValue({
       mutate: jest.fn(),
       isPending: false,
@@ -130,6 +138,39 @@ describe('POS live order UI', () => {
     render(<LiveOrdersTable />);
 
     expect((screen.getByRole('button', { name: 'Đang nhận...' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('shows business status filters and lets staff mark a READY order as served', () => {
+    const mutate = jest.fn();
+    const readyOrder = {
+      ...baseOrder,
+      id: 'order-ready',
+      status: OrderStatus.READY,
+      updatedAt: new Date(Date.now() - 60_000).toISOString(),
+      items: [{ ...baseOrder.items[0], status: OrderItemStatus.READY }],
+    };
+    mockUseOrdersQuery.mockReturnValue({
+      data: [readyOrder],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    mockUseMarkOrderServedMutation.mockReturnValue({
+      mutate,
+      mutateAsync: jest.fn(),
+      isPending: false,
+      variables: null,
+    });
+
+    render(<LiveOrdersTable />);
+
+    expect(screen.queryByRole('radio', { name: 'Đang chế biến' })).not.toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Sẵn sàng bưng' })).not.toBeNull();
+    expect(screen.queryByRole('radio', { name: 'Đã phục vụ' })).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Đã phục vụ' }));
+
+    expect(mutate).toHaveBeenCalledWith('order-ready');
   });
 
   it('keeps the captured cancel status if the row disappears after the dialog opens', async () => {

@@ -14,7 +14,11 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CancelOrderDialog } from '@/components/pos/cancel-order-dialog';
-import { useConfirmOrderMutation, useOrderDetailQuery } from '@/features/order/hooks/use-order-query';
+import {
+  useConfirmOrderMutation,
+  useMarkOrderServedMutation,
+  useOrderDetailQuery,
+} from '@/features/order/hooks/use-order-query';
 import { getErrorDisplayMessage } from '@einvoice/frontend-utils';
 import { formatVnd } from '@/lib/format-vnd';
 import { orderItemStatusChipClass, orderStatusChipClass } from '@/lib/pos-status-chips';
@@ -23,6 +27,7 @@ import { cn } from '@/lib/utils';
 export function OrderDetailPanel({ orderId }: { orderId: string }) {
   const orderDetailQuery = useOrderDetailQuery(orderId);
   const confirmOrderMutation = useConfirmOrderMutation();
+  const markServedMutation = useMarkOrderServedMutation();
   const [cancelOpen, setCancelOpen] = useState(false);
   const order = orderDetailQuery.data;
 
@@ -76,8 +81,10 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
   }
 
   const canConfirm = order.status === OrderStatus.PENDING;
+  const canServe = order.status === OrderStatus.READY;
   const canCancel = order.status === OrderStatus.PENDING || order.status === OrderStatus.PROCESSING;
   const isConfirming = confirmOrderMutation.isPending && confirmOrderMutation.variables === order.id;
+  const isServing = markServedMutation.isPending && markServedMutation.variables === order.id;
 
   return (
     <div
@@ -107,6 +114,16 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
               disabled={isConfirming}
             >
               {isConfirming ? 'Đang xác nhận...' : 'Xác nhận'}
+            </Button>
+          ) : null}
+          {canServe ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => markServedMutation.mutate(order.id)}
+              disabled={isServing}
+            >
+              {isServing ? 'Đang lưu...' : 'Xác nhận đã phục vụ'}
             </Button>
           ) : null}
           {canCancel ? (

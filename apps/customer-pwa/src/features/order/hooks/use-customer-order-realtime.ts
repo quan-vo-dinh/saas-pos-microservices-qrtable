@@ -47,7 +47,7 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
     const invalidateSessionScope = (): void => {
       void queryClient.invalidateQueries({ queryKey: cartKeys.snapshot(tenantId, sessionId) });
       void queryClient.invalidateQueries({ queryKey: billKeys.current(tenantId, sessionId) });
-      void queryClient.invalidateQueries({ queryKey: orderKeys.list(tenantId, sessionId) });
+      void queryClient.invalidateQueries({ queryKey: orderKeys.all });
     };
 
     const invalidateOrder = (orderId: string): void => {
@@ -68,6 +68,14 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
     };
     const onReconnectError = (): void => setStatus('degraded');
     const onReconnectFailed = (): void => setStatus('degraded');
+    const onBrowserRecovery = (): void => {
+      invalidateSessionScope();
+    };
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible') {
+        invalidateSessionScope();
+      }
+    };
 
     const onCartUpdated = (event: CartUpdatedEvent): void => {
       if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
@@ -107,6 +115,9 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
     socket.io.on('reconnect', onReconnect);
     socket.io.on('reconnect_error', onReconnectError);
     socket.io.on('reconnect_failed', onReconnectFailed);
+    window.addEventListener('online', onBrowserRecovery);
+    window.addEventListener('focus', onBrowserRecovery);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       socket.off('connect', onConnect);
@@ -122,6 +133,9 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
       socket.io.off('reconnect', onReconnect);
       socket.io.off('reconnect_error', onReconnectError);
       socket.io.off('reconnect_failed', onReconnectFailed);
+      window.removeEventListener('online', onBrowserRecovery);
+      window.removeEventListener('focus', onBrowserRecovery);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       socket.disconnect();
     };
   }, [queryClient, sessionId, tenantId]);

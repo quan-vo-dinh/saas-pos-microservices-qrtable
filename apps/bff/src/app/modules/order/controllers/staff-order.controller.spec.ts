@@ -18,10 +18,14 @@ import { StaffOrderController } from './staff-order.controller';
 describe('StaffOrderController', () => {
   let controller: StaffOrderController;
   let orderClient: { send: jest.Mock };
+  let realtimeEvents: { emitOrderStatusChanged: jest.Mock };
 
   beforeEach(async () => {
     orderClient = {
       send: jest.fn().mockReturnValue(of(Response.success([]))),
+    };
+    realtimeEvents = {
+      emitOrderStatusChanged: jest.fn(),
     };
     const module: TestingModule = await Test.createTestingModule({
       controllers: [StaffOrderController],
@@ -34,7 +38,7 @@ describe('StaffOrderController', () => {
         {
           provide: RealtimeEventsService,
           useValue: {
-            emitOrderStatusChanged: jest.fn(),
+            emitOrderStatusChanged: realtimeEvents.emitOrderStatusChanged,
             emitServiceRequested: jest.fn(),
             emitCartUpdated: jest.fn(),
             emitTableTransferred: jest.fn(),
@@ -68,5 +72,51 @@ describe('StaffOrderController', () => {
     const reflector = new Reflector();
     const required = reflector.get(Permissions, StaffOrderController.prototype.listServiceRequests);
     expect(required).toEqual([PERMISSION.SERVICE_REQUEST_ACKNOWLEDGE]);
+  });
+
+  it('serve sends MARK_SERVED and emits orderStatusChanged realtime event', async () => {
+    const orderStatusChanged = {
+      tenantId: 'tenant-1',
+      orderId: 'order-1',
+      fromStatus: 'READY',
+      toStatus: 'SERVED',
+      changedByUserId: 'staff-1',
+      timestamp: '2026-05-07T12:00:00.000Z',
+    };
+    orderClient.send.mockReturnValueOnce(
+      of(
+        Response.success({
+          order: { id: 'order-1', sessionId: 'session-1' },
+          events: { orderStatusChanged },
+        }),
+      ),
+    );
+
+    const req = {
+      [MetadataKey.TENANT_ID]: 'tenant-1',
+      [MetadataKey.USER_DATA]: { metadata: { userId: 'staff-1' } },
+    } as unknown as Request;
+
+    await controller.serve('order-1', 'pid-1', req);
+
+    expect(orderClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.ORDER.MARK_SERVED,
+      expect.objectContaining({
+        processId: 'pid-1',
+        data: expect.objectContaining({
+          tenantId: 'tenant-1',
+          orderId: 'order-1',
+          userId: 'staff-1',
+          processId: 'pid-1',
+        }),
+      }),
+    );
+    expect(realtimeEvents.emitOrderStatusChanged).toHaveBeenCalledWith(orderStatusChanged, 'session-1');
+  });
+
+  it('serve requires ORDER_CONFIRM permission for waiter progression', () => {
+    const reflector = new Reflector();
+    const required = reflector.get(Permissions, StaffOrderController.prototype.serve);
+    expect(required).toEqual([PERMISSION.ORDER_CONFIRM]);
   });
 });

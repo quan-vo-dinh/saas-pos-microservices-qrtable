@@ -97,6 +97,11 @@ export const orderService = {
       method: 'POST',
     }),
 
+  markOrderServed: (id: string): Promise<OrderActionResult> =>
+    authApiClient<OrderActionResult>(`${API_CONFIG.ENDPOINTS.ADMIN_ORDERS}/${encodeURIComponent(id)}/serve`, {
+      method: 'POST',
+    }),
+
   cancelPendingOrder: (id: string, payload: CancelOrderPayload): Promise<OrderActionResult> =>
     authApiClient<OrderActionResult>(`${API_CONFIG.ENDPOINTS.ADMIN_ORDERS}/${encodeURIComponent(id)}/cancel-pending`, {
       method: 'POST',

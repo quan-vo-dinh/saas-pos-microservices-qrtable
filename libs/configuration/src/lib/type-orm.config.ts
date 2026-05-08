@@ -3,6 +3,25 @@ import { DatabaseType } from 'typeorm';
 import { TypeOrmModule, TypeOrmModuleAsyncOptions } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
+type PgTypes = {
+  setTypeParser: (oid: number, parser: (value: string) => Date) => void;
+};
+
+const POSTGRES_TIMESTAMP_OID = 1114;
+let pgTimestampParserConfigured = false;
+
+export function configurePostgresTimestampParser(): void {
+  if (pgTimestampParserConfigured) {
+    return;
+  }
+
+  const pg = require('pg') as { types: PgTypes };
+  pg.types.setTypeParser(POSTGRES_TIMESTAMP_OID, (value: string) => new Date(`${value}Z`));
+  pgTimestampParserConfigured = true;
+}
+
+configurePostgresTimestampParser();
+
 export class TypeOrmConfiguration {
   @IsString()
   @IsNotEmpty()

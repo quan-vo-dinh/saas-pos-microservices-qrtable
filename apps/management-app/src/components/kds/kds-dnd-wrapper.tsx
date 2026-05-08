@@ -70,9 +70,9 @@ export function KdsDndWrapper({ children, tickets, onColumnChange }: Props) {
       {children}
       <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
         {active ? (
-          <div className="w-[220px] rounded-lg border border-[var(--lime)]/50 bg-black/90 p-2 font-mono text-sm text-[var(--ink)] shadow-xl">
-            <p className="text-lg font-bold text-[var(--lime)]">#{active.ticketId.slice(-3).toUpperCase()}</p>
-            <p className="truncate text-xs text-white/70">{active.tableName}</p>
+          <div className="w-[220px] rounded-lg border border-ring/50 bg-card p-2 font-mono text-sm text-card-foreground shadow-xl">
+            <p className="text-lg font-bold text-primary">#{active.ticketId.slice(-3).toUpperCase()}</p>
+            <p className="truncate text-xs text-muted-foreground">{active.tableName}</p>
           </div>
         ) : null}
       </DragOverlay>

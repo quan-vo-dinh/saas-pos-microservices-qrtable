@@ -109,6 +109,11 @@ type PatchVars = {
   menuItem?: PublicMenuItem;
 };
 
+function normalizeCartNote(note?: string): string | undefined {
+  const trimmed = note?.trim();
+  return trimmed ? trimmed.slice(0, 255) : undefined;
+}
+
 function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
   const items = [...prev.items];
   const now = new Date().toISOString();
@@ -118,16 +123,31 @@ function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
       const mi = vars.menuItem;
       const qty = vars.quantity ?? 1;
       if (!mi || !vars.menuItemId) return prev;
-      items.push({
-        cartLineId: `optimistic-${globalThis.crypto?.randomUUID?.() ?? String(Date.now())}`,
-        menuItemId: mi.id,
-        menuItemName: mi.name,
-        menuItemImageUrl: mi.imageUrl ?? null,
-        quantity: qty,
-        unitPrice: mi.price,
-        note: vars.note,
-        lineVersion: 1,
-      });
+      const note = normalizeCartNote(vars.note);
+      const idx = items.findIndex((l) => l.menuItemId === mi.id && normalizeCartNote(l.note) === note);
+      if (idx >= 0) {
+        const line = items[idx];
+        items[idx] = {
+          ...line,
+          menuItemName: mi.name,
+          menuItemImageUrl: mi.imageUrl ?? null,
+          quantity: line.quantity + qty,
+          unitPrice: mi.price,
+          note,
+          lineVersion: line.lineVersion + 1,
+        };
+      } else {
+        items.push({
+          cartLineId: `optimistic-${globalThis.crypto?.randomUUID?.() ?? String(Date.now())}`,
+          menuItemId: mi.id,
+          menuItemName: mi.name,
+          menuItemImageUrl: mi.imageUrl ?? null,
+          quantity: qty,
+          unitPrice: mi.price,
+          note,
+          lineVersion: 1,
+        });
+      }
       break;
     }
     case 'SET_QUANTITY': {
@@ -153,7 +173,7 @@ function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
       const line = items[idx];
       items[idx] = {
         ...line,
-        note: vars.note,
+        note: normalizeCartNote(vars.note),
         lineVersion: line.lineVersion + 1,
       };
       break;

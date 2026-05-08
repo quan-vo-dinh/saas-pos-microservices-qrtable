@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OrderStatus } from '@einvoice/types';
 
 const mockConfirmOrder = jest.fn();
+const mockMarkOrderServed = jest.fn();
 const mockCancelPendingOrder = jest.fn();
 const mockCancelProcessingOrder = jest.fn();
 const mockTransferTable = jest.fn();
@@ -26,6 +27,7 @@ jest.mock('@einvoice/frontend-utils', () => ({
 jest.mock('../../services/order.service', () => ({
   orderService: {
     confirmOrder: (...args: unknown[]) => mockConfirmOrder(...args),
+    markOrderServed: (...args: unknown[]) => mockMarkOrderServed(...args),
     cancelPendingOrder: (...args: unknown[]) => mockCancelPendingOrder(...args),
     cancelProcessingOrder: (...args: unknown[]) => mockCancelProcessingOrder(...args),
     transferTable: (...args: unknown[]) => mockTransferTable(...args),
@@ -37,6 +39,7 @@ import {
   orderKeys,
   useCancelOrderMutation,
   useConfirmOrderMutation,
+  useMarkOrderServedMutation,
   useReopenBillMutation,
   useTransferTableMutation,
 } from '../use-order-query';
@@ -67,6 +70,27 @@ describe('order mutations', () => {
 
     await waitFor(() => {
       expect(mockConfirmOrder).toHaveBeenCalledWith('order-1');
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: orderKeys.lists() });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: orderKeys.details() });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: orderKeys.detail('order-1') });
+  });
+
+  it('invalidates order list and detail after mark-served succeeds', async () => {
+    mockMarkOrderServed.mockResolvedValue({ id: 'order-1' });
+    const queryClient = new QueryClient();
+    const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useMarkOrderServedMutation(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync('order-1');
+    });
+
+    await waitFor(() => {
+      expect(mockMarkOrderServed).toHaveBeenCalledWith('order-1');
     });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: orderKeys.lists() });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: orderKeys.details() });

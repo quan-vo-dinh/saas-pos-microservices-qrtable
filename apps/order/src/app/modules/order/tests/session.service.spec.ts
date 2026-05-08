@@ -138,6 +138,40 @@ describe('SessionService', () => {
     expect(redis.del).toHaveBeenCalled();
   });
 
+  it('refreshes stale Redis orderCount from PostgreSQL instead of idle-closing a session with orders', async () => {
+    const stale = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    redis.hgetall.mockResolvedValue({
+      tenantId: 'tenant-1',
+      sessionId: 'sess-1',
+      tableId: '00000000-0000-4000-8000-000000000001',
+      tableName: 'T1',
+      status: SessionStatus.ACTIVE,
+      startedAt: stale,
+      lastActivity: stale,
+      orderCount: '0',
+      closedAt: '',
+    });
+    const entity = {
+      id: 'sess-1',
+      tenantId: 'tenant-1',
+      tableId: '00000000-0000-4000-8000-000000000001',
+      tableName: 'T1',
+      status: SessionStatus.ACTIVE,
+      startedAt: new Date(stale),
+      lastActivity: new Date(stale),
+      closedAt: null,
+      orderCount: 3,
+    } as Session;
+    sessionRepo.findActiveByIdAndTenant.mockResolvedValue(entity);
+
+    const row = await service.getActiveSessionOrThrow('tenant-1', 'sess-1');
+
+    expect(row.orderCount).toBe(3);
+    expect(sessionRepo.markClosed).not.toHaveBeenCalled();
+    expect(redis.hset).toHaveBeenCalledWith('session:tenant-1:sess-1', expect.objectContaining({ orderCount: '3' }));
+    expect(redis.del).not.toHaveBeenCalledWith('cart:tenant-1:sess-1');
+  });
+
   it('does not idle-close when orderCount > 0 even if stale', async () => {
     const stale = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     redis.hgetall.mockResolvedValue({

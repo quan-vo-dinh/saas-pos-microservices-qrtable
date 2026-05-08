@@ -159,6 +159,42 @@ export class StaffOrderController {
     });
   }
 
+  @Post('orders/:id/serve')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.ORDER_CONFIRM])
+  @ApiOkResponse({ type: ResponseDto })
+  @ApiOperation({ summary: 'Mark ready order as served' })
+  async serve(
+    @Param('id') id: string,
+    @ProcessId() processId: string,
+    @Req() req: Request,
+  ): Promise<ResponseDto<OrderActionTcpResponse>> {
+    const tenantId = req[MetadataKey.TENANT_ID] as string;
+    const userId = this.staffUserId(req);
+    const tcp = await firstValueFrom(
+      this.orderClient
+        .send<OrderActionTcpResponse, StaffOrderActionTcpRequest>(
+          TCP_REQUEST_MESSAGE.ORDER.MARK_SERVED,
+          buildTcpRequestContext<StaffOrderActionTcpRequest>(req, processId, {
+            tenantId,
+            orderId: id,
+            userId,
+            processId,
+          }),
+        )
+        .pipe(map((r) => r)),
+    );
+    if (tcp.data?.events?.orderStatusChanged && tcp.data.order) {
+      this.realtimeEvents.emitOrderStatusChanged(tcp.data.events.orderStatusChanged, tcp.data.order.sessionId);
+    }
+    return new ResponseDto<OrderActionTcpResponse>({
+      data: tcp.data,
+      statusCode: tcp.statusCode,
+      message: tcp.code as HTTP_MESSAGE,
+      processID: processId,
+    });
+  }
+
   @Post('orders/:id/cancel-pending')
   @Authorization({ secured: true })
   @Permissions([PERMISSION.ORDER_CANCEL_PENDING])

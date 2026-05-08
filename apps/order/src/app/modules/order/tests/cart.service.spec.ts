@@ -103,6 +103,46 @@ describe('CartService', () => {
     expect(sessionService.touchAfterCartMutation).toHaveBeenCalledWith('tenant-1', 'sess-1');
   });
 
+  it('normalizes duplicate Redis cart lines when reading a snapshot', async () => {
+    redis.hgetall.mockResolvedValue({
+      ...baseSnapshot,
+      items: JSON.stringify([
+        {
+          cartLineId: 'line-1',
+          menuItemId: 'mi-1',
+          menuItemName: 'Pho',
+          quantity: 1,
+          unitPrice: 65000,
+          note: ' no onions ',
+          station: 'KITCHEN',
+          lineVersion: 1,
+        },
+        {
+          cartLineId: 'line-2',
+          menuItemId: 'mi-1',
+          menuItemName: 'Pho',
+          quantity: 2,
+          unitPrice: 65000,
+          note: 'no onions',
+          station: 'KITCHEN',
+          lineVersion: 1,
+        },
+      ]),
+    });
+
+    const result = await service.getSnapshot('tenant-1', 'sess-1');
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        cartLineId: 'line-1',
+        menuItemId: 'mi-1',
+        quantity: 3,
+        note: 'no onions',
+      }),
+    );
+  });
+
   it('ADD_ITEM calls Catalog validate and appends line', async () => {
     redis.hgetall.mockResolvedValue({
       ...baseSnapshot,
@@ -143,5 +183,64 @@ describe('CartService', () => {
     expect(result.items[0].unitPrice).toBe(65000);
     expect(result.items[0].menuItemImageUrl).toBe('https://cdn.example.com/pho.jpg');
     expect(result.cartVersion).toBe(1);
+  });
+
+  it('ADD_ITEM increments an existing line when menu item and note match', async () => {
+    redis.hgetall.mockResolvedValue({
+      ...baseSnapshot,
+      cartVersion: '4',
+      items: JSON.stringify([
+        {
+          cartLineId: 'line-1',
+          menuItemId: 'mi-1',
+          menuItemName: 'Pho',
+          menuItemImageUrl: 'https://cdn.example.com/pho.jpg',
+          quantity: 2,
+          unitPrice: 65000,
+          note: 'no onions',
+          station: 'KITCHEN',
+          lineVersion: 1,
+        },
+      ]),
+    });
+
+    catalog.send.mockReturnValue(
+      of({
+        statusCode: 200,
+        data: [
+          {
+            menuItemId: 'mi-1',
+            menuItemName: 'Pho',
+            unitPrice: 65000,
+            status: 'available',
+            stock: 10,
+            station: 'KITCHEN',
+            menuItemImageUrl: 'https://cdn.example.com/pho.jpg',
+          },
+        ],
+      }),
+    );
+
+    const result = await service.mutate({
+      tenantId: 'tenant-1',
+      sessionId: 'sess-1',
+      expectedCartVersion: 4,
+      operation: 'ADD_ITEM',
+      menuItemId: 'mi-1',
+      quantity: 3,
+      note: ' no onions ',
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        cartLineId: 'line-1',
+        menuItemId: 'mi-1',
+        quantity: 5,
+        note: 'no onions',
+        lineVersion: 2,
+      }),
+    );
+    expect(result.cartVersion).toBe(5);
   });
 });

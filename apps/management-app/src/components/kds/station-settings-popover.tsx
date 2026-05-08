@@ -53,17 +53,17 @@ export function StationSettingsPopover({ station, open, onOpenChange, onSaved }:
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="border-white/10 bg-[#090b10] text-[var(--ink)]" data-kds-ignore-shortcuts>
+      <DialogContent data-kds-ignore-shortcuts>
         <DialogHeader>
           <DialogTitle>Cài đặt trạm · {station === 'KITCHEN' ? 'Bếp' : 'Bar'}</DialogTitle>
-          <DialogDescription className="text-white/55">
+          <DialogDescription>
             Ngưỡng SLA (cap phút) và cỡ chữ chỉ ảnh hưởng mock KDS; lưu theo trạm trên thiết bị này.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-6 py-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`${baseId}-sla`} className="text-[var(--ink)]">
+            <Label htmlFor={`${baseId}-sla`}>
               Cap SLA (phút): {slaMin}
             </Label>
             <input
@@ -73,12 +73,12 @@ export function StationSettingsPopover({ station, open, onOpenChange, onSaved }:
               max={20}
               step={1}
               value={slaMin}
-              className="accent-[var(--lime)]"
+              className="accent-primary"
               onChange={(e) => setSlaMin(Number(e.target.value))}
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor={`${baseId}-font`} className="text-[var(--ink)]">
+            <Label htmlFor={`${baseId}-font`}>
               Cỡ chữ UI: {fontPx}px
             </Label>
             <input
@@ -88,23 +88,23 @@ export function StationSettingsPopover({ station, open, onOpenChange, onSaved }:
               max={22}
               step={1}
               value={fontPx}
-              className="accent-[var(--lime)]"
+              className="accent-primary"
               onChange={(e) => setFontPx(Number(e.target.value))}
             />
           </div>
-          <div className="flex items-center gap-3 rounded-md border border-white/10 bg-black/40 px-3 py-2">
+          <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
             <Checkbox id={`${baseId}-sound`} checked={sound} onCheckedChange={(v) => setSound(v === true)} />
-            <Label htmlFor={`${baseId}-sound`} className="cursor-pointer text-[var(--ink)]">
+            <Label htmlFor={`${baseId}-sound`} className="cursor-pointer">
               Âm thanh cảnh báo
             </Label>
           </div>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" className="border-white/20" onClick={() => handleDialogOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => handleDialogOpenChange(false)}>
             Hủy
           </Button>
-          <Button type="button" className="bg-[var(--lime)] text-black active:bg-[var(--lime)]/90" onClick={persist}>
+          <Button type="button" onClick={persist}>
             Lưu
           </Button>
         </DialogFooter>

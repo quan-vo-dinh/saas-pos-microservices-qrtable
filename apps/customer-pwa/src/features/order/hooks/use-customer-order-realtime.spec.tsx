@@ -111,9 +111,7 @@ describe('useCustomerOrderRealtime', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: billKeys.current('tenant-1', 'session-1'),
     });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: orderKeys.list('tenant-1', 'session-1'),
-    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.all });
   });
 
   it('invalidates customer order scope for matching kitchenItemReady events', () => {
@@ -143,7 +141,7 @@ describe('useCustomerOrderRealtime', () => {
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.detail('tenant-1', 'session-1', 'order-1') });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.list('tenant-1', 'session-1') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.all });
   });
 
   it('exposes reconnecting when manager reconnect_attempt fires', () => {
@@ -162,6 +160,31 @@ describe('useCustomerOrderRealtime', () => {
     });
 
     expect(result.current).toBe('reconnecting');
+  });
+
+  it('invalidates active customer order domain on socket reconnect and browser online recovery', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useCustomerOrderRealtime(), { wrapper: createWrapper(queryClient) });
+
+    const managerCalls = managerOnMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const onReconnect = managerCalls.find(([event]) => event === 'reconnect')?.[1];
+    expect(onReconnect).toBeDefined();
+
+    act(() => {
+      onReconnect?.();
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.all });
+
+    invalidateSpy.mockClear();
+
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.all });
   });
 
   it('exposes auth-error on events.authError', () => {

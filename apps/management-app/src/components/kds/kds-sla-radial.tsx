@@ -15,7 +15,7 @@ export function KdsSlaRadial({ chartData }: Props) {
       <ResponsiveContainer width="100%" height="100%" minHeight={176}>
         <RadialBarChart innerRadius="68%" outerRadius="100%" data={chartData} startAngle={90} endAngle={-270}>
           <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-          <RadialBar dataKey="value" cornerRadius={6} background={{ fill: 'rgba(255,255,255,0.06)' }} />
+          <RadialBar dataKey="value" cornerRadius={6} background={{ fill: 'var(--muted)' }} />
         </RadialBarChart>
       </ResponsiveContainer>
     </div>

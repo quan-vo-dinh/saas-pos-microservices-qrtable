@@ -16,6 +16,8 @@
     "dev:bff-product": "pnpm dev --projects=bff,product",
     "dev:bff-order": "pnpm dev --projects=bff,order,catalog",
     "dev:reseed": "bash tools/dev-reseed.sh",
+    "e2e:step2.7": "playwright test tests/e2e/step-2.7-realtime.spec.ts",
+    "e2e:install": "playwright install chromium",
     "dev:verify-seed": "node tools/dev-seed/verify/verify-dev-seed.js",
     "theme:build": "pnpm --dir apps/keycloak-theme run build-keycloak-theme",
     "theme:dev": "pnpm --dir apps/keycloak-theme run dev"
@@ -91,6 +93,7 @@
     "@nx/web": "22.5.4",
     "@nx/webpack": "22.1.1",
     "@nx/workspace": "22.1.1",
+    "@playwright/test": "1.52.0",
     "@swc-node/register": "~1.11.1",
     "@swc/core": "~1.15.5",
     "@swc/helpers": "~0.5.18",

@@ -44,8 +44,12 @@ function matchesTenantStation(
  * Subscribes to KDS-related Socket.IO events as invalidation hints; refetches REST snapshot.
  * Uses staff JWT in `auth.token` (server-derived rooms). Filters by tenant + station.
  */
-export function useKdsRealtime(station: PreparationStation, options?: { enabled?: boolean }): KdsRealtimeStatus {
+export function useKdsRealtime(
+  station: PreparationStation,
+  options?: { enabled?: boolean; subscribeStation?: boolean },
+): KdsRealtimeStatus {
   const enabledHook = options?.enabled !== false;
+  const shouldSubscribeStation = options?.subscribeStation === true;
   const queryClient = useQueryClient();
   const tenantId = useAuthStore((s) => s.profile?.tenantId);
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -76,9 +80,15 @@ export function useKdsRealtime(station: PreparationStation, options?: { enabled?
     const bump = (): void => {
       invalidateKdsQueue(queryClient, tenantId, station);
     };
+    const subscribeToStation = (): void => {
+      if (shouldSubscribeStation) {
+        socket.emit('subscribe.kds', { station });
+      }
+    };
 
     const onConnect = (): void => {
       setStatus('connected');
+      subscribeToStation();
       bump();
     };
     const onDisconnect = (): void => setStatus('degraded');
@@ -86,6 +96,7 @@ export function useKdsRealtime(station: PreparationStation, options?: { enabled?
     const onReconnectAttempt = (): void => setStatus('reconnecting');
     const onReconnect = (): void => {
       setStatus('connected');
+      subscribeToStation();
       bump();
     };
     const onReconnectError = (): void => setStatus('degraded');
@@ -131,7 +142,7 @@ export function useKdsRealtime(station: PreparationStation, options?: { enabled?
       socket.io.off('reconnect_failed', onReconnectFailed);
       socket.disconnect();
     };
-  }, [enabledHook, queryClient, tenantId, accessToken, station]);
+  }, [enabledHook, shouldSubscribeStation, queryClient, tenantId, accessToken, station]);
 
   return status;
 }

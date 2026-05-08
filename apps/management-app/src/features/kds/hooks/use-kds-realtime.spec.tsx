@@ -9,6 +9,7 @@ import { useKdsRealtime } from './use-kds-realtime';
 const ioMock = jest.fn();
 const onMock = jest.fn();
 const offMock = jest.fn();
+const emitMock = jest.fn();
 const disconnectMock = jest.fn();
 const managerOnMock = jest.fn();
 const managerOffMock = jest.fn();
@@ -38,6 +39,7 @@ describe('useKdsRealtime', () => {
   beforeEach(() => {
     onMock.mockReset();
     offMock.mockReset();
+    emitMock.mockReset();
     disconnectMock.mockReset();
     managerOnMock.mockReset();
     managerOffMock.mockReset();
@@ -45,6 +47,7 @@ describe('useKdsRealtime', () => {
     ioMock.mockReturnValue({
       on: onMock,
       off: offMock,
+      emit: emitMock,
       disconnect: disconnectMock,
       io: {
         on: managerOnMock,
@@ -133,6 +136,36 @@ describe('useKdsRealtime', () => {
     kdsChangedHandler?.(ev);
 
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  it('requests a validated station subscription when enabled for management roles', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    renderHook(
+      () => useKdsRealtime(PreparationStation.KITCHEN, { subscribeStation: true }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    const onCalls = onMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const connectHandler = onCalls.find(([event]) => event === 'connect')?.[1];
+    const managerCalls = managerOnMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const reconnectHandler = managerCalls.find(([event]) => event === 'reconnect')?.[1];
+
+    act(() => {
+      connectHandler?.();
+    });
+    expect(emitMock).toHaveBeenCalledWith('subscribe.kds', { station: PreparationStation.KITCHEN });
+
+    emitMock.mockClear();
+
+    act(() => {
+      reconnectHandler?.();
+    });
+    expect(emitMock).toHaveBeenCalledWith('subscribe.kds', { station: PreparationStation.KITCHEN });
   });
 
   it('ignores kds events for another station', () => {

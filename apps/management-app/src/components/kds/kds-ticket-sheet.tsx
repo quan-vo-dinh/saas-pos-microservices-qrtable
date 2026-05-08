@@ -37,7 +37,7 @@ import type { KDSTicketMock, KDSStation } from '@/mocks/kds-ticket';
 
 const KdsSlaRadial = dynamic(
   () => import('@/components/kds/kds-sla-radial').then((m) => m.KdsSlaRadial),
-  { ssr: false, loading: () => <div className="h-44 animate-pulse rounded-md bg-white/5" aria-hidden /> },
+  { ssr: false, loading: () => <div className="h-44 animate-pulse rounded-md bg-muted" aria-hidden /> },
 );
 
 type Props = {
@@ -70,11 +70,11 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
   }, []);
 
   const ticket = ticketId ? tickets.find((t) => t.ticketId === ticketId) : undefined;
-  const order = ticket ? liveOrders.find((o) => o.id === ticket.orderId) : undefined;
+  const order = ticket && !liveMode ? liveOrders.find((o) => o.id === ticket.orderId) : undefined;
 
   const { ratio, pct, chartData } = useMemo(() => {
     if (!ticket) {
-      return { ratio: 0, pct: 0, chartData: [{ name: 'sla', value: 0, fill: 'var(--lime)' }] };
+      return { ratio: 0, pct: 0, chartData: [{ name: 'sla', value: 0, fill: 'var(--primary)' }] };
     }
     const capMin = readKdsSlaCapMinutes(station);
     const created = new Date(ticket.createdAt).getTime();
@@ -83,7 +83,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
     const eff = effectiveSlaSeconds(ticket.slaSeconds, capMin);
     const r = elapsed / eff;
     const p = Math.min(100, Math.round(r * 100));
-    const f = r < 0.6 ? 'var(--lime)' : r < 0.9 ? 'var(--amber)' : 'var(--pink)';
+    const f = r < 0.6 ? 'var(--chart-2)' : r < 0.9 ? 'var(--chart-4)' : 'var(--destructive)';
     return { ratio: r, pct: p, chartData: [{ name: 'sla', value: p, fill: f }] };
   }, [now, station, ticket]);
 
@@ -93,19 +93,19 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col border-l border-white/10 bg-[#090b10] p-0 text-[var(--ink)] sm:max-w-[480px]"
+        className="flex w-full flex-col border-l border-border bg-background p-0 text-foreground sm:max-w-[480px]"
         showCloseButton
       >
         {!ticket ? (
-          <div className="p-6 text-sm text-white/60">Không tìm thấy ticket.</div>
+          <div className="p-6 text-sm text-muted-foreground">Không tìm thấy ticket.</div>
         ) : (
           <>
-        <SheetHeader className="border-b border-white/10 px-4 py-3">
+        <SheetHeader className="border-b border-border px-4 py-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex flex-col gap-1">
-              <SheetTitle className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[var(--lime)]">
+              <SheetTitle className="flex items-center gap-2 text-2xl font-bold tracking-tight text-primary">
                 #{ticket.ticketId.slice(-3).toUpperCase()}
-                <Badge variant="outline" className="border-white/20 font-mono text-[0.65rem] uppercase">
+                <Badge variant="outline" className="border-border/60 font-mono text-[0.65rem] uppercase">
                   {station === 'KITCHEN' ? (
                     <span className="inline-flex items-center gap-1">
                       <ChefHat className="size-3" aria-hidden />
@@ -119,7 +119,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
                   )}
                 </Badge>
               </SheetTitle>
-              <SheetDescription className="text-xs text-white/60">{ticket.tableName}</SheetDescription>
+              <SheetDescription className="text-xs">{ticket.tableName}</SheetDescription>
             </div>
             <HoverCard>
               <HoverCardTrigger asChild>
@@ -127,7 +127,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="border-white/20 text-[0.7rem] active:bg-white/10"
+                  className="text-[0.7rem]"
                 >
                   <Link2 className="size-4" aria-hidden />
                   Liên kết đơn
@@ -141,6 +141,8 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
                     Trạng thái đơn: <span className="text-foreground">{orderStatusVi(order.status)}</span> ·{' '}
                     {order.items.length} dòng
                   </p>
+                ) : liveMode ? (
+                  <p className="mt-2 text-muted-foreground">Chi tiết đơn lấy từ ticket snapshot live.</p>
                 ) : (
                   <p className="mt-2 text-muted-foreground">Không tìm thấy đơn mock.</p>
                 )}
@@ -151,11 +153,11 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto px-4 py-3">
           <section className="flex flex-col gap-2">
-            <p className="text-[0.65rem] font-medium uppercase text-white/50">Món theo ticket</p>
-            <div className="rounded-lg border border-white/10">
+            <p className="text-[0.65rem] font-medium uppercase text-muted-foreground">Món theo ticket</p>
+            <div className="rounded-lg border border-border">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="text-[0.65rem]">Món</TableHead>
                     <TableHead className="w-24 text-[0.65rem]">SL</TableHead>
                     <TableHead className="text-[0.65rem]">Trạng thái</TableHead>
@@ -163,11 +165,11 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
                 </TableHeader>
                 <TableBody>
                   {ticket.items.map((it) => (
-                    <TableRow key={it.id} className="border-white/10">
+                    <TableRow key={it.id} className="border-border">
                       <TableCell className="max-w-40 text-[0.75rem]">
                         <span className="font-medium">{it.menuItemName}</span>
                         {it.note ? (
-                          <span className="mt-0.5 block font-mono text-[0.65rem] text-white/50">{it.note}</span>
+                          <span className="mt-0.5 block font-mono text-[0.65rem] text-muted-foreground">{it.note}</span>
                         ) : null}
                       </TableCell>
                       <TableCell className="font-mono text-xs">{it.quantity}</TableCell>
@@ -179,7 +181,7 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
                             updateItem(ticket.ticketId, it.id, v as OrderItem['status'])
                           }
                         >
-                          <SelectTrigger size="sm" className="h-7 w-[128px] border-white/20 text-[0.65rem]">
+                          <SelectTrigger size="sm" className="h-7 w-[128px] text-[0.65rem]">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -208,34 +210,35 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
           </section>
 
           <section className="flex flex-col gap-2">
-            <p className="text-[0.65rem] font-medium uppercase text-white/50">Timeline (mock)</p>
-            <ol className="flex flex-col gap-2 border-s border-white/15 ps-3 text-[0.75rem]">
+            <p className="text-[0.65rem] font-medium uppercase text-muted-foreground">
+              {liveMode ? 'Timeline' : 'Timeline (mock)'}
+            </p>
+            <ol className="flex flex-col gap-2 border-s border-border ps-3 text-[0.75rem]">
               <li>
-                <span className="font-mono text-white/50">{new Date(ticket.createdAt).toLocaleTimeString('vi-VN')}</span>{' '}
+                <span className="font-mono text-muted-foreground">{new Date(ticket.createdAt).toLocaleTimeString('vi-VN')}</span>{' '}
                 Ticket tạo từ đơn ({orderStatusVi(OrderStatus.PROCESSING)})
               </li>
               <li>
-                <span className="font-mono text-white/50">{timelineNow}</span> SLA đạt {pct}%
+                <span className="font-mono text-muted-foreground">{timelineNow}</span> SLA đạt {pct}%
               </li>
             </ol>
           </section>
 
           <section className="flex flex-col gap-2">
-            <p className="text-[0.65rem] font-medium uppercase text-white/50">SLA gauge</p>
+            <p className="text-[0.65rem] font-medium uppercase text-muted-foreground">SLA gauge</p>
             <KdsSlaRadial chartData={chartData} />
-            <p className="text-center font-mono text-xs text-white/60">
+            <p className="text-center font-mono text-xs text-muted-foreground">
               {ratio < 0.6 ? 'Trong ngưỡng an toàn' : ratio < 0.9 ? 'Cảnh báo amber' : 'Vượt SLA — ưu tiên xử lý'}
             </p>
           </section>
         </div>
 
-        <div className="mt-auto flex flex-col gap-2 border-t border-white/10 px-4 py-3">
+        <div className="mt-auto flex flex-col gap-2 border-t border-border px-4 py-3">
           {!liveMode ? (
             <>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              className="bg-[var(--lime)] text-black active:bg-[var(--lime)]/90"
               onClick={() => {
                 updateOrderStatus(ticket.orderId, OrderStatus.READY, 'staff-chef-1');
                 toast('Đã đánh dấu Ready (mock)');
@@ -246,7 +249,6 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
             <Button
               type="button"
               variant="outline"
-              className="border-[var(--pink)]/50 text-[var(--pink)] active:bg-[var(--pink)]/10"
               onClick={() => {
                 recallTicket(ticket.ticketId, 'Sheet recall', 'staff-chef-1', 'Chị Lan');
                 toast('Recall (mock)');
@@ -256,21 +258,20 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button type="button" variant="secondary" className="border-white/15">
+                <Button type="button" variant="secondary">
                   Báo hết hàng
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent className="border-white/10 bg-[#090b10] text-[var(--ink)]">
+              <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Xác nhận hết hàng</AlertDialogTitle>
-                  <AlertDialogDescription className="text-white/60">
+                  <AlertDialogDescription>
                     Mock: đánh dấu một món trong ticket là CANCELED để demo luồng báo bếp.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel className="border-white/20">Huỷ</AlertDialogCancel>
+                  <AlertDialogCancel>Huỷ</AlertDialogCancel>
                   <AlertDialogAction
-                    className="bg-[var(--pink)] text-black active:bg-[var(--pink)]/90"
                     onClick={() => {
                       const first = ticket.items[0];
                       if (first) updateItem(ticket.ticketId, first.id, OrderItemStatus.CANCELED);
@@ -283,13 +284,13 @@ export function KdsTicketSheet({ ticketId, station, open, onOpenChange, tickets:
               </AlertDialogContent>
             </AlertDialog>
           </div>
-          <Separator className="bg-white/10" />
-          <p className="text-[0.65rem] text-white/45">
+          <Separator />
+          <p className="text-[0.65rem] text-muted-foreground">
             Mở sheet bằng tap vùng tiêu đề ticket · chân nút không mở sheet (blueprint bước 4.3).
           </p>
             </>
           ) : (
-            <p className="text-[0.7rem] text-white/50">
+            <p className="text-[0.7rem] text-muted-foreground">
               Luồng live: dùng nút trên thẻ ticket (Bắt đầu / Xong / Recall). Sheet chỉ xem chi tiết.
             </p>
           )}

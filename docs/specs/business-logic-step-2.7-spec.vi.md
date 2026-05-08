@@ -15,7 +15,7 @@
 | Q1      | Phương án C      | Không triển khai `menu.updated`, `events.menu.updated`, `events.menuUpdated` hoặc `menuUpdated` trong Bước 2.7. Menu giữ cơ chế cache và invalidate sau mutation hiện tại; không claim realtime menu. |
 | Q2      | Theo khuyến nghị | POS live orders giữ polling 3s/5s cho tới khi staff socket auth chạy đúng; sau khi kiểm thử nhanh realtime đạt thì giảm về polling dự phòng 10-15s, không tắt hẳn.                                    |
 | Q3      | Theo khuyến nghị | KDS start/done/recall/priority dùng strict refetch-after-mutation. Không dùng optimistic movement làm nguồn sự thật.                                                                                  |
-| Q4      | Theo Bước 2.6    | Gỡ bỏ hoàn toàn tính năng gom món/gom đơn/batching. Không còn UI/API/WS/cache behavior nào aggregate cùng món hoặc gom nhiều order.                                                                   |
+| Q4      | Theo Bước 2.6    | Gỡ bỏ hoàn toàn tính năng gom món/gom đơn/batching cho KDS/order/prep/ticket. Cart trước submit vẫn được tăng `quantity` cho cùng món/cùng ghi chú trong cùng session; đây không phải KDS batching.   |
 | Q5      | Theo khuyến nghị | KDS realtime phải lọc mọi KDS event theo `tenantId` và `station` trước khi invalidate.                                                                                                                |
 | Q6      | Theo khuyến nghị | Customer socket hỗ trợ chuyển tiếp cả headers và `auth`, sau đó chuẩn hóa về Socket.IO `auth`.                                                                                                        |
 | Q7      | Theo khuyến nghị | Reconnect refetch active domain đang mounted trong app shell; mặc định không refetch toàn bộ inactive cache.                                                                                          |
@@ -24,7 +24,7 @@
 ### 0.1 Tài Liệu Này Override Điểm Nào?
 
 1. Wording cũ trong phase doc về menu realtime không còn là tiêu chí nghiệm thu của Bước 2.7. `menu.updated` không thuộc phạm vi hiện tại.
-2. Mọi wording cũ về batching/gom món/gom đơn bị thay thế bởi Chính Sách Không Gom Món của Bước 2.6 và Bước 2.7 này.
+2. Mọi cách diễn đạt cũ về batching/gom món/gom đơn bị thay thế bởi Chính Sách Không Gom Món của Bước 2.6 và Bước 2.7 này. Chính sách này áp dụng cho KDS/order/prep/ticket, không cấm gộp dòng giỏ hàng cùng món trước submit.
 3. FE không được dùng `join.staff` hoặc `join.session` như cơ chế join room. Room assignment phải do server suy ra.
 4. WebSocket event chỉ là gợi ý invalidate. REST snapshot/TanStack Query data mới là nguồn sự thật để render UI sau reconnect hoặc event bị bỏ lỡ.
 
@@ -73,7 +73,7 @@
 
 1. Không triển khai `events.menuUpdated`, `events.menu.updated`, hoặc `menuUpdated`.
 2. Không thêm backend Catalog realtime bridge cho menu.
-3. Không batching/gom món/gom đơn dưới bất kỳ tên gọi nào.
+3. Không batching/gom món/gom đơn KDS/order/prep/ticket dưới bất kỳ tên gọi nào.
 4. Không hard-code routing food/drink ở FE theo name/category.
 5. Không tạo WebSocket mutation contract cho KDS; KDS mutate qua REST guarded endpoints.
 6. Không thêm durable WebSocket replay, Redis Stream replay, hoặc client-side event log bắt buộc.
@@ -589,9 +589,9 @@ KDS thấy:
 
 KDS không được:
 
-- Group same menu item across tables.
-- Show backend-derived batch totals.
-- Route items bằng frontend name/category heuristics.
+- Gom cùng món giữa nhiều bàn/ticket.
+- Hiển thị bất kỳ tổng số gom món/gom đơn nào.
+- Tự định tuyến món bằng suy luận theo tên món hoặc category ở frontend.
 - Mutate KDS qua WebSocket.
 
 ---
@@ -612,17 +612,19 @@ KDS không được:
 
 ## 12. Chính Sách Không Gom Món Cho FE
 
-Bước 2.7 kế thừa hoàn toàn quyết định không gom món của Bước 2.6.
+Bước 2.7 kế thừa hoàn toàn quyết định không gom món của Bước 2.6 cho KDS/order/prep/ticket.
+
+Chính sách này không áp dụng cho Redis cart trước submit. Trong cart của một `sessionId`, `ADD_ITEM` được phép tăng `quantity` trên dòng hiện có khi trùng `menuItemId` và cùng ghi chú/tùy chọn; đây là hành vi giỏ hàng, không phải batching KDS.
 
 Các khái niệm UI/FE sau không được tồn tại:
 
 - Panel `Batching` như một tính năng nghiệp vụ.
-- Same-item aggregation across tickets/tables.
-- Cross-order grouped quantity.
-- Batch total.
-- Batch click/focus by menu item name.
+- Gom cùng món giữa nhiều ticket/bàn.
+- Số lượng gộp xuyên đơn.
+- Tổng số gom món/gom đơn.
+- Click/focus theo nhóm tên món.
 - Bất kỳ KDS decision nào dựa trên grouping theo `menuItemName`.
-- Bất kỳ DTO/cache/view-model nào reintroduce batch row.
+- Bất kỳ DTO/cache/view-model nào tạo lại dòng dữ liệu gom món/gom đơn.
 
 Được phép:
 
@@ -730,6 +732,6 @@ Q8 yêu cầu E2E đầy đủ cho realtime order/KDS/customer ready flow.
 5. POS polling được giữ tới khi realtime kiểm thử nhanh đạt, sau đó giảm về cơ chế dự phòng 10-15s.
 6. KDS actions giữ strict refetch-after-mutation.
 7. Không có menu realtime event trong Bước 2.7.
-8. Không còn batching/gom món/gom đơn behavior ở bất kỳ FE nào.
+8. Không còn hành vi batching/gom món/gom đơn ở bất kỳ FE nào.
 9. FE không bao giờ hard-code KDS routing theo category/name.
 10. Full E2E PWA -> POS -> KDS -> PWA ready flow pass, bao gồm disconnect/reconnect.

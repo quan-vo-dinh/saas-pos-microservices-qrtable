@@ -115,6 +115,7 @@ enum ORDER {
   KDS_ACTIVE_ORDERS_GET = 'order.kds_active_orders_get',
   MARK_ITEMS_READY = 'order.mark_items_ready',
   REVERT_ITEMS_PROCESSING = 'order.revert_items_processing',
+  MARK_SERVED = 'order.mark_served',
 }
 
 enum KITCHEN {

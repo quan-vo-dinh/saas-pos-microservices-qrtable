@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 
-export type OrderViewFilter = 'all' | 'PENDING' | 'PROCESSING' | 'READY' | 'OVERDUE' | 'OCCUPIED_TABLE';
+export type OrderViewFilter = 'all' | 'PENDING' | 'PROCESSING' | 'READY' | 'SERVED' | 'OVERDUE' | 'OCCUPIED_TABLE';
 
 type OrderUiState = {
   selectedOrderId: string | null;

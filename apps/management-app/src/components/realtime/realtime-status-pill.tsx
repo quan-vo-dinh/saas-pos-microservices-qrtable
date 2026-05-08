@@ -23,7 +23,7 @@ export function RealtimeStatusPill({ status, tone = 'default' }: Props): ReactEl
 
   const className =
     tone === 'kds'
-      ? 'fixed right-3 top-3 z-50 rounded-full border border-white/15 bg-black/80 px-3 py-1 font-[family-name:var(--font-kds-mono)] text-xs text-[var(--ink)] shadow-sm'
+      ? 'absolute right-3 top-3 z-10 rounded-full border border-border/60 bg-background/95 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur'
       : 'fixed right-4 top-4 z-50 rounded-full border border-border/60 bg-background/95 px-3 py-1 text-xs font-medium shadow-sm backdrop-blur';
 
   return <div className={className}>{label}</div>;

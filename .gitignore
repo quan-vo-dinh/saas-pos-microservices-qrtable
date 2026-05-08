@@ -52,3 +52,9 @@ docker/**/docker_data/
 .agent/
 
 vite.config.*.timestamp*
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

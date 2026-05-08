@@ -1,9 +1,10 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { OrderItemStatus, OrderStatus, type Order } from '@einvoice/types';
 
 const mockUseOrderDetailQuery = jest.fn();
 const mockUseConfirmOrderMutation = jest.fn();
+const mockUseMarkOrderServedMutation = jest.fn();
 
 jest.mock('framer-motion', () => ({
   motion: {
@@ -27,6 +28,7 @@ jest.mock('@einvoice/frontend-ui', () => ({
 jest.mock('@/features/order/hooks/use-order-query', () => ({
   useOrderDetailQuery: (...args: unknown[]) => mockUseOrderDetailQuery(...args),
   useConfirmOrderMutation: (...args: unknown[]) => mockUseConfirmOrderMutation(...args),
+  useMarkOrderServedMutation: (...args: unknown[]) => mockUseMarkOrderServedMutation(...args),
 }));
 
 import { OrderDetailPanel } from '../order-detail-panel';
@@ -66,6 +68,11 @@ describe('OrderDetailPanel', () => {
       isPending: false,
       variables: null,
     });
+    mockUseMarkOrderServedMutation.mockReturnValue({
+      mutate: jest.fn(),
+      isPending: false,
+      variables: null,
+    });
   });
 
   it('renders catalog image URL from order item snapshot', () => {
@@ -81,5 +88,30 @@ describe('OrderDetailPanel', () => {
     expect((screen.getByAltText('Phở bò') as HTMLImageElement).src).toBe(
       'https://cdn.example.test/menu/pho-bo.jpg',
     );
+  });
+
+  it('shows a serve action for READY orders', () => {
+    const mutate = jest.fn();
+    mockUseMarkOrderServedMutation.mockReturnValue({
+      mutate,
+      isPending: false,
+      variables: null,
+    });
+    mockUseOrderDetailQuery.mockReturnValue({
+      data: {
+        ...orderWithCatalogImage,
+        status: OrderStatus.READY,
+        items: [{ ...orderWithCatalogImage.items[0], status: OrderItemStatus.READY }],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<OrderDetailPanel orderId="order-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận đã phục vụ' }));
+
+    expect(mutate).toHaveBeenCalledWith('order-1');
   });
 });

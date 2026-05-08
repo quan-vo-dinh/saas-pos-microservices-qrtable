@@ -22,7 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { OrderRowContextMenu } from '@/components/pos/order-row-context-menu';
 import { CancelOrderDialog } from '@/components/pos/cancel-order-dialog';
-import { useConfirmOrderMutation, useOrdersQuery } from '@/features/order/hooks/use-order-query';
+import { useConfirmOrderMutation, useMarkOrderServedMutation, useOrdersQuery } from '@/features/order/hooks/use-order-query';
 import { useOrderUiState, type OrderViewFilter } from '@/features/order/hooks/use-order-ui-state';
 import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 import { formatVnd } from '@/lib/format-vnd';
@@ -32,8 +32,9 @@ import { cn } from '@/lib/utils';
 
 function posFilterChipsToView(filter: string): OrderViewFilter {
   if (filter === 'P') return 'PENDING';
-  if (filter === 'R') return 'READY';
   if (filter === 'D') return 'PROCESSING';
+  if (filter === 'R') return 'READY';
+  if (filter === 'S') return 'SERVED';
   if (filter === 'O') return 'OVERDUE';
   if (filter === 'T') return 'OCCUPIED_TABLE';
   return 'all';
@@ -41,11 +42,12 @@ function posFilterChipsToView(filter: string): OrderViewFilter {
 
 const QUICK: { id: string; label: string; value: string }[] = [
   { id: 'a', label: 'Tất cả', value: 'ALL' },
-  { id: 'b', label: 'Chờ', value: 'P' },
-  { id: 'c', label: 'Bếp', value: 'D' },
-  { id: 'd', label: 'Sẵn sàng', value: 'R' },
-  { id: 'e', label: "Quá 15'", value: 'O' },
-  { id: 'f', label: 'Bàn bận', value: 'T' },
+  { id: 'b', label: 'Chờ xác nhận', value: 'P' },
+  { id: 'c', label: 'Đang chế biến', value: 'D' },
+  { id: 'd', label: 'Sẵn sàng bưng', value: 'R' },
+  { id: 'e', label: 'Đã phục vụ', value: 'S' },
+  { id: 'f', label: 'Quá SLA', value: 'O' },
+  { id: 'g', label: 'Bàn bận', value: 'T' },
 ];
 
 export function LiveOrdersTable() {
@@ -54,6 +56,7 @@ export function LiveOrdersTable() {
   const selectRow = useOrderUiState((s) => s.selectOrder);
   const selectedRowId = useOrderUiState((s) => s.selectedOrderId);
   const confirmOrderMutation = useConfirmOrderMutation();
+  const markServedMutation = useMarkOrderServedMutation();
   const tablesQuery = useTablesQuery();
 
   const [cancelTarget, setCancelTarget] = useState<{ orderId: string; orderStatus: OrderStatus } | null>(null);
@@ -68,6 +71,8 @@ export function LiveOrdersTable() {
         return { status: OrderStatus.PROCESSING } as const;
       case 'READY':
         return { status: OrderStatus.READY } as const;
+      case 'SERVED':
+        return { status: OrderStatus.SERVED } as const;
       default:
         return undefined;
     }
@@ -76,11 +81,13 @@ export function LiveOrdersTable() {
   const liveOrders = ordersQuery.data ?? [];
   const tables = tablesQuery.data ?? [];
   const confirmingOrderId = confirmOrderMutation.isPending ? confirmOrderMutation.variables : null;
+  const servingOrderId = markServedMutation.isPending ? markServedMutation.variables : null;
 
   useEffect(() => {
     if (posViewFilter === 'PENDING') setChip('P');
     else if (posViewFilter === 'PROCESSING') setChip('D');
     else if (posViewFilter === 'READY') setChip('R');
+    else if (posViewFilter === 'SERVED') setChip('S');
     else if (posViewFilter === 'OVERDUE') setChip('O');
     else if (posViewFilter === 'OCCUPIED_TABLE') setChip('T');
     else if (posViewFilter === 'all') setChip('ALL');
@@ -94,7 +101,7 @@ export function LiveOrdersTable() {
       tables.filter((t) => t.status === 'occupied' || t.status === 'billing').map((t) => t.id),
     );
     return base.filter((o) => {
-      const w = waitMinutes(o.createdAt, nowMs);
+      const w = stageWaitMinutes(o, nowMs);
       switch (posViewFilter) {
         case 'PENDING':
           return o.status === OrderStatus.PENDING;
@@ -102,6 +109,8 @@ export function LiveOrdersTable() {
           return o.status === OrderStatus.PROCESSING;
         case 'READY':
           return o.status === OrderStatus.READY;
+        case 'SERVED':
+          return o.status === OrderStatus.SERVED;
         case 'OVERDUE':
           return w > 15;
         case 'OCCUPIED_TABLE':
@@ -183,8 +192,8 @@ export function LiveOrdersTable() {
       {
         id: 'wait',
         header: 'Chờ',
-        cell: ({ row }) => <WaitCell createdAt={row.original.createdAt} nowMs={nowMs} />,
-        size: 64,
+        cell: ({ row }) => <WaitCell order={row.original} nowMs={nowMs} />,
+        size: 86,
       },
       {
         id: 'note',
@@ -225,6 +234,7 @@ export function LiveOrdersTable() {
         cell: ({ row }) => {
           const o = row.original;
           const isConfirming = confirmingOrderId === o.id;
+          const isServing = servingOrderId === o.id;
           if (o.status === OrderStatus.PENDING) {
             return (
               <div
@@ -254,12 +264,30 @@ export function LiveOrdersTable() {
               </div>
             );
           }
+          if (o.status === OrderStatus.READY) {
+            return (
+              <div
+                className="flex flex-nowrap items-center justify-end"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <Button
+                  type="button"
+                  className="h-7 px-2 text-[0.7rem]"
+                  onClick={() => markServedMutation.mutate(o.id)}
+                  disabled={isServing}
+                >
+                  {isServing ? 'Đang lưu...' : 'Đã phục vụ'}
+                </Button>
+              </div>
+            );
+          }
           return <span className="text-xs text-muted-foreground">—</span>;
         },
         size: 150,
       },
     ],
-    [confirmOrderMutation, confirmingOrderId, selectRow, nowMs],
+    [confirmOrderMutation, confirmingOrderId, markServedMutation, selectRow, servingOrderId, nowMs],
   );
 
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
@@ -433,8 +461,9 @@ export function LiveOrdersTable() {
   );
 }
 
-function WaitCell({ createdAt, nowMs }: { createdAt: string; nowMs: number }) {
-  const m = waitMinutes(createdAt, nowMs);
+function WaitCell({ order, nowMs }: { order: Order; nowMs: number }) {
+  const m = stageWaitMinutes(order, nowMs);
+  const label = stageWaitLabel(order.status);
   const c =
     m <= 8
       ? 'from-emerald-500/20 to-transparent'
@@ -442,8 +471,31 @@ function WaitCell({ createdAt, nowMs }: { createdAt: string; nowMs: number }) {
         ? 'from-amber-500/25 to-transparent'
         : 'from-destructive/30 to-transparent animate-pulse';
   return (
-    <div className={cn('rounded border border-transparent bg-gradient-to-r p-0.5 font-mono text-[0.7rem] tabular-nums', c)}>
-      {m < 0 ? '0' : m.toFixed(0)}&apos;
+    <div className={cn('rounded border border-transparent bg-gradient-to-r p-0.5 text-[0.65rem]', c)}>
+      <span className="block truncate text-muted-foreground">{label}</span>
+      <span className="font-mono text-[0.7rem] tabular-nums">{m.toFixed(0)}&apos;</span>
     </div>
   );
+}
+
+function stageWaitMinutes(order: Order, nowMs: number): number {
+  return Math.max(0, waitMinutes(stageStartedAt(order), nowMs));
+}
+
+function stageStartedAt(order: Order): string {
+  if (order.status === OrderStatus.PROCESSING) {
+    return order.confirmedAt ?? order.updatedAt ?? order.createdAt;
+  }
+  if (order.status === OrderStatus.READY || order.status === OrderStatus.SERVED) {
+    return order.updatedAt ?? order.createdAt;
+  }
+  return order.createdAt;
+}
+
+function stageWaitLabel(status: OrderStatus): string {
+  if (status === OrderStatus.PENDING) return 'Xác nhận';
+  if (status === OrderStatus.PROCESSING) return 'Đang làm';
+  if (status === OrderStatus.READY) return 'Chờ bưng';
+  if (status === OrderStatus.SERVED) return 'Đã phục vụ';
+  return 'Chờ';
 }
