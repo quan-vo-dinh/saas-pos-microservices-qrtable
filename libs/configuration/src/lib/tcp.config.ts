@@ -10,6 +10,7 @@ export enum TCP_SERVICES {
   SAAS_SERVICE = 'TCP_SAAS_SERVICE',
   ORDER_SERVICE = 'TCP_ORDER_SERVICE',
   KITCHEN_SERVICE = 'TCP_KITCHEN_SERVICE',
+  PAYMENT_SERVICE = 'TCP_PAYMENT_SERVICE',
 }
 
 export class TcpConfiguration {
@@ -40,6 +41,10 @@ export class TcpConfiguration {
   @IsNotEmpty()
   @IsObject()
   TCP_KITCHEN_SERVICE: TcpClientOptions;
+
+  @IsNotEmpty()
+  @IsObject()
+  TCP_PAYMENT_SERVICE: TcpClientOptions;
 
   constructor() {
     Object.entries(TCP_SERVICES).forEach(([key, serviceName]) => {

@@ -3,7 +3,7 @@
  * Bill aggregate roll-up từ nhiều Orders trong cùng Session.
  *
  * Phase 3 sẽ EXTEND file này (thêm paidAmount, change, refund references).
- * Phase 3 sẽ EXTEND PaymentMethod enum (thêm CARD, MOMO, ZALOPAY, BANK_TRANSFER).
+ * Phase 3: PaymentMethod includes CASH, VIETQR (future methods may extend further).
  *
  * @see docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md
  */
@@ -23,11 +23,7 @@ export type BillStatus = (typeof BillStatus)[keyof typeof BillStatus];
 
 export const PaymentMethod = {
   CASH: 'CASH',
-  // Phase 3 sẽ thêm:
-  // CARD: 'CARD',
-  // MOMO: 'MOMO',
-  // ZALOPAY: 'ZALOPAY',
-  // BANK_TRANSFER: 'BANK_TRANSFER',
+  VIETQR: 'VIETQR',
 } as const;
 export type PaymentMethod = (typeof PaymentMethod)[keyof typeof PaymentMethod];
 

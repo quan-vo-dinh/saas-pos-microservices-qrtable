@@ -39,8 +39,8 @@ describe('Enum completeness — canonical values per Step 2.3 spec', () => {
     expect(Object.values(ServiceRequestStatus).sort()).toEqual(['ACKNOWLEDGED', 'PENDING', 'RESOLVED'].sort());
   });
 
-  it('PaymentMethod has exactly 1 value (Phase 2A — CASH only; Phase 3 mở rộng)', () => {
-    expect(Object.values(PaymentMethod).sort()).toEqual(['CASH']);
+  it('PaymentMethod has exactly 2 values for Phase 3', () => {
+    expect(Object.values(PaymentMethod).sort()).toEqual(['CASH', 'VIETQR'].sort());
   });
 
   it('All enum values are UPPERCASE strings (no lowercase, no kebab-case)', () => {

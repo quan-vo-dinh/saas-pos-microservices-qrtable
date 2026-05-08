@@ -116,6 +116,18 @@ enum ORDER {
   MARK_ITEMS_READY = 'order.mark_items_ready',
   REVERT_ITEMS_PROCESSING = 'order.revert_items_processing',
   MARK_SERVED = 'order.mark_served',
+  BILL_GET_PAYMENT_SNAPSHOT = 'order.bill_get_payment_snapshot',
+  BILL_MARK_PAID = 'order.bill_mark_paid',
+}
+
+enum PAYMENT {
+  CREATE_VIETQR = 'payment.create_vietqr',
+  CONFIRM_CASH = 'payment.confirm_cash',
+  HANDLE_SEPAY_WEBHOOK = 'payment.handle_sepay_webhook',
+  REFUND_REQUEST = 'payment.refund_request',
+  REFUND_CONFIRM = 'payment.refund_confirm',
+  GET_HISTORY = 'payment.get_history',
+  GET_STATUS = 'payment.get_status',
 }
 
 enum KITCHEN {
@@ -143,4 +155,5 @@ export const TCP_REQUEST_MESSAGE = {
   SAAS,
   ORDER,
   KITCHEN,
+  PAYMENT,
 };

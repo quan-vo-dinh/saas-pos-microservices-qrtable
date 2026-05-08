@@ -99,7 +99,7 @@ Tất cả permissions in format `domain.action_snake_case`:
 | `KITCHEN_UPDATE_TICKET`       | `kitchen.update_ticket`       | Update ticket status (Pending → Processing → Ready)             |
 | `KITCHEN_RECALL`              | `kitchen.recall`              | Recall completed ticket (mistake handling)                      |
 | `KITCHEN_SET_PRIORITY`        | `kitchen.set_priority`        | Set/unset KDS ticket priority; OWNER/MANAGER/SUPER_ADMIN only   |
-| `PAYMENT_CREATE`              | `payment.create`              | Initiate payment (e.g., Stripe checkout session)                |
+| `PAYMENT_CREATE`              | `payment.create`              | Initiate payment (e.g., SePay VietQR QR creation)               |
 | `PAYMENT_CONFIRM_CASH`        | `payment.confirm_cash`        | Staff confirms cash received                                    |
 | `PAYMENT_REFUND`              | `payment.refund`              | Refund payment (Manager override)                               |
 | `PAYMENT_GET_HISTORY`         | `payment.get_history`         | View payment history (Waiter needs for "last bill" queries)     |
@@ -166,7 +166,7 @@ Legend: ✅ = granted; (blank) = not granted.
 | 39        | `kitchen.update_ticket`       |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
 | 40        | `kitchen.recall`              |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
 | 41        | `kitchen.set_priority`        |     ✅      |   ✅   |   ✅    |        |       |         |
-| 42        | `payment.create`              |     ✅      |   ✅   |   ✅    |        |       |         |
+| 42        | `payment.create`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
 | 43        | `payment.confirm_cash`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
 | 44        | `payment.refund`              |     ✅      |   ✅   |   ✅    |        |       |         |
 | 45        | `payment.get_history`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |

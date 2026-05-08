@@ -151,6 +151,7 @@
         "order.cancel_pending",
         "order.get_list",
         "order.get_by_id",
+        "payment.create",
         "payment.confirm_cash",
         "payment.get_history",
         "table.transfer",

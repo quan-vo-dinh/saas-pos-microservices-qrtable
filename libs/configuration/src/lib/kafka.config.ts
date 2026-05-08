@@ -32,6 +32,18 @@ export class KafkaConfiguration {
   @IsNotEmpty()
   BFF_CONSUMER_GROUP: string;
 
+  @IsString()
+  @IsNotEmpty()
+  PAYMENT_COMPLETED_TOPIC: string;
+
+  @IsString()
+  @IsNotEmpty()
+  PAYMENT_REFUNDED_TOPIC: string;
+
+  @IsString()
+  @IsNotEmpty()
+  PAYMENT_CLIENT_ID: string;
+
   constructor(data?: Partial<KafkaConfiguration>) {
     const brokerValue = data?.BROKERS?.join(',') || process.env['KAFKA_BROKERS'] || 'localhost:29092';
     this.BROKERS = brokerValue
@@ -49,5 +61,11 @@ export class KafkaConfiguration {
       data?.KITCHEN_CONSUMER_GROUP || process.env['KAFKA_KITCHEN_CONSUMER_GROUP'] || 'kitchen-service-group';
     this.BFF_CLIENT_ID = data?.BFF_CLIENT_ID || process.env['KAFKA_BFF_CLIENT_ID'] || 'qrtable-bff-bridge';
     this.BFF_CONSUMER_GROUP = data?.BFF_CONSUMER_GROUP || process.env['KAFKA_BFF_CONSUMER_GROUP'] || 'bff-kafka-bridge';
+    this.PAYMENT_COMPLETED_TOPIC =
+      data?.PAYMENT_COMPLETED_TOPIC || process.env['KAFKA_PAYMENT_COMPLETED_TOPIC'] || 'payment.completed';
+    this.PAYMENT_REFUNDED_TOPIC =
+      data?.PAYMENT_REFUNDED_TOPIC || process.env['KAFKA_PAYMENT_REFUNDED_TOPIC'] || 'payment.refunded';
+    this.PAYMENT_CLIENT_ID =
+      data?.PAYMENT_CLIENT_ID || process.env['KAFKA_PAYMENT_CLIENT_ID'] || 'qrtable-payment-service';
   }
 }

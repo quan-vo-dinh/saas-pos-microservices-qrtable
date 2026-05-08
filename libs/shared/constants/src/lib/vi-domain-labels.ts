@@ -62,6 +62,7 @@ const SESSION_STATUS_VI = {
 
 const PAYMENT_METHOD_VI = {
   [PaymentMethod.CASH]: 'Tiền mặt',
+  [PaymentMethod.VIETQR]: 'VietQR',
 } as const satisfies Record<PaymentMethod, string>;
 
 export function orderStatusVi(status: OrderStatus): string {

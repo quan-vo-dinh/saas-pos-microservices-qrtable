@@ -14,5 +14,5 @@ export const SESSION_POLICY = {
 
 export const TENANT_POLICY = {
   HOST_MIN_SEGMENTS: 3,
-  EXCLUDED_PATH_PREFIXES: ['authorizer', 'health', 'public'] as const,
+  EXCLUDED_PATH_PREFIXES: ['authorizer', 'health', 'public', 'payment/sepay/webhook'] as const,
 } as const;
