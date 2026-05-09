@@ -12,9 +12,14 @@ import { PaymentOutboxRepository } from './repositories/payment-outbox.repositor
 import { PaymentRepository } from './repositories/payment.repository';
 import { RefundRepository } from './repositories/refund.repository';
 import { PaymentOutboxPublisherService } from './services/payment-outbox-publisher.service';
+import { PaymentMapper } from './services/payment.mapper';
+import { PaymentOrderGateway } from './services/payment-order.gateway';
+import { PaymentQueryService } from './services/payment-query.service';
 import { PaymentReferenceService } from './services/payment-reference.service';
+import { PaymentSettlementService } from './services/payment-settlement.service';
 import { PaymentService } from './services/payment.service';
 import { RefundService } from './services/refund.service';
+import { SepayWebhookService } from './services/sepay-webhook.service';
 
 @Module({
   imports: [
@@ -23,6 +28,11 @@ import { RefundService } from './services/refund.service';
   ],
   controllers: [PaymentController],
   providers: [
+    PaymentMapper,
+    PaymentOrderGateway,
+    PaymentQueryService,
+    PaymentSettlementService,
+    SepayWebhookService,
     PaymentService,
     RefundService,
     PaymentReferenceService,

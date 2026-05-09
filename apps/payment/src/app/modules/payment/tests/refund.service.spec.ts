@@ -41,7 +41,12 @@ describe('RefundService', () => {
   }) {
     const manager = {
       save: jest.fn().mockImplementation(async (_: unknown, entity: PaymentEntity | RefundEntity) => {
-        if ('reason' in entity && 'paymentId' in entity && 'status' in entity && entity.status === 'PENDING_STAFF_ACTION') {
+        if (
+          'reason' in entity &&
+          'paymentId' in entity &&
+          'status' in entity &&
+          entity.status === 'PENDING_STAFF_ACTION'
+        ) {
           return {
             ...entity,
             id: 'refund-new',
@@ -54,13 +59,13 @@ describe('RefundService', () => {
     };
 
     const dataSource = {
-      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<unknown>) => fn(manager as unknown as EntityManager)),
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<unknown>) =>
+        fn(manager as unknown as EntityManager),
+      ),
     };
 
     const paymentRepo = {
-      findByTenantAndIdForUpdate: jest
-        .fn()
-        .mockResolvedValue(mocks.paymentForConfirm ?? mocks.payment),
+      findByTenantAndIdForUpdate: jest.fn().mockResolvedValue(mocks.paymentForConfirm ?? mocks.payment),
     };
 
     const refundRepo = {

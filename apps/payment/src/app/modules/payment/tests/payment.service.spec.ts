@@ -6,8 +6,13 @@ import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { PaymentEntity } from '../entities/payment.entity';
 import { CONFIGURATION } from '../../../../configuration';
+import { PaymentMapper } from '../services/payment.mapper';
+import { PaymentOrderGateway } from '../services/payment-order.gateway';
+import { PaymentQueryService } from '../services/payment-query.service';
 import { PaymentReferenceService } from '../services/payment-reference.service';
+import { PaymentSettlementService } from '../services/payment-settlement.service';
 import { PaymentService } from '../services/payment.service';
+import { SepayWebhookService } from '../services/sepay-webhook.service';
 
 function makePayment(overrides: Partial<PaymentEntity> = {}): PaymentEntity {
   return Object.assign(new PaymentEntity(), {
@@ -38,6 +43,38 @@ function makePayment(overrides: Partial<PaymentEntity> = {}): PaymentEntity {
 
 function uniqueViolation(): QueryFailedError {
   return new QueryFailedError('INSERT INTO payments', [], { code: '23505' } as Error & { code: string });
+}
+
+function buildPaymentServiceForTest(opts: {
+  dataSource: DataSource;
+  orderClient: unknown;
+  paymentRepo: unknown;
+  auditRepo: unknown;
+  outboxRepo: unknown;
+  reference?: PaymentReferenceService;
+}): PaymentService {
+  const reference = opts.reference ?? new PaymentReferenceService();
+  const gateway = new PaymentOrderGateway(opts.orderClient as never);
+  const mapper = new PaymentMapper();
+  const query = new PaymentQueryService(opts.paymentRepo as never, mapper);
+  const settlement = new PaymentSettlementService(
+    opts.dataSource,
+    gateway,
+    opts.paymentRepo as never,
+    opts.auditRepo as never,
+    opts.outboxRepo as never,
+    reference,
+    mapper,
+  );
+  const sepay = new SepayWebhookService(
+    opts.dataSource,
+    gateway,
+    opts.paymentRepo as never,
+    opts.auditRepo as never,
+    opts.outboxRepo as never,
+    reference,
+  );
+  return new PaymentService(settlement, sepay, query);
 }
 
 function baseSepayPayload(overrides: Partial<SepayWebhookPayload> = {}): SepayWebhookPayload {
@@ -112,14 +149,13 @@ describe('PaymentService policy checks', () => {
         });
       }),
     };
-    const service = new PaymentService(
-      {} as never,
-      orderClient as never,
-      paymentRepo as never,
-      auditRepo as never,
-      {} as never,
-      new PaymentReferenceService(),
-    );
+    const service = buildPaymentServiceForTest({
+      dataSource: {} as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo: {} as never,
+    });
 
     const result = await service.createVietQr({
       tenantId: existing.tenantId,
@@ -167,14 +203,13 @@ describe('PaymentService settlement behavior', () => {
     const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
     const orderClient = { send: jest.fn() };
 
-    const service = new PaymentService(
-      dataSource as unknown as DataSource,
-      orderClient as never,
-      paymentRepo as never,
-      auditRepo as never,
-      outboxRepo as never,
-      new PaymentReferenceService(),
-    );
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
 
     await service.handleSepayWebhook({
       payload: baseSepayPayload({ transferAmount: 100_000 }),
@@ -207,14 +242,13 @@ describe('PaymentService settlement behavior', () => {
     const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
     const orderClient = { send: jest.fn() };
 
-    const service = new PaymentService(
-      dataSource as unknown as DataSource,
-      orderClient as never,
-      paymentRepo as never,
-      auditRepo as never,
-      outboxRepo as never,
-      new PaymentReferenceService(),
-    );
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
 
     await service.handleSepayWebhook({ payload: baseSepayPayload({ id: 42 }) });
 
@@ -245,14 +279,13 @@ describe('PaymentService settlement behavior', () => {
     const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
     const orderClient = { send: jest.fn() };
 
-    const service = new PaymentService(
-      dataSource as unknown as DataSource,
-      orderClient as never,
-      paymentRepo as never,
-      auditRepo as never,
-      outboxRepo as never,
-      new PaymentReferenceService(),
-    );
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
 
     await service.handleSepayWebhook({ payload: baseSepayPayload({ id: 99 }) });
 
@@ -290,14 +323,13 @@ describe('PaymentService settlement behavior', () => {
       }),
     };
 
-    const service = new PaymentService(
-      dataSource as unknown as DataSource,
-      orderClient as never,
-      paymentRepo as never,
-      auditRepo as never,
-      outboxRepo as never,
-      new PaymentReferenceService(),
-    );
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
 
     await service.handleSepayWebhook({
       payload: baseSepayPayload({ transferAmount: 200_000 }),
@@ -356,14 +388,13 @@ describe('PaymentService settlement behavior', () => {
       }),
     };
 
-    const service = new PaymentService(
-      dataSource as unknown as DataSource,
-      orderClient as never,
-      paymentRepo as never,
-      auditRepo as never,
-      outboxRepo as never,
-      new PaymentReferenceService(),
-    );
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
 
     const result = await service.confirmCash({
       tenantId: 'tenant-1',
