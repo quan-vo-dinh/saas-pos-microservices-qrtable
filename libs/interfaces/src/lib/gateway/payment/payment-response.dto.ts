@@ -20,6 +20,8 @@ export class PaymentResponseDto {
 
 export class CreateVietQrResponseDto extends PaymentResponseDto {
   qrUrl!: string;
+  bankAccount!: string;
+  bankName!: string;
 }
 
 export class RefundResponseDto {

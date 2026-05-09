@@ -166,6 +166,8 @@ describe('PaymentService policy checks', () => {
 
     expect(result.id).toBe(existing.id);
     expect(result.qrUrl).toContain(`des=${existing.billReference}`);
+    expect(result.bankAccount).toBe('0010000000355');
+    expect(result.bankName).toBe('Vietcombank');
     expect(paymentRepo.findByTenantAndBill).toHaveBeenCalledTimes(2);
     expect(auditRepo.createPaymentAudit).not.toHaveBeenCalled();
   });

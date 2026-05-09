@@ -22,6 +22,7 @@ import type {
   OrderIdTcpRequest,
   SubmitOrderTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
+import type { CreateVietQrTcpRequest, CreateVietQrTcpResponse } from '@common/interfaces/tcp/payment';
 import type {
   BillCurrentTcpResponse,
   BillRequestedTcpResponse,
@@ -32,9 +33,10 @@ import type {
   SubmitOrderTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
 import { buildTcpRequestContext } from '@common/utils/request.util';
-import type { ServiceRequestType } from '@einvoice/types';
+import { BillStatus, type ServiceRequestType } from '@einvoice/types';
 import {
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -49,7 +51,7 @@ import {
 } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { firstValueFrom, map } from 'rxjs';
+import { firstValueFrom, map, timeout } from 'rxjs';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 @ApiTags('Customer Orders')
@@ -58,8 +60,14 @@ import { RealtimeEventsService } from '../../realtime/services/realtime-events.s
 export class CustomerOrderController {
   constructor(
     @Inject(TCP_SERVICES.ORDER_SERVICE) private readonly orderClient: TcpClient,
+    @Inject(TCP_SERVICES.PAYMENT_SERVICE) private readonly paymentClient: TcpClient,
     private readonly realtimeEvents: RealtimeEventsService,
   ) {}
+
+  private paymentTcpTimeoutMs(): number {
+    const parsed = Number(process.env['BFF_PAYMENT_TCP_TIMEOUT_MS'] ?? 5000);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 5000;
+  }
 
   @Get('cart')
   @ApiOkResponse({ type: ResponseDto })
@@ -388,6 +396,56 @@ export class CustomerOrderController {
         .pipe(map((r) => r)),
     );
     return new ResponseDto<BillCurrentTcpResponse>({
+      data: tcp.data,
+      statusCode: tcp.statusCode,
+      message: tcp.code as HTTP_MESSAGE,
+      processID: processId,
+    });
+  }
+
+  @Post('payment/vietqr/create-qr')
+  @ApiOkResponse({ type: ResponseDto })
+  @ApiOperation({ summary: 'Create or reuse VietQR for current session bill' })
+  async createCustomerVietQr(
+    @ProcessId() processId: string,
+    @Req() req: Request,
+  ): Promise<ResponseDto<CreateVietQrTcpResponse>> {
+    const tenantId = req[MetadataKey.TENANT_ID] as string;
+    const sessionId = req[MetadataKey.SESSION_ID] as string;
+    const currentBill = await firstValueFrom(
+      this.orderClient
+        .send<
+          BillCurrentTcpResponse,
+          BillSessionTcpRequest
+        >(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_CURRENT, buildTcpRequestContext<BillSessionTcpRequest>(req, processId, { tenantId, sessionId }))
+        .pipe(map((r) => r)),
+    );
+    const bill = currentBill.data?.bill;
+    if (!bill || bill.status !== BillStatus.PENDING_PAYMENT) {
+      throw new ConflictException('Current bill is not pending payment');
+    }
+    if (bill.sessionId !== sessionId) {
+      throw new ConflictException('Bill does not belong to this session');
+    }
+
+    const payload: CreateVietQrTcpRequest = {
+      tenantId,
+      billId: bill.id,
+      userId: `customer-session:${sessionId}`,
+      processId,
+    };
+    const tcp = await firstValueFrom(
+      this.paymentClient
+        .send<
+          CreateVietQrTcpResponse,
+          CreateVietQrTcpRequest
+        >(TCP_REQUEST_MESSAGE.PAYMENT.CREATE_VIETQR, buildTcpRequestContext<CreateVietQrTcpRequest>(req, processId, payload))
+        .pipe(
+          timeout({ first: this.paymentTcpTimeoutMs() }),
+          map((r) => r),
+        ),
+    );
+    return new ResponseDto<CreateVietQrTcpResponse>({
       data: tcp.data,
       statusCode: tcp.statusCode,
       message: tcp.code as HTTP_MESSAGE,

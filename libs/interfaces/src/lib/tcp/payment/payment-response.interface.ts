@@ -20,6 +20,8 @@ export type PaymentTcpResponse = {
 
 export type CreateVietQrTcpResponse = PaymentTcpResponse & {
   qrUrl: string;
+  bankAccount: string;
+  bankName: string;
 };
 
 export type SepayWebhookTcpResponse = {

@@ -50,7 +50,7 @@ export class PaymentSettlementService {
     const existing = await this.paymentRepo.findByTenantAndBill(dto.tenantId, dto.billId);
     if (existing) {
       if (existing.status === 'PENDING') {
-        return { ...this.mapper.toPaymentResponse(existing), qrUrl: this.buildQrUrl(existing) };
+        return { ...this.mapper.toPaymentResponse(existing), ...this.vietQrPresentation(existing) };
       }
       throw new ConflictException('Bill already paid');
     }
@@ -70,7 +70,7 @@ export class PaymentSettlementService {
     if (persisted.created) {
       await this.auditRepo.createPaymentAudit(persisted.payment, 'PAYMENT_CREATED', 'USER', dto.userId, null, null);
     }
-    return { ...this.mapper.toPaymentResponse(persisted.payment), qrUrl: this.buildQrUrl(persisted.payment) };
+    return { ...this.mapper.toPaymentResponse(persisted.payment), ...this.vietQrPresentation(persisted.payment) };
   }
 
   async confirmCash(dto: ConfirmCashTcpRequest): Promise<PaymentTcpResponse> {
@@ -160,14 +160,18 @@ export class PaymentSettlementService {
     return this.mapper.toPaymentResponse(fresh);
   }
 
-  private buildQrUrl(payment: PaymentEntity): string {
+  private vietQrPresentation(payment: PaymentEntity): { qrUrl: string; bankAccount: string; bankName: string } {
     const qrConfig = this.getSepayQrConfig();
-    return this.reference.buildQrUrl({
-      account: qrConfig.account,
-      bank: qrConfig.bank,
-      amount: payment.roundedTotal,
-      description: payment.billReference,
-    });
+    return {
+      qrUrl: this.reference.buildQrUrl({
+        account: qrConfig.account,
+        bank: qrConfig.bank,
+        amount: payment.roundedTotal,
+        description: payment.billReference,
+      }),
+      bankAccount: qrConfig.account,
+      bankName: qrConfig.bank,
+    };
   }
 
   private getSepayQrConfig(): { account: string; bank: string } {

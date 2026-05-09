@@ -173,19 +173,14 @@ describe('StaffOrderController', () => {
   });
 
   it('reopenBill rejects when payment history has PENDING', async () => {
-    orderClient.send.mockReturnValueOnce(
-      of(Response.success({ bill: { id: 'bill-1' }, cart: {} })),
-    );
+    orderClient.send.mockReturnValueOnce(of(Response.success({ bill: { id: 'bill-1' }, cart: {} })));
     paymentClient.send.mockReturnValueOnce(of(Response.success([minimalPayment(PaymentStatus.PENDING)])));
 
     await expect(controller.reopenBill('session-1', 'pid-1', staffReq())).rejects.toMatchObject({
       errorCode: ErrorCode.BILL_REOPEN_BLOCKED_BY_PAYMENT,
     });
 
-    expect(orderClient.send).toHaveBeenCalledWith(
-      TCP_REQUEST_MESSAGE.ORDER.BILL_GET_CURRENT,
-      expect.any(Object),
-    );
+    expect(orderClient.send).toHaveBeenCalledWith(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_CURRENT, expect.any(Object));
     expect(orderClient.send).toHaveBeenCalledTimes(1);
     expect(paymentClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.PAYMENT.GET_HISTORY,
@@ -196,9 +191,7 @@ describe('StaffOrderController', () => {
   });
 
   it('reopenBill rejects when payment history has REFUND_PENDING', async () => {
-    orderClient.send.mockReturnValueOnce(
-      of(Response.success({ bill: { id: 'bill-1' }, cart: {} })),
-    );
+    orderClient.send.mockReturnValueOnce(of(Response.success({ bill: { id: 'bill-1' }, cart: {} })));
     paymentClient.send.mockReturnValueOnce(of(Response.success([minimalPayment(PaymentStatus.REFUND_PENDING)])));
 
     await expect(controller.reopenBill('session-1', 'pid-1', staffReq())).rejects.toMatchObject({
@@ -250,9 +243,7 @@ describe('StaffOrderController', () => {
   });
 
   it('reopenBill throws COMMON_INTERNAL_ERROR when payment history TCP fails', async () => {
-    orderClient.send.mockReturnValueOnce(
-      of(Response.success({ bill: { id: 'bill-1' }, cart: {} })),
-    );
+    orderClient.send.mockReturnValueOnce(of(Response.success({ bill: { id: 'bill-1' }, cart: {} })));
     paymentClient.send.mockReturnValueOnce(
       of(new Response({ statusCode: HttpStatus.BAD_GATEWAY, code: 'FAILED' as never, data: undefined })),
     );
