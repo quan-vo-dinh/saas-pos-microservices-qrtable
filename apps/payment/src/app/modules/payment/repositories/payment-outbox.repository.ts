@@ -16,6 +16,8 @@ export class PaymentOutboxRepository {
     @InjectRepository(PaymentOutboxEventEntity) private readonly repo: Repository<PaymentOutboxEventEntity>,
   ) {}
 
+  // Phase 3 demo assumes a single Payment instance. Multi-instance deployment must replace
+  // this read with a DB claim/lock step such as FOR UPDATE SKIP LOCKED or PROCESSING rows.
   findPendingRows(take: number): Promise<PaymentOutboxEventEntity[]> {
     return this.repo.find({
       where: { status: 'PENDING' },
