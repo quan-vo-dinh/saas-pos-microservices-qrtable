@@ -12,6 +12,7 @@ import {
   CreateVietQrRequestDto,
   RefundConfirmRequestDto,
   RefundRequestDto,
+  SepayWebhookRequestDto,
 } from '@common/interfaces/gateway/payment';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
 import type { RequestType } from '@common/interfaces/tcp/common/request.interface';
@@ -25,7 +26,6 @@ import type {
   PaymentHistoryTcpRequest,
   RefundConfirmTcpRequest,
   RefundRequestTcpRequest,
-  SepayWebhookPayload,
 } from '@common/interfaces/tcp/payment';
 import type {
   CreateVietQrTcpResponse,
@@ -35,12 +35,12 @@ import type {
   SepayWebhookTcpResponse,
 } from '@common/interfaces/tcp/payment';
 import { buildTcpRequestContext } from '@common/utils/request.util';
-import { Body, Controller, Get, Headers, Inject, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { firstValueFrom, map, timeout } from 'rxjs';
-import { assertSepayWebhookSecret } from '../verify-sepay-webhook-secret';
+import { SepayWebhookSecretGuard } from '../guards/sepay-webhook-secret.guard';
 
 @ApiTags('Payment')
 @Controller('payment')
@@ -131,16 +131,13 @@ export class PaymentController {
 
   @Post('sepay/webhook')
   @Authorization({ secured: false })
+  @UseGuards(SepayWebhookSecretGuard)
   @RawResponse()
   @ApiOperation({ summary: 'SePay bank transfer webhook' })
   async sepayWebhook(
-    @Headers('x-secret-key') secretKey: string | undefined,
-    @Body() payload: SepayWebhookPayload,
+    @Body() payload: SepayWebhookRequestDto,
     @ProcessId() processId: string,
   ): Promise<{ success: true }> {
-    const expected =
-      this.configService.get<string>('SEPAY_WEBHOOK_SECRET') || process.env['SEPAY_WEBHOOK_SECRET'] || '';
-    assertSepayWebhookSecret(secretKey, expected);
     const tcpData: HandleSepayWebhookTcpRequest = { payload, processId };
     await this.sendPaymentTcp<SepayWebhookTcpResponse, HandleSepayWebhookTcpRequest>(
       TCP_REQUEST_MESSAGE.PAYMENT.HANDLE_SEPAY_WEBHOOK,

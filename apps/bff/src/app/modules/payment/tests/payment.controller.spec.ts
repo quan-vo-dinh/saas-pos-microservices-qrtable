@@ -2,15 +2,41 @@ jest.mock('uuid', () => ({
   v4: jest.fn(() => '00000000-0000-4000-8000-000000000001'),
 }));
 
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { MetadataKey } from '@common/constants/common.constant';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { SepayWebhookRequestDto } from '@common/interfaces/gateway/payment';
 import type { SepayWebhookPayload } from '@common/interfaces/tcp/payment';
 import { NEVER, of } from 'rxjs';
 import { PaymentController } from '../controllers/payment.controller';
 import { assertSepayWebhookSecret } from '../verify-sepay-webhook-secret';
+
+describe('SepayWebhookRequestDto validation', () => {
+  it('rejects malformed SePay webhook payloads before TCP forwarding', async () => {
+    const dto = plainToInstance(SepayWebhookRequestDto, {
+      id: 'not-a-number',
+      gateway: '',
+      transactionDate: '',
+      accountNumber: '',
+      code: null,
+      content: '',
+      transferType: 'sideways',
+      transferAmount: -1,
+      accumulated: 0,
+      subAccount: null,
+      referenceCode: '',
+      description: '',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.length).toBeGreaterThan(0);
+  });
+});
 
 function makeSepayPayload(overrides: Partial<SepayWebhookPayload> = {}): SepayWebhookPayload {
   return {
@@ -69,7 +95,7 @@ describe('PaymentController TCP behavior', () => {
     };
     const controller = new PaymentController({ send } as never, configService as never);
 
-    await expect(controller.sepayWebhook('secret', makeSepayPayload(), 'process-1')).rejects.toMatchObject({
+    await expect(controller.sepayWebhook(makeSepayPayload(), 'process-1')).rejects.toMatchObject({
       name: 'TimeoutError',
     });
     expect(send).toHaveBeenCalledWith(TCP_REQUEST_MESSAGE.PAYMENT.HANDLE_SEPAY_WEBHOOK, expect.any(Object));
@@ -82,7 +108,7 @@ describe('PaymentController TCP behavior', () => {
     };
     const controller = new PaymentController({ send } as never, configService as never);
 
-    const response = await controller.sepayWebhook('secret', makeSepayPayload(), 'process-1');
+    const response = await controller.sepayWebhook(makeSepayPayload(), 'process-1');
 
     expect(response).toEqual({ success: true });
   });
