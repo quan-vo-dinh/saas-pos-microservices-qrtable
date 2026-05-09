@@ -9,6 +9,7 @@ import type {
   KitchenItemReadyEvent,
   OrderCreatedEvent,
   OrderStatusChangedEvent,
+  PaymentCompletedRealtimeEvent,
   ServiceRequestedEvent,
   TableTransferredEvent,
 } from '@einvoice/types';
@@ -16,6 +17,8 @@ import { API_CONFIG } from '@/constants/api';
 import { useAuthStore } from '@/lib/auth/auth-store';
 import { tableKeys } from '@/features/tables/hooks/use-tables-query';
 import { serviceRequestKeys } from '@/features/service-requests/hooks/use-service-request-query';
+import { paymentQueryKeys } from '@/features/payment/hooks/use-payment';
+import { billKeys } from '@/features/order/hooks/use-bill-query';
 import { orderKeys } from './use-order-query';
 
 export type StaffRealtimeStatus = 'idle' | 'connected' | 'reconnecting' | 'degraded' | 'auth-error';
@@ -63,6 +66,12 @@ export function useStaffOrderRealtime(): StaffRealtimeStatus {
 
     const invalidateTables = (): void => {
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
+    };
+
+    const invalidatePaymentState = (billId?: string): void => {
+      void queryClient.invalidateQueries({ queryKey: billKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: tableKeys.all });
+      void queryClient.invalidateQueries({ queryKey: paymentQueryKeys.history(billId) });
     };
 
     const onConnect = (): void => {
@@ -123,6 +132,12 @@ export function useStaffOrderRealtime(): StaffRealtimeStatus {
       invalidateOrders(event.orderId);
     };
 
+    const onPaymentCompleted = (event: PaymentCompletedRealtimeEvent): void => {
+      if (event.tenantId !== tenantId) return;
+      invalidateOrders();
+      invalidatePaymentState(event.billId);
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('events.authError', onAuthError);
@@ -133,6 +148,7 @@ export function useStaffOrderRealtime(): StaffRealtimeStatus {
     socket.on('events.tableTransferred', onTableTransferred);
     socket.on('events.billRequested', onBillRequested);
     socket.on('events.kitchenItemReady', onKitchenItemReady);
+    socket.on('events.paymentCompleted', onPaymentCompleted);
     socket.io.on('reconnect_attempt', onReconnectAttempt);
     socket.io.on('reconnect', onReconnect);
     socket.io.on('reconnect_error', onReconnectError);
@@ -149,6 +165,7 @@ export function useStaffOrderRealtime(): StaffRealtimeStatus {
       socket.off('events.tableTransferred', onTableTransferred);
       socket.off('events.billRequested', onBillRequested);
       socket.off('events.kitchenItemReady', onKitchenItemReady);
+      socket.off('events.paymentCompleted', onPaymentCompleted);
       socket.io.off('reconnect_attempt', onReconnectAttempt);
       socket.io.off('reconnect', onReconnect);
       socket.io.off('reconnect_error', onReconnectError);

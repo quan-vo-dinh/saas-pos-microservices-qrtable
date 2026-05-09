@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
+import { paymentQueryKeys } from '@/features/payment/hooks/use-payment';
 import { tableKeys } from '@/features/tables/hooks/use-tables-query';
 import { serviceRequestKeys } from '@/features/service-requests/hooks/use-service-request-query';
+import { billKeys } from './use-bill-query';
 import { orderKeys } from './use-order-query';
 import { useStaffOrderRealtime } from './use-staff-order-realtime';
 
@@ -99,6 +101,53 @@ describe('useStaffOrderRealtime', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.details() });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.detail('order-1') });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: tableKeys.all });
+  });
+
+  it('invalidates bills, tables, and payment history on paymentCompleted for matching tenant', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useStaffOrderRealtime(), { wrapper: createWrapper(queryClient) });
+
+    const onCalls = onMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const paymentHandler = onCalls.find(([event]) => event === 'events.paymentCompleted')?.[1];
+
+    paymentHandler?.({
+      eventId: 'pc-1',
+      eventType: 'payment.completed',
+      tenantId: 'other-tenant',
+      sessionId: 'session-1',
+      billId: 'bill-1',
+      paymentId: 'pay-1',
+      method: 'VIETQR',
+      status: 'PAID',
+      paidAt: '2026-05-08T12:00:00.000Z',
+      amount: 128_000,
+    });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: billKeys.lists() });
+
+    invalidateSpy.mockClear();
+
+    paymentHandler?.({
+      eventId: 'pc-1',
+      eventType: 'payment.completed',
+      tenantId: 'tenant-1',
+      sessionId: 'session-1',
+      billId: 'bill-1',
+      paymentId: 'pay-1',
+      method: 'VIETQR',
+      status: 'PAID',
+      paidAt: '2026-05-08T12:00:00.000Z',
+      amount: 128_000,
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.lists() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.details() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: billKeys.lists() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: tableKeys.all });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: paymentQueryKeys.history('bill-1') });
   });
 
   it('invalidates service-request lists for matching service request events only', () => {

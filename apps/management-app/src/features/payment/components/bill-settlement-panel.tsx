@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { billKeys } from '@/features/order/hooks/use-bill-query';
 import { paymentService } from '@/features/payment/services/payment.service';
 import { paymentQueryKeys, usePaymentHistoryQuery } from '@/features/payment/hooks/use-payment';
+import { tableKeys } from '@/features/tables/hooks/use-tables-query';
 
 const schema = z.object({
   received: z
@@ -65,6 +66,12 @@ export function BillSettlementPanel({ bill }: { bill: Bill }) {
     }, 3000);
     return () => clearInterval(t);
   }, [qrUrl, billId, bill.status, terminalFromHistory, queryClient]);
+
+  useEffect(() => {
+    if (!paidFromHistory) return;
+    void queryClient.invalidateQueries({ queryKey: billKeys.lists() });
+    void queryClient.invalidateQueries({ queryKey: tableKeys.all });
+  }, [paidFromHistory, queryClient]);
 
   const pendingVietQr = useMemo(
     () =>
@@ -157,6 +164,7 @@ export function BillSettlementPanel({ bill }: { bill: Bill }) {
                   await Promise.all([
                     queryClient.invalidateQueries({ queryKey: billKeys.lists() }),
                     queryClient.invalidateQueries({ queryKey: paymentQueryKeys.history(bill.id) }),
+                    queryClient.invalidateQueries({ queryKey: tableKeys.all }),
                   ]);
                   toast.success('Đã thu — đóng phiên');
                 } catch (e) {
