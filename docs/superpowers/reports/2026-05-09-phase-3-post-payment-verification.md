@@ -73,13 +73,13 @@ npx nx run-many -t test -p payment,order --runInBand
 
 ## Doc / architecture alignment
 
-| Topic | Status |
-| ----- | ------ |
-| Order sở hữu bill/session lifecycle; `BILL_MARK_PAID` khép session + gọi Catalog `billing → cleaning` | Documented |
-| Catalog sở hữu trạng thái bàn | Documented |
-| Payment sở hữu payment + outbox `payment.completed` | Documented |
-| POS/PWA correctness: **polling/refetch baseline**; Kafka→BFF→WS chỉ **hint invalidate** | Documented |
-| Email receipt / durable notification pipeline | **Phase 4C — không implement Phase 3** |
+| Topic                                                                                                 | Status                                 |
+| ----------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Order sở hữu bill/session lifecycle; `BILL_MARK_PAID` khép session + gọi Catalog `billing → cleaning` | Documented                             |
+| Catalog sở hữu trạng thái bàn                                                                         | Documented                             |
+| Payment sở hữu payment + outbox `payment.completed`                                                   | Documented                             |
+| POS/PWA correctness: **polling/refetch baseline**; Kafka→BFF→WS chỉ **hint invalidate**               | Documented                             |
+| Email receipt / durable notification pipeline                                                         | **Phase 4C — không implement Phase 3** |
 
 ---
 
