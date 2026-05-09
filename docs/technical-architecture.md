@@ -162,11 +162,10 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
                     ├── Redis Sorted Set (FIFO queue)
                     └── Publish internal KDS invalidation hint after Redis write → BFF WebSocket → KDS screens
     │
-    └──→ Payment Service (TCP): process payment
-            ├── VietQR: build QR URL (qr.sepay.vn) → POS display → SePay webhook → X-Secret-Key verify → update status
-            ├── OR Cash: staff confirm → update status
-            ├── Emit Kafka: "payment.completed"
-            └── WebSocket → notify Customer + update table status
+    └──→ Payment Service (TCP): settle payment (VietQR hoặc cash)
+            ├── Cùng transaction: ghi payment + outbox row `payment.completed` (Payment DB)
+            ├── Sau commit: optional TCP Order `BILL_MARK_PAID` (fast path, idempotent); Kafka publish từ outbox = recovery/fan-out
+            └── Phase 3 baseline: POS/Customer **polling/refetch**; push WebSocket qua bridge Kafka→BFF là follow-up (xem decision D5)
 ```
 
 ---
@@ -1111,7 +1110,7 @@ Cấu hình qua Keycloak **Protocol Mapper** (type: User Attribute → Token Cla
 │  │  order.confirmed → session:{sid}:cust    │    │
 │  │    (customer tracking only; non-KDS)     │    │
 │  │  kitchen.sla_warning → tenant:{tid}:mgmt│    │
-│  │  payment.completed → session:{sid}:cust  │    │
+│  │  payment.completed → session:{sid}:cust (bridge follow-up; baseline polling) │    │
 │  └──────────────────────────────────────────┘    │
 │           │                                      │
 │           ├─ Kitchen internal Redis hint:        │
@@ -1202,7 +1201,7 @@ Client A ──→ BFF Instance 1 ──→ Redis Pub/Sub ──→ BFF Instance
 3. Staff nhập số tiền khách đưa → hệ thống tính tiền thừa
 4. Staff nhấn "Xác nhận thanh toán tiền mặt"
 5. Payment Service: ghi nhận { method: "CASH", amount, received, change }
-6. Emit Kafka: payment.completed → close session → table → "Cleaning"
+6. Giống VietQR: trong một transaction ghi payment PAID + outbox; sau commit publish Kafka `payment.completed`. Order Service (consumer và/hoặc TCP fast path idempotent) đánh dấu bill PAID và chuyển bàn `Billing` → `Cleaning` theo luồng Order — không coi Payment là nơi “đóng session” trực tiếp (xem D1, D4).
 ```
 
 ### 10.3 SePay Configuration
@@ -1231,7 +1230,7 @@ Webhook Verification (X-Secret-Key header):
 
 QR URL Format:
   https://qr.sepay.vn/img?acc={BANK_ACCOUNT}&bank={BANK_NAME}
-                         &amount={rounded_total}&des={QRTBL+billId_8chars}
+                         &amount={rounded_total}&des={QRTBL + 8 ký tự đầu của billId sau khi bỏ dấu gạch (UUID)}
 ```
 
 ---

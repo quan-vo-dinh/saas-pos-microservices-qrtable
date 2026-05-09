@@ -4,7 +4,7 @@
 > **Ước lượng:** ~1-2 tuần
 > **Trạng thái:** ⬜ TODO
 
-> **Safe refactor (2026-05):** Các quyết định kiến trúc/nghiệp vụ đã khóa tại [`docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md`](../superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md). Phạm vi refactor: đúng đắn thanh toán, đồng bộ bill/`payment_id`, SePay webhook + guard/DTO; **không** gói gọn đóng session realtime qua Kafka→BFF (baseline: **polling** trên POS) và **không** implement chuyển bàn/session ngoài luồng Billing→Cleaning đã mô tả — các phần đó là task follow-up.
+> **Safe refactor (2026-05):** Các quyết định kiến trúc/nghiệp vụ đã khóa tại [`docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md`](../superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md). Phạm vi refactor: đúng đắn thanh toán, đồng bộ bill/`payment_id`, SePay webhook + guard/DTO. **Phạm vi không bao gồm:** đóng session realtime qua cầu nối Kafka→BFF (baseline hiện tại: **polling** trên POS); cũng **không** implement chuyển bàn hay đóng session ngoài luồng Billing→Cleaning đã mô tả trong tài liệu — các hạng mục đó là task follow-up riêng.
 
 ## Prerequisites
 
