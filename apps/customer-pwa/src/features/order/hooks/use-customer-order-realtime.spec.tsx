@@ -85,6 +85,39 @@ describe('useCustomerOrderRealtime', () => {
     expect(emitMock).not.toHaveBeenCalledWith('join.session', expect.anything());
   });
 
+  it('invalidates cart, bill, and order list for matching paymentCompleted events', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    renderHook(() => useCustomerOrderRealtime(), { wrapper: createWrapper(queryClient) });
+
+    const onCalls = onMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const paymentCompletedHandler = onCalls.find(([event]) => event === 'events.paymentCompleted')?.[1];
+
+    paymentCompletedHandler?.({
+      eventId: 'pay-event-1',
+      eventType: 'payment.completed',
+      tenantId: 'tenant-1',
+      sessionId: 'session-1',
+      billId: 'bill-1',
+      paymentId: 'payment-1',
+      method: 'VIETQR',
+      status: 'PAID',
+      paidAt: '2026-05-10T12:00:00.000Z',
+      amount: 128000,
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: cartKeys.snapshot('tenant-1', 'session-1'),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: billKeys.current('tenant-1', 'session-1'),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.all });
+  });
+
   it('invalidates cart, bill, and order list for matching cartUpdated events', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },

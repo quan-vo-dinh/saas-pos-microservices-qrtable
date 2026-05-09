@@ -9,6 +9,7 @@
  *   - CartUpdatedEvent        → cart mutation / lock (Step 2.4)
  *   - BillRequestedEvent      → explicit bill request (Step 2.4)
  *   - TableTransferredEvent   → transfer table saga hoàn tất (Step 2.4)
+ *   - PaymentCompletedRealtimeEvent → Kafka bridge hint after Payment outbox event (Phase 3)
  *
  * Kafka (4 Producers — domain events post-confirmation):
  *   - OrderConfirmedEvent     → topic `order.confirmed` cho cross-service consumers
@@ -109,6 +110,21 @@ export type TableTransferredEvent = {
   toTableName: string;
   transferredByUserId: string;
   timestamp: string;
+};
+
+/** BFF Direct — hint sau khi Payment hoàn tất (polling vẫn là nguồn chuẩn). */
+export type PaymentCompletedRealtimeEvent = {
+  eventId: string;
+  eventType: 'payment.completed';
+  tenantId: string;
+  sessionId: string;
+  billId: string;
+  paymentId: string;
+  method: 'CASH' | 'VIETQR';
+  status: 'PAID';
+  paidAt: string;
+  amount: number;
+  correlationId?: string;
 };
 
 // ─── Kafka topic payload ────────────────────────────

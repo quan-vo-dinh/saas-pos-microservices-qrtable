@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@einvoice/frontend-utils';
 import type { Bill, CartSnapshot, PublicMenuItem, ServiceRequestType } from '@einvoice/types';
+import { BillStatus } from '@einvoice/types';
 import { useSession } from '@/features/session/context/session-provider';
 import { createAndPersistIdempotencyKey } from '@/lib/idempotency';
 import { orderService, type CartMutateOperation } from '../services/order.service';
@@ -21,6 +22,21 @@ export const billKeys = {
   all: ['customer-bill'] as const,
   current: (tenantId: string, sessionId: string) => [...billKeys.all, 'current', tenantId, sessionId] as const,
 };
+
+export type CurrentBillQueryData = {
+  bill: Bill | null;
+  cart: CartSnapshot;
+};
+
+/** Exported for unit tests — polling baseline while chờ thanh toán. */
+export function resolveCurrentBillPollingInterval(data: CurrentBillQueryData | undefined): number | false {
+  if (!data) return false;
+  const { bill, cart } = data;
+  if (bill?.status === BillStatus.PENDING_PAYMENT || cart?.status === 'LOCKED') {
+    return 3000;
+  }
+  return false;
+}
 
 function isCartConflict(err: unknown): boolean {
   return err instanceof ApiError && (err.status === 409 || err.errorCode === 'CART_VERSION_CONFLICT');
@@ -96,6 +112,7 @@ export function useCurrentBillQuery() {
     queryKey: key,
     queryFn: () => orderService.getCurrentBill(),
     enabled: !!tenantId && !!sessionId,
+    refetchInterval: (query) => resolveCurrentBillPollingInterval(query.state.data as CurrentBillQueryData | undefined),
   });
 }
 

@@ -13,6 +13,7 @@ export const API_CONFIG = {
     SERVICE_REQUESTS: '/customer/service-requests',
     BILL_REQUEST: '/customer/bill/request',
     BILL_CURRENT: '/customer/bill/current',
+    VIETQR_CREATE: '/customer/payment/vietqr/create-qr',
   },
 } as const;
 

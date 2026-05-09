@@ -7,6 +7,7 @@ import type {
   KitchenItemReadyEvent,
   OrderCreatedEvent,
   OrderStatusChangedEvent,
+  PaymentCompletedRealtimeEvent,
   TableTransferredEvent,
 } from '@einvoice/types';
 import { io } from 'socket.io-client';
@@ -101,6 +102,10 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
       if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
       invalidateOrder(event.orderId);
     };
+    const onPaymentCompleted = (event: PaymentCompletedRealtimeEvent): void => {
+      if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
+      invalidateSessionScope();
+    };
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -111,6 +116,7 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
     socket.on('events.billRequested', onBillRequested);
     socket.on('events.tableTransferred', onTableTransferred);
     socket.on('events.kitchenItemReady', onKitchenItemReady);
+    socket.on('events.paymentCompleted', onPaymentCompleted);
     socket.io.on('reconnect_attempt', onReconnectAttempt);
     socket.io.on('reconnect', onReconnect);
     socket.io.on('reconnect_error', onReconnectError);
@@ -129,6 +135,7 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
       socket.off('events.billRequested', onBillRequested);
       socket.off('events.tableTransferred', onTableTransferred);
       socket.off('events.kitchenItemReady', onKitchenItemReady);
+      socket.off('events.paymentCompleted', onPaymentCompleted);
       socket.io.off('reconnect_attempt', onReconnectAttempt);
       socket.io.off('reconnect', onReconnect);
       socket.io.off('reconnect_error', onReconnectError);

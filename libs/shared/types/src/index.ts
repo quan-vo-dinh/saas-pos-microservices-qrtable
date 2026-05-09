@@ -54,6 +54,7 @@ export type {
   CartUpdatedEvent,
   BillRequestedEvent,
   TableTransferredEvent,
+  PaymentCompletedRealtimeEvent,
   OrderConfirmedEvent,
   OrderConfirmedEventItem,
   KDSTicket,

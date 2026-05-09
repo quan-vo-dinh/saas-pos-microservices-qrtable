@@ -1,7 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { CartSnapshot, PublicMenuItem } from '@einvoice/types';
-import { useCartMutations, useCustomerOrdersQuery, useSubmitOrderMutation, cartKeys } from './use-order-query';
+import { BillStatus } from '@einvoice/types';
+import {
+  useCartMutations,
+  useCustomerOrdersQuery,
+  useSubmitOrderMutation,
+  cartKeys,
+  resolveCurrentBillPollingInterval,
+  type CurrentBillQueryData,
+} from './use-order-query';
 
 const submitOrderMock = jest.fn();
 const getCartMock = jest.fn();
@@ -46,6 +54,41 @@ function makeCartSnapshot(overrides: Partial<CartSnapshot> = {}): CartSnapshot {
     ...overrides,
   };
 }
+
+describe('resolveCurrentBillPollingInterval', () => {
+  const baseCart: CartSnapshot = {
+    tenantId: 'tenant-1',
+    sessionId: 'session-1',
+    cartVersion: 1,
+    status: 'ACTIVE',
+    updatedAt: '2026-04-30T00:00:00.000Z',
+    items: [],
+  };
+
+  it('polls current bill every 3s while bill is pending payment', () => {
+    const data: CurrentBillQueryData = {
+      bill: { status: BillStatus.PENDING_PAYMENT } as CurrentBillQueryData['bill'],
+      cart: baseCart,
+    };
+    expect(resolveCurrentBillPollingInterval(data)).toBe(3000);
+  });
+
+  it('polls while cart is LOCKED even if bill snapshot is missing pending flag', () => {
+    const data: CurrentBillQueryData = {
+      bill: null,
+      cart: { ...baseCart, status: 'LOCKED' },
+    };
+    expect(resolveCurrentBillPollingInterval(data)).toBe(3000);
+  });
+
+  it('disables polling when bill is paid and cart active', () => {
+    const data: CurrentBillQueryData = {
+      bill: { status: BillStatus.PAID } as CurrentBillQueryData['bill'],
+      cart: baseCart,
+    };
+    expect(resolveCurrentBillPollingInterval(data)).toBe(false);
+  });
+});
 
 describe('useSubmitOrderMutation', () => {
   beforeEach(() => {
