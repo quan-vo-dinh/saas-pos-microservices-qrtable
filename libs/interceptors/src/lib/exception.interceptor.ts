@@ -1,4 +1,12 @@
-import { CallHandler, ExecutionContext, HttpException, HttpStatus, Logger, NestInterceptor } from '@nestjs/common';
+import {
+  CallHandler,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  NestInterceptor,
+} from '@nestjs/common';
 import { Observable, catchError, map } from 'rxjs';
 import { Request } from 'express';
 import { MetadataKey } from '@common/constants/common.constant';
@@ -10,6 +18,7 @@ import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { getErrorMessage } from '@common/error-messages/error-messages.registry';
 import { Reflector } from '@nestjs/core';
 
+@Injectable()
 export class ExceptionInterceptor implements NestInterceptor {
   private readonly logger = new Logger(ExceptionInterceptor.name);
 

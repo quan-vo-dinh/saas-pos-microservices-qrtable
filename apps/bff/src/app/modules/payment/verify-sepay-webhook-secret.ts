@@ -1,23 +1,39 @@
 import { UnauthorizedException } from '@nestjs/common';
-import { timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
- * Constant-time compare for SePay `X-Secret-Key` vs configured secret.
- * @throws UnauthorizedException when missing or mismatch.
+ * Verify SePay HMAC-SHA256 webhook signature.
+ *
+ * SePay sends:
+ *   X-SePay-Signature: sha256=<hex>
+ *   X-SePay-Timestamp: <unix_seconds>
+ *
+ * Signing payload: `{timestamp}.{rawBody}`
+ *
+ * @throws UnauthorizedException when signature is invalid or any input is missing.
  */
-export function assertSepayWebhookSecret(received: string | undefined, expected: string): void {
-  if (!expected) {
-    throw new UnauthorizedException('Invalid webhook secret');
+export function assertSepayHmacSignature(
+  signature: string | undefined,
+  timestamp: string | undefined,
+  rawBody: Buffer | string,
+  secret: string,
+): void {
+  if (!secret) {
+    throw new UnauthorizedException('Webhook secret not configured');
   }
-  if (received === undefined || received === null) {
-    throw new UnauthorizedException('Invalid webhook secret');
+  if (!signature || !timestamp) {
+    throw new UnauthorizedException('Missing SePay signature headers');
   }
-  const a = Buffer.from(received, 'utf8');
+
+  const bodyStr = rawBody instanceof Buffer ? rawBody.toString('utf8') : rawBody;
+  const signingPayload = `${timestamp}.${bodyStr}`;
+  const hex = createHmac('sha256', secret).update(signingPayload, 'utf8').digest('hex');
+  const expected = `sha256=${hex}`;
+
+  const a = Buffer.from(signature, 'utf8');
   const b = Buffer.from(expected, 'utf8');
-  if (a.length !== b.length) {
-    throw new UnauthorizedException('Invalid webhook secret');
-  }
-  if (!timingSafeEqual(a, b)) {
-    throw new UnauthorizedException('Invalid webhook secret');
+
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    throw new UnauthorizedException('Invalid webhook signature');
   }
 }

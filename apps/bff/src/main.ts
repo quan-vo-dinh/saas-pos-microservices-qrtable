@@ -11,7 +11,7 @@ import { RedisIoAdapter } from './app/modules/realtime/adapters/redis-io.adapter
 
 async function bootstrap() {
   try {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, { rawBody: true });
     const redisHost = AppModule.CONFIGURATION.REDIS_CONFIG.HOST;
     const redisPort = AppModule.CONFIGURATION.REDIS_CONFIG.PORT;
     const redisIoAdapter = new RedisIoAdapter(app);

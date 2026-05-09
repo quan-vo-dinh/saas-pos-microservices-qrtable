@@ -2,6 +2,7 @@ jest.mock('uuid', () => ({
   v4: jest.fn(() => '00000000-0000-4000-8000-000000000001'),
 }));
 
+import { createHmac } from 'node:crypto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { UnauthorizedException } from '@nestjs/common';
@@ -13,7 +14,34 @@ import { SepayWebhookRequestDto } from '@common/interfaces/gateway/payment';
 import type { SepayWebhookPayload } from '@common/interfaces/tcp/payment';
 import { NEVER, of } from 'rxjs';
 import { PaymentController } from '../controllers/payment.controller';
-import { assertSepayWebhookSecret } from '../verify-sepay-webhook-secret';
+import { assertSepayHmacSignature } from '../verify-sepay-webhook-secret';
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function makeSignature(secret: string, timestamp: string, body: string): string {
+  const hex = createHmac('sha256', secret).update(`${timestamp}.${body}`, 'utf8').digest('hex');
+  return `sha256=${hex}`;
+}
+
+function makeSepayPayload(overrides: Partial<SepayWebhookPayload> = {}): SepayWebhookPayload {
+  return {
+    id: 1,
+    gateway: 'VCB',
+    transactionDate: '2026-05-08 10:00:00',
+    accountNumber: '0010000000355',
+    code: 'QRTBL11111111',
+    content: 'QRTBL11111111',
+    transferType: 'in',
+    transferAmount: 128000,
+    accumulated: 128000,
+    subAccount: null,
+    referenceCode: 'REF-1',
+    description: 'QRTBL11111111',
+    ...overrides,
+  };
+}
+
+// ─── DTO validation ───────────────────────────────────────────────────────────
 
 describe('SepayWebhookRequestDto validation', () => {
   it('rejects malformed SePay webhook payloads before TCP forwarding', async () => {
@@ -38,41 +66,45 @@ describe('SepayWebhookRequestDto validation', () => {
   });
 });
 
-function makeSepayPayload(overrides: Partial<SepayWebhookPayload> = {}): SepayWebhookPayload {
-  return {
-    id: 1,
-    gateway: 'VCB',
-    transactionDate: '2026-05-08 10:00:00',
-    accountNumber: '0010000000355',
-    code: 'QRTBL11111111',
-    content: 'QRTBL11111111',
-    transferType: 'in',
-    transferAmount: 128000,
-    accumulated: 128000,
-    subAccount: null,
-    referenceCode: 'REF-1',
-    description: 'QRTBL11111111',
-    ...overrides,
-  };
-}
+// ─── assertSepayHmacSignature ─────────────────────────────────────────────────
 
-describe('assertSepayWebhookSecret', () => {
-  it('rejects missing secret', () => {
-    expect(() => assertSepayWebhookSecret(undefined, 'secret')).toThrow(UnauthorizedException);
+describe('assertSepayHmacSignature', () => {
+  const SECRET = 'test-secret';
+  const TIMESTAMP = '1715000000';
+  const BODY = '{"id":1}';
+  const VALID_SIG = makeSignature(SECRET, TIMESTAMP, BODY);
+
+  it('throws when secret is empty', () => {
+    expect(() => assertSepayHmacSignature(VALID_SIG, TIMESTAMP, BODY, '')).toThrow(UnauthorizedException);
   });
 
-  it('rejects invalid secret', () => {
-    expect(() => assertSepayWebhookSecret('wrong', 'secret')).toThrow(UnauthorizedException);
+  it('throws when signature header is missing', () => {
+    expect(() => assertSepayHmacSignature(undefined, TIMESTAMP, BODY, SECRET)).toThrow(UnauthorizedException);
   });
 
-  it('rejects empty configured secret', () => {
-    expect(() => assertSepayWebhookSecret('anything', '')).toThrow(UnauthorizedException);
+  it('throws when timestamp header is missing', () => {
+    expect(() => assertSepayHmacSignature(VALID_SIG, undefined, BODY, SECRET)).toThrow(UnauthorizedException);
   });
 
-  it('accepts matching secret', () => {
-    expect(() => assertSepayWebhookSecret('secret', 'secret')).not.toThrow();
+  it('throws when signature does not match', () => {
+    expect(() => assertSepayHmacSignature('sha256=deadbeef', TIMESTAMP, BODY, SECRET)).toThrow(UnauthorizedException);
+  });
+
+  it('throws when timestamp is tampered', () => {
+    expect(() => assertSepayHmacSignature(VALID_SIG, '9999999999', BODY, SECRET)).toThrow(UnauthorizedException);
+  });
+
+  it('accepts a valid HMAC-SHA256 signature', () => {
+    expect(() => assertSepayHmacSignature(VALID_SIG, TIMESTAMP, BODY, SECRET)).not.toThrow();
+  });
+
+  it('accepts raw body as Buffer', () => {
+    const buf = Buffer.from(BODY, 'utf8');
+    expect(() => assertSepayHmacSignature(VALID_SIG, TIMESTAMP, buf, SECRET)).not.toThrow();
   });
 });
+
+// ─── PaymentController ────────────────────────────────────────────────────────
 
 describe('PaymentController TCP behavior', () => {
   it('marks SePay webhook as a raw response endpoint for the external provider contract', () => {
@@ -84,12 +116,8 @@ describe('PaymentController TCP behavior', () => {
     const send = jest.fn(() => NEVER);
     const configService = {
       get: jest.fn((key: string) => {
-        if (key === 'SEPAY_WEBHOOK_SECRET') {
-          return 'secret';
-        }
-        if (key === 'BFF_PAYMENT_TCP_TIMEOUT_MS') {
-          return '1';
-        }
+        if (key === 'SEPAY_WEBHOOK_SECRET') return 'secret';
+        if (key === 'BFF_PAYMENT_TCP_TIMEOUT_MS') return '1';
         return undefined;
       }),
     };
