@@ -4,12 +4,7 @@ import type {
   CreateVietQrTcpResponse,
   PaymentTcpResponse,
 } from '@common/interfaces/tcp/payment';
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { BillStatus, PaymentMethod } from '@einvoice/types';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { CONFIGURATION } from '../../../../configuration';
