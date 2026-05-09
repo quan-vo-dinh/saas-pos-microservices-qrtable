@@ -23,7 +23,7 @@ export class AuditPaymentEntity {
   @Column({ name: 'actor_type', type: 'varchar', length: 20 })
   actorType!: PaymentActorTypeValue;
 
-  @Column({ name: 'actor_id', type: 'uuid', nullable: true }) 
+  @Column({ name: 'actor_id', type: 'uuid', nullable: true })
   actorId!: string | null;
 
   @Column({ type: 'text', nullable: true })
