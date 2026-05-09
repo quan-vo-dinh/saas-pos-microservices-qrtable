@@ -3,6 +3,9 @@ describe('Payment configuration', () => {
   const originalSepayQrAccount = process.env.PAYMENT_SEPAY_QR_ACCOUNT;
   const originalSepayQrBank = process.env.PAYMENT_SEPAY_QR_BANK;
   const originalOrderTcpTimeout = process.env.PAYMENT_ORDER_TCP_TIMEOUT_MS;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalPaymentTypeormDb = process.env.PAYMENT_TYPEORM_DATABASE;
+  const originalTypeormDatabase = process.env.TYPEORM_DATABASE;
 
   afterEach(() => {
     jest.resetModules();
@@ -25,6 +28,21 @@ describe('Payment configuration', () => {
       delete process.env.PAYMENT_ORDER_TCP_TIMEOUT_MS;
     } else {
       process.env.PAYMENT_ORDER_TCP_TIMEOUT_MS = originalOrderTcpTimeout;
+    }
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+    if (originalPaymentTypeormDb === undefined) {
+      delete process.env.PAYMENT_TYPEORM_DATABASE;
+    } else {
+      process.env.PAYMENT_TYPEORM_DATABASE = originalPaymentTypeormDb;
+    }
+    if (originalTypeormDatabase === undefined) {
+      delete process.env.TYPEORM_DATABASE;
+    } else {
+      process.env.TYPEORM_DATABASE = originalTypeormDatabase;
     }
   });
 
@@ -75,5 +93,23 @@ describe('Payment configuration', () => {
     const { CONFIGURATION } = await import('./index');
 
     expect(CONFIGURATION).toHaveProperty('PAYMENT_INTEGRATION_CONFIG.ORDER_TCP_TIMEOUT_MS', 2500);
+  });
+
+  it('requires PAYMENT_TYPEORM_DATABASE in production', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.PAYMENT_TYPEORM_DATABASE;
+    process.env.TYPEORM_DATABASE = 'qrtable';
+    jest.resetModules();
+
+    await expect(import('./index')).rejects.toThrow('PAYMENT_TYPEORM_DATABASE is required');
+  });
+
+  it('requires PAYMENT_TYPEORM_DATABASE in staging', async () => {
+    process.env.NODE_ENV = 'staging';
+    delete process.env.PAYMENT_TYPEORM_DATABASE;
+    process.env.TYPEORM_DATABASE = 'qrtable';
+    jest.resetModules();
+
+    await expect(import('./index')).rejects.toThrow('PAYMENT_TYPEORM_DATABASE is required');
   });
 });

@@ -19,8 +19,13 @@ class PaymentAppConfiguration extends AppConfiguration {
 
 class PaymentTypeOrmConfiguration extends TypeOrmConfiguration {
   constructor() {
+    const dedicatedDatabase = process.env['PAYMENT_TYPEORM_DATABASE'];
+    const nodeEnv = process.env['NODE_ENV'] || 'development';
+    if ((nodeEnv === 'production' || nodeEnv === 'staging') && !dedicatedDatabase) {
+      throw new Error('PAYMENT_TYPEORM_DATABASE is required for payment service in staging/production');
+    }
     super({
-      DATABASE: process.env['PAYMENT_TYPEORM_DATABASE'] || process.env['TYPEORM_DATABASE'] || DEFAULT_PAYMENT_DATABASE,
+      DATABASE: dedicatedDatabase || process.env['TYPEORM_DATABASE'] || DEFAULT_PAYMENT_DATABASE,
     });
   }
 }

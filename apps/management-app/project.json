@@ -29,7 +29,15 @@
       "options": {
         "command": "pnpm --dir apps/management-app lint"
       }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "apps/management-app/jest.config.cjs",
+        "passWithNoTests": true
+      }
     }
   },
-  "tags": []
+  "tags": ["type:app", "scope:management"]
 }
