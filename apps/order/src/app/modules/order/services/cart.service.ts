@@ -37,6 +37,15 @@ export class CartService {
     return snapshot;
   }
 
+  async getReadOnlySnapshot(tenantId: string, sessionId: string): Promise<CartSnapshot> {
+    const redis = this.redisClient.getClient();
+    const snapshot = await this.loadSnapshot(redis, tenantId, sessionId);
+    return {
+      ...snapshot,
+      status: snapshot.status === 'ACTIVE' ? 'LOCKED' : snapshot.status,
+    };
+  }
+
   async mutate(input: CartMutateTcpRequest): Promise<CartUpdatedEvent> {
     await this.sessionService.getActiveSessionOrThrow(input.tenantId, input.sessionId);
 

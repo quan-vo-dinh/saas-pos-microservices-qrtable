@@ -71,6 +71,23 @@ export class SessionService {
     await this.touchAfterCartMutation(tenantId, sessionId);
   }
 
+  async closeAfterPayment(tenantId: string, sessionId: string, closedAt: Date): Promise<void> {
+    await this.sessionRepository.markClosed(sessionId, tenantId, closedAt);
+    const redis = this.redisClient.getClient();
+    await redis.del(this.sessionKey(tenantId, sessionId));
+    await redis.del(`cart:${tenantId}:${sessionId}`);
+  }
+
+  async getSessionForReadOnlyBill(tenantId: string, sessionId: string): Promise<Session> {
+    const session =
+      (await this.sessionRepository.findActiveByIdAndTenant(sessionId, tenantId)) ??
+      (await this.sessionRepository.findByIdAndTenant(sessionId, tenantId));
+    if (!session) {
+      throw new BusinessException(ErrorCode.SESSION_CLOSED, HttpStatus.GONE);
+    }
+    return session;
+  }
+
   /** Updates cached session hash after table transfer (same session id / cart key). */
   async patchSessionTableInRedis(
     tenantId: string,

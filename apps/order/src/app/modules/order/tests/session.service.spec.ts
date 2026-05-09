@@ -173,7 +173,6 @@ describe('SessionService', () => {
   });
 
   it('closes durable session and removes active Redis session/cart keys after payment', async () => {
-    // @ts-expect-error closeAfterPayment is implemented in cluster A2 (Order finalization)
     await service.closeAfterPayment('t1', 'sess-1', new Date('2026-05-08T12:00:00.000Z'));
 
     expect(sessionRepo.markClosed).toHaveBeenCalledWith('sess-1', 't1', new Date('2026-05-08T12:00:00.000Z'));

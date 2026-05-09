@@ -2,7 +2,7 @@ import { Session } from '@common/entities/session.entity';
 import { SessionStatus } from '@einvoice/types';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 @Injectable()
 export class SessionRepository {
@@ -14,6 +14,16 @@ export class SessionRepository {
 
   findActiveByIdAndTenant(id: string, tenantId: string): Promise<Session | null> {
     return this.repo.findOne({ where: { id, tenantId, status: SessionStatus.ACTIVE } });
+  }
+
+  findByIdAndTenantForUpdate(id: string, tenantId: string, manager: EntityManager): Promise<Session | null> {
+    return manager
+      .getRepository(Session)
+      .createQueryBuilder('s')
+      .setLock('pessimistic_write')
+      .where('s.id = :id', { id })
+      .andWhere('s.tenantId = :tenantId', { tenantId })
+      .getOne();
   }
 
   async updateTableSnapshot(id: string, tenantId: string, tableId: string, tableName: string): Promise<void> {

@@ -29,6 +29,7 @@ import {
   OrderStatus,
   PaymentMethod,
   ServiceRequestedEvent,
+  SessionStatus,
   ServiceRequestStatus,
   ServiceRequestType,
 } from '@einvoice/types';
@@ -57,10 +58,12 @@ export class BillService {
   ) {}
 
   async getCurrentBill(dto: BillSessionTcpRequest): Promise<BillCurrentTcpResponse> {
-    await this.sessionService.getActiveSessionOrThrow(dto.tenantId, dto.sessionId);
-    const session = await this.sessionRepository.findActiveByIdAndTenant(dto.sessionId, dto.tenantId);
-    const cart = await this.cartService.getSnapshot(dto.tenantId, dto.sessionId);
-    if (!session?.currentBillId) {
+    const session = await this.sessionService.getSessionForReadOnlyBill(dto.tenantId, dto.sessionId);
+    const cart =
+      session.status === SessionStatus.ACTIVE
+        ? await this.cartService.getSnapshot(dto.tenantId, dto.sessionId)
+        : await this.cartService.getReadOnlySnapshot(dto.tenantId, dto.sessionId);
+    if (!session.currentBillId) {
       return { bill: null, cart };
     }
     const bill = await this.billRepository.findByIdAndTenant(session.currentBillId, dto.tenantId);
@@ -95,21 +98,62 @@ export class BillService {
   }
 
   async markPaid(dto: BillMarkPaidTcpRequest): Promise<BillMarkedPaidTcpResponse> {
-    const bill = await this.billRepository.findByIdAndTenant(dto.billId, dto.tenantId);
-    if (!bill) {
+    const existing = await this.billRepository.findByIdAndTenant(dto.billId, dto.tenantId);
+    if (!existing) {
       throw new BusinessException(ErrorCode.BILL_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
-    if (bill.status === BillStatus.PAID) {
-      return { bill: this.toBillDto(bill) };
+    if (existing.status === BillStatus.PAID) {
+      return { bill: this.toBillDto(existing) };
     }
-    if (bill.status !== BillStatus.PENDING_PAYMENT) {
+    if (existing.status !== BillStatus.PENDING_PAYMENT) {
       throw new BusinessException(ErrorCode.BILL_NOT_PENDING_PAYMENT, HttpStatus.CONFLICT);
     }
-    bill.status = BillStatus.PAID;
-    bill.paymentId = dto.paymentId;
-    bill.paymentMethod = dto.method as PaymentMethod;
-    bill.paidAt = new Date(dto.paidAt);
-    await this.billRepository.save(bill);
+
+    const paidAt = new Date(dto.paidAt);
+    const { bill, session } = await this.dataSource.transaction(async (manager) => {
+      const lockedBill = await this.billRepository.findByIdAndTenantForUpdate(dto.billId, dto.tenantId, manager);
+      if (!lockedBill) {
+        throw new BusinessException(ErrorCode.BILL_NOT_FOUND, HttpStatus.NOT_FOUND);
+      }
+      if (lockedBill.status === BillStatus.PAID) {
+        const paidSession = await this.sessionRepository.findByIdAndTenant(lockedBill.sessionId, dto.tenantId);
+        return { bill: lockedBill, session: paidSession };
+      }
+      if (lockedBill.status !== BillStatus.PENDING_PAYMENT) {
+        throw new BusinessException(ErrorCode.BILL_NOT_PENDING_PAYMENT, HttpStatus.CONFLICT);
+      }
+
+      const lockedSession = await this.sessionRepository.findByIdAndTenantForUpdate(
+        lockedBill.sessionId,
+        dto.tenantId,
+        manager,
+      );
+      if (!lockedSession) {
+        throw new BusinessException(ErrorCode.SESSION_CLOSED, HttpStatus.GONE);
+      }
+
+      lockedBill.status = BillStatus.PAID;
+      lockedBill.paymentId = dto.paymentId;
+      lockedBill.paymentMethod = dto.method as PaymentMethod;
+      lockedBill.paidAt = paidAt;
+      await manager.save(Bill, lockedBill);
+
+      return { bill: lockedBill, session: lockedSession };
+    });
+
+    if (session?.status === SessionStatus.ACTIVE) {
+      await this.sessionService.closeAfterPayment(dto.tenantId, session.id, paidAt);
+    }
+
+    if (session) {
+      await this.callCatalogUpdateTableStatus({
+        id: session.tableId,
+        tenantId: dto.tenantId,
+        status: TABLE_STATUS.CLEANING,
+        sessionId: session.id,
+      });
+    }
+
     return { bill: this.toBillDto(bill) };
   }
 

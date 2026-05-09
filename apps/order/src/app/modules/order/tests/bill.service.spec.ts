@@ -408,16 +408,15 @@ describe('BillService', () => {
       } as Session;
 
       billRepository.findByIdAndTenant.mockResolvedValue(pending);
+      const managerSave = jest.fn().mockImplementation((_entity: unknown, entity: Bill) => Promise.resolve(entity));
       dataSource.transaction.mockImplementation(async (fn: (manager: EntityManager) => Promise<unknown>) =>
-        fn({} as EntityManager),
+        fn({ save: managerSave } as unknown as EntityManager),
       );
       billRepository.findByIdAndTenantForUpdate.mockResolvedValue(pending);
       sessionRepository.findByIdAndTenantForUpdate.mockResolvedValue(session);
       billRepository.save.mockImplementation(async (b: Bill) => b);
       sessionService.closeAfterPayment.mockResolvedValue(undefined);
-      catalogClient.send.mockReturnValue(
-        of({ statusCode: 200, data: { id: 'table-1', status: 'cleaning' } }),
-      );
+      catalogClient.send.mockReturnValue(of({ statusCode: 200, data: { id: 'table-1', status: 'cleaning' } }));
 
       const result = await service.markPaid({
         tenantId: 't1',
@@ -462,8 +461,24 @@ describe('BillService', () => {
         createdAt: now,
         updatedAt: now,
       } as Bill;
+      const session = {
+        id: 'sess-1',
+        tenantId: 't1',
+        tableId: 'table-1',
+        tableName: 'B1',
+        status: SessionStatus.ACTIVE,
+        currentBillId: 'bill-1',
+      } as Session;
       billRepository.findByIdAndTenant.mockResolvedValue(pending);
-      billRepository.save.mockImplementation(async (b: Bill) => Promise.resolve({ ...b }));
+      billRepository.findByIdAndTenantForUpdate.mockResolvedValue(pending);
+      sessionRepository.findByIdAndTenantForUpdate.mockResolvedValue(session);
+      sessionService.closeAfterPayment.mockResolvedValue(undefined);
+      catalogClient.send.mockReturnValue(of({ statusCode: 200, data: { id: 'table-1', status: 'cleaning' } }));
+
+      const managerSave = jest.fn().mockImplementation((_entity: unknown, entity: Bill) => Promise.resolve(entity));
+      dataSource.transaction.mockImplementation(async (fn: (manager: EntityManager) => Promise<unknown>) =>
+        fn({ save: managerSave } as unknown as EntityManager),
+      );
 
       const paidAtIso = '2026-05-08T12:00:00.000Z';
       const result = await service.markPaid({
@@ -474,12 +489,16 @@ describe('BillService', () => {
         paidAt: paidAtIso,
       });
 
-      expect(billRepository.save).toHaveBeenCalled();
-      const saved = billRepository.save.mock.calls[0][0] as Bill;
-      expect(saved.status).toBe(BillStatus.PAID);
-      expect(saved.paymentId).toBe('pay-1');
-      expect(saved.paymentMethod).toBe(PaymentMethod.VIETQR);
-      expect(saved.paidAt).toEqual(new Date(paidAtIso));
+      expect(managerSave).toHaveBeenCalledWith(
+        Bill,
+        expect.objectContaining({
+          status: BillStatus.PAID,
+          paymentId: 'pay-1',
+          paymentMethod: PaymentMethod.VIETQR,
+          paidAt: new Date(paidAtIso),
+        }),
+      );
+      expect(billRepository.save).not.toHaveBeenCalled();
       expect(result.bill.status).toBe(BillStatus.PAID);
       expect(result.bill.paymentMethod).toBe(PaymentMethod.VIETQR);
       expect(result.bill.paymentId).toBe('pay-1');
