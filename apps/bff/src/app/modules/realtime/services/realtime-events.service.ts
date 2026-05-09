@@ -7,6 +7,7 @@ import type {
   KitchenSlaWarningEvent,
   OrderCreatedEvent,
   OrderStatusChangedEvent,
+  PaymentCompletedRealtimeEvent,
   ServiceRequestedEvent,
   TableTransferredEvent,
 } from '@einvoice/types';
@@ -76,5 +77,10 @@ export class RealtimeEventsService {
     const stationRoom = event.station === 'KITCHEN' ? `tenant:${tid}:kds:kitchen` : `tenant:${tid}:kds:bar`;
     this.gateway.emitToRoom(stationRoom, 'events.kitchenSlaWarning', event);
     this.gateway.emitToRoom(`tenant:${tid}:management`, 'events.kitchenSlaWarning', event);
+  }
+
+  emitPaymentCompleted(event: PaymentCompletedRealtimeEvent): void {
+    this.gateway.emitToRoom(`session:${event.sessionId}:customer`, 'events.paymentCompleted', event);
+    this.gateway.emitToRoom(`tenant:${event.tenantId}:staff`, 'events.paymentCompleted', event);
   }
 }
