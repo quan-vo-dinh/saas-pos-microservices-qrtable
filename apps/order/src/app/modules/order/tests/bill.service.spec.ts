@@ -1,10 +1,20 @@
 import { Bill } from '@common/entities/bill.entity';
+import { Session } from '@common/entities/session.entity';
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
+import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
+import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Test, TestingModule } from '@nestjs/testing';
-import { BillStatus, OrderStatus, PaymentMethod, ServiceRequestStatus, ServiceRequestType } from '@einvoice/types';
+import {
+  BillStatus,
+  OrderStatus,
+  PaymentMethod,
+  ServiceRequestStatus,
+  ServiceRequestType,
+  SessionStatus,
+} from '@einvoice/types';
 import { of } from 'rxjs';
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import { BillRepository } from '../repositories/bill.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { ServiceRequestRepository } from '../repositories/service-request.repository';
@@ -15,8 +25,17 @@ import { SessionService } from '../services/session.service';
 
 describe('BillService', () => {
   let service: BillService;
-  let sessionService: { getActiveSessionOrThrow: jest.Mock };
-  let sessionRepository: { findActiveByIdAndTenant: jest.Mock };
+  let sessionService: {
+    getActiveSessionOrThrow: jest.Mock;
+    closeAfterPayment: jest.Mock;
+    getSessionForReadOnlyBill: jest.Mock;
+  };
+  let sessionRepository: {
+    findActiveByIdAndTenant: jest.Mock;
+    findByIdAndTenant: jest.Mock;
+    findByIdAndTenantForUpdate: jest.Mock;
+    markClosed: jest.Mock;
+  };
   let billRepository: {
     findByIdAndTenant: jest.Mock;
     findByIdAndTenantForUpdate: jest.Mock;
@@ -29,8 +48,17 @@ describe('BillService', () => {
   let dataSource: { transaction: jest.Mock };
 
   beforeEach(async () => {
-    sessionService = { getActiveSessionOrThrow: jest.fn().mockResolvedValue({}) };
-    sessionRepository = { findActiveByIdAndTenant: jest.fn() };
+    sessionService = {
+      getActiveSessionOrThrow: jest.fn().mockResolvedValue({}),
+      closeAfterPayment: jest.fn().mockResolvedValue(undefined),
+      getSessionForReadOnlyBill: jest.fn(),
+    };
+    sessionRepository = {
+      findActiveByIdAndTenant: jest.fn(),
+      findByIdAndTenant: jest.fn(),
+      findByIdAndTenantForUpdate: jest.fn(),
+      markClosed: jest.fn(),
+    };
     billRepository = {
       findByIdAndTenant: jest.fn(),
       findByIdAndTenantForUpdate: jest.fn(),
@@ -348,6 +376,73 @@ describe('BillService', () => {
       expect(result.bill.status).toBe(BillStatus.PAID);
       expect(result.bill.paymentId).toBe('pay-existing');
       expect(billRepository.save).not.toHaveBeenCalled();
+      expect(sessionService.closeAfterPayment).not.toHaveBeenCalled();
+      expect(catalogClient.send).not.toHaveBeenCalled();
+    });
+
+    it('marks bill PAID, closes session, and moves table billing -> cleaning', async () => {
+      const now = new Date('2026-05-08T11:00:00.000Z');
+      const pending = {
+        id: 'bill-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        orderIds: ['order-1'],
+        status: BillStatus.PENDING_PAYMENT,
+        subtotal: 100_000,
+        total: 100_000,
+        roundingAmount: 0,
+        paymentMethod: null,
+        paymentId: null,
+        closedAt: now,
+        paidAt: null,
+        createdAt: now,
+        updatedAt: now,
+      } as Bill;
+      const session = {
+        id: 'sess-1',
+        tenantId: 't1',
+        tableId: 'table-1',
+        tableName: 'Bàn 1',
+        status: SessionStatus.ACTIVE,
+        currentBillId: 'bill-1',
+      } as Session;
+
+      billRepository.findByIdAndTenant.mockResolvedValue(pending);
+      dataSource.transaction.mockImplementation(async (fn: (manager: EntityManager) => Promise<unknown>) =>
+        fn({} as EntityManager),
+      );
+      billRepository.findByIdAndTenantForUpdate.mockResolvedValue(pending);
+      sessionRepository.findByIdAndTenantForUpdate.mockResolvedValue(session);
+      billRepository.save.mockImplementation(async (b: Bill) => b);
+      sessionService.closeAfterPayment.mockResolvedValue(undefined);
+      catalogClient.send.mockReturnValue(
+        of({ statusCode: 200, data: { id: 'table-1', status: 'cleaning' } }),
+      );
+
+      const result = await service.markPaid({
+        tenantId: 't1',
+        billId: 'bill-1',
+        paymentId: 'pay-1',
+        method: 'VIETQR',
+        paidAt: '2026-05-08T12:00:00.000Z',
+        processId: 'proc-1',
+      });
+
+      expect(result.bill.status).toBe(BillStatus.PAID);
+      expect(result.bill.paymentId).toBe('pay-1');
+      expect(sessionService.closeAfterPayment).toHaveBeenCalledWith('t1', 'sess-1', expect.any(Date));
+      expect(catalogClient.send).toHaveBeenCalledWith(
+        TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS,
+        expect.objectContaining({
+          tenantId: 't1',
+          data: expect.objectContaining({
+            id: 'table-1',
+            tenantId: 't1',
+            status: TABLE_STATUS.CLEANING,
+            sessionId: 'sess-1',
+          }),
+        }),
+      );
     });
 
     it('sets PAID, payment method, paidAt and saves when PENDING_PAYMENT', async () => {

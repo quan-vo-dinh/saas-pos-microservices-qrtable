@@ -172,6 +172,15 @@ describe('SessionService', () => {
     expect(redis.del).not.toHaveBeenCalledWith('cart:tenant-1:sess-1');
   });
 
+  it('closes durable session and removes active Redis session/cart keys after payment', async () => {
+    // @ts-expect-error closeAfterPayment is implemented in cluster A2 (Order finalization)
+    await service.closeAfterPayment('t1', 'sess-1', new Date('2026-05-08T12:00:00.000Z'));
+
+    expect(sessionRepo.markClosed).toHaveBeenCalledWith('sess-1', 't1', new Date('2026-05-08T12:00:00.000Z'));
+    expect(redis.del).toHaveBeenCalledWith('session:t1:sess-1');
+    expect(redis.del).toHaveBeenCalledWith('cart:t1:sess-1');
+  });
+
   it('does not idle-close when orderCount > 0 even if stale', async () => {
     const stale = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     redis.hgetall.mockResolvedValue({
