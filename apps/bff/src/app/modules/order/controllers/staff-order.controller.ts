@@ -92,13 +92,18 @@ export class StaffOrderController {
    * Loads the session's current bill; if present, rejects reopen when Payment lists any row in
    * PENDING / PAID / REFUND_PENDING / REFUNDED for that bill (source of truth: Payment service).
    */
-  private async assertReopenAllowedAgainstPayments(req: Request, processId: string, tenantId: string, sessionId: string) {
+  private async assertReopenAllowedAgainstPayments(
+    req: Request,
+    processId: string,
+    tenantId: string,
+    sessionId: string,
+  ) {
     const currentTcp = await firstValueFrom(
       this.orderClient
-        .send<BillCurrentTcpResponse, BillSessionTcpRequest>(
-          TCP_REQUEST_MESSAGE.ORDER.BILL_GET_CURRENT,
-          buildTcpRequestContext<BillSessionTcpRequest>(req, processId, { tenantId, sessionId }),
-        )
+        .send<
+          BillCurrentTcpResponse,
+          BillSessionTcpRequest
+        >(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_CURRENT, buildTcpRequestContext<BillSessionTcpRequest>(req, processId, { tenantId, sessionId }))
         .pipe(map((r) => r)),
     );
     if (currentTcp.statusCode !== 200 || !currentTcp.data?.bill?.id) {
@@ -107,10 +112,10 @@ export class StaffOrderController {
     const billId = currentTcp.data.bill.id;
     const historyTcp = await firstValueFrom(
       this.paymentClient
-        .send<PaymentHistoryTcpResponse, PaymentHistoryTcpRequest>(
-          TCP_REQUEST_MESSAGE.PAYMENT.GET_HISTORY,
-          buildTcpRequestContext<PaymentHistoryTcpRequest>(req, processId, { tenantId, billId }),
-        )
+        .send<
+          PaymentHistoryTcpResponse,
+          PaymentHistoryTcpRequest
+        >(TCP_REQUEST_MESSAGE.PAYMENT.GET_HISTORY, buildTcpRequestContext<PaymentHistoryTcpRequest>(req, processId, { tenantId, billId }))
         .pipe(map((r) => r)),
     );
     if (historyTcp.statusCode !== 200 || !historyTcp.data) {
