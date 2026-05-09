@@ -56,7 +56,7 @@ https://qr.sepay.vn/img?acc={SO_TAI_KHOAN}&bank={TEN_NGAN_HANG}&amount={SO_TIEN}
 https://qr.sepay.vn/img?acc=9332770502&bank=Vietcombank&amount=128000&des=QRTBLB1A2C3D4
 ```
 
-QR code này nhúng trực tiếp qua thẻ `<img>` hoặc hiển thị bằng `next/image`. Không cần redirect. POS/PWA chỉ render ảnh và lắng nghe WebSocket để nhận confirmation.
+QR code này nhúng trực tiếp qua thẻ `<img>` hoặc hiển thị bằng `next/image`. Không cần redirect. POS/PWA render ảnh và **poll/refetch** trạng thái thanh toán (baseline Phase 3); WebSocket qua bridge Kafka→BFF là tùy chọn follow-up.
 
 ### Webhook Payload (SePay → BFF)
 
