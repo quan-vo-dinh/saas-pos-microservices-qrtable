@@ -59,7 +59,7 @@ export type PaymentHistoryTcpRequest = {
   offset?: number;
 };
 
-export type PaymentStatusTcpRequest = {
+export type PaymentByIdTcpRequest = {
   tenantId: string;
   paymentId: string;
 };

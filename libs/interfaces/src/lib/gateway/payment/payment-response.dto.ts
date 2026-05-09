@@ -1,10 +1,12 @@
+import type { PaymentMethod, PaymentStatusValue, RefundStatusValue } from '@einvoice/types';
+
 export class PaymentResponseDto {
   id!: string;
   tenantId!: string;
   billId!: string;
   billReference!: string;
-  method!: string | null;
-  status!: string;
+  method!: PaymentMethod | null;
+  status!: PaymentStatusValue;
   rawTotal!: number;
   roundedTotal!: number;
   roundingDelta!: number;
@@ -26,7 +28,7 @@ export class RefundResponseDto {
   paymentId!: string;
   amount!: number;
   reason!: string;
-  status!: string;
+  status!: RefundStatusValue;
   requestedByUserId!: string;
   requestedAt!: string;
   confirmedByUserId?: string;

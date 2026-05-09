@@ -1,7 +1,5 @@
-import { PaymentMethod } from '@einvoice/types';
+import type { PaymentMethod, PaymentStatusValue } from '@einvoice/types';
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
-
-export type PaymentStatus = 'PENDING' | 'PAID' | 'REFUND_PENDING' | 'REFUNDED' | 'FAILED';
 
 @Entity({ name: 'payments' })
 @Index(['tenantId', 'billId'], { unique: true })
@@ -25,7 +23,7 @@ export class PaymentEntity {
   method!: PaymentMethod | null;
 
   @Column({ type: 'varchar', length: 30, default: 'PENDING' })
-  status!: PaymentStatus;
+  status!: PaymentStatusValue;
 
   @Column({ name: 'raw_total', type: 'int' })
   rawTotal!: number;

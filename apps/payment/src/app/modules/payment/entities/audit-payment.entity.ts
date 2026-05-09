@@ -1,18 +1,5 @@
+import type { PaymentActorTypeValue, PaymentAuditActionValue } from '@einvoice/types';
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
-
-export type AuditPaymentAction =
-  | 'PAYMENT_CREATED'
-  | 'CASH_CONFIRMED'
-  | 'SEPAY_WEBHOOK_RECEIVED'
-  | 'SEPAY_WEBHOOK_DUPLICATE'
-  | 'SEPAY_WEBHOOK_UNDERPAID'
-  | 'SEPAY_WEBHOOK_AFTER_PAID'
-  | 'PAYMENT_COMPLETED'
-  | 'REFUND_REQUESTED'
-  | 'REFUND_CONFIRMED'
-  | 'REFUND_CANCELED';
-
-export type AuditActorType = 'USER' | 'SEPAY' | 'SYSTEM';
 
 @Entity({ name: 'audit_payments' })
 @Index(['paymentId', 'createdAt'])
@@ -31,12 +18,12 @@ export class AuditPaymentEntity {
   refundId!: string | null;
 
   @Column({ type: 'varchar', length: 60 })
-  action!: AuditPaymentAction;
+  action!: PaymentAuditActionValue;
 
   @Column({ name: 'actor_type', type: 'varchar', length: 20 })
-  actorType!: AuditActorType;
+  actorType!: PaymentActorTypeValue;
 
-  @Column({ name: 'actor_id', type: 'uuid', nullable: true })
+  @Column({ name: 'actor_id', type: 'uuid', nullable: true }) 
   actorId!: string | null;
 
   @Column({ type: 'text', nullable: true })

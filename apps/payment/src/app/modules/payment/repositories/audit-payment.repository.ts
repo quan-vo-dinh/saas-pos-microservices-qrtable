@@ -1,7 +1,9 @@
+import type { PaymentAuditActionValue, PaymentActorTypeValue } from '@einvoice/types';
+import { PaymentActorType } from '@einvoice/types';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
-import { AuditPaymentAction, AuditActorType, AuditPaymentEntity } from '../entities/audit-payment.entity';
+import { AuditPaymentEntity } from '../entities/audit-payment.entity';
 import { PaymentEntity } from '../entities/payment.entity';
 import { RefundEntity } from '../entities/refund.entity';
 
@@ -11,8 +13,8 @@ export class AuditPaymentRepository {
 
   async createPaymentAudit(
     payment: PaymentEntity,
-    action: AuditPaymentAction,
-    actorType: AuditActorType,
+    action: PaymentAuditActionValue,
+    actorType: PaymentActorTypeValue,
     actorId: string | null,
     reason: string | null,
     meta: Record<string, unknown> | null,
@@ -38,7 +40,7 @@ export class AuditPaymentRepository {
   async createRefundAudit(
     refund: RefundEntity,
     payment: PaymentEntity,
-    action: AuditPaymentAction,
+    action: PaymentAuditActionValue,
     actorId: string | null,
     reason: string | null,
     manager?: EntityManager,
@@ -48,7 +50,7 @@ export class AuditPaymentRepository {
       paymentId: payment.id,
       refundId: refund.id,
       action,
-      actorType: 'USER',
+      actorType: PaymentActorType.USER,
       actorId,
       reason,
       meta: null,

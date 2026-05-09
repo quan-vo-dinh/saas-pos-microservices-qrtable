@@ -1,6 +1,5 @@
+import type { RefundStatusValue } from '@einvoice/types';
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
-
-export type RefundStatus = 'PENDING_STAFF_ACTION' | 'CONFIRMED' | 'CANCELED';
 
 @Entity({ name: 'refunds' })
 @Index(['tenantId', 'paymentId'])
@@ -32,7 +31,7 @@ export class RefundEntity {
   customerAccountName!: string | null;
 
   @Column({ type: 'varchar', length: 30, default: 'PENDING_STAFF_ACTION' })
-  status!: RefundStatus;
+  status!: RefundStatusValue;
 
   @Column({ name: 'requested_by_user_id', type: 'uuid' })
   requestedByUserId!: string;

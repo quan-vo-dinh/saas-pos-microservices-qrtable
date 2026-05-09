@@ -23,4 +23,4 @@ export const SERVICE_REQUEST_TYPES = Object.values(ServiceRequestType);
 export const SERVICE_REQUEST_STATUSES = Object.values(ServiceRequestStatus);
 export const PAYMENT_METHODS = Object.values(PaymentMethod);
 
-// REMOVED: PAYMENT_STATUSES (PaymentStatus enum loại bỏ — replaced by BillStatus)
+// Payment aggregate statuses (Phase 3) live in @einvoice/types — use PaymentStatus / RefundStatus / PaymentAuditAction there.

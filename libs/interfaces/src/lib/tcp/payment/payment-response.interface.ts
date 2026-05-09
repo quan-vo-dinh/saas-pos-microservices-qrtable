@@ -1,7 +1,4 @@
-import type { PaymentMethod } from '@einvoice/types';
-
-export type PaymentStatus = 'PENDING' | 'PAID' | 'REFUND_PENDING' | 'REFUNDED' | 'FAILED';
-export type RefundStatus = 'PENDING_STAFF_ACTION' | 'CONFIRMED' | 'CANCELED';
+import type { PaymentMethod, PaymentStatusValue, RefundStatusValue } from '@einvoice/types';
 
 export type PaymentTcpResponse = {
   id: string;
@@ -9,7 +6,7 @@ export type PaymentTcpResponse = {
   billId: string;
   billReference: string;
   method: PaymentMethod | null;
-  status: PaymentStatus;
+  status: PaymentStatusValue;
   rawTotal: number;
   roundedTotal: number;
   roundingDelta: number;
@@ -35,7 +32,7 @@ export type RefundTcpResponse = {
   paymentId: string;
   amount: number;
   reason: string;
-  status: RefundStatus;
+  status: RefundStatusValue;
   requestedByUserId: string;
   requestedAt: string;
   confirmedByUserId?: string;

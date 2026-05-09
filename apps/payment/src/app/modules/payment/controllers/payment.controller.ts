@@ -7,7 +7,7 @@ import type {
   CreateVietQrTcpRequest,
   HandleSepayWebhookTcpRequest,
   PaymentHistoryTcpRequest,
-  PaymentStatusTcpRequest,
+  PaymentByIdTcpRequest,
   RefundConfirmTcpRequest,
   RefundRequestTcpRequest,
 } from '@common/interfaces/tcp/payment';
@@ -64,7 +64,7 @@ export class PaymentController {
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.PAYMENT.GET_STATUS)
-  async status(@RequestParams() body: PaymentStatusTcpRequest): Promise<Response<PaymentTcpResponse>> {
+  async status(@RequestParams() body: PaymentByIdTcpRequest): Promise<Response<PaymentTcpResponse>> {
     return Response.success(await this.paymentService.getStatus(body));
   }
 }

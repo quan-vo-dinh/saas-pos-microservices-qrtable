@@ -1,5 +1,6 @@
 import { authApiClient } from '@/lib/api/authenticated-client';
 import { API_CONFIG } from '@/constants/api';
+import type { PaymentStatusValue, RefundStatusValue } from '@einvoice/types';
 
 const EP = API_CONFIG.ENDPOINTS;
 
@@ -10,7 +11,7 @@ export type StaffPaymentRecord = {
   billId: string;
   billReference: string;
   method: string | null;
-  status: 'PENDING' | 'PAID' | 'REFUND_PENDING' | 'REFUNDED' | 'FAILED';
+  status: PaymentStatusValue;
   rawTotal: number;
   roundedTotal: number;
   roundingDelta: number;
@@ -38,7 +39,7 @@ export type RefundRecord = {
   paymentId: string;
   amount: number;
   reason: string;
-  status: 'PENDING_STAFF_ACTION' | 'CONFIRMED' | 'CANCELED';
+  status: RefundStatusValue;
   requestedByUserId: string;
   requestedAt: string;
   confirmedByUserId?: string;

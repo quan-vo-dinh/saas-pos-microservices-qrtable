@@ -7,7 +7,7 @@ import type {
   CreateVietQrTcpRequest,
   HandleSepayWebhookTcpRequest,
   PaymentHistoryTcpRequest,
-  PaymentStatusTcpRequest,
+  PaymentByIdTcpRequest,
 } from '@common/interfaces/tcp/payment';
 import type {
   CreateVietQrTcpResponse,
@@ -326,7 +326,7 @@ export class PaymentService {
     return rows.map((p) => this.toPaymentResponse(p));
   }
 
-  async getStatus(dto: PaymentStatusTcpRequest): Promise<PaymentTcpResponse> {
+  async getStatus(dto: PaymentByIdTcpRequest): Promise<PaymentTcpResponse> {
     const payment = await this.paymentRepo.findByTenantAndId(dto.tenantId, dto.paymentId);
     if (!payment) {
       throw new NotFoundException('Payment not found');
