@@ -317,7 +317,7 @@ describe('BillService', () => {
       });
     });
 
-    it('returns bill without save when already PAID', async () => {
+    it('returns bill without save when already PAID (idempotent duplicate markPaid)', async () => {
       const now = new Date();
       const paidAt = new Date('2026-05-08T11:00:00.000Z');
       billRepository.findByIdAndTenant.mockResolvedValue({
@@ -330,6 +330,7 @@ describe('BillService', () => {
         total: 100,
         roundingAmount: 0,
         paymentMethod: PaymentMethod.CASH,
+        paymentId: 'pay-existing',
         closedAt: paidAt,
         paidAt,
         createdAt: now,
@@ -339,12 +340,13 @@ describe('BillService', () => {
       const result = await service.markPaid({
         tenantId: 't1',
         billId: 'bill-1',
-        paymentId: 'pay-1',
-        method: 'VIETQR',
+        paymentId: 'pay-existing',
+        method: 'CASH',
         paidAt: '2026-05-08T12:00:00.000Z',
       });
 
       expect(result.bill.status).toBe(BillStatus.PAID);
+      expect(result.bill.paymentId).toBe('pay-existing');
       expect(billRepository.save).not.toHaveBeenCalled();
     });
 
@@ -380,10 +382,12 @@ describe('BillService', () => {
       expect(billRepository.save).toHaveBeenCalled();
       const saved = billRepository.save.mock.calls[0][0] as Bill;
       expect(saved.status).toBe(BillStatus.PAID);
+      expect(saved.paymentId).toBe('pay-1');
       expect(saved.paymentMethod).toBe(PaymentMethod.VIETQR);
       expect(saved.paidAt).toEqual(new Date(paidAtIso));
       expect(result.bill.status).toBe(BillStatus.PAID);
       expect(result.bill.paymentMethod).toBe(PaymentMethod.VIETQR);
+      expect(result.bill.paymentId).toBe('pay-1');
     });
   });
 });

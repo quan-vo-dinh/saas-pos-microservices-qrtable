@@ -1,7 +1,11 @@
 import type { PaymentActorTypeValue, PaymentAuditActionValue } from '@einvoice/types';
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { Check, Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity({ name: 'audit_payments' })
+@Check(
+  `"action" IN ('PAYMENT_CREATED', 'CASH_CONFIRMED', 'SEPAY_WEBHOOK_RECEIVED', 'SEPAY_WEBHOOK_DUPLICATE', 'SEPAY_WEBHOOK_UNDERPAID', 'SEPAY_WEBHOOK_AFTER_PAID', 'PAYMENT_COMPLETED', 'REFUND_REQUESTED', 'REFUND_CONFIRMED', 'REFUND_CANCELED')`,
+)
+@Check(`"actor_type" IN ('USER', 'SEPAY', 'SYSTEM')`)
 @Index(['paymentId', 'createdAt'])
 @Index(['tenantId', 'createdAt'])
 export class AuditPaymentEntity {

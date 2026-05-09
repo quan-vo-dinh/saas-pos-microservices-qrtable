@@ -40,7 +40,7 @@ export class RefundService {
       const refund = manager.create(RefundEntity, {
         tenantId: dto.tenantId,
         paymentId: dto.paymentId,
-        amount: payment.roundedTotal,
+        amount: payment.paidAmount ?? payment.roundedTotal,
         reason: dto.reason,
         customerBankAccount: dto.customerBankAccount ?? null,
         customerBankName: dto.customerBankName ?? null,

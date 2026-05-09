@@ -1,7 +1,9 @@
 import type { RefundStatusValue } from '@einvoice/types';
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { Check, Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity({ name: 'refunds' })
+@Check(`"status" IN ('PENDING_STAFF_ACTION', 'CONFIRMED', 'CANCELED')`)
+@Check(`"amount" >= 0`)
 @Index(['tenantId', 'paymentId'])
 @Index(['tenantId', 'status', 'createdAt'])
 @Index(['paymentId'], { unique: true, where: "status IN ('PENDING_STAFF_ACTION', 'CONFIRMED')" })

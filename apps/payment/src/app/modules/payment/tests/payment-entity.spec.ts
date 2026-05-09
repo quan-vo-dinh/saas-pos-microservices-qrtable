@@ -24,4 +24,11 @@ describe('Payment persistence entities', () => {
 
     expect(billReferenceIndex?.unique).toBe(true);
   });
+
+  it('registers PostgreSQL check constraints on payment aggregate roots', () => {
+    const { checks } = getMetadataArgsStorage();
+    expect(checks.filter((c) => c.target === PaymentEntity).length).toBe(7);
+    expect(checks.filter((c) => c.target === RefundEntity).length).toBe(2);
+    expect(checks.filter((c) => c.target === AuditPaymentEntity).length).toBe(2);
+  });
 });

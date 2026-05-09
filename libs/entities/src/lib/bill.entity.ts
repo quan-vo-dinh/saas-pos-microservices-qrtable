@@ -34,4 +34,7 @@ export class Bill extends BaseEntity {
 
   @Column({ name: 'paid_at', type: 'timestamp', nullable: true })
   paidAt: Date | null;
+
+  @Column({ name: 'payment_id', type: 'uuid', nullable: true })
+  paymentId: string | null;
 }

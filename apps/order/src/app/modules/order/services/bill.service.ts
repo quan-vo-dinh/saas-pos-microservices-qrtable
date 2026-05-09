@@ -106,6 +106,7 @@ export class BillService {
       throw new BusinessException(ErrorCode.BILL_NOT_PENDING_PAYMENT, HttpStatus.CONFLICT);
     }
     bill.status = BillStatus.PAID;
+    bill.paymentId = dto.paymentId;
     bill.paymentMethod = dto.method as PaymentMethod;
     bill.paidAt = new Date(dto.paidAt);
     await this.billRepository.save(bill);
@@ -300,6 +301,7 @@ export class BillService {
       total: entity.total,
       roundingAmount: entity.roundingAmount,
       paymentMethod: entity.paymentMethod ?? undefined,
+      paymentId: entity.paymentId ?? undefined,
       status: entity.status,
       closedAt: entity.closedAt?.toISOString(),
       paidAt: entity.paidAt?.toISOString(),

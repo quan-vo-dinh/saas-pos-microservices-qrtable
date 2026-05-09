@@ -1,7 +1,14 @@
 import type { PaymentMethod, PaymentStatusValue } from '@einvoice/types';
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { Check, Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity({ name: 'payments' })
+@Check(`"status" IN ('PENDING', 'PAID', 'REFUND_PENDING', 'REFUNDED', 'FAILED')`)
+@Check(`"method" IS NULL OR "method" IN ('CASH', 'VIETQR')`)
+@Check(`"raw_total" >= 0`)
+@Check(`"rounded_total" >= 0`)
+@Check(`"paid_amount" IS NULL OR "paid_amount" >= 0`)
+@Check(`"amount_received" IS NULL OR "amount_received" >= 0`)
+@Check(`"change_amount" IS NULL OR "change_amount" >= 0`)
 @Index(['tenantId', 'billId'], { unique: true })
 @Index(['billReference'], { unique: true })
 @Index(['sepayTransactionId'], { unique: true, where: 'sepay_transaction_id IS NOT NULL' })

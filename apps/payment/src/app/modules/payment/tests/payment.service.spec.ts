@@ -1,7 +1,8 @@
 import { ConflictException } from '@nestjs/common';
+import type { SepayWebhookPayload } from '@common/interfaces/tcp/payment';
 import { BillStatus, PaymentMethod } from '@einvoice/types';
-import { of } from 'rxjs';
-import { QueryFailedError } from 'typeorm';
+import { of, throwError } from 'rxjs';
+import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { PaymentEntity } from '../entities/payment.entity';
 import { CONFIGURATION } from '../../../../configuration';
@@ -37,6 +38,24 @@ function makePayment(overrides: Partial<PaymentEntity> = {}): PaymentEntity {
 
 function uniqueViolation(): QueryFailedError {
   return new QueryFailedError('INSERT INTO payments', [], { code: '23505' } as Error & { code: string });
+}
+
+function baseSepayPayload(overrides: Partial<SepayWebhookPayload> = {}): SepayWebhookPayload {
+  return {
+    id: 42,
+    gateway: 'MB',
+    transactionDate: '2026-05-08 10:00:00',
+    accountNumber: '123456',
+    code: 'QRTBL11111111',
+    content: 'transfer',
+    transferType: 'in',
+    transferAmount: 128_000,
+    accumulated: 0,
+    subAccount: null,
+    referenceCode: 'REF-1',
+    description: 'SePay in',
+    ...overrides,
+  };
 }
 
 describe('PaymentService policy checks', () => {
@@ -113,5 +132,250 @@ describe('PaymentService policy checks', () => {
     expect(result.qrUrl).toContain(`des=${existing.billReference}`);
     expect(paymentRepo.findByTenantAndBill).toHaveBeenCalledTimes(2);
     expect(auditRepo.createPaymentAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe('PaymentService settlement behavior', () => {
+  const snapshot = {
+    billId: '11111111-1111-4111-8111-111111111111',
+    tenantId: 'tenant-1',
+    sessionId: 'session-1',
+    status: BillStatus.PENDING_PAYMENT,
+    rawTotal: 127_500,
+    roundedTotal: 128_000,
+    roundingDelta: 500,
+  };
+
+  it('handleSepayWebhook: underpaid transfer records UNDERPAID audit and does not complete payment', async () => {
+    const payment = makePayment({
+      billReference: 'QRTBL11111111',
+      status: 'PENDING',
+      sepayTransactionId: null,
+    });
+    const manager = { save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e) };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn().mockResolvedValue(payment),
+      findByTenantBillForUpdate: jest.fn(),
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = { send: jest.fn() };
+
+    const service = new PaymentService(
+      dataSource as unknown as DataSource,
+      orderClient as never,
+      paymentRepo as never,
+      auditRepo as never,
+      outboxRepo as never,
+      new PaymentReferenceService(),
+    );
+
+    await service.handleSepayWebhook({
+      payload: baseSepayPayload({ transferAmount: 100_000 }),
+    });
+
+    const actions = auditRepo.createPaymentAudit.mock.calls.map((c) => c[1]);
+    expect(actions).toContain('SEPAY_WEBHOOK_UNDERPAID');
+    expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
+    expect(orderClient.send).not.toHaveBeenCalled();
+  });
+
+  it('handleSepayWebhook: duplicate SePay transaction id records DUPLICATE and skips settlement', async () => {
+    const payment = makePayment({
+      billReference: 'QRTBL11111111',
+      status: 'PENDING',
+      sepayTransactionId: 42,
+    });
+    const manager = { save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e) };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn().mockResolvedValue(payment),
+      findByTenantBillForUpdate: jest.fn(),
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = { send: jest.fn() };
+
+    const service = new PaymentService(
+      dataSource as unknown as DataSource,
+      orderClient as never,
+      paymentRepo as never,
+      auditRepo as never,
+      outboxRepo as never,
+      new PaymentReferenceService(),
+    );
+
+    await service.handleSepayWebhook({ payload: baseSepayPayload({ id: 42 }) });
+
+    const actions = auditRepo.createPaymentAudit.mock.calls.map((c) => c[1]);
+    expect(actions).toContain('SEPAY_WEBHOOK_DUPLICATE');
+    expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
+    expect(orderClient.send).not.toHaveBeenCalled();
+  });
+
+  it('handleSepayWebhook: webhook after PAID records AFTER_PAID and does not call Order', async () => {
+    const payment = makePayment({
+      billReference: 'QRTBL11111111',
+      status: 'PAID',
+      sepayTransactionId: 1,
+    });
+    const manager = { save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e) };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn().mockResolvedValue(payment),
+      findByTenantBillForUpdate: jest.fn(),
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = { send: jest.fn() };
+
+    const service = new PaymentService(
+      dataSource as unknown as DataSource,
+      orderClient as never,
+      paymentRepo as never,
+      auditRepo as never,
+      outboxRepo as never,
+      new PaymentReferenceService(),
+    );
+
+    await service.handleSepayWebhook({ payload: baseSepayPayload({ id: 99 }) });
+
+    const actions = auditRepo.createPaymentAudit.mock.calls.map((c) => c[1]);
+    expect(actions).toContain('SEPAY_WEBHOOK_AFTER_PAID');
+    expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
+    expect(orderClient.send).not.toHaveBeenCalled();
+  });
+
+  it('handleSepayWebhook: sufficient or overpaid transfer completes payment and notifies Order', async () => {
+    const payment = makePayment({
+      billReference: 'QRTBL11111111',
+      status: 'PENDING',
+      sepayTransactionId: null,
+    });
+    const manager = { save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e) };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn().mockResolvedValue(payment),
+      findByTenantBillForUpdate: jest.fn(),
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = {
+      send: jest.fn().mockImplementation((pattern: string) => {
+        if (pattern === TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID) {
+          return of({ data: { ok: true } });
+        }
+        return throwError(() => new Error(`unexpected pattern ${pattern}`));
+      }),
+    };
+
+    const service = new PaymentService(
+      dataSource as unknown as DataSource,
+      orderClient as never,
+      paymentRepo as never,
+      auditRepo as never,
+      outboxRepo as never,
+      new PaymentReferenceService(),
+    );
+
+    await service.handleSepayWebhook({
+      payload: baseSepayPayload({ transferAmount: 200_000 }),
+      processId: 'proc-1',
+    });
+
+    expect(payment.status).toBe('PAID');
+    expect(payment.method).toBe(PaymentMethod.VIETQR);
+    expect(outboxRepo.createCompleted).toHaveBeenCalled();
+    expect(orderClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID,
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        processId: 'proc-1',
+        data: expect.objectContaining({
+          paymentId: payment.id,
+          method: 'VIETQR',
+          processId: 'proc-1',
+        }),
+      }),
+    );
+  });
+
+  it('confirmCash: persists PAID payment even when BILL_MARK_PAID TCP fails afterward', async () => {
+    const payment = makePayment({ status: 'PENDING', method: null, paidAmount: null });
+    const manager = { save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e) };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn(),
+      findByTenantBillForUpdate: jest.fn().mockResolvedValue(payment),
+      findByTenantAndBill: jest.fn().mockResolvedValue({
+        ...payment,
+        status: 'PAID',
+        method: PaymentMethod.CASH,
+        paidAmount: 128_000,
+        amountReceived: 130_000,
+        changeAmount: 2000,
+        paidAt: new Date('2026-05-08T12:00:00.000Z'),
+      }),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = {
+      send: jest.fn().mockImplementation((pattern: string) => {
+        if (pattern === TCP_REQUEST_MESSAGE.ORDER.BILL_GET_PAYMENT_SNAPSHOT) {
+          return of({ data: snapshot });
+        }
+        if (pattern === TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID) {
+          return throwError(() => new Error('order unavailable'));
+        }
+        return throwError(() => new Error(`unexpected pattern ${pattern}`));
+      }),
+    };
+
+    const service = new PaymentService(
+      dataSource as unknown as DataSource,
+      orderClient as never,
+      paymentRepo as never,
+      auditRepo as never,
+      outboxRepo as never,
+      new PaymentReferenceService(),
+    );
+
+    const result = await service.confirmCash({
+      tenantId: 'tenant-1',
+      billId: payment.billId,
+      userId: 'user-1',
+      amountReceived: 130_000,
+      processId: 'p1',
+    });
+
+    expect(result.status).toBe('PAID');
+    expect(result.method).toBe(PaymentMethod.CASH);
+    expect(outboxRepo.createCompleted).toHaveBeenCalled();
+    expect(orderClient.send).toHaveBeenCalledWith(TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID, expect.anything());
   });
 });
