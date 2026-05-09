@@ -344,12 +344,11 @@ describe('PaymentService settlement behavior', () => {
     expect(orderClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID,
       expect.objectContaining({
-        tenantId: 'tenant-1',
-        processId: 'proc-1',
         data: expect.objectContaining({
+          tenantId: 'tenant-1',
+          billId: payment.billId,
           paymentId: payment.id,
           method: 'VIETQR',
-          processId: 'proc-1',
         }),
       }),
     );
@@ -408,7 +407,11 @@ describe('PaymentService settlement behavior', () => {
 
     expect(result.status).toBe('PAID');
     expect(result.method).toBe(PaymentMethod.CASH);
-    expect(outboxRepo.createCompleted).toHaveBeenCalled();
+    expect(outboxRepo.createCompleted).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'PAID' }),
+      expect.any(String),
+    );
     expect(orderClient.send).toHaveBeenCalledWith(TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID, expect.anything());
   });
 });

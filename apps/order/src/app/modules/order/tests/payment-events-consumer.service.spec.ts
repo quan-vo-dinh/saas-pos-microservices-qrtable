@@ -1,4 +1,6 @@
+import type { BillService } from '../services/bill.service';
 import {
+  PaymentEventsConsumerService,
   parsePaymentCompletedEvent,
   paymentCompletedToMarkPaidRequest,
   safePaymentMethod,
@@ -132,6 +134,43 @@ describe('payment-events-consumer helpers', () => {
         paidAt: '2026-01-01T00:00:00.000Z',
         processId: 'c1',
       });
+    });
+  });
+
+  describe('PaymentEventsConsumerService.dispatchPaymentCompletedPayload', () => {
+    it('maps valid payment.completed JSON to BillService.markPaid (Kafka → Order finalization)', async () => {
+      const billService = { markPaid: jest.fn().mockResolvedValue(undefined) };
+      const svc = new PaymentEventsConsumerService(billService as unknown as BillService);
+      const raw = JSON.stringify({
+        eventId: 'e1',
+        eventType: 'payment.completed',
+        tenantId: 't1',
+        billId: 'b1',
+        paymentId: 'p1',
+        method: 'VIETQR',
+        paidAt: '2026-05-08T12:00:00.000Z',
+        amount: 128_000,
+        correlationId: 'corr-1',
+      });
+
+      await expect(svc.dispatchPaymentCompletedPayload(raw)).resolves.toBe(true);
+
+      expect(billService.markPaid).toHaveBeenCalledWith({
+        tenantId: 't1',
+        billId: 'b1',
+        paymentId: 'p1',
+        method: 'VIETQR',
+        paidAt: '2026-05-08T12:00:00.000Z',
+        processId: 'corr-1',
+      });
+    });
+
+    it('returns false and does not call markPaid for invalid payload', async () => {
+      const billService = { markPaid: jest.fn() };
+      const svc = new PaymentEventsConsumerService(billService as unknown as BillService);
+
+      await expect(svc.dispatchPaymentCompletedPayload('not json')).resolves.toBe(false);
+      expect(billService.markPaid).not.toHaveBeenCalled();
     });
   });
 });

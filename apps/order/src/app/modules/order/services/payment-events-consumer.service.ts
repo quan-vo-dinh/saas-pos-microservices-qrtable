@@ -78,6 +78,19 @@ export class PaymentEventsConsumerService implements OnModuleInit, OnModuleDestr
 
   constructor(private readonly billService: BillService) {}
 
+  /**
+   * Parses a Kafka message body and runs Order finalization. Returns whether a valid
+   * `payment.completed` event was applied (false = invalid payload, same as consumer skip).
+   */
+  async dispatchPaymentCompletedPayload(raw: string): Promise<boolean> {
+    const event = parsePaymentCompletedEvent(raw);
+    if (!event) {
+      return false;
+    }
+    await this.billService.markPaid(paymentCompletedToMarkPaidRequest(event));
+    return true;
+  }
+
   async onModuleInit(): Promise<void> {
     const { BROKERS, CLIENT_ID, PAYMENT_COMPLETED_TOPIC } = CONFIGURATION.KAFKA_CONFIG;
     if (!BROKERS?.length) {
@@ -100,19 +113,20 @@ export class PaymentEventsConsumerService implements OnModuleInit, OnModuleDestr
             );
             return;
           }
-          const event = parsePaymentCompletedEvent(raw);
-          if (!event) {
-            this.logger.warn(
-              `Invalid or non-payment.completed payload topic=${topic} partition=${partition} offset=${message.offset} preview=${raw.slice(0, 240)}`,
-            );
-            return;
-          }
           try {
-            await this.billService.markPaid(paymentCompletedToMarkPaidRequest(event));
+            const applied = await this.dispatchPaymentCompletedPayload(raw);
+            if (!applied) {
+              this.logger.warn(
+                `Invalid or non-payment.completed payload topic=${topic} partition=${partition} offset=${message.offset} preview=${raw.slice(0, 240)}`,
+              );
+            }
           } catch (error) {
             const err = error as Error;
+            const preview = parsePaymentCompletedEvent(raw);
+            const eventId = preview?.eventId ?? 'unknown';
+            const billId = preview?.billId ?? 'unknown';
             this.logger.error(
-              `markPaid failed after payment.completed eventId=${event.eventId} billId=${event.billId}: ${err.message}`,
+              `markPaid failed after payment.completed eventId=${eventId} billId=${billId}: ${err.message}`,
               err.stack,
             );
             throw error;
