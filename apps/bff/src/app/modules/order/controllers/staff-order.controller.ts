@@ -3,6 +3,8 @@ import { MetadataKey } from '@common/constants/common.constant';
 import { PERMISSION } from '@common/constants/enum/role.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Authorization } from '@common/decorators/authorizer.decorator';
 import { Permissions } from '@common/decorators/permission.decorator';
 import { ProcessId } from '@common/decorators/processId.decorator';
@@ -25,6 +27,7 @@ import type {
   TransferTableTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
 import type {
+  BillCurrentTcpResponse,
   BillListTcpResponse,
   BillRequestedTcpResponse,
   OrderActionTcpResponse,
@@ -33,13 +36,36 @@ import type {
   ServiceRequestListTcpResponse,
   TableTransferredTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
+import type { PaymentHistoryTcpRequest } from '@common/interfaces/tcp/payment/payment-request.interface';
+import type { PaymentHistoryTcpResponse } from '@common/interfaces/tcp/payment/payment-response.interface';
 import type { KdsPatchTableSnapshotTcpRequest, KdsVoidByOrderTcpRequest } from '@common/interfaces/tcp/kitchen';
 import { buildTcpRequestContext } from '@common/utils/request.util';
-import { Body, Controller, Get, Inject, Logger, Param, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Inject,
+  Logger,
+  Param,
+  Post,
+  Query,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { PaymentStatus } from '@einvoice/types';
 import { Request } from 'express';
 import { firstValueFrom, map } from 'rxjs';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
+
+/** Payment rows that must prevent staff reopen (race vs VietQR / settlement). */
+const REOPEN_BLOCKED_PAYMENT_STATUSES = new Set<string>([
+  PaymentStatus.PENDING,
+  PaymentStatus.PAID,
+  PaymentStatus.REFUND_PENDING,
+  PaymentStatus.REFUNDED,
+]);
 
 @ApiTags('Orders (Admin)')
 @Controller('admin')
@@ -49,6 +75,7 @@ export class StaffOrderController {
   constructor(
     @Inject(TCP_SERVICES.ORDER_SERVICE) private readonly orderClient: TcpClient,
     @Inject(TCP_SERVICES.KITCHEN_SERVICE) private readonly kitchenClient: TcpClient,
+    @Inject(TCP_SERVICES.PAYMENT_SERVICE) private readonly paymentClient: TcpClient,
     private readonly realtimeEvents: RealtimeEventsService,
   ) {}
 
@@ -59,6 +86,40 @@ export class StaffOrderController {
       throw new UnauthorizedException();
     }
     return id;
+  }
+
+  /**
+   * Loads the session's current bill; if present, rejects reopen when Payment lists any row in
+   * PENDING / PAID / REFUND_PENDING / REFUNDED for that bill (source of truth: Payment service).
+   */
+  private async assertReopenAllowedAgainstPayments(req: Request, processId: string, tenantId: string, sessionId: string) {
+    const currentTcp = await firstValueFrom(
+      this.orderClient
+        .send<BillCurrentTcpResponse, BillSessionTcpRequest>(
+          TCP_REQUEST_MESSAGE.ORDER.BILL_GET_CURRENT,
+          buildTcpRequestContext<BillSessionTcpRequest>(req, processId, { tenantId, sessionId }),
+        )
+        .pipe(map((r) => r)),
+    );
+    if (currentTcp.statusCode !== 200 || !currentTcp.data?.bill?.id) {
+      return;
+    }
+    const billId = currentTcp.data.bill.id;
+    const historyTcp = await firstValueFrom(
+      this.paymentClient
+        .send<PaymentHistoryTcpResponse, PaymentHistoryTcpRequest>(
+          TCP_REQUEST_MESSAGE.PAYMENT.GET_HISTORY,
+          buildTcpRequestContext<PaymentHistoryTcpRequest>(req, processId, { tenantId, billId }),
+        )
+        .pipe(map((r) => r)),
+    );
+    if (historyTcp.statusCode !== 200 || !historyTcp.data) {
+      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    const blocked = historyTcp.data.some((p) => REOPEN_BLOCKED_PAYMENT_STATUSES.has(p.status));
+    if (blocked) {
+      throw new BusinessException(ErrorCode.BILL_REOPEN_BLOCKED_BY_PAYMENT, HttpStatus.CONFLICT);
+    }
   }
 
   @Get('orders')
@@ -446,6 +507,7 @@ export class StaffOrderController {
   ): Promise<ResponseDto<BillRequestedTcpResponse>> {
     const tenantId = req[MetadataKey.TENANT_ID] as string;
     const userId = this.staffUserId(req);
+    await this.assertReopenAllowedAgainstPayments(req, processId, tenantId, sessionId);
     const tcp = await firstValueFrom(
       this.orderClient
         .send<BillRequestedTcpResponse, BillSessionTcpRequest>(

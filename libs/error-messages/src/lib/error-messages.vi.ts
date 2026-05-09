@@ -23,6 +23,8 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.BILL_CART_NOT_EMPTY]: 'Giỏ hàng phải trống trước khi yêu cầu thanh toán',
   [ErrorCode.BILL_ORDERS_NOT_ALL_SERVED]: 'Tất cả món phải được phục vụ trước khi yêu cầu thanh toán',
   [ErrorCode.BILL_NOT_PENDING_PAYMENT]: 'Hóa đơn không ở trạng thái chờ thanh toán để mở lại',
+  [ErrorCode.BILL_REOPEN_BLOCKED_BY_PAYMENT]:
+    'Không thể mở lại hóa đơn khi đã có giao dịch thanh toán (chờ/kết toán/hoàn tiền)',
   [ErrorCode.SERVICE_REQUEST_INVALID_STATE]: 'Yêu cầu phục vụ không ở trạng thái hợp lệ',
   [ErrorCode.TRANSFER_LOCK_FAILED]: 'Không thể khóa chuyển bàn; vui lòng thử lại',
   [ErrorCode.TRANSFER_SESSION_TABLE_MISMATCH]: 'Phiên không ngồi tại bàn nguồn',

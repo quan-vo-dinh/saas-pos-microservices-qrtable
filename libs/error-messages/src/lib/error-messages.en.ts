@@ -23,6 +23,8 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.BILL_CART_NOT_EMPTY]: 'Cart must be empty before requesting the bill',
   [ErrorCode.BILL_ORDERS_NOT_ALL_SERVED]: 'All active orders must be served before requesting the bill',
   [ErrorCode.BILL_NOT_PENDING_PAYMENT]: 'Bill is not waiting for payment and cannot be reopened',
+  [ErrorCode.BILL_REOPEN_BLOCKED_BY_PAYMENT]:
+    'Cannot reopen the bill while a payment exists (pending, paid, or refund in progress)',
   [ErrorCode.SERVICE_REQUEST_INVALID_STATE]: 'Service request is not in a valid state for this action',
   [ErrorCode.TRANSFER_LOCK_FAILED]: 'Could not acquire transfer locks; retry shortly',
   [ErrorCode.TRANSFER_SESSION_TABLE_MISMATCH]: 'Session is not seated at the source table',
