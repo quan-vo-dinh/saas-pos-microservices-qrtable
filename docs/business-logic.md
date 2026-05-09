@@ -363,25 +363,27 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
       Staff xác nhận "Đã thu tiền"
       → payment_status = "Paid", payment_method = "Cash"
       ```
-    - **Thanh toán Chuyển khoản (Bank Transfer):**
+    - **Thanh toán Chuyển khoản (Bank Transfer — SePay / VietQR):**
 
       ```
-      Hệ thống sinh QR VietQR động với:
-        - Số tiền chính xác (Total)
-        - Nội dung: "[TenQuan] Ban [SoBan] [BillID]"
+      Hệ thống sinh QR VietQR (SePay) với:
+        - Tham số amount = bill.roundedTotal (VND đã làm tròn theo policy làm tròn nghìn)
+        - Nội dung chuyển khoản (des / CK content) chứa billReference cố định:
+          "QRTBL" + 8 ký tự đầu tiên của billId sau khi bỏ dấu gạch (UUID)
 
       Khách quét QR và chuyển khoản
 
-      Webhook từ ngân hàng → Auto verify
-      IF transaction.amount == bill.total AND transaction.content == bill.reference
-      THEN payment_status = "Paid", payment_method = "Bank Transfer"
+      Webhook SePay → BFF → Payment khớp billReference (code hoặc regex trên content)
+        - Nếu số tiền < roundedTotal: giữ payment PENDING, ghi audit SEPAY_WEBHOOK_UNDERPAID
+        - Nếu số tiền >= roundedTotal: payment_status = "Paid"; lưu paidAmount = số tiền thực nhận
+          (chấp nhận overpaid; hoàn tiền full dùng paidAmount ?? roundedTotal)
       ```
 
-      > **Lưu ý kiến trúc (2026-05):** Thanh toán chuyển khoản được xử lý thông qua **SePay + VietQR động** — QR code nhúng inline trong POS/PWA (không redirect). SePay gửi webhook với `X-Secret-Key` header khi giao dịch thành công. Xem `technical-architecture.md` §6.2.7 — Payment Service.
+      > **Lưu ý kiến trúc (2026-05):** Thanh toán chuyển khoản được xử lý thông qua **SePay + VietQR động** — QR code nhúng inline trong POS/PWA (không redirect). SePay gửi webhook với `X-Secret-Key` header khi giao dịch thành công. Xem `technical-architecture.md` §6.2.7 — Payment Service và `docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md`.
 
 4.  **In Hóa đơn & Giải phóng Bàn (Closing):**
     - In hóa đơn giấy.
-    - **Đóng phiên (Close Session):** Ghi nhận doanh thu, cập nhật trạng thái bàn về `Available` (Trống).
+    - **Sau thanh toán thành công:** Theo state machine bàn, bàn chuyển `Billing` → `Cleaning`; nhân viên sau đó đánh dấu `Cleaning` → `Available` khi dọn xong. Không mô tả “nhảy thẳng Available” ngay khi thanh toán.
 
 5.  **Đối soát Tài chính (Reconciliation):**
     - Cuối ngày/tháng, hệ thống tổng hợp nguồn thu theo phương thức (Tiền mặt, Chuyển khoản...).

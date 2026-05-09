@@ -788,22 +788,22 @@ VND Rounding Logic:
 
 VietQR Flow (SePay):
   1. Staff chọn "VietQR" trên POS → BFF → Payment Service (TCP): createVietQR({ billId })
-  2. Payment Service: tính rounded_total, sinh billReference = "QRTBL" + billId.slice(0,8)
+  2. Payment Service: tính rounded_total, sinh billReference = "QRTBL" + 8 ký tự đầu của billId sau khi bỏ dấu gạch (UUID)
   3. Build QR URL: https://qr.sepay.vn/img?acc={BANK_ACCOUNT}&bank={BANK_NAME}
                     &amount={rounded_total}&des={billReference}
   4. POS render <img src={qrUrl} /> — Khách quét và chuyển khoản
   5. SePay → BFF webhook: POST /api/v1/payment/sepay/webhook
      Headers: X-Secret-Key: {SEPAY_WEBHOOK_SECRET}
-  6. BFF: so sánh X-Secret-Key → reject 401 nếu không khớp
-  7. Payment Service: match billReference trong code/content, verify amount ≥ rounded_total
-  8. Update payment status = PAID, lưu sepay_transaction_id
-  9. Emit Kafka: payment.completed
+  6. BFF: so sánh X-Secret-Key → reject 401 nếu không khớp; validate body theo DTO runtime (class-validator)
+  7. Payment Service: match billReference trong code/content; nếu amount < rounded_total → giữ PENDING + audit SEPAY_WEBHOOK_UNDERPAID; nếu amount ≥ rounded_total → PAID, lưu paidAmount = số tiền thực nhận (chấp nhận overpaid)
+  8. Lưu sepay_transaction_id; sau commit có thể gọi Order TCP (BILL_MARK_PAID) làm fast path đồng bộ; Kafka payment.completed vẫn là recovery/fan-out
+  9. Ghi outbox trong cùng transaction DB → publish Kafka: payment.completed
 
 Cash Flow:
   1. Staff confirms "Đã thu tiền mặt" on POS
   2. BFF → Payment Service (TCP): confirmCashPayment({ billId, amountReceived })
   3. Payment Service: calculate change, update status = PAID, method = CASH
-  4. Emit Kafka: payment.completed
+  4. Ghi outbox → Kafka: payment.completed (và có thể TCP Order tương tự VietQR — idempotent markPaid)
 
 Refund Flow (Manual — Demo/Luận văn):
   1. Owner/Manager tạo refund request: { paymentId, reason, customerBankAccount? }
@@ -813,7 +813,7 @@ Refund Flow (Manual — Demo/Luận văn):
   5. Ghi audit_payments, Emit Kafka: payment.refunded
 
 Events emitted (Kafka):
-  - payment.completed → close session, update table status, archive bill
+  - payment.completed → Order/Catalog/Notification consumers (đóng bill, chuyển bàn Billing→Cleaning, v.v. theo Order); duplicate/idempotent với fast path TCP
   - payment.refunded → adjust reconciliation data, notify owner
 ```
 
@@ -1131,18 +1131,18 @@ Cấu hình qua Keycloak **Protocol Mapper** (type: User Attribute → Token Cla
 
 ### 9.2 Real-time Use Cases
 
-| Use Case                     | Source                   | Event                 | WebSocket Room            | Nội dung push                       |
-| ---------------------------- | ------------------------ | --------------------- | ------------------------- | ----------------------------------- |
-| Đơn mới cho Staff            | BFF Direct               | `order.created`       | `tenant:{tid}:staff`      | `{ tableId, items, total }`         |
-| Order tracking (Customer)    | Kafka → BFF              | `order.confirmed`     | `session:{sid}:customer`  | `{ orderId, status: "Processing" }` |
-| KDS queue changed (Kitchen)  | Kitchen Redis hint → BFF | `kds.queue_changed`   | `tenant:{tid}:kds:*`      | `{ station, revision, reason }`     |
-| Món xong → notify waiter     | BFF Direct               | `kitchen.item_ready`  | `tenant:{tid}:staff`      | `{ tableId, itemName: "Phở bò" }`   |
-| Menu sync (giá/out of stock) | BFF Direct               | `menu.updated`        | `tenant:{tid}:*` (public) | `{ itemId, field, newValue }`       |
-| Table status change          | BFF Direct               | `table.status_chg`    | `tenant:{tid}:staff`      | `{ tableId, status: "Billing" }`    |
-| Payment done                 | Kafka → BFF              | `payment.completed`   | `session:{sid}:customer`  | `{ status: "Paid", receipt_url }`   |
-| SLA warning (quá giờ)        | Kafka → BFF              | `kitchen.sla_warning` | `tenant:{tid}:management` | `{ ticketId, waitingMin: 18 }`      |
-| Yêu cầu phục vụ (Customer)   | BFF Direct               | `service.requested`   | `tenant:{tid}:staff`      | `{ tableId, type: "CALL_STAFF" }`   |
-| Refund processed             | Kafka → BFF              | `payment.refunded`    | `tenant:{tid}:management` | `{ paymentId, amount, reason }`     |
+| Use Case                     | Source                                                                         | Event                 | WebSocket Room                            | Nội dung push                       |
+| ---------------------------- | ------------------------------------------------------------------------------ | --------------------- | ----------------------------------------- | ----------------------------------- |
+| Đơn mới cho Staff            | BFF Direct                                                                     | `order.created`       | `tenant:{tid}:staff`                      | `{ tableId, items, total }`         |
+| Order tracking (Customer)    | Kafka → BFF                                                                    | `order.confirmed`     | `session:{sid}:customer`                  | `{ orderId, status: "Processing" }` |
+| KDS queue changed (Kitchen)  | Kitchen Redis hint → BFF                                                       | `kds.queue_changed`   | `tenant:{tid}:kds:*`                      | `{ station, revision, reason }`     |
+| Món xong → notify waiter     | BFF Direct                                                                     | `kitchen.item_ready`  | `tenant:{tid}:staff`                      | `{ tableId, itemName: "Phở bò" }`   |
+| Menu sync (giá/out of stock) | BFF Direct                                                                     | `menu.updated`        | `tenant:{tid}:*` (public)                 | `{ itemId, field, newValue }`       |
+| Table status change          | BFF Direct                                                                     | `table.status_chg`    | `tenant:{tid}:staff`                      | `{ tableId, status: "Billing" }`    |
+| POS payment settled          | **Phase 3 baseline: polling**; bridge Kafka tới BFF rồi WebSocket là follow-up | `payment.completed`   | (khi có bridge) `session:{sid}:customer`  | `{ status: "Paid", receipt_url }`   |
+| SLA warning (quá giờ)        | Kafka → BFF                                                                    | `kitchen.sla_warning` | `tenant:{tid}:management`                 | `{ ticketId, waitingMin: 18 }`      |
+| Yêu cầu phục vụ (Customer)   | BFF Direct                                                                     | `service.requested`   | `tenant:{tid}:staff`                      | `{ tableId, type: "CALL_STAFF" }`   |
+| Refund processed             | **Phase 3 baseline: polling**; bridge follow-up                                | `payment.refunded`    | (khi có bridge) `tenant:{tid}:management` | `{ paymentId, amount, reason }`     |
 
 ### 9.3 Scaling Strategy
 
@@ -1184,12 +1184,15 @@ Client A ──→ BFF Instance 1 ──→ Redis Pub/Sub ──→ BFF Instance
    │          │           │ Match code  │           │
    │          │           │ Update PAID │   TCP     │
    │          │           ├────────────────────────►│
-   │          │           │             │ Complete  │
-   │          │  Kafka: payment.completed            │
-   │          │◄──────────┤             │           │
-   │ WS push  │           │             │           │
-   │◄─────────┤           │             │           │
+   │          │           │ (fast path; idempotent)   │
+   │          │  Outbox → Kafka: payment.completed   │
+   │          │           │ (recovery / fan-out)      │
+   │ Polling  │           │             │           │
+   │ POS/PWA  │           │             │           │
+   │◄─refetch─┤           │             │           │
 ```
+
+> **Phase 3 baseline:** POS/Customer cập nhật trạng thái thanh toán chủ yếu bằng **polling**; WebSocket real-time qua bridge Kafka → BFF là **task tách** sau khi correctness ổn định (xem `docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md` D5).
 
 ### 10.2 Cash Payment Flow
 
@@ -1212,6 +1215,7 @@ Environment Variables:
   PAYMENT_SEPAY_QR_BANK: "Vietcombank"       # Tên ngân hàng SePay-compatible
   PAYMENT_ORDER_TCP_TIMEOUT_MS: 5000         # Payment Service chờ Order Service qua TCP
   BILL_REF_PREFIX: "QRTBL"                   # Prefix nhận diện trong nội dung CK
+  PAYMENT_TYPEORM_DATABASE: "qrtable_payment"  # Bắt buộc staging/production; dev có thể fallback TYPEORM_DATABASE (xem decision D6)
 
 Webhook URL (cấu hình trong SePay dashboard):
   POST https://{bff-host}/api/v1/payment/sepay/webhook

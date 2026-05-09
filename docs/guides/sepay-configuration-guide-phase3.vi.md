@@ -122,16 +122,19 @@ Theo tài liệu SePay, field `code` được điền khi SePay **nhận diện 
 
 Sau khi đã có giá trị từ SePay và tài khoản ngân hàng, cấu hình phía monorepo (BFF + Payment Service — đúng file `.env` / secret manager của bạn):
 
-| Biến                           | Nguồn sự thật                                                      |
-| ------------------------------ | ------------------------------------------------------------------ |
-| `SEPAY_WEBHOOK_SECRET`         | Trùng `secret_key` webhook (header `X-Secret-Key`)                 |
-| `BFF_PAYMENT_TCP_TIMEOUT_MS`   | Timeout BFF chờ Payment Service qua TCP; mặc định `5000`           |
-| `PAYMENT_SEPAY_QR_ACCOUNT`     | STK nhận tiền (giống `acc` trong URL VietQR)                       |
-| `PAYMENT_SEPAY_QR_BANK`        | Tên ngân hàng SePay chấp nhận (giống `bank` trong URL)             |
-| `PAYMENT_ORDER_TCP_TIMEOUT_MS` | Timeout Payment Service chờ Order Service qua TCP; mặc định `5000` |
-| `BILL_REF_PREFIX`              | Thường là `QRTBL`                                                  |
+| Biến                           | Nguồn sự thật                                                                                                                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SEPAY_WEBHOOK_SECRET`         | Trùng `secret_key` webhook (header `X-Secret-Key`)                                                                                                                                                                                                                        |
+| `BFF_PAYMENT_TCP_TIMEOUT_MS`   | Timeout BFF chờ Payment Service qua TCP; mặc định `5000`                                                                                                                                                                                                                  |
+| `PAYMENT_SEPAY_QR_ACCOUNT`     | STK nhận tiền (giống `acc` trong URL VietQR)                                                                                                                                                                                                                              |
+| `PAYMENT_SEPAY_QR_BANK`        | Tên ngân hàng SePay chấp nhận (giống `bank` trong URL)                                                                                                                                                                                                                    |
+| `PAYMENT_ORDER_TCP_TIMEOUT_MS` | Timeout Payment Service chờ Order Service qua TCP; mặc định `5000`                                                                                                                                                                                                        |
+| `BILL_REF_PREFIX`              | Thường là `QRTBL`                                                                                                                                                                                                                                                         |
+| `PAYMENT_TYPEORM_DATABASE`     | **Staging/production:** database riêng cho Payment (ví dụ `qrtable_payment`). Dev có thể fallback `TYPEORM_DATABASE` — xem decision D6 trong [`2026-05-09-phase-3-payment-refactor-decisions.md`](../superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md). |
 
 **Giải thích xác thực:** SePay gửi header `X-Secret-Key`; BFF so sánh byte-by-byte với `SEPAY_WEBHOOK_SECRET` — **không** dùng HMAC raw body kiểu Stripe (theo phase 3).
+
+**Pipeline webhook BFF (safe refactor):** (1) `SepayWebhookSecretGuard` hoặc tương đương — từ chối sớm nếu secret sai; (2) `ValidationPipe` + DTO runtime (`class-validator`) trên body Bank Hub — từ chối payload không đúng hình dạng trước khi gọi Payment qua TCP. Endpoint vẫn là public URL nhưng **không** nhận JSON tùy ý không validate.
 
 **Giải thích phản hồi:** endpoint webhook trả raw body `{"success": true}` sau khi đã chuyển payload sang Payment Service. Không dùng `ResponseDto` wrapper cho riêng callback này, vì tài liệu SePay yêu cầu body thành công đúng dạng `{"success": true}` và hoàn tất trong 30 giây.
 

@@ -4,6 +4,8 @@
 > **Ước lượng:** ~1-2 tuần
 > **Trạng thái:** ⬜ TODO
 
+> **Safe refactor (2026-05):** Các quyết định kiến trúc/nghiệp vụ đã khóa tại [`docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md`](../superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md). Phạm vi refactor: đúng đắn thanh toán, đồng bộ bill/`payment_id`, SePay webhook + guard/DTO; **không** gói gọn đóng session realtime qua Kafka→BFF (baseline: **polling** trên POS) và **không** implement chuyển bàn/session ngoài luồng Billing→Cleaning đã mô tả — các phần đó là task follow-up.
+
 ## Prerequisites
 
 - Phase 2B hoàn thành — [phase-2b-kitchen-websocket.md](phase-2b-kitchen-websocket.md) (đơn/bếp ổn định, WebSocket và Kafka nền tảng sẵn sàng cho sự kiện downstream)
@@ -21,7 +23,7 @@
 
 Phase 3 sử dụng **SePay** làm cổng nhận thanh toán chuyển khoản ngân hàng qua **VietQR động** — không có redirect sang hosted page. Payment Service tách trách nhiệm thanh toán khỏi Order Service theo đúng bounded context: chỉ ghi nhận và điều phối tiền (VietQR/SePay, tiền mặt), làm tròn VND, refund và audit — còn bill/order lifecycle vẫn do Order Service dẫn dắt qua `billId`.
 
-**Luồng VietQR:** Payment Service tạo URL QR tĩnh nhúng trực tiếp (`qr.sepay.vn/img?acc=...&bank=...&amount=...&des=...`) với số tiền đã làm tròn và mã tham chiếu bill (pattern `QRTBL{billId_8}`) được nhúng vào nội dung chuyển khoản → POS/Customer hiển thị QR → Khách quét và chuyển khoản → SePay phát hiện giao dịch → POST webhook tới BFF với `X-Secret-Key` header → BFF xác thực bằng so sánh header token (không dùng raw-body HMAC như Stripe) → extract `code` hoặc khớp `content` → Payment Service cập nhật trạng thái "Paid".
+**Luồng VietQR:** Payment Service tạo URL QR tĩnh nhúng trực tiếp (`qr.sepay.vn/img?acc=...&bank=...&amount=...&des=...`) với **amount = rounded_total** và mã tham chiếu bill **`QRTBL` + 8 ký tự đầu của `billId` sau khi bỏ dấu gạch** (UUID) trong `des`/nội dung CK → POS/Customer hiển thị QR → Khách quét và chuyển khoản → SePay phát hiện giao dịch → POST webhook tới BFF với `X-Secret-Key` header → BFF xác thực secret + validate body (DTO runtime) → extract `code` hoặc khớp `content` → Payment Service: **underpaid** giữ PENDING + audit `SEPAY_WEBHOOK_UNDERPAID`; **đủ hoặc thừa tiền** → PAID, lưu `paidAmount` thực nhận (overpaid được chấp nhận).
 
 **Tiền mặt** không đi SePay: staff xác nhận trên POS là điểm cam kết nghiệp vụ, sau đó `payment.completed` qua Kafka.
 
@@ -255,7 +257,7 @@ export interface Refund {
    → BFF → Payment Service (TCP): createVietQR({ billId, tenantId })
    → Payment Service:
        a. Tính rounded_total từ bill (qua Order Service TCP lấy billId subtotal)
-       b. Sinh billReference = "QRTBL" + billId.slice(0, 8).toUpperCase()
+       b. Sinh billReference = "QRTBL" + 8 ký tự đầu của billId sau khi bỏ dấu gạch (UUID), uppercase khi cần cho regex
        c. Build QR URL:
           "https://qr.sepay.vn/img?acc={BANK_ACCOUNT}&bank={BANK_NAME}
            &amount={rounded_total}&des={billReference}"
@@ -276,17 +278,15 @@ export interface Refund {
 
 7. Payment Service:
    a. Tìm billReference trong code hoặc content (regex QRTBL[A-Z0-9]{8})
-   b. Verify: transferType == "in" && transferAmount >= bill.rounded_total
-   c. Update payment: status = PAID, sepayTransactionId = payload.id, paidAt = now()
-   d. Emit Kafka: payment.completed { tenantId, billId, method: "VIETQR" }
+   b. Nếu transferAmount < rounded_total: giữ PENDING, audit SEPAY_WEBHOOK_UNDERPAID
+   c. Nếu transferAmount >= rounded_total: status = PAID, paidAmount = transferAmount (ghi nhận overpaid)
+   d. Ghi outbox; sau commit có thể TCP Order (BILL_MARK_PAID) idempotent; publish Kafka payment.completed
 
-8. Kafka consumer (Order Service):
+8. Kafka consumer (Order Service) + duplicate/idempotent với fast path TCP:
    → Bill status = PAID (bất biến)
-   → Table status = Cleaning
-   → Session closed
+   → Table status = Cleaning (theo state machine; staff sau đó Cleaning→Available)
 
-9. BFF Kafka bridge → WS → session:{sid}:customer: "Thanh toán thành công"
-   → POS tab tự chuyển sang "Đã thanh toán ✓"
+9. **Baseline Phase 3:** POS/PWA **poll/refetch** server state để hiển thị "Đã thanh toán" — bridge Kafka → BFF → WebSocket cho `payment.completed` là **task realtime tách**, không bắt buộc trong safe refactor.
 ```
 
 **Cash Flow:**
@@ -415,7 +415,7 @@ timestamp TIMESTAMPTZ DEFAULT now()
 **Kịch bản xác minh cụ thể:**
 
 - **Yêu cầu thanh toán:** Customer nhấn nút → confirmation dialog → bàn chuyển Billing → Staff thấy yêu cầu trên POS.
-- **VietQR:** Staff chọn tab VietQR → POS hiển thị QR với số tiền đúng + mã bill → Khách quét → chuyển khoản (sandbox hoặc real) → SePay POST webhook → BFF verify `X-Secret-Key` → match `code`/`content` → Payment Service cập nhật PAID → WS push → POS/Customer thấy "Đã thanh toán" → bill lock → bàn chuyển Cleaning.
+- **VietQR:** Staff chọn tab VietQR → POS hiển thị QR với số tiền đúng + mã bill → Khách quét → chuyển khoản (sandbox hoặc real) → SePay POST webhook → BFF verify `X-Secret-Key` + DTO body → match `code`/`content` → Payment Service cập nhật PAID (hoặc PENDING nếu underpaid) → **poll/refetch** → POS/Customer thấy "Đã thanh toán" → bill lock → bàn chuyển Cleaning.
 - **Cash:** Staff chọn tab Tiền mặt → nhập tiền nhận → confirm → bill lock → bàn chuyển Cleaning.
 - **Refund:** Owner vào Dashboard → chọn payment đã `PAID` từ `GET /payment/history` → nhấn Refund → điền lý do/thông tin ngân hàng nếu có → Tạo record `PENDING_STAFF_ACTION` → Staff/Owner chuyển khoản tay → bấm "Xác nhận đã hoàn tiền" → audit log ghi nhận → `payment.refunded` emit.
 
