@@ -15,7 +15,6 @@ export function NonOrderRouteReset() {
     if (!pathname.startsWith(ROUTES.POS_TABLES)) {
       usePosTableUiState.getState().selectTable(null);
     }
-    if (!pathname.startsWith(ROUTES.POS_BILLS)) store.selectBill(null);
     if (!pathname.startsWith(ROUTES.POS_SERVICE_REQUESTS)) store.selectServiceRequest(null);
   }, [pathname]);
 

@@ -68,6 +68,13 @@ export type ListOrdersTcpRequest = {
   offset?: number;
 };
 
+export type ListBillsTcpRequest = {
+  tenantId: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+};
+
 export type CustomerListOrdersTcpRequest = {
   tenantId: string;
   sessionId: string;

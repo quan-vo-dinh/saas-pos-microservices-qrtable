@@ -20,6 +20,8 @@ export type CartTcpResponse = CartSnapshot;
 export type BillTcpResponse = Bill;
 export type ServiceRequestTcpResponse = ServiceRequest;
 
+export type BillListTcpResponse = Bill[];
+
 export type ServiceRequestListTcpResponse = ServiceRequest[];
 
 export type SubmitOrderTcpResponse = {

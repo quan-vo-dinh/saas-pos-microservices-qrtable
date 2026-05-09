@@ -14,6 +14,7 @@ export const API_CONFIG = {
     ADMIN_ORDERS: '/admin/orders',
     ADMIN_SERVICE_REQUESTS: '/admin/service-requests',
     ADMIN_TABLES_TRANSFER: '/admin/tables/transfer',
+    ADMIN_BILLS: '/admin/bills',
     ADMIN_BILLS_REOPEN: '/admin/bills',
     ADMIN_CURRENT_TENANT: '/admin/tenant/current',
     /** Step 2.6 KDS — BFF `KitchenController` */

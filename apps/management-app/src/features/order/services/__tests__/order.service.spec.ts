@@ -5,10 +5,10 @@ jest.mock('@/lib/api/authenticated-client', () => ({
 }));
 
 import { API_CONFIG } from '@/constants/api';
-import { OrderStatus } from '@einvoice/types';
+import { BillStatus, OrderStatus } from '@einvoice/types';
 import { orderService } from '../order.service';
 
-const { ADMIN_ORDERS, ADMIN_TABLES_TRANSFER, ADMIN_BILLS_REOPEN } = API_CONFIG.ENDPOINTS;
+const { ADMIN_ORDERS, ADMIN_TABLES_TRANSFER, ADMIN_BILLS, ADMIN_BILLS_REOPEN } = API_CONFIG.ENDPOINTS;
 
 describe('orderService', () => {
   afterEach(() => {
@@ -27,6 +27,20 @@ describe('orderService', () => {
 
     expect(mockAuthApiClient).toHaveBeenCalledWith(
       `${ADMIN_ORDERS}?status=${encodeURIComponent(OrderStatus.PENDING)}&tableId=${encodeURIComponent('table/1')}&limit=25&offset=50`,
+    );
+  });
+
+  it('lists bills with encoded query params', async () => {
+    mockAuthApiClient.mockResolvedValue([]);
+
+    await orderService.getBills({
+      status: BillStatus.PENDING_PAYMENT,
+      limit: 25,
+      offset: 50,
+    });
+
+    expect(mockAuthApiClient).toHaveBeenCalledWith(
+      `${ADMIN_BILLS}?status=${encodeURIComponent(BillStatus.PENDING_PAYMENT)}&limit=25&offset=50`,
     );
   });
 

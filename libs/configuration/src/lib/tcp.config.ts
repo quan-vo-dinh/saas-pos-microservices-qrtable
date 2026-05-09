@@ -13,6 +13,17 @@ export enum TCP_SERVICES {
   PAYMENT_SERVICE = 'TCP_PAYMENT_SERVICE',
 }
 
+const DEFAULT_TCP_SERVICE_PORTS: Record<TCP_SERVICES, number> = {
+  [TCP_SERVICES.PRODUCT_SERVICE]: 3202,
+  [TCP_SERVICES.USER_ACCESS_SERVICE]: 3203,
+  [TCP_SERVICES.AUTHORIZER_SERVICE]: 3204,
+  [TCP_SERVICES.CATALOG_SERVICE]: 3205,
+  [TCP_SERVICES.SAAS_SERVICE]: 3206,
+  [TCP_SERVICES.ORDER_SERVICE]: 3201,
+  [TCP_SERVICES.KITCHEN_SERVICE]: 3207,
+  [TCP_SERVICES.PAYMENT_SERVICE]: 3208,
+};
+
 export class TcpConfiguration {
   @IsNotEmpty()
   @IsObject()
@@ -49,7 +60,7 @@ export class TcpConfiguration {
   constructor() {
     Object.entries(TCP_SERVICES).forEach(([key, serviceName]) => {
       const host = process.env[`${key}_HOST`] || 'localhost';
-      const port = Number(process.env[`${serviceName}_PORT`]) || 3301;
+      const port = Number(process.env[`${serviceName}_PORT`]) || DEFAULT_TCP_SERVICE_PORTS[serviceName];
 
       this[serviceName] = TcpConfiguration.setValue(port, host);
     });
@@ -83,7 +94,7 @@ export function TcpProvider(serviceName: keyof TcpConfiguration): ClientsProvide
       const host =
         configService.get<string>(`${serviceName}_HOST`) ??
         configService.get<string>(`${getLegacyServiceHostKey(serviceName)}_HOST`, 'localhost');
-      const port = configService.get<number>(`${serviceName}_PORT`, 3301);
+      const port = configService.get<number>(`${serviceName}_PORT`, DEFAULT_TCP_SERVICE_PORTS[serviceName]);
 
       return {
         transport: Transport.TCP,

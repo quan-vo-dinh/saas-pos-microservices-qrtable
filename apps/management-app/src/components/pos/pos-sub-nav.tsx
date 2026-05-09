@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ServiceRequestStatus } from '@einvoice/types';
+import { BillStatus, ServiceRequestStatus } from '@einvoice/types';
 import { cn } from '@/lib/utils';
 import { ROUTES } from '@/constants/routes';
-import { useMockStore } from '@/mocks/store';
+import { useBillsQuery } from '@/features/order/hooks/use-bill-query';
 import { useServiceRequestsQuery } from '@/features/service-requests/hooks/use-service-request-query';
 
 const links = [
@@ -23,7 +23,8 @@ export function PosSubNav() {
     offset: 0,
   });
   const servicePending = serviceRequestsQuery.data?.length ?? 0;
-  const billsPending = useMockStore((s) => s.bills.filter((b) => b.status === 'PENDING_PAYMENT').length);
+  const billsQuery = useBillsQuery({ status: BillStatus.PENDING_PAYMENT, limit: 100, offset: 0 });
+  const billsPending = billsQuery.data?.length ?? 0;
 
   return (
     <nav

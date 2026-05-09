@@ -127,8 +127,8 @@ _Quy chuẩn hóa doanh thu và dòng tiền._
 ### Bảng `payments` & `refunds` (Thanh toán & Hoàn tiền)
 
 - **`payments`**: 1 Hóa đơn có thể thanh toán nhiều lần hoặc qua nhiều hình thức (chia tiền).
-  - `method`: Tiền mặt (`cash`), Chuyển khoản (`bank_transfer`), Stripe (`stripe`).
-  - `stripe_session_id`: Map với Webhook trả về từ Stripe. Đảm bảo tính nhất quán.
+  - `method`: Tiền mặt (`CASH`), Chuyển khoản VietQR (`VIETQR`).
+  - `sepay_transaction_id`: Map với Webhook trả về từ SePay. Đảm bảo tính nhất quán (idempotency key).
 - **`refunds`**: Trong trường hợp khách khiếu nại hoặc hủy món sau khi đã thanh toán (`status = paid`), hệ thống thiết kế Dòng Hoàn Tiền riêng biệt để dấu vết kiểm toán (Audit Trail) không bị mất mát.
 
 ---

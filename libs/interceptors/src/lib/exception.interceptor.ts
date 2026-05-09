@@ -8,19 +8,29 @@ import { BusinessException, BusinessExceptionResponse } from '@common/error-mess
 import { transformDbError } from '@common/error-messages/db-error.transformer';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { getErrorMessage } from '@common/error-messages/error-messages.registry';
+import { Reflector } from '@nestjs/core';
 
 export class ExceptionInterceptor implements NestInterceptor {
   private readonly logger = new Logger(ExceptionInterceptor.name);
 
+  constructor(private readonly reflector: Reflector) {}
+
   intercept(context: ExecutionContext, next: CallHandler<unknown>): Observable<unknown> {
     const ctx = context.switchToHttp();
     const request: Request & { [MetadataKey.PROCESSID]: string; [MetadataKey.STARTTIME]: number } = ctx.getRequest();
+    const skipResponseWrapper = this.reflector.getAllAndOverride<boolean>(MetadataKey.SKIP_RESPONSE_WRAPPER, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     const processID = request[MetadataKey.PROCESSID];
     const startTime = request[MetadataKey.STARTTIME];
 
     return next.handle().pipe(
       map((data: unknown) => {
+        if (skipResponseWrapper) {
+          return data;
+        }
         const durationMs = Date.now() - startTime;
         const responseData = data as ResponseDto<unknown>;
         responseData.processID = processID;

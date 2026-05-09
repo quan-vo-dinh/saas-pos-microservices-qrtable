@@ -5,7 +5,7 @@ export type PaymentStatus = 'PENDING' | 'PAID' | 'REFUND_PENDING' | 'REFUNDED' |
 
 @Entity({ name: 'payments' })
 @Index(['tenantId', 'billId'], { unique: true })
-@Index(['tenantId', 'billReference'], { unique: true })
+@Index(['billReference'], { unique: true })
 @Index(['sepayTransactionId'], { unique: true, where: 'sepay_transaction_id IS NOT NULL' })
 @Index(['tenantId', 'status', 'createdAt'])
 export class PaymentEntity {

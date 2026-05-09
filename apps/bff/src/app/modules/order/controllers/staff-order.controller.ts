@@ -16,6 +16,7 @@ import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import type { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import type {
   BillSessionTcpRequest,
+  ListBillsTcpRequest,
   ListOrdersTcpRequest,
   ListServiceRequestsTcpRequest,
   OrderIdTcpRequest,
@@ -24,6 +25,7 @@ import type {
   TransferTableTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
 import type {
+  BillListTcpResponse,
   BillRequestedTcpResponse,
   OrderActionTcpResponse,
   OrderTcpResponse,
@@ -116,6 +118,41 @@ export class StaffOrderController {
         .pipe(map((r) => r)),
     );
     return new ResponseDto<OrderTcpResponse>({
+      data: tcp.data,
+      statusCode: tcp.statusCode,
+      message: tcp.code as HTTP_MESSAGE,
+      processID: processId,
+    });
+  }
+
+  @Get('bills')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.PAYMENT_GET_HISTORY])
+  @ApiOkResponse({ type: ResponseDto })
+  @ApiOperation({ summary: 'List bills for POS settlement' })
+  async listBills(
+    @ProcessId() processId: string,
+    @Req() req: Request,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ): Promise<ResponseDto<BillListTcpResponse>> {
+    const tenantId = req[MetadataKey.TENANT_ID] as string;
+    const payload: ListBillsTcpRequest = {
+      tenantId,
+      status,
+      limit: limit !== undefined ? Number.parseInt(limit, 10) : undefined,
+      offset: offset !== undefined ? Number.parseInt(offset, 10) : undefined,
+    };
+    const tcp = await firstValueFrom(
+      this.orderClient
+        .send<
+          BillListTcpResponse,
+          ListBillsTcpRequest
+        >(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_LIST, buildTcpRequestContext<ListBillsTcpRequest>(req, processId, payload))
+        .pipe(map((r) => r)),
+    );
+    return new ResponseDto<BillListTcpResponse>({
       data: tcp.data,
       statusCode: tcp.statusCode,
       message: tcp.code as HTTP_MESSAGE,

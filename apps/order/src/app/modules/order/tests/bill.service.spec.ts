@@ -17,7 +17,12 @@ describe('BillService', () => {
   let service: BillService;
   let sessionService: { getActiveSessionOrThrow: jest.Mock };
   let sessionRepository: { findActiveByIdAndTenant: jest.Mock };
-  let billRepository: { findByIdAndTenant: jest.Mock; findByIdAndTenantForUpdate: jest.Mock; save: jest.Mock };
+  let billRepository: {
+    findByIdAndTenant: jest.Mock;
+    findByIdAndTenantForUpdate: jest.Mock;
+    findStaffList: jest.Mock;
+    save: jest.Mock;
+  };
   let orderRepository: { findByIdsAndTenant: jest.Mock };
   let cartService: { getSnapshot: jest.Mock; lockCart: jest.Mock; unlockCartForBillReopen: jest.Mock };
   let catalogClient: { send: jest.Mock };
@@ -29,6 +34,7 @@ describe('BillService', () => {
     billRepository = {
       findByIdAndTenant: jest.fn(),
       findByIdAndTenantForUpdate: jest.fn(),
+      findStaffList: jest.fn(),
       save: jest.fn(),
     };
     orderRepository = { findByIdsAndTenant: jest.fn() };
@@ -55,6 +61,48 @@ describe('BillService', () => {
     }).compile();
 
     service = module.get(BillService);
+  });
+
+  it('lists tenant-scoped bills with status filter and clamped pagination', async () => {
+    const now = new Date('2026-05-08T10:00:00.000Z');
+    billRepository.findStaffList.mockResolvedValue([
+      {
+        id: 'bill-1',
+        tenantId: 'tenant-1',
+        sessionId: 'session-1',
+        orderIds: ['order-1'],
+        subtotal: 127_500,
+        total: 128_000,
+        roundingAmount: 500,
+        paymentMethod: null,
+        status: BillStatus.PENDING_PAYMENT,
+        closedAt: now,
+        paidAt: null,
+        createdAt: now,
+        updatedAt: now,
+      } as Bill,
+    ]);
+
+    const rows = await service.listBills({
+      tenantId: 'tenant-1',
+      status: BillStatus.PENDING_PAYMENT,
+      limit: 999,
+      offset: -10,
+    });
+
+    expect(billRepository.findStaffList).toHaveBeenCalledWith('tenant-1', {
+      status: BillStatus.PENDING_PAYMENT,
+      limit: 200,
+      offset: 0,
+    });
+    expect(rows).toEqual([
+      expect.objectContaining({
+        id: 'bill-1',
+        tenantId: 'tenant-1',
+        status: BillStatus.PENDING_PAYMENT,
+        total: 128_000,
+      }),
+    ]);
   });
 
   it('rejects bill request when cart is not empty', async () => {

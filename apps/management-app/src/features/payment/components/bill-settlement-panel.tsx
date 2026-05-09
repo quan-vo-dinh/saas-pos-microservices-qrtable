@@ -3,15 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { BillStatus, PaymentMethod } from '@einvoice/types';
+import { BillStatus, PaymentMethod, type Bill } from '@einvoice/types';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useMockStore } from '@/mocks/store';
 import { formatVnd } from '@/lib/format-vnd';
 import { cn } from '@/lib/utils';
+import { billKeys } from '@/features/order/hooks/use-bill-query';
 import { paymentService } from '@/features/payment/services/payment.service';
 import { paymentQueryKeys, usePaymentHistoryQuery } from '@/features/payment/hooks/use-payment';
 
@@ -24,10 +24,9 @@ const schema = z.object({
 
 const chips = [100_000, 200_000, 500_000, 1_000_000] as const;
 
-export function BillSettlementPanel({ billId }: { billId: string }) {
+export function BillSettlementPanel({ bill }: { bill: Bill }) {
   const queryClient = useQueryClient();
-  const bills = useMockStore((s) => s.bills);
-  const payCash = useMockStore((s) => s.payCash);
+  const billId = bill.id;
   const [received, setReceived] = useState(300_000);
   const [err, setErr] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
@@ -38,10 +37,9 @@ export function BillSettlementPanel({ billId }: { billId: string }) {
     setErr(null);
   }, [billId]);
 
-  const bill = useMemo(() => bills.find((b) => b.id === billId), [bills, billId]);
-  const total = bill?.total ?? 0;
+  const total = bill.total;
   const change = received - total;
-  const canPayCash = total > 0 && received >= total && bill?.status === BillStatus.PENDING_PAYMENT;
+  const canPayCash = total > 0 && received >= total && bill.status === BillStatus.PENDING_PAYMENT;
 
   const { data: history } = usePaymentHistoryQuery(billId);
 
@@ -55,13 +53,18 @@ export function BillSettlementPanel({ billId }: { billId: string }) {
     [history, billId],
   );
 
+  const paidFromHistory = useMemo(
+    () => (history ?? []).some((r) => r.billId === billId && r.status === 'PAID'),
+    [history, billId],
+  );
+
   useEffect(() => {
-    if (!qrUrl || bill?.status !== BillStatus.PENDING_PAYMENT || terminalFromHistory) return;
+    if (!qrUrl || bill.status !== BillStatus.PENDING_PAYMENT || terminalFromHistory) return;
     const t = setInterval(() => {
       void queryClient.invalidateQueries({ queryKey: paymentQueryKeys.history(billId) });
     }, 3000);
     return () => clearInterval(t);
-  }, [qrUrl, billId, bill?.status, terminalFromHistory, queryClient]);
+  }, [qrUrl, billId, bill.status, terminalFromHistory, queryClient]);
 
   const pendingVietQr = useMemo(
     () =>
@@ -71,11 +74,7 @@ export function BillSettlementPanel({ billId }: { billId: string }) {
     [history, billId],
   );
 
-  if (!bill) {
-    return <p className="text-sm text-destructive">Không tìm thấy bill.</p>;
-  }
-
-  if (bill.status === BillStatus.PAID) {
+  if (bill.status === BillStatus.PAID || paidFromHistory) {
     return <p className="text-sm text-muted-foreground">Bill đã thanh toán.</p>;
   }
 
@@ -155,7 +154,10 @@ export function BillSettlementPanel({ billId }: { billId: string }) {
               void (async () => {
                 try {
                   await paymentService.confirmCash(bill.id, parsed.data.received);
-                  payCash(bill.id, parsed.data.received);
+                  await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: billKeys.lists() }),
+                    queryClient.invalidateQueries({ queryKey: paymentQueryKeys.history(bill.id) }),
+                  ]);
                   toast.success('Đã thu — đóng phiên');
                 } catch (e) {
                   toast.error((e as Error).message || 'Không xác nhận tiền mặt');

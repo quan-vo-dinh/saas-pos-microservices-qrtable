@@ -1,5 +1,6 @@
-import { PosPaymentClient } from './pos-payment-client';
+import { redirect } from 'next/navigation';
+import { ROUTES } from '@/constants/routes';
 
 export default function PosPaymentPage() {
-  return <PosPaymentClient />;
+  redirect(ROUTES.POS_BILLS);
 }

@@ -14,6 +14,7 @@ import type {
   BillMarkPaidTcpRequest,
   BillPaymentSnapshotTcpRequest,
   BillSessionTcpRequest,
+  ListBillsTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
 import type {
   BillCurrentTcpResponse,
@@ -64,6 +65,17 @@ export class BillService {
     }
     const bill = await this.billRepository.findByIdAndTenant(session.currentBillId, dto.tenantId);
     return { bill: bill ? this.toBillDto(bill) : null, cart };
+  }
+
+  async listBills(dto: ListBillsTcpRequest): Promise<BillDto[]> {
+    const limit = Math.min(Math.max(dto.limit ?? 50, 1), 200);
+    const offset = Math.max(dto.offset ?? 0, 0);
+    const rows = await this.billRepository.findStaffList(dto.tenantId, {
+      status: dto.status,
+      limit,
+      offset,
+    });
+    return rows.map((r) => this.toBillDto(r));
   }
 
   async getPaymentSnapshot(dto: BillPaymentSnapshotTcpRequest): Promise<BillPaymentSnapshotTcpResponse> {

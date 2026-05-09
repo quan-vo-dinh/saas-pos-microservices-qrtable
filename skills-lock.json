@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "code-review-and-quality": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-review-and-quality/SKILL.md",
+      "computedHash": "83931d7416bcff73c24d976c1e45f09f80259541d33e9fdfe3ee521d39b27428"
+    },
     "frontend-design": {
       "source": "affaan-m/everything-claude-code",
       "sourceType": "github",
@@ -34,6 +40,12 @@
       "sourceType": "github",
       "skillPath": "plugins/developer-essentials/skills/nx-workspace-patterns/SKILL.md",
       "computedHash": "c998c269c46455ad2bd9a1b61fb7db9ced887ddca40c2f3e54a610c6d9f9b09c"
+    },
+    "self-assessment": {
+      "source": "FlorianBruniaux/claude-code-ultimate-guide",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/self-assessment/SKILL.md",
+      "computedHash": "9bf2bfd7e574e760cec05f466e59d99e4e10b0886acd1bb59d97bb3a3919e779"
     },
     "shadcn": {
       "source": "shadcn-ui/ui",

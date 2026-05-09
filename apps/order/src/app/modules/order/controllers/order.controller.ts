@@ -14,6 +14,7 @@ import type {
   CustomerListOrdersTcpRequest,
   JoinSessionTcpRequest,
   KdsActiveOrdersGetTcpRequest,
+  ListBillsTcpRequest,
   ListOrdersTcpRequest,
   ListServiceRequestsTcpRequest,
   MarkOrderItemsReadyTcpRequest,
@@ -26,6 +27,7 @@ import type {
 } from '@common/interfaces/tcp/order/order-request.interface';
 import type {
   BillCurrentTcpResponse,
+  BillListTcpResponse,
   BillMarkedPaidTcpResponse,
   BillPaymentSnapshotTcpResponse,
   BillRequestedTcpResponse,
@@ -118,6 +120,12 @@ export class OrderController {
   @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.GET_BY_ID)
   async getById(@RequestParams() body: OrderIdTcpRequest): Promise<Response<OrderTcpResponse>> {
     const data = await this.orderService.getOrderById(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_LIST)
+  async billGetList(@RequestParams() body: ListBillsTcpRequest): Promise<Response<BillListTcpResponse>> {
+    const data = await this.billService.listBills(body);
     return Response.success(data);
   }
 

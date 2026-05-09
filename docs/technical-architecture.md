@@ -163,7 +163,7 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
                     └── Publish internal KDS invalidation hint after Redis write → BFF WebSocket → KDS screens
     │
     └──→ Payment Service (TCP): process payment
-            ├── Stripe Checkout Session → webhook → verify → update status
+            ├── VietQR: build QR URL (qr.sepay.vn) → POS display → SePay webhook → X-Secret-Key verify → update status
             ├── OR Cash: staff confirm → update status
             ├── Emit Kafka: "payment.completed"
             └── WebSocket → notify Customer + update table status
@@ -184,7 +184,7 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
 | **Cache**            | Redis                                  | Token cache, session store, menu cache, rate limit | Sub-millisecond latency, Sorted Set cho FIFO, Pub/Sub     |
 | **Message Broker**   | Apache Kafka                           | Event streaming, async decoupling                  | High-throughput, consumer groups, at-least-once delivery  |
 | **Identity**         | Keycloak                               | User management, OAuth 2.0/OIDC, SSO               | Enterprise IAM, realm/client model, social login          |
-| **Payment**          | Stripe                                 | Thanh toán trực tuyến                              | Checkout Session + Webhook, PCI compliant, SDK tốt        |
+| **Payment**          | SePay (VietQR)                         | Thanh toán chuyển khoản ngân hàng VN               | VietQR động inline, Webhook X-Secret-Key, không phí cổng  |
 | **Real-time**        | Socket.io (NestJS GW)                  | WebSocket bidirectional                            | Room-based, auto-reconnect, fallback transport            |
 | **File Storage**     | Cloudinary                             | Hình ảnh menu, QR export                           | CDN tích hợp, image transformation, free tier             |
 | **Monitoring**       | Grafana + Loki + Promtail              | Centralized logging & dashboard                    | PLG Stack, LogQL, Docker-native log collection            |
@@ -377,8 +377,9 @@ Platform Ops
 POS
   ├── / (Live Orders: confirm, cancel)
   ├── /tables (Table Map: status, session info, transfer)
-  ├── /payment (Payment: cash confirm, Stripe status)
-  └── /notifications (SLA alerts, service requests)
+  ├── /bills (Payment settlement: PENDING bills, cash confirm, VietQR QR display + status)
+  ├── /service-requests (SLA alerts, service requests)
+  └── /payment (legacy alias → redirect to /pos/bills)
 ```
 
 **Route `/kds/*` — Staff (Chef/Barista):**
@@ -543,7 +544,7 @@ File Storage Level:
 | 4   | **Catalog Service**      | TCP           | PG: `qrtable_catalog`  | Menu (Category + Item), Table & Area, QR token management                                                   |
 | 5   | **Order Service**        | TCP           | PG: `qrtable_order`    | Order state machine, Cart/Session cache, bills; stock **không** ghi trực tiếp — gọi Catalog TCP khi confirm |
 | 6   | **Kitchen Service**      | TCP + Kafka   | Redis only             | KDS ticket/item routing, FIFO/priority queue, SLA monitoring; no batching                                   |
-| 7   | **Payment Service**      | TCP + Webhook | PG: `qrtable_payment`  | Stripe Checkout, Cash flow, Payment records, Reconciliation                                                 |
+| 7   | **Payment Service**      | TCP + Webhook | PG: `qrtable_payment`  | SePay VietQR, Cash flow, Payment records, Reconciliation                                                    |
 | 8   | **Notification Service** | Kafka         | Mongo: `qrtable_notif` | Email (SMTP), Push events, Audit log                                                                        |
 | 9   | **User-Access Service**  | TCP           | Mongo: `qrtable_auth`  | User profile, Role mapping, Staff management                                                                |
 
@@ -757,25 +758,27 @@ WebSocket push (do BFF xử lý — Kitchen không emit WS trực tiếp):
 
 ```
 Trách nhiệm:
-  - Stripe Checkout Session: tạo payment link với metadata { billId, tenantId, tableId }
-  - Stripe Webhook: verify signature, extract metadata, update payment status
-  - Bank Transfer (via Stripe): hỗ trợ chuyển khoản qua Stripe Payment Methods
-  - Cash payment: staff-confirmed flow (không qua Stripe)
+  - VietQR (SePay): build QR URL động (qr.sepay.vn) với số tiền làm tròn + bill reference
+  - SePay Webhook: xác thực X-Secret-Key header, match bill reference, update payment status
+  - Cash payment: staff-confirmed flow
   - VND Rounding: áp dụng Math.ceil(amount / 1000) * 1000 trước khi tạo bill
   - Payment records: lưu lịch sử thanh toán (amount, method, timestamp)
   - Bill finalization: lock bill khi payment completed (immutable sau Paid)
-  - Refund flow: xử lý hoàn tiền (partial/full) với audit trail
+  - Refund flow (manual): Owner/Manager tạo record, Staff xác nhận sau khi chuyển tay
   - Reconciliation data: aggregation theo ngày/tháng, phương thức
-  - In hóa đơn: generate receipt data (PDF/thermal printer format)
 
 Entities (PostgreSQL):
-  - payments: id, tenant_id, bill_id, amount, rounded_amount, rounding_delta,
-              method (enum: stripe | cash | bank_transfer),
-              stripe_session_id, status (pending | paid | refunded | failed),
-              paid_at
-  - refunds: id, tenant_id, payment_id, amount, reason, refunded_by (user_id),
-             stripe_refund_id, status, created_at
-  - audit_payments: id, payment_id, action, actor_id, reason, timestamp
+  - payments: id, tenant_id, bill_id, bill_reference, method (enum: CASH | VIETQR),
+              raw_total, rounded_total, rounding_delta,
+              amount_received, change_amount,
+              sepay_transaction_id, sepay_reference_code,
+              status (PENDING | PAID | REFUND_PENDING | REFUNDED | FAILED), paid_at
+  - refunds: id, tenant_id, payment_id, amount, reason,
+             requested_by_user_id, requested_at,
+             confirmed_by_user_id, confirmed_at,
+             customer_bank_account, customer_bank_name, customer_account_name,
+             status (PENDING_STAFF_ACTION | CONFIRMED | CANCELED)
+  - audit_payments: id, payment_id, action, actor_id, meta JSONB, timestamp
 
 VND Rounding Logic:
   raw_total = Σ(item_price × quantity)
@@ -783,34 +786,31 @@ VND Rounding Logic:
   rounding_delta = rounded_total - raw_total
   → Lưu cả 3 giá trị: raw_total, rounded_total, rounding_delta
 
-Stripe Flow:
-  1. BFF → Payment Service (TCP): createCheckoutSession({ billId, items, tenantId })
-  2. Payment Service → Stripe API: create session with metadata
-     - currency: "vnd"
-     - payment_method_types: ["card", "promptpay"] (mở rộng sau)
-  3. Stripe → return payment URL
-  4. Customer completes payment on Stripe hosted page
-  5. Stripe → BFF webhook endpoint: POST /api/v1/payment/stripe/webhook
-  6. BFF → Payment Service (TCP): handleWebhook({ rawBody, signature })
-  7. Payment Service: verify signature → extract billId → update status = "Paid"
-  8. Emit Kafka: payment.completed
+VietQR Flow (SePay):
+  1. Staff chọn "VietQR" trên POS → BFF → Payment Service (TCP): createVietQR({ billId })
+  2. Payment Service: tính rounded_total, sinh billReference = "QRTBL" + billId.slice(0,8)
+  3. Build QR URL: https://qr.sepay.vn/img?acc={BANK_ACCOUNT}&bank={BANK_NAME}
+                    &amount={rounded_total}&des={billReference}
+  4. POS render <img src={qrUrl} /> — Khách quét và chuyển khoản
+  5. SePay → BFF webhook: POST /api/v1/payment/sepay/webhook
+     Headers: X-Secret-Key: {SEPAY_WEBHOOK_SECRET}
+  6. BFF: so sánh X-Secret-Key → reject 401 nếu không khớp
+  7. Payment Service: match billReference trong code/content, verify amount ≥ rounded_total
+  8. Update payment status = PAID, lưu sepay_transaction_id
+  9. Emit Kafka: payment.completed
 
 Cash Flow:
   1. Staff confirms "Đã thu tiền mặt" on POS
   2. BFF → Payment Service (TCP): confirmCashPayment({ billId, amountReceived })
-  3. Payment Service: calculate change, update status = "Paid", method = "cash"
+  3. Payment Service: calculate change, update status = PAID, method = CASH
   4. Emit Kafka: payment.completed
 
-Refund Flow:
-  1. Manager/Owner yêu cầu hoàn tiền trên Dashboard
-  2. BFF → Payment Service (TCP): createRefund({ paymentId, amount, reason })
-  3. IF method == "stripe" THEN:
-     → Stripe API: create refund (full or partial)
-     → Verify refund status via webhook
-  4. IF method == "cash" THEN:
-     → Ghi nhận refund record (staff xác nhận đã trả lại tiền)
-  5. Update payment record, log audit trail
-  6. Emit Kafka: payment.refunded → adjust revenue report
+Refund Flow (Manual — Demo/Luận văn):
+  1. Owner/Manager tạo refund request: { paymentId, reason, customerBankAccount? }
+  2. Payment Service: tạo refund record PENDING_STAFF_ACTION, update payment REFUND_PENDING
+  3. Staff/Owner chuyển khoản tay qua app ngân hàng dựa vào customerBankAccount hiển thị
+  4. Staff/Owner bấm "Xác nhận đã hoàn tiền" → status CONFIRMED
+  5. Ghi audit_payments, Emit Kafka: payment.refunded
 
 Events emitted (Kafka):
   - payment.completed → close session, update table status, archive bill
@@ -853,7 +853,7 @@ Giao tiếp:
 | **gRPC**          | BFF → Auth Service       | RPC (sync)       | Authentication — cần hiệu năng cao             |
 | **Kafka**         | Service → Service        | Pub/Sub (async)  | Side-effects, event notification, decoupling   |
 | **WebSocket**     | BFF → Clients            | Push (real-time) | KDS updates, order tracking, menu sync         |
-| **HTTP Webhook**  | Stripe → BFF             | Event callback   | Payment confirmation                           |
+| **HTTP Webhook**  | SePay → BFF              | Event callback   | Payment confirmation (X-Secret-Key header)     |
 | **Redis Pub/Sub** | Service → BFF WS Gateway | Pub/Sub          | Bridge nội bộ → WebSocket broadcast (optional) |
 
 ### 7.2 Kafka Topic Registry
@@ -1158,38 +1158,37 @@ Client A ──→ BFF Instance 1 ──→ Redis Pub/Sub ──→ BFF Instance
 
 ## 10. TÍCH HỢP THANH TOÁN
 
-### 10.1 Stripe Checkout Flow
+> **ADR (2026-05):** Hệ thống sử dụng **SePay + VietQR** thay vì Stripe để phù hợp thị trường Việt Nam. Không có redirect sang hosted page — QR code nhúng trực tiếp trong giao diện POS/Customer.
+
+### 10.1 VietQR (SePay) Flow
 
 ```
-┌──────┐    ┌───┐    ┌─────────┐    ┌────────┐    ┌──────┐
-│Client│    │BFF│    │ Payment │    │ Stripe │    │Order │
-│      │    │   │    │ Service │    │  API   │    │ Svc  │
-└──┬───┘    └─┬─┘    └────┬────┘    └───┬────┘    └──┬───┘
-   │ Request  │           │             │            │
-   │ Bill     │           │             │            │
-   ├─────────►│   TCP     │             │            │
-   │          ├──────────►│  Create     │            │
-   │          │           ├────────────►│            │
-   │          │           │  Session    │            │
-   │          │           │◄────────────┤            │
-   │          │◄──────────┤  payment_url│            │
-   │◄─────────┤           │             │            │
-   │ Redirect │           │             │            │
-   ├──────────────────────────────────►│            │
-   │          │  Complete Payment       │            │
-   │          │           │  Webhook    │            │
-   │          │◄──────────────────────┤            │
-   │          │   TCP     │             │            │
-   │          ├──────────►│  Verify     │            │
-   │          │           │  Signature  │            │
-   │          │           │  Update     │    TCP     │
+┌──────┐    ┌───┐    ┌─────────┐    ┌───────┐    ┌──────┐
+│Client│    │BFF│    │ Payment │    │ SePay │    │Order │
+│ POS  │    │   │    │ Service │    │Webhook│    │ Svc  │
+└──┬───┘    └─┬─┘    └────┬────┘    └───┬───┘    └──┬───┘
+   │ VietQR   │           │             │           │
+   │ Request  │           │             │           │
+   ├─────────►│   TCP     │             │           │
+   │          ├──────────►│ Build QR URL│           │
+   │          │           │ (qr.sepay.vn)           │
+   │          │◄──────────┤ qrUrl+meta  │           │
+   │◄─────────┤           │             │           │
+   │ Display  │           │             │           │
+   │ QR inline│           │             │           │
+   │          │           │  POST /webhook           │
+   │          │◄──────────────────────┤           │
+   │          │ X-Secret-Key header    │           │
+   │          │   TCP     │             │           │
+   │          ├──────────►│ Verify key  │           │
+   │          │           │ Match code  │           │
+   │          │           │ Update PAID │   TCP     │
    │          │           ├────────────────────────►│
-   │          │           │             │  Complete  │
-   │          │           │◄────────────────────────┤
+   │          │           │             │ Complete  │
    │          │  Kafka: payment.completed            │
-   │          │◄──────────┤             │            │
-   │ WS push  │           │             │            │
-   │◄─────────┤           │             │            │
+   │          │◄──────────┤             │           │
+   │ WS push  │           │             │           │
+   │◄─────────┤           │             │           │
 ```
 
 ### 10.2 Cash Payment Flow
@@ -1199,23 +1198,36 @@ Client A ──→ BFF Instance 1 ──→ Redis Pub/Sub ──→ BFF Instance
 2. Staff xem bill trên POS → kiểm tra tổng tiền
 3. Staff nhập số tiền khách đưa → hệ thống tính tiền thừa
 4. Staff nhấn "Xác nhận thanh toán tiền mặt"
-5. Payment Service: ghi nhận { method: "cash", amount, received, change }
+5. Payment Service: ghi nhận { method: "CASH", amount, received, change }
 6. Emit Kafka: payment.completed → close session → table → "Cleaning"
 ```
 
-### 10.3 Stripe Configuration
+### 10.3 SePay Configuration
 
 ```yaml
 Environment Variables:
-  STRIPE_SECRET_KEY: sk_test_... # Stripe Secret Key
-  STRIPE_WEBHOOK_SECRET: whsec_... # Webhook signature verification
-  STRIPE_SUCCESS_URL: https://{slug}.qrtable.io/payment/success
-  STRIPE_CANCEL_URL: https://{slug}.qrtable.io/payment/cancel
+  SEPAY_WEBHOOK_SECRET: "your_secret_key"   # Khớp với secret_key trong SePay dashboard
+  BFF_PAYMENT_TCP_TIMEOUT_MS: 5000           # BFF chờ Payment Service qua TCP
+  PAYMENT_SEPAY_QR_ACCOUNT: "0010000000355"  # Số TK ngân hàng nhận tiền
+  PAYMENT_SEPAY_QR_BANK: "Vietcombank"       # Tên ngân hàng SePay-compatible
+  PAYMENT_ORDER_TCP_TIMEOUT_MS: 5000         # Payment Service chờ Order Service qua TCP
+  BILL_REF_PREFIX: "QRTBL"                   # Prefix nhận diện trong nội dung CK
 
-Checkout Session Metadata:
-  invoiceId: bill_id # Để trace lại khi webhook callback
-  tenantId: tenant_id # Multi-tenant context
-  tableId: table_id # Để update table status sau payment
+Webhook URL (cấu hình trong SePay dashboard):
+  POST https://{bff-host}/api/v1/payment/sepay/webhook
+  auth_type: SECRET_KEY
+  event_type: In_only
+  is_verify_payment: 1
+
+Webhook Verification (X-Secret-Key header):
+  # BFF so sánh header, không dùng HMAC raw-body
+  if (req.headers['x-secret-key'] !== SEPAY_WEBHOOK_SECRET) → 401
+  # Success response gửi về SePay là raw JSON, không dùng internal ResponseDto wrapper
+  return {"success": true}
+
+QR URL Format:
+  https://qr.sepay.vn/img?acc={BANK_ACCOUNT}&bank={BANK_NAME}
+                         &amount={rounded_total}&des={QRTBL+billId_8chars}
 ```
 
 ---
@@ -1311,7 +1323,7 @@ On Menu Update (admin changes price/availability):
 ```yaml
 Strategy:
   - Mỗi order submission mang idempotency key: {session_id}:{timestamp}:{hash}
-  - Payment webhook: Stripe session_id là natural idempotency key
+  - Payment webhook: SePay payload.id (sepay_transaction_id) là natural idempotency key
   - Kafka consumer: dedup bằng message key + consumer offset
 
 Implementation:
@@ -1356,16 +1368,16 @@ Implementation:
 
 Mỗi service expose health endpoint kiểm tra:
 
-| Service      | Health Checks                                  |
-| ------------ | ---------------------------------------------- |
-| BFF          | Redis connection, TCP clients reachable        |
-| Auth         | Keycloak reachable, gRPC listener active       |
-| Catalog      | PostgreSQL connection                          |
-| Order        | PostgreSQL connection, Redis connection, Kafka |
-| Kitchen      | Redis connection, Kafka consumer status        |
-| Payment      | PostgreSQL connection, Stripe API reachable    |
-| SaaS Mgmt    | PostgreSQL connection                          |
-| Notification | Kafka consumer status, SMTP connection         |
+| Service      | Health Checks                                      |
+| ------------ | -------------------------------------------------- |
+| BFF          | Redis connection, TCP clients reachable            |
+| Auth         | Keycloak reachable, gRPC listener active           |
+| Catalog      | PostgreSQL connection                              |
+| Order        | PostgreSQL connection, Redis connection, Kafka     |
+| Kitchen      | Redis connection, Kafka consumer status            |
+| Payment      | PostgreSQL connection, SePay webhook config loaded |
+| SaaS Mgmt    | PostgreSQL connection                              |
+| Notification | Kafka consumer status, SMTP connection             |
 
 ### 13.3 Alerting Rules (Grafana)
 
@@ -1403,7 +1415,7 @@ services:
   catalog:      # TCP — Menu & Table
   order:        # TCP — Order processing
   kitchen:      # TCP — KDS
-  payment:      # TCP — Payment + Stripe webhook
+  payment:      # TCP — Payment + SePay webhook
   saas:         # TCP — Tenant management
   notification: # Kafka consumer — Mail & audit
 ```
@@ -1429,11 +1441,11 @@ docker compose -f docker-compose.prod.yaml up -d    # Full stack
 
 ### 14.3 Environment Strategy
 
-| Environment    | Database   | Kafka  | Keycloak | Stripe    | Monitoring |
-| -------------- | ---------- | ------ | -------- | --------- | ---------- |
-| **Local**      | Docker PG  | Docker | Docker   | Test keys | Optional   |
-| **Staging**    | Docker PG  | Docker | Docker   | Test keys | Full stack |
-| **Production** | Managed PG | Docker | Docker   | Live keys | Full stack |
+| Environment    | Database   | Kafka  | Keycloak | SePay         | Monitoring |
+| -------------- | ---------- | ------ | -------- | ------------- | ---------- |
+| **Local**      | Docker PG  | Docker | Docker   | SePay sandbox | Optional   |
+| **Staging**    | Docker PG  | Docker | Docker   | SePay sandbox | Full stack |
+| **Production** | Managed PG | Docker | Docker   | SePay live    | Full stack |
 
 ---
 
@@ -1462,7 +1474,7 @@ Phase 1 — Core Foundation (MVP):
   ├── PostgreSQL + Redis + Keycloak + Kafka
   ├── Multi-tenancy enforcement
   ├── Basic WebSocket (order notification)
-  └── Stripe + Cash payment
+  └── SePay VietQR + Cash payment
 
 Phase 2 — Real-time & KDS:
   ├── Kitchen Service + KDS WebSocket
@@ -1479,7 +1491,7 @@ Phase 3 — SaaS & Observability:
 Phase 4 — Polish & Extended:
   ├── PWA & Offline resilience (Service Worker, IndexedDB)
   ├── Notification Service (email receipts, daily report)
-  ├── Refund flow (Stripe refund + cash refund)
+  ├── Refund flow (SePay manual refund + cash refund)
   ├── Service Request (yêu cầu phục vụ từ khách)
   ├── Shared Cart multi-device sync
   └── KOT printing integration (ESC/POS)
@@ -1544,7 +1556,7 @@ Scenario 2: KDS mất kết nối
 Scenario 3: Payment terminal offline
   Behavior:
     - Allow cash payment only
-    - Disable Stripe payment button
+    - Disable VietQR payment button
     - Queue payment record
     - Manual reconciliation khi có mạng
 ```

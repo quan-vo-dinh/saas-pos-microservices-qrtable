@@ -108,6 +108,7 @@ enum ORDER {
   SERVICE_REQUEST_GET_LIST = 'order.service_request_get_list',
   SERVICE_REQUEST_ACKNOWLEDGE = 'order.service_request_acknowledge',
   SERVICE_REQUEST_RESOLVE = 'order.service_request_resolve',
+  BILL_GET_LIST = 'order.bill_get_list',
   BILL_GET_CURRENT = 'order.bill_get_current',
   BILL_REQUEST = 'order.bill_request',
   BILL_REOPEN = 'order.bill_reopen',

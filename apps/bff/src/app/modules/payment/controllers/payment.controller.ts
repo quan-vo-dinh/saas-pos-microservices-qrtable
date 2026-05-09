@@ -6,6 +6,7 @@ import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message'
 import { Authorization } from '@common/decorators/authorizer.decorator';
 import { Permissions } from '@common/decorators/permission.decorator';
 import { ProcessId } from '@common/decorators/processId.decorator';
+import { RawResponse } from '@common/decorators/raw-response.decorator';
 import {
   ConfirmCashRequestDto,
   CreateVietQrRequestDto,
@@ -13,6 +14,8 @@ import {
   RefundRequestDto,
 } from '@common/interfaces/gateway/payment';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
+import type { RequestType } from '@common/interfaces/tcp/common/request.interface';
+import type { ResponseType } from '@common/interfaces/tcp/common/response.interface';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import type { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import type {
@@ -36,7 +39,7 @@ import { Body, Controller, Get, Headers, Inject, Post, Query, Req, UnauthorizedE
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { firstValueFrom, map } from 'rxjs';
+import { firstValueFrom, map, timeout } from 'rxjs';
 import { assertSepayWebhookSecret } from '../verify-sepay-webhook-secret';
 
 @ApiTags('Payment')
@@ -54,6 +57,24 @@ export class PaymentController {
     return id;
   }
 
+  private paymentTcpTimeoutMs(): number {
+    const configured =
+      this.configService.get<number | string>('BFF_PAYMENT_TCP_TIMEOUT_MS') ?? process.env['BFF_PAYMENT_TCP_TIMEOUT_MS'];
+    const parsed = Number(configured ?? 5000);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 5000;
+  }
+
+  private sendPaymentTcp<TResponse, TRequest>(
+    pattern: unknown,
+    request: RequestType<TRequest>,
+  ): Promise<ResponseType<TResponse>> {
+    return firstValueFrom(
+      this.paymentClient
+        .send<TResponse, TRequest>(pattern, request)
+        .pipe(timeout({ first: this.paymentTcpTimeoutMs() }), map((r) => r)),
+    );
+  }
+
   @Post('vietqr/create-qr')
   @Authorization({ secured: true })
   @Permissions([PERMISSION.PAYMENT_CREATE])
@@ -65,13 +86,9 @@ export class PaymentController {
   ): Promise<ResponseDto<CreateVietQrTcpResponse>> {
     const tenantId = req[MetadataKey.TENANT_ID] as string;
     const payload: CreateVietQrTcpRequest = { tenantId, billId: dto.billId, userId: this.userId(req), processId };
-    const tcp = await firstValueFrom(
-      this.paymentClient
-        .send<
-          CreateVietQrTcpResponse,
-          CreateVietQrTcpRequest
-        >(TCP_REQUEST_MESSAGE.PAYMENT.CREATE_VIETQR, buildTcpRequestContext(req, processId, payload))
-        .pipe(map((r) => r)),
+    const tcp = await this.sendPaymentTcp<CreateVietQrTcpResponse, CreateVietQrTcpRequest>(
+      TCP_REQUEST_MESSAGE.PAYMENT.CREATE_VIETQR,
+      buildTcpRequestContext(req, processId, payload),
     );
     return new ResponseDto<CreateVietQrTcpResponse>({
       data: tcp.data,
@@ -98,13 +115,9 @@ export class PaymentController {
       userId: this.userId(req),
       processId,
     };
-    const tcp = await firstValueFrom(
-      this.paymentClient
-        .send<
-          PaymentTcpResponse,
-          ConfirmCashTcpRequest
-        >(TCP_REQUEST_MESSAGE.PAYMENT.CONFIRM_CASH, buildTcpRequestContext(req, processId, payload))
-        .pipe(map((r) => r)),
+    const tcp = await this.sendPaymentTcp<PaymentTcpResponse, ConfirmCashTcpRequest>(
+      TCP_REQUEST_MESSAGE.PAYMENT.CONFIRM_CASH,
+      buildTcpRequestContext(req, processId, payload),
     );
     return new ResponseDto<PaymentTcpResponse>({
       data: tcp.data,
@@ -116,30 +129,22 @@ export class PaymentController {
 
   @Post('sepay/webhook')
   @Authorization({ secured: false })
+  @RawResponse()
   @ApiOperation({ summary: 'SePay bank transfer webhook' })
   async sepayWebhook(
     @Headers('x-secret-key') secretKey: string | undefined,
     @Body() payload: SepayWebhookPayload,
     @ProcessId() processId: string,
-  ): Promise<ResponseDto<SepayWebhookTcpResponse>> {
+  ): Promise<{ success: true }> {
     const expected =
       this.configService.get<string>('SEPAY_WEBHOOK_SECRET') || process.env['SEPAY_WEBHOOK_SECRET'] || '';
     assertSepayWebhookSecret(secretKey, expected);
     const tcpData: HandleSepayWebhookTcpRequest = { payload, processId };
-    const tcp = await firstValueFrom(
-      this.paymentClient
-        .send<
-          SepayWebhookTcpResponse,
-          HandleSepayWebhookTcpRequest
-        >(TCP_REQUEST_MESSAGE.PAYMENT.HANDLE_SEPAY_WEBHOOK, { data: tcpData, processId })
-        .pipe(map((r) => r)),
+    await this.sendPaymentTcp<SepayWebhookTcpResponse, HandleSepayWebhookTcpRequest>(
+      TCP_REQUEST_MESSAGE.PAYMENT.HANDLE_SEPAY_WEBHOOK,
+      { data: tcpData, processId },
     );
-    return new ResponseDto<SepayWebhookTcpResponse>({
-      data: tcp.data,
-      statusCode: tcp.statusCode,
-      message: tcp.code as HTTP_MESSAGE,
-      processID: processId,
-    });
+    return { success: true };
   }
 
   @Post('refund/request')
@@ -153,13 +158,9 @@ export class PaymentController {
   ): Promise<ResponseDto<RefundTcpResponse>> {
     const tenantId = req[MetadataKey.TENANT_ID] as string;
     const payload: RefundRequestTcpRequest = { tenantId, userId: this.userId(req), processId, ...dto };
-    const tcp = await firstValueFrom(
-      this.paymentClient
-        .send<
-          RefundTcpResponse,
-          RefundRequestTcpRequest
-        >(TCP_REQUEST_MESSAGE.PAYMENT.REFUND_REQUEST, buildTcpRequestContext(req, processId, payload))
-        .pipe(map((r) => r)),
+    const tcp = await this.sendPaymentTcp<RefundTcpResponse, RefundRequestTcpRequest>(
+      TCP_REQUEST_MESSAGE.PAYMENT.REFUND_REQUEST,
+      buildTcpRequestContext(req, processId, payload),
     );
     return new ResponseDto<RefundTcpResponse>({
       data: tcp.data,
@@ -180,13 +181,9 @@ export class PaymentController {
   ): Promise<ResponseDto<RefundTcpResponse>> {
     const tenantId = req[MetadataKey.TENANT_ID] as string;
     const payload: RefundConfirmTcpRequest = { tenantId, refundId: dto.refundId, userId: this.userId(req), processId };
-    const tcp = await firstValueFrom(
-      this.paymentClient
-        .send<
-          RefundTcpResponse,
-          RefundConfirmTcpRequest
-        >(TCP_REQUEST_MESSAGE.PAYMENT.REFUND_CONFIRM, buildTcpRequestContext(req, processId, payload))
-        .pipe(map((r) => r)),
+    const tcp = await this.sendPaymentTcp<RefundTcpResponse, RefundConfirmTcpRequest>(
+      TCP_REQUEST_MESSAGE.PAYMENT.REFUND_CONFIRM,
+      buildTcpRequestContext(req, processId, payload),
     );
     return new ResponseDto<RefundTcpResponse>({
       data: tcp.data,
@@ -207,13 +204,9 @@ export class PaymentController {
   ): Promise<ResponseDto<PaymentHistoryTcpResponse>> {
     const tenantId = req[MetadataKey.TENANT_ID] as string;
     const payload: PaymentHistoryTcpRequest = { tenantId, billId };
-    const tcp = await firstValueFrom(
-      this.paymentClient
-        .send<
-          PaymentHistoryTcpResponse,
-          PaymentHistoryTcpRequest
-        >(TCP_REQUEST_MESSAGE.PAYMENT.GET_HISTORY, buildTcpRequestContext(req, processId, payload))
-        .pipe(map((r) => r)),
+    const tcp = await this.sendPaymentTcp<PaymentHistoryTcpResponse, PaymentHistoryTcpRequest>(
+      TCP_REQUEST_MESSAGE.PAYMENT.GET_HISTORY,
+      buildTcpRequestContext(req, processId, payload),
     );
     return new ResponseDto<PaymentHistoryTcpResponse>({
       data: tcp.data,

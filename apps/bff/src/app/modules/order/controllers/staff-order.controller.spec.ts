@@ -68,6 +68,30 @@ describe('StaffOrderController', () => {
     );
   });
 
+  it('listBills sends BILL_GET_LIST with tenant-scoped payload', async () => {
+    const req = { [MetadataKey.TENANT_ID]: 'tenant-1' } as unknown as Request;
+    await controller.listBills('pid-1', req, 'PENDING_PAYMENT', '25', '10');
+
+    expect(orderClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.ORDER.BILL_GET_LIST,
+      expect.objectContaining({
+        processId: 'pid-1',
+        data: {
+          tenantId: 'tenant-1',
+          status: 'PENDING_PAYMENT',
+          limit: 25,
+          offset: 10,
+        },
+      }),
+    );
+  });
+
+  it('listBills requires PAYMENT_GET_HISTORY permission for POS settlement', () => {
+    const reflector = new Reflector();
+    const required = reflector.get(Permissions, StaffOrderController.prototype.listBills);
+    expect(required).toEqual([PERMISSION.PAYMENT_GET_HISTORY]);
+  });
+
   it('listServiceRequests requires SERVICE_REQUEST_ACKNOWLEDGE', () => {
     const reflector = new Reflector();
     const required = reflector.get(Permissions, StaffOrderController.prototype.listServiceRequests);

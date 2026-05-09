@@ -17,6 +17,7 @@ export const ROUTES = {
   POS_TABLES: '/pos/tables',
   POS_SERVICE_REQUESTS: '/pos/service-requests',
   POS_BILLS: '/pos/bills',
+  /** Legacy alias route; the page redirects to POS_BILLS. */
   POS_PAYMENT: '/pos/payment',
 
   // KDS

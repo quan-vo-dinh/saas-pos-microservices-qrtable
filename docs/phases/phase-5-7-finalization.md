@@ -142,7 +142,7 @@ Ba mảng này được gộp một tài liệu vì cùng một "cổng hoàn th
 
 - **Demo script** (kịch bản 15–20 phút cho bảo vệ luận văn):
   - **Tab 1 (Customer):** QR scan → menu hiển thị → chọn món + thêm giỏ hàng → submit đơn hàng.
-  - **Tab 2 (Management):** Staff confirm đơn → KDS hiển thị ticket → Chef/Barista xử lý → Payment (cash hoặc Stripe) → bill close.
+  - **Tab 2 (Management):** Staff confirm đơn → KDS hiển thị ticket → Chef/Barista xử lý → Payment (cash hoặc VietQR/SePay) → bill close.
   - **Tab 3 (Monitoring):** Grafana trace xuyên suốt — chỉ trace ID đi từ BFF → Order → Kitchen → Payment, chứng minh phân tán.
 - **Full stack dry run** ít nhất một lần end-to-end trước ngày bảo vệ — vì phát hiện lỗi compose/network/sớm hơn slide.
 - **Backup plan:** Seed data script chạy nhanh nếu cần reset giữa các lần diễn tập — đưa hệ thống về trạng thái sạch trong < 2 phút.

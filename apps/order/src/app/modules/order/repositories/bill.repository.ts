@@ -15,6 +15,19 @@ export class BillRepository {
     return this.repo.findOne({ where: { sessionId, tenantId } });
   }
 
+  findStaffList(tenantId: string, opts: { status?: string; limit: number; offset: number }): Promise<Bill[]> {
+    const qb = this.repo
+      .createQueryBuilder('b')
+      .where('b.tenantId = :tenantId', { tenantId })
+      .orderBy('b.createdAt', 'DESC')
+      .take(opts.limit)
+      .skip(opts.offset);
+    if (opts.status) {
+      qb.andWhere('b.status = :status', { status: opts.status });
+    }
+    return qb.getMany();
+  }
+
   findByIdAndTenantForUpdate(id: string, tenantId: string, manager: EntityManager): Promise<Bill | null> {
     return manager
       .getRepository(Bill)

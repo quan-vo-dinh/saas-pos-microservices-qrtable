@@ -11,7 +11,7 @@ const EXACT: Record<string, string> = {
   [ROUTES.POS_TABLES]: 'Quản lý bàn',
   [ROUTES.POS_SERVICE_REQUESTS]: 'Yêu cầu phục vụ',
   [ROUTES.POS_BILLS]: 'Hóa đơn',
-  [ROUTES.POS_PAYMENT]: 'Thanh toán',
+  [ROUTES.POS_PAYMENT]: 'Hóa đơn',
   [ROUTES.KDS_KITCHEN]: 'Bếp',
   [ROUTES.KDS_BAR]: 'Quầy bar',
   [ROUTES.ADMIN]: 'Quản trị nền tảng',

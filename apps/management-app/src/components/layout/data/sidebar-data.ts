@@ -91,11 +91,6 @@ export const sidebarData: SidebarData = {
               url: ROUTES.POS_BILLS,
               roles: POS_STAFF,
             },
-            {
-              title: 'Payments',
-              url: ROUTES.POS_PAYMENT,
-              roles: POS_STAFF,
-            },
           ],
         },
         {

@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import { ROUTES } from '@/constants/routes';
 import { useOrderUiState } from '@/features/order/hooks/use-order-ui-state';
@@ -28,5 +29,9 @@ export function PosRightInspector() {
     return <OrderDetailPanel orderId={selectedRowId} />;
   }
 
-  return <NonOrderRightInspector />;
+  return (
+    <Suspense fallback={<EmptyState message="Đang tải chi tiết." />}>
+      <NonOrderRightInspector />
+    </Suspense>
+  );
 }

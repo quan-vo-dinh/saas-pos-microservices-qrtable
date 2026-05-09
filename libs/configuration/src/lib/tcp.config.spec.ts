@@ -1,4 +1,4 @@
-import { TcpProvider, TCP_SERVICES } from './tcp.config';
+import { TcpConfiguration, TcpProvider, TCP_SERVICES } from './tcp.config';
 
 type TcpConnectionOptions = {
   options: {
@@ -49,5 +49,25 @@ describe('TcpProvider', () => {
 
     expect(options.options.host).toBe('legacy-kitchen.internal');
     expect(options.options.port).toBe(3207);
+  });
+
+  it('uses a dedicated default TCP port for payment service', async () => {
+    const config = new TcpConfiguration();
+    const options = config.TCP_PAYMENT_SERVICE as TcpConnectionOptions;
+
+    expect(options.options.port).toBe(3208);
+  });
+
+  it('uses the dedicated default TCP payment port in async providers', async () => {
+    const provider = TcpProvider(TCP_SERVICES.PAYMENT_SERVICE);
+    if (!provider.useFactory) {
+      throw new Error('TcpProvider must define a useFactory function');
+    }
+
+    const options = (await provider.useFactory({
+      get: <T>(_key: string, defaultValue?: T): T | undefined => defaultValue,
+    })) as TcpConnectionOptions;
+
+    expect(options.options.port).toBe(3208);
   });
 });

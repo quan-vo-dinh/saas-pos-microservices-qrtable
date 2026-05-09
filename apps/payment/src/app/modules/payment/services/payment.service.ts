@@ -23,10 +23,19 @@ import type {
   BillMarkedPaidTcpResponse,
   BillPaymentSnapshotTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
-import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { BillStatus, PaymentMethod } from '@einvoice/types';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
-import { firstValueFrom, map } from 'rxjs';
+import { firstValueFrom, map, timeout } from 'rxjs';
+import { CONFIGURATION } from '../../../../configuration';
 import { PaymentEntity } from '../entities/payment.entity';
 import { AuditPaymentRepository } from '../repositories/audit-payment.repository';
 import { PaymentOutboxRepository } from '../repositories/payment-outbox.repository';
@@ -41,12 +50,14 @@ function isPostgresUniqueViolation(error: unknown): boolean {
   return q.code === '23505' || q.driverError?.code === '23505';
 }
 
+type PaymentPersistResult = {
+  payment: PaymentEntity;
+  created: boolean;
+};
+
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
-
-  private readonly sepayQrAccount = process.env['PAYMENT_SEPAY_QR_ACCOUNT'] ?? '9332770502';
-  private readonly sepayQrBank = process.env['PAYMENT_SEPAY_QR_BANK'] ?? 'Vietcombank';
 
   constructor(
     private readonly dataSource: DataSource,
@@ -71,7 +82,7 @@ export class PaymentService {
       throw new ConflictException('Bill already paid');
     }
 
-    let payment = this.paymentRepo.create({
+    const payment = this.paymentRepo.create({
       tenantId: dto.tenantId,
       billId: dto.billId,
       billReference: this.reference.createBillReference(dto.billId),
@@ -82,9 +93,11 @@ export class PaymentService {
       roundingDelta: snapshot.roundingDelta,
     });
 
-    payment = await this.persistNewPaymentWithFallbackReference(payment);
-    await this.auditRepo.createPaymentAudit(payment, 'PAYMENT_CREATED', 'USER', dto.userId, null, null);
-    return { ...this.toPaymentResponse(payment), qrUrl: this.buildQrUrl(payment) };
+    const persisted = await this.persistNewPaymentWithFallbackReference(payment);
+    if (persisted.created) {
+      await this.auditRepo.createPaymentAudit(persisted.payment, 'PAYMENT_CREATED', 'USER', dto.userId, null, null);
+    }
+    return { ...this.toPaymentResponse(persisted.payment), qrUrl: this.buildQrUrl(persisted.payment) };
   }
 
   async confirmCash(dto: ConfirmCashTcpRequest): Promise<PaymentTcpResponse> {
@@ -337,7 +350,7 @@ export class PaymentService {
           BillPaymentSnapshotTcpResponse,
           BillPaymentSnapshotTcpRequest
         >(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_PAYMENT_SNAPSHOT, req)
-        .pipe(map((r) => r)),
+        .pipe(timeout({ first: CONFIGURATION.PAYMENT_INTEGRATION_CONFIG.ORDER_TCP_TIMEOUT_MS }), map((r) => r)),
     );
     if (!wrapped?.data) {
       throw new ConflictException('Unable to load bill snapshot');
@@ -369,7 +382,7 @@ export class PaymentService {
       await firstValueFrom(
         this.orderClient
           .send<BillMarkedPaidTcpResponse, BillMarkPaidTcpRequest>(TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID, req)
-          .pipe(map((r) => r)),
+          .pipe(timeout({ first: CONFIGURATION.PAYMENT_INTEGRATION_CONFIG.ORDER_TCP_TIMEOUT_MS }), map((r) => r)),
       );
     } catch (e) {
       this.logger.warn(`BILL_MARK_PAID failed for bill ${params.billId}: ${(e as Error).message}`);
@@ -397,12 +410,21 @@ export class PaymentService {
   }
 
   private buildQrUrl(payment: PaymentEntity): string {
+    const qrConfig = this.getSepayQrConfig();
     return this.reference.buildQrUrl({
-      account: this.sepayQrAccount,
-      bank: this.sepayQrBank,
+      account: qrConfig.account,
+      bank: qrConfig.bank,
       amount: payment.roundedTotal,
       description: payment.billReference,
     });
+  }
+
+  private getSepayQrConfig(): { account: string; bank: string } {
+    const { QR_ACCOUNT, QR_BANK } = CONFIGURATION.SEPAY_CONFIG;
+    if (!QR_ACCOUNT || !QR_BANK) {
+      throw new ServiceUnavailableException('SePay QR account and bank are not configured');
+    }
+    return { account: QR_ACCOUNT, bank: QR_BANK };
   }
 
   private parseSepayDate(raw: string): Date {
@@ -411,13 +433,17 @@ export class PaymentService {
     return Number.isNaN(d.getTime()) ? new Date() : d;
   }
 
-  private async persistNewPaymentWithFallbackReference(payment: PaymentEntity): Promise<PaymentEntity> {
+  private async persistNewPaymentWithFallbackReference(payment: PaymentEntity): Promise<PaymentPersistResult> {
     try {
-      return await this.paymentRepo.save(payment);
+      return { payment: await this.paymentRepo.save(payment), created: true };
     } catch (e) {
       if (isPostgresUniqueViolation(e)) {
+        const existing = await this.paymentRepo.findByTenantAndBill(payment.tenantId, payment.billId);
+        if (existing) {
+          return { payment: existing, created: false };
+        }
         payment.billReference = this.reference.createCollisionFallbackReference(payment.billId);
-        return await this.paymentRepo.save(payment);
+        return { payment: await this.paymentRepo.save(payment), created: true };
       }
       throw e;
     }
@@ -428,6 +454,10 @@ export class PaymentService {
       return await manager.save(PaymentEntity, payment);
     } catch (e) {
       if (isPostgresUniqueViolation(e)) {
+        const existing = await this.paymentRepo.findByTenantBillForUpdate(manager, payment.tenantId, payment.billId);
+        if (existing) {
+          return existing;
+        }
         payment.billReference = this.reference.createCollisionFallbackReference(payment.billId);
         return await manager.save(PaymentEntity, payment);
       }

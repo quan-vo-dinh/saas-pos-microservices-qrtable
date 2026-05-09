@@ -377,7 +377,7 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
       THEN payment_status = "Paid", payment_method = "Bank Transfer"
       ```
 
-      > **Lưu ý kiến trúc (2026-04):** Thanh toán chuyển khoản được xử lý thông qua Stripe Payment Methods (hỗ trợ PromptPay và các phương thức local), không tích hợp VietQR API riêng biệt. Xem `technical-architecture.md` §6.2.7 — Payment Service.
+      > **Lưu ý kiến trúc (2026-05):** Thanh toán chuyển khoản được xử lý thông qua **SePay + VietQR động** — QR code nhúng inline trong POS/PWA (không redirect). SePay gửi webhook với `X-Secret-Key` header khi giao dịch thành công. Xem `technical-architecture.md` §6.2.7 — Payment Service.
 
 4.  **In Hóa đơn & Giải phóng Bàn (Closing):**
     - In hóa đơn giấy.

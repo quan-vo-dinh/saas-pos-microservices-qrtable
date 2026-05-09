@@ -1,8 +1,10 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { BillStatus } from '@einvoice/types';
 import { ROUTES } from '@/constants/routes';
 import { useMockStore } from '@/mocks/store';
+import { useBillsQuery } from '@/features/order/hooks/use-bill-query';
 import { usePosTableUiState } from '@/features/tables/hooks/use-pos-table-ui-state';
 import { TableDetailPanel } from '@/components/pos/table-detail-panel';
 import { CashBillPanel } from '@/components/pos/cash-bill-panel';
@@ -21,9 +23,11 @@ function EmptyState({ message }: { message: string }) {
 
 export function NonOrderRightInspector() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const selectedTableId = usePosTableUiState((s) => s.selectedTableId);
-  const selectedBillId = useMockStore((s) => s.selectedBillId);
+  const selectedBillId = searchParams.get('billId');
   const selectedServiceRequestId = useMockStore((s) => s.selectedServiceRequestId);
+  const billsQuery = useBillsQuery({ status: BillStatus.PENDING_PAYMENT, limit: 100, offset: 0 });
 
   if (pathname.startsWith(ROUTES.POS_TABLES)) {
     if (!selectedTableId) {
@@ -33,10 +37,20 @@ export function NonOrderRightInspector() {
   }
 
   if (pathname.startsWith(ROUTES.POS_BILLS)) {
+    if (billsQuery.isLoading) {
+      return <EmptyState message="Đang tải hóa đơn PENDING." />;
+    }
+    if (billsQuery.isError) {
+      return <EmptyState message="Không tải được hóa đơn PENDING." />;
+    }
     if (!selectedBillId) {
       return <EmptyState message="Chọn hóa đơn PENDING ở danh sách bên trái." />;
     }
-    return <CashBillPanel billId={selectedBillId} />;
+    const bill = (billsQuery.data ?? []).find((b) => b.id === selectedBillId);
+    if (!bill) {
+      return <EmptyState message="Hóa đơn đã được xử lý hoặc không còn trong danh sách PENDING." />;
+    }
+    return <CashBillPanel bill={bill} />;
   }
 
   if (pathname.startsWith(ROUTES.POS_SERVICE_REQUESTS)) {

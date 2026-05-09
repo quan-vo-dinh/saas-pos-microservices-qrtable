@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { BillStatus } from '@einvoice/types';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,36 +14,49 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useMockStore } from '@/mocks/store';
 import { formatVnd } from '@/lib/format-vnd';
-import { paymentService } from '@/features/payment/services/payment.service';
+import { paymentQueryKeys, usePaymentHistoryQuery } from '@/features/payment/hooks/use-payment';
+import { paymentService, type StaffPaymentRecord } from '@/features/payment/services/payment.service';
 
 export function OrdersRefundSection() {
-  const bills = useMockStore((s) => s.bills);
-  const paidWithPayment = useMemo(
-    () => bills.filter((b) => b.status === BillStatus.PAID && b.paymentId).slice(0, 8),
-    [bills],
+  const queryClient = useQueryClient();
+  const historyQuery = usePaymentHistoryQuery(undefined);
+  const paidPayments = useMemo(
+    () => (historyQuery.data ?? []).filter((p) => p.status === 'PAID').slice(0, 8),
+    [historyQuery.data],
   );
+
+  const refreshHistory = () => queryClient.invalidateQueries({ queryKey: paymentQueryKeys.history(undefined) });
 
   return (
     <div className="flex flex-col gap-4" data-slot="orders-refund-section">
       <div>
         <h2 className="text-lg font-semibold">Hoàn tiền / Refund</h2>
         <p className="text-sm text-muted-foreground">
-          Yêu cầu hoàn tiền thủ công (mock bill kèm paymentId). Xác nhận sau khi chủ quán đã chuyển khoản.
+          Yêu cầu hoàn tiền thủ công từ payment đã thanh toán. Xác nhận sau khi chủ quán đã chuyển khoản.
         </p>
       </div>
+      {historyQuery.isLoading ? <p className="text-sm text-muted-foreground">Đang tải payment history...</p> : null}
+      {historyQuery.isError ? <p className="text-sm text-destructive">Không tải được payment history.</p> : null}
+      {!historyQuery.isLoading && paidPayments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Chưa có payment đã thanh toán để hoàn tiền.</p>
+      ) : null}
       <ul className="flex flex-col gap-2">
-        {paidWithPayment.map((b) => (
+        {paidPayments.map((p) => (
           <li
-            key={b.id}
+            key={p.id}
             className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/80 px-3 py-2"
           >
             <div className="min-w-0">
-              <p className="truncate font-mono text-xs">{b.id}</p>
-              <p className="font-mono text-sm tabular-nums">{formatVnd(b.total)}</p>
+              <p className="truncate font-mono text-xs">{p.id}</p>
+              <p className="text-xs text-muted-foreground">Bill: {paymentBillLabel(p)}</p>
+              <p className="font-mono text-sm tabular-nums">{formatVnd(p.roundedTotal)}</p>
             </div>
-            <RefundDialog paymentId={b.paymentId!} amountLabel={formatVnd(b.total)} />
+            <RefundDialog
+              paymentId={p.id}
+              amountLabel={formatVnd(p.roundedTotal)}
+              onRefundConfirmed={refreshHistory}
+            />
           </li>
         ))}
       </ul>
@@ -51,7 +64,19 @@ export function OrdersRefundSection() {
   );
 }
 
-function RefundDialog({ paymentId, amountLabel }: { paymentId: string; amountLabel: string }) {
+function paymentBillLabel(payment: StaffPaymentRecord) {
+  return payment.billReference || payment.billId;
+}
+
+function RefundDialog({
+  paymentId,
+  amountLabel,
+  onRefundConfirmed,
+}: {
+  paymentId: string;
+  amountLabel: string;
+  onRefundConfirmed: () => Promise<unknown>;
+}) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('Khách yêu cầu hoàn');
   const [refundId, setRefundId] = useState<string | null>(null);
@@ -119,6 +144,7 @@ function RefundDialog({ paymentId, amountLabel }: { paymentId: string; amountLab
                 setBusy(true);
                 try {
                   await paymentService.confirmRefund(refundId);
+                  await onRefundConfirmed();
                   toast.success('Đã xác nhận hoàn');
                   setOpen(false);
                   setRefundId(null);
