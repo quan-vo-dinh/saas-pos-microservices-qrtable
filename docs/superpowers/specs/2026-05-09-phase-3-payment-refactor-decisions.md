@@ -22,11 +22,12 @@ Bill is owned by Order, but it stores the Payment aggregate id as nullable `paym
 ## D4. Table Close Semantics
 
 Canonical table state after successful payment is `Billing -> Cleaning`. Staff later marks the table `Available`.
-This safe refactor only fixes Payment correctness and Bill payment reference consistency. Session close and table transition implementation requires a separate Order settlement task.
+
+The follow-up post-payment finalization work implements this transition in Order Service: `BILL_MARK_PAID` marks the bill paid, closes the session, and commands Catalog to move the table from `billing` to `cleaning`. Staff still marks `cleaning -> available`.
 
 ## D5. Phase 3 Realtime Baseline
 
-Phase 3 safe refactor accepts polling on POS payment screens. Kafka -> BFF bridge for `payment.completed` and `payment.refunded` is a separate real-time task.
+POS/PWA correctness uses **polling/refetch** as the baseline. BFF may subscribe to Kafka `payment.completed` (and related topics) and emit WebSocket hints so clients invalidate queries sooner; that path does **not** replace server polling as the source of truth. Bridge coverage for `payment.refunded` follows the same principle where implemented.
 
 ## D6. Payment Database Configuration
 

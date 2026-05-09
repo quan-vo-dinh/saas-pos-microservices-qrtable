@@ -2,9 +2,11 @@
 
 > **Mục tiêu:** Khép kín luồng thanh toán tiền mặt và VietQR/SePay (VND) trên POS/Dashboard và Customer PWA — làm tròn đúng quy tắc VND, bill bất biến sau Paid, hoàn tiền có vết audit — để doanh thu và trạng thái bàn/session phản ánh thực tế thu ngân.
 > **Ước lượng:** ~1-2 tuần
-> **Trạng thái:** ⬜ TODO
+> **Trạng thái:** 🟨 Đang triển khai
 
-> **Safe refactor (2026-05):** Các quyết định kiến trúc/nghiệp vụ đã khóa tại [`docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md`](../superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md). Phạm vi refactor: đúng đắn thanh toán, đồng bộ bill/`payment_id`, SePay webhook + guard/DTO. **Phạm vi không bao gồm:** đóng session realtime qua cầu nối Kafka→BFF (baseline hiện tại: **polling** trên POS); cũng **không** implement chuyển bàn hay đóng session ngoài luồng Billing→Cleaning đã mô tả trong tài liệu — các hạng mục đó là task follow-up riêng.
+> **Post-payment finalization (2026-05-09):** Sau khi thanh toán hoàn tất, Payment completion được đồng bộ vào Order qua `BILL_MARK_PAID`: bill **PAID**, session **đóng**, Catalog chuyển bàn **billing → cleaning**. POS/Customer/PWA lấy đúng trạng thái chủ yếu qua **polling/refetch**; Kafka → BFF WebSocket chỉ phát **hint** (`events.paymentCompleted`) để invalidate query, không thay thế nguồn dữ liệu chuẩn.
+>
+> **Safe refactor (2026-05):** Quyết định kiến trúc/nghiệp vụ tại [`docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md`](../superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md). Phạm vi cốt lõi: thanh toán đúng, đồng bộ bill/`payment_id`, SePay webhook + guard/DTO. **Email biên lai / Notification Service:** Phase 4C — không nằm trong Phase 3.
 
 ## Prerequisites
 
@@ -56,7 +58,7 @@ https://qr.sepay.vn/img?acc={SO_TAI_KHOAN}&bank={TEN_NGAN_HANG}&amount={SO_TIEN}
 https://qr.sepay.vn/img?acc=9332770502&bank=Vietcombank&amount=128000&des=QRTBLB1A2C3D4
 ```
 
-QR code này nhúng trực tiếp qua thẻ `<img>` hoặc hiển thị bằng `next/image`. Không cần redirect. POS/PWA render ảnh và **poll/refetch** trạng thái thanh toán (baseline Phase 3); WebSocket qua bridge Kafka→BFF là tùy chọn follow-up.
+QR code này nhúng trực tiếp qua thẻ `<img>` hoặc hiển thị bằng `next/image`. Không cần redirect. POS/PWA render ảnh và **poll/refetch** trạng thái thanh toán (baseline Phase 3); BFF có thể subscribe Kafka `payment.completed` và emit WebSocket như **hint** invalidate — không thay polling làm nguồn đúng.
 
 ### Webhook Payload (SePay → BFF)
 
@@ -284,9 +286,10 @@ export interface Refund {
 
 8. Kafka consumer (Order Service) + duplicate/idempotent với fast path TCP:
    → Bill status = PAID (bất biến)
-   → Table status = Cleaning (theo state machine; staff sau đó Cleaning→Available)
+   → Session đóng; Redis active session/cart gỡ theo luồng Order
+   → Catalog: table **billing → cleaning** (staff sau đó cleaning → available)
 
-9. **Baseline Phase 3:** POS/PWA **poll/refetch** server state để hiển thị "Đã thanh toán" — bridge Kafka → BFF → WebSocket cho `payment.completed` là **task realtime tách**, không bắt buộc trong safe refactor.
+9. **Baseline Phase 3:** POS/PWA **poll/refetch** server state để hiển thị "Đã thanh toán". Kafka → BFF → WebSocket (`payment.completed` / `events.paymentCompleted`) là **bổ trợ realtime** để invalidate/refetch nhanh hơn, không thay thế polling.
 ```
 
 **Cash Flow:**
@@ -345,8 +348,9 @@ cho tài khoản ngân hàng thông thường → Dùng mô hình Staff-confirme
 
 **Kafka Events:**
 
-- `payment.completed` → Order Service (PAID bill, Cleaning table), Notification Service (receipt email)
-- `payment.refunded` → Order Service (adjust revenue), Notification Service
+- `payment.completed` → Order Service (PAID bill, đóng session, cleaning table), consumers downstream
+- `payment.refunded` → Order Service (adjust revenue), consumers downstream
+- **Email biên lai / Notification Service:** Phase 4C — không triển khai trong Phase 3 này
 
 **Bill finalization:** Bill **bất biến sau trạng thái PAID** — mọi điều chỉnh đi qua refund flow, không sửa bill đã khóa.
 
