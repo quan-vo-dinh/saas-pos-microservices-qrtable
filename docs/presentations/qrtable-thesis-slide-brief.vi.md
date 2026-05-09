@@ -328,13 +328,13 @@ Mỗi actor có phạm vi dữ liệu và cách xác thực khác nhau
 
 **Bảng tóm tắt:**
 
-| Actor | Phạm vi | Xác thực | Giao diện |
-| --- | --- | --- | --- |
-| Super Admin | Cross-tenant | JWT/Keycloak | Admin Portal |
-| Owner/Manager | Một tenant | JWT/Keycloak | Dashboard |
-| Waiter | Một tenant | JWT/Keycloak | POS |
-| Chef/Barista | Một tenant + station | JWT/Keycloak | KDS |
-| Customer | Session/Table | QR HMAC + Redis session | Customer PWA |
+| Actor         | Phạm vi              | Xác thực                | Giao diện    |
+| ------------- | -------------------- | ----------------------- | ------------ |
+| Super Admin   | Cross-tenant         | JWT/Keycloak            | Admin Portal |
+| Owner/Manager | Một tenant           | JWT/Keycloak            | Dashboard    |
+| Waiter        | Một tenant           | JWT/Keycloak            | POS          |
+| Chef/Barista  | Một tenant + station | JWT/Keycloak            | KDS          |
+| Customer      | Session/Table        | QR HMAC + Redis session | Customer PWA |
 
 **Callout:**
 
@@ -519,16 +519,16 @@ Service boundary được chia theo dữ liệu sở hữu và nghiệp vụ, kh
 
 **Bảng service ownership:**
 
-| Service | Sở hữu chính | Data store | Giao tiếp |
-| --- | --- | --- | --- |
-| BFF | API edge, WS, guards | Stateless + Redis cache | HTTP, WS, TCP, gRPC |
-| Auth | Token verify, user info | Keycloak/Redis JWKS cache | gRPC |
-| SaaS | Tenant, subscription, plan | PostgreSQL | TCP, Kafka |
-| Catalog | Category, menu item, table, QR, stock | PostgreSQL | TCP |
-| Order | Session, cart, order, bill, service request | PostgreSQL + Redis | TCP, Kafka |
-| Kitchen | KDS ticket, queue, SLA | Redis-only | Kafka, TCP |
-| Payment | Payment, refund, audit | PostgreSQL | TCP, webhook, Kafka |
-| Notification | Email/audit async | MongoDB | Kafka |
+| Service      | Sở hữu chính                                | Data store                | Giao tiếp           |
+| ------------ | ------------------------------------------- | ------------------------- | ------------------- |
+| BFF          | API edge, WS, guards                        | Stateless + Redis cache   | HTTP, WS, TCP, gRPC |
+| Auth         | Token verify, user info                     | Keycloak/Redis JWKS cache | gRPC                |
+| SaaS         | Tenant, subscription, plan                  | PostgreSQL                | TCP, Kafka          |
+| Catalog      | Category, menu item, table, QR, stock       | PostgreSQL                | TCP                 |
+| Order        | Session, cart, order, bill, service request | PostgreSQL + Redis        | TCP, Kafka          |
+| Kitchen      | KDS ticket, queue, SLA                      | Redis-only                | Kafka, TCP          |
+| Payment      | Payment, refund, audit                      | PostgreSQL                | TCP, webhook, Kafka |
+| Notification | Email/audit async                           | MongoDB                   | Kafka               |
 
 ### Visual / layout
 
@@ -674,15 +674,15 @@ RBAC được enforce ở API boundary, không chỉ ẩn/hiện menu trên giao
 
 **Ví dụ validation theo API:**
 
-| Thao tác | Actor hợp lệ | Guard/Permission |
-| --- | --- | --- |
-| Staff xác nhận đơn | Waiter/Manager/Owner | `UserGuard -> TenantGuard -> PermissionGuard(order.confirm)` |
-| Hủy đơn đang Processing | Manager/Owner | `order.cancel_processing` + bắt buộc lý do |
-| Cập nhật ticket KDS | Chef/Barista | `kitchen.update_ticket` + station scope |
-| Set priority KDS | Owner/Manager | `kitchen.set_priority` |
-| Xác nhận tiền mặt | Waiter/Manager/Owner | `payment.confirm_cash` |
-| Customer đặt món | Customer session | `SessionGuard -> TenantGuard`, không dùng role DB |
-| Customer xem order status | Customer session | session ownership: `order.sessionId === req.sessionId` |
+| Thao tác                  | Actor hợp lệ         | Guard/Permission                                             |
+| ------------------------- | -------------------- | ------------------------------------------------------------ |
+| Staff xác nhận đơn        | Waiter/Manager/Owner | `UserGuard -> TenantGuard -> PermissionGuard(order.confirm)` |
+| Hủy đơn đang Processing   | Manager/Owner        | `order.cancel_processing` + bắt buộc lý do                   |
+| Cập nhật ticket KDS       | Chef/Barista         | `kitchen.update_ticket` + station scope                      |
+| Set priority KDS          | Owner/Manager        | `kitchen.set_priority`                                       |
+| Xác nhận tiền mặt         | Waiter/Manager/Owner | `payment.confirm_cash`                                       |
+| Customer đặt món          | Customer session     | `SessionGuard -> TenantGuard`, không dùng role DB            |
+| Customer xem order status | Customer session     | session ownership: `order.sessionId === req.sessionId`       |
 
 ### Visual / layout
 
@@ -724,15 +724,15 @@ QRTable chọn giao thức theo semantics của luồng, không dùng một kên
 
 **Bảng giao tiếp:**
 
-| Kênh | Dùng cho | Ví dụ |
-| --- | --- | --- |
-| HTTP REST | Client -> BFF request/response | Customer submit order |
-| WebSocket | BFF -> Client realtime push | order status, KDS update |
-| TCP | BFF/Service -> business service sync | Order gọi Catalog deduct stock |
-| gRPC | Auth performance-critical RPC | BFF verify token |
-| Kafka | Async domain event | `order.confirmed`, `payment.completed` |
-| HTTP Webhook | External callback | SePay -> BFF webhook |
-| Redis | Cache/runtime/pub-sub | session, cart, KDS queue |
+| Kênh         | Dùng cho                             | Ví dụ                                  |
+| ------------ | ------------------------------------ | -------------------------------------- |
+| HTTP REST    | Client -> BFF request/response       | Customer submit order                  |
+| WebSocket    | BFF -> Client realtime push          | order status, KDS update               |
+| TCP          | BFF/Service -> business service sync | Order gọi Catalog deduct stock         |
+| gRPC         | Auth performance-critical RPC        | BFF verify token                       |
+| Kafka        | Async domain event                   | `order.confirmed`, `payment.completed` |
+| HTTP Webhook | External callback                    | SePay -> BFF webhook                   |
+| Redis        | Cache/runtime/pub-sub                | session, cart, KDS queue               |
 
 ### Visual / layout
 
@@ -810,15 +810,15 @@ Redis được dùng có kiểm soát cho dữ liệu nóng, runtime state và q
 
 **Bảng usage:**
 
-| Use case | Key pattern | Owner |
-| --- | --- | --- |
-| Token cache | `user-token:{sha256(jwt)}` | BFF/Auth |
-| Menu cache | `menu:{tenant_id}` | BFF/Catalog flow |
-| Session | `session:{tenant_id}:{session_id}` | Order |
-| Shared cart | `cart:{tenant_id}:{session_id}` | Order |
-| Rate limit | `rl:{endpoint}:{ip/token}` | BFF |
-| KDS queue | `kds:{tenant_id}:{station}` | Kitchen |
-| Ticket snapshot | `ticket:{ticket_id}` | Kitchen |
+| Use case        | Key pattern                        | Owner            |
+| --------------- | ---------------------------------- | ---------------- |
+| Token cache     | `user-token:{sha256(jwt)}`         | BFF/Auth         |
+| Menu cache      | `menu:{tenant_id}`                 | BFF/Catalog flow |
+| Session         | `session:{tenant_id}:{session_id}` | Order            |
+| Shared cart     | `cart:{tenant_id}:{session_id}`    | Order            |
+| Rate limit      | `rl:{endpoint}:{ip/token}`         | BFF              |
+| KDS queue       | `kds:{tenant_id}:{station}`        | Kitchen          |
+| Ticket snapshot | `ticket:{ticket_id}`               | Kitchen          |
 
 **Policy callout:**
 
@@ -1184,13 +1184,13 @@ Realtime updates được route theo room để mỗi actor chỉ nhận đúng 
 
 **Room mapping:**
 
-| Actor | Room |
-| --- | --- |
-| Waiter | `tenant:{tid}:staff` |
-| Chef | `tenant:{tid}:kds:kitchen` |
-| Barista | `tenant:{tid}:kds:bar` |
-| Owner/Manager | `tenant:{tid}:management` |
-| Customer | `session:{sid}:customer` |
+| Actor         | Room                       |
+| ------------- | -------------------------- |
+| Waiter        | `tenant:{tid}:staff`       |
+| Chef          | `tenant:{tid}:kds:kitchen` |
+| Barista       | `tenant:{tid}:kds:bar`     |
+| Owner/Manager | `tenant:{tid}:management`  |
+| Customer      | `session:{sid}:customer`   |
 
 **Event examples:**
 
@@ -1565,16 +1565,16 @@ Khi khách quét QR:
 
 ### 3.3. Permission examples nên nhớ
 
-| Tình huống | Quyền hoặc guard chính | Ý nghĩa |
-| --- | --- | --- |
-| Waiter xác nhận đơn | `order.confirm` | Chỉ staff vận hành hợp lệ được đưa đơn vào bếp |
-| Waiter hủy đơn pending | `order.cancel_pending` | Đơn chưa vào bếp có thể reject/hủy |
-| Manager hủy đơn processing | `order.cancel_processing` | Đơn đã vào bếp cần quyền cao hơn và lý do |
-| Chef cập nhật ticket | `kitchen.update_ticket` | Chỉ bếp/bar xử lý KDS ticket |
-| Owner/Manager set priority KDS | `kitchen.set_priority` | Chef/Barista không tự đổi priority |
-| Waiter xác nhận tiền mặt | `payment.confirm_cash` | Staff thu ngân xác nhận đã nhận tiền |
-| Owner/Manager refund | `payment.refund` | Hoàn tiền cần quyền quản lý và audit |
-| Customer submit order | `SessionGuard` + ownership | Customer không có DB role |
+| Tình huống                     | Quyền hoặc guard chính     | Ý nghĩa                                        |
+| ------------------------------ | -------------------------- | ---------------------------------------------- |
+| Waiter xác nhận đơn            | `order.confirm`            | Chỉ staff vận hành hợp lệ được đưa đơn vào bếp |
+| Waiter hủy đơn pending         | `order.cancel_pending`     | Đơn chưa vào bếp có thể reject/hủy             |
+| Manager hủy đơn processing     | `order.cancel_processing`  | Đơn đã vào bếp cần quyền cao hơn và lý do      |
+| Chef cập nhật ticket           | `kitchen.update_ticket`    | Chỉ bếp/bar xử lý KDS ticket                   |
+| Owner/Manager set priority KDS | `kitchen.set_priority`     | Chef/Barista không tự đổi priority             |
+| Waiter xác nhận tiền mặt       | `payment.confirm_cash`     | Staff thu ngân xác nhận đã nhận tiền           |
+| Owner/Manager refund           | `payment.refund`           | Hoàn tiền cần quyền quản lý và audit           |
+| Customer submit order          | `SessionGuard` + ownership | Customer không có DB role                      |
 
 ### 3.4. Câu giải thích ngắn khi bị hỏi "RBAC hoạt động như thế nào?"
 

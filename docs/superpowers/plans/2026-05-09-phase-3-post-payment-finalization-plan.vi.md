@@ -190,6 +190,7 @@ Staff cleans table:
 ## 2. Task 1: Order Domain Finalization Tests
 
 **Files:**
+
 - Modify: `apps/order/src/app/modules/order/tests/bill.service.spec.ts`
 - Modify: `apps/order/src/app/modules/order/tests/session.service.spec.ts`
 
@@ -307,11 +308,7 @@ Add to `apps/order/src/app/modules/order/tests/session.service.spec.ts`:
 it('closes durable session and removes active Redis session/cart keys after payment', async () => {
   await service.closeAfterPayment('t1', 'sess-1', new Date('2026-05-08T12:00:00.000Z'));
 
-  expect(sessionRepo.markClosed).toHaveBeenCalledWith(
-    'sess-1',
-    't1',
-    new Date('2026-05-08T12:00:00.000Z'),
-  );
+  expect(sessionRepo.markClosed).toHaveBeenCalledWith('sess-1', 't1', new Date('2026-05-08T12:00:00.000Z'));
   expect(redis.del).toHaveBeenCalledWith('session:t1:sess-1');
   expect(redis.del).toHaveBeenCalledWith('cart:t1:sess-1');
 });
@@ -333,6 +330,7 @@ Expected: new tests fail for missing finalization methods/calls.
 ## 3. Task 2: Implement Order Finalization
 
 **Files:**
+
 - Modify: `apps/order/src/app/modules/order/repositories/session.repository.ts`
 - Modify: `apps/order/src/app/modules/order/services/session.service.ts`
 - Modify: `apps/order/src/app/modules/order/services/cart.service.ts`
@@ -510,6 +508,7 @@ git commit -m "feat(order): finalize bill after payment"
 ## 4. Task 3: Protect Reopen Bill From Payment Race
 
 **Files:**
+
 - Modify: `apps/bff/src/app/modules/order/controllers/staff-order.controller.ts`
 - Modify: `apps/bff/src/app/modules/order/controllers/staff-order.controller.spec.ts`
 
@@ -622,6 +621,7 @@ git commit -m "fix(payment): prevent reopening bills with payment attempts"
 ## 5. Task 4: Shared Realtime Payment Event Contract
 
 **Files:**
+
 - Modify: `libs/shared/types/src/lib/realtime-events.types.ts`
 - Modify: package barrel if exports require it, usually `libs/shared/types/src/index.ts`
 
@@ -683,6 +683,7 @@ git commit -m "feat(types): add payment completed realtime event"
 ## 6. Task 5: BFF Kafka Bridge For `payment.completed`
 
 **Files:**
+
 - Modify: `apps/bff/src/app/modules/realtime/services/realtime-events.service.ts`
 - Modify: `apps/bff/src/app/modules/realtime/services/realtime-kafka-bridge.service.ts`
 - Modify: `apps/bff/src/app/modules/realtime/tests/realtime-kafka-bridge.service.spec.ts`
@@ -748,16 +749,18 @@ if (event.eventType === 'kitchen.sla_warning') {
 }
 
 if (event.eventType === 'payment.completed') {
-  await this.emitPaymentCompleted(event as {
-    eventId: string;
-    tenantId: string;
-    billId: string;
-    paymentId: string;
-    method: 'CASH' | 'VIETQR';
-    amount: number;
-    paidAt: string;
-    correlationId?: string;
-  });
+  await this.emitPaymentCompleted(
+    event as {
+      eventId: string;
+      tenantId: string;
+      billId: string;
+      paymentId: string;
+      method: 'CASH' | 'VIETQR';
+      amount: number;
+      paidAt: string;
+      correlationId?: string;
+    },
+  );
 }
 ```
 
@@ -828,7 +831,18 @@ Mock Kafka message with payload:
 Mock Order TCP response:
 
 ```ts
-of({ statusCode: 200, data: { billId: 'bill-1', tenantId: 't1', sessionId: 'sess-1', status: 'PAID', rawTotal: 127500, roundedTotal: 128000, roundingDelta: 500 } })
+of({
+  statusCode: 200,
+  data: {
+    billId: 'bill-1',
+    tenantId: 't1',
+    sessionId: 'sess-1',
+    status: 'PAID',
+    rawTotal: 127500,
+    roundedTotal: 128000,
+    roundingDelta: 500,
+  },
+});
 ```
 
 Assert:
@@ -869,6 +883,7 @@ git commit -m "feat(realtime): bridge payment completed events"
 ## 7. Task 6: Customer PWA Payment Sync UX
 
 **Files:**
+
 - Modify: `apps/bff/src/app/modules/order/controllers/customer-order.controller.ts`
 - Modify: `apps/bff/src/app/modules/order/controllers/customer-order.controller.spec.ts`
 - Modify: `apps/customer-pwa/src/features/payment/services/payment.service.ts`
@@ -955,13 +970,22 @@ it('creates VietQR only for current session pending bill', async () => {
         statusCode: 200,
         data: {
           bill: { id: 'bill-1', tenantId: 't1', sessionId: 'sess-1', status: BillStatus.PENDING_PAYMENT },
-          cart: { tenantId: 't1', sessionId: 'sess-1', status: 'LOCKED', cartVersion: 1, items: [], updatedAt: '2026-05-08T12:00:00.000Z' },
+          cart: {
+            tenantId: 't1',
+            sessionId: 'sess-1',
+            status: 'LOCKED',
+            cartVersion: 1,
+            items: [],
+            updatedAt: '2026-05-08T12:00:00.000Z',
+          },
         },
       });
     }
     return of({ statusCode: 200, data: {} });
   });
-  paymentClient.send.mockReturnValue(of({ statusCode: 200, data: { billId: 'bill-1', qrUrl: 'https://qr.sepay.vn/img?...' } }));
+  paymentClient.send.mockReturnValue(
+    of({ statusCode: 200, data: { billId: 'bill-1', qrUrl: 'https://qr.sepay.vn/img?...' } }),
+  );
 
   const result = await controller.createCustomerVietQr('proc-1', req);
 
@@ -975,7 +999,9 @@ it('creates VietQR only for current session pending bill', async () => {
 });
 
 it('rejects customer VietQR when current bill is not pending payment', async () => {
-  orderClient.send.mockReturnValue(of({ statusCode: 200, data: { bill: { id: 'bill-1', status: BillStatus.OPEN }, cart: null } }));
+  orderClient.send.mockReturnValue(
+    of({ statusCode: 200, data: { bill: { id: 'bill-1', status: BillStatus.OPEN }, cart: null } }),
+  );
   await expect(controller.createCustomerVietQr('proc-1', req)).rejects.toBeInstanceOf(ConflictException);
   expect(paymentClient.send).not.toHaveBeenCalled();
 });
@@ -1144,33 +1170,36 @@ When `billPending`, render copyable transfer details and QR:
 ```tsx
 <Button className="w-full" variant="secondary" onClick={() => void onCreateVietQr()} disabled={vietQrBusy}>
   {vietQrBusy ? 'Đang tạo mã…' : vietQr ? 'Làm mới mã VietQR' : 'Thanh toán bằng VietQR'}
-</Button>
-{vietQr ? (
-  <div className="rounded-lg border border-border/80 p-4">
-    <p className="text-sm font-medium">Quét mã để chuyển khoản</p>
-    <dl className="mt-3 grid gap-2 text-sm">
-      <div className="flex justify-between gap-3">
-        <dt className="text-muted-foreground">Ngân hàng</dt>
-        <dd className="font-medium">{vietQr.bankName}</dd>
-      </div>
-      <div className="flex justify-between gap-3">
-        <dt className="text-muted-foreground">Số tài khoản</dt>
-        <dd className="font-mono font-medium">{vietQr.bankAccount}</dd>
-      </div>
-      <div className="flex justify-between gap-3">
-        <dt className="text-muted-foreground">Nội dung</dt>
-        <dd className="font-mono font-medium">{vietQr.billReference}</dd>
-      </div>
-    </dl>
-    <p className="mt-2 font-mono text-xl font-semibold tabular-nums">
-      {new Intl.NumberFormat('vi-VN').format(vietQr.roundedTotal)} đ
-    </p>
-    <img src={vietQr.qrUrl} alt="VietQR" className="mt-3 max-h-72 w-full object-contain" />
-    <p className="mt-2 text-xs text-muted-foreground">
-      Nếu app ngân hàng không quét được QR trên cùng điện thoại, hãy nhập/copy đúng số tiền và nội dung chuyển khoản ở trên.
-    </p>
-  </div>
-) : null}
+</Button>;
+{
+  vietQr ? (
+    <div className="rounded-lg border border-border/80 p-4">
+      <p className="text-sm font-medium">Quét mã để chuyển khoản</p>
+      <dl className="mt-3 grid gap-2 text-sm">
+        <div className="flex justify-between gap-3">
+          <dt className="text-muted-foreground">Ngân hàng</dt>
+          <dd className="font-medium">{vietQr.bankName}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-muted-foreground">Số tài khoản</dt>
+          <dd className="font-mono font-medium">{vietQr.bankAccount}</dd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <dt className="text-muted-foreground">Nội dung</dt>
+          <dd className="font-mono font-medium">{vietQr.billReference}</dd>
+        </div>
+      </dl>
+      <p className="mt-2 font-mono text-xl font-semibold tabular-nums">
+        {new Intl.NumberFormat('vi-VN').format(vietQr.roundedTotal)} đ
+      </p>
+      <img src={vietQr.qrUrl} alt="VietQR" className="mt-3 max-h-72 w-full object-contain" />
+      <p className="mt-2 text-xs text-muted-foreground">
+        Nếu app ngân hàng không quét được QR trên cùng điện thoại, hãy nhập/copy đúng số tiền và nội dung chuyển khoản ở
+        trên.
+      </p>
+    </div>
+  ) : null;
+}
 ```
 
 Then derive:
@@ -1295,6 +1324,7 @@ git commit -m "feat(customer-pwa): show VietQR payment flow"
 ## 8. Task 7: Management App Payment/Table Sync
 
 **Files:**
+
 - Modify: `apps/management-app/src/features/payment/components/bill-settlement-panel.tsx`
 - Modify: `apps/management-app/src/features/order/hooks/use-staff-order-realtime.ts`
 - Modify: related tests
@@ -1378,9 +1408,9 @@ expect(queryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: tableKeys
 In `use-staff-order-realtime.spec.tsx`, emit `events.paymentCompleted` from mocked socket and assert invalidations for:
 
 ```ts
-billKeys.lists()
-tableKeys.all
-paymentQueryKeys.history('bill-1')
+billKeys.lists();
+tableKeys.all;
+paymentQueryKeys.history('bill-1');
 ```
 
 - [ ] **Step 5: Run management tests/build**
@@ -1409,6 +1439,7 @@ git commit -m "feat(management): sync post-payment table state"
 ## 9. Task 8: Backend Integration Verification
 
 **Files:**
+
 - Modify/Create: `apps/payment/src/app/modules/payment/tests/payment.service.spec.ts`
 - Modify/Create: `apps/order/src/app/modules/order/tests/bill.service.spec.ts`
 
@@ -1417,7 +1448,11 @@ git commit -m "feat(management): sync post-payment table state"
 Keep the existing test that confirms `confirmCash` persists PAID when `BILL_MARK_PAID` fails. Add assertion that outbox row exists:
 
 ```ts
-expect(outboxRepo.createCompleted).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: 'PAID' }), expect.any(String));
+expect(outboxRepo.createCompleted).toHaveBeenCalledWith(
+  expect.anything(),
+  expect.objectContaining({ status: 'PAID' }),
+  expect.any(String),
+);
 ```
 
 - [ ] **Step 2: Assert SePay completion still calls Order**
@@ -1478,6 +1513,7 @@ git commit -m "test(payment): cover post-payment finalization"
 ## 10. Task 9: End-To-End Manual Demo Script
 
 **Files:**
+
 - Modify/Create: `docs/superpowers/reports/2026-05-09-phase-3-post-payment-verification.md`
 
 - [ ] **Step 1: Start backend services**
@@ -1633,6 +1669,7 @@ git commit -m "docs(payment): add post-payment verification report"
 ## 11. Task 10: Documentation Sync
 
 **Files:**
+
 - Modify: `docs/phases/phase-3-payment.md`
 - Modify: `docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md`
 - Optional: `docs/implementation_plan.md`
