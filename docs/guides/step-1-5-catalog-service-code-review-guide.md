@@ -30,7 +30,7 @@ Step 1.5 triển khai toàn bộ **Catalog Service Backend** — microservice qu
            │ TCP (port 3205)
 ┌──────────▼───────────┐
 │  Catalog Service     │  ← Layer 2: Business logic, DB queries
-│  (:3005 HTTP)        │
+│  (:3305 HTTP)        │
 │  (:3205 TCP)         │
 └──────────┬───────────┘
            │ TypeORM
@@ -449,9 +449,9 @@ Barrel export tất cả 5 DTO files.
 1. `NestFactory.create(AppModule)` — tạo HTTP app
 2. `app.connectMicroservice<MicroserviceOptions>()` — kết nối TCP transport với host/port từ config (`TCP_CATALOG_SERVICE`)
 3. `app.setGlobalPrefix('api')` — prefix cho HTTP endpoints
-4. `app.startAllMicroservices()` → `app.listen(3005)` — khởi động cả TCP và HTTP
+4. `app.startAllMicroservices()` → `app.listen(3305)` — khởi động cả TCP và HTTP
 
-**Điểm cần chú ý:** HTTP port fallback `3005` nếu không set `CATALOG_PORT` env var. TCP config lấy từ `CONFIGURATION.TCP_SERV.TCP_CATALOG_SERVICE`.
+**Điểm cần chú ý:** HTTP port fallback `3305` nếu không set `CATALOG_PORT` env var. TCP config lấy từ `CONFIGURATION.TCP_SERV.TCP_CATALOG_SERVICE`.
 
 #### Configuration
 
@@ -1117,7 +1117,7 @@ Client Request
                   │ TCP (port 3205)
                   ▼
 ┌─────────────────────────────────────┐
-│       Catalog Service (:3005)       │
+│       Catalog Service (:3305)       │
 │                                     │
 │  @MessagePattern(TCP_REQUEST_...)   │
 │                                     │

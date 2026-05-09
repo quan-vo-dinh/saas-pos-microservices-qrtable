@@ -4,7 +4,7 @@
 
 **Goal:** Build the complete Catalog Service Backend — 4 domain entities (Category, Area, MenuItem, Table), CRUD services, Table State Machine, QR Token security, BFF REST endpoints with Redis menu cache, Cloudinary image upload integration, and ~32 unit tests.
 
-**Architecture:** NestJS hybrid microservice (HTTP:3005 + TCP:3205) with TypeORM/PostgreSQL (`qrtable_catalog` database). BFF acts as API Gateway — admin endpoints with JWT guard chain, public menu endpoint with session guard. BFF manages Redis cache centrally (Catalog Service has NO Redis). Image upload flows through BFF → Cloudinary → TCP to Catalog.
+**Architecture:** NestJS hybrid microservice (HTTP:3305 + TCP:3205) with TypeORM/PostgreSQL (`qrtable_catalog` database). BFF acts as API Gateway — admin endpoints with JWT guard chain, public menu endpoint with session guard. BFF manages Redis cache centrally (Catalog Service has NO Redis). Image upload flows through BFF → Cloudinary → TCP to Catalog.
 
 **Tech Stack:** NestJS, TypeORM, PostgreSQL, Redis (@keyv/redis at BFF), Cloudinary (via @common/providers/cloudinary), Jest, HMAC-SHA256 (Node.js crypto)
 

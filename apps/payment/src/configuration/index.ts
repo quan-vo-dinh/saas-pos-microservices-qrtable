@@ -6,7 +6,7 @@ import { TypeOrmConfiguration } from '@common/configuration/type-orm.config';
 import { Type } from 'class-transformer';
 import { IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
-const DEFAULT_PAYMENT_PORT = 3304;
+const DEFAULT_PAYMENT_PORT = 3308;
 const DEFAULT_PAYMENT_DATABASE = 'qrtable';
 const DEFAULT_ORDER_TCP_TIMEOUT_MS = 5000;
 

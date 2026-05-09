@@ -14,13 +14,15 @@ This is an Nx monorepo with NestJS hybrid apps (HTTP + TCP). Each service runs b
 
 ### Service Map
 
-- **BFF** (port 3000): API Gateway — proxies all frontend requests to downstream services
-- **Authorizer** (HTTP 3004, TCP 3104, gRPC 5100): JWT validation + Keycloak integration
-- **User-Access** (HTTP 3003, TCP 3103, gRPC 5200): User CRUD (MongoDB)
+- **BFF** (HTTP 3300, `PORT`): API gateway — sole HTTP entry for web apps
+- **Order** (HTTP 3301, TCP 3201): Orders / bills (PostgreSQL)
 - **Product** (HTTP 3302, TCP 3202): Product management (PostgreSQL)
-- **Invoice** (HTTP 3301, TCP 3201): Invoice management (PostgreSQL)
-- **Catalog** (HTTP 3005, TCP 3205): Menu catalog (PostgreSQL)
-- **SaaS** (HTTP 3006, TCP 3206): Tenant management (PostgreSQL)
+- **User-Access** (HTTP 3303, TCP 3203, gRPC 5200): User CRUD (MongoDB)
+- **Authorizer** (HTTP 3304, TCP 3204, gRPC 5100): JWT validation + Keycloak integration
+- **Catalog** (HTTP 3305, TCP 3205): Menu catalog (PostgreSQL)
+- **SaaS** (HTTP 3306, TCP 3206): Tenant management (PostgreSQL)
+- **Kitchen** (HTTP 3307, TCP 3207): KDS / kitchen pipeline
+- **Payment** (HTTP 3308, TCP 3208): Payments / integrations (PostgreSQL)
 
 ## Workflow: Adding a New Feature
 

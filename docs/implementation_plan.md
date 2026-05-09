@@ -30,18 +30,18 @@ Cột **% phase** = mức hoàn thành nội bộ của phase đó (0–100%), �
 
 Cột **Phạm vi tích lũy (P0→Pn @100%)** = tổng trọng số từ **Phase 0** đến **hết phase ở hàng đó**, **giả định** mọi phase trong đoạn đó đạt **100%** hoàn thành. Đây là **trần phần trăm khối lượng toàn dự án** đã được “bao phủ” khi chạm milestone đó — **không** phải tiến độ thực tế hiện tại (tiến độ thực tế vẫn lấy theo `Σ (Trọng số × % phase)` ở dưới).
 
-| Phase     | Nội dung                         | Ước lượng   | Trọng số | % phase  | Phạm vi tích lũy (P0→Pn @100%) | Trạng thái      | File chi tiết                                     |
-| --------- | -------------------------------- | ----------- | -------- | -------- | ------------------------------ | --------------- | ------------------------------------------------- |
-| Phase 0   | Nền tảng & Kiến trúc             | ~1 tuần     | **7%**   | **100%** | **7%**                         | ✅ Hoàn thành   | [phase-0](phases/phase-0-foundation.md)           |
-| Phase 1   | Catalog + Menu + Table           | ~2-3 tuần   | **20%**  | **100%** | **27%**                        | ✅ Hoàn thành   | [phase-1](phases/phase-1-catalog.md)              |
-| Phase 2A  | Permissions + Order + Kafka      | ~2-2.5 tuần | **18%**  | **0%**   | **45%**                        | ⬜ Chưa bắt đầu | [phase-2a](phases/phase-2a-order-kafka.md)        |
-| Phase 2B  | Kitchen/KDS + WebSocket          | ~1-1.5 tuần | **10%**  | **0%**   | **55%**                        | ⬜ Chưa bắt đầu | [phase-2b](phases/phase-2b-kitchen-websocket.md)  |
+| Phase     | Nội dung                         | Ước lượng   | Trọng số | % phase  | Phạm vi tích lũy (P0→Pn @100%) | Trạng thái         | File chi tiết                                     |
+| --------- | -------------------------------- | ----------- | -------- | -------- | ------------------------------ | ------------------ | ------------------------------------------------- |
+| Phase 0   | Nền tảng & Kiến trúc             | ~1 tuần     | **7%**   | **100%** | **7%**                         | ✅ Hoàn thành      | [phase-0](phases/phase-0-foundation.md)           |
+| Phase 1   | Catalog + Menu + Table           | ~2-3 tuần   | **20%**  | **100%** | **27%**                        | ✅ Hoàn thành      | [phase-1](phases/phase-1-catalog.md)              |
+| Phase 2A  | Permissions + Order + Kafka      | ~2-2.5 tuần | **18%**  | **0%**   | **45%**                        | ⬜ Chưa bắt đầu    | [phase-2a](phases/phase-2a-order-kafka.md)        |
+| Phase 2B  | Kitchen/KDS + WebSocket          | ~1-1.5 tuần | **10%**  | **0%**   | **55%**                        | ⬜ Chưa bắt đầu    | [phase-2b](phases/phase-2b-kitchen-websocket.md)  |
 | Phase 3   | Payment (SePay/VietQR + Cash)    | ~1-2 tuần   | **10%**  | **70%**  | **65%**                        | 🟨 Đang triển khai | [phase-3](phases/phase-3-payment.md)              |
-| Phase 4A  | Saga + Hardening                 | ~1 tuần     | **8%**   | **0%**   | **73%**                        | ⬜ Chưa bắt đầu | [phase-4a](phases/phase-4a-saga-hardening.md)     |
-| Phase 4B  | SaaS + Tenant Onboarding         | ~1 tuần     | **7%**   | **0%**   | **80%**                        | ⬜ Chưa bắt đầu | [phase-4b](phases/phase-4b-saas-onboarding.md)    |
-| Phase 4C  | Notification + Staff Mgmt        | ~1 tuần     | **6%**   | **0%**   | **86%**                        | ⬜ Chưa bắt đầu | [phase-4c](phases/phase-4c-notification-staff.md) |
-| Phase 5-7 | Testing + Observability + Deploy | ~3-5 tuần   | **14%**  | **0%**   | **100%**                       | ⬜ Chưa bắt đầu | [phase-5-7](phases/phase-5-7-finalization.md)     |
-| **Σ**     |                                  |             | **100%** |          | —                              |                 |                                                   |
+| Phase 4A  | Saga + Hardening                 | ~1 tuần     | **8%**   | **0%**   | **73%**                        | ⬜ Chưa bắt đầu    | [phase-4a](phases/phase-4a-saga-hardening.md)     |
+| Phase 4B  | SaaS + Tenant Onboarding         | ~1 tuần     | **7%**   | **0%**   | **80%**                        | ⬜ Chưa bắt đầu    | [phase-4b](phases/phase-4b-saas-onboarding.md)    |
+| Phase 4C  | Notification + Staff Mgmt        | ~1 tuần     | **6%**   | **0%**   | **86%**                        | ⬜ Chưa bắt đầu    | [phase-4c](phases/phase-4c-notification-staff.md) |
+| Phase 5-7 | Testing + Observability + Deploy | ~3-5 tuần   | **14%**  | **0%**   | **100%**                       | ⬜ Chưa bắt đầu    | [phase-5-7](phases/phase-5-7-finalization.md)     |
+| **Σ**     |                                  |             | **100%** |          | —                              |                    |                                                   |
 
 **Tiến độ tổng dự án (có trọng số):** `Σ (Trọng số × % phase)` = **34,0%** (Phase 0 + Phase 1 đều 100%, Phase 3 đang triển khai 70%) — cập nhật đồng bộ ngày 2026-05-09.
 
@@ -124,18 +124,18 @@ Cột **Phạm vi tích lũy (P0→Pn @100%)** = tổng trọng số từ **Phas
 
 ## Tiến Độ Tổng Quan
 
-| Phase     | Trọng số | % hoàn thành phase | Đóng góp vào tổng dự án | Phạm vi tích lũy (P0→Pn @100%) | Ngày cập nhật | Ghi chú                                                          |
-| --------- | -------- | ------------------ | ----------------------- | ------------------------------ | ------------- | ---------------------------------------------------------------- |
-| Phase 0   | 7%       | 100%               | 7,0%                    | **7%**                         | 2026-04-17    | Nền tảng, auth, monorepo, 2 app skeleton                         |
-| Phase 1   | 20%      | 100%               | 20,0%                   | **27%**                        | 2026-04-17    | Catalog + BFF + Cloudinary + CRUD + hooks + FE↔BE; Phase 1 đóng |
-| Phase 2A  | 18%      | 0%                 | 0%                      | **45%**                        | —             | Order service + Kafka + mở rộng RBAC                             |
-| Phase 2B  | 10%      | 0%                 | 0%                      | **55%**                        | —             | KDS + WebSocket                                                  |
+| Phase     | Trọng số | % hoàn thành phase | Đóng góp vào tổng dự án | Phạm vi tích lũy (P0→Pn @100%) | Ngày cập nhật | Ghi chú                                                                                                 |
+| --------- | -------- | ------------------ | ----------------------- | ------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------- |
+| Phase 0   | 7%       | 100%               | 7,0%                    | **7%**                         | 2026-04-17    | Nền tảng, auth, monorepo, 2 app skeleton                                                                |
+| Phase 1   | 20%      | 100%               | 20,0%                   | **27%**                        | 2026-04-17    | Catalog + BFF + Cloudinary + CRUD + hooks + FE↔BE; Phase 1 đóng                                        |
+| Phase 2A  | 18%      | 0%                 | 0%                      | **45%**                        | —             | Order service + Kafka + mở rộng RBAC                                                                    |
+| Phase 2B  | 10%      | 0%                 | 0%                      | **55%**                        | —             | KDS + WebSocket                                                                                         |
 | Phase 3   | 10%      | 70%                | 7,0%                    | **65%**                        | 2026-05-09    | Payment service + POS `/pos/bills` + Dashboard refund real API; E2E/customer final verification pending |
-| Phase 4A  | 8%       | 0%                 | 0%                      | **73%**                        | —             | Saga / outbox                                                    |
-| Phase 4B  | 7%       | 0%                 | 0%                      | **80%**                        | —             | SaaS onboarding                                                  |
-| Phase 4C  | 6%       | 0%                 | 0%                      | **86%**                        | —             | Notification + staff                                             |
-| Phase 5-7 | 14%      | 0%                 | 0%                      | **100%**                       | —             | Test + PLG stack + deploy demo                                   |
-| **Tổng**  | **100%** | —                  | **34,0%**               | —                              | 2026-05-09    | Công thức tiến độ thực: `Σ (trọng số × % phase / 100)`           |
+| Phase 4A  | 8%       | 0%                 | 0%                      | **73%**                        | —             | Saga / outbox                                                                                           |
+| Phase 4B  | 7%       | 0%                 | 0%                      | **80%**                        | —             | SaaS onboarding                                                                                         |
+| Phase 4C  | 6%       | 0%                 | 0%                      | **86%**                        | —             | Notification + staff                                                                                    |
+| Phase 5-7 | 14%      | 0%                 | 0%                      | **100%**                       | —             | Test + PLG stack + deploy demo                                                                          |
+| **Tổng**  | **100%** | —                  | **34,0%**               | —                              | 2026-05-09    | Công thức tiến độ thực: `Σ (trọng số × % phase / 100)`                                                  |
 
 > **4 highlight demo ấn tượng nhất:** Phase 1 (QR + Menu), Phase 2 (Real-time Ordering), Phase 3 (Payment), Phase 6 (Grafana Tracing).
 

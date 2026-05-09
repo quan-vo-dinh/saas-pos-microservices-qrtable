@@ -11,9 +11,9 @@ Tài liệu này mô tả **từ đầu đến cuối** các bước cần làm 
 
 SePay có nhiều sản phẩm. **QRTable Phase 3** dùng mô hình:
 
-| Thành phần | Vai trò |
-| ---------- | ------- |
-| **VietQR (ảnh QR)** | Build URL `https://qr.sepay.vn/img?acc=...&bank=...&amount=...&des=...` — **không redirect**, nhúng `<img>` trên POS/PWA. |
+| Thành phần                       | Vai trò                                                                                                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **VietQR (ảnh QR)**              | Build URL `https://qr.sepay.vn/img?acc=...&bank=...&amount=...&des=...` — **không redirect**, nhúng `<img>` trên POS/PWA.                                                 |
 | **Bank Hub / Webhook giao dịch** | Khi có biến động tiền vào tài khoản đã kết nối, SePay **POST JSON** tới URL webhook bạn cấu hình; xác thực bằng header **`X-Secret-Key`** nếu chọn kiểu **`SECRET_KEY`**. |
 
 **Không nhầm với:** IPN / “Cổng thanh toán” (schema JSON khác, ví dụ có `notification_type`, `order`, `transaction` — xem tài liệu IPN trên [developer.sepay.vn](https://developer.sepay.vn)). Backend Phase 3 của bạn khớp với **payload Bank Hub** có các field kiểu `id`, `transferType`, `transferAmount`, `code`, `content`, … như mục tài liệu [Tích hợp webhook](https://developer.sepay.vn/vi/sepay-webhooks/tich-hop-webhook).
@@ -91,17 +91,17 @@ Tài liệu SePay mô tả endpoint upsert webhook, ví dụ:
 
 Theo [Tích hợp webhook](https://developer.sepay.vn/vi/sepay-webhooks/tich-hop-webhook), body gồm các field tiêu biểu:
 
-| Field | Ý nghĩa ngắn |
-| ----- | ------------ |
-| `id` | ID giao dịch trên SePay |
-| `gateway` | Tên/ngân hàng |
-| `transactionDate` | Thời gian |
-| `accountNumber` | STK |
-| `code` | **Tùy chọn** — mã thanh toán SePay cố gắng nhận diện từ nội dung; có thể `null` |
-| `content` | Nội dung chuyển khoản |
-| `transferType` | `in` = tiền vào, `out` = tiền ra |
-| `transferAmount` | Số tiền (VND, integer) |
-| `referenceCode`, `description` | Tham chiếu / SMS raw |
+| Field                          | Ý nghĩa ngắn                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------- |
+| `id`                           | ID giao dịch trên SePay                                                         |
+| `gateway`                      | Tên/ngân hàng                                                                   |
+| `transactionDate`              | Thời gian                                                                       |
+| `accountNumber`                | STK                                                                             |
+| `code`                         | **Tùy chọn** — mã thanh toán SePay cố gắng nhận diện từ nội dung; có thể `null` |
+| `content`                      | Nội dung chuyển khoản                                                           |
+| `transferType`                 | `in` = tiền vào, `out` = tiền ra                                                |
+| `transferAmount`               | Số tiền (VND, integer)                                                          |
+| `referenceCode`, `description` | Tham chiếu / SMS raw                                                            |
 
 **Phase 3 QRTable** chỉ xử lý **`transferType === "in"`** và khớp mã bill (`QRTBL` + 8 ký tự) qua `code` hoặc regex trên `content` — xem [phase-3-payment.md](../phases/phase-3-payment.md).
 
@@ -122,14 +122,14 @@ Theo tài liệu SePay, field `code` được điền khi SePay **nhận diện 
 
 Sau khi đã có giá trị từ SePay và tài khoản ngân hàng, cấu hình phía monorepo (BFF + Payment Service — đúng file `.env` / secret manager của bạn):
 
-| Biến | Nguồn sự thật |
-| ---- | ------------- |
-| `SEPAY_WEBHOOK_SECRET` | Trùng `secret_key` webhook (header `X-Secret-Key`) |
-| `BFF_PAYMENT_TCP_TIMEOUT_MS` | Timeout BFF chờ Payment Service qua TCP; mặc định `5000` |
-| `PAYMENT_SEPAY_QR_ACCOUNT` | STK nhận tiền (giống `acc` trong URL VietQR) |
-| `PAYMENT_SEPAY_QR_BANK` | Tên ngân hàng SePay chấp nhận (giống `bank` trong URL) |
+| Biến                           | Nguồn sự thật                                                      |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `SEPAY_WEBHOOK_SECRET`         | Trùng `secret_key` webhook (header `X-Secret-Key`)                 |
+| `BFF_PAYMENT_TCP_TIMEOUT_MS`   | Timeout BFF chờ Payment Service qua TCP; mặc định `5000`           |
+| `PAYMENT_SEPAY_QR_ACCOUNT`     | STK nhận tiền (giống `acc` trong URL VietQR)                       |
+| `PAYMENT_SEPAY_QR_BANK`        | Tên ngân hàng SePay chấp nhận (giống `bank` trong URL)             |
 | `PAYMENT_ORDER_TCP_TIMEOUT_MS` | Timeout Payment Service chờ Order Service qua TCP; mặc định `5000` |
-| `BILL_REF_PREFIX` | Thường là `QRTBL` |
+| `BILL_REF_PREFIX`              | Thường là `QRTBL`                                                  |
 
 **Giải thích xác thực:** SePay gửi header `X-Secret-Key`; BFF so sánh byte-by-byte với `SEPAY_WEBHOOK_SECRET` — **không** dùng HMAC raw body kiểu Stripe (theo phase 3).
 
@@ -141,7 +141,7 @@ Sau khi đã có giá trị từ SePay và tài khoản ngân hàng, cấu hình
 
 SePay gửi webhook **từ internet** tới `webhook_url`. Máy `localhost` **không** nhận trực tiếp trừ khi bạn dùng:
 
-- **Tunnel HTTPS:** ngrok, Cloudflare Tunnel, localtunnel, …  
+- **Tunnel HTTPS:** ngrok, Cloudflare Tunnel, localtunnel, …
 - Hoặc deploy BFF lên **staging có HTTPS**.
 
 **Checklist nhanh:**
@@ -184,27 +184,27 @@ Yêu cầu kèm **access token** OAuth/API (401 nếu sai token). Endpoint này 
 
 ## 11. Checklist tóm tắt (in ra và tick)
 
-| # | Việc cần làm | Đã xong |
-| - | ------------ | ------- |
-| 1 | Có tài khoản SePay + liên kết STK nhận tiền | ☐ |
-| 2 | Webhook URL = `https://<bff>/api/v1/payment/sepay/webhook` | ☐ |
-| 3 | `auth_type = SECRET_KEY`, đặt `secret_key` | ☐ |
-| 4 | Copy `secret_key` → `SEPAY_WEBHOOK_SECRET` | ☐ |
-| 5 | `PAYMENT_SEPAY_QR_ACCOUNT` / `PAYMENT_SEPAY_QR_BANK` khớp VietQR | ☐ |
-| 6 | Cấu hình nhận diện prefix `QRTBL` (Công ty → Cấu hình chung) | ☐ |
-| 7 | BFF public HTTPS (tunnel/staging) cho dev | ☐ |
-| 8 | Test sandbox `transaction/create` hoặc CK thật | ☐ |
+| #   | Việc cần làm                                                     | Đã xong |
+| --- | ---------------------------------------------------------------- | ------- |
+| 1   | Có tài khoản SePay + liên kết STK nhận tiền                      | ☐       |
+| 2   | Webhook URL = `https://<bff>/api/v1/payment/sepay/webhook`       | ☐       |
+| 3   | `auth_type = SECRET_KEY`, đặt `secret_key`                       | ☐       |
+| 4   | Copy `secret_key` → `SEPAY_WEBHOOK_SECRET`                       | ☐       |
+| 5   | `PAYMENT_SEPAY_QR_ACCOUNT` / `PAYMENT_SEPAY_QR_BANK` khớp VietQR | ☐       |
+| 6   | Cấu hình nhận diện prefix `QRTBL` (Công ty → Cấu hình chung)     | ☐       |
+| 7   | BFF public HTTPS (tunnel/staging) cho dev                        | ☐       |
+| 8   | Test sandbox `transaction/create` hoặc CK thật                   | ☐       |
 
 ---
 
 ## 12. Xử lý sự cố thường gặp
 
-| Triệu chứng | Hướng xử lý |
-| ----------- | ----------- |
-| Webhook không tới BFF | Kiểm tra URL SePay, tunnel còn sống, path đúng `/api/v1/payment/sepay/webhook`. |
-| 401 Unauthorized | Sai `X-Secret-Key` hoặc env `SEPAY_WEBHOOK_SECRET` lệch ký tự / khoảng trắng. |
+| Triệu chứng                      | Hướng xử lý                                                                                           |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Webhook không tới BFF            | Kiểm tra URL SePay, tunnel còn sống, path đúng `/api/v1/payment/sepay/webhook`.                       |
+| 401 Unauthorized                 | Sai `X-Secret-Key` hoặc env `SEPAY_WEBHOOK_SECRET` lệch ký tự / khoảng trắng.                         |
 | Có webhook nhưng không khớp bill | `content` không chứa `QRTBL...`; hoặc số tiền `< rounded_total`; hoặc `transferType` không phải `in`. |
-| `code` luôn `null` | Kiểm tra lại cấu hình nhận diện mã tại SePay; vẫn có thể khớp qua regex `content` nếu nội dung đủ. |
+| `code` luôn `null`               | Kiểm tra lại cấu hình nhận diện mã tại SePay; vẫn có thể khớp qua regex `content` nếu nội dung đủ.    |
 
 ---
 
@@ -218,4 +218,4 @@ Yêu cầu kèm **access token** OAuth/API (401 nếu sai token). Endpoint này 
 
 ---
 
-*Nếu dashboard SePay thay đổi tên menu, hãy đối chiếu lại mục “Webhook / Bank Hub” và “Công ty → Cấu hình chung” trên tài liệu chính thức mới nhất tại [developer.sepay.vn](https://developer.sepay.vn).*
+_Nếu dashboard SePay thay đổi tên menu, hãy đối chiếu lại mục “Webhook / Bank Hub” và “Công ty → Cấu hình chung” trên tài liệu chính thức mới nhất tại [developer.sepay.vn](https://developer.sepay.vn)._

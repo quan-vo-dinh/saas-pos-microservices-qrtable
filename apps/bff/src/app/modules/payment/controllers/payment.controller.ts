@@ -59,7 +59,8 @@ export class PaymentController {
 
   private paymentTcpTimeoutMs(): number {
     const configured =
-      this.configService.get<number | string>('BFF_PAYMENT_TCP_TIMEOUT_MS') ?? process.env['BFF_PAYMENT_TCP_TIMEOUT_MS'];
+      this.configService.get<number | string>('BFF_PAYMENT_TCP_TIMEOUT_MS') ??
+      process.env['BFF_PAYMENT_TCP_TIMEOUT_MS'];
     const parsed = Number(configured ?? 5000);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 5000;
   }
@@ -69,9 +70,10 @@ export class PaymentController {
     request: RequestType<TRequest>,
   ): Promise<ResponseType<TResponse>> {
     return firstValueFrom(
-      this.paymentClient
-        .send<TResponse, TRequest>(pattern, request)
-        .pipe(timeout({ first: this.paymentTcpTimeoutMs() }), map((r) => r)),
+      this.paymentClient.send<TResponse, TRequest>(pattern, request).pipe(
+        timeout({ first: this.paymentTcpTimeoutMs() }),
+        map((r) => r),
+      ),
     );
   }
 

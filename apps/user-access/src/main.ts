@@ -29,7 +29,7 @@ async function bootstrap() {
   });
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
-  const port = process.env.USER_ACCESS_PORT || 3003;
+  const port = process.env.USER_ACCESS_PORT || 3303;
 
   await app.startAllMicroservices();
   await app.listen(port);

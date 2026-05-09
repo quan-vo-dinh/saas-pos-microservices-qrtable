@@ -2066,7 +2066,7 @@ pnpm dev:bff-order
 Kỳ vọng:
 
 - BFF on `http://localhost:3300/api/v1`
-- Catalog on `http://localhost:3005/api/v1`
+- Catalog on `http://localhost:3305/api/v1`
 - Order on `http://localhost:3301/api/v1`
 - Catalog TCP on `3205`
 - Order TCP on `3201`

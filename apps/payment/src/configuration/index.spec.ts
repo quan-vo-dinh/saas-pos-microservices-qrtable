@@ -34,7 +34,7 @@ describe('Payment configuration', () => {
 
     const { CONFIGURATION } = await import('./index');
 
-    expect(CONFIGURATION.APP_CONFIG.PORT).toBe(3304);
+    expect(CONFIGURATION.APP_CONFIG.PORT).toBe(3308);
   });
 
   it('does not fallback to demo SePay QR account and bank when env is missing', async () => {

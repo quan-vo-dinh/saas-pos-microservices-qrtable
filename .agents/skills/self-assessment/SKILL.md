@@ -7,93 +7,93 @@ invocation: manual
 
 profiles:
   - name: junior
-    label: "Beginner"
+    label: 'Beginner'
     min_score: 0
     max_score: 6
   - name: intermediate
-    label: "Intermediate"
+    label: 'Intermediate'
     min_score: 7
     max_score: 13
   - name: advanced
-    label: "Advanced"
+    label: 'Advanced'
     min_score: 14
     max_score: 20
 
 topics:
   - id: 01
-    name: "Quick Start"
-    guide_section: "guide/ultimate-guide.md#part-1-quick-start"
-    importance: "critical"
+    name: 'Quick Start'
+    guide_section: 'guide/ultimate-guide.md#part-1-quick-start'
+    importance: 'critical'
     depends_on: []
-    
+
   - id: 02
-    name: "Core Concepts"
-    guide_section: "guide/ultimate-guide.md#part-2-core-concepts"
-    importance: "critical"
+    name: 'Core Concepts'
+    guide_section: 'guide/ultimate-guide.md#part-2-core-concepts'
+    importance: 'critical'
     depends_on: [01]
-    
+
   - id: 03
-    name: "Memory & Settings"
-    guide_section: "guide/ultimate-guide.md#part-3-memory--settings"
-    importance: "high"
+    name: 'Memory & Settings'
+    guide_section: 'guide/ultimate-guide.md#part-3-memory--settings'
+    importance: 'high'
     depends_on: [02]
-    
+
   - id: 04
-    name: "Agents"
-    guide_section: "guide/ultimate-guide.md#part-4-agents"
-    importance: "high"
+    name: 'Agents'
+    guide_section: 'guide/ultimate-guide.md#part-4-agents'
+    importance: 'high'
     depends_on: [02, 03]
-    
+
   - id: 05
-    name: "Skills"
-    guide_section: "guide/ultimate-guide.md#part-5-skills"
-    importance: "high"
+    name: 'Skills'
+    guide_section: 'guide/ultimate-guide.md#part-5-skills'
+    importance: 'high'
     depends_on: [02, 03]
-    
+
   - id: 06
-    name: "Commands"
-    guide_section: "guide/ultimate-guide.md#part-6-commands"
-    importance: "medium"
+    name: 'Commands'
+    guide_section: 'guide/ultimate-guide.md#part-6-commands'
+    importance: 'medium'
     depends_on: [02]
-    
+
   - id: 07
-    name: "Hooks"
-    guide_section: "guide/ultimate-guide.md#part-7-hooks"
-    importance: "medium"
+    name: 'Hooks'
+    guide_section: 'guide/ultimate-guide.md#part-7-hooks'
+    importance: 'medium'
     depends_on: [02, 03]
-    
+
   - id: 08
-    name: "MCP Servers"
-    guide_section: "guide/ultimate-guide.md#part-8-mcp-servers"
-    importance: "medium"
+    name: 'MCP Servers'
+    guide_section: 'guide/ultimate-guide.md#part-8-mcp-servers'
+    importance: 'medium'
     depends_on: [02]
-    
+
   - id: 09
-    name: "Advanced Patterns"
-    guide_section: "guide/ultimate-guide.md#part-9-advanced-patterns"
-    importance: "low"
+    name: 'Advanced Patterns'
+    guide_section: 'guide/ultimate-guide.md#part-9-advanced-patterns'
+    importance: 'low'
     depends_on: [04, 05, 06, 07, 08]
-    
+
   - id: 10
-    name: "Security & Production"
-    guide_section: "guide/security/"
-    importance: "critical"
+    name: 'Security & Production'
+    guide_section: 'guide/security/'
+    importance: 'critical'
     depends_on: [02, 03]
 
 modes:
   - id: quick
-    name: "Quick Assessment"
-    duration: "5 minutes"
+    name: 'Quick Assessment'
+    duration: '5 minutes'
     questions_per_topic: 1
     total_questions: 10
-    description: "Rapid assessment across core topics. Get a skill level + identify 2-3 immediate gaps."
-    
+    description: 'Rapid assessment across core topics. Get a skill level + identify 2-3 immediate gaps.'
+
   - id: comprehensive
-    name: "Comprehensive Assessment"
-    duration: "20 minutes"
+    name: 'Comprehensive Assessment'
+    duration: '20 minutes'
     questions_per_topic: 2
     total_questions: 20
-    description: "Deep dive into each topic. Get per-topic scores + detailed learning path + practice projects."
+    description: 'Deep dive into each topic. Get per-topic scores + detailed learning path + practice projects.'
 ---
 
 # Claude Code Self-Assessment
@@ -109,11 +109,13 @@ This interactive assessment identifies your current expertise level and generate
 ### Step 1: Choose Your Mode
 
 **Quick Mode** (5 min)
+
 - 10 questions across 10 topics
 - Best for: Quick skill check, understanding your general level
 - Output: Overall profile (Beginner/Intermediate/Advanced) + top 2-3 gaps
 
 **Comprehensive Mode** (20 min)
+
 - 20 questions (2 per topic)
 - Best for: Detailed mastery assessment, planning team training
 - Output: Per-topic scores + detailed learning path + 3 practice projects
@@ -121,12 +123,14 @@ This interactive assessment identifies your current expertise level and generate
 ### Step 2: Answer Questions
 
 Questions cover:
+
 - Practical usage (how to do things)
 - Decision-making (when to use what)
 - Architecture patterns (why things work)
 - Production best practices (security, performance, scaling)
 
 Each question has:
+
 - 4 options (A-D)
 - Immediate feedback on correct answer
 - Link to relevant guide section
@@ -134,6 +138,7 @@ Each question has:
 ### Step 3: Get Your Profile
 
 **Quick Mode Output:**
+
 ```
 ╔═══════════════════════════════════════════════╗
 ║ Your Profile: Intermediate Developer          ║
@@ -151,6 +156,7 @@ Each question has:
 ```
 
 **Comprehensive Mode Output:**
+
 ```
 ╔═══════════════════════════════════════════════════════════════╗
 ║ Detailed Mastery Profile                                      ║
@@ -176,12 +182,14 @@ Each question has:
 Based on your scores, you get:
 
 **Prioritized learning sequence** (respects dependencies):
+
 1. Topics ordered by weakness + importance
 2. Prerequisites shown (you can't skip foundations)
 3. Time estimates for each topic (sums only what you need)
 4. Templates and examples linked to each topic
 
 **Example path for Intermediate developer:**
+
 ```
 Phase 1: Hooks Fundamentals (2 hours)
   → Read: guide/ultimate-guide.md#part-7-hooks
@@ -201,6 +209,7 @@ Phase 3: Advanced Patterns (4 hours)
 
 **3 Practice Projects**
 Based on your profile, you get targeted exercises:
+
 - Project 1: Combine 2-3 topics you're weak in
 - Project 2: Real-world workflow integration
 - Project 3: Team/production scenario
@@ -210,16 +219,19 @@ Based on your profile, you get targeted exercises:
 ## Getting Started
 
 ### Quick Assessment
+
 ```
 /self-assessment quick
 ```
 
 ### Full Assessment
+
 ```
 /self-assessment comprehensive
 ```
 
 ### Options
+
 ```
 /self-assessment quick --verbose      # Show explanations
 /self-assessment comprehensive --save  # Save results to file
@@ -232,16 +244,19 @@ Based on your profile, you get targeted exercises:
 This assessment is designed to identify:
 
 ### Fundamental Gaps
+
 - Core interaction loops you haven't tried
 - Essential features you've overlooked
 - Mental model misconceptions
 
 ### Decision-Making Blind Spots
+
 - When to use agents vs skills vs commands
 - Which hook event to use for which problem
 - MCP server selection for your needs
 
 ### Production Readiness
+
 - Security best practices
 - Performance optimization patterns
 - Scaling multi-agent systems
@@ -252,12 +267,14 @@ This assessment is designed to identify:
 ## After Your Assessment
 
 ### Immediate Actions
+
 1. **See your profile** — Understand your current mastery level
 2. **Identify gaps** — Know exactly what to learn next
 3. **Get a learning path** — Personalized, dependency-aware sequence
 4. **Practice** — 3 targeted projects matching your level
 
 ### Recommended Follow-up Skills
+
 - `/lesson-quiz [topic]` — Quiz yourself on specific topics
 - `/audit-agents-skills` — Audit your own config quality
 - `/claude-md` — Manage your CLAUDE.md configuration
@@ -265,6 +282,7 @@ This assessment is designed to identify:
 ### Integration with Learning Path
 
 After assessment, the `/lesson-quiz` skill provides per-module verification:
+
 - Answer 5 questions per module
 - Get instant feedback on weak areas
 - Unlock next module when ready
@@ -274,12 +292,14 @@ After assessment, the `/lesson-quiz` skill provides per-module verification:
 ## Scoring & Profiles
 
 ### Junior Developer (0-6 points)
+
 - Just installed Claude Code
 - Know basic commands and workflows
 - Haven't touched memory/agents/hooks yet
 - **Next step:** Core Concepts + Memory module
 
 ### Intermediate Developer (7-13 points)
+
 - Using Claude Code daily
 - Comfortable with CLAUDE.md and basic agents
 - Exploring skills and commands
@@ -287,6 +307,7 @@ After assessment, the `/lesson-quiz` skill provides per-module verification:
 - **Next step:** Deep MCP + Advanced Patterns
 
 ### Advanced Developer (14-20 points)
+
 - Master multi-agent orchestration
 - Production-grade security and scaling
 - Custom skills and complex hooks

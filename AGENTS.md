@@ -58,13 +58,17 @@ Keycloak (OAuth2/OIDC) → JWT in Authorization header → BFF UserGuard → gRP
 
 ## Service Ports Quick Reference
 
-- BFF: HTTP 3000
-- Authorizer: HTTP 3004, TCP 3104, gRPC 5100
-- User-Access: HTTP 3003, TCP 3103, gRPC 5200
-- Product: HTTP 3302, TCP 3202
-- Invoice: HTTP 3301, TCP 3201
-- Catalog: HTTP 3005, TCP 3205
-- SaaS: HTTP 3006, TCP 3206
+HTTP defaults use contiguous **3300–3308** (see repo `.env.example`). Nest TCP transport uses **3201–3208** (`libs/configuration/tcp.config.ts`). gRPC ports are unchanged.
+
+- BFF: HTTP **3300** (`PORT`)
+- Order: HTTP **3301**, TCP **3201**
+- Product: HTTP **3302**, TCP **3202**
+- User-Access: HTTP **3303**, TCP **3203**, gRPC **5200**
+- Authorizer: HTTP **3304**, TCP **3204**, gRPC **5100**
+- Catalog: HTTP **3305**, TCP **3205**
+- SaaS: HTTP **3306**, TCP **3206**
+- Kitchen: HTTP **3307**, TCP **3207**
+- Payment: HTTP **3308**, TCP **3208**
 
 ## Development Commands
 

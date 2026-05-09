@@ -21,7 +21,7 @@ async function bootstrap() {
 
   const globalPrefix = AppModule.CONFIGURATION.GLOBAL_PREFIX || 'api';
   app.setGlobalPrefix(globalPrefix);
-  const port = process.env.SAAS_PORT || 3006;
+  const port = process.env.SAAS_PORT || 3306;
 
   await app.startAllMicroservices();
   await app.listen(port);

@@ -9,14 +9,14 @@
 
 ## 0. Biên Bản Quyết Định
 
-| Câu hỏi | Quyết định | Nội dung chốt |
-| ------- | ---------- | ------------- |
-| Q1 | Phương án A | Nếu khách chuyển thiếu tiền qua VietQR, giữ payment `PENDING`, ghi audit `SEPAY_WEBHOOK_UNDERPAID`, trả webhook HTTP 200 và để staff xử lý thủ công. |
-| Q2 | Phương án A | Nếu khách chuyển dư tiền qua VietQR, chấp nhận `PAID`, lưu `paidAmount = transferAmount`, không tự tạo refund cho phần chênh. |
-| Q3 | Phương án A | Phase 3 chỉ hỗ trợ **full refund**, tối đa một refund active/confirmed cho mỗi payment. |
-| Q4 | Phương án A | WAITER được quyền `payment.create` để tạo QR VietQR trên POS. |
-| Q5 | Phương án A | Webhook không khớp bill/payment chỉ ghi application log và trả HTTP 200; không persist vào `audit_payments`. |
-| Q6 | Phương án A | `billReference = "QRTBL" + first 8 chars of billId`, nếu đụng unique thì regenerate bằng suffix đơn giản. |
+| Câu hỏi | Quyết định  | Nội dung chốt                                                                                                                                        |
+| ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1      | Phương án A | Nếu khách chuyển thiếu tiền qua VietQR, giữ payment `PENDING`, ghi audit `SEPAY_WEBHOOK_UNDERPAID`, trả webhook HTTP 200 và để staff xử lý thủ công. |
+| Q2      | Phương án A | Nếu khách chuyển dư tiền qua VietQR, chấp nhận `PAID`, lưu `paidAmount = transferAmount`, không tự tạo refund cho phần chênh.                        |
+| Q3      | Phương án A | Phase 3 chỉ hỗ trợ **full refund**, tối đa một refund active/confirmed cho mỗi payment.                                                              |
+| Q4      | Phương án A | WAITER được quyền `payment.create` để tạo QR VietQR trên POS.                                                                                        |
+| Q5      | Phương án A | Webhook không khớp bill/payment chỉ ghi application log và trả HTTP 200; không persist vào `audit_payments`.                                         |
+| Q6      | Phương án A | `billReference = "QRTBL" + first 8 chars of billId`, nếu đụng unique thì regenerate bằng suffix đơn giản.                                            |
 
 ### 0.1 Tài Liệu Này Override Điểm Nào?
 
@@ -99,25 +99,25 @@ Content-Type: application/json
 
 ### 3.1 Ownership
 
-| Domain object | Owner | Storage | Ghi chú |
-| ------------- | ----- | ------- | ------- |
-| Bill | Order Service | `qrtable_order.bills` | Payment Service chỉ nhận `billId`, không sở hữu lifecycle bill. |
-| Payment | Payment Service | `qrtable_payment.payments` | Source of truth cho method, paid amount, SePay transaction. |
-| Refund | Payment Service | `qrtable_payment.refunds` | Manual full refund, audit bắt buộc. |
-| Payment audit | Payment Service | `qrtable_payment.audit_payments` | Truy vết payment/refund. |
-| Table status | Catalog Service | `qrtable_catalog.tables` | Được cập nhật sau `payment.completed` qua consumer/BFF pattern đã có. |
-| User/permission | User-Access + Authorizer | MongoDB + Keycloak | BFF enforce permission với staff routes. |
+| Domain object   | Owner                    | Storage                          | Ghi chú                                                               |
+| --------------- | ------------------------ | -------------------------------- | --------------------------------------------------------------------- |
+| Bill            | Order Service            | `qrtable_order.bills`            | Payment Service chỉ nhận `billId`, không sở hữu lifecycle bill.       |
+| Payment         | Payment Service          | `qrtable_payment.payments`       | Source of truth cho method, paid amount, SePay transaction.           |
+| Refund          | Payment Service          | `qrtable_payment.refunds`        | Manual full refund, audit bắt buộc.                                   |
+| Payment audit   | Payment Service          | `qrtable_payment.audit_payments` | Truy vết payment/refund.                                              |
+| Table status    | Catalog Service          | `qrtable_catalog.tables`         | Được cập nhật sau `payment.completed` qua consumer/BFF pattern đã có. |
+| User/permission | User-Access + Authorizer | MongoDB + Keycloak               | BFF enforce permission với staff routes.                              |
 
 ### 3.2 Communication
 
-| Flow | Protocol | Lý do |
-| ---- | -------- | ----- |
-| Client -> BFF payment endpoints | HTTP REST | BFF là API gateway duy nhất. |
-| BFF -> Payment Service | TCP | Theo pattern service hiện tại. |
-| Payment Service -> Order Service query bill | TCP | Payment cần snapshot bill để tạo payment/QR. |
-| Payment Service -> Kafka | Kafka via local outbox | Domain events `payment.completed`, `payment.refunded`. |
-| SePay -> BFF webhook | HTTP POST | External callback. |
-| BFF -> clients realtime | WebSocket bridge / BFF Direct | UI status update, không thay source of truth. |
+| Flow                                        | Protocol                      | Lý do                                                  |
+| ------------------------------------------- | ----------------------------- | ------------------------------------------------------ |
+| Client -> BFF payment endpoints             | HTTP REST                     | BFF là API gateway duy nhất.                           |
+| BFF -> Payment Service                      | TCP                           | Theo pattern service hiện tại.                         |
+| Payment Service -> Order Service query bill | TCP                           | Payment cần snapshot bill để tạo payment/QR.           |
+| Payment Service -> Kafka                    | Kafka via local outbox        | Domain events `payment.completed`, `payment.refunded`. |
+| SePay -> BFF webhook                        | HTTP POST                     | External callback.                                     |
+| BFF -> clients realtime                     | WebSocket bridge / BFF Direct | UI status update, không thay source of truth.          |
 
 ---
 
@@ -237,19 +237,19 @@ CREATE INDEX idx_payments_tenant_status_created
 
 Field semantics:
 
-| Field | Ý nghĩa |
-| ----- | ------- |
-| `tenant_id` | Tenant scope bắt buộc. |
-| `bill_id` | Bill thuộc Order Service. |
-| `bill_reference` | Mã đưa vào nội dung VietQR, format `QRTBL` + 8 chars. |
-| `method` | `CASH` hoặc `VIETQR`; có thể null khi payment mới pending. |
-| `raw_total` | Tổng gốc từ bill/order snapshot. |
-| `rounded_total` | Số tiền phải thu sau rounding. |
-| `rounding_delta` | `rounded_total - raw_total`. |
-| `paid_amount` | Số tiền thực thu; VietQR overpaid lưu số tiền chuyển thực tế. |
-| `amount_received` | Tiền mặt khách đưa, chỉ dùng cho `CASH`. |
-| `change_amount` | Tiền thừa, chỉ dùng cho `CASH`. |
-| `sepay_transaction_id` | `payload.id` từ SePay, dùng chống webhook duplicate. |
+| Field                  | Ý nghĩa                                                       |
+| ---------------------- | ------------------------------------------------------------- |
+| `tenant_id`            | Tenant scope bắt buộc.                                        |
+| `bill_id`              | Bill thuộc Order Service.                                     |
+| `bill_reference`       | Mã đưa vào nội dung VietQR, format `QRTBL` + 8 chars.         |
+| `method`               | `CASH` hoặc `VIETQR`; có thể null khi payment mới pending.    |
+| `raw_total`            | Tổng gốc từ bill/order snapshot.                              |
+| `rounded_total`        | Số tiền phải thu sau rounding.                                |
+| `rounding_delta`       | `rounded_total - raw_total`.                                  |
+| `paid_amount`          | Số tiền thực thu; VietQR overpaid lưu số tiền chuyển thực tế. |
+| `amount_received`      | Tiền mặt khách đưa, chỉ dùng cho `CASH`.                      |
+| `change_amount`        | Tiền thừa, chỉ dùng cho `CASH`.                               |
+| `sepay_transaction_id` | `payload.id` từ SePay, dùng chống webhook duplicate.          |
 
 ### 5.2 Bảng `refunds`
 
@@ -380,14 +380,14 @@ CREATE INDEX idx_payment_outbox_status_created
 
 ### 6.1 BFF HTTP Endpoints
 
-| Endpoint | Actor | Guard/Permission | Mục đích |
-| -------- | ----- | ---------------- | -------- |
-| `POST /api/v1/payment/vietqr/create-qr` | OWNER/MANAGER/WAITER | `UserGuard -> TenantGuard -> PermissionGuard`, `payment.create` | Tạo/reuse payment pending và trả QR URL. |
-| `POST /api/v1/payment/cash/confirm` | OWNER/MANAGER/WAITER | `payment.confirm_cash` | Xác nhận thu tiền mặt. |
-| `POST /api/v1/payment/sepay/webhook` | SePay | Public endpoint + `X-Secret-Key` | Nhận webhook SePay. Không dùng JWT guards. |
-| `POST /api/v1/payment/refund/request` | OWNER/MANAGER | `payment.refund` | Tạo yêu cầu full refund. |
-| `POST /api/v1/payment/refund/confirm` | OWNER/MANAGER | `payment.refund` | Xác nhận đã hoàn tiền tay. |
-| `GET /api/v1/payment/history` | OWNER/MANAGER/WAITER | `payment.get_history` | Xem lịch sử payment theo tenant/bill/table. |
+| Endpoint                                | Actor                | Guard/Permission                                                | Mục đích                                    |
+| --------------------------------------- | -------------------- | --------------------------------------------------------------- | ------------------------------------------- |
+| `POST /api/v1/payment/vietqr/create-qr` | OWNER/MANAGER/WAITER | `UserGuard -> TenantGuard -> PermissionGuard`, `payment.create` | Tạo/reuse payment pending và trả QR URL.    |
+| `POST /api/v1/payment/cash/confirm`     | OWNER/MANAGER/WAITER | `payment.confirm_cash`                                          | Xác nhận thu tiền mặt.                      |
+| `POST /api/v1/payment/sepay/webhook`    | SePay                | Public endpoint + `X-Secret-Key`                                | Nhận webhook SePay. Không dùng JWT guards.  |
+| `POST /api/v1/payment/refund/request`   | OWNER/MANAGER        | `payment.refund`                                                | Tạo yêu cầu full refund.                    |
+| `POST /api/v1/payment/refund/confirm`   | OWNER/MANAGER        | `payment.refund`                                                | Xác nhận đã hoàn tiền tay.                  |
+| `GET /api/v1/payment/history`           | OWNER/MANAGER/WAITER | `payment.get_history`                                           | Xem lịch sử payment theo tenant/bill/table. |
 
 ### 6.2 Request/Response: Create VietQR
 
@@ -800,13 +800,13 @@ UserGuard -> TenantGuard -> PermissionGuard
 
 Permissions:
 
-| Action | Permission | Roles |
-| ------ | ---------- | ----- |
-| Create VietQR QR | `payment.create` | SUPER_ADMIN, OWNER, MANAGER, WAITER |
-| Confirm cash | `payment.confirm_cash` | SUPER_ADMIN, OWNER, MANAGER, WAITER |
-| Request refund | `payment.refund` | SUPER_ADMIN, OWNER, MANAGER |
-| Confirm manual refund | `payment.refund` | SUPER_ADMIN, OWNER, MANAGER |
-| View payment history | `payment.get_history` | SUPER_ADMIN, OWNER, MANAGER, WAITER |
+| Action                | Permission             | Roles                               |
+| --------------------- | ---------------------- | ----------------------------------- |
+| Create VietQR QR      | `payment.create`       | SUPER_ADMIN, OWNER, MANAGER, WAITER |
+| Confirm cash          | `payment.confirm_cash` | SUPER_ADMIN, OWNER, MANAGER, WAITER |
+| Request refund        | `payment.refund`       | SUPER_ADMIN, OWNER, MANAGER         |
+| Confirm manual refund | `payment.refund`       | SUPER_ADMIN, OWNER, MANAGER         |
+| View payment history  | `payment.get_history`  | SUPER_ADMIN, OWNER, MANAGER, WAITER |
 
 Required doc/code update:
 
@@ -832,17 +832,17 @@ Rules:
 
 ## 10. Error and Status Policy
 
-| Case | HTTP | Payment state | Audit/log | UI impact |
-| ---- | ---- | ------------- | --------- | --------- |
-| Invalid webhook secret | 401 | unchanged | security log | none |
-| Webhook no bill reference | 200 | unchanged | application log only | none |
-| Webhook non-`in` transfer | 200 | unchanged | application log only | none |
-| Webhook matched but underpaid | 200 | `PENDING` | `SEPAY_WEBHOOK_UNDERPAID` | POS shows pending/underpaid note after status refresh. |
-| Webhook duplicate same transaction id | 200 | unchanged | `SEPAY_WEBHOOK_DUPLICATE` if matched | no-op |
-| Webhook after cash paid | 200 | unchanged | `SEPAY_WEBHOOK_AFTER_PAID` | staff handles bank transfer manually if needed. |
-| Cash confirm after VietQR paid | 409 | unchanged | application log | POS shows bill already paid. |
-| Refund request for non-paid payment | 409 | unchanged | application log | Dashboard shows invalid state. |
-| Refund confirm before request | 409 | unchanged | application log | Dashboard shows invalid state. |
+| Case                                  | HTTP | Payment state | Audit/log                            | UI impact                                              |
+| ------------------------------------- | ---- | ------------- | ------------------------------------ | ------------------------------------------------------ |
+| Invalid webhook secret                | 401  | unchanged     | security log                         | none                                                   |
+| Webhook no bill reference             | 200  | unchanged     | application log only                 | none                                                   |
+| Webhook non-`in` transfer             | 200  | unchanged     | application log only                 | none                                                   |
+| Webhook matched but underpaid         | 200  | `PENDING`     | `SEPAY_WEBHOOK_UNDERPAID`            | POS shows pending/underpaid note after status refresh. |
+| Webhook duplicate same transaction id | 200  | unchanged     | `SEPAY_WEBHOOK_DUPLICATE` if matched | no-op                                                  |
+| Webhook after cash paid               | 200  | unchanged     | `SEPAY_WEBHOOK_AFTER_PAID`           | staff handles bank transfer manually if needed.        |
+| Cash confirm after VietQR paid        | 409  | unchanged     | application log                      | POS shows bill already paid.                           |
+| Refund request for non-paid payment   | 409  | unchanged     | application log                      | Dashboard shows invalid state.                         |
+| Refund confirm before request         | 409  | unchanged     | application log                      | Dashboard shows invalid state.                         |
 
 ---
 
@@ -966,4 +966,3 @@ Implementation plan sau tài liệu này nên tạo các nhóm việc:
 8. Add outbox publisher in Payment Service.
 9. Update permission matrix/code seed for WAITER `payment.create`.
 10. Add POS/Dashboard/PWA integration.
-

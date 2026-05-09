@@ -453,13 +453,13 @@ Pragmatic recommendation:
 
 ## 7. Security and Authorization Findings
 
-| Finding | Severity | Recommendation |
-| ------- | -------- | -------------- |
-| Webhook must bypass normal JWT guards but verify `X-Secret-Key`. | High | Public endpoint with secret-header auth only. Resolve tenant via payment record. |
-| Permission Matrix grants `payment.create` to OWNER/MANAGER, not WAITER. POS waiter likely needs to create VietQR QR. | Medium | Either grant `PAYMENT_CREATE` to WAITER or create a narrower `PAYMENT_CREATE_VIETQR` permission. Simpler: grant WAITER `payment.create` for Phase 3. |
-| Phase 3 mentions `PAYMENT_REFUND_CONFIRM`, but matrix only has `PAYMENT_REFUND`. | Low | Reuse `PAYMENT_REFUND` for both request and confirm. Avoid a new permission unless UX requires separate roles. |
-| Current shared `PaymentMethod` still says Phase 3 will add card/MoMo/ZaloPay/bank transfer. | Low | For SePay scope, extend with `VIETQR` only. |
-| `phase-3-payment.md` has a Markdown typo around `X-Secret-Key` formatting. | Low | Fix before final spec. |
+| Finding                                                                                                              | Severity | Recommendation                                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Webhook must bypass normal JWT guards but verify `X-Secret-Key`.                                                     | High     | Public endpoint with secret-header auth only. Resolve tenant via payment record.                                                                     |
+| Permission Matrix grants `payment.create` to OWNER/MANAGER, not WAITER. POS waiter likely needs to create VietQR QR. | Medium   | Either grant `PAYMENT_CREATE` to WAITER or create a narrower `PAYMENT_CREATE_VIETQR` permission. Simpler: grant WAITER `payment.create` for Phase 3. |
+| Phase 3 mentions `PAYMENT_REFUND_CONFIRM`, but matrix only has `PAYMENT_REFUND`.                                     | Low      | Reuse `PAYMENT_REFUND` for both request and confirm. Avoid a new permission unless UX requires separate roles.                                       |
+| Current shared `PaymentMethod` still says Phase 3 will add card/MoMo/ZaloPay/bank transfer.                          | Low      | For SePay scope, extend with `VIETQR` only.                                                                                                          |
+| `phase-3-payment.md` has a Markdown typo around `X-Secret-Key` formatting.                                           | Low      | Fix before final spec.                                                                                                                               |
 
 ## 8. Open Questions for Approval
 
@@ -499,4 +499,3 @@ If you want the simplest production-real demo path, I recommend:
 - Q4: A — WAITER can create VietQR QR.
 - Q5: A — unmatched webhook is application log only.
 - Q6: B — random/base32 reference, not UUID slice.
-

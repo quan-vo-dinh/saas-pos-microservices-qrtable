@@ -453,13 +453,13 @@ Khuyến nghị thực dụng:
 
 ## 7. Phát hiện bảo mật và phân quyền
 
-| Phát hiện | Mức độ | Khuyến nghị |
-| ------- | -------- | -------------- |
-| Webhook phải bypass JWT guards thông thường nhưng verify `X-Secret-Key`. | High | Dùng public endpoint với secret-header auth. Resolve tenant qua payment record. |
+| Phát hiện                                                                                                               | Mức độ | Khuyến nghị                                                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Webhook phải bypass JWT guards thông thường nhưng verify `X-Secret-Key`.                                                | High   | Dùng public endpoint với secret-header auth. Resolve tenant qua payment record.                                                                |
 | Permission Matrix cấp `payment.create` cho OWNER/MANAGER, không có WAITER. POS waiter nhiều khả năng cần tạo QR VietQR. | Medium | Hoặc cấp `PAYMENT_CREATE` cho WAITER, hoặc thêm quyền hẹp hơn `PAYMENT_CREATE_VIETQR`. Đơn giản nhất cho Phase 3: cấp WAITER `payment.create`. |
-| Phase 3 nhắc `PAYMENT_REFUND_CONFIRM`, nhưng matrix chỉ có `PAYMENT_REFUND`. | Low | Dùng lại `PAYMENT_REFUND` cho cả request và confirm. Tránh thêm permission mới nếu UX chưa cần tách role. |
-| Shared `PaymentMethod` hiện vẫn ghi chú sẽ thêm card/MoMo/ZaloPay/bank transfer ở Phase 3. | Low | Trong scope SePay hiện tại, chỉ cần thêm `VIETQR`. |
-| `phase-3-payment.md` có lỗi Markdown quanh định dạng `X-Secret-Key`. | Low | Sửa trước khi chốt spec cuối. |
+| Phase 3 nhắc `PAYMENT_REFUND_CONFIRM`, nhưng matrix chỉ có `PAYMENT_REFUND`.                                            | Low    | Dùng lại `PAYMENT_REFUND` cho cả request và confirm. Tránh thêm permission mới nếu UX chưa cần tách role.                                      |
+| Shared `PaymentMethod` hiện vẫn ghi chú sẽ thêm card/MoMo/ZaloPay/bank transfer ở Phase 3.                              | Low    | Trong scope SePay hiện tại, chỉ cần thêm `VIETQR`.                                                                                             |
+| `phase-3-payment.md` có lỗi Markdown quanh định dạng `X-Secret-Key`.                                                    | Low    | Sửa trước khi chốt spec cuối.                                                                                                                  |
 
 ## 8. Câu hỏi mở cần phê duyệt
 
@@ -499,4 +499,3 @@ Nếu mục tiêu là con đường demo production-real đơn giản nhất, t�
 - Q4: A — WAITER được tạo QR VietQR.
 - Q5: A — unmatched webhook chỉ log ở application layer.
 - Q6: B — bill reference random/base32, không dùng UUID slice.
-

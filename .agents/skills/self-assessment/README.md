@@ -10,6 +10,7 @@ This skill provides two assessment modes:
 - **Comprehensive** (20 min): 20 questions, two per topic, deep mastery analysis
 
 After assessment, get:
+
 - ✓ Your mastery profile (Beginner/Intermediate/Advanced)
 - ✓ Per-topic score breakdown
 - ✓ Identified gaps ranked by importance
@@ -19,18 +20,23 @@ After assessment, get:
 ## Usage
 
 ### Quick Assessment
+
 ```bash
 /self-assessment quick
 ```
+
 Fast evaluation across all topics. Shows overall level + top 2-3 gaps.
 
 ### Comprehensive Assessment
+
 ```bash
 /self-assessment comprehensive
 ```
+
 Deep dive into each topic. Shows detailed per-topic scores + full learning path + practice projects.
 
 ### Options
+
 ```bash
 /self-assessment quick --verbose        # Show detailed explanations
 /self-assessment comprehensive --save   # Save results to assessment-results.json
@@ -50,10 +56,12 @@ Deep dive into each topic. Shows detailed per-topic scores + full learning path 
 ### Scoring
 
 **Quick Mode:**
+
 - 10 points total (1 per topic)
 - Levels: 0-3 (Beginner), 4-7 (Intermediate), 8-10 (Advanced)
 
 **Comprehensive Mode:**
+
 - 20 points total (2 per topic)
 - Levels: 0-6 (Beginner), 7-13 (Intermediate), 14-20 (Advanced)
 
@@ -73,6 +81,7 @@ Deep dive into each topic. Shows detailed per-topic scores + full learning path 
 ## Output Examples
 
 ### Quick Mode Result
+
 ```
 ╔════════════════════════════════════════╗
 ║ Quick Assessment Results               ║
@@ -93,6 +102,7 @@ Deep dive into each topic. Shows detailed per-topic scores + full learning path 
 ```
 
 ### Comprehensive Mode Result
+
 ```
 ╔══════════════════════════════════════════════════════╗
 ║ Comprehensive Mastery Assessment                     ║
@@ -125,17 +135,20 @@ Personalized Learning Path Generated (8-12 hours)
 After comprehensive assessment, receive:
 
 ### Structured Learning Phases
+
 - **Phase 1:** Fill critical gaps first (respects dependencies)
 - **Phase 2:** Build intermediate skills
 - **Phase 3:** Master advanced patterns and production
 - **Bonus:** Deep-dive on specific weak topics
 
 Each phase includes:
+
 - 📖 Reading assignments (links to specific guide sections)
 - 🔨 Hands-on practice (templates from examples/)
 - 📝 Knowledge validation (/lesson-quiz [topic])
 
 ### 3 Practice Projects
+
 Get real-world scenarios matched to your level:
 
 1. **Project 1:** Combine 2-3 topics you're weak in (2-3 hours)
@@ -143,6 +156,7 @@ Get real-world scenarios matched to your level:
 3. **Project 3:** Production setup or team configuration (3 hours)
 
 Each project includes:
+
 - Clear success criteria
 - Step-by-step instructions
 - Expected outcomes
@@ -176,18 +190,21 @@ This skill works with `/lesson-quiz` for deeper learning:
 ## Scoring Distribution
 
 ### Quick Mode (10 questions, 1 per topic)
+
 - Perfect score: 10/10 (100%) — Master level
 - Advanced: 8-10/10 (80-100%)
 - Intermediate: 4-7/10 (40-70%)
 - Beginner: 0-3/10 (0-30%)
 
 ### Comprehensive Mode (20 questions, 2 per topic)
+
 - Perfect score: 20/20 (100%) — Expert level
 - Advanced: 14-20/20 (70-100%)
 - Intermediate: 7-13/20 (35-65%)
 - Beginner: 0-6/20 (0-30%)
 
 Per-topic mastery:
+
 - 0/2 (0%) — No mastery, focus here first
 - 1/2 (50%) — Basic understanding, needs practice
 - 2/2 (100%) — Proficient, ready for advanced
@@ -195,6 +212,7 @@ Per-topic mastery:
 ## Examples
 
 ### For a New Developer
+
 ```
 Quick assessment → Identifies gaps in Core Concepts + Commands
 → Recommended: Read Part 2 + Part 6 of guide
@@ -203,6 +221,7 @@ Quick assessment → Identifies gaps in Core Concepts + Commands
 ```
 
 ### For an Intermediate Developer
+
 ```
 Comprehensive assessment → Shows 50% on MCP + 0% on Hooks
 → Recommended learning path: Hooks Phase (4h) → MCP Phase (3h)
@@ -211,6 +230,7 @@ Comprehensive assessment → Shows 50% on MCP + 0% on Hooks
 ```
 
 ### For Team Adoption
+
 ```
 All team members take comprehensive assessment
 → Aggregate results show:
@@ -224,6 +244,7 @@ All team members take comprehensive assessment
 ## Future Enhancements
 
 Planned features:
+
 - [ ] Team aggregate reporting (see team gaps at a glance)
 - [ ] Progress tracking (compare to previous assessment)
 - [ ] Difficulty-adjusted questions (harder if you're scoring high)

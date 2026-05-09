@@ -9,7 +9,7 @@ import { IsNumber, ValidateNested } from 'class-validator';
 class KitchenAppConfiguration extends AppConfiguration {
   constructor() {
     super();
-    this.PORT = Number(process.env['KITCHEN_PORT'] || 3303);
+    this.PORT = Number(process.env['KITCHEN_PORT'] || 3307);
   }
 }
 

@@ -350,7 +350,10 @@ export class PaymentService {
           BillPaymentSnapshotTcpResponse,
           BillPaymentSnapshotTcpRequest
         >(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_PAYMENT_SNAPSHOT, req)
-        .pipe(timeout({ first: CONFIGURATION.PAYMENT_INTEGRATION_CONFIG.ORDER_TCP_TIMEOUT_MS }), map((r) => r)),
+        .pipe(
+          timeout({ first: CONFIGURATION.PAYMENT_INTEGRATION_CONFIG.ORDER_TCP_TIMEOUT_MS }),
+          map((r) => r),
+        ),
     );
     if (!wrapped?.data) {
       throw new ConflictException('Unable to load bill snapshot');
@@ -382,7 +385,10 @@ export class PaymentService {
       await firstValueFrom(
         this.orderClient
           .send<BillMarkedPaidTcpResponse, BillMarkPaidTcpRequest>(TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID, req)
-          .pipe(timeout({ first: CONFIGURATION.PAYMENT_INTEGRATION_CONFIG.ORDER_TCP_TIMEOUT_MS }), map((r) => r)),
+          .pipe(
+            timeout({ first: CONFIGURATION.PAYMENT_INTEGRATION_CONFIG.ORDER_TCP_TIMEOUT_MS }),
+            map((r) => r),
+          ),
       );
     } catch (e) {
       this.logger.warn(`BILL_MARK_PAID failed for bill ${params.billId}: ${(e as Error).message}`);

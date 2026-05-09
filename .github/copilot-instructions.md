@@ -23,15 +23,17 @@ You are operating in an integrated environment combining the **Superpower Framew
 
 **Backend** — Event-driven microservices (NestJS hybrid apps: HTTP + TCP/gRPC):
 
-| Service     | HTTP | TCP  | gRPC | DB         | Purpose                                |
-| ----------- | ---- | ---- | ---- | ---------- | -------------------------------------- |
-| BFF         | 3000 | —    | —    | —          | API Gateway, sole frontend entry point |
-| Authorizer  | 3004 | 3104 | 5100 | —          | JWT verification, Keycloak integration |
-| User-Access | 3003 | 3103 | 5200 | MongoDB    | User management                        |
-| Product     | 3302 | 3202 | —    | PostgreSQL | Product CRUD                           |
-| Invoice     | 3301 | 3201 | —    | PostgreSQL | Invoice CRUD                           |
-| Catalog     | 3005 | 3205 | —    | PostgreSQL | Menu catalog                           |
-| SaaS        | 3006 | 3206 | —    | PostgreSQL | Tenant management                      |
+| Service     | HTTP | TCP  | gRPC | DB          | Purpose                                   |
+| ----------- | ---- | ---- | ---- | ----------- | ----------------------------------------- |
+| BFF         | 3300 | —    | —    | Redis/Kafka | API gateway, sole HTTP entry for web apps |
+| Order       | 3301 | 3201 | —    | PostgreSQL  | Orders / bills                            |
+| Product     | 3302 | 3202 | —    | PostgreSQL  | Product CRUD                              |
+| User-Access | 3303 | 3203 | 5200 | MongoDB     | User management                           |
+| Authorizer  | 3304 | 3204 | 5100 | —           | JWT verification, Keycloak integration    |
+| Catalog     | 3305 | 3205 | —    | PostgreSQL  | Menu catalog                              |
+| SaaS        | 3306 | 3206 | —    | PostgreSQL  | Tenant management                         |
+| Kitchen     | 3307 | 3207 | —    | Redis/Kafka | KDS / kitchen                             |
+| Payment     | 3308 | 3208 | —    | PostgreSQL  | Payments / SePay                          |
 
 **Frontend** — Two apps:
 

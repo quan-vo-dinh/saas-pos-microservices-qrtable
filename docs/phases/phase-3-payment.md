@@ -12,12 +12,10 @@
 
 ## Tham Chiếu
 
-
 | Tài liệu                  | Section liên quan                                         |
 | ------------------------- | --------------------------------------------------------- |
 | technical-architecture.md | §6.2.7 Payment Service, §10 Tích hợp thanh toán           |
 | business-logic.md         | §6 Luồng thanh toán & đối soát (Payment & Reconciliation) |
-
 
 ## Tổng Quan
 
@@ -43,14 +41,12 @@ SePay cung cấp endpoint tạo ảnh QR code trực tiếp, không cần SDK:
 https://qr.sepay.vn/img?acc={SO_TAI_KHOAN}&bank={TEN_NGAN_HANG}&amount={SO_TIEN}&des={NOI_DUNG}
 ```
 
-
 | Tham số  | Ví dụ           | Mô tả                                             |
 | -------- | --------------- | ------------------------------------------------- |
 | `acc`    | `9332770502`    | Số tài khoản ngân hàng (bắt buộc)                 |
 | `bank`   | `Vietcombank`   | Tên ngân hàng SePay-compatible (bắt buộc)         |
 | `amount` | `128000`        | Số tiền VND đã làm tròn (tùy chọn, nên truyền)    |
 | `des`    | `QRTBLB1A2C3D4` | Nội dung chuyển khoản có mã tham chiếu (tùy chọn) |
-
 
 **Ví dụ thực tế:**
 
@@ -81,14 +77,12 @@ Khi giao dịch phát sinh, SePay POST tới `BFF_WEBHOOK_URL` đã cấu hình:
 }
 ```
 
-
 | Field            | Ý nghĩa                                                                    |
 | ---------------- | -------------------------------------------------------------------------- |
 | `transferType`   | `"in"` = tiền vào, `"out"` = tiền ra — chỉ xử lý `"in"`                    |
 | `transferAmount` | Số tiền thực tế chuyển (integer, VND)                                      |
 | `code`           | Mã thanh toán SePay tự detect từ `content`. Có thể `null` nếu không detect |
 | `content`        | Nội dung chuyển khoản do khách nhập                                        |
-
 
 **Matching logic** (theo thứ tự ưu tiên):
 
@@ -109,7 +103,7 @@ const isValid = payload.transferType === 'in' && billRef !== null && payload.tra
 
 ### Webhook Authentication (X-Secret-Key)
 
-SePay xác thực webhook bằng `**X-Secret-Key` header** — khác hoàn toàn với Stripe raw-body HMAC. BFF đọc header và so sánh trực tiếp:
+SePay xác thực webhook bằng `**X-Secret-Key` header\*\* — khác hoàn toàn với Stripe raw-body HMAC. BFF đọc header và so sánh trực tiếp:
 
 ```typescript
 // BFF Webhook Controller
