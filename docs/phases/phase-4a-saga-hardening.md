@@ -2,7 +2,7 @@
 
 > **Mục tiêu:** Chuẩn hóa giao dịch đa bước cho xác nhận đơn và hoàn tất thanh toán — có bù trừ (compensation) rõ ràng, giới hạn và idempotency chống double-submit, ràng buộc xóa dữ liệu và audit hủy đơn; đưa transactional outbox đơn giản vào Order/Payment để Kafka không mất sự kiện khi commit DB thành công.
 > **Ước lượng:** ~1 tuần
-> **Trạng thái:** ✅ DONE
+> **Trạng thái:**
 
 ## Prerequisites
 
@@ -98,16 +98,16 @@ Compensation thực hiện theo thứ tự ngược: Step 4 → Step 3 → Step 
 
 ## Acceptance Criteria
 
-- [ ] **Saga compensation (order):** Khi khóa/giữ tồn thất bại → **không** tạo đơn hợp lệ; tồn và trạng thái hệ thống không ở trạng thái "có đơn nhưng không có đủ hàng".
-- [ ] **Billing validation (payment):** Thanh toán **bị chặn** khi còn line-item chưa đạt điều kiện Ready/Served (theo rule §6.B / cấu hình nghiệp vụ đã thống nhất).
-- [ ] **Idempotency:** Gửi trùng cùng idempotency key (double-submit) → **một** đơn/hành động tương ứng, không nhân đôi side-effect.
-- [ ] **Delete constraints:** Không xóa được Category còn MenuItem; không xóa được MenuItem còn OrderItem active — API/DB phản hồi lỗi rõ ràng.
-- [ ] **Audit cancel:** Mọi thao tác hủy đơn có bản ghi audit với **actor, reason, timestamp** đủ để tra cứu sau.
+- **Saga compensation (order):** Khi khóa/giữ tồn thất bại → **không** tạo đơn hợp lệ; tồn và trạng thái hệ thống không ở trạng thái "có đơn nhưng không có đủ hàng".
+- **Billing validation (payment):** Thanh toán **bị chặn** khi còn line-item chưa đạt điều kiện Ready/Served (theo rule §6.B / cấu hình nghiệp vụ đã thống nhất).
+- **Idempotency:** Gửi trùng cùng idempotency key (double-submit) → **một** đơn/hành động tương ứng, không nhân đôi side-effect.
+- **Delete constraints:** Không xóa được Category còn MenuItem; không xóa được MenuItem còn OrderItem active — API/DB phản hồi lỗi rõ ràng.
+- **Audit cancel:** Mọi thao tác hủy đơn có bản ghi audit với **actor, reason, timestamp** đủ để tra cứu sau.
 
 ## Outputs
 
 - Luồng **Order Confirm Saga** và **Payment Complete Saga** được mô tả bằng hành vi có compensation, khớp technical-architecture §12 và business-logic §4.B / §6.B.
-- Policy **`max_orders_per_session`** (mặc định 20, configurable theo tenant) áp dụng nhất quán trên luồng đặt/xác nhận.
+- Policy `**max_orders_per_session`\*\* (mặc định 20, configurable theo tenant) áp dụng nhất quán trên luồng đặt/xác nhận.
 - Idempotency và delete constraints là **bất biến** trong integration/API tests hoặc checklist QA tương đương.
 - Outbox đơn giản trên Order + Payment: event ghi cùng transaction, worker/cron đẩy Kafka và đánh dấu sent.
 - Roadmap ghi rõ: **Debezium / full CDC** — sau luận án.
