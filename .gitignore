@@ -53,6 +53,9 @@ docker/**/docker_data/
 
 vite.config.*.timestamp*
 
+# Local ngrok config (may contain authtoken) — keep example only in git
+tools/ngrok/qrtable-dev-ngrok.yml
+
 # Playwright
 /test-results/
 /playwright-report/

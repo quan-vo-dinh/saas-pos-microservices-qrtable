@@ -68,6 +68,10 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_HEALTH_ENABLED: 'true'
+      # Behind ngrok / Cloudflare Tunnel (TLS terminates at edge): Admin UI + OIDC need forwarded host/proto.
+      # See tools/ngrok/README.md — optional KC_HOSTNAME in shell .env when strict=false is not enough.
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME_STRICT: 'false'
 
     command:
       - start-dev
