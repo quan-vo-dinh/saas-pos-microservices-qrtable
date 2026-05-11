@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { Button } from '@einvoice/frontend-ui';
+import { buttonVariants } from '@einvoice/frontend-ui';
 import { NAV_ITEMS } from '@/constants/nav-items';
+import { ROUTES } from '@/constants/routes';
 import { useSession } from '@/features/session/context/session-provider';
+import { cn } from '@/lib/utils';
 
 export function MobileHeader() {
   const { session } = useSession();
@@ -28,23 +30,23 @@ export function MobileHeader() {
 
         <nav aria-label="Customer flow navigation" className="grid grid-cols-4 gap-2">
           {NAV_ITEMS.map((item) => (
-            <Button
+            <NavLink
               key={item.to}
-              asChild
-              size="sm"
-              variant="ghost"
-              className="h-auto flex-col gap-1.5 py-2 text-[11px]"
+              to={item.to}
+              end={item.to !== ROUTES.ORDER_TRACKING}
+              className={({ isActive }) =>
+                cn(
+                  buttonVariants({ variant: 'ghost', size: 'sm' }),
+                  'h-auto min-h-0 flex-col gap-1.5 border py-2 text-[11px] no-underline',
+                  isActive
+                    ? 'border-primary/40 bg-primary/15 font-semibold text-foreground shadow-sm ring-2 ring-primary/35 [&_svg]:text-primary'
+                    : 'border-border bg-background text-muted-foreground hover:border-border/80 [&_svg]:text-muted-foreground',
+                )
+              }
             >
-              <NavLink
-                to={item.to}
-                className={({ isActive }) =>
-                  isActive ? 'bg-primary/10 text-foreground ring-1 ring-border' : 'text-muted-foreground'
-                }
-              >
-                <item.icon />
-                <span>{item.label}</span>
-              </NavLink>
-            </Button>
+              <item.icon className="size-4 shrink-0" aria-hidden />
+              <span>{item.label}</span>
+            </NavLink>
           ))}
         </nav>
       </div>

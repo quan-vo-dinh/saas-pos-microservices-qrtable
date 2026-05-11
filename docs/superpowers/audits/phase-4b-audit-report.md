@@ -101,7 +101,7 @@ Phase 4B là phase **đặt nền móng SaaS thực sự** — cho đến hiện
 
 | #   | Conflict                                                                                                                                                                                                                                                                                                                             | Mức độ     | Ghi chú                                                             |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------- |
-| C20 | Permission matrix hiện tại có `SAAS_CREATE/GET/UPDATE/DELETE` (5 quyền). Phase 4B cần phân biệt: - `tenant.suspend` (SUPER_ADMIN) — admin hành chính - `tenant.activate` (SUPER_ADMIN) - `tenant.close` (SUPER_ADMIN, irreversible) - `tenant.onboard` (SUPER_ADMIN) — admin-assisted onboarding - `tenant.read_own` (OWNER/MANAGER) | **Cao**    | Gộp `saas.`_ hay tách `tenant._`/`subscription._`/`plan._`? Xem Q3. |
+| C20 | Permission matrix hiện tại có `SAAS_CREATE/GET/UPDATE/DELETE` (5 quyền). Phase 4B cần phân biệt: - `tenant.suspend` (SUPER_ADMIN) — admin hành chính - `tenant.activate` (SUPER_ADMIN) - `tenant.close` (SUPER_ADMIN, irreversible) - `tenant.onboard` (SUPER_ADMIN) — admin-assisted onboarding - `tenant.read_own` (OWNER/MANAGER) | **Cao**    | Gộp `saas.`_ hay tách `tenant.`_/`subscription.`_/`plan._`? Xem Q3. |
 | C21 | OWNER/MANAGER cần xem subscription của tenant mình. Hiện không có permission `subscription.get_own` hay tương tự. Mặc nhiên SUPER_ADMIN-only sẽ chặn UI `/dashboard/subscription`.                                                                                                                                                   | Trung bình | Tách permission theo phạm vi (own vs cross-tenant).                 |
 | C22 | `BFF/admin/tenant/current` controller dùng `PERMISSION.CATALOG_GET_LIST` — semantic mismatch (đọc tenant metadata không phải catalog). Tại sao? Có thể do tránh thêm permission. Phase 4B nên sửa thành `tenant.read_own` hoặc `subscription.get_own`.                                                                               | Nhỏ        | Refactor thuần khi có permission mới.                               |
 | C23 | Self-service registration (nice-to-have) là **public endpoint** — không có user role nào. Phải design như SePay webhook (no `@Permissions`, có rate limit + CAPTCHA + email verification).                                                                                                                                           | Trung bình | Nếu chốt làm self-service, cần thêm guard custom.                   |
@@ -152,7 +152,7 @@ Chuẩn hóa state machine — bám doc nhưng làm chặt edge case:
 - `ACTIVE → SUSPENDED`: trigger bởi (a) cron hết hạn subscription, (b) admin manual, (c) policy violation (tương lai).
 - `SUSPENDED → ACTIVE`: trigger bởi (a) renew subscription, (b) admin manual unblock.
 - `* → CLOSED`: chỉ admin, **irreversible**, không thể activate lại. Tài nguyên Keycloak (user OWNER) bị disable, dữ liệu giữ lại 90 ngày (policy tùy chọn — Q12) rồi mới hard-delete.
-- `CLOSED → `\*: không có transition.
+- `CLOSED →` : không có transition.
 
 **Side-effects mỗi transition:**
 
@@ -297,8 +297,8 @@ HTTP 402 Payment Required
 
 1. **Cờ Redis (fast path, low TTL):** `tenant:{tenant_id}:suspended` = `1` với no expire. Set khi suspend, DEL khi activate. Check trong **mọi guard** trước khi pass qua PermissionGuard.
 2. **DB source of truth:** `tenants.status = SUSPENDED`. Là nguồn duy nhất khi rebuild Redis (cron warmup hoặc khi miss).
-3. **Authorizer cache invalidation:** Khi suspend → SaaS publish event nội bộ (TCP hoặc Redis Pub/Sub) → Authorizer DEL tất cả `user-token:`\* key có `tenant_id = X`. Khó tìm key theo tenant → đề xuất: TTL ngắn hơn cho cache (5 phút) **HOẶC** thêm secondary index `tenant-tokens:{tenant_id} → SET<sha256(token)>`.
-4. **WebSocket force-disconnect:** BFF emit `tenant.suspended` lên rooms `tenant:{id}:`\* và `session:{sid}:customer` → FE handler force logout / redirect tới landing page "Tạm khóa".
+3. **Authorizer cache invalidation:** Khi suspend → SaaS publish event nội bộ (TCP hoặc Redis Pub/Sub) → Authorizer DEL tất cả `user-token:` key có `tenant_id = X`. Khó tìm key theo tenant → đề xuất: TTL ngắn hơn cho cache (5 phút) **HOẶC** thêm secondary index `tenant-tokens:{tenant_id} → SET<sha256(token)>`.
+4. **WebSocket force-disconnect:** BFF emit `tenant.suspended` lên rooms `tenant:{id}:` và `session:{sid}:customer` → FE handler force logout / redirect tới landing page "Tạm khóa".
 
 **Trade-off:**
 
@@ -461,7 +461,7 @@ Bắt buộc theo thứ tự:
 | B      | **Read-only:** customer xem được cart/order đã đặt nhưng không submit thêm; cho phép thanh toán bills `PENDING_PAYMENT` đã tạo | UX mềm; staff có thể tất toán | Phức tạp guard logic; cần whitelist endpoints               |
 | C      | **Grace period:** sau suspend cho phép thêm 30 phút "đóng cửa nhẹ" rồi mới hard cut                                            | Cân bằng                      | Cần cron + TTL Redis flag                                   |
 
-**Khuyến nghị: B.** Tenant suspend thường do hết hạn subscription (lỗi business, không phải fraud). Cho phép tất toán bills đang dở giảm khiếu nại; chặn write mới (submit order, create bill mới). Implement bằng `TenantStatusGuard` với whitelist permissions: `payment.confirm_cash`, `payment.create` (refund), `order.get_`\*.
+**Khuyến nghị: B.** Tenant suspend thường do hết hạn subscription (lỗi business, không phải fraud). Cho phép tất toán bills đang dở giảm khiếu nại; chặn write mới (submit order, create bill mới). Implement bằng `TenantStatusGuard` với whitelist permissions: `payment.confirm_cash`, `payment.create` (refund), `order.get_`.
 
 ---
 
@@ -471,11 +471,11 @@ Bắt buộc theo thứ tự:
 
 | Option | Mô tả                                                                                                             | Pros                        | Cons                                   |
 | ------ | ----------------------------------------------------------------------------------------------------------------- | --------------------------- | -------------------------------------- |
-| A      | Mở rộng namespace `saas.`\*: thêm `saas.suspend`, `saas.activate`, `saas.close`, `saas.onboard`, `saas.read_own`  | Ít domain mới; quen pattern | Tên dài, khó scan                      |
-| B      | Tách 3 domain: `tenant.*` (lifecycle), `subscription.*`, `plan.*`. Drop `saas.*` legacy hoặc deprecate            | Domain-driven, sạch         | Migration permission matrix nhiều dòng |
+| A      | Mở rộng namespace `saas.`: thêm `saas.suspend`, `saas.activate`, `saas.close`, `saas.onboard`, `saas.read_own`    | Ít domain mới; quen pattern | Tên dài, khó scan                      |
+| B      | Tách 3 domain: `tenant.`_ (lifecycle), `subscription.`_, `plan.*`. Drop `saas.*` legacy hoặc deprecate            | Domain-driven, sạch         | Migration permission matrix nhiều dòng |
 | C      | Hybrid: giữ `saas.*` cho admin CRUD, thêm `tenant.suspend/activate/close`, `subscription.read_own`, `plan.manage` | Vừa phải                    | Hơi không nhất quán                    |
 
-**Khuyến nghị: B.** Phase 4B là cơ hội tốt để clean (legacy `saas.`\* chỉ có 5 quyền và đều SUPER_ADMIN-only). Migration:
+**Khuyến nghị: B.** Phase 4B là cơ hội tốt để clean (legacy `saas.` chỉ có 5 quyền và đều SUPER_ADMIN-only). Migration:
 
 ```
 saas.create     → tenant.create
@@ -516,7 +516,7 @@ Phase 4B tăng từ 53 → ~64 permissions. Effort: 1-2 ngày update matrix + te
 | B      | Cron daily 02:00 Asia/Ho_Chi_Minh (= 19:00 UTC trước đó), grace 24h (suspend khi `expires_at + 1d < now()`) | Friendly UX cho khách Việt      | 1 ngày "free" sau hết hạn                            |
 | C      | Cron mỗi 15 phút với grace 0; gửi notification 3 ngày trước hết hạn (Phase 4C)                              | Phản ứng nhanh + cảnh báo trước | Cron load cao; Notification phụ thuộc Phase 4C       |
 
-**Khuyến nghị: B + welcome notification của Phase 4C.** Grace 24h đủ thân thiện với chủ quán, không quá rộng. Time-zone Vietnam là target market chính. Cron `0 2 * * `\* với env `TZ=Asia/Ho_Chi_Minh`.
+**Khuyến nghị: B + welcome notification của Phase 4C.** Grace 24h đủ thân thiện với chủ quán, không quá rộng. Time-zone Vietnam là target market chính. Cron `0 2 `\* \* với env `TZ=Asia/Ho_Chi_Minh`.
 
 ---
 
@@ -571,7 +571,7 @@ Phase 4B tăng từ 53 → ~64 permissions. Effort: 1-2 ngày update matrix + te
 - Q9b: Order `PROCESSING` ở bếp khi suspend?
   - **Khuyến nghị:** Cho phép kitchen finish (`Processing → Ready → Served`); chỉ chặn create/confirm mới.
 - Q9c: WebSocket connection của staff/customer hiện tại?
-  - **Khuyến nghị:** BFF emit `tenant.suspended` qua WS rooms `tenant:{id}:`\*; FE handle: hiển thị banner cảnh báo, không force disconnect (tránh staff đang nhập đơn bị mất state).
+  - **Khuyến nghị:** BFF emit `tenant.suspended` qua WS rooms `tenant:{id}:`; FE handle: hiển thị banner cảnh báo, không force disconnect (tránh staff đang nhập đơn bị mất state).
 
 ---
 
@@ -579,10 +579,10 @@ Phase 4B tăng từ 53 → ~64 permissions. Effort: 1-2 ngày update matrix + te
 
 **Lựa chọn:**
 
-| Option | Mô tả                                                                                                  | Pros                        | Cons                                                              |
-| ------ | ------------------------------------------------------------------------------------------------------ | --------------------------- | ----------------------------------------------------------------- |
-| A      | Trong Management App, route `/admin/`\* chỉ accessible bởi SUPER_ADMIN (đã có cấu trúc `app/(admin)/`) | Đã có placeholder, tiếp tục | SUPER_ADMIN dùng chung app với tenant users → có thể nhầm context |
-| B      | Tách app `admin-portal` riêng (subdomain `admin.qrtable.io`)                                           | Tách biệt rõ                | Tăng deploy 1 app + redo auth flow                                |
+| Option | Mô tả                                                                                                | Pros                        | Cons                                                              |
+| ------ | ---------------------------------------------------------------------------------------------------- | --------------------------- | ----------------------------------------------------------------- |
+| A      | Trong Management App, route `/admin/` chỉ accessible bởi SUPER_ADMIN (đã có cấu trúc `app/(admin)/`) | Đã có placeholder, tiếp tục | SUPER_ADMIN dùng chung app với tenant users → có thể nhầm context |
+| B      | Tách app `admin-portal` riêng (subdomain `admin.qrtable.io`)                                         | Tách biệt rõ                | Tăng deploy 1 app + redo auth flow                                |
 
 **Khuyến nghị: A.** Đã có cấu trúc `app/(admin)/admin/{tenants,plans}/page.tsx`. Middleware Next.js đã filter theo role. Tách app sau (post-thesis) khi traffic SUPER_ADMIN tăng.
 
@@ -749,7 +749,7 @@ Ngoài AC trong phase doc, audit này đề xuất thêm:
 - **Customer suspend:** Sau khi suspend, customer vẫn có session active → reload menu → 403; bill `PENDING_PAYMENT` cũ vẫn thanh toán được.
 - **Cron acceptance:** Set tenant subscription `expires_at` quá khứ → chạy cron manual → tenant `SUSPENDED` + Redis flag set.
 - **Onboarding rollback:** Mock Keycloak fail ở step 4 → DB transaction rollback → không có tenant orphan.
-- `**tenant.created` event:\*\* Onboard tenant → Kafka topic `tenant.created` có message với payload đúng schema (eventId, ownerEmail, ...).
+- `**tenant.created` event: Onboard tenant → Kafka topic `tenant.created` có message với payload đúng schema (eventId, ownerEmail, ...).
 - **L1 gating concurrent:** 2 admins đồng thời tạo bàn thứ 10 và 11 trong tenant Free → 1 thành công, 1 nhận 402.
 - **Plan upgrade:** Tenant Free đầy 10 bàn → admin upgrade Premium → có thể tạo bàn thứ 11 ngay (Redis cache invalidate).
 - **Time-zone counter:** `max_orders_per_day=100`, đặt 99 đơn lúc 23:59 Asia/Ho_Chi_Minh → đơn 100 ở 00:01 → vẫn limit của ngày mới (counter reset đúng).
@@ -785,7 +785,7 @@ Sau khi bạn duyệt câu hỏi chốt hạ, spec `docs/specs/business-logic-ph
 | --- | ----------------------------------- | -------------------------------------------------- |
 | Q1  | `isActive` vs `status`              | C (giữ cả 2 với mapper)                            |
 | Q2  | Suspend behavior với active session | B (read-only + payment allowed)                    |
-| Q3  | Permission namespace                | B (tenant._ / subscription._ / plan.\*)            |
+| Q3  | Permission namespace                | B (tenant._ / subscription._ / plan.)              |
 | Q4  | Reserved slug source                | A (hardcoded const)                                |
 | Q5  | Cron schedule                       | B (02:00 Asia/Ho_Chi_Minh, grace 24h)              |
 | Q6  | Feature gating layer                | C (BFF guard + service backup)                     |
@@ -1230,8 +1230,8 @@ const { QR_ACCOUNT, QR_BANK } = CONFIGURATION.SEPAY_CONFIG; // ← env var, khô
  );
 ```
 
-2. SePay dashboard config: nhiều bank accounts; mỗi account có một `subAccount` ID. Webhook payload field `subAccount` được dùng để route về tenant.
-3. Refactor `payment-settlement.service.ts`:
+1. SePay dashboard config: nhiều bank accounts; mỗi account có một `subAccount` ID. Webhook payload field `subAccount` được dùng để route về tenant.
+2. Refactor `payment-settlement.service.ts`:
 
 ```typescript
 const settings = await this.tenantPaymentSettingsRepo.findByTenantId(tenantId);
@@ -1241,7 +1241,7 @@ if (!settings || !settings.vietqr_enabled || !settings.vietqr_account_number) {
 return { account: settings.vietqr_account_number, bank: settings.vietqr_bank_name };
 ```
 
-4. Webhook routing:
+1. Webhook routing:
 
 ```typescript
 // payment.handle_sepay_webhook
@@ -1272,7 +1272,7 @@ const tenantId = tenantSettings.tenant_id;
 | 4    | UI `/dashboard/payment-settings` (CRUD bank settings)                         | Phase 4B FE           |
 | 5    | Webhook routing: tách logic match tenant từ `subAccount` hoặc `accountNumber` | Phase 4B              |
 | 6    | Test webhook ("Test webhook" button trong UI gọi SePay sandbox)               | Phase 4B nice-to-have |
-| 7    | Deprecate env vars `PAYMENT_SEPAY_QR_`\* (vẫn giữ làm fallback cho dev)       | Phase 4B              |
+| 7    | Deprecate env vars `PAYMENT_SEPAY_QR_` (vẫn giữ làm fallback cho dev)         | Phase 4B              |
 
 **Effort estimate:** +3-4 ngày dev backend + 1-2 ngày FE settings page.
 
@@ -1343,8 +1343,8 @@ CREATE TABLE subscription_invoices (
   - Tier 1: `QRTBL` + 8 chars (đã có)
   - Tier 2: `QRSUB` + 8 chars (mới)
 - BFF sniff prefix → route TCP message khác nhau:
-  - `QRTBL`\* → `payment.handle_sepay_webhook` (tenant settlement, hiện tại)
-  - `QRSUB*` → `subscription.handle_sepay_webhook` (mới, SaaS service xử lý)
+  - `QRTBL` → `payment.handle_sepay_webhook` (tenant settlement, hiện tại)
+  - `QRSUB`\* → `subscription.handle_sepay_webhook` (mới, SaaS service xử lý)
 - Account routing: tenant accounts (Tier 1) phải có `subAccount` non-null trong SePay; platform account (Tier 2) là default account.
 
 #### Service ownership
@@ -1401,7 +1401,7 @@ CREATE TABLE subscription_invoices (
 | #   | Risk                                                                                 | Likelihood | Impact       | Mitigation                                                                    |
 | --- | ------------------------------------------------------------------------------------ | ---------- | ------------ | ----------------------------------------------------------------------------- |
 | R11 | Phase 3 codebase đang share single bank account → demo multi-tenant không trung thực | High       | **Critical** | Phase 4B PHẢI refactor (§14.2), không defer được nếu demo SaaS                |
-| R12 | Tier 1 + Tier 2 webhook collision (cùng SePay account)                               | Medium     | High         | Naming convention `QRTBL*` vs `QRSUB*`; SePay sub-accounts                    |
+| R12 | Tier 1 + Tier 2 webhook collision (cùng SePay account)                               | Medium     | High         | Naming convention `QRTBL`_ vs `QRSUB`_; SePay sub-accounts                    |
 | R13 | Owner chuyển khoản sai nội dung → subscription không activate                        | High       | Medium       | UI cảnh báo "BẮT BUỘC nhập đúng mã"; SUPER_ADMIN manual assign fallback       |
 | R14 | Tenant đổi bank account giữa chừng → bills `PENDING_PAYMENT` cũ vẫn ref bank cũ      | Low        | Medium       | Bills lưu `bank_snapshot` tại lúc tạo QR; mới chỉ áp cho QR mới               |
 | R15 | Tenant cancel subscription → expires_at giữ → khi đến hạn auto-suspend               | Medium     | Low          | Notification trước 7 ngày (Phase 4C)                                          |
@@ -1461,7 +1461,7 @@ CREATE TABLE subscription_invoices (
 
 **Khuyến nghị:** Theo Q19. Q19=B/C → Q20=A; Q19=D → Q20=B.
 
-#### Q21. Webhook prefix routing (`QRTBL*` vs `QRSUB*`)
+#### Q21. Webhook prefix routing (`QRTBL`_ vs `QRSUB`_)
 
 Đây là follow-up technical decision của Q19:
 
@@ -1484,21 +1484,21 @@ CREATE TABLE subscription_invoices (
 
 ## 15. Cập Nhật Coverage Matrix (sau §13 + §14)
 
-| Khía cạnh                                 | Phase doc | Audit này (Round 1+2) | Spec sẽ cover |
-| ----------------------------------------- | --------- | --------------------- | ------------- |
-| (Tất cả mục §7 cũ)                        | —         | ✅                    | ✅            |
-| **Landing page**                          | ❌        | ✅ Q16                | tùy Q16       |
-| `**/admin/*` page-by-page UX\*\*          | partial   | ✅ §13.2              | ✅            |
-| `**/dashboard/subscription` UX detail\*\* | partial   | ✅ §13.3.2            | ✅            |
-| `**/dashboard/payment-settings`\*\*       | ❌        | ✅ §13.3.3 + §14.2    | ✅            |
-| `**/dashboard/billing` (Tier 2 pay)\*\*   | ❌        | ✅ §13.3.4 + §14.4    | tùy Q19/Q20   |
-| **Tier 1 per-tenant bank account**        | ❌        | ✅ §14.2 (Q17)        | tùy Q17       |
-| **Tier 2 platform billing**               | ❌        | ✅ §14.3 (Q19)        | tùy Q19       |
-| **Webhook prefix routing (QRTBL/QRSUB)**  | ❌        | ✅ §14.3 (Q21)        | tùy Q19/Q21   |
-| **Sidebar / nav update**                  | ❌        | ✅ §13.6              | ✅            |
-| **Customer PWA suspend banner**           | ❌        | ✅ §13.4              | ✅            |
-| **Subscription invoice entity**           | ❌        | ✅ §14.3              | tùy Q19       |
-| **Migration Phase 3 → tenant payment**    | ❌        | ✅ §14.2 step list    | tùy Q17       |
+| Khía cạnh                                | Phase doc | Audit này (Round 1+2) | Spec sẽ cover |
+| ---------------------------------------- | --------- | --------------------- | ------------- |
+| (Tất cả mục §7 cũ)                       | —         | ✅                    | ✅            |
+| **Landing page**                         | ❌        | ✅ Q16                | tùy Q16       |
+| `**/admin/`\* page-by-page UX            | partial   | ✅ §13.2              | ✅            |
+| `**/dashboard/subscription` UX detail    | partial   | ✅ §13.3.2            | ✅            |
+| `**/dashboard/payment-settings`          | ❌        | ✅ §13.3.3 + §14.2    | ✅            |
+| `**/dashboard/billing` (Tier 2 pay)      | ❌        | ✅ §13.3.4 + §14.4    | tùy Q19/Q20   |
+| **Tier 1 per-tenant bank account**       | ❌        | ✅ §14.2 (Q17)        | tùy Q17       |
+| **Tier 2 platform billing**              | ❌        | ✅ §14.3 (Q19)        | tùy Q19       |
+| **Webhook prefix routing (QRTBL/QRSUB)** | ❌        | ✅ §14.3 (Q21)        | tùy Q19/Q21   |
+| **Sidebar / nav update**                 | ❌        | ✅ §13.6              | ✅            |
+| **Customer PWA suspend banner**          | ❌        | ✅ §13.4              | ✅            |
+| **Subscription invoice entity**          | ❌        | ✅ §14.3              | tùy Q19       |
+| **Migration Phase 3 → tenant payment**   | ❌        | ✅ §14.2 step list    | tùy Q17       |
 
 ---
 
@@ -1518,7 +1518,7 @@ Tổng kết Q1-Q22 (15 cũ + 7 mới):
 | ------- | ---------------------------------------- | ---------------------------------------------------- |
 | Q1      | `isActive` vs `status`                   | C (giữ cả 2 với mapper)                              |
 | Q2      | Suspend behavior với active session      | B (read-only + payment allowed)                      |
-| Q3      | Permission namespace                     | B (tenant._ / subscription._ / plan.\*)              |
+| Q3      | Permission namespace                     | B (tenant._ / subscription._ / plan.)                |
 | Q4      | Reserved slug source                     | A (hardcoded const)                                  |
 | Q5      | Cron schedule                            | B (02:00 Asia/Ho_Chi_Minh, grace 24h)                |
 | Q6      | Feature gating layer                     | C (BFF guard + service backup)                       |
@@ -1535,7 +1535,7 @@ Tổng kết Q1-Q22 (15 cũ + 7 mới):
 | **Q17** | **Per-tenant bank account (Tier 1 fix)** | **A nếu demo SaaS thực sự; C nếu defer**             |
 | **Q18** | **SePay sub-account routing**            | **A cho thesis; B cho production scale**             |
 | **Q19** | **Tier 2 subscription billing flow**     | **C (hybrid auto + manual fallback) hoặc D (defer)** |
-| **Q20** | `**/dashboard/billing` page scope\*\*    | **Theo Q19**                                         |
+| **Q20** | `**/dashboard/billing` page scope        | **Theo Q19**                                         |
 | **Q21** | **Webhook prefix QRTBL vs QRSUB**        | **Confirm 2 prefix khi Q19=B/C**                     |
 | **Q22** | **Payment settings entity location**     | **A (Payment Service owns)**                         |
 
@@ -1835,15 +1835,15 @@ WS notify → POS + Customer thấy "Đã thanh toán"
 
 **Cập nhật scopes (verified, đầy đủ hơn Round 3 §18.1):**
 
-| Scope                  | Quyền                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------------------------ |
-| `bank-account:read`    | Xem danh sách tài khoản, số dư, chi tiết từng tài khoản                                    |
-| `transaction:read`     | Xem lịch sử giao dịch, chi tiết giao dịch, đếm số lượng                                    |
-| `**webhook:read`\*\*   | **Xem danh sách webhook, chi tiết từng webhook** (mới phát hiện)                           |
-| `**webhook:write`\*\*  | **Tạo mới + cập nhật webhook** (mới phát hiện — confirm Q23 α auto webhook setup feasible) |
-| `**webhook:delete`\*\* | **Xóa webhook** (mới phát hiện)                                                            |
-| `profile`              | Xem thông tin cá nhân người dùng                                                           |
-| `**company`\*\*        | **Xem thông tin chi tiết về công ty** (mới phát hiện)                                      |
+| Scope               | Quyền                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------ |
+| `bank-account:read` | Xem danh sách tài khoản, số dư, chi tiết từng tài khoản                                    |
+| `transaction:read`  | Xem lịch sử giao dịch, chi tiết giao dịch, đếm số lượng                                    |
+| `**webhook:read`    | **Xem danh sách webhook, chi tiết từng webhook** (mới phát hiện)                           |
+| `**webhook:write`   | **Tạo mới + cập nhật webhook** (mới phát hiện — confirm Q23 α auto webhook setup feasible) |
+| `**webhook:delete`  | **Xóa webhook** (mới phát hiện)                                                            |
+| `profile`           | Xem thông tin cá nhân người dùng                                                           |
+| `**company`         | **Xem thông tin chi tiết về công ty** (mới phát hiện)                                      |
 
 **Ý nghĩa cho Q23 α:** Có scope `webhook:write` → flow §19.2 step "Setup webhook tự động (`POST /v1/webhook`)" hoàn toàn khả thi qua API, **không cần can thiệp manual**.
 
@@ -1863,8 +1863,8 @@ WS notify → POS + Customer thấy "Đã thanh toán"
 
 - Channels: Email [support@sepay.vn](mailto:support@sepay.vn) / inbox fb.me/sepay.vn / tel: 02873.059.589.
 
-2. **Trong khi chờ:** Implement Phase 4B với mock OAuth2 server local. Dùng `oauth2-mock-server` npm package hoặc tự stub. Code production-ready với env vars `SEPAY_OAUTH_BASE_URL` (default `https://my.sepay.vn`, có thể switch `http://localhost:9999` cho dev).
-3. **Có 2 outcomes:**
+1. **Trong khi chờ:** Implement Phase 4B với mock OAuth2 server local. Dùng `oauth2-mock-server` npm package hoặc tự stub. Code production-ready với env vars `SEPAY_OAUTH_BASE_URL` (default `https://my.sepay.vn`, có thể switch `http://localhost:9999` cho dev).
+2. **Có 2 outcomes:**
 
 - **A approve** (xác suất ~70%): demo thesis với SePay thật. Switch env vars → real production.
 - **A reject hoặc delay** (xác suất ~30%): demo thesis với mock OAuth + production-ready code. Document trong slide thesis: "OAuth2 với SePay đang chờ approve; mock OAuth được dùng cho demo, code đã production-ready cho cutover khi approve". Đây vẫn là acceptable cho luận án vì kiến trúc đã đúng.
@@ -1879,7 +1879,7 @@ Tổng kết Q1–Q25 (15 cũ + 7 round 2 + 3 round 3):
 | ------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Q1      | `isActive` vs `status`                                   | C (giữ cả 2 với mapper)                                                                               |
 | Q2      | Suspend behavior với active session                      | B (read-only + payment allowed)                                                                       |
-| Q3      | Permission namespace                                     | B (tenant._ / subscription._ / plan.\*)                                                               |
+| Q3      | Permission namespace                                     | B (tenant._ / subscription._ / plan.)                                                                 |
 | Q4      | Reserved slug source                                     | A (hardcoded const)                                                                                   |
 | Q5      | Cron schedule                                            | B (02:00 Asia/Ho_Chi_Minh, grace 24h)                                                                 |
 | Q6      | Feature gating layer                                     | C (BFF guard + service backup)                                                                        |
