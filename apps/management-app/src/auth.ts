@@ -133,6 +133,8 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Vercel / reverse proxy: avoid UntrustedHost; preview may not infer like production.
+  trustHost: true,
   providers: [
     Keycloak({
       clientId: process.env.AUTH_KEYCLOAK_ID,
