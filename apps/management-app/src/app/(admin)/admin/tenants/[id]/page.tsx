@@ -8,6 +8,7 @@ import { Skeleton } from '@einvoice/frontend-ui';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ROUTES } from '@/constants/routes';
+import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { saasApi } from '@/features/saas/api';
 import {
   TenantAuditTab,
@@ -23,11 +24,12 @@ export default function AdminTenantDetailPage() {
   const id = String(params.id ?? '');
   const { data: session } = useSession();
   const permissions = session?.user?.permissions ?? [];
+  const authReady = useAuthReadyForBff();
 
   const tenantQuery = useQuery({
     queryKey: ['admin-tenant', id],
     queryFn: () => saasApi.getTenant(id),
-    enabled: Boolean(id),
+    enabled: authReady && Boolean(id),
   });
 
   if (!id) {

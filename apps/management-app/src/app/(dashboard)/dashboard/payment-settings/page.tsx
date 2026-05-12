@@ -8,15 +8,18 @@ import { saasApi } from '@/features/saas/api';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
+import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 
 export default function DashboardPaymentSettingsPage() {
   const { data: session } = useSession();
   const permissions = session?.user?.permissions ?? [];
+  const authReady = useAuthReadyForBff();
   const qc = useQueryClient();
 
   const q = useQuery({
     queryKey: ['dashboard-payment-settings'],
     queryFn: () => saasApi.getDashboardPaymentSettings(),
+    enabled: authReady,
   });
 
   const canUpdate = hasPermission(permissions, phase4bPermissions.paymentSettingsUpdateOwn);

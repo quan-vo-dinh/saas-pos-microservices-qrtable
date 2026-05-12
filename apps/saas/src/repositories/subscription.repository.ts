@@ -2,7 +2,7 @@ import { SubscriptionStatus, normalizePlanCode } from '@common/constants/saas.co
 import { Subscription } from '@common/entities/subscription.entity';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { In, LessThan, Repository } from 'typeorm';
 import type { AssignPlanParams } from '../services/subscription.service';
 
 type CreateActiveParams = AssignPlanParams & {
@@ -16,6 +16,17 @@ export class SubscriptionRepository {
 
   findActiveByTenantId(tenantId: string): Promise<Subscription | null> {
     return this.repo.findOne({ where: { tenantId, status: SubscriptionStatus.ACTIVE } });
+  }
+
+  findById(id: string): Promise<Subscription | null> {
+    return this.repo.findOne({ where: { id } });
+  }
+
+  findActiveByTenantIds(tenantIds: string[]): Promise<Subscription[]> {
+    if (!tenantIds.length) {
+      return Promise.resolve([]);
+    }
+    return this.repo.find({ where: { tenantId: In(tenantIds), status: SubscriptionStatus.ACTIVE } });
   }
 
   async supersedeActive(tenantId: string, oldSubscriptionId: string): Promise<void> {
@@ -63,6 +74,18 @@ export class SubscriptionRepository {
 
   async markExpired(subscriptionId: string, expiredAt: Date): Promise<void> {
     await this.repo.update({ id: subscriptionId }, { status: SubscriptionStatus.EXPIRED, expiredAt });
+  }
+
+  async cancelActive(tenantId: string, subscriptionId: string, reason: string): Promise<Subscription> {
+    await this.repo.update(
+      { id: subscriptionId, tenantId, status: SubscriptionStatus.ACTIVE },
+      { status: SubscriptionStatus.CANCELED, canceledAt: new Date(), canceledReason: reason },
+    );
+    const updated = await this.findById(subscriptionId);
+    if (!updated) {
+      throw new Error('SUBSCRIPTION_NOT_FOUND_AFTER_CANCEL');
+    }
+    return updated;
   }
 
   private toRepositorySource(source: AssignPlanParams['source']): Subscription['source'] {

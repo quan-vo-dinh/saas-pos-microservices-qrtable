@@ -19,6 +19,13 @@ describe('SubscriptionInvoiceService', () => {
       status: SubscriptionInvoiceStatus.PENDING,
       tenantId: 'tenant-1',
       planCodeSnapshot: 'PREMIUM',
+      periodEndsAt: new Date('2026-06-12T00:00:00.000Z'),
+    });
+    invoiceRepo.markPaid.mockResolvedValue({
+      id: 'invoice-1',
+      tenantId: 'tenant-1',
+      planCodeSnapshot: 'PREMIUM',
+      periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
     });
     const service = new SubscriptionInvoiceService(invoiceRepo as never, subscriptionService as never);
 
@@ -39,6 +46,13 @@ describe('SubscriptionInvoiceService', () => {
       status: SubscriptionInvoiceStatus.PENDING,
       tenantId: 'tenant-1',
       planCodeSnapshot: 'PREMIUM',
+      periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
+    });
+    invoiceRepo.markPaid.mockResolvedValue({
+      id: 'invoice-1',
+      tenantId: 'tenant-1',
+      planCodeSnapshot: 'PREMIUM',
+      periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
     });
     const service = new SubscriptionInvoiceService(invoiceRepo as never, subscriptionService as never);
 
@@ -46,10 +60,32 @@ describe('SubscriptionInvoiceService', () => {
 
     expect(invoiceRepo.markPaid).toHaveBeenCalledWith(
       'invoice-1',
-      expect.objectContaining({ sepayTransactionId: 'tx-1' }),
+      expect.objectContaining({ sepayTransactionId: null }),
     );
     expect(subscriptionService.assignPlan).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: 'tenant-1', planCode: 'PREMIUM' }),
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        planCode: 'PREMIUM',
+        expiresAt: new Date('2027-05-12T00:00:00.000Z'),
+      }),
     );
+  });
+
+  it('does not assign subscription when duplicate webhook loses pending update race', async () => {
+    invoiceRepo.findByBillingReferenceForUpdate.mockResolvedValue({
+      id: 'invoice-1',
+      billingReference: 'QRSUB123',
+      amountVnd: 999000,
+      status: SubscriptionInvoiceStatus.PENDING,
+      tenantId: 'tenant-1',
+      planCodeSnapshot: 'PREMIUM',
+      periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
+    });
+    invoiceRepo.markPaid.mockResolvedValue(null);
+    const service = new SubscriptionInvoiceService(invoiceRepo as never, subscriptionService as never);
+
+    await service.handleWebhook({ code: 'QRSUB123', transferAmount: 999000, sepayTransactionId: 'tx-1' });
+
+    expect(subscriptionService.assignPlan).not.toHaveBeenCalled();
   });
 });

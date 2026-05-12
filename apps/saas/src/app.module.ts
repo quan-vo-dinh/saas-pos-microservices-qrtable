@@ -21,11 +21,14 @@ import { SubscriptionInvoiceRepository } from './repositories/subscription-invoi
 import { SubscriptionRepository } from './repositories/subscription.repository';
 import { TenantRepository } from './repositories/tenant.repository';
 import { OnboardingSagaService } from './services/onboarding-saga.service';
+import { PricingPlanAdminService } from './services/pricing-plan-admin.service';
 import { SaasOutboxPublisherService } from './services/saas-outbox-publisher.service';
 import { SlugService } from './services/slug.service';
+import { SubscriptionDashboardService } from './services/subscription-dashboard.service';
 import { SubscriptionInvoiceService } from './services/subscription-invoice.service';
 import { SubscriptionCacheService } from './services/subscription-cache.service';
 import { SubscriptionService } from './services/subscription.service';
+import { TenantAdminService } from './services/tenant-admin.service';
 import { TenantLifecycleService } from './services/tenant-lifecycle.service';
 import { TenantStatusCacheService } from './services/tenant-status-cache.service';
 import { TenantSuspendCronService } from './services/tenant-suspend-cron.service';
@@ -48,11 +51,14 @@ import { TenantSuspendCronService } from './services/tenant-suspend-cron.service
     SaasService,
     SaasRepository,
     SlugService,
+    PricingPlanAdminService,
     PricingPlanRepository,
     SubscriptionRepository,
+    SubscriptionDashboardService,
     SubscriptionService,
     SubscriptionCacheService,
     TenantRepository,
+    TenantAdminService,
     TenantLifecycleService,
     TenantStatusCacheService,
     OnboardingSagaService,

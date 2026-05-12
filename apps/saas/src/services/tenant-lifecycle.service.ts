@@ -1,14 +1,12 @@
 import { TenantStatus } from '@common/constants/saas.constants';
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { TenantRepository } from '../repositories/tenant.repository';
 import { TenantStatusCacheService } from './tenant-status-cache.service';
 
 @Injectable()
 export class TenantLifecycleService {
   constructor(
-    private readonly tenantRepository: {
-      findById(id: string): Promise<{ id: string; status: TenantStatus } | null>;
-      updateStatus(id: string, patch: Record<string, unknown>): Promise<unknown>;
-    },
+    private readonly tenantRepository: TenantRepository,
     private readonly tenantStatusCache: TenantStatusCacheService,
   ) {}
 
@@ -32,6 +30,17 @@ export class TenantLifecycleService {
       suspendedReason: null,
     });
     await this.tenantStatusCache.clearSuspended(params.tenantId);
+  }
+
+  async close(params: { tenantId: string; reason?: string | null }) {
+    await this.assertTenant(params.tenantId);
+    await this.tenantRepository.updateStatus(params.tenantId, {
+      status: TenantStatus.CLOSED,
+      isActive: false,
+      closedAt: new Date(),
+      closedReason: params.reason ?? null,
+    });
+    await this.tenantStatusCache.markSuspended(params.tenantId);
   }
 
   private async assertTenant(tenantId: string): Promise<void> {

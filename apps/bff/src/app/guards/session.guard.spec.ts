@@ -1,3 +1,4 @@
+import { ExecutionContext } from '@nestjs/common';
 import { MetadataKey } from '@common/constants/common.constant';
 import { REQUEST_HEADERS } from '@common/constants/request-context.constant';
 import { SessionGuard } from '@common/guards/session.guard';
@@ -12,7 +13,6 @@ jest.mock('crypto', () => ({
 
 describe('SessionGuard', () => {
   const reflector = {
-    get: jest.fn(),
     getAllAndOverride: jest.fn(),
   };
 
@@ -23,13 +23,34 @@ describe('SessionGuard', () => {
       switchToHttp: () => ({
         getRequest: () => request,
       }),
-    }) as any;
+    }) as unknown as ExecutionContext;
 
   beforeEach(() => {
-    reflector.get.mockReset();
     reflector.getAllAndOverride.mockReset();
-    reflector.get.mockReturnValue(undefined);
     reflector.getAllAndOverride.mockReturnValue(false);
+  });
+
+  it('bypasses anonymous session minting for class-level secured controllers', async () => {
+    const cacheManager = {
+      get: jest.fn(),
+      set: jest.fn(),
+      del: jest.fn(),
+    };
+    reflector.getAllAndOverride.mockImplementation((key: unknown) =>
+      key === MetadataKey.SECURED ? { secured: true } : false,
+    );
+    const request = {
+      headers: {},
+      [MetadataKey.TENANT_ID]: 'tenant-a',
+      res: { setHeader: jest.fn() },
+    };
+    const guard = new SessionGuard(reflector as never, cacheManager as never);
+
+    await expect(guard.canActivate(getContext(request))).resolves.toBe(true);
+
+    expect(reflector.getAllAndOverride).toHaveBeenCalledWith(MetadataKey.SECURED, [{}, {}]);
+    expect(cacheManager.set).not.toHaveBeenCalled();
+    expect(request[MetadataKey.SESSION_ID]).toBeUndefined();
   });
 
   it('mints anonymous BFF sessions in a namespace that cannot collide with Order sessions', async () => {
@@ -43,7 +64,7 @@ describe('SessionGuard', () => {
       [MetadataKey.TENANT_ID]: 'tenant-a',
       res: { setHeader: jest.fn() },
     };
-    const guard = new SessionGuard(reflector as any, cacheManager as any);
+    const guard = new SessionGuard(reflector as never, cacheManager as never);
 
     await expect(guard.canActivate(getContext(request))).resolves.toBe(true);
 
@@ -72,7 +93,7 @@ describe('SessionGuard', () => {
       [MetadataKey.TENANT_ID]: 'tenant-a',
       res: { setHeader: jest.fn() },
     };
-    const guard = new SessionGuard(reflector as any, cacheManager as any);
+    const guard = new SessionGuard(reflector as never, cacheManager as never);
 
     await expect(guard.canActivate(getContext(request))).resolves.toBe(true);
 

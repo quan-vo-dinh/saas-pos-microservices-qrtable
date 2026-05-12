@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { ApiError } from '@einvoice/frontend-utils';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/constants/routes';
+import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { saasApi } from '@/features/saas/api';
 import { formatDateTime, formatVnd } from '@/features/saas/formatters';
 import { InvoiceStatusBadge } from '@/features/saas/admin-billing/invoice-status-badge';
@@ -16,11 +17,12 @@ export default function DashboardBillingInvoicePage() {
   const params = useParams();
   const id = String(params.id ?? '');
   const qc = useQueryClient();
+  const authReady = useAuthReadyForBff();
 
   const inv = useQuery({
     queryKey: ['dashboard-invoice', id],
     queryFn: () => saasApi.getDashboardInvoice(id),
-    enabled: Boolean(id),
+    enabled: authReady && Boolean(id),
   });
 
   const cancel = async () => {

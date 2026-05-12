@@ -1,5 +1,8 @@
 import { TenantStatus } from '@common/constants/saas.constants';
+import { Test } from '@nestjs/testing';
+import { TenantRepository } from '../repositories/tenant.repository';
 import { TenantLifecycleService } from './tenant-lifecycle.service';
+import { TenantStatusCacheService } from './tenant-status-cache.service';
 
 describe('TenantLifecycleService', () => {
   const tenantRepo = {
@@ -33,5 +36,17 @@ describe('TenantLifecycleService', () => {
     await service.activate({ tenantId: 'tenant-1' });
 
     expect(redis.clearSuspended).toHaveBeenCalledWith('tenant-1');
+  });
+
+  it('resolves through Nest DI with concrete repository and cache providers', async () => {
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        TenantLifecycleService,
+        { provide: TenantRepository, useValue: tenantRepo },
+        { provide: TenantStatusCacheService, useValue: redis },
+      ],
+    }).compile();
+
+    expect(moduleRef.get(TenantLifecycleService)).toBeInstanceOf(TenantLifecycleService);
   });
 });

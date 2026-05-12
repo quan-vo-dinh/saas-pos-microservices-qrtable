@@ -1,9 +1,10 @@
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
-import { RequestParams } from '@common/decorators/request-param.decorator';
+import { RequestParams, RequestProcessId } from '@common/decorators/request-param.decorator';
 import { TcpLoggingInterceptor } from '@common/interceptors/tcpLogging.interceptor';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
 import {
   CreateTenantTcpRequest,
+  CheckoutInvoiceTcpRequest,
   DeleteTenantTcpRequest,
   GetTenantByIdTcpRequest,
   GetTenantBySlugTcpRequest,
@@ -15,8 +16,11 @@ import {
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { OnboardingSagaService } from '../services/onboarding-saga.service';
+import { PricingPlanAdminService } from '../services/pricing-plan-admin.service';
 import { SaasService } from '../services/saas.service';
+import { SubscriptionDashboardService } from '../services/subscription-dashboard.service';
 import { SubscriptionInvoiceService } from '../services/subscription-invoice.service';
+import { TenantAdminService } from '../services/tenant-admin.service';
 import { TenantLifecycleService } from '../services/tenant-lifecycle.service';
 
 @UseInterceptors(TcpLoggingInterceptor)
@@ -24,6 +28,9 @@ import { TenantLifecycleService } from '../services/tenant-lifecycle.service';
 export class SaasController {
   constructor(
     private readonly saasService: SaasService,
+    private readonly tenantAdminService: TenantAdminService,
+    private readonly pricingPlanAdminService: PricingPlanAdminService,
+    private readonly subscriptionDashboardService: SubscriptionDashboardService,
     private readonly onboardingSagaService: OnboardingSagaService,
     private readonly tenantLifecycleService: TenantLifecycleService,
     private readonly subscriptionInvoiceService: SubscriptionInvoiceService,
@@ -74,33 +81,164 @@ export class SaasController {
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.ONBOARD)
-  async onboard(@RequestParams() body: OnboardTenantTcpRequest): Promise<Response<unknown>> {
+  async onboard(
+    @RequestParams() body: OnboardTenantTcpRequest & Record<string, unknown>,
+    @RequestProcessId() processId?: string,
+  ): Promise<Response<unknown>> {
     return Response.success(
       await this.onboardingSagaService.onboard({
-        tenantName: body.name,
+        tenantName: String(body.name ?? body.tenantName ?? ''),
         ownerEmail: body.ownerEmail,
         ownerPassword: body.ownerPassword,
         ownerFirstName: body.ownerFirstName,
         ownerLastName: body.ownerLastName,
-        type: body.type,
+        type: String(body.type ?? body.tenantType ?? 'RESTAURANT'),
         address: body.address,
-        planCode: body.planCode,
+        planCode: String(body.planCode ?? body.initialPlanCode ?? ''),
         createdByUserId: body.createdByUserId,
-        processId: body.processId,
+        processId: processId ?? body.processId,
       }),
     );
   }
 
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.GET_PLATFORM_STATS)
+  async getPlatformStats(): Promise<Response<unknown>> {
+    return Response.success(await this.tenantAdminService.getPlatformStats());
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.LIST)
+  async listTenants(@RequestParams() body: Record<string, unknown>): Promise<Response<unknown>> {
+    return Response.success(await this.tenantAdminService.list(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.GET_BY_ID)
+  async getTenantById(@RequestParams() body: { id: string }): Promise<Response<unknown>> {
+    return Response.success(await this.tenantAdminService.get(body.id));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.UPDATE)
+  async updateTenant(@RequestParams() body: { id: string } & Record<string, unknown>): Promise<Response<unknown>> {
+    const { id, ...patch } = body;
+    return Response.success(await this.tenantAdminService.update(id, patch));
+  }
+
   @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.SUSPEND)
-  async suspend(@RequestParams() body: { tenantId: string; reason: string }): Promise<Response<boolean>> {
-    await this.tenantLifecycleService.suspend(body);
+  async suspend(
+    @RequestParams() body: { id?: string; tenantId?: string; reason?: string },
+  ): Promise<Response<boolean>> {
+    await this.tenantLifecycleService.suspend({ tenantId: this.tenantId(body), reason: body.reason ?? '' });
     return Response.success(true);
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.ACTIVATE)
-  async activate(@RequestParams() body: { tenantId: string }): Promise<Response<boolean>> {
-    await this.tenantLifecycleService.activate(body);
+  async activate(@RequestParams() body: { id?: string; tenantId?: string }): Promise<Response<boolean>> {
+    await this.tenantLifecycleService.activate({ tenantId: this.tenantId(body) });
     return Response.success(true);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.CLOSE)
+  async close(
+    @RequestParams() body: { id?: string; tenantId?: string; reason?: string | null },
+  ): Promise<Response<boolean>> {
+    await this.tenantLifecycleService.close({ tenantId: this.tenantId(body), reason: body.reason ?? null });
+    return Response.success(true);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.GET_USAGE)
+  async getTenantUsage(@RequestParams() body: { tenantId: string }): Promise<Response<unknown>> {
+    return Response.success(await this.tenantAdminService.usage(body.tenantId));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.GET_AUDIT)
+  async getTenantAudit(@RequestParams() body: { tenantId: string }): Promise<Response<unknown>> {
+    return Response.success(await this.tenantAdminService.audit(body.tenantId));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.PLAN.LIST_ACTIVE)
+  async listActivePlans(): Promise<Response<unknown>> {
+    return Response.success(await this.pricingPlanAdminService.listPublic());
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.PLAN.LIST)
+  async listPlans(@RequestParams() body: Record<string, unknown>): Promise<Response<unknown>> {
+    return Response.success(await this.pricingPlanAdminService.list(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.PLAN.CREATE)
+  async createPlan(@RequestParams() body: Record<string, unknown>): Promise<Response<unknown>> {
+    return Response.success(await this.pricingPlanAdminService.create(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.PLAN.UPDATE)
+  async updatePlan(@RequestParams() body: { id: string } & Record<string, unknown>): Promise<Response<unknown>> {
+    const { id, ...patch } = body;
+    return Response.success(await this.pricingPlanAdminService.update(id, patch));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.PLAN.DELETE)
+  async deletePlan(@RequestParams() body: { id: string }): Promise<Response<unknown>> {
+    return Response.success(await this.pricingPlanAdminService.deactivate(body.id));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.GET_CURRENT)
+  async getCurrentSubscription(@RequestParams() body: { tenantId: string }): Promise<Response<unknown>> {
+    return Response.success(await this.subscriptionDashboardService.getDashboardSubscription(body.tenantId));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.CHECKOUT_INVOICE)
+  async checkoutInvoice(@RequestParams() body: CheckoutInvoiceTcpRequest): Promise<Response<unknown>> {
+    return Response.success(await this.subscriptionDashboardService.checkoutInvoice(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.CANCEL)
+  async cancelSubscription(
+    @RequestParams() body: { tenantId: string; reason?: string | null },
+  ): Promise<Response<unknown>> {
+    return Response.success(await this.subscriptionDashboardService.cancelSubscription(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.LIST_HISTORY)
+  async listSubscriptionHistory(@RequestParams() body: { tenantId: string }): Promise<Response<unknown>> {
+    return Response.success(await this.subscriptionDashboardService.listSubscriptions(body.tenantId));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.ASSIGN)
+  async assignSubscription(
+    @RequestParams()
+    body: {
+      tenantId: string;
+      planCode: string;
+      billingPeriod?: 'MONTHLY' | 'YEARLY';
+      createdByUserId?: string;
+    },
+  ): Promise<Response<unknown>> {
+    return Response.success(await this.subscriptionDashboardService.assignSubscription(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.LIST_INVOICES)
+  async listInvoices(@RequestParams() body: Record<string, unknown>): Promise<Response<unknown>> {
+    return Response.success(await this.subscriptionDashboardService.listInvoices(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.GET_INVOICE)
+  async getInvoice(
+    @RequestParams() body: { tenantId?: string; invoiceId: string; statusOnly?: boolean },
+  ): Promise<Response<unknown>> {
+    return Response.success(await this.subscriptionDashboardService.getInvoice(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.CANCEL_INVOICE)
+  async cancelInvoice(
+    @RequestParams() body: { tenantId?: string; invoiceId: string; reason?: string | null },
+  ): Promise<Response<unknown>> {
+    return Response.success(await this.subscriptionDashboardService.cancelInvoice(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.MANUAL_CONFIRM_INVOICE)
+  async manualConfirmInvoice(
+    @RequestParams() body: { invoiceId: string; confirmedByUserId: string; note?: string | null },
+  ): Promise<Response<unknown>> {
+    return Response.success(await this.subscriptionDashboardService.manualConfirmInvoice(body));
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.HANDLE_WEBHOOK)
@@ -118,5 +256,9 @@ export class SaasController {
       });
     }
     return Response.success(true);
+  }
+
+  private tenantId(body: { id?: string; tenantId?: string }): string {
+    return body.tenantId ?? body.id ?? '';
   }
 }

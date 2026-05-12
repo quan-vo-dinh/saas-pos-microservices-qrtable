@@ -2,19 +2,21 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { OnboardTenantDialog } from '@/features/saas/admin-tenants/onboard-tenant-dialog';
 import { TenantFilters } from '@/features/saas/admin-tenants/tenant-filters';
 import { TenantsTable } from '@/features/saas/admin-tenants/tenants-table';
+import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { saasApi } from '@/features/saas/api';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 
-export default function AdminTenantsPage() {
+function AdminTenantsClient() {
   const router = useRouter();
   const { data: session } = useSession();
   const permissions = session?.user?.permissions ?? [];
+  const authReady = useAuthReadyForBff();
   const searchParams = useSearchParams();
   const [onboardOpen, setOnboardOpen] = useState(false);
 
@@ -39,12 +41,14 @@ export default function AdminTenantsPage() {
         page: query.page,
         limit: query.limit,
       }),
+    enabled: authReady,
     retry: 1,
   });
 
   const plansQuery = useQuery({
     queryKey: ['admin-plans', 'codes'],
     queryFn: () => saasApi.listPlansAdmin(),
+    enabled: authReady,
   });
 
   const extraPlanCodes = useMemo(
@@ -98,5 +102,13 @@ export default function AdminTenantsPage() {
         onCreated={() => void tenantsQuery.refetch()}
       />
     </div>
+  );
+}
+
+export default function AdminTenantsPage() {
+  return (
+    <Suspense fallback={<p className="text-muted-foreground p-6 text-sm">Đang tải danh sách tenant…</p>}>
+      <AdminTenantsClient />
+    </Suspense>
   );
 }

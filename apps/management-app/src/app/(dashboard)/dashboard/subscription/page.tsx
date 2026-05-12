@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { ApiError } from '@einvoice/frontend-utils';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { saasApi } from '@/features/saas/api';
 import { formatDateTime } from '@/features/saas/formatters';
 import type { BillingPeriod } from '@/features/saas/types';
@@ -23,6 +24,7 @@ import {
 
 export default function DashboardSubscriptionPage() {
   const qc = useQueryClient();
+  const authReady = useAuthReadyForBff();
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('MONTHLY');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [pendingInvoice, setPendingInvoice] = useState<Awaited<ReturnType<typeof saasApi.checkoutSubscription>> | null>(
@@ -33,6 +35,7 @@ export default function DashboardSubscriptionPage() {
   const sub = useQuery({
     queryKey: ['dashboard-subscription'],
     queryFn: () => saasApi.getDashboardSubscription(),
+    enabled: authReady,
   });
 
   const onCheckout = useCallback(

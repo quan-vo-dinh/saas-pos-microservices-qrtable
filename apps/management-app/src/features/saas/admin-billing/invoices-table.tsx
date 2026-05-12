@@ -9,6 +9,7 @@ import { ApiError } from '@einvoice/frontend-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import {
   Table,
   TableBody,
@@ -29,6 +30,7 @@ export function AdminBillingClient() {
   const router = useRouter();
   const { data: session } = useSession();
   const permissions = session?.user?.permissions ?? [];
+  const authReady = useAuthReadyForBff();
   const searchParams = useSearchParams();
   const qc = useQueryClient();
   const [manual, setManual] = useState<SubscriptionInvoice | null>(null);
@@ -64,6 +66,7 @@ export function AdminBillingClient() {
         page: filters.page,
         limit: filters.limit,
       }),
+    enabled: authReady,
   });
 
   const confirm = async (note: string) => {
@@ -86,7 +89,7 @@ export function AdminBillingClient() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
         <div className="grid gap-1.5">
           <Label>Trạng thái</Label>
           <Select
@@ -125,6 +128,24 @@ export function AdminBillingClient() {
                   n.set('tenantId', v);
                 } else {
                   n.delete('tenantId');
+                }
+                n.set('page', '1');
+              })
+            }
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Plan code</Label>
+          <Input
+            defaultValue={filters.planCode}
+            placeholder="BASIC"
+            onBlur={(e) =>
+              pushParams((n) => {
+                const v = e.target.value.trim().toUpperCase();
+                if (v) {
+                  n.set('planCode', v);
+                } else {
+                  n.delete('planCode');
                 }
                 n.set('page', '1');
               })

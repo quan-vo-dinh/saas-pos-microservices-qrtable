@@ -28,7 +28,10 @@ export class SessionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
 
     // Nhánh bypass cho các route không yêu cầu session
-    const authOptions = this.reflector.get<{ secured: boolean }>(MetadataKey.SECURED, context.getHandler());
+    const authOptions = this.reflector.getAllAndOverride<{ secured: boolean }>(MetadataKey.SECURED, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (authOptions?.secured) {
       return true;

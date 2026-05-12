@@ -42,7 +42,8 @@ export class TenantPaymentSettingsService {
   }
 
   async get(params: PaymentSettingsByTenantTcpRequest): Promise<TenantPaymentSettingsTcpResponse> {
-    return this.toResponse(await this.findRequired(params.tenantId));
+    const settings = await this.repository.findByTenantId(params.tenantId);
+    return this.toResponse(settings ?? (await this.repository.createEmpty(params.tenantId)));
   }
 
   async generateAuthorizeUrl(

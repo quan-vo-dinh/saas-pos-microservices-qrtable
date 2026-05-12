@@ -8,3 +8,8 @@ export const RequestParams = createParamDecorator((param: string, ctx: Execution
   }
   return request.data?.[param];
 });
+
+export const RequestProcessId = createParamDecorator((_: unknown, ctx: ExecutionContext) => {
+  const request = ctx.switchToRpc().getData();
+  return request?.processId;
+});

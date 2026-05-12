@@ -54,7 +54,10 @@ describe('OnboardingSaga integration', () => {
     expect(subscriptionService.assignPlan).toHaveBeenCalledWith(expect.objectContaining({ planCode: 'FREE' }));
     expect(paymentClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.CREATE_EMPTY,
-      expect.objectContaining({ tenantId: 'tenant-1' }),
+      expect.objectContaining({
+        data: { tenantId: 'tenant-1' },
+        processId: 'p1',
+      }),
     );
     expect(outbox.createTenantCreated).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-1' }));
   });

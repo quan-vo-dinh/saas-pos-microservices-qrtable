@@ -110,7 +110,9 @@ export class OnboardingSagaService {
 
       await this.resolveTcp(
         this.paymentClient.send(TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.CREATE_EMPTY, {
-          tenantId: tenant.id,
+          data: {
+            tenantId: tenant.id,
+          },
           processId: params.processId,
         }),
       );

@@ -1,4 +1,5 @@
 import { Reflector } from '@nestjs/core';
+import { ExecutionContext } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { MetadataKey } from '@common/constants/common.constant';
@@ -15,33 +16,33 @@ describe('UserGuard', () => {
         getRequest: () => request,
       }),
       getHandler: () => 'handler',
-    }) as any;
+      getClass: () => 'controller',
+    }) as unknown as ExecutionContext;
+
+  const reflectorWithAuth = (authOptions: { secured: boolean }) =>
+    ({
+      getAllAndOverride: jest.fn().mockReturnValue(authOptions),
+    }) as unknown as Reflector;
 
   it('returns true for unsecured route', async () => {
-    const reflector = {
-      get: jest.fn().mockReturnValue({ secured: false }),
-    } as unknown as Reflector;
+    const reflector = reflectorWithAuth({ secured: false });
 
-    const guard = new UserGuard(reflector, {} as any, { get: jest.fn(), set: jest.fn() } as any);
+    const guard = new UserGuard(reflector, {} as never, { get: jest.fn(), set: jest.fn() } as never);
 
     const result = await guard.canActivate(getContext({}));
     expect(result).toBe(true);
   });
 
   it('throws invalid_token when access token is missing', async () => {
-    const reflector = {
-      get: jest.fn().mockReturnValue({ secured: true }),
-    } as unknown as Reflector;
+    const reflector = reflectorWithAuth({ secured: true });
 
-    const guard = new UserGuard(reflector, {} as any, { get: jest.fn(), set: jest.fn() } as any);
+    const guard = new UserGuard(reflector, {} as never, { get: jest.fn(), set: jest.fn() } as never);
 
     await expect(guard.canActivate(getContext({ headers: {} }))).rejects.toThrow(BusinessException);
   });
 
   it('maps role_mapping_mismatch to user_not_provisioned', async () => {
-    const reflector = {
-      get: jest.fn().mockReturnValue({ secured: true }),
-    } as unknown as Reflector;
+    const reflector = reflectorWithAuth({ secured: true });
 
     const mockAuthorizerService = {
       verifyUserToken: jest.fn().mockReturnValue(throwError(() => ({ details: 'ROLE_MAPPING_MISMATCH' }))),
@@ -51,11 +52,11 @@ describe('UserGuard', () => {
       reflector,
       {
         getService: jest.fn().mockReturnValue(mockAuthorizerService),
-      } as any,
+      } as never,
       {
         get: jest.fn().mockResolvedValue(undefined),
         set: jest.fn(),
-      } as any,
+      } as never,
     );
 
     guard.onModuleInit();
@@ -73,9 +74,7 @@ describe('UserGuard', () => {
   });
 
   it('returns true and caches user data when token is valid', async () => {
-    const reflector = {
-      get: jest.fn().mockReturnValue({ secured: true }),
-    } as unknown as Reflector;
+    const reflector = reflectorWithAuth({ secured: true });
 
     const mockAuthorizeResponse = {
       valid: true,
@@ -105,11 +104,11 @@ describe('UserGuard', () => {
       reflector,
       {
         getService: jest.fn().mockReturnValue(mockAuthorizerService),
-      } as any,
+      } as never,
       {
         get: jest.fn().mockResolvedValue(undefined),
         set: cacheSet,
-      } as any,
+      } as never,
     );
 
     guard.onModuleInit();
@@ -119,5 +118,17 @@ describe('UserGuard', () => {
     expect(result).toBe(true);
     expect(request[MetadataKey.USER_DATA]).toEqual(mockAuthorizeResponse);
     expect(cacheSet).toHaveBeenCalled();
+  });
+
+  it('reads class-level authorization metadata for secured controllers', async () => {
+    const getAllAndOverride = jest.fn().mockReturnValue({ secured: true });
+    const reflector = {
+      getAllAndOverride,
+    } as unknown as Reflector;
+
+    const guard = new UserGuard(reflector, {} as never, { get: jest.fn(), set: jest.fn() } as never);
+
+    await expect(guard.canActivate(getContext({ headers: {} }))).rejects.toThrow(BusinessException);
+    expect(getAllAndOverride).toHaveBeenCalledWith(MetadataKey.SECURED, ['handler', 'controller']);
   });
 });

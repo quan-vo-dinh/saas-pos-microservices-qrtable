@@ -15,15 +15,7 @@ export class TenantPaymentSettingsRepository {
   }
 
   createEmpty(tenantId: string): Promise<TenantPaymentSettingsEntity> {
-    return this.repo.save(
-      this.repo.create({
-        tenantId,
-        cashEnabled: true,
-        vietqrEnabled: false,
-        connectionStatus: TenantPaymentConnectionStatus.NOT_CONNECTED,
-        sepayTokenScopes: [],
-      }),
-    );
+    return this.saveEmptyOrReadExisting(tenantId);
   }
 
   async updateByTenantId(
@@ -36,5 +28,35 @@ export class TenantPaymentSettingsRepository {
       throw new NotFoundException('TENANT_PAYMENT_SETTINGS_NOT_FOUND');
     }
     return updated;
+  }
+
+  private async saveEmptyOrReadExisting(tenantId: string): Promise<TenantPaymentSettingsEntity> {
+    try {
+      return await this.repo.save(
+        this.repo.create({
+          tenantId,
+          cashEnabled: true,
+          vietqrEnabled: false,
+          connectionStatus: TenantPaymentConnectionStatus.NOT_CONNECTED,
+          sepayTokenScopes: [],
+        }),
+      );
+    } catch (error) {
+      if (!this.isUniqueViolation(error)) {
+        throw error;
+      }
+
+      const existing = await this.findByTenantId(tenantId);
+      if (!existing) {
+        throw error;
+      }
+      return existing;
+    }
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    return (
+      typeof error === 'object' && error !== null && 'code' in error && (error as { code?: unknown }).code === '23505'
+    );
   }
 }

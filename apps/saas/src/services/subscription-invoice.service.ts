@@ -1,5 +1,8 @@
 import { BILL_REF_PREFIXES, SubscriptionInvoiceStatus } from '@common/constants/saas.constants';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { SubscriptionInvoice } from '@common/entities/subscription-invoice.entity';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { randomBytes } from 'crypto';
+import { PricingPlanRepository } from '../repositories/pricing-plan.repository';
 import { SubscriptionInvoiceRepository } from '../repositories/subscription-invoice.repository';
 import { SubscriptionService } from './subscription.service';
 
@@ -18,6 +21,8 @@ export class SubscriptionInvoiceService {
   constructor(
     @Inject(SubscriptionInvoiceRepository)
     private readonly invoiceRepository: {
+      createInvoice(data: Partial<SubscriptionInvoice>): Promise<SubscriptionInvoice>;
+      findById(id: string): Promise<SubscriptionInvoice | null>;
       findByBillingReferenceForUpdate(billingReference: string): Promise<{
         id: string;
         billingReference: string;
@@ -25,12 +30,131 @@ export class SubscriptionInvoiceService {
         status: SubscriptionInvoiceStatus;
         tenantId: string;
         planCodeSnapshot: string;
+        periodEndsAt: Date;
       } | null>;
-      markPaid(id: string, patch: Record<string, unknown>): Promise<void>;
+      list(
+        query: Record<string, unknown>,
+      ): Promise<{ items: SubscriptionInvoice[]; page: number; limit: number; total: number }>;
+      markPaid(id: string, patch: Partial<SubscriptionInvoice>): Promise<SubscriptionInvoice | null>;
+      updateById(id: string, patch: Partial<SubscriptionInvoice>): Promise<SubscriptionInvoice>;
       auditUnderpaid(id: string, patch: Record<string, unknown>): Promise<void>;
     },
     private readonly subscriptionService: SubscriptionService,
+    @Optional() private readonly planRepository?: PricingPlanRepository,
   ) {}
+
+  async checkout(input: {
+    tenantId: string;
+    planCode: string;
+    billingPeriod: 'MONTHLY' | 'YEARLY';
+    requestedByUserId: string;
+  }): Promise<Record<string, unknown>> {
+    const plan = await this.planRepository?.findActiveByCode(input.planCode);
+    if (!plan) {
+      throw new NotFoundException('PLAN_NOT_FOUND');
+    }
+
+    const now = new Date();
+    const periodEndsAt = this.addBillingPeriod(now, input.billingPeriod);
+    const amountVnd = this.calculateAmount(plan.priceVnd, plan.billingPeriod, input.billingPeriod);
+    const invoice = await this.invoiceRepository.createInvoice({
+      tenantId: input.tenantId,
+      pricingPlanId: plan.id,
+      planCodeSnapshot: plan.code,
+      amountVnd,
+      billingPeriod: input.billingPeriod,
+      periodStartsAt: now,
+      periodEndsAt,
+      billingReference: this.createBillingReference(),
+      status: SubscriptionInvoiceStatus.PENDING,
+      qrExpiresAt: new Date(now.getTime() + 15 * 60 * 1000),
+      requestedByUserId: input.requestedByUserId,
+    });
+
+    const qrUrl = this.buildQrUrl(invoice);
+    const saved = qrUrl ? await this.invoiceRepository.updateById(invoice.id, { qrUrl }) : invoice;
+    return this.toInvoiceResponse(saved);
+  }
+
+  async list(query: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const result = await this.invoiceRepository.list(query);
+    return {
+      ...result,
+      items: result.items.map((invoice) => this.toInvoiceResponse(invoice)),
+    };
+  }
+
+  async getInvoice(input: {
+    tenantId?: string;
+    invoiceId: string;
+    statusOnly?: boolean;
+  }): Promise<Record<string, unknown>> {
+    const invoice = await this.invoiceRepository.findById(input.invoiceId);
+    if (!invoice || (input.tenantId && invoice.tenantId !== input.tenantId)) {
+      throw new NotFoundException('SUBSCRIPTION_INVOICE_NOT_FOUND');
+    }
+    const response = this.toInvoiceResponse(invoice);
+    return input.statusOnly ? { id: response.id, status: response.status } : response;
+  }
+
+  async cancelInvoice(input: {
+    tenantId?: string;
+    invoiceId: string;
+    reason?: string | null;
+  }): Promise<Record<string, unknown>> {
+    const invoice = await this.invoiceRepository.findById(input.invoiceId);
+    if (!invoice || (input.tenantId && invoice.tenantId !== input.tenantId)) {
+      throw new NotFoundException('SUBSCRIPTION_INVOICE_NOT_FOUND');
+    }
+    if (invoice.status !== SubscriptionInvoiceStatus.PENDING) {
+      throw new BadRequestException('ONLY_PENDING_INVOICE_CAN_BE_CANCELED');
+    }
+    return this.toInvoiceResponse(
+      await this.invoiceRepository.updateById(invoice.id, {
+        status: SubscriptionInvoiceStatus.CANCELED,
+        canceledAt: new Date(),
+        canceledReason: input.reason ?? 'Canceled by user',
+      }),
+    );
+  }
+
+  async manualConfirm(input: {
+    invoiceId: string;
+    confirmedByUserId: string;
+    note?: string | null;
+  }): Promise<Record<string, unknown>> {
+    const invoice = await this.invoiceRepository.findById(input.invoiceId);
+    if (!invoice) {
+      throw new NotFoundException('SUBSCRIPTION_INVOICE_NOT_FOUND');
+    }
+    if (invoice.status !== SubscriptionInvoiceStatus.PENDING) {
+      throw new BadRequestException('ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED');
+    }
+
+    const paid = await this.invoiceRepository.markPaid(invoice.id, {
+      status: SubscriptionInvoiceStatus.PAID,
+      paidAt: new Date(),
+      paidAmountVnd: invoice.amountVnd,
+      manuallyConfirmedByUserId: input.confirmedByUserId,
+      manuallyConfirmedAt: new Date(),
+      sepayTransferContent: input.note ?? invoice.sepayTransferContent ?? null,
+    });
+    if (!paid) {
+      throw new BadRequestException('ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED');
+    }
+
+    await this.subscriptionService.assignPlan({
+      tenantId: invoice.tenantId,
+      planCode: invoice.planCodeSnapshot,
+      source: 'SUBSCRIPTION_PAYMENT',
+      sourceInvoiceId: invoice.id,
+      startsAt: new Date(),
+      expiresAt: invoice.periodEndsAt,
+      createdByUserId: input.confirmedByUserId,
+    });
+
+    return this.toInvoiceResponse(paid);
+  }
 
   async handleWebhook(input: SubscriptionWebhookInput): Promise<void> {
     if (!input.code.startsWith(BILL_REF_PREFIXES.SUBSCRIPTION)) {
@@ -48,26 +172,81 @@ export class SubscriptionInvoiceService {
       return;
     }
 
-    await this.invoiceRepository.markPaid(invoice.id, {
+    const paid = await this.invoiceRepository.markPaid(invoice.id, {
       status: SubscriptionInvoiceStatus.PAID,
-      sepayTransactionId: input.sepayTransactionId,
+      sepayTransactionId: Number(input.sepayTransactionId) || null,
       paidAmountVnd: input.transferAmount,
       paidAt: new Date(),
     });
+    if (!paid) {
+      return;
+    }
 
-    const now = new Date();
     await this.subscriptionService.assignPlan({
       tenantId: invoice.tenantId,
       planCode: invoice.planCodeSnapshot,
       source: 'SUBSCRIPTION_PAYMENT',
-      startsAt: now,
-      expiresAt: this.addOneMonth(now),
+      sourceInvoiceId: invoice.id,
+      startsAt: new Date(),
+      expiresAt: invoice.periodEndsAt,
     });
   }
 
-  private addOneMonth(now: Date): Date {
+  private addBillingPeriod(now: Date, billingPeriod: 'MONTHLY' | 'YEARLY'): Date {
     const next = new Date(now);
-    next.setMonth(next.getMonth() + 1);
+    if (billingPeriod === 'YEARLY') {
+      next.setFullYear(next.getFullYear() + 1);
+    } else {
+      next.setMonth(next.getMonth() + 1);
+    }
     return next;
+  }
+
+  private calculateAmount(
+    planPriceVnd: number,
+    planBillingPeriod: 'MONTHLY' | 'YEARLY',
+    requestedBillingPeriod: 'MONTHLY' | 'YEARLY',
+  ): number {
+    if (planBillingPeriod === requestedBillingPeriod) {
+      return Number(planPriceVnd);
+    }
+    return requestedBillingPeriod === 'YEARLY' ? Number(planPriceVnd) * 12 : Math.ceil(Number(planPriceVnd) / 12);
+  }
+
+  private createBillingReference(): string {
+    return `${BILL_REF_PREFIXES.SUBSCRIPTION}${randomBytes(5).toString('hex').toUpperCase()}`;
+  }
+
+  private buildQrUrl(invoice: SubscriptionInvoice): string | null {
+    const account = process.env.SEPAY_PLATFORM_QR_ACCOUNT || process.env.PAYMENT_SEPAY_QR_ACCOUNT;
+    const bank = process.env.SEPAY_PLATFORM_QR_BANK || process.env.PAYMENT_SEPAY_QR_BANK;
+    if (!account || !bank) {
+      return null;
+    }
+
+    const params = new URLSearchParams({
+      acc: account,
+      bank,
+      amount: String(invoice.amountVnd),
+      des: invoice.billingReference,
+    });
+    return `https://qr.sepay.vn/img?${params.toString()}`;
+  }
+
+  private toInvoiceResponse(invoice: SubscriptionInvoice): Record<string, unknown> {
+    return {
+      id: invoice.id,
+      tenantId: invoice.tenantId,
+      pricingPlanId: invoice.pricingPlanId,
+      planCodeSnapshot: invoice.planCodeSnapshot,
+      amountVnd: Number(invoice.amountVnd),
+      billingPeriod: invoice.billingPeriod,
+      billingReference: invoice.billingReference,
+      status: invoice.status,
+      qrUrl: invoice.qrUrl ?? null,
+      qrExpiresAt: invoice.qrExpiresAt?.toISOString() ?? null,
+      paidAt: invoice.paidAt?.toISOString() ?? null,
+      createdAt: invoice.createdAt?.toISOString?.() ?? invoice.createdAt,
+    };
   }
 }

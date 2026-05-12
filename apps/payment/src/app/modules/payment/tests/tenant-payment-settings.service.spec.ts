@@ -35,6 +35,25 @@ describe('TenantPaymentSettingsService', () => {
     expect(repo.createEmpty).not.toHaveBeenCalled();
   });
 
+  it('creates empty settings when get is called for an existing tenant without settings row', async () => {
+    repo.findByTenantId.mockResolvedValue(null);
+    repo.createEmpty.mockResolvedValue({
+      tenantId: 'tenant-1',
+      connectionStatus: TenantPaymentConnectionStatus.NOT_CONNECTED,
+    });
+    const service = new TenantPaymentSettingsService(repo as never);
+
+    const result = await service.get({ tenantId: 'tenant-1' });
+
+    expect(repo.createEmpty).toHaveBeenCalledWith('tenant-1');
+    expect(result).toEqual(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        connectionStatus: TenantPaymentConnectionStatus.NOT_CONNECTED,
+      }),
+    );
+  });
+
   it('stores selected bank and marks settings connected after webhook setup', async () => {
     const localRepo = {
       findByTenantId: jest.fn().mockResolvedValue({ tenantId: 'tenant-1', sepayAccessTokenEncrypted: 'enc' }),

@@ -1,12 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
 
-type OAuthConfig = {
+export type OAuthConfig = {
   baseUrl: string;
   clientId: string;
   clientSecret: string;
   redirectUri: string;
 };
+
+export const SEPAY_OAUTH_CLIENT_CONFIG = Symbol('SEPAY_OAUTH_CLIENT_CONFIG');
 
 type SepayOAuthTokenResponse = {
   access_token: string;
@@ -40,6 +42,7 @@ type SepayWebhookResponse = {
 @Injectable()
 export class SepayOAuthClientService {
   private readonly http: AxiosInstance;
+  private readonly config: OAuthConfig;
   private readonly scopes = [
     'bank-account:read',
     'transaction:read',
@@ -49,14 +52,14 @@ export class SepayOAuthClientService {
     'profile',
   ];
 
-  constructor(
-    private readonly config: OAuthConfig = {
+  constructor(@Optional() @Inject(SEPAY_OAUTH_CLIENT_CONFIG) config?: Partial<OAuthConfig>) {
+    this.config = {
       baseUrl: process.env.SEPAY_OAUTH_BASE_URL ?? 'https://my.sepay.vn',
       clientId: process.env.SEPAY_OAUTH_CLIENT_ID ?? '',
       clientSecret: process.env.SEPAY_OAUTH_CLIENT_SECRET ?? '',
       redirectUri: process.env.SEPAY_OAUTH_REDIRECT_URI ?? '',
-    },
-  ) {
+      ...config,
+    };
     this.http = axios.create({ baseURL: this.config.baseUrl, timeout: 5000 });
   }
 

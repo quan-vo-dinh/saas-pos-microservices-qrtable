@@ -16,8 +16,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@einvoice/frontend-ui';
 import { ROUTES } from '@/constants/routes';
+import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { saasApi } from '@/features/saas/api';
 import { formatDateTime } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
@@ -164,12 +166,20 @@ export function TenantSubscriptionsTab({
   permissions: string[];
 }) {
   const qc = useQueryClient();
+  const authReady = useAuthReadyForBff();
   const list = useQuery({
     queryKey: ['admin-tenant-subs', tenantId],
     queryFn: () => saasApi.listTenantSubscriptions(tenantId),
+    enabled: authReady,
   });
   const [planCode, setPlanCode] = useState('BASIC');
   const [billingPeriod, setBillingPeriod] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
+  const [effectiveAt] = useState(() => new Date().toISOString());
+  const plans = useQuery({
+    queryKey: ['admin-plans', 'assign-options'],
+    queryFn: () => saasApi.listPlansAdmin(),
+    enabled: authReady,
+  });
 
   const assign = useMutation({
     mutationFn: () => saasApi.assignTenantSubscription(tenantId, { planCode, billingPeriod }),
@@ -187,21 +197,43 @@ export function TenantSubscriptionsTab({
     <div className="space-y-6">
       {canAssign ? (
         <div className="flex flex-col gap-3 rounded-md border p-4 md:flex-row md:items-end">
-          <div className="grid flex-1 gap-2 md:grid-cols-2">
+          <div className="grid flex-1 gap-2 md:grid-cols-3">
             <div className="grid gap-1.5">
               <Label>Gói</Label>
-              <Input value={planCode} onChange={(e) => setPlanCode(e.target.value.toUpperCase())} />
+              <Select value={planCode} onValueChange={setPlanCode}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn gói" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(plans.data ?? [])
+                    .filter((plan) => plan.isActive)
+                    .sort((a, b) => a.displayOrder - b.displayOrder)
+                    .map((plan) => (
+                      <SelectItem key={plan.id} value={plan.code}>
+                        {plan.code} · {plan.name}
+                      </SelectItem>
+                    ))}
+                  {!(plans.data ?? []).some((plan) => plan.code === planCode) ? (
+                    <SelectItem value={planCode}>{planCode}</SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-1.5">
               <Label>Chu kỳ</Label>
-              <select
-                className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-                value={billingPeriod}
-                onChange={(e) => setBillingPeriod(e.target.value as 'MONTHLY' | 'YEARLY')}
-              >
-                <option value="MONTHLY">Tháng</option>
-                <option value="YEARLY">Năm</option>
-              </select>
+              <Select value={billingPeriod} onValueChange={(value) => setBillingPeriod(value as 'MONTHLY' | 'YEARLY')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MONTHLY">Tháng</SelectItem>
+                  <SelectItem value="YEARLY">Năm</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Hiệu lực</Label>
+              <Input value={formatDateTime(effectiveAt)} readOnly />
             </div>
           </div>
           <div className="text-muted-foreground text-xs md:flex-1">
@@ -265,10 +297,12 @@ function QuotaBar({ label, used, max }: { label: string; used: number; max: numb
 }
 
 export function TenantUsageTab({ tenantId }: { tenantId: string }) {
+  const authReady = useAuthReadyForBff();
   const usage = useQuery({
     queryKey: ['admin-tenant-usage', tenantId],
     queryFn: () => saasApi.getTenantUsage(tenantId),
-    refetchInterval: 30_000,
+    enabled: authReady,
+    refetchInterval: authReady ? 30_000 : false,
   });
   const u = usage.data ?? {};
   return (
@@ -281,9 +315,11 @@ export function TenantUsageTab({ tenantId }: { tenantId: string }) {
 }
 
 export function TenantAuditTab({ tenantId }: { tenantId: string }) {
+  const authReady = useAuthReadyForBff();
   const audit = useQuery({
     queryKey: ['admin-tenant-audit', tenantId],
     queryFn: () => saasApi.getTenantAudit(tenantId),
+    enabled: authReady,
   });
   return (
     <ol className="border-s-muted max-w-2xl space-y-3 border-s ps-4 text-sm">

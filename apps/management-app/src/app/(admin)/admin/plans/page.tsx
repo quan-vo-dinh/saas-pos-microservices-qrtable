@@ -8,6 +8,7 @@ import { ApiError } from '@einvoice/frontend-utils';
 import { Button } from '@/components/ui/button';
 import { PlanFormDialog } from '@/features/saas/admin-plans/plan-form-dialog';
 import { PlansTable } from '@/features/saas/admin-plans/plans-table';
+import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { saasApi } from '@/features/saas/api';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import type { CreatePlanPayload, PricingPlan } from '@/features/saas/types';
@@ -15,6 +16,7 @@ import type { CreatePlanPayload, PricingPlan } from '@/features/saas/types';
 export default function AdminPlansPage() {
   const { data: session } = useSession();
   const permissions = session?.user?.permissions ?? [];
+  const authReady = useAuthReadyForBff();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<'create' | 'edit'>('create');
   const [editing, setEditing] = useState<PricingPlan | null>(null);
@@ -22,6 +24,7 @@ export default function AdminPlansPage() {
   const plansQuery = useQuery({
     queryKey: ['admin-plans'],
     queryFn: () => saasApi.listPlansAdmin(),
+    enabled: authReady,
   });
 
   const handleSubmit = async (values: CreatePlanPayload) => {
