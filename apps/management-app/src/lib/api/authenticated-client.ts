@@ -4,7 +4,7 @@ import { apiClient } from '@einvoice/frontend-utils';
 import { getBffBaseUrl } from '@/lib/auth/bff-server';
 import { useAuthStore } from '@/lib/auth/auth-store';
 
-type AuthClientOptions = Omit<RequestInit, 'headers'> & {
+export type AuthClientOptions = Omit<RequestInit, 'headers'> & {
   headers?: Record<string, string>;
 };
 

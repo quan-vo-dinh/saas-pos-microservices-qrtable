@@ -7,6 +7,7 @@ const EXACT: Record<string, string> = {
   [ROUTES.STAFF]: 'Nhân sự',
   [ROUTES.ORDERS]: 'Đơn hàng',
   [ROUTES.SUBSCRIPTION]: 'Đăng ký gói',
+  [ROUTES.DASHBOARD_PAYMENT_SETTINGS]: 'Thanh toán tenant',
   [ROUTES.POS]: 'Đơn trực tiếp',
   [ROUTES.POS_TABLES]: 'Quản lý bàn',
   [ROUTES.POS_SERVICE_REQUESTS]: 'Yêu cầu phục vụ',
@@ -17,6 +18,7 @@ const EXACT: Record<string, string> = {
   [ROUTES.ADMIN]: 'Quản trị nền tảng',
   [ROUTES.ADMIN_TENANTS]: 'Thuê bao',
   [ROUTES.ADMIN_PLANS]: 'Gói dịch vụ',
+  [ROUTES.ADMIN_BILLING]: 'Billing nền tảng',
   [ROUTES.ADMIN_ANALYTICS]: 'Thống kê',
 };
 

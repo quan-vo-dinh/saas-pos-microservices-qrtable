@@ -3,7 +3,10 @@ import {
   ChefHat,
   ClipboardList,
   CreditCard,
+  Landmark,
   LayoutDashboard,
+  Package,
+  Receipt,
   Shield,
   Store,
   Table,
@@ -12,6 +15,7 @@ import {
 
 import type { SidebarData } from '@/components/layout/types';
 import { ROUTES } from '@/constants/routes';
+import { phase4bPermissions } from '@/features/saas/permissions';
 
 const OM = ['OWNER', 'MANAGER'] as const;
 const POS_STAFF = ['OWNER', 'MANAGER', 'WAITER'] as const;
@@ -59,8 +63,16 @@ export const sidebarData: SidebarData = {
         {
           title: 'Subscription',
           url: ROUTES.SUBSCRIPTION,
-          icon: Building2,
+          icon: CreditCard,
           roles: OM,
+          permissions: [phase4bPermissions.subscriptionReadOwn],
+        },
+        {
+          title: 'Payment settings',
+          url: ROUTES.DASHBOARD_PAYMENT_SETTINGS,
+          icon: Landmark,
+          roles: OM,
+          permissions: [phase4bPermissions.paymentSettingsReadOwn],
         },
       ],
     },
@@ -126,12 +138,23 @@ export const sidebarData: SidebarData = {
             {
               title: 'Tenants',
               url: ROUTES.ADMIN_TENANTS,
+              icon: Building2,
               roles: SUPER,
+              permissions: [phase4bPermissions.tenantListAll],
             },
             {
               title: 'Plans',
               url: ROUTES.ADMIN_PLANS,
+              icon: Package,
               roles: SUPER,
+              permissions: [phase4bPermissions.planRead],
+            },
+            {
+              title: 'Billing',
+              url: ROUTES.ADMIN_BILLING,
+              icon: Receipt,
+              roles: SUPER,
+              permissions: [phase4bPermissions.subscriptionListAny],
             },
             {
               title: 'Analytics',

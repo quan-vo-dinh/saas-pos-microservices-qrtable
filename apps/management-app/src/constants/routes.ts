@@ -11,6 +11,9 @@ export const ROUTES = {
   ORDERS: '/dashboard/orders',
   STAFF: '/dashboard/staff',
   SUBSCRIPTION: '/dashboard/subscription',
+  DASHBOARD_BILLING_INVOICE: (id: string) => `/dashboard/billing/${encodeURIComponent(id)}`,
+  DASHBOARD_PAYMENT_SETTINGS: '/dashboard/payment-settings',
+  DASHBOARD_SEPAY_CALLBACK: '/dashboard/payment-settings/sepay-callback',
 
   // POS
   POS: '/pos',
@@ -27,7 +30,9 @@ export const ROUTES = {
   // Admin (Super Admin)
   ADMIN: '/admin',
   ADMIN_TENANTS: '/admin/tenants',
+  ADMIN_TENANT_DETAIL: (id: string) => `/admin/tenants/${encodeURIComponent(id)}`,
   ADMIN_PLANS: '/admin/plans',
+  ADMIN_BILLING: '/admin/billing',
   ADMIN_ANALYTICS: '/admin/analytics',
 
   // API

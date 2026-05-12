@@ -13,10 +13,17 @@ function userMatchesRoles(userRoles: AppRole[], required?: readonly AppRole[]): 
   return userRoles.some((r) => required.includes(r));
 }
 
-function filterNavItem(item: NavItem, userRoles: AppRole[]): NavItem | null {
+function userMatchesPermissions(userPermissions: string[], required?: readonly string[]): boolean {
+  if (!required?.length) {
+    return true;
+  }
+  return required.every((p) => userPermissions.includes(p));
+}
+
+function filterNavItem(item: NavItem, userRoles: AppRole[], userPermissions: string[]): NavItem | null {
   if (isCollapsible(item)) {
     const nextItems = item.items
-      .map((child) => filterNavItem(child, userRoles))
+      .map((child) => filterNavItem(child, userRoles, userPermissions))
       .filter((child): child is NavLink => child !== null);
     if (!nextItems.length) {
       return null;
@@ -24,11 +31,21 @@ function filterNavItem(item: NavItem, userRoles: AppRole[]): NavItem | null {
     return { ...item, items: nextItems };
   }
 
-  return userMatchesRoles(userRoles, item.roles) ? item : null;
+  if (!userMatchesRoles(userRoles, item.roles)) {
+    return null;
+  }
+  if (!userMatchesPermissions(userPermissions, item.permissions)) {
+    return null;
+  }
+  return item;
 }
 
-/** Filters sidebar nav to entries the user is allowed to see (aligned with middleware route access). */
-export function filterSidebarNavByRoles(navGroups: NavGroup[], userRoles: AppRole[]): NavGroup[] {
+/** Filters sidebar nav to entries the user is allowed to see (roles + Phase 4B permission gates). */
+export function filterSidebarNavByRoles(
+  navGroups: NavGroup[],
+  userRoles: AppRole[],
+  userPermissions: string[] = [],
+): NavGroup[] {
   if (!userRoles.length) {
     return [];
   }
@@ -36,7 +53,9 @@ export function filterSidebarNavByRoles(navGroups: NavGroup[], userRoles: AppRol
   return navGroups
     .map((group) => ({
       ...group,
-      items: group.items.map((item) => filterNavItem(item, userRoles)).filter((item): item is NavItem => item !== null),
+      items: group.items
+        .map((item) => filterNavItem(item, userRoles, userPermissions))
+        .filter((item): item is NavItem => item !== null),
     }))
     .filter((group) => group.items.length > 0);
 }

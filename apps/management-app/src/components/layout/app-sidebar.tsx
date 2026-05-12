@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useSession } from 'next-auth/react';
 import {
   Avatar,
@@ -41,13 +41,11 @@ export function AppSidebar() {
     () => false,
   );
 
-  const navGroups = useMemo(() => {
-    const roles = parseRoles(session?.user?.roles);
-    if (!hasClientMounted || status === 'loading') {
-      return sidebarData.navGroups;
-    }
-    return filterSidebarNavByRoles(sidebarData.navGroups, roles);
-  }, [session?.user?.roles, status, hasClientMounted]);
+  const roles = parseRoles(session?.user?.roles);
+  const navGroups =
+    !hasClientMounted || status === 'loading'
+      ? sidebarData.navGroups
+      : filterSidebarNavByRoles(sidebarData.navGroups, roles, session?.user?.permissions ?? []);
 
   return (
     <Sidebar collapsible="icon" variant="inset">

@@ -9,6 +9,8 @@ export type NavLink = {
   badge?: string;
   /** If set, at least one role must match (same semantics as route middleware). */
   roles?: readonly AppRole[];
+  /** If set, user must have every listed permission (in addition to role match when roles are set). */
+  permissions?: readonly string[];
 };
 
 export type NavCollapsible = {
