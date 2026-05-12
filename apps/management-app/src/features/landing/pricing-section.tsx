@@ -14,7 +14,7 @@ export function PricingSection({ plans }: PricingSectionProps): React.ReactEleme
   const hasPlans = sorted.length > 0;
 
   return (
-    <section id="pricing" aria-labelledby="pricing-heading" className="border-b border-border/80 bg-muted/20 py-16 md:py-24">
+    <section id="pricing" aria-labelledby="pricing-heading" className="qrt-landing__band border-b border-border/60 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="max-w-3xl">
           <h2 id="pricing-heading" className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
@@ -27,7 +27,7 @@ export function PricingSection({ plans }: PricingSectionProps): React.ReactEleme
         </div>
 
         {!hasPlans ? (
-          <p className="mt-10 rounded-xl border border-dashed border-border bg-card p-8 text-center text-muted-foreground">
+          <p className="qrt-glass mt-10 rounded-xl border border-dashed border-border/80 p-8 text-center text-muted-foreground">
             Hiện chưa có dữ liệu gói công khai. Vui lòng thử lại sau hoặc liên hệ triển khai.
           </p>
         ) : (
@@ -37,8 +37,10 @@ export function PricingSection({ plans }: PricingSectionProps): React.ReactEleme
               return (
                 <li
                   key={plan.id}
-                  className={`flex flex-col rounded-2xl border bg-card p-6 shadow-sm ${
-                    emphasized ? 'border-primary ring-2 ring-primary/20 lg:-translate-y-0.5' : 'border-border'
+                  className={`qrt-glass flex flex-col rounded-2xl border p-6 shadow-sm ${
+                    emphasized
+                      ? 'border-primary ring-2 ring-primary/25 motion-safe:lg:-translate-y-0.5'
+                      : 'border-border/70'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -78,7 +80,7 @@ export function PricingSection({ plans }: PricingSectionProps): React.ReactEleme
                   </ul>
                   <a
                     href="#contact"
-                    className="mt-8 inline-flex h-12 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                    className="mt-8 inline-flex h-12 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:scale-[1.01]"
                   >
                     Liên hệ triển khai
                   </a>

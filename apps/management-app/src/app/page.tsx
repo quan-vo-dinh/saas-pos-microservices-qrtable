@@ -9,6 +9,7 @@ import { TableLifecycleSection } from '@/features/landing/table-lifecycle-sectio
 import { ComparisonSection } from '@/features/landing/comparison-section';
 import { LandingHeader } from '@/features/landing/landing-header';
 import { LandingFooter } from '@/features/landing/landing-footer';
+import { LandingBackdrop } from '@/features/landing/landing-backdrop';
 import '@/features/landing/landing.css';
 
 export default async function Home(): Promise<React.ReactElement> {
@@ -16,24 +17,27 @@ export default async function Home(): Promise<React.ReactElement> {
 
   return (
     <div className="qrt-landing min-h-dvh bg-background text-foreground">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-primary-foreground"
-      >
-        Bỏ qua điều hướng tới nội dung chính
-      </a>
-      <LandingHeader productName={landing.productName} />
-      <main id="main">
-        <HeroSection productName={landing.productName} />
-        <ProductOverviewSection />
-        <TableLifecycleSection />
-        <WorkflowSection />
-        <ComparisonSection />
-        <PricingSection plans={plans} />
-        <PaymentSection />
-        <ContactSection contactEmail={landing.contactEmail} />
-      </main>
-      <LandingFooter productName={landing.productName} />
+      <LandingBackdrop />
+      <div className="qrt-landing__shell">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-primary-foreground"
+        >
+          Bỏ qua điều hướng tới nội dung chính
+        </a>
+        <LandingHeader productName={landing.productName} />
+        <main id="main">
+          <HeroSection productName={landing.productName} />
+          <ProductOverviewSection />
+          <TableLifecycleSection />
+          <WorkflowSection />
+          <ComparisonSection />
+          <PricingSection plans={plans} />
+          <PaymentSection />
+          <ContactSection contactEmail={landing.contactEmail} />
+        </main>
+        <LandingFooter productName={landing.productName} />
+      </div>
     </div>
   );
 }

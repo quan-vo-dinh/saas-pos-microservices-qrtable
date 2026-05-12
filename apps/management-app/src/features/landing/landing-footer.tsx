@@ -3,7 +3,7 @@ import Link from 'next/link';
 export function LandingFooter({ productName }: { productName: string }): React.ReactElement {
   const year = new Date().getFullYear();
   return (
-    <footer role="contentinfo" className="border-t border-border bg-muted/30 py-12 text-sm">
+    <footer role="contentinfo" className="qrt-landing__band-muted border-t border-border/60 py-12 text-sm">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 md:grid-cols-[1.2fr_1fr]">
         <div>
           <p className="text-base font-semibold text-foreground">{productName}</p>

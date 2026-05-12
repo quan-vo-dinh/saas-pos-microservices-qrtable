@@ -13,7 +13,7 @@ export function LandingHeader({ productName }: { productName: string }): React.R
   return (
     <header
       role="banner"
-      className="sticky top-0 z-50 border-b border-border/80 bg-background/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/80"
+      className="sticky top-0 z-50 border-b border-border/60 bg-background/55 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/45"
     >
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex h-14 min-h-[3.5rem] items-center justify-between gap-4 sm:h-[4.25rem]">

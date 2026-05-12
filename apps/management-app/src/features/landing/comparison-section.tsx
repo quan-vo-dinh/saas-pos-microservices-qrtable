@@ -50,7 +50,7 @@ function Cell({ value }: { value: boolean | 'partial' }): React.ReactElement {
 
 export function ComparisonSection(): React.ReactElement {
   return (
-    <section id="so-sanh" aria-labelledby="so-sanh-heading" className="border-b border-border/80 bg-background py-16 md:py-24">
+    <section id="so-sanh" aria-labelledby="so-sanh-heading" className="qrt-landing__band-muted border-b border-border/60 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <h2 id="so-sanh-heading" className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
           QRTable so với vận hành “tách rời công cụ”
@@ -60,11 +60,11 @@ export function ComparisonSection(): React.ReactElement {
           giảm sai lệch dữ liệu và chi phí tích hợp.
         </p>
 
-        <div className="mt-10 overflow-x-auto rounded-xl border border-border shadow-sm">
+        <div className="qrt-glass mt-10 overflow-x-auto rounded-xl shadow-sm">
           <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
             <caption className="sr-only">So sánh QRTable với mô hình vận hành truyền thống</caption>
             <thead>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-border/60 bg-muted/25">
                 <th scope="col" className="px-4 py-3 font-semibold text-foreground sm:px-6">
                   Tiêu chí
                 </th>
@@ -78,7 +78,7 @@ export function ComparisonSection(): React.ReactElement {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.aspect} className="border-b border-border last:border-0 odd:bg-background even:bg-muted/20">
+                <tr key={r.aspect} className="border-b border-border/60 last:border-0 odd:bg-background/25 even:bg-muted/15">
                   <th scope="row" className="px-4 py-3.5 font-medium text-foreground sm:px-6">
                     {r.aspect}
                   </th>
@@ -98,7 +98,7 @@ export function ComparisonSection(): React.ReactElement {
           <p className="text-sm text-muted-foreground">Kết luận ngắn: một luồng dữ liệu từ bàn → bếp → thanh toán → gói dịch vụ.</p>
           <a
             href="#pricing"
-            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:scale-[1.02]"
           >
             Xem bảng giá
           </a>

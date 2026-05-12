@@ -2,7 +2,7 @@ import { Building2, Landmark, Lock, ShieldCheck } from 'lucide-react';
 
 export function PaymentSection(): React.ReactElement {
   return (
-    <section id="thanh-toan" aria-labelledby="payment-heading" className="border-b border-border/80 bg-background py-16 md:py-24">
+    <section id="thanh-toan" aria-labelledby="payment-heading" className="qrt-landing__band-muted border-b border-border/60 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="max-w-3xl">
           <h2 id="payment-heading" className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
@@ -15,7 +15,7 @@ export function PaymentSection(): React.ReactElement {
         </div>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
-          <article className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <article className="qrt-glass flex flex-col rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 text-primary">
               <Building2 className="size-6" aria-hidden />
               <h3 className="text-lg font-semibold text-foreground">Tier 1 — Bill khách (QRTBL…)</h3>
@@ -36,7 +36,7 @@ export function PaymentSection(): React.ReactElement {
             </ul>
           </article>
 
-          <article className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <article className="qrt-glass flex flex-col rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 text-primary">
               <Lock className="size-6" aria-hidden />
               <h3 className="text-lg font-semibold text-foreground">Tier 2 — Cước SaaS (QRSUB…)</h3>

@@ -5,9 +5,13 @@ export function HeroSection({ productName }: { productName: string }): React.Rea
   return (
     <section
       aria-labelledby="hero-heading"
-      className="relative overflow-hidden border-b border-border/80 bg-gradient-to-b from-muted/40 via-background to-background"
+      className="qrt-landing__band relative overflow-hidden border-b border-border/60"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/25 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/35 to-transparent" />
+      <div
+        className="pointer-events-none absolute -right-24 top-1/4 size-[28rem] rounded-full bg-primary/10 blur-3xl motion-safe:animate-pulse motion-reduce:hidden"
+        aria-hidden
+      />
       <div className="mx-auto grid max-w-6xl gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center lg:gap-14 lg:py-20">
         <div className="flex flex-col gap-6">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -24,7 +28,7 @@ export function HeroSection({ productName }: { productName: string }): React.Rea
           <div className="flex flex-wrap gap-3">
             <a
               href="#pricing"
-              className="inline-flex h-12 min-h-[44px] items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
+              className="inline-flex h-12 min-h-[44px] items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:scale-[1.02] motion-safe:active:scale-[0.99]"
             >
               Xem bảng giá
             </a>
@@ -52,8 +56,8 @@ export function HeroSection({ productName }: { productName: string }): React.Rea
         </div>
 
         <div className="relative" aria-label="Minh họa luồng vận hành">
-          <div className="rounded-2xl border border-border bg-card p-1 shadow-lg ring-1 ring-border/60">
-            <div className="rounded-xl bg-muted/30 p-4 md:p-5">
+          <div className="qrt-glass rounded-2xl p-1 shadow-lg ring-1 ring-primary/10">
+            <div className="rounded-xl bg-muted/25 p-4 backdrop-blur-sm md:p-5 dark:bg-muted/15">
               <div className="flex items-center justify-between gap-2 border-b border-border/80 pb-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Luồng trong một ca</p>
                 <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold uppercase text-emerald-800 dark:text-emerald-300">
@@ -61,7 +65,7 @@ export function HeroSection({ productName }: { productName: string }): React.Rea
                 </span>
               </div>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-border bg-background p-4">
+                <div className="qrt-glass rounded-lg p-4">
                   <div className="flex items-center gap-2 text-primary">
                     <QrCode className="size-4" aria-hidden />
                     <p className="text-xs font-semibold uppercase tracking-wide">Khách</p>
@@ -71,7 +75,7 @@ export function HeroSection({ productName }: { productName: string }): React.Rea
                     Mở phiên, xem menu, đặt món. Giá = đơn giá × số lượng (theo rule nghiệp vụ).
                   </p>
                 </div>
-                <div className="rounded-lg border border-border bg-background p-4">
+                <div className="qrt-glass rounded-lg p-4">
                   <div className="flex items-center gap-2 text-primary">
                     <Receipt className="size-4" aria-hidden />
                     <p className="text-xs font-semibold uppercase tracking-wide">POS</p>

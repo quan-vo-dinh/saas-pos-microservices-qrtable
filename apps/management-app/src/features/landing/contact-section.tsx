@@ -9,7 +9,7 @@ export function ContactSection({ contactEmail }: ContactSectionProps): React.Rea
   const mail = `mailto:${contactEmail}?subject=${encodeURIComponent('QRTable — Liên hệ triển khai')}`;
 
   return (
-    <section id="contact" aria-labelledby="contact-heading" className="bg-muted/30 py-16 md:py-24">
+    <section id="contact" aria-labelledby="contact-heading" className="qrt-landing__band py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
           <div>
@@ -23,7 +23,7 @@ export function ContactSection({ contactEmail }: ContactSectionProps): React.Rea
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <a
                 href={mail}
-                className="inline-flex h-12 min-h-[44px] items-center justify-center gap-2 rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                className="inline-flex h-12 min-h-[44px] items-center justify-center gap-2 rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground hover:bg-primary/90 motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:scale-[1.02]"
               >
                 <Mail className="size-4" aria-hidden />
                 Gửi email
@@ -45,7 +45,7 @@ export function ContactSection({ contactEmail }: ContactSectionProps): React.Rea
 
           <aside
             aria-label="Gợi ý nội dung khi liên hệ"
-            className="rounded-2xl border border-border bg-card p-6 shadow-sm"
+            className="qrt-glass rounded-2xl p-6 shadow-sm"
           >
             <div className="flex items-center gap-2 text-foreground">
               <MessageCircle className="size-5 text-primary" aria-hidden />

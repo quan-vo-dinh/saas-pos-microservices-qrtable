@@ -23,7 +23,14 @@
 
 ## Motion
 
-- `landing.css`: `prefers-reduced-motion` giảm transition/animation; smooth scroll tắt khi reduce motion.
+- `landing.css`: `prefers-reduced-motion` tắt animation flow nền; giảm transition trên nút/liên kết trong shell.
+- Hero: blob gradient `animate-pulse` rất nhẹ — ẩn hoàn toàn khi `motion-reduce`.
+- CTA chính: `motion-safe:hover:scale` ngắn (200ms) — không dùng khi reduced motion.
+
+## Ambient background
+
+- Ảnh nhà hàng mờ: `public/landing/bg-restaurant.jpg` (Unsplash, xem README trong thư mục).
+- Lớp cố định: blur + mesh tech + scanline siêu nhẹ + flow gradient 22s + veil + backdrop-blur để chữ đạt contrast.
 
 ## Typography / color
 

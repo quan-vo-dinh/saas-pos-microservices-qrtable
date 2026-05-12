@@ -25,7 +25,7 @@ const steps = [
 
 export function WorkflowSection(): React.ReactElement {
   return (
-    <section aria-labelledby="trien-khai-heading" className="border-b border-border/80 bg-background py-16 md:py-24">
+    <section aria-labelledby="trien-khai-heading" className="qrt-landing__band border-b border-border/60 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <h2 id="trien-khai-heading" className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
           Triển khai có kiểm soát cho chủ quán
@@ -38,7 +38,7 @@ export function WorkflowSection(): React.ReactElement {
           {steps.map((s, i) => (
             <li
               key={s.title}
-              className="flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm"
+              className="qrt-glass flex flex-col rounded-xl p-5 shadow-sm"
             >
               <div className="flex items-start gap-3">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden>

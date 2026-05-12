@@ -33,7 +33,7 @@ const states = [
 
 export function TableLifecycleSection(): React.ReactElement {
   return (
-    <section id="ban-va-qr" aria-labelledby="ban-heading" className="border-b border-border/80 bg-muted/25 py-16 md:py-24">
+    <section id="ban-va-qr" aria-labelledby="ban-heading" className="qrt-landing__band-muted border-b border-border/60 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-3xl">
@@ -55,7 +55,7 @@ export function TableLifecycleSection(): React.ReactElement {
           {states.map((s, i) => (
             <li
               key={s.key}
-              className="relative flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm"
+              className="qrt-glass relative flex flex-col rounded-xl p-5 shadow-sm"
               style={{ counterIncrement: 'none' }}
             >
               <span

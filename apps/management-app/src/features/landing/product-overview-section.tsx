@@ -23,7 +23,7 @@ const pillars = [
 
 export function ProductOverviewSection(): React.ReactElement {
   return (
-    <section id="tong-quan" aria-labelledby="tong-quan-heading" className="border-b border-border/80 bg-background py-16 md:py-24">
+    <section id="tong-quan" aria-labelledby="tong-quan-heading" className="qrt-landing__band border-b border-border/60 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="max-w-3xl">
           <h2 id="tong-quan-heading" className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
@@ -40,7 +40,7 @@ export function ProductOverviewSection(): React.ReactElement {
           {pillars.map((p) => (
             <li
               key={p.title}
-              className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm"
+              className="qrt-glass flex flex-col rounded-xl p-6 shadow-sm"
             >
               <div
                 className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
