@@ -1,0 +1,21 @@
+# Ngrok agent config — QRTable local dev (Keycloak + BFF).
+# Docs: https://ngrok.com/docs/agent/config · multi-tunnel: `ngrok start <name> <name>`
+#
+# Usage:
+#   1) Copy: cp tools/ngrok/qrtable-dev-ngrok.example.yml tools/ngrok/qrtable-dev-ngrok.yml
+#   2) Put your authtoken in the copy (or rely on NGROK_AUTHTOKEN env — see tools/ngrok/README.md)
+#   3) From repo root:
+#        ngrok start --config tools/ngrok/qrtable-dev-ngrok.yml qrtable-keycloak qrtable-bff
+#
+# Do NOT commit qrtable-dev-ngrok.yml if it contains secrets (add to .gitignore if you keep token in file).
+
+version: '2'
+# authtoken: <paste from https://dashboard.ngrok.com/get-started/your-authtoken>  # optional if NGROK_AUTHTOKEN is set
+
+tunnels:
+  qrtable-keycloak:
+    proto: http
+    addr: 8180
+  qrtable-bff:
+    proto: http
+    addr: 3300

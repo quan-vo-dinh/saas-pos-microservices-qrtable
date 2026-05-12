@@ -57,6 +57,7 @@ describe('UserService', () => {
       email: 'owner@example.com',
       firstName: 'Owner',
       lastName: 'One',
+      tenantId: 'tenant-a',
       roleNames: ['OWNER'],
     });
 
@@ -64,6 +65,7 @@ describe('UserService', () => {
       expect.objectContaining({
         userId: 'sub-1',
         email: 'owner@example.com',
+        tenantId: 'tenant-a',
       }),
     );
     expect(result).toEqual({ id: 'user-1' });

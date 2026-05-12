@@ -15,6 +15,7 @@ type UpsertIdentityParams = {
   email: string;
   firstName?: string;
   lastName?: string;
+  tenantId?: string | null;
   roleNames?: string[];
 };
 

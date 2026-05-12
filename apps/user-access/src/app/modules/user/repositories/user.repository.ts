@@ -29,6 +29,7 @@ export class UserRepository {
     email: string;
     firstName?: string;
     lastName?: string;
+    tenantId?: string | null;
     roleNames?: string[];
   }) {
     const roleIds = await this.resolveRoleIds(params.roleNames);
@@ -38,6 +39,8 @@ export class UserRepository {
       email: params.email,
       firstName: params.firstName || '',
       lastName: params.lastName || '',
+      tenantId: params.tenantId ?? null,
+      isActive: true,
       roles: roleIds,
     };
 
@@ -55,6 +58,14 @@ export class UserRepository {
       .exec();
 
     return this.getByUserId(params.userId);
+  }
+
+  countActiveByTenant(tenantId: string): Promise<number> {
+    return this.userModel.countDocuments({ tenantId, isActive: true }).exec();
+  }
+
+  async disableByUserId(userId: string): Promise<void> {
+    await this.userModel.updateOne({ userId }, { $set: { isActive: false, disabledAt: new Date() } }).exec();
   }
 
   getByEmail(email: string) {
