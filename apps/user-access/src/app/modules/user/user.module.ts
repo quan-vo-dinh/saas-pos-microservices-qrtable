@@ -8,6 +8,7 @@ import { UserRepository } from './repositories/user.repository';
 import { UserController } from './controllers/user.controller';
 import { UserService } from './services/user.service';
 import { UserGrpcController } from './controllers/user-grpc.controller';
+import { TenantUserService } from './services/tenant-user.service';
 
 @Module({
   imports: [
@@ -15,6 +16,6 @@ import { UserGrpcController } from './controllers/user-grpc.controller';
     ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.AUTHORIZER_SERVICE)]),
   ],
   controllers: [UserController, UserGrpcController],
-  providers: [UserRepository, UserService],
+  providers: [UserRepository, UserService, TenantUserService],
 })
 export class UserModule {}

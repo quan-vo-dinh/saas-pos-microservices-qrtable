@@ -57,6 +57,7 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.SAAS_TENANT_ALREADY_EXISTS]: 'Cửa hàng đã tồn tại',
   [ErrorCode.SAAS_TENANT_NOT_FOUND]: 'Cửa hàng không tìm thấy',
   [ErrorCode.SAAS_TENANT_INACTIVE]: 'Cửa hàng đã tạm ngưng hoặc không khả dụng',
+  [ErrorCode.TENANT_ONBOARDING_FAILED]: 'Onboarding cửa hàng thất bại',
   [ErrorCode.UPLOAD_FILE_REQUIRED]: 'Vui lòng chọn tệp để tải lên',
   [ErrorCode.UPLOAD_FILE_TOO_LARGE]: 'Kích thước tệp vượt quá giới hạn 5MB',
   [ErrorCode.UPLOAD_INVALID_FILE_TYPE]: 'Loại tệp không hợp lệ. Cho phép: jpeg, png, webp',
@@ -67,4 +68,5 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.COMMON_VALIDATION_FAILED]: 'Dữ liệu không hợp lệ',
   [ErrorCode.COMMON_INTERNAL_ERROR]: 'Lỗi hệ thống, vui lòng thử lại sau',
   [ErrorCode.KEYCLOAK_USER_CREATION_FAILED]: 'Không thể tạo tài khoản trên hệ thống xác thực',
+  [ErrorCode.OWNER_EMAIL_ALREADY_EXISTS]: 'Email chủ cửa hàng đã tồn tại',
 };

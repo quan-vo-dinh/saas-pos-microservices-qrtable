@@ -5,3 +5,31 @@ export type CreateKeyCloakUserTcpRequest = {
   lastName: string;
   tenantId?: string;
 };
+
+export interface CreateTenantOwnerKeycloakRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+  tenantId: string;
+  tenantSlug: string;
+  roleNames: string[];
+  temporaryPassword?: string;
+  processId?: string;
+}
+
+export interface AssignKeycloakRealmRolesRequest {
+  userId: string;
+  roleNames: string[];
+  processId?: string;
+}
+
+export interface DisableKeycloakUserRequest {
+  userId: string;
+  reason: string;
+  processId?: string;
+}
+
+export interface GetKeycloakUserAdminRequest {
+  userId: string;
+  processId?: string;
+}

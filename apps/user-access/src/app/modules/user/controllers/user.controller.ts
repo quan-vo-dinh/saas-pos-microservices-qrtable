@@ -9,10 +9,19 @@ import { Response } from '@common/interfaces/tcp/common/response.interface';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { ProcessId } from '@common/decorators/processId.decorator';
 import { User } from '@common/schemas/user.schema';
+import {
+  CountTenantUsersRequest,
+  DisableTenantUsersRequest,
+  UpsertTenantOwnerProfileRequest,
+} from '@common/interfaces/tcp/user';
+import { TenantUserService } from '../services/tenant-user.service';
 @Controller('users')
 @UseInterceptors(TcpLoggingInterceptor)
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly tenantUserService: TenantUserService,
+  ) {}
 
   @MessagePattern(TCP_REQUEST_MESSAGE.USER.CREATE)
   async create(@RequestParams() data: CreateUserTcpRequest, @ProcessId() processId: string): Promise<Response<string>> {
@@ -25,5 +34,29 @@ export class UserController {
   async getByUserId(@RequestParams() userId: string): Promise<Response<User>> {
     const user = await this.userService.getUserByUserId(userId);
     return Response.success<User>(user);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.UPSERT_WITH_TENANT)
+  async upsertWithTenant(@RequestParams() data: UpsertTenantOwnerProfileRequest): Promise<Response<User>> {
+    const user = await this.tenantUserService.upsertOwnerProfile(data);
+    return Response.success<User>(user);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.UPSERT_TENANT_OWNER_PROFILE)
+  async upsertTenantOwnerProfile(@RequestParams() data: UpsertTenantOwnerProfileRequest): Promise<Response<User>> {
+    const user = await this.tenantUserService.upsertOwnerProfile(data);
+    return Response.success<User>(user);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.DISABLE_TENANT_USERS)
+  async disableTenantUsers(@RequestParams() data: DisableTenantUsersRequest) {
+    const result = await this.tenantUserService.disableTenantUsers(data);
+    return Response.success(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.COUNT_BY_TENANT)
+  async countByTenant(@RequestParams() data: CountTenantUsersRequest) {
+    const result = await this.tenantUserService.countTenantUsers(data);
+    return Response.success(result);
   }
 }

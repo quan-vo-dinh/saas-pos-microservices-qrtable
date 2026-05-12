@@ -60,6 +60,39 @@ export class UserRepository {
     return this.getByUserId(params.userId);
   }
 
+  upsertTenantUserByUserId(params: {
+    userId: string;
+    tenantId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    roleNames: string[];
+  }) {
+    return this.upsertByUserId(params);
+  }
+
+  async disableUsersByTenantId(params: {
+    tenantId: string;
+    disabledAt: Date;
+    reason: string;
+  }): Promise<{ modifiedCount: number }> {
+    const result = await this.userModel
+      .updateMany(
+        { tenantId: params.tenantId },
+        { $set: { isActive: false, disabledAt: params.disabledAt, disabledReason: params.reason } },
+      )
+      .exec();
+    return { modifiedCount: result.modifiedCount ?? 0 };
+  }
+
+  countByTenantId(params: { tenantId: string; activeOnly: boolean }): Promise<number> {
+    const query: Record<string, unknown> = { tenantId: params.tenantId };
+    if (params.activeOnly) {
+      query.isActive = true;
+    }
+    return this.userModel.countDocuments(query).exec();
+  }
+
   countActiveByTenant(tenantId: string): Promise<number> {
     return this.userModel.countDocuments({ tenantId, isActive: true }).exec();
   }

@@ -1,7 +1,8 @@
 import { normalizePlanCode } from '@common/constants/saas.constants';
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PricingPlanRepository } from '../repositories/pricing-plan.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
+import { SubscriptionCacheService } from './subscription-cache.service';
 
 export type AssignPlanParams = {
   tenantId: string;
@@ -18,7 +19,15 @@ export class SubscriptionService {
   constructor(
     @Inject(PricingPlanRepository)
     private readonly planRepository: {
-      findActiveByCode(code: string): Promise<{ id: string; code: string; priceVnd: number } | null>;
+      findActiveByCode(code: string): Promise<{
+        id: string;
+        code: string;
+        priceVnd: number;
+        maxTables?: number;
+        maxStaff?: number;
+        maxOrdersPerDay?: number;
+        features?: string[];
+      } | null>;
     },
     @Inject(SubscriptionRepository)
     private readonly subscriptionRepository: {
@@ -26,8 +35,9 @@ export class SubscriptionService {
       supersedeActive(tenantId: string, oldSubscriptionId: string): Promise<void>;
       createActive(
         params: AssignPlanParams & { pricingPlanId: string; priceVndSnapshot: number },
-      ): Promise<{ id: string }>;
+      ): Promise<{ id: string; expiresAt?: Date | null }>;
     },
+    @Optional() private readonly subscriptionCache?: SubscriptionCacheService,
   ) {}
 
   async assignPlan(params: AssignPlanParams) {
@@ -42,11 +52,24 @@ export class SubscriptionService {
       await this.subscriptionRepository.supersedeActive(params.tenantId, existing.id);
     }
 
-    return this.subscriptionRepository.createActive({
+    const subscription = await this.subscriptionRepository.createActive({
       ...params,
       planCode,
       pricingPlanId: plan.id,
       priceVndSnapshot: plan.priceVnd,
     });
+
+    await this.subscriptionCache?.setCurrent(params.tenantId, {
+      tenantId: params.tenantId,
+      planCode,
+      status: 'ACTIVE',
+      maxTables: plan.maxTables ?? 0,
+      maxStaff: plan.maxStaff ?? 0,
+      maxOrdersPerDay: plan.maxOrdersPerDay ?? 0,
+      features: plan.features ?? [],
+      expiresAt: subscription.expiresAt?.toISOString() ?? params.expiresAt?.toISOString() ?? null,
+    });
+
+    return subscription;
   }
 }

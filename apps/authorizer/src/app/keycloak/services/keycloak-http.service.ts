@@ -2,7 +2,7 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 import { CreateKeyCloakUserRequest, ExchangeClientTokenResponse } from '@common/interfaces/common/index';
 import { LoginTcpRequest } from '@common/interfaces/tcp/authorizer';
 import { ExchangeUserTokenResponse } from '@common/interfaces/common/index';
@@ -74,31 +74,24 @@ export class KeycloakHttpService {
 
     const attributes = tenantId ? { tenant_id: [tenantId] } : undefined;
 
-    const { headers } = await this.axiosInstance.post(
-      `/admin/realms/${this.realm}/users`,
-      {
-        firstName,
-        lastName,
-        email,
-        username: email,
-        enabled: true,
-        emailVerified: true,
-        credentials: [
-          {
-            type: 'password',
-            value: password,
-            temporary: false,
-          },
-        ],
-        attributes,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+    const { headers } = await this.createUserWithToken(accessToken, {
+      firstName,
+      lastName,
+      email,
+      username: email,
+      enabled: true,
+      emailVerified: true,
+      credentials: [
+        {
+          type: 'password',
+          value: password,
+          temporary: false,
         },
-      },
-    );
-    const userId = headers['location'].split('/').pop();
+      ],
+      attributes,
+    });
+    const location = headers['location'];
+    const userId = Array.isArray(location) ? location[0]?.split('/').pop() : location?.split('/').pop();
 
     if (!userId) {
       throw new BusinessException(ErrorCode.KEYCLOAK_USER_CREATION_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
@@ -106,5 +99,54 @@ export class KeycloakHttpService {
 
     this.logger.debug(`Created user in Keycloak with ID: ${userId}`);
     return userId;
+  }
+
+  createUserWithToken(
+    accessToken: string,
+    payload: Record<string, unknown>,
+  ): Promise<{ headers: Record<string, string | string[] | undefined> }> {
+    return this.axiosInstance.post(`/admin/realms/${this.realm}/users`, payload, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  }
+
+  getRealmRole(accessToken: string, roleName: string): Promise<{ data: Record<string, unknown> }> {
+    return this.axiosInstance.get(`/admin/realms/${this.realm}/roles/${encodeURIComponent(roleName)}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  }
+
+  assignRealmRoles(accessToken: string, userId: string, roles: Record<string, unknown>[]): Promise<unknown> {
+    return this.axiosInstance.post(`/admin/realms/${this.realm}/users/${userId}/role-mappings/realm`, roles, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  }
+
+  async updateUser(accessToken: string, userId: string, payload: Record<string, unknown>): Promise<void> {
+    await this.axiosInstance.put(`/admin/realms/${this.realm}/users/${userId}`, payload, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  }
+
+  async getUserById(accessToken: string, userId: string): Promise<Record<string, unknown>> {
+    const { data } = await this.axiosInstance.get(`/admin/realms/${this.realm}/users/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    return data;
+  }
+
+  isDuplicateUserError(error: unknown): boolean {
+    const axiosError = error as AxiosError;
+    return axios.isAxiosError(error) && axiosError.response?.status === HttpStatus.CONFLICT;
   }
 }

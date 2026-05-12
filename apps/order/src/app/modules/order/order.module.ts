@@ -20,6 +20,7 @@ import { BillService } from './services/bill.service';
 import { CartService } from './services/cart.service';
 import { OrderService } from './services/order.service';
 import { OutboxPublisherService } from './services/outbox-publisher.service';
+import { OrderQuotaService } from './services/order-quota.service';
 import { PaymentEventsConsumerService } from './services/payment-events-consumer.service';
 import { ServiceRequestService } from './services/service-request.service';
 import { SessionService } from './services/session.service';
@@ -34,6 +35,7 @@ import { TransferService } from './services/transfer.service';
   controllers: [OrderController],
   providers: [
     OrderService,
+    OrderQuotaService,
     BillService,
     ServiceRequestService,
     TransferService,

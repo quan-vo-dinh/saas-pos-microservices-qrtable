@@ -12,7 +12,7 @@ describe('OnboardingSagaService', () => {
 
   it('creates tenant, owner, free subscription, empty payment settings, and outbox event', async () => {
     tenantRepo.create.mockResolvedValue({ id: 'tenant-1', slug: 'pho-ha-noi', name: 'Pho Ha Noi' });
-    authorizerClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: 'kc-owner-1' }) });
+    authorizerClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: { userId: 'kc-owner-1' } }) });
     userClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: { userId: 'kc-owner-1' } }) });
     paymentClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: { tenantId: 'tenant-1' } }) });
     subscriptionService.assignPlan.mockResolvedValue({ id: 'sub-1' });

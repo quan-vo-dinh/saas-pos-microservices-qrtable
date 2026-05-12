@@ -57,6 +57,7 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.SAAS_TENANT_ALREADY_EXISTS]: 'Tenant already exists',
   [ErrorCode.SAAS_TENANT_NOT_FOUND]: 'Tenant not found',
   [ErrorCode.SAAS_TENANT_INACTIVE]: 'Tenant is inactive or unavailable',
+  [ErrorCode.TENANT_ONBOARDING_FAILED]: 'Tenant onboarding failed',
   [ErrorCode.UPLOAD_FILE_REQUIRED]: 'File is required',
   [ErrorCode.UPLOAD_FILE_TOO_LARGE]: 'File size exceeds 5MB limit',
   [ErrorCode.UPLOAD_INVALID_FILE_TYPE]: 'Invalid file type. Allowed: jpeg, png, webp',
@@ -67,4 +68,5 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.COMMON_VALIDATION_FAILED]: 'Validation failed',
   [ErrorCode.COMMON_INTERNAL_ERROR]: 'Internal server error, please try again later',
   [ErrorCode.KEYCLOAK_USER_CREATION_FAILED]: 'Failed to create user in authentication system',
+  [ErrorCode.OWNER_EMAIL_ALREADY_EXISTS]: 'Owner email already exists',
 };

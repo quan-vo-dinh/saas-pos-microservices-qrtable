@@ -1,8 +1,10 @@
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { DEFAULT_PLAN_CODES, TenantStatus } from '@common/constants/saas.constants';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Optional } from '@nestjs/common';
 import { firstValueFrom, isObservable } from 'rxjs';
 import { SaasOutboxRepository } from '../repositories/saas-outbox.repository';
 import { TenantRepository } from '../repositories/tenant.repository';
@@ -69,18 +71,20 @@ export class OnboardingSagaService {
         defaultLocale: 'vi-VN',
       });
 
-      ownerUserId = await this.resolveTcp<{ data: string }>(
-        this.authorizerClient.send(TCP_REQUEST_MESSAGE.KEYCLOAK.CREATE_USER, {
+      ownerUserId = await this.resolveTcp<{ data: { userId: string } }>(
+        this.authorizerClient.send(TCP_REQUEST_MESSAGE.KEYCLOAK.CREATE_TENANT_OWNER, {
           data: {
             email: params.ownerEmail,
-            password: params.ownerPassword,
             firstName: params.ownerFirstName ?? '',
             lastName: params.ownerLastName ?? '',
             tenantId: tenant.id,
+            tenantSlug: tenant.slug,
+            roleNames: ['OWNER'],
+            temporaryPassword: params.ownerPassword,
           },
           processId: params.processId,
         }),
-      ).then((res) => res.data);
+      ).then((res) => res.data.userId);
 
       await this.resolveTcp(
         this.userClient.send(TCP_REQUEST_MESSAGE.USER.UPSERT_WITH_TENANT, {
@@ -125,8 +129,24 @@ export class OnboardingSagaService {
 
       return { tenant, ownerUserId };
     } catch (error) {
+      if (ownerUserId) {
+        await Promise.resolve(
+          this.resolveTcp(
+            this.authorizerClient.send(TCP_REQUEST_MESSAGE.KEYCLOAK.DISABLE_USER, {
+              data: {
+                userId: ownerUserId,
+                reason: 'TENANT_ONBOARDING_FAILED',
+              },
+              processId: params.processId,
+            }),
+          ),
+        ).catch(() => undefined);
+      }
       if (tenant) {
         await Promise.resolve(this.tenantRepository.deleteById(tenant.id)).catch(() => undefined);
+      }
+      if (ownerUserId) {
+        throw new BusinessException(ErrorCode.TENANT_ONBOARDING_FAILED, HttpStatus.BAD_GATEWAY);
       }
       throw error;
     }

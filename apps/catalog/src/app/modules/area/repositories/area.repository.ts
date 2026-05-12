@@ -28,6 +28,10 @@ export class AreaRepository {
     return count > 0;
   }
 
+  findByTenantIdAndName(tenantId: string, name: string): Promise<Area | null> {
+    return this.repo.findOne({ where: { tenantId, name } });
+  }
+
   async updateByIdAndTenant(id: string, tenantId: string, data: Partial<Area>): Promise<Area | null> {
     await this.repo.update({ id, tenantId }, data);
     return this.findByIdAndTenant(id, tenantId);

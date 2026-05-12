@@ -86,4 +86,23 @@ export class AreaService {
     await this.areaRepository.batchUpdateSortOrder(data.tenantId, data.items);
     return this.areaRepository.findAllByTenant(data.tenantId);
   }
+
+  existsByTenantIdAndName(tenantId: string, name: string): Promise<boolean> {
+    return this.areaRepository.existsByName(tenantId, name.trim());
+  }
+
+  async createSystemArea(params: { tenantId: string; name: string; processId?: string }): Promise<Area> {
+    const exists = await this.existsByTenantIdAndName(params.tenantId, params.name);
+    if (exists) {
+      const area = await this.areaRepository.findByTenantIdAndName(params.tenantId, params.name.trim());
+      if (area) {
+        return area;
+      }
+    }
+    return this.areaRepository.create({
+      tenantId: params.tenantId,
+      name: params.name.trim(),
+      sortOrder: 0,
+    });
+  }
 }

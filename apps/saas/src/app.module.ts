@@ -24,8 +24,10 @@ import { OnboardingSagaService } from './services/onboarding-saga.service';
 import { SaasOutboxPublisherService } from './services/saas-outbox-publisher.service';
 import { SlugService } from './services/slug.service';
 import { SubscriptionInvoiceService } from './services/subscription-invoice.service';
+import { SubscriptionCacheService } from './services/subscription-cache.service';
 import { SubscriptionService } from './services/subscription.service';
 import { TenantLifecycleService } from './services/tenant-lifecycle.service';
+import { TenantStatusCacheService } from './services/tenant-status-cache.service';
 import { TenantSuspendCronService } from './services/tenant-suspend-cron.service';
 
 @Module({
@@ -49,8 +51,10 @@ import { TenantSuspendCronService } from './services/tenant-suspend-cron.service
     PricingPlanRepository,
     SubscriptionRepository,
     SubscriptionService,
+    SubscriptionCacheService,
     TenantRepository,
     TenantLifecycleService,
+    TenantStatusCacheService,
     OnboardingSagaService,
     SubscriptionInvoiceRepository,
     SubscriptionInvoiceService,

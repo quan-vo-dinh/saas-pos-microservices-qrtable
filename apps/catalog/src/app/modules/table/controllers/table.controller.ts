@@ -12,6 +12,8 @@ import {
   UpdateTableStatusTcpRequest,
   ValidateQrTokenTcpRequest,
   RegenerateQrTokenTcpRequest,
+  CountTenantTablesRequest,
+  CountTenantTablesResponse,
 } from '@common/interfaces/tcp/catalog';
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
@@ -68,5 +70,19 @@ export class TableController {
   async regenerateQrToken(@RequestParams() body: RegenerateQrTokenTcpRequest): Promise<Response<TableTcpResponse>> {
     const result = await this.tableService.regenerateQrToken(body);
     return Response.success<TableTcpResponse>(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.CATALOG.COUNT_TABLES_BY_TENANT)
+  async countTablesByTenant(
+    @RequestParams() body: CountTenantTablesRequest,
+  ): Promise<Response<CountTenantTablesResponse>> {
+    const result = await this.tableService.countTablesByTenant(body);
+    return Response.success<CountTenantTablesResponse>(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.CATALOG.COUNT_TABLES)
+  async countTables(@RequestParams() body: CountTenantTablesRequest): Promise<Response<CountTenantTablesResponse>> {
+    const result = await this.tableService.countTablesByTenant(body);
+    return Response.success<CountTenantTablesResponse>(result);
   }
 }

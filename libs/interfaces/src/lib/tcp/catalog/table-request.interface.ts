@@ -48,3 +48,9 @@ export type RegenerateQrTokenTcpRequest = {
   id: string;
   tenantId: string;
 };
+
+export interface CountTenantTablesRequest {
+  tenantId: string;
+  activeOnly?: boolean;
+  processId?: string;
+}

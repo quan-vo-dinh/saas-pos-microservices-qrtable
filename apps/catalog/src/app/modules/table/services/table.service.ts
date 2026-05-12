@@ -15,6 +15,8 @@ import {
   UpdateTableStatusTcpRequest,
   ValidateQrTokenTcpRequest,
   RegenerateQrTokenTcpRequest,
+  CountTenantTablesRequest,
+  CountTenantTablesResponse,
 } from '@common/interfaces/tcp/catalog';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -63,7 +65,10 @@ export class TableService {
 
     const qrToken = this.generateQrToken();
     const updated = await this.tableRepository.updateByIdAndTenant(table.id, data.tenantId, { qrToken });
-    return updated!;
+    if (!updated) {
+      throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
+    }
+    return updated;
   }
 
   async getList(data: GetTableListTcpRequest): Promise<Table[]> {
@@ -182,5 +187,13 @@ export class TableService {
       throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
+  }
+
+  async countTablesByTenant(data: CountTenantTablesRequest): Promise<CountTenantTablesResponse> {
+    const count = await this.tableRepository.countByTenant({
+      tenantId: data.tenantId,
+      activeOnly: data.activeOnly ?? true,
+    });
+    return { tenantId: data.tenantId, count };
   }
 }

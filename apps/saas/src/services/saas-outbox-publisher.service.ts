@@ -87,21 +87,30 @@ export class SaasOutboxPublisherService implements OnModuleInit, OnModuleDestroy
     }
   }
 
-  private async publishBatch(): Promise<void> {
+  async publishPendingBatch(limit = BATCH): Promise<{ published: number; failed: number }> {
     if (!this.producer) {
-      return;
+      return { published: 0, failed: 0 };
     }
-    const rows = await this.outbox.findPendingRows(BATCH);
+    const rows = await this.outbox.lockPending(limit);
+    let published = 0;
+    let failed = 0;
     for (const row of rows) {
       try {
         await this.producer.send({
           topic: row.topic,
           messages: [{ key: row.partitionKey, value: JSON.stringify(row.payload) }],
         });
-        await this.outbox.markPublished(row.id, row.tenantId);
+        await this.outbox.markPublishedById(row.id);
+        published += 1;
       } catch (error) {
-        await this.outbox.recordSendFailure(row.id, row.tenantId, (error as Error).message);
+        await this.outbox.markAttemptFailed(row.id, error);
+        failed += 1;
       }
     }
+    return { published, failed };
+  }
+
+  private async publishBatch(): Promise<void> {
+    await this.publishPendingBatch(BATCH);
   }
 }

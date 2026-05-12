@@ -44,6 +44,7 @@ describe('TableService', () => {
       updateByIdAndTenant: jest.fn(),
       deleteByIdAndTenant: jest.fn(),
       findByQrToken: jest.fn(),
+      countByTenant: jest.fn(),
     };
 
     areaRepo = { findOne: jest.fn() };
@@ -280,6 +281,18 @@ describe('TableService', () => {
           qrToken: expect.stringMatching(/^[a-f0-9]{64}$/),
         }),
       );
+    });
+  });
+
+  describe('countTablesByTenant', () => {
+    it('returns tenant table count', async () => {
+      repository.countByTenant.mockResolvedValue(2);
+
+      await expect(service.countTablesByTenant({ tenantId: 'tenant-1' })).resolves.toEqual({
+        tenantId: 'tenant-1',
+        count: 2,
+      });
+      expect(repository.countByTenant).toHaveBeenCalledWith({ tenantId: 'tenant-1', activeOnly: true });
     });
   });
 });

@@ -14,20 +14,25 @@ enum USER {
   DELETE = 'user_access.delete',
   GET_BY_USER_ID = 'user_access.get_by_user_id',
   UPSERT_WITH_TENANT = 'user.upsert_with_tenant',
+  UPSERT_TENANT_OWNER_PROFILE = 'user.upsert_tenant_owner_profile',
   COUNT_BY_TENANT = 'user.count_by_tenant',
+  DISABLE_TENANT_USERS = 'user.disable_tenant_users',
   DISABLE = 'user.disable',
 }
 
 enum KEYCLOAK {
   CREATE_USER = 'keycloak.create_user',
+  CREATE_TENANT_OWNER = 'keycloak.create_tenant_owner',
   GET_USER_BY_ID = 'keycloak.get_user_by_id',
   GET_USERS = 'keycloak.get_users',
   UPDATE_USER = 'keycloak.update_user',
   DELETE_USER = 'keycloak.delete_user',
   ASSIGN_REALM_ROLE = 'keycloak.assign_realm_role',
+  ASSIGN_REALM_ROLES = 'keycloak.assign_realm_roles',
   REMOVE_REALM_ROLE = 'keycloak.remove_realm_role',
   DISABLE_USER = 'keycloak.disable_user',
   GET_USER = 'keycloak.get_user',
+  GET_USER_ADMIN = 'keycloak.get_user_admin',
 }
 
 enum AUTHORIZER {
@@ -87,6 +92,7 @@ enum MENU {
 enum CATALOG {
   HEALTH = 'catalog.health',
   COUNT_TABLES = 'catalog.count_tables',
+  COUNT_TABLES_BY_TENANT = 'catalog.count_tables_by_tenant',
   SEED_DEFAULT_AREA = 'catalog.seed_default_area',
 }
 

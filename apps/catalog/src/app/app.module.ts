@@ -7,6 +7,7 @@ import { AreaModule } from './modules/area/area.module';
 import { MenuItemModule } from './modules/menu-item/menu-item.module';
 import { TableModule } from './modules/table/table.module';
 import { MenuModule } from './modules/menu/menu.module';
+import { TenantEventsModule } from './modules/tenant-events/tenant-events.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { MenuModule } from './modules/menu/menu.module';
     MenuItemModule,
     TableModule,
     MenuModule,
+    TenantEventsModule,
   ],
   controllers: [],
   providers: [],

@@ -43,4 +43,10 @@ export class TableRepository {
   findByQrToken(tenantId: string, qrToken: string): Promise<Table | null> {
     return this.repo.findOne({ where: { tenantId, qrToken } });
   }
+
+  countByTenant(params: { tenantId: string; activeOnly: boolean }): Promise<number> {
+    return this.repo.count({
+      where: { tenantId: params.tenantId },
+    });
+  }
 }

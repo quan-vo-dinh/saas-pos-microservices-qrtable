@@ -7,8 +7,8 @@ describe('TenantLifecycleService', () => {
     updateStatus: jest.fn(),
   };
   const redis = {
-    set: jest.fn(),
-    del: jest.fn(),
+    markSuspended: jest.fn(),
+    clearSuspended: jest.fn(),
   };
 
   beforeEach(() => jest.resetAllMocks());
@@ -23,7 +23,7 @@ describe('TenantLifecycleService', () => {
       'tenant-1',
       expect.objectContaining({ status: TenantStatus.SUSPENDED }),
     );
-    expect(redis.set).toHaveBeenCalledWith('tenant:tenant-1:suspended', '1');
+    expect(redis.markSuspended).toHaveBeenCalledWith('tenant-1');
   });
 
   it('activates tenant and clears redis flag', async () => {
@@ -32,6 +32,6 @@ describe('TenantLifecycleService', () => {
 
     await service.activate({ tenantId: 'tenant-1' });
 
-    expect(redis.del).toHaveBeenCalledWith('tenant:tenant-1:suspended');
+    expect(redis.clearSuspended).toHaveBeenCalledWith('tenant-1');
   });
 });

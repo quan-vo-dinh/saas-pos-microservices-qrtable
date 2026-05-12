@@ -4,6 +4,7 @@ import { AppConfiguration } from '@common/configuration/app.config';
 import { ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TypeOrmConfiguration } from '@common/configuration/type-orm.config';
+import { KafkaConfiguration } from '@common/configuration/kafka.config';
 
 class Configuration extends BaseConfiguration {
   @ValidateNested()
@@ -17,6 +18,10 @@ class Configuration extends BaseConfiguration {
   @ValidateNested()
   @Type(() => TypeOrmConfiguration)
   TYPEORM_CONFIG = new TypeOrmConfiguration();
+
+  @ValidateNested()
+  @Type(() => KafkaConfiguration)
+  KAFKA_CONFIG = new KafkaConfiguration();
 }
 
 export const CONFIGURATION = new Configuration();

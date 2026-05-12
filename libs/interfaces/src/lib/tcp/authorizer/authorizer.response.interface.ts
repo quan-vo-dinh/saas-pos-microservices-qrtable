@@ -39,3 +39,24 @@ export class AuthorizeResponse {
 }
 
 export type LoginTcpResponse = LoginResponseDto;
+
+export interface CreateTenantOwnerKeycloakResponse {
+  userId: string;
+  email: string;
+  enabled: boolean;
+  requiredActions: string[];
+}
+
+export interface DisableKeycloakUserResponse {
+  userId: string;
+  enabled: false;
+}
+
+export interface KeycloakUserAdminResponse {
+  userId: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  enabled?: boolean;
+  attributes?: Record<string, string[]>;
+}

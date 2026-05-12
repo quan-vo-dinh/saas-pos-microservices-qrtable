@@ -47,6 +47,17 @@ export const DEFAULT_PLAN_CODES = {
   PREMIUM: 'PREMIUM',
 } as const;
 
+export const SAAS_EVENTS = {
+  TENANT_CREATED: 'tenant.created',
+  TENANT_SUSPENDED: 'tenant.suspended',
+  TENANT_ACTIVATED: 'tenant.activated',
+  TENANT_CLOSED: 'tenant.closed',
+  SUBSCRIPTION_ASSIGNED: 'subscription.assigned',
+  SUBSCRIPTION_EXPIRED: 'subscription.expired',
+  SUBSCRIPTION_INVOICE_PAID: 'subscription_invoice.paid',
+  TENANT_CACHE_REFRESH_REQUESTED: 'tenant.cache_refresh_requested',
+} as const;
+
 export const RESERVED_TENANT_SLUGS = [
   'admin',
   'api',
@@ -109,4 +120,8 @@ export function normalizePlanCode(code: string): string {
 
 export function buildTenantSuspendedRedisKey(tenantId: string): string {
   return `tenant:${tenantId}:suspended`;
+}
+
+export function buildCurrentSubscriptionRedisKey(tenantId: string): string {
+  return `subscription:${tenantId}`;
 }

@@ -1,11 +1,6 @@
-import { buildTenantSuspendedRedisKey, TenantStatus } from '@common/constants/saas.constants';
-import { RedisClientService } from '@common/providers/redis-client/redis-client.service';
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-
-type RedisLike = {
-  set(key: string, value: string): Promise<unknown>;
-  del(key: string): Promise<unknown>;
-};
+import { TenantStatus } from '@common/constants/saas.constants';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { TenantStatusCacheService } from './tenant-status-cache.service';
 
 @Injectable()
 export class TenantLifecycleService {
@@ -14,7 +9,7 @@ export class TenantLifecycleService {
       findById(id: string): Promise<{ id: string; status: TenantStatus } | null>;
       updateStatus(id: string, patch: Record<string, unknown>): Promise<unknown>;
     },
-    @Inject(RedisClientService) private readonly redis: RedisLike | RedisClientService,
+    private readonly tenantStatusCache: TenantStatusCacheService,
   ) {}
 
   async suspend(params: { tenantId: string; reason: string }) {
@@ -25,7 +20,7 @@ export class TenantLifecycleService {
       suspendedAt: new Date(),
       suspendedReason: params.reason,
     });
-    await this.redisClient().set(buildTenantSuspendedRedisKey(params.tenantId), '1');
+    await this.tenantStatusCache.markSuspended(params.tenantId);
   }
 
   async activate(params: { tenantId: string }) {
@@ -36,7 +31,7 @@ export class TenantLifecycleService {
       suspendedAt: null,
       suspendedReason: null,
     });
-    await this.redisClient().del(buildTenantSuspendedRedisKey(params.tenantId));
+    await this.tenantStatusCache.clearSuspended(params.tenantId);
   }
 
   private async assertTenant(tenantId: string): Promise<void> {
@@ -44,12 +39,5 @@ export class TenantLifecycleService {
     if (!tenant) {
       throw new NotFoundException('TENANT_NOT_FOUND');
     }
-  }
-
-  private redisClient(): RedisLike {
-    if ('getClient' in this.redis) {
-      return this.redis.getClient();
-    }
-    return this.redis;
   }
 }

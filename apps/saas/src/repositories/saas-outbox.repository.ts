@@ -1,4 +1,5 @@
 import { SaasOutboxEvent } from '@common/entities/saas-outbox-event.entity';
+import { SAAS_EVENTS } from '@common/constants/saas.constants';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -19,9 +20,24 @@ export class SaasOutboxRepository {
     });
   }
 
+  lockPending(limit: number): Promise<SaasOutboxEvent[]> {
+    return this.findPendingRows(limit);
+  }
+
   async markPublished(id: string, tenantId: string): Promise<void> {
     await this.repo.update(
       { id, tenantId },
+      {
+        status: 'PUBLISHED',
+        publishedAt: new Date(),
+        lastError: null,
+      },
+    );
+  }
+
+  async markPublishedById(id: string): Promise<void> {
+    await this.repo.update(
+      { id },
       {
         status: 'PUBLISHED',
         publishedAt: new Date(),
@@ -46,12 +62,20 @@ export class SaasOutboxRepository {
     );
   }
 
+  async markAttemptFailed(id: string, error: unknown): Promise<void> {
+    const row = await this.repo.findOne({ where: { id } });
+    if (!row) {
+      return;
+    }
+    await this.recordSendFailure(id, row.tenantId, (error as Error).message ?? String(error));
+  }
+
   async createTenantCreated(input: Record<string, unknown>): Promise<void> {
     const tenantId = String(input.tenantId);
     const eventId = randomUUID();
     const payload = {
       eventId,
-      eventType: 'tenant.created',
+      eventType: SAAS_EVENTS.TENANT_CREATED,
       occurredAt: new Date().toISOString(),
       tenantId,
       slug: input.slug,
@@ -69,7 +93,7 @@ export class SaasOutboxRepository {
     const row = this.repo.create({
       tenantId,
       topic: TENANT_CREATED_TOPIC,
-      eventType: 'tenant.created',
+      eventType: SAAS_EVENTS.TENANT_CREATED,
       aggregateId: tenantId,
       partitionKey: tenantId,
       payload,
