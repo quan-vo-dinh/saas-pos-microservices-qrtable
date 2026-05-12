@@ -1,47 +1,39 @@
-import Link from 'next/link';
 import { getPublicLandingInfo, getPublicPlans } from '@/features/landing/landing-api';
 import { HeroSection } from '@/features/landing/hero-section';
 import { PricingSection } from '@/features/landing/pricing-section';
 import { WorkflowSection } from '@/features/landing/workflow-section';
 import { PaymentSection } from '@/features/landing/payment-section';
 import { ContactSection } from '@/features/landing/contact-section';
+import { ProductOverviewSection } from '@/features/landing/product-overview-section';
+import { TableLifecycleSection } from '@/features/landing/table-lifecycle-section';
+import { ComparisonSection } from '@/features/landing/comparison-section';
+import { LandingHeader } from '@/features/landing/landing-header';
+import { LandingFooter } from '@/features/landing/landing-footer';
+import '@/features/landing/landing.css';
 
 export default async function Home(): Promise<React.ReactElement> {
   const [plans, landing] = await Promise.all([getPublicPlans(), getPublicLandingInfo()]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 border-b border-border/80 bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4">
-          <Link href="/" className="text-lg font-bold tracking-tight">
-            {landing.productName}
-          </Link>
-          <nav className="flex items-center gap-4 text-sm">
-            <a href="#pricing" className="text-muted-foreground transition hover:text-foreground">
-              Giá
-            </a>
-            <a href="#contact" className="text-muted-foreground transition hover:text-foreground">
-              Liên hệ
-            </a>
-            <Link
-              href="/login"
-              className="rounded-md border border-border px-3 py-1.5 font-medium transition hover:bg-muted"
-            >
-              Đăng nhập
-            </Link>
-          </nav>
-        </div>
-      </header>
-      <main>
-        <HeroSection />
-        <PricingSection plans={plans} />
+    <div className="qrt-landing min-h-dvh bg-background text-foreground">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-3 focus:text-sm focus:font-medium focus:text-primary-foreground"
+      >
+        Bỏ qua điều hướng tới nội dung chính
+      </a>
+      <LandingHeader productName={landing.productName} />
+      <main id="main">
+        <HeroSection productName={landing.productName} />
+        <ProductOverviewSection />
+        <TableLifecycleSection />
         <WorkflowSection />
+        <ComparisonSection />
+        <PricingSection plans={plans} />
         <PaymentSection />
         <ContactSection contactEmail={landing.contactEmail} />
       </main>
-      <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} QRTable — SaaS POS đa tenant.
-      </footer>
+      <LandingFooter productName={landing.productName} />
     </div>
   );
 }

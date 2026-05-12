@@ -1,48 +1,30 @@
-# Landing Page Overrides
+# Landing — QRTable (management-app)
 
-> **PROJECT:** QRTable
-> **Generated:** 2026-05-13 02:51:08
-> **Page Type:** Landing / Marketing
+> Overrides `design-system/qrtable/MASTER.md` for the **public marketing / landing** route only (`/`).
 
-> ⚠️ **IMPORTANT:** Rules in this file **override** the Master file (`design-system/MASTER.md`).
-> Only deviations from the Master are documented here. For all other rules, refer to the Master.
+## Intent
 
----
+- **Product:** SaaS POS đa tenant, QR đặt món theo bàn, catalog realtime, thanh toán VietQR + SePay (hai tầng).
+- **Audience:** Chủ quán / điều hành F&B Việt Nam đang đánh giá nền tảng vận hành.
+- **Tone:** SaaS vận hành — rõ ràng, có số liệu, có luồng; **không** marketing rỗng, **không** gradient orb / card lồng chỉ để trang trí (theo Phase 4B plan).
 
-## Page-Specific Rules
+## Layout (implemented)
 
-### Layout Overrides
+1. Skip link + sticky header (desktop nav + mobile pill strip).
+2. Hero: value prop POS + minh họa luồng Khách / POS / Thanh toán.
+3. Tổng quan: 3 trụ (đa tenant, QR & POS, realtime).
+4. Bàn & QR: vòng đời Available → Occupied → Billing → Cleaning (theo `docs/business-logic.md`).
+5. Triển khai: 4 bước onboarding có kiểm soát.
+6. So sánh: bảng QRTable vs nhiều công cụ rời (pattern Comparison + CTA từ ui-ux-pro-max).
+7. Pricing: thẻ gói + checklist tính năng (Lucide `Check`).
+8. Thanh toán: hai cột Tier 1 / Tier 2.
+9. Liên hệ: CTA + aside gợi ý nội dung email.
+10. Footer.
 
-- **Max Width:** 1200px (standard)
-- **Layout:** Full-width sections, centered content
-- **Sections:** 1. Hero (date/location/countdown), 2. Speakers grid, 3. Agenda/schedule, 4. Sponsors, 5. Register CTA
+## Motion
 
-### Spacing Overrides
+- `landing.css`: `prefers-reduced-motion` giảm transition/animation; smooth scroll tắt khi reduce motion.
 
-- No overrides — use Master spacing
+## Typography / color
 
-### Typography Overrides
-
-- No overrides — use Master typography
-
-### Color Overrides
-
-- **Strategy:** Urgency colors (countdown). Event branding. Speaker cards professional. Sponsor logos neutral.
-
-### Component Overrides
-
-- Avoid: No indication of progress
-
----
-
-## Page-Specific Components
-
-- No unique components for this page
-
----
-
-## Recommendations
-
-- Effects: Smooth scroll reveal, fade-in animations on hero, subtle background parallax, CTA glow/pulse effect
-- Feedback: Step indicators or progress bar
-- CTA Placement: Register CTA sticky + After speakers + Bottom
+- Dùng **Geist + theme tokens** (`globals.css`) — không ép palette “Vibrant red” từ script nếu phá contrast với theme hiện tại; nội dung và hierarchy là ưu tiên.

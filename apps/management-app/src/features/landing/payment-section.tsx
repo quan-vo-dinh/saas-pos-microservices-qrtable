@@ -1,26 +1,61 @@
-import { ShieldCheck } from 'lucide-react';
+import { Building2, Landmark, Lock, ShieldCheck } from 'lucide-react';
 
 export function PaymentSection(): React.ReactElement {
   return (
-    <section className="border-b border-border/80 bg-background py-16 md:py-20">
-      <div className="mx-auto max-w-5xl px-4">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <ShieldCheck className="size-7" aria-hidden />
-          </div>
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Thanh toán &amp; niềm tin</h2>
-            <p className="mt-3 text-muted-foreground">
-              Hai tầng tách bạch: (1) Khách thanh toán hóa đơn trực tiếp vào tài khoản nhà hàng qua VietQR Tier 1 với tiền tố tham
-              chiếu bill; (2) Chủ quán thanh toán gói dịch vụ vào tài khoản nền tảng qua VietQR Tier 2 với tiền tố subscription.
+    <section id="thanh-toan" aria-labelledby="payment-heading" className="border-b border-border/80 bg-background py-16 md:py-24">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="max-w-3xl">
+          <h2 id="payment-heading" className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+            Thanh toán &amp; niềm tin vận hành
+          </h2>
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground md:text-lg">
+            QRTable tách rõ hai luồng tiền: khách trả bill vào tài khoản nhà hàng; chủ quán trả cước SaaS vào tài khoản
+            nền tảng. Kết nối SePay dùng OAuth theo từng tenant — client secret và khóa mã hóa chỉ tồn tại phía server.
+          </p>
+        </div>
+
+        <div className="mt-10 grid gap-6 lg:grid-cols-2">
+          <article className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center gap-3 text-primary">
+              <Building2 className="size-6" aria-hidden />
+              <h3 className="text-lg font-semibold text-foreground">Tier 1 — Bill khách (QRTBL…)</h3>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              VietQR + webhook khớp mã tham chiếu bill: tiền về tài khoản đã kết nối của đúng nhà hàng. Phù hợp thanh toán
+              tại bàn sau khi chốt đơn.
             </p>
-            <p className="mt-4 text-muted-foreground">
-              SePay OAuth2 Connect cho phép mỗi nhà hàng ủy quyền ứng dụng QRTable truy cập có phạm vi hẹp để đồng bộ tài khoản ngân
-              hàng và thiết lập webhook qua API —{' '}
-              <span className="font-medium text-foreground">tích hợp qua luồng OAuth2/API của SePay</span>, không lưu Client Secret
-              trên trình duyệt khách.
+            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+              <li className="flex gap-2">
+                <Landmark className="mt-0.5 size-4 shrink-0 text-foreground" aria-hidden />
+                Định danh giao dịch theo prefix tham chiếu bill (ví dụ QRTBL + phần đầu UUID).
+              </li>
+              <li className="flex gap-2">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-foreground" aria-hidden />
+                Webhook xác thực secret; không hiển thị thông tin nhạy cảm trên PWA khách.
+              </li>
+            </ul>
+          </article>
+
+          <article className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex items-center gap-3 text-primary">
+              <Lock className="size-6" aria-hidden />
+              <h3 className="text-lg font-semibold text-foreground">Tier 2 — Cước SaaS (QRSUB…)</h3>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Hóa đơn subscription / gia hạn gói: tiền về tài khoản nền tảng, kích hoạt hoặc gia hạn quyền vận hành tenant
+              sau khi đối soát webhook.
             </p>
-          </div>
+            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+              <li className="flex gap-2">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-foreground" aria-hidden />
+                Tách routing webhook platform vs theo slug tenant để tránh nhầm luồng.
+              </li>
+              <li className="flex gap-2">
+                <Lock className="mt-0.5 size-4 shrink-0 text-foreground" aria-hidden />
+                OAuth state và token refresh được xử lý server-side; trình duyệt không giữ client secret.
+              </li>
+            </ul>
+          </article>
         </div>
       </div>
     </section>

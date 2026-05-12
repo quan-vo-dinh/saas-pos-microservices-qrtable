@@ -7,8 +7,8 @@
 ---
 
 **Project:** QRTable
-**Generated:** 2026-05-13 02:51:08
-**Category:** Micro SaaS
+**Generated:** 2026-05-13 03:18:55
+**Category:** Restaurant/Food Service
 
 ---
 
@@ -18,30 +18,30 @@
 
 | Role        | Hex       | CSS Variable          |
 | ----------- | --------- | --------------------- |
-| Primary     | `#6366F1` | `--color-primary`     |
+| Primary     | `#DC2626` | `--color-primary`     |
 | On Primary  | `#FFFFFF` | `--color-on-primary`  |
-| Secondary   | `#818CF8` | `--color-secondary`   |
-| Accent/CTA  | `#059669` | `--color-accent`      |
-| Background  | `#F5F3FF` | `--color-background`  |
-| Foreground  | `#1E1B4B` | `--color-foreground`  |
-| Muted       | `#EBEFF9` | `--color-muted`       |
-| Border      | `#E0E7FF` | `--color-border`      |
+| Secondary   | `#F87171` | `--color-secondary`   |
+| Accent/CTA  | `#A16207` | `--color-accent`      |
+| Background  | `#FEF2F2` | `--color-background`  |
+| Foreground  | `#450A0A` | `--color-foreground`  |
+| Muted       | `#F0EDF1` | `--color-muted`       |
+| Border      | `#FECACA` | `--color-border`      |
 | Destructive | `#DC2626` | `--color-destructive` |
-| Ring        | `#6366F1` | `--color-ring`        |
+| Ring        | `#DC2626` | `--color-ring`        |
 
-**Color Notes:** Indigo primary + emerald CTA [Accent adjusted from #10B981 for WCAG 3:1]
+**Color Notes:** Appetizing red + warm gold [Accent adjusted from #CA8A04 for WCAG 3:1]
 
 ### Typography
 
-- **Heading Font:** Be Vietnam Pro
-- **Body Font:** Noto Sans
-- **Mood:** vietnamese, international, readable, clean, multilingual, accessible
-- **Google Fonts:** [Be Vietnam Pro + Noto Sans](https://fonts.google.com/share?selection.family=Be+Vietnam+Pro:wght@300;400;500;600;700|Noto+Sans:wght@300;400;500;600;700)
+- **Heading Font:** Playfair Display SC
+- **Body Font:** Karla
+- **Mood:** restaurant, menu, culinary, elegant, foodie, hospitality
+- **Google Fonts:** [Playfair Display SC + Karla](https://fonts.google.com/share?selection.family=Karla:wght@300;400;500;600;700|Playfair+Display+SC:wght@400;700)
 
 **CSS Import:**
 
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&family=Noto+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display+SC:wght@400;700&display=swap');
 ```
 
 ### Spacing Variables
@@ -74,7 +74,7 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #059669;
+  background: #a16207;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -91,8 +91,8 @@
 /* Secondary Button */
 .btn-secondary {
   background: transparent;
-  color: #6366f1;
-  border: 2px solid #6366f1;
+  color: #dc2626;
+  border: 2px solid #dc2626;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -105,7 +105,7 @@
 
 ```css
 .card {
-  background: #f5f3ff;
+  background: #fef2f2;
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
@@ -131,9 +131,9 @@
 }
 
 .input:focus {
-  border-color: #6366f1;
+  border-color: #dc2626;
   outline: none;
-  box-shadow: 0 0 0 3px #6366f120;
+  box-shadow: 0 0 0 3px #dc262620;
 }
 ```
 
@@ -159,29 +159,28 @@
 
 ## Style Guidelines
 
-**Style:** Motion-Driven
+**Style:** Vibrant & Block-based
 
-**Keywords:** Animation-heavy, microinteractions, smooth transitions, scroll effects, parallax, entrance anim, page transitions
+**Keywords:** Bold, energetic, playful, block layout, geometric shapes, high color contrast, duotone, modern, energetic
 
-**Best For:** Portfolio sites, storytelling platforms, interactive experiences, entertainment apps, creative, SaaS
+**Best For:** Startups, creative agencies, gaming, social media, youth-focused, entertainment, consumer
 
-**Key Effects:** Scroll anim (Intersection Observer), hover (300-400ms), entrance, parallax (3-5 layers), page transitions
+**Key Effects:** Large sections (48px+ gaps), animated patterns, bold hover (color shift), scroll-snap, large type (32px+), 200-300ms
 
 ### Page Pattern
 
-**Pattern Name:** Event/Conference Landing
+**Pattern Name:** Comparison Table + CTA
 
-- **Conversion Strategy:** Early bird pricing with deadline. Social proof (past attendees). Speaker credibility. Multi-ticket discounts.
-- **CTA Placement:** Register CTA sticky + After speakers + Bottom
-- **Section Order:** 1. Hero (date/location/countdown), 2. Speakers grid, 3. Agenda/schedule, 4. Sponsors, 5. Register CTA
+- **Conversion Strategy:** Use comparison to show unique value. Highlight your product row. Include 'free trial' in pricing row.
+- **CTA Placement:** Table: Right column. CTA: Below table
+- **Section Order:** 1. Hero, 2. Problem intro, 3. Comparison table (product vs competitors), 4. Pricing (optional), 5. CTA
 
 ---
 
 ## Anti-Patterns (Do NOT Use)
 
-- ❌ Static design
-- ❌ No video
-- ❌ Poor mobile
+- ❌ Low-quality imagery
+- ❌ Outdated hours
 
 ### Additional Forbidden Patterns
 
