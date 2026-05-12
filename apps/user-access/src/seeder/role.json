@@ -13,6 +13,25 @@
         "saas.get_list",
         "saas.update",
         "saas.delete",
+        "tenant.onboard",
+        "tenant.list_all",
+        "tenant.read_any",
+        "tenant.read_own",
+        "tenant.update",
+        "tenant.suspend",
+        "tenant.activate",
+        "tenant.close",
+        "subscription.assign",
+        "subscription.list_any",
+        "subscription.list_history_any",
+        "subscription.read_own",
+        "subscription.checkout",
+        "plan.create",
+        "plan.read",
+        "plan.update",
+        "plan.delete",
+        "payment_settings.read_own",
+        "payment_settings.update_own",
         "catalog.create",
         "catalog.get_by_id",
         "catalog.get_list",
@@ -69,6 +88,10 @@
         "catalog.get_list",
         "catalog.update",
         "catalog.delete",
+        "tenant.read_own",
+        "subscription.read_own",
+        "plan.read",
+        "payment_settings.read_own",
         "user.create",
         "user.get_by_id",
         "user.get_all",
@@ -95,7 +118,9 @@
         "table.update_status",
         "service_request.create",
         "service_request.acknowledge",
-        "service_request.resolve"
+        "service_request.resolve",
+        "subscription.checkout",
+        "payment_settings.update_own"
       ]
     },
     {
@@ -135,7 +160,11 @@
         "table.update_status",
         "service_request.create",
         "service_request.acknowledge",
-        "service_request.resolve"
+        "service_request.resolve",
+        "tenant.read_own",
+        "subscription.read_own",
+        "plan.read",
+        "payment_settings.read_own"
       ]
     },
     {
@@ -147,6 +176,7 @@
       "permissions": [
         "catalog.get_by_id",
         "catalog.get_list",
+        "plan.read",
         "order.confirm",
         "order.cancel_pending",
         "order.get_list",
@@ -170,6 +200,7 @@
       "permissions": [
         "catalog.get_by_id",
         "catalog.get_list",
+        "plan.read",
         "kitchen.get_queue",
         "kitchen.update_ticket",
         "kitchen.recall"
@@ -184,6 +215,7 @@
       "permissions": [
         "catalog.get_by_id",
         "catalog.get_list",
+        "plan.read",
         "kitchen.get_queue",
         "kitchen.update_ticket",
         "kitchen.recall"

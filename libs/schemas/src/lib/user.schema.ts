@@ -20,6 +20,15 @@ export class User extends BaseSchema {
   @Prop({ type: String })
   userId: string;
 
+  @Prop({ type: String, default: null, index: true })
+  tenantId?: string | null;
+
+  @Prop({ type: Boolean, default: true, index: true })
+  isActive: boolean;
+
+  @Prop({ type: Date, default: null })
+  disabledAt?: Date | null;
+
   @Prop({ type: [ObjectId], ref: 'Role' })
   roles: ObjectId[];
 }

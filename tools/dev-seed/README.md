@@ -29,3 +29,14 @@ Ownership seed:
 
 Runtime dev hiện vẫn dùng một database PostgreSQL `qrtable`.
 Bố cục thư mục cố ý sẵn sàng cho tách Database-per-Service sau này.
+
+## Phase 4B SaaS Schema Seed
+
+Run after PostgreSQL/MongoDB are up:
+
+```bash
+psql "$SAAS_DATABASE_URL" -f tools/dev-seed/postgres/phase-4b-saas.sql
+mongosh "$MONGO_URI" tools/dev-seed/mongo/phase-4b-users-tenantid.js
+```
+
+The scripts are idempotent and can be rerun during local development.

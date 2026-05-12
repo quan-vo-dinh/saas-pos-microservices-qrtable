@@ -1,7 +1,14 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { TenantStatus } from '@common/constants/saas.constants';
+import { Tenant } from '@common/entities/tenant.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
-import { CreateTenantTcpRequest, TenantTcpResponse, UpdateTenantTcpRequest } from '@common/interfaces/tcp/saas';
+import {
+  CreateTenantTcpRequest,
+  TenantTcpResponse,
+  TenantSummaryTcpResponse,
+  UpdateTenantTcpRequest,
+} from '@common/interfaces/tcp/saas';
 import { SaasRepository } from '../repositories/saas.repository';
 
 @Injectable()
@@ -20,15 +27,17 @@ export class SaasService {
       throw new BusinessException(ErrorCode.SAAS_TENANT_ALREADY_EXISTS, HttpStatus.CONFLICT);
     }
 
-    return this.saasRepository.create({
+    const tenant = await this.saasRepository.create({
       name,
       slug,
       isActive: data.isActive ?? true,
     });
+    return this.toTenantResponse(tenant);
   }
 
-  getList(): Promise<TenantTcpResponse[]> {
-    return this.saasRepository.findAll();
+  async getList(): Promise<TenantTcpResponse[]> {
+    const tenants = await this.saasRepository.findAll();
+    return tenants.map((tenant) => this.toTenantResponse(tenant));
   }
 
   async getById(id: string): Promise<TenantTcpResponse> {
@@ -37,7 +46,7 @@ export class SaasService {
       throw new BusinessException(ErrorCode.SAAS_TENANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
-    return tenant;
+    return this.toTenantResponse(tenant);
   }
 
   async getBySlug(rawSlug: string): Promise<TenantTcpResponse> {
@@ -55,7 +64,7 @@ export class SaasService {
       throw new BusinessException(ErrorCode.SAAS_TENANT_INACTIVE, HttpStatus.FORBIDDEN);
     }
 
-    return tenant;
+    return this.toTenantResponse(tenant);
   }
 
   async update(data: UpdateTenantTcpRequest): Promise<TenantTcpResponse> {
@@ -70,11 +79,12 @@ export class SaasService {
       }
     }
 
-    return this.saasRepository.updateById(data.id, {
+    const updated = await this.saasRepository.updateById(data.id, {
       name,
       slug,
       isActive: data.isActive,
     });
+    return this.toTenantResponse(updated);
   }
 
   async delete(id: string): Promise<void> {
@@ -88,5 +98,27 @@ export class SaasService {
       .toLowerCase()
       .replace(/[^a-z0-9_\s-]/g, '')
       .replace(/\s+/g, '-');
+  }
+
+  private toTenantResponse(tenant: Tenant): TenantSummaryTcpResponse {
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      status: tenant.status ?? (tenant.isActive ? TenantStatus.ACTIVE : TenantStatus.SUSPENDED),
+      isActive: tenant.isActive ?? tenant.status === TenantStatus.ACTIVE,
+      defaultCurrency: tenant.defaultCurrency ?? 'VND',
+      defaultLocale: tenant.defaultLocale ?? 'vi-VN',
+      ownerId: tenant.ownerId ?? null,
+      createdAt: this.toIsoString(tenant.createdAt),
+      updatedAt: this.toIsoString(tenant.updatedAt),
+    };
+  }
+
+  private toIsoString(value: Date | string | undefined): string {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    return value ?? '';
   }
 }

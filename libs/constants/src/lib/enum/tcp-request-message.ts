@@ -13,6 +13,9 @@ enum USER {
   UPDATE = 'user_access.update',
   DELETE = 'user_access.delete',
   GET_BY_USER_ID = 'user_access.get_by_user_id',
+  UPSERT_WITH_TENANT = 'user.upsert_with_tenant',
+  COUNT_BY_TENANT = 'user.count_by_tenant',
+  DISABLE = 'user.disable',
 }
 
 enum KEYCLOAK {
@@ -21,6 +24,10 @@ enum KEYCLOAK {
   GET_USERS = 'keycloak.get_users',
   UPDATE_USER = 'keycloak.update_user',
   DELETE_USER = 'keycloak.delete_user',
+  ASSIGN_REALM_ROLE = 'keycloak.assign_realm_role',
+  REMOVE_REALM_ROLE = 'keycloak.remove_realm_role',
+  DISABLE_USER = 'keycloak.disable_user',
+  GET_USER = 'keycloak.get_user',
 }
 
 enum AUTHORIZER {
@@ -79,6 +86,8 @@ enum MENU {
 
 enum CATALOG {
   HEALTH = 'catalog.health',
+  COUNT_TABLES = 'catalog.count_tables',
+  SEED_DEFAULT_AREA = 'catalog.seed_default_area',
 }
 
 enum SAAS {
@@ -89,6 +98,43 @@ enum SAAS {
   UPDATE = 'saas.update',
   DELETE = 'saas.delete',
   HEALTH = 'saas.health',
+}
+
+enum TENANT {
+  ONBOARD = 'tenant.onboard',
+  LIST = 'tenant.list',
+  GET_BY_ID = 'tenant.get_by_id',
+  GET_BY_SLUG = 'tenant.get_by_slug',
+  UPDATE = 'tenant.update',
+  SUSPEND = 'tenant.suspend',
+  ACTIVATE = 'tenant.activate',
+  CLOSE = 'tenant.close',
+  GET_USAGE = 'tenant.get_usage',
+  GET_AUDIT = 'tenant.get_audit',
+  GET_PLATFORM_STATS = 'tenant.get_platform_stats',
+}
+
+enum SUBSCRIPTION {
+  ASSIGN = 'subscription.assign',
+  CHECKOUT_INVOICE = 'subscription.checkout_invoice',
+  CANCEL = 'subscription.cancel',
+  GET_CURRENT = 'subscription.get_current',
+  LIST_HISTORY = 'subscription.list_history',
+  LIST_INVOICES = 'subscription.list_invoices',
+  GET_INVOICE = 'subscription.get_invoice',
+  CANCEL_INVOICE = 'subscription.cancel_invoice',
+  MANUAL_CONFIRM_INVOICE = 'subscription.manual_confirm_invoice',
+  HANDLE_WEBHOOK = 'subscription.handle_webhook',
+}
+
+enum PLAN {
+  CREATE = 'plan.create',
+  UPDATE = 'plan.update',
+  DELETE = 'plan.delete',
+  GET_BY_ID = 'plan.get_by_id',
+  GET_BY_CODE = 'plan.get_by_code',
+  LIST = 'plan.list',
+  LIST_ACTIVE = 'plan.list_active',
 }
 
 enum ORDER {
@@ -131,6 +177,15 @@ enum PAYMENT {
   GET_STATUS = 'payment.get_status',
 }
 
+enum PAYMENT_SETTINGS {
+  GET = 'payment.settings_get',
+  CREATE_EMPTY = 'payment.settings_create_empty',
+  GENERATE_AUTHORIZE_URL = 'payment.settings_generate_authorize_url',
+  HANDLE_OAUTH_CALLBACK = 'payment.settings_handle_oauth_callback',
+  SELECT_BANK = 'payment.settings_select_bank',
+  DISCONNECT = 'payment.settings_disconnect',
+}
+
 enum KITCHEN {
   GET_QUEUE = 'kitchen.get_queue',
   START_TICKET = 'kitchen.start_ticket',
@@ -154,7 +209,11 @@ export const TCP_REQUEST_MESSAGE = {
   MENU,
   CATALOG,
   SAAS,
+  TENANT,
+  SUBSCRIPTION,
+  PLAN,
   ORDER,
   KITCHEN,
   PAYMENT,
+  PAYMENT_SETTINGS,
 };
