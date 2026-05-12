@@ -1660,13 +1660,14 @@ BFF emit WS subscription.activated → /dashboard/subscription auto-refresh → 
 
 **Setup ban đầu (1 lần, do bạn — platform owner):**
 
-1. Đăng ký QRTable làm OAuth2 client với SePay (qua liên hệ SePay support hoặc developer portal).
+1. QRTable OAuth2 app đã được SePay support cấp Client ID + Client Secret.
 2. Lưu env vars:
 
 ```
  SEPAY_OAUTH_CLIENT_ID=qrtable_xxx
  SEPAY_OAUTH_CLIENT_SECRET=...
- SEPAY_OAUTH_REDIRECT_URI=https://app.qrtable.io/dashboard/payment-settings/sepay-callback
+ SEPAY_OAUTH_REDIRECT_URI=https://saas-pos-microservices-qrtable-mana.vercel.app/dashboard/payment-settings/sepay-callback
+ PUBLIC_API_BASE_URL=https://<backend-public-tunnel-or-api-domain>
 ```
 
 **Runtime onboarding flow (mỗi tenant — 100% tự động):**
@@ -1680,8 +1681,8 @@ QRTable redirect tới:
   https://my.sepay.vn/oauth/authorize?
     response_type=code
     &client_id=qrtable_xxx
-    &redirect_uri=https://app.qrtable.io/dashboard/payment-settings/sepay-callback
-    &scope=bank-account:read transaction:read profile
+    &redirect_uri=https://saas-pos-microservices-qrtable-mana.vercel.app/dashboard/payment-settings/sepay-callback
+    &scope=bank-account:read transaction:read webhook:read webhook:write webhook:delete profile
     &state={CSRF_random + tenant_id encoded}
   ↓
 Tenant đăng nhập SePay account của họ (đã đăng ký riêng FREE)
@@ -1706,7 +1707,7 @@ QRTable backend:
   - Setup webhook trong SePay account của tenant qua API:
       POST {tenant_sepay_base}/v1/webhook
       Body: {
-        webhook_url: "https://app.qrtable.io/api/v1/payment/sepay/webhook/{tenantSlug}",
+        webhook_url: "{PUBLIC_API_BASE_URL}/api/v1/payment/sepay/webhook/{tenantSlug}",
         auth_type: "SECRET_KEY",
         secret_key: generateRandom(32),  // unique per tenant
         active: 1,
@@ -1735,7 +1736,7 @@ Customer scan QR, chuyển khoản từ app NH cá nhân
 Tiền vào TK ngân hàng của TENANT
   ↓
 SePay (account của tenant) detect → POST đến tenant-specific webhook URL:
-  https://app.qrtable.io/api/v1/payment/sepay/webhook/{tenantSlug}
+  {PUBLIC_API_BASE_URL}/api/v1/payment/sepay/webhook/{tenantSlug}
   Body: { code: "QRTBLxxxxxxxx", accountNumber: "...", transferAmount: 128000, ... }
   Headers: X-Secret-Key: tenant_specific_secret (đã setup khi onboarding)
   ↓
@@ -1825,7 +1826,7 @@ WS notify → POS + Customer thấy "Đã thanh toán"
 
 **Khuyến nghị: C** (A as primary, B as fallback for edge cases).
 
-### Q25. SePay OAuth2 client registration (CONFIRMED qua Round 3.5)
+### Q25. SePay OAuth2 client registration (CONFIRMED qua Round 4)
 
 **Bối cảnh — Verified (docs.sepay.vn/oauth2/dang-ky-ung-dung.html):**
 
@@ -1839,69 +1840,78 @@ WS notify → POS + Customer thấy "Đã thanh toán"
 | ------------------- | ------------------------------------------------------------------------------------------ |
 | `bank-account:read` | Xem danh sách tài khoản, số dư, chi tiết từng tài khoản                                    |
 | `transaction:read`  | Xem lịch sử giao dịch, chi tiết giao dịch, đếm số lượng                                    |
-| `**webhook:read`    | **Xem danh sách webhook, chi tiết từng webhook** (mới phát hiện)                           |
-| `**webhook:write`   | **Tạo mới + cập nhật webhook** (mới phát hiện — confirm Q23 α auto webhook setup feasible) |
-| `**webhook:delete`  | **Xóa webhook** (mới phát hiện)                                                            |
+| `webhook:read`      | **Xem danh sách webhook, chi tiết từng webhook** (mới phát hiện)                           |
+| `webhook:write`     | **Tạo mới + cập nhật webhook** (mới phát hiện — confirm Q23 α auto webhook setup feasible) |
+| `webhook:delete`    | **Xóa webhook** (mới phát hiện)                                                            |
 | `profile`           | Xem thông tin cá nhân người dùng                                                           |
-| `**company`         | **Xem thông tin chi tiết về công ty** (mới phát hiện)                                      |
+| `company`           | **Xem thông tin chi tiết về công ty** (mới phát hiện)                                      |
 
 **Ý nghĩa cho Q23 α:** Có scope `webhook:write` → flow §19.2 step "Setup webhook tự động (`POST /v1/webhook`)" hoàn toàn khả thi qua API, **không cần can thiệp manual**.
 
-**Lựa chọn cho Q25:**
+**Cập nhật quyết định cuối cùng từ project owner (Round 4):**
+
+- Project owner đã liên hệ SePay support và **đã được cấp Client ID + Client Secret** cho QRTable.
+- Redirect URI hiện đăng ký để demo qua Vercel:
+  `https://saas-pos-microservices-qrtable-mana.vercel.app/dashboard/payment-settings/sepay-callback`.
+- Vì credentials thật đã có, Q25 **không còn là quyết định "liên hệ support hay mock"**. Hybrid ở Round 3.5 chỉ là chiến lược phòng rủi ro trước khi được cấp credentials.
+- Mock OAuth2 server vẫn có giá trị cho local development / CI automated tests, nhưng **không còn là fallback chiến lược cho thesis demo**.
+
+**Lựa chọn cho Q25 (giữ lại lịch sử quyết định để trace audit):**
 
 | Option | Mô tả                                                                                                                                                                                                                                    | Pros                                                   | Cons                                                |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
 | **A**  | **Liên hệ SePay ngay (TUẦN NÀY).** Email/chat fb.me/sepay.vn hoặc tel: 02873.059.589 — request OAuth2 app cho thesis demo + scopes `bank-account:read`, `transaction:read`, `webhook:read`, `webhook:write`, `webhook:delete`, `profile` | Nếu được approve → có credentials thật demo end-to-end | Phụ thuộc thời gian phản hồi SePay (1-7 ngày)       |
 | B      | Implement code OAuth2 song song, mock OAuth2 server local cho dev (ví dụ `oauth2-mock-server` npm package); credentials thật chỉ cần khi demo.                                                                                           | Phase 4B không bị block                                | Risk: thesis defense ngày đó SePay vẫn chưa approve |
 | C      | Downgrade Q23 sang β / γ / δ → không cần OAuth2 → không cần liên hệ.                                                                                                                                                                     | Đơn giản, không phụ thuộc bên thứ ba                   | Mất "100% auto" + mất demo highlight                |
-| D      | Hybrid A+B: liên hệ A song song với code mock B. Nếu A approve trước thesis → demo Path 3 đầy đủ; nếu A delay → demo với mock OAuth + giả lập SePay sandbox locally.                                                                     | Chống risk tối đa                                      | Phải maintain 2 paths code (mock + real)            |
+| D      | Historical pre-approval fallback: liên hệ A song song với code mock B. **Obsolete sau Round 4** vì credentials thật đã có.                                                                                                               | Từng chống risk vendor approval                        | Không còn là decision hiện tại                      |
+| **E**  | **Resolved:** SePay OAuth2 app đã được approve và đã có Client ID + Client Secret; triển khai trực tiếp real OAuth2 flow, mock chỉ dùng cho automated tests/local isolation.                                                             | Không còn block bởi vendor approval; demo thật được    | Vẫn cần test redirect URI + webhook trên deployment |
 
-**Khuyến nghị: D (Hybrid).** Cụ thể:
+**Quyết định cuối cùng: E (Resolved).**
 
-1. **Ngay hôm nay:** Soạn email/inbox FB tới SePay support với nội dung:
-   > _"Tôi đang triển khai project [QRTable] làm luận án tốt nghiệp ngành Khoa học Máy tính. Project mô phỏng nền tảng SaaS cho ngành F&B Việt Nam, trong đó tích hợp SePay làm provider thanh toán cho cả 2 luồng: (1) tenant chuyển khoản subscription cho platform; (2) khách hàng cuối chuyển khoản cho từng nhà hàng (qua OAuth2 Connect, mỗi tenant authorize app của tôi truy cập SePay account của họ). Tôi xin được đăng ký 1 OAuth2 application trên SePay với các scopes: bank-account:read, transaction:read, webhook:read, webhook:write, webhook:delete, profile. Mục đích academic, không thương mại. Redirect URI: [https://app.qrtable.io/dashboard/payment-settings/sepay-callback](https://app.qrtable.io/dashboard/payment-settings/sepay-callback) (hoặc localhost cho dev)."_
+Implementation nên dùng env vars thật:
 
-- Channels: Email [support@sepay.vn](mailto:support@sepay.vn) / inbox fb.me/sepay.vn / tel: 02873.059.589.
+```env
+SEPAY_OAUTH_CLIENT_ID=<issued-by-sepay>
+SEPAY_OAUTH_CLIENT_SECRET=<issued-by-sepay>
+SEPAY_OAUTH_REDIRECT_URI=https://saas-pos-microservices-qrtable-mana.vercel.app/dashboard/payment-settings/sepay-callback
+SEPAY_OAUTH_BASE_URL=https://my.sepay.vn
+```
 
-1. **Trong khi chờ:** Implement Phase 4B với mock OAuth2 server local. Dùng `oauth2-mock-server` npm package hoặc tự stub. Code production-ready với env vars `SEPAY_OAUTH_BASE_URL` (default `https://my.sepay.vn`, có thể switch `http://localhost:9999` cho dev).
-2. **Có 2 outcomes:**
-
-- **A approve** (xác suất ~70%): demo thesis với SePay thật. Switch env vars → real production.
-- **A reject hoặc delay** (xác suất ~30%): demo thesis với mock OAuth + production-ready code. Document trong slide thesis: "OAuth2 với SePay đang chờ approve; mock OAuth được dùng cho demo, code đã production-ready cho cutover khi approve". Đây vẫn là acceptable cho luận án vì kiến trúc đã đúng.
+Mock OAuth2 local chỉ nên tồn tại như adapter test được bật bằng env `SEPAY_OAUTH_BASE_URL=http://localhost:9999` trong test/dev, không phải một business path dành cho production/demo.
 
 ---
 
-## 21. Cập Nhật Quick Decision Checklist (Round 3)
+## 21. Cập Nhật Quick Decision Checklist (Round 4)
 
-Tổng kết Q1–Q25 (15 cũ + 7 round 2 + 3 round 3):
+Tổng kết Q1–Q25 sau khi project owner chốt Round 4:
 
-| #       | Câu hỏi                                                  | Khuyến nghị                                                                                           |
-| ------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Q1      | `isActive` vs `status`                                   | C (giữ cả 2 với mapper)                                                                               |
-| Q2      | Suspend behavior với active session                      | B (read-only + payment allowed)                                                                       |
-| Q3      | Permission namespace                                     | B (tenant._ / subscription._ / plan.)                                                                 |
-| Q4      | Reserved slug source                                     | A (hardcoded const)                                                                                   |
-| Q5      | Cron schedule                                            | B (02:00 Asia/Ho_Chi_Minh, grace 24h)                                                                 |
-| Q6      | Feature gating layer                                     | C (BFF guard + service backup)                                                                        |
-| Q7      | Onboarding TX                                            | B (mini-saga in-process)                                                                              |
-| Q8      | Self-service registration wizard                         | A (defer post-thesis) **HOẶC C nếu chốt full SaaS auto** (xem §22 below)                              |
-| Q9      | Webhook/Order/WS khi suspend                             | a-Process / b-Allow finish / c-WS banner                                                              |
-| Q10     | Admin app structure                                      | A (giữ trong management-app)                                                                          |
-| Q11     | Suspend notification channel                             | A→D (defer Notification, dùng TCP sau)                                                                |
-| Q12     | Data retention CLOSED                                    | C (defer)                                                                                             |
-| Q13     | Counter time-zone                                        | C (hardcoded Asia/Ho_Chi_Minh)                                                                        |
-| Q14     | Legacy tenant migration                                  | (a) Free plan vô hạn, (b) SUSPENDED, (c) VND/vi-VN                                                    |
-| Q15     | Owner password handoff                                   | A→C (admin-typed, upgrade khi Phase 4C SMTP)                                                          |
-| Q16     | Landing page                                             | B (static landing với pricing) **HOẶC C nếu Q8=C**                                                    |
-| Q17     | (DEPRECATED — replaced by Q23)                           | Xem Q23                                                                                               |
-| ~~Q18~~ | ~~SePay sub-account routing~~                            | **REPLACED bởi Q23** (giả định cũ sai)                                                                |
-| Q19     | Tier 2 subscription billing flow                         | **REPLACED bởi Q24** (chi tiết hơn)                                                                   |
-| Q20     | `/dashboard/billing` page scope                          | A (build full nếu Q24=A/C)                                                                            |
-| Q21     | Webhook prefix QRTBL vs QRSUB                            | Confirm 2 prefix                                                                                      |
-| Q22     | Payment settings entity location                         | A (Payment Service owns)                                                                              |
-| **Q23** | **Tier 1 architecture (OAuth2 Connect vs alternatives)** | **α (OAuth2 Connect — 100% auto, demo ấn tượng nhất)**                                                |
-| **Q24** | **Tier 2 billing flow**                                  | **C (auto webhook + manual fallback)**                                                                |
-| **Q25** | **SePay OAuth2 client registration**                     | **D (Hybrid: liên hệ SePay support TUẦN NÀY + mock OAuth2 local song song)** — verified docs.sepay.vn |
+| #       | Câu hỏi                                                  | Khuyến nghị                                                                                                       |
+| ------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Q1      | `isActive` vs `status`                                   | C (giữ cả 2 với mapper)                                                                                           |
+| Q2      | Suspend behavior với active session                      | B (read-only + payment allowed)                                                                                   |
+| Q3      | Permission namespace                                     | B (tenant._ / subscription._ / plan.)                                                                             |
+| Q4      | Reserved slug source                                     | A (hardcoded const)                                                                                               |
+| Q5      | Cron schedule                                            | B (02:00 Asia/Ho_Chi_Minh, grace 24h)                                                                             |
+| Q6      | Feature gating layer                                     | C (BFF guard + service backup)                                                                                    |
+| Q7      | Onboarding TX                                            | B (mini-saga in-process)                                                                                          |
+| Q8      | Self-service registration wizard                         | A (defer post-thesis; Phase 4B dùng admin-assisted onboarding)                                                    |
+| Q9      | Webhook/Order/WS khi suspend                             | a-Process / b-Allow finish / c-WS banner                                                                          |
+| Q10     | Admin app structure                                      | A (giữ trong management-app)                                                                                      |
+| Q11     | Suspend notification channel                             | A→D (defer Notification, dùng TCP sau)                                                                            |
+| Q12     | Data retention CLOSED                                    | C (defer)                                                                                                         |
+| Q13     | Counter time-zone                                        | C (hardcoded Asia/Ho_Chi_Minh)                                                                                    |
+| Q14     | Legacy tenant migration                                  | (a) Free plan vô hạn, (b) SUSPENDED, (c) VND/vi-VN                                                                |
+| Q15     | Owner password handoff                                   | A→C (admin-typed, upgrade khi Phase 4C SMTP)                                                                      |
+| Q16     | Landing page                                             | B (static landing với pricing; khi triển khai bắt buộc áp dụng `ui-ux-pro-max`)                                   |
+| Q17     | (DEPRECATED — replaced by Q23)                           | Xem Q23                                                                                                           |
+| ~~Q18~~ | ~~SePay sub-account routing~~                            | **REPLACED bởi Q23** (giả định cũ sai)                                                                            |
+| Q19     | Tier 2 subscription billing flow                         | **REPLACED bởi Q24** (chi tiết hơn)                                                                               |
+| Q20     | `/dashboard/billing` page scope                          | N/A — Round 2 question bỏ qua; billing scope được quyết định bởi Q24=C                                            |
+| Q21     | Webhook prefix QRTBL vs QRSUB                            | Confirm 2 prefix                                                                                                  |
+| Q22     | Payment settings entity location                         | A (Payment Service owns)                                                                                          |
+| **Q23** | **Tier 1 architecture (OAuth2 Connect vs alternatives)** | **α (OAuth2 Connect — 100% auto; Tenant tự đăng ký SePay account, OAuth flow trong QRTable, auto setup webhook)** |
+| **Q24** | **Tier 2 billing flow**                                  | **C (auto webhook + manual fallback)**                                                                            |
+| **Q25** | **SePay OAuth2 client registration**                     | **E (Resolved: đã có Client ID + Client Secret; Vercel redirect URI đã được dùng cho callback)**                  |
 
 ---
 
@@ -1921,45 +1931,59 @@ Tùy theo bạn chốt Q23 + Q24, scope Phase 4B sẽ khác nhau:
 - Demo: Multi-tenant Tier 1 (manual link), Tier 2 auto webhook
 - Trade-off: SUPER_ADMIN can thiệp manual mỗi tenant onboard ở Tier 1
 
-### Path 3 — "Full SaaS Vision" (Q23=α, Q24=C, Q8=C, Q16=C, Q25=D) ⭐ RECOMMENDED
+### Path 2.5 — "Selected Thesis SaaS" (Q8=A, Q16=B, Q23=α, Q24=C, Q25=E) ✅ SELECTED
+
+- Effort: ~2.5-3 tuần
+- Demo:
+  - Static public landing page với pricing table (`ui-ux-pro-max` bắt buộc khi triển khai UI).
+  - SUPER_ADMIN onboard tenant qua `/admin/tenants/onboard` (không làm self-service wizard trong Phase 4B).
+  - Sau onboarding, tenant tự kết nối SePay bằng OAuth2 thật qua redirect URI Vercel đã đăng ký.
+  - QRTable tự lấy bank accounts, tenant chọn tài khoản nhận tiền, hệ thống tự setup webhook bằng `webhook:write`.
+  - Tenant tự thanh toán subscription qua VietQR auto-webhook; webhook fail thì SUPER_ADMIN manual confirm.
+  - Customer thanh toán bill → tiền đi vào bank account của tenant, không đi qua tài khoản platform.
+- Trade-off: Không có self-service signup wizard hoàn chỉnh trong Phase 4B; demo vẫn thể hiện SaaS production-grade ở subscription + payment automation.
+
+### Path 3 — "Full SaaS Vision Extension" (Q23=α, Q24=C, Q8=C, Q16=C, Q25=E) OPTIONAL
 
 - Effort: ~3-3.5 tuần
 - Demo:
   - Public landing page với pricing
   - Self-service registration wizard
-  - Tenant tự kết nối SePay (OAuth2 — mock hoặc real tùy SePay approve)
+  - Tenant tự kết nối SePay bằng real OAuth2 credentials đã được cấp
   - Tenant tự thanh toán subscription (auto VietQR webhook)
   - Customer thanh toán → tiền vào tenant's bank
   - Hoàn toàn KHÔNG cần SUPER_ADMIN intervention sau setup ban đầu
-- Trade-off: Phase 4B chiếm 40% timeline còn lại của thesis + dependency vào SePay support response time
+- Trade-off: Phase 4B chiếm nhiều timeline hơn vì phải xây self-service signup wizard, validation, draft onboarding và abuse-prevention.
 - Reward: Demo "production-grade SaaS" — highlight điểm mạnh nhất của thesis
 
----
-
-## 23. Cập Nhật Risk Register (Round 3.5 — sau khi verify SePay docs)
-
-Bổ sung 2 risks mới do constraint thực tế của SePay OAuth2 registration:
-
-| #   | Risk                                                                                                  | Likelihood | Impact | Mitigation                                                                                                  |
-| --- | ----------------------------------------------------------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------- |
-| R17 | SePay từ chối approve OAuth2 app cho thesis demo (vì ưu tiên businesses thật)                         | Medium     | High   | Q25=D Hybrid: viết email professional, mention thesis academic; nếu reject → fallback Q23=β hoặc mock OAuth |
-| R18 | SePay approve nhưng delay > 2 tuần → block Phase 4B end-to-end demo                                   | Medium     | Medium | Q25=D Hybrid: dev với mock OAuth2 server local song song; switch env vars khi credentials có                |
-| R19 | SePay approve cho dev/staging nhưng không cho production redirect URI                                 | Low        | Low    | Đăng ký 2 redirect URIs từ đầu (dev + prod); nếu chỉ approve dev → demo thesis dùng dev URI                 |
-| R20 | Code OAuth2 dependency trên SePay-specific endpoints (`my.sepay.vn/oauth/authorize`) → vendor lock-in | Low        | Low    | Abstract qua interface `OAuth2Provider`; SePay là 1 implementation; có thể swap sang Casso, BankHub sau     |
+> Round 4 note: Path 3 vẫn là lựa chọn nếu sau này muốn thêm self-service registration wizard. Phase 4B hiện đã chốt Path 2.5 để giữ admin-assisted onboarding nhưng vẫn tự động hóa đầy đủ hai tầng thanh toán.
 
 ---
 
-## Hết Báo Cáo (Round 3.5 — Verified)
+## 23. Cập Nhật Risk Register (Round 4)
+
+Round 3.5 từng bổ sung 2 risks do constraint OAuth2 registration. Round 4 đánh dấu R17/R18 đã resolved vì credentials thật đã được cấp.
+
+| #   | Risk                                                                                                  | Likelihood | Impact | Mitigation                                                                                              |
+| --- | ----------------------------------------------------------------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| R17 | SePay từ chối approve OAuth2 app cho thesis demo (vì ưu tiên businesses thật)                         | Resolved   | High   | **Resolved Round 4:** project owner đã được cấp Client ID + Client Secret                               |
+| R18 | SePay approve nhưng delay > 2 tuần → block Phase 4B end-to-end demo                                   | Resolved   | Medium | **Resolved Round 4:** credentials đã có; mock OAuth chỉ dùng cho automated tests/local dev              |
+| R19 | SePay approve cho dev/staging nhưng không cho production redirect URI                                 | Low        | Low    | Đăng ký 2 redirect URIs từ đầu (dev + prod); nếu chỉ approve dev → demo thesis dùng dev URI             |
+| R20 | Code OAuth2 dependency trên SePay-specific endpoints (`my.sepay.vn/oauth/authorize`) → vendor lock-in | Low        | Low    | Abstract qua interface `OAuth2Provider`; SePay là 1 implementation; có thể swap sang Casso, BankHub sau |
+
+---
+
+## Hết Báo Cáo (Round 4 — Decisions Locked)
 
 > **Verification trail:**
 >
 > - Round 1: Phase docs review.
 > - Round 2: FE pages + Two-tier payment gap discovery.
 > - Round 3: Context7 SePay developer docs → confirm OAuth2 + scopes + pricing 0đ.
-> - **Round 3.5 (current):** docs.sepay.vn verify → confirm OAuth2 app registration **không self-service**, phải liên hệ SePay support; thêm 3 scopes mới (`webhook:read/write/delete`, `company`); thêm risks R17-R20.
+> - Round 3.5: docs.sepay.vn verify → confirm OAuth2 app registration **không self-service**, phải liên hệ SePay support; thêm 3 scopes mới (`webhook:read/write/delete`, `company`); thêm risks R17-R20.
+> - **Round 4 (current):** project owner đã liên hệ SePay và nhận Client ID + Client Secret; Q25 chuyển từ "hybrid risk mitigation" sang **Resolved**; selected path = **Path 2.5**.
 >
 > **Hành động tiếp theo:**
 >
-> 1. **Hôm nay (independent của decision Path):** Soạn email/inbox SePay support theo template ở Q25 D.1. Lý do: response time SePay không chắc chắn, làm sớm tốt hơn.
-> 2. **Bạn confirm Path (1 / 2 / 3 ở §22) + answers cho remaining Q1–Q25.** Path 3 là recommended để đạt mục tiêu "SaaS chuẩn 100% tự động".
-> 3. Sau khi confirm, tôi viết spec chính thức `docs/specs/business-logic-phase-4b-spec.md` với độ chi tiết đủ làm input cho `writing-plans`.
+> 1. Đồng bộ spec chính thức `docs/specs/business-logic-phase-4b-spec.md` theo Q25=E.
+> 2. Bước kế tiếp sau khi review: dùng spec làm input cho `writing-plans`.

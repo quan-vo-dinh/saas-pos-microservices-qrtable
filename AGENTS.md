@@ -1,388 +1,101 @@
-# QRTable — AGENTS.md
+# QRTable — [AGENTS.md](http://AGENTS.md)
 
-Primary agent context for the QRTable Restaurant QR-code ordering SaaS platform.
+Ngữ cảnh chính cho agent về nền tảng SaaS đặt món nhà hàng qua mã QR QRTable.
 
-> ⚠️ **TARGET STANDARDS — NOT CURRENT STATE**
-> This document describes **how the codebase should be built**, not necessarily its current state.
-> The project is under active improvement. Always apply the patterns below when generating new code or refactoring existing code — even if surrounding code doesn't follow them yet.
-> **Do not copy existing code patterns blindly** — audit them against these standards first.
+> ⚠️ **TIÊU CHUẨN MỤC TIÊU — KHÔNG PHẢI TRẠNG THÁI HIỆN TẠI**
+> Tài liệu này mô tả **cách codebase nên được xây dựng**, không nhất thiết phản ánh trạng thái hiện tại.
+> Dự án đang được cải tiến tích cực. Luôn áp dụng các mẫu dưới đây khi sinh mã mới hoặc refactor — kể cả khi mã xung quanh chưa tuân theo.
+> **Không sao chép mù quáng mẫu mã hiện có** — hãy đối chiếu với các tiêu chuẩn này trước.
 
-## Project Identity
+## Bản sắc dự án
 
-Nx monorepo with NestJS microservices backend + React/Next.js frontends. Multi-tenant SaaS architecture.
+Monorepo Nx với backend NestJS dạng microservice + frontend React/Next.js. Kiến trúc SaaS đa tenant.
 
-## Critical Patterns to Know
+Khi người dùng yêu cầu thực hiện việc, kiểm tra xem các kỹ năng có sẵn bên dưới có giúp hoàn thành hiệu quả hơn không. Kỹ năng cung cấp năng lực chuyên biệt và kiến thức miền.
 
-### Guard Chain (Backend)
+Cách dùng kỹ năng:
 
-Every protected HTTP endpoint goes through: `UserGuard` → `TenantGuard` → `PermissionGuard`.
+- Gọi: `npx openskills read <skill-name>` (chạy trong shell)
+  - Nhiều skill: `npx openskills read skill-one,skill-two`
+- Nội dung skill sẽ tải kèm hướng dẫn chi tiết để hoàn thành tác vụ
+- Thư mục gốc trong output dùng để resolve tài nguyên đính kèm (references/, scripts/, assets/)
 
-- `UserGuard`: Validates JWT via gRPC call to Authorizer service. Attaches `user` to request.
-- `TenantGuard`: Resolves tenant from header/subdomain/JWT. Attaches `tenant_id` to request.
-- `PermissionGuard`: Checks RBAC permissions from `@common/constants`.
+Lưu ý:
 
-Never bypass this chain. Always apply guards in this order.
+- Chỉ dùng các skill liệt kê trong bên dưới
+- Không gọi lại skill đã có trong ngữ cảnh hiện tại
+- Mỗi lần gọi skill là độc lập (stateless)
 
-### TCP Microservice Communication
+brainstormingSocratic questioning protocol + user communication. MANDATORY for complex requests, new features, or unclear requirements. Includes progress reporting and error handling.project
 
-Services communicate via NestJS TCP transport. Pattern:
+clean-codePragmatic coding standards - concise, direct, no over-engineering, no unnecessary commentsproject
 
-1. BFF Controller calls `this.client.send(TCP_MESSAGE_PATTERN, payload)`
-2. Target service handles with `@MessagePattern(TCP_MESSAGE_PATTERN)`
-3. Constants in `libs/constants/src/lib/enum/tcp-request-message.ts`
+code-review-checklistCode review guidelines covering code quality, security, and best practices.project
 
-### Multi-Tenant Data Isolation
+database-designDatabase design principles and decision-making. Schema design, indexing strategy, ORM selection, serverless databases.project
 
-Every DB query MUST include `tenant_id` filter. `TenantMiddleware` resolves and injects it.
-TypeORM: always add `WHERE tenant_id = :tenantId` parameter.
-Mongoose: always add `{ tenant_id: tenantId }` to queries.
+deployment-proceduresProduction deployment principles and decision-making. Safe deployment workflows, rollback strategies, and verification. Teaches thinking, not scripts.project
 
-### Response Wrapper
+documentation-templatesDocumentation templates and structure guidelines. README, API docs, code comments, and AI-friendly documentation.project
 
-All HTTP responses are wrapped by `ExceptionInterceptor`:
+frontend-designDesign thinking and decision-making for web UI. Use when designing components, layouts, color schemes, typography, or creating aesthetic interfaces. Teaches principles, not fixed values.project
 
-```json
-{ "data": ..., "message": "...", "statusCode": 200, "duration": "12ms", "processID": "..." }
-```
+frontend-patternsFrontend development patterns for React, Next.js, state management, performance optimization, and UI best practices.project
 
-### Auth Flow
+game-developmentGame development orchestrator. Routes to platform-specific skills based on project needs.project
 
-Keycloak (OAuth2/OIDC) → JWT in Authorization header → BFF UserGuard → gRPC to Authorizer → Redis cache (30min TTL)
+geo-fundamentalsGenerative Engine Optimization for AI search engines (ChatGPT, Claude, Perplexity).project
 
-### Frontend RBAC vs BFF permissions (`management-app`)
+i18n-localizationInternationalization and localization patterns. Detecting hardcoded strings, managing translations, locale files, RTL support.project
 
-- **BFF:** Source of truth — mỗi endpoint dùng `PermissionGuard` + `@Permissions([...])` theo matrix (`docs/architecture/permission-matrix.md` §6).
-- **Management App (Phase 2.x):** **Điều hướng + sidebar theo role** (prefix route + filter nav), đồng bộ với `role-routing.ts`. Đây là lớp **thô** (UX), không thay thế kiểm tra permission trên API.
-- **Mock UI Step 2.2:** Đã có trong `apps/customer-pwa` và `apps/management-app` (`src/mocks/`, fake realtime); Phase 2A Step 2.5 sẽ thay mock bằng API + WS/polling thật.
-- **Tech debt (sau):** có thể map từng control UI ↔ `session.user.permissions` khi cần phân quyền trong cùng một màn hình. Chi tiết & nguyên tắc đồng bộ: `docs/architecture/permission-matrix.md` §9.
+intelligent-routingAutomatic agent selection and intelligent task routing. Analyzes user requests and automatically selects the best specialist agent(s) without requiring explicit user mentions.project
 
-## Service Ports Quick Reference
+lint-and-validateAutomatic quality control, linting, and static analysis procedures. Use after every code modification to ensure syntax correctness and project standards. Triggers onKeywords: lint, format, check, validate, types, static analysis.project
 
-HTTP defaults use contiguous **3300–3308** (see repo `.env.example`). Nest TCP transport uses **3201–3208** (`libs/configuration/tcp.config.ts`). gRPC ports are unchanged.
+mcp-builderMCP (Model Context Protocol) server building principles. Tool design, resource patterns, best practices.project
 
-- BFF: HTTP **3300** (`PORT`)
-- Order: HTTP **3301**, TCP **3201**
-- Product: HTTP **3302**, TCP **3202**
-- User-Access: HTTP **3303**, TCP **3203**, gRPC **5200**
-- Authorizer: HTTP **3304**, TCP **3204**, gRPC **5100**
-- Catalog: HTTP **3305**, TCP **3205**
-- SaaS: HTTP **3306**, TCP **3206**
-- Kitchen: HTTP **3307**, TCP **3207**
-- Payment: HTTP **3308**, TCP **3208**
+mobile-designMobile-first design thinking and decision-making for iOS and Android apps. Touch interaction, performance patterns, platform conventions. Teaches principles, not fixed values. Use when building React Native, Flutter, or native mobile apps.project
 
-## Development Commands
+nextjs-react-expertReact and Next.js performance optimization from Vercel Engineering. Use when building React components, optimizing performance, eliminating waterfalls, reducing bundle size, reviewing code for performance issues, or implementing server/client-side optimizations.project
 
-```bash
-npx nx serve <service>        # Single service
-pnpm dev:bff-auth             # BFF + Authorizer
-pnpm dev:bff-product          # BFF + Product
-npx nx test <project>         # Unit tests
-npx nx lint <project> --fix   # Lint fix
-```
+nodejs-best-practicesNode.js development principles and decision-making. Framework selection, async patterns, security, and architecture. Teaches thinking, not copying.project
 
-## When to Use Which Agent
+parallel-agentsMulti-agent orchestration patterns. Use when multiple independent tasks can run with different domain expertise or when comprehensive analysis requires multiple perspectives.project
 
-- Adding/modifying NestJS service → `nestjs-microservice-expert`
-- Frontend UI/UX changes → `frontend-specialist`
-- Database schema changes → `database-architect`
-- CI/CD or Docker issues → `devops-engineer`
-- Tracking down bugs → `debugger`
-- Writing tests → `test-engineer`
-- Code quality / refactoring → `code-quality-auditor`
-- PR / diff review → `code-reviewer` (global)
+performance-profilingPerformance profiling principles. Measurement, analysis, and optimization techniques.project
 
-## Recommended Workflows
+plan-writingStructured task planning with clear breakdowns, dependencies, and verification criteria. Use when implementing features, refactoring, or any multi-step work.project
 
-### Feature Development
+shadcnManages shadcn components and projects — adding, searching, fixing, debugging, styling, and composing UI. Provides project context, component docs, and usage examples. Applies when working with shadcn/ui, component registries, presets, --preset codes, or any project with a components.json file. Also triggers for "shadcn init", "create an app with --preset", or "switch to --preset".project
 
-```
-/plan Add [feature] to [service]
-→ Review plan → Proceed
-→ Use the nestjs-microservice-expert to implement
-→ Use the test-engineer to write tests
-→ /review
-→ Commit with conventional commit message
-```
-
-### Code Quality Audit
-
-```
-Use the code-quality-auditor to audit apps/[service]/src/
-→ Review findings
-→ Proceed with fixes
-→ npx nx lint [service] --fix && npx nx test [service]
-```
-
-### Debugging
-
-```
-Use the debugger agent to investigate [symptom] in [service]
-```
-
-### New Microservice
-
-```
-/plan Scaffold new [name] microservice
-→ Use the nestjs-microservice-expert to implement following the plan
-→ Use the devops-engineer to add Docker config if needed
-```
-
-### Onboarding / Understanding Code
-
-```
-How does [feature/flow] work in this codebase?
-Explain the auth flow from frontend to Keycloak
-What's the pattern for adding a new TCP endpoint?
-```
-
-<skills_system priority="1">
-
-## Available Skills
-
-<!-- SKILLS_TABLE_START -->
-<usage>
-When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively. Skills provide specialized capabilities and domain knowledge.
-
-How to use skills:
-
-- Invoke: `npx openskills read <skill-name>` (run in your shell)
-  - For multiple: `npx openskills read skill-one,skill-two`
-- The skill content will load with detailed instructions on how to complete the task
-- Base directory provided in output for resolving bundled resources (references/, scripts/, assets/)
-
-Usage notes:
-
-- Only use skills listed in <available_skills> below
-- Do not invoke a skill that is already loaded in your context
-- Each skill invocation is stateless
-  </usage>
-
-<available_skills>
-
-<skill>
-<name>brainstorming</name>
-<description>Socratic questioning protocol + user communication. MANDATORY for complex requests, new features, or unclear requirements. Includes progress reporting and error handling.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>clean-code</name>
-<description>Pragmatic coding standards - concise, direct, no over-engineering, no unnecessary comments</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>code-review-checklist</name>
-<description>Code review guidelines covering code quality, security, and best practices.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>database-design</name>
-<description>Database design principles and decision-making. Schema design, indexing strategy, ORM selection, serverless databases.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>deployment-procedures</name>
-<description>Production deployment principles and decision-making. Safe deployment workflows, rollback strategies, and verification. Teaches thinking, not scripts.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>documentation-templates</name>
-<description>Documentation templates and structure guidelines. README, API docs, code comments, and AI-friendly documentation.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>frontend-design</name>
-<description>Design thinking and decision-making for web UI. Use when designing components, layouts, color schemes, typography, or creating aesthetic interfaces. Teaches principles, not fixed values.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>frontend-patterns</name>
-<description>Frontend development patterns for React, Next.js, state management, performance optimization, and UI best practices.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>game-development</name>
-<description>Game development orchestrator. Routes to platform-specific skills based on project needs.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>geo-fundamentals</name>
-<description>Generative Engine Optimization for AI search engines (ChatGPT, Claude, Perplexity).</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>i18n-localization</name>
-<description>Internationalization and localization patterns. Detecting hardcoded strings, managing translations, locale files, RTL support.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>intelligent-routing</name>
-<description>Automatic agent selection and intelligent task routing. Analyzes user requests and automatically selects the best specialist agent(s) without requiring explicit user mentions.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>lint-and-validate</name>
-<description>Automatic quality control, linting, and static analysis procedures. Use after every code modification to ensure syntax correctness and project standards. Triggers onKeywords: lint, format, check, validate, types, static analysis.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>mcp-builder</name>
-<description>MCP (Model Context Protocol) server building principles. Tool design, resource patterns, best practices.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>mobile-design</name>
-<description>Mobile-first design thinking and decision-making for iOS and Android apps. Touch interaction, performance patterns, platform conventions. Teaches principles, not fixed values. Use when building React Native, Flutter, or native mobile apps.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>nextjs-react-expert</name>
-<description>React and Next.js performance optimization from Vercel Engineering. Use when building React components, optimizing performance, eliminating waterfalls, reducing bundle size, reviewing code for performance issues, or implementing server/client-side optimizations.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>nodejs-best-practices</name>
-<description>Node.js development principles and decision-making. Framework selection, async patterns, security, and architecture. Teaches thinking, not copying.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>parallel-agents</name>
-<description>Multi-agent orchestration patterns. Use when multiple independent tasks can run with different domain expertise or when comprehensive analysis requires multiple perspectives.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>performance-profiling</name>
-<description>Performance profiling principles. Measurement, analysis, and optimization techniques.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>plan-writing</name>
-<description>Structured task planning with clear breakdowns, dependencies, and verification criteria. Use when implementing features, refactoring, or any multi-step work.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>shadcn</name>
-<description>Manages shadcn components and projects — adding, searching, fixing, debugging, styling, and composing UI. Provides project context, component docs, and usage examples. Applies when working with shadcn/ui, component registries, presets, --preset codes, or any project with a components.json file. Also triggers for "shadcn init", "create an app with --preset", or "switch to --preset".</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>shadcn-component-discovery</name>
-<description>Discover existing shadcn components from registries before building custom. Use PROACTIVELY when about to build any UI component, page section, or layout. Use when user explicitly asks to find/search components. Searches 1,500+ components across official and community registries including @shadcn, @blocks, @reui, @animate-ui, @diceui, Magic UI, and 30+ specialty registries. Provides install commands and code examples. Works best with shadcn MCP configured, but provides manual guidance without it.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>shadcn-component-review</name>
-<description>Review custom components and layouts against shadcn design patterns, theme styles (Maia, Vega, Lyra, Nova, Mira), component structure, composability, and Radix UI best practices. Use when planning new components, reviewing existing components, auditing spacing, checking component structure, or verifying shadcn best practices alignment.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>systematic-debugging</name>
-<description>4-phase systematic debugging methodology with root cause analysis and evidence-based verification. Use when debugging complex issues.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>tailwind-patterns</name>
-<description>Tailwind CSS v4 principles. CSS-first configuration, container queries, modern patterns, design token architecture.</description>
-<location>project</location>
-</skill>
-
-<skill>
-<name>dispatching-parallel-agents</name>
-<description>Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>executing-plans</name>
-<description>Use when you have a written implementation plan to execute in a separate session with review checkpoints</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>finishing-a-development-branch</name>
-<description>Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>receiving-code-review</name>
-<description>Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>requesting-code-review</name>
-<description>Use when completing tasks, implementing major features, or before merging to verify work meets requirements</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>subagent-driven-development</name>
-<description>Use when executing implementation plans with independent tasks in the current session</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>test-driven-development</name>
-<description>Use when implementing any feature or bugfix, before writing implementation code</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>using-git-worktrees</name>
-<description>Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>using-superpowers</name>
-<description>Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>verification-before-completion</name>
-<description>Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>writing-plans</name>
-<description>Use when you have a spec or requirements for a multi-step task, before touching code</description>
-<location>global</location>
-</skill>
-
-<skill>
-<name>writing-skills</name>
-<description>Use when creating new skills, editing existing skills, or verifying skills work before deployment</description>
-<location>global</location>
-</skill>
-
-</available_skills>
-
-<!-- SKILLS_TABLE_END -->
-
-</skills_system>
+shadcn-component-discoveryDiscover existing shadcn components from registries before building custom. Use PROACTIVELY when about to build any UI component, page section, or layout. Use when user explicitly asks to find/search components. Searches 1,500+ components across official and community registries including @shadcn, @blocks, @reui, @animate-ui, @diceui, Magic UI, and 30+ specialty registries. Provides install commands and code examples. Works best with shadcn MCP configured, but provides manual guidance without it.project
+
+shadcn-component-reviewReview custom components and layouts against shadcn design patterns, theme styles (Maia, Vega, Lyra, Nova, Mira), component structure, composability, and Radix UI best practices. Use when planning new components, reviewing existing components, auditing spacing, checking component structure, or verifying shadcn best practices alignment.project
+
+systematic-debugging4-phase systematic debugging methodology with root cause analysis and evidence-based verification. Use when debugging complex issues.project
+
+tailwind-patternsTailwind CSS v4 principles. CSS-first configuration, container queries, modern patterns, design token architecture.project
+
+dispatching-parallel-agentsUse when facing 2+ independent tasks that can be worked on without shared state or sequential dependenciesglobal
+
+executing-plansUse when you have a written implementation plan to execute in a separate session with review checkpointsglobal
+
+finishing-a-development-branchUse when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanupglobal
+
+receiving-code-reviewUse when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementationglobal
+
+requesting-code-reviewUse when completing tasks, implementing major features, or before merging to verify work meets requirementsglobal
+
+subagent-driven-developmentUse when executing implementation plans with independent tasks in the current sessionglobal
+
+test-driven-developmentUse when implementing any feature or bugfix, before writing implementation codeglobal
+
+using-git-worktreesUse when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verificationglobal
+
+using-superpowersUse when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questionsglobal
+
+verification-before-completionUse when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions alwaysglobal
+
+writing-plansUse when you have a spec or requirements for a multi-step task, before touching codeglobal
+
+writing-skillsUse when creating new skills, editing existing skills, or verifying skills work before deploymentglobal
