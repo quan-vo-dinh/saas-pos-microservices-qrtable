@@ -7,17 +7,27 @@ import {
   DeleteTenantTcpRequest,
   GetTenantByIdTcpRequest,
   GetTenantBySlugTcpRequest,
+  HandleSubscriptionWebhookTcpRequest,
+  OnboardTenantTcpRequest,
   TenantTcpResponse,
   UpdateTenantTcpRequest,
 } from '@common/interfaces/tcp/saas';
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
+import { OnboardingSagaService } from '../services/onboarding-saga.service';
 import { SaasService } from '../services/saas.service';
+import { SubscriptionInvoiceService } from '../services/subscription-invoice.service';
+import { TenantLifecycleService } from '../services/tenant-lifecycle.service';
 
 @UseInterceptors(TcpLoggingInterceptor)
 @Controller('saas')
 export class SaasController {
-  constructor(private readonly saasService: SaasService) {}
+  constructor(
+    private readonly saasService: SaasService,
+    private readonly onboardingSagaService: OnboardingSagaService,
+    private readonly tenantLifecycleService: TenantLifecycleService,
+    private readonly subscriptionInvoiceService: SubscriptionInvoiceService,
+  ) {}
 
   @MessagePattern(TCP_REQUEST_MESSAGE.SAAS.HEALTH)
   async health(): Promise<Response<{ service: string; status: 'UP' }>> {
@@ -61,5 +71,52 @@ export class SaasController {
   async remove(@RequestParams() body: DeleteTenantTcpRequest): Promise<Response<boolean>> {
     await this.saasService.delete(body.id);
     return Response.success<boolean>(true);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.ONBOARD)
+  async onboard(@RequestParams() body: OnboardTenantTcpRequest): Promise<Response<unknown>> {
+    return Response.success(
+      await this.onboardingSagaService.onboard({
+        tenantName: body.name,
+        ownerEmail: body.ownerEmail,
+        ownerPassword: body.ownerPassword,
+        ownerFirstName: body.ownerFirstName,
+        ownerLastName: body.ownerLastName,
+        type: body.type,
+        address: body.address,
+        planCode: body.planCode,
+        createdByUserId: body.createdByUserId,
+        processId: body.processId,
+      }),
+    );
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.SUSPEND)
+  async suspend(@RequestParams() body: { tenantId: string; reason: string }): Promise<Response<boolean>> {
+    await this.tenantLifecycleService.suspend(body);
+    return Response.success(true);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.TENANT.ACTIVATE)
+  async activate(@RequestParams() body: { tenantId: string }): Promise<Response<boolean>> {
+    await this.tenantLifecycleService.activate(body);
+    return Response.success(true);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.HANDLE_WEBHOOK)
+  async handleSubscriptionWebhook(
+    @RequestParams() body: HandleSubscriptionWebhookTcpRequest,
+  ): Promise<Response<boolean>> {
+    const { payload } = body;
+    if (payload.code) {
+      await this.subscriptionInvoiceService.handleWebhook({
+        code: payload.code,
+        transferAmount: payload.transferAmount,
+        sepayTransactionId: String(payload.id),
+        referenceCode: payload.referenceCode,
+        content: payload.content,
+      });
+    }
+    return Response.success(true);
   }
 }
