@@ -39,6 +39,9 @@ export type Session = {
   closedAt?: string;
   /** Denormalized — tránh JOIN khi check auto-close rule (orderCount == 0?) */
   orderCount: number;
+  /** Phase 4B — SaaS tenant lifecycle for customer PWA (BFF-enriched on join). */
+  tenantStatus?: 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
+  tenantStatusReason?: string | null;
 };
 
 export type CartItem = {

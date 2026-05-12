@@ -12,9 +12,12 @@ import { useSession } from '@/features/session/context/session-provider';
 import { useCartMutations, useCurrentBillQuery, useCustomerCartQuery } from '@/features/order/hooks/use-order-query';
 import { extractCategories, extractItems, useFullMenuQuery } from '@/features/menu/hooks/use-menu-query';
 import { ROUTES } from '@/constants/routes';
+import { useTenantStatus } from '@/features/tenant/use-tenant-status';
 
 export function MenuPage(): React.ReactElement {
   const { session, hydrated } = useSession();
+  const { canOrder } = useTenantStatus();
+  const tenantOrderLocked = !canOrder;
   const {
     data: menu = [],
     isPending: menuPending,
@@ -41,7 +44,7 @@ export function MenuPage(): React.ReactElement {
   };
 
   const handleQuickAdd = (item: PublicMenuItem): void => {
-    if (billLockActive || isUpdating || item.status !== 'available') return;
+    if (billLockActive || tenantOrderLocked || isUpdating || item.status !== 'available') return;
     addItem(item, 1);
   };
 
@@ -109,7 +112,7 @@ export function MenuPage(): React.ReactElement {
               item={item}
               onOpenDetail={handleOpenDetail}
               onQuickAdd={handleQuickAdd}
-              disabled={billLockActive || isUpdating}
+              disabled={billLockActive || tenantOrderLocked || isUpdating}
             />
           ))}
         </div>

@@ -14,6 +14,12 @@ export class PublicTenantMetadataDto {
 
   @ApiProperty()
   isActive: boolean;
+
+  @ApiProperty({ enum: ['ACTIVE', 'SUSPENDED', 'CLOSED'] })
+  status!: 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
+
+  @ApiProperty({ required: false, nullable: true })
+  suspendedReason?: string | null;
 }
 
 export class TenantResponseDto extends BaseResponseDto {

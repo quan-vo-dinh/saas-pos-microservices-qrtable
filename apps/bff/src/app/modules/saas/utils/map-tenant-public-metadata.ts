@@ -7,5 +7,7 @@ export function mapTcpTenantToPublicMetadata(t: TenantTcpResponse): PublicTenant
     slug: t.slug,
     name: t.name,
     isActive: t.isActive,
+    status: t.status,
+    suspendedReason: t.suspendedReason ?? null,
   };
 }

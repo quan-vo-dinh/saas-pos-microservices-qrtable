@@ -120,7 +120,8 @@ describe('RealtimeAuthService', () => {
     } as unknown as Socket;
 
     const rooms = await service.resolveConnectionRooms(socket);
-    expect(rooms).toEqual(['session:sid_1:customer']);
+    expect(rooms).toEqual(expect.arrayContaining(['session:sid_1:customer', 'tenant:t1:customers']));
+    expect(rooms.length).toBe(2);
   });
 
   it('customer prefers handshake.auth tenant/session over conflicting headers', async () => {
@@ -140,8 +141,32 @@ describe('RealtimeAuthService', () => {
     } as unknown as Socket;
 
     const rooms = await service.resolveConnectionRooms(socket);
-    expect(rooms).toEqual(['session:sid_auth:customer']);
+    expect(rooms).toEqual(expect.arrayContaining(['session:sid_auth:customer', 'tenant:t_auth:customers']));
+    expect(rooms.length).toBe(2);
     expect(cache.get).toHaveBeenCalledWith(getSessionCacheKey('sid_auth', 't_auth'));
+  });
+
+  it('customer joins slug lifecycle room when tenantSlug provided in handshake', async () => {
+    cache.get.mockImplementation(async (key: string) => {
+      if (key === getSessionCacheKey('sid_slug', 't_slug')) {
+        return { tenantId: 't_slug', createdAt: Date.now(), lastActivityAt: Date.now() };
+      }
+      return undefined;
+    });
+
+    const socket = {
+      handshake: {
+        auth: { tenantId: 't_slug', sessionId: 'sid_slug', tenantSlug: 'my-rest' },
+        headers: {},
+      },
+      data: {},
+    } as unknown as Socket;
+
+    const rooms = await service.resolveConnectionRooms(socket);
+    expect(rooms).toEqual(
+      expect.arrayContaining(['session:sid_slug:customer', 'tenant:t_slug:customers', 'tenant-slug:my-rest:customers']),
+    );
+    expect(rooms.length).toBe(3);
   });
 
   it('customer requires existing BFF session cache entry', async () => {
@@ -158,7 +183,8 @@ describe('RealtimeAuthService', () => {
     } as unknown as Socket;
 
     const rooms = await service.resolveConnectionRooms(socket);
-    expect(rooms).toEqual(['session:sid_1:customer']);
+    expect(rooms).toEqual(expect.arrayContaining(['session:sid_1:customer', 'tenant:t1:customers']));
+    expect(rooms.length).toBe(2);
   });
 
   it('rejects customer when session cache misses', async () => {

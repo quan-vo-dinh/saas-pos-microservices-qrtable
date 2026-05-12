@@ -58,6 +58,21 @@ export const SAAS_EVENTS = {
   TENANT_CACHE_REFRESH_REQUESTED: 'tenant.cache_refresh_requested',
 } as const;
 
+/** Socket.io event names for tenant lifecycle → customer `tenant:{id}:customers` room (Phase 4B). */
+export const TENANT_LIFECYCLE_SOCKET_EVENTS = {
+  SUSPENDED: SAAS_EVENTS.TENANT_SUSPENDED,
+  ACTIVATED: SAAS_EVENTS.TENANT_ACTIVATED,
+  CLOSED: SAAS_EVENTS.TENANT_CLOSED,
+} as const;
+
+export function buildTenantCustomersSocketRoom(tenantId: string): string {
+  return `tenant:${tenantId}:customers`;
+}
+
+export function buildTenantSlugCustomersSocketRoom(tenantSlug: string): string {
+  return `tenant-slug:${tenantSlug}:customers`;
+}
+
 export const RESERVED_TENANT_SLUGS = [
   'admin',
   'api',

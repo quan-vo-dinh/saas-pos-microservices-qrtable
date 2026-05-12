@@ -11,10 +11,12 @@ import { PublicSaasController } from './controllers/public-saas.controller';
 import { PublicTenantController } from './controllers/public-tenant.controller';
 import { SaasController } from './controllers/saas.controller';
 import { SepayWebhookController } from './controllers/sepay-webhook.controller';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 @Module({
   imports: [
     ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.SAAS_SERVICE), TcpProvider(TCP_SERVICES.PAYMENT_SERVICE)]),
+    RealtimeModule,
   ],
   controllers: [
     SaasController,
@@ -29,5 +31,6 @@ import { SepayWebhookController } from './controllers/sepay-webhook.controller';
     SepayWebhookController,
   ],
   providers: [],
+  exports: [ClientsModule],
 })
 export class SaasModule {}

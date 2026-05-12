@@ -28,6 +28,7 @@ import {
 } from '@/features/order/hooks/use-order-query';
 import { createAndPersistIdempotencyKey } from '@/lib/idempotency';
 import { usePwaMockStore } from '@/mocks/store';
+import { useTenantStatus } from '@/features/tenant/use-tenant-status';
 
 const NOTE_CHIPS = ['Không cay', 'Ít muối', 'Không hành'] as const;
 
@@ -41,6 +42,8 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
   const { data: cart, isLoading } = useCustomerCartQuery();
   const { setQuantity, updateNote, removeLine, clearCart, isUpdating } = useCartMutations();
   const submitOrder = useSubmitOrderMutation();
+  const { canOrder } = useTenantStatus();
+  const orderBlocked = !canOrder;
 
   const presence = usePwaMockStore((s) => s.presence);
   const activityFeed = usePwaMockStore((s) => s.activityFeed);
@@ -54,7 +57,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
   const isSubmittingOrder = submitOrder.isPending;
 
   const handleSubmitOrder = async (): Promise<void> => {
-    if (items.length === 0 || submitInFlightRef.current || isSubmittingOrder) {
+    if (orderBlocked || items.length === 0 || submitInFlightRef.current || isSubmittingOrder) {
       return;
     }
 
@@ -81,7 +84,11 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
               <div>
                 <DrawerTitle>Giỏ hàng</DrawerTitle>
                 <DrawerDescription>
-                  {isLoading ? 'Đang tải…' : `${totalItems} món · ${formatCurrency(totalAmount)}`}
+                  {orderBlocked
+                    ? 'Cửa hàng tạm không nhận đơn mới — bạn vẫn xem được giỏ đã chọn.'
+                    : isLoading
+                      ? 'Đang tải…'
+                      : `${totalItems} món · ${formatCurrency(totalAmount)}`}
                 </DrawerDescription>
               </div>
               <PresenceAvatars presence={presence} activity={activityFeed} />
@@ -112,7 +119,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                         dragConstraints={{ left: -88, right: 0 }}
                         dragElastic={0.06}
                         onDragEnd={(_, info) => {
-                          if (info.offset.x < -80 && !isUpdating) removeLine(line.cartLineId);
+                          if (info.offset.x < -80 && !isUpdating && !orderBlocked) removeLine(line.cartLineId);
                         }}
                         className="relative bg-card"
                       >
@@ -134,7 +141,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                                 variant="outline"
                                 size="icon"
                                 className="size-8"
-                                disabled={isUpdating}
+                                disabled={isUpdating || orderBlocked}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setQuantity(line.cartLineId, line.quantity - 1);
@@ -148,7 +155,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                                 variant="outline"
                                 size="icon"
                                 className="size-8"
-                                disabled={isUpdating}
+                                disabled={isUpdating || orderBlocked}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setQuantity(line.cartLineId, line.quantity + 1);
@@ -174,7 +181,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                                     size="sm"
                                     variant="secondary"
                                     className="h-7 text-xs"
-                                    disabled={isUpdating}
+                                    disabled={isUpdating || orderBlocked}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const base = line.note?.trim() ?? '';
@@ -207,7 +214,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                                     key={`${line.cartLineId}-${line.lineVersion}`}
                                     className="mt-2 min-h-[72px]"
                                     defaultValue={line.note ?? ''}
-                                    disabled={isUpdating}
+                                    disabled={isUpdating || orderBlocked}
                                     onBlur={(e) => {
                                       const v = e.target.value;
                                       if (v !== (line.note ?? '')) {
@@ -233,7 +240,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                 </div>
                 <Button
                   className="h-12 w-full text-base"
-                  disabled={items.length === 0 || isUpdating || isSubmittingOrder}
+                  disabled={items.length === 0 || isUpdating || isSubmittingOrder || orderBlocked}
                   onClick={() => void handleSubmitOrder()}
                 >
                   {isSubmittingOrder ? 'Đang gửi đơn…' : 'Đặt món'}
@@ -243,7 +250,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  disabled={isUpdating || isSubmittingOrder || items.length === 0}
+                  disabled={isUpdating || isSubmittingOrder || items.length === 0 || orderBlocked}
                   onClick={() => {
                     if (items.length === 0) return;
                     clearCart();

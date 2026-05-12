@@ -27,7 +27,9 @@ jest.mock('@/features/session/context/session-provider', () => ({
     session: {
       tenantId: 'tenant-1',
       sessionId: 'session-1',
+      tenantSlug: 'my-rest',
     },
+    patchTenantLifecycle: jest.fn(),
   }),
 }));
 
@@ -70,7 +72,7 @@ describe('useCustomerOrderRealtime', () => {
     renderHook(() => useCustomerOrderRealtime(), { wrapper: createWrapper(queryClient) });
 
     expect(ioMock).toHaveBeenCalledWith('http://localhost:3300/orders', {
-      auth: { tenantId: 'tenant-1', sessionId: 'session-1' },
+      auth: { tenantId: 'tenant-1', sessionId: 'session-1', tenantSlug: 'my-rest' },
       autoConnect: true,
       reconnection: true,
       timeout: 10_000,

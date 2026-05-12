@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { buildTenantCustomersSocketRoom, buildTenantSlugCustomersSocketRoom } from '@common/constants/saas.constants';
 import type {
   BillRequestedEvent,
   CartUpdatedEvent,
@@ -82,5 +83,29 @@ export class RealtimeEventsService {
   emitPaymentCompleted(event: PaymentCompletedRealtimeEvent): void {
     this.gateway.emitToRoom(`session:${event.sessionId}:customer`, 'events.paymentCompleted', event);
     this.gateway.emitToRoom(`tenant:${event.tenantId}:staff`, 'events.paymentCompleted', event);
+  }
+
+  /** Phase 4B — broadcast tenant lifecycle to all customer sockets for the tenant. */
+  emitTenantLifecycle(params: {
+    eventName: string;
+    tenantId: string;
+    tenantSlug: string;
+    status: 'SUSPENDED' | 'ACTIVE' | 'CLOSED';
+    reason: string | null;
+    occurredAt: string;
+  }): void {
+    const payload = {
+      tenantId: params.tenantId,
+      tenantSlug: params.tenantSlug,
+      status: params.status,
+      reason: params.reason,
+      occurredAt: params.occurredAt,
+    };
+    const idRoom = buildTenantCustomersSocketRoom(params.tenantId);
+    const slugRoom = buildTenantSlugCustomersSocketRoom(params.tenantSlug);
+    this.gateway.emitToRoom(idRoom, params.eventName, payload);
+    if (params.tenantSlug?.trim()) {
+      this.gateway.emitToRoom(slugRoom, params.eventName, payload);
+    }
   }
 }

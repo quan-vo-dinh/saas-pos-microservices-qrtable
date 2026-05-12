@@ -10,10 +10,14 @@ import { ResponseDto } from '@common/interfaces/gateway/response.interface';
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import { buildTcpRequestContext } from '@common/utils/request.util';
+import { SAAS_EVENTS, TenantStatus } from '@common/constants/saas.constants';
+import type { GetTenantByIdTcpRequest } from '@common/interfaces/tcp/saas';
+import type { TenantTcpResponse } from '@common/interfaces/tcp/saas';
 import { Body, Controller, ForbiddenException, Get, Inject, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { map } from 'rxjs';
+import { firstValueFrom, from, map, mergeMap } from 'rxjs';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import {
   AdminListTenantsQueryDto,
   AssignTenantSubscriptionDto,
@@ -28,7 +32,10 @@ import { SAAS_BFF_ROUTES } from '../saas-bff-routes';
 @Controller()
 @Authorization({ secured: true })
 export class AdminTenantsController {
-  constructor(@Inject(TCP_SERVICES.SAAS_SERVICE) private readonly saasClient: TcpClient) {}
+  constructor(
+    @Inject(TCP_SERVICES.SAAS_SERVICE) private readonly saasClient: TcpClient,
+    private readonly realtimeEvents: RealtimeEventsService,
+  ) {}
 
   @Get(SAAS_BFF_ROUTES.adminPlatformStats)
   @Permissions([PERMISSION.TENANT_LIST_ALL])
@@ -89,11 +96,36 @@ export class AdminTenantsController {
       [TenantStatusActionDtoValue.CLOSE]: TCP_REQUEST_MESSAGE.TENANT.CLOSE,
     }[body.action];
 
-    return this.forward(pattern, req, processId, {
-      id,
-      reason: body.reason ?? null,
-      requestedByUserId: this.userId(req),
-    });
+    return this.saasClient
+      .send(
+        pattern,
+        buildTcpRequestContext(req, processId, {
+          id,
+          reason: body.reason ?? null,
+          requestedByUserId: this.userId(req),
+        }),
+      )
+      .pipe(
+        mergeMap((response) =>
+          from(
+            (async () => {
+              if (response.statusCode >= 200 && response.statusCode < 300) {
+                await this.emitTenantLifecycleSocket(req, processId, id, body);
+              }
+              return response;
+            })(),
+          ),
+        ),
+        map(
+          (response) =>
+            new ResponseDto({
+              data: response.data,
+              statusCode: response.statusCode,
+              message: response.code as HTTP_MESSAGE,
+              processID: processId,
+            }),
+        ),
+      );
   }
 
   @Get(SAAS_BFF_ROUTES.adminTenantSubscriptions)
@@ -149,6 +181,52 @@ export class AdminTenantsController {
           }),
       ),
     );
+  }
+
+  private async emitTenantLifecycleSocket(
+    req: Request,
+    processId: string,
+    tenantId: string,
+    body: UpdateTenantStatusDto,
+  ): Promise<void> {
+    const tcp = await firstValueFrom(
+      this.saasClient.send<TenantTcpResponse, GetTenantByIdTcpRequest>(
+        TCP_REQUEST_MESSAGE.SAAS.GET_BY_ID,
+        buildTcpRequestContext<GetTenantByIdTcpRequest>(req, processId, { id: tenantId }),
+      ),
+    );
+    const t = tcp.data;
+    if (!t?.slug) {
+      return;
+    }
+
+    const eventByAction = {
+      [TenantStatusActionDtoValue.SUSPEND]: SAAS_EVENTS.TENANT_SUSPENDED,
+      [TenantStatusActionDtoValue.ACTIVATE]: SAAS_EVENTS.TENANT_ACTIVATED,
+      [TenantStatusActionDtoValue.CLOSE]: SAAS_EVENTS.TENANT_CLOSED,
+    } as const;
+
+    const statusByAction: Record<TenantStatusActionDtoValue, 'SUSPENDED' | 'ACTIVE' | 'CLOSED'> = {
+      [TenantStatusActionDtoValue.SUSPEND]: TenantStatus.SUSPENDED,
+      [TenantStatusActionDtoValue.ACTIVATE]: TenantStatus.ACTIVE,
+      [TenantStatusActionDtoValue.CLOSE]: TenantStatus.CLOSED,
+    } as const;
+
+    const reason =
+      body.action === TenantStatusActionDtoValue.SUSPEND
+        ? (t.suspendedReason ?? body.reason ?? null)
+        : body.action === TenantStatusActionDtoValue.CLOSE
+          ? (body.reason ?? null)
+          : null;
+
+    this.realtimeEvents.emitTenantLifecycle({
+      eventName: eventByAction[body.action],
+      tenantId: t.id,
+      tenantSlug: t.slug,
+      status: statusByAction[body.action],
+      reason,
+      occurredAt: new Date().toISOString(),
+    });
   }
 
   private userId(req: Request): string {

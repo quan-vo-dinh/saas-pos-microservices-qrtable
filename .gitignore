@@ -51,6 +51,9 @@ docker/**/docker_data/
 # Ignore Antigravity agent files
 .agent/
 
+# Local agent skill script caches
+.agents/**/__pycache__/
+
 vite.config.*.timestamp*
 
 # Local ngrok config (may contain authtoken) — keep example only in git

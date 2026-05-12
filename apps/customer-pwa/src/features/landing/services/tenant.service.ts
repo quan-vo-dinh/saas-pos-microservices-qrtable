@@ -6,6 +6,8 @@ export type PublicTenantResolve = {
   slug: string;
   name: string;
   isActive: boolean;
+  status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
+  suspendedReason?: string | null;
 };
 
 export const tenantService = {

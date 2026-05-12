@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { TenantStatus } from '@common/constants/saas.constants';
 import { SaasService } from './saas.service';
 import { SaasRepository } from '../repositories/saas.repository';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
@@ -70,17 +71,38 @@ describe('SaasService', () => {
       });
     });
 
-    it('throws SAAS_TENANT_INACTIVE when tenant is inactive', async () => {
+    it('throws SAAS_TENANT_INACTIVE when tenant is CLOSED', async () => {
       repo.findBySlug.mockResolvedValue({
         id: 't1',
         slug: 'closed',
         name: 'Closed',
         isActive: false,
+        status: TenantStatus.CLOSED,
       });
 
       await expect(service.getBySlug('closed')).rejects.toMatchObject({
         errorCode: ErrorCode.SAAS_TENANT_INACTIVE,
       });
+    });
+
+    it('returns tenant when suspended (QR customer resolve)', async () => {
+      repo.findBySlug.mockResolvedValue({
+        id: 't1',
+        slug: 'suspended-cafe',
+        name: 'Cafe',
+        isActive: false,
+        status: TenantStatus.SUSPENDED,
+        suspendedReason: 'SUBSCRIPTION_EXPIRED',
+        defaultCurrency: 'VND',
+        defaultLocale: 'vi-VN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await service.getBySlug('suspended-cafe');
+
+      expect(result.status).toBe(TenantStatus.SUSPENDED);
+      expect(result.suspendedReason).toBe('SUBSCRIPTION_EXPIRED');
     });
   });
 });

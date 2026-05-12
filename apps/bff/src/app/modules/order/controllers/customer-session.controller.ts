@@ -8,6 +8,8 @@ import { ResponseDto } from '@common/interfaces/gateway/response.interface';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import type { JoinSessionTcpRequest } from '@common/interfaces/tcp/order/order-request.interface';
 import type { SessionTcpResponse } from '@common/interfaces/tcp/order/order-response.interface';
+import type { GetTenantByIdTcpRequest } from '@common/interfaces/tcp/saas';
+import type { TenantTcpResponse } from '@common/interfaces/tcp/saas';
 import { buildTcpRequestContext } from '@common/utils/request.util';
 import { Body, Controller, Inject, Post, Req, SetMetadata } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -17,7 +19,10 @@ import { firstValueFrom, map } from 'rxjs';
 @ApiTags('Customer Sessions')
 @Controller('customer/sessions')
 export class CustomerSessionController {
-  constructor(@Inject(TCP_SERVICES.ORDER_SERVICE) private readonly orderClient: TcpClient) {}
+  constructor(
+    @Inject(TCP_SERVICES.ORDER_SERVICE) private readonly orderClient: TcpClient,
+    @Inject(TCP_SERVICES.SAAS_SERVICE) private readonly saasClient: TcpClient,
+  ) {}
 
   @Post('join')
   @SetMetadata(MetadataKey.SKIP_BFF_SESSION_MINT, true)
@@ -41,8 +46,29 @@ export class CustomerSessionController {
         )
         .pipe(map((r) => r)),
     );
+
+    let sessionData = tcp.data;
+    try {
+      const tenantTcp = await firstValueFrom(
+        this.saasClient.send<TenantTcpResponse, GetTenantByIdTcpRequest>(
+          TCP_REQUEST_MESSAGE.SAAS.GET_BY_ID,
+          buildTcpRequestContext<GetTenantByIdTcpRequest>(req, processId, { id: tenantId }),
+        ),
+      );
+      const t = tenantTcp.data;
+      if (sessionData && t?.status) {
+        sessionData = {
+          ...sessionData,
+          tenantStatus: t.status,
+          tenantStatusReason: t.suspendedReason ?? null,
+        };
+      }
+    } catch {
+      /* join still succeeds; PWA relies on public tenant resolve + realtime */
+    }
+
     return new ResponseDto<SessionTcpResponse>({
-      data: tcp.data,
+      data: sessionData,
       statusCode: tcp.statusCode,
       message: tcp.code as HTTP_MESSAGE,
       processID: processId,

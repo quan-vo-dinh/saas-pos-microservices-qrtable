@@ -15,10 +15,12 @@ import { Request } from 'express';
 import { firstValueFrom, of } from 'rxjs';
 import { TenantStatusActionDtoValue } from '../dtos/admin-tenant.dto';
 import { AdminTenantsController } from './admin-tenants.controller';
+import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 describe('AdminTenantsController', () => {
   let controller: AdminTenantsController;
   let saasClient: { send: jest.Mock };
+  let realtimeEvents: { emitTenantLifecycle: jest.Mock };
 
   const req = (permissions: PERMISSION[] = Object.values(PERMISSION)) =>
     ({
@@ -31,10 +33,39 @@ describe('AdminTenantsController', () => {
     }) as unknown as Request;
 
   beforeEach(async () => {
-    saasClient = { send: jest.fn().mockReturnValue(of(Response.success({ ok: true }))) };
+    realtimeEvents = { emitTenantLifecycle: jest.fn() };
+    saasClient = {
+      send: jest.fn().mockImplementation((pattern: unknown) => {
+        if (pattern === TCP_REQUEST_MESSAGE.TENANT.SUSPEND) {
+          return of({ statusCode: 200, code: 'OK', data: true });
+        }
+        if (pattern === TCP_REQUEST_MESSAGE.SAAS.GET_BY_ID) {
+          return of({
+            statusCode: 200,
+            code: 'OK',
+            data: {
+              id: 'tenant-1',
+              slug: 'tenant-slug',
+              name: 'Tenant',
+              status: 'SUSPENDED',
+              isActive: false,
+              suspendedReason: 'expired',
+              defaultCurrency: 'VND',
+              defaultLocale: 'vi-VN',
+              createdAt: '',
+              updatedAt: '',
+            },
+          });
+        }
+        return of(Response.success({ ok: true }));
+      }),
+    };
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AdminTenantsController],
-      providers: [{ provide: TCP_SERVICES.SAAS_SERVICE, useValue: saasClient }],
+      providers: [
+        { provide: TCP_SERVICES.SAAS_SERVICE, useValue: saasClient },
+        { provide: RealtimeEventsService, useValue: realtimeEvents },
+      ],
     }).compile();
     controller = module.get(AdminTenantsController);
   });
@@ -77,6 +108,13 @@ describe('AdminTenantsController', () => {
       TCP_REQUEST_MESSAGE.TENANT.SUSPEND,
       expect.objectContaining({
         data: expect.objectContaining({ id: 'tenant-1', requestedByUserId: 'admin-user-1' }),
+      }),
+    );
+    expect(realtimeEvents.emitTenantLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        tenantSlug: 'tenant-slug',
+        eventName: expect.any(String),
       }),
     );
   });

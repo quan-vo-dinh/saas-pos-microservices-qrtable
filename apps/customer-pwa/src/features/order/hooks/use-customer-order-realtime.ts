@@ -12,6 +12,7 @@ import type {
 } from '@einvoice/types';
 import { io } from 'socket.io-client';
 import { API_CONFIG } from '@/constants/api';
+import { TENANT_LIFECYCLE_SOCKET_EVENTS } from '@/constants/tenant-lifecycle';
 import { useSession } from '@/features/session/context/session-provider';
 import { billKeys, cartKeys, orderKeys } from './use-order-query';
 
@@ -28,9 +29,10 @@ function socketNamespaceUrl(apiBaseUrl: string): string {
 
 export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
   const queryClient = useQueryClient();
-  const { session } = useSession();
+  const { session, patchTenantLifecycle } = useSession();
   const tenantId = session?.tenantId;
   const sessionId = session?.sessionId;
+  const tenantSlug = session?.tenantSlug;
   const [status, setStatus] = useState<CustomerRealtimeStatus>('idle');
 
   useEffect(() => {
@@ -39,7 +41,11 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
     }
 
     const socket: Socket = io(socketNamespaceUrl(API_CONFIG.DEFAULT_BASE_URL), {
-      auth: { tenantId, sessionId },
+      auth: {
+        tenantId,
+        sessionId,
+        ...(tenantSlug?.trim() ? { tenantSlug: tenantSlug.trim() } : {}),
+      },
       autoConnect: true,
       reconnection: true,
       timeout: 10_000,
@@ -107,6 +113,28 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
       invalidateSessionScope();
     };
 
+    type TenantLifecyclePayload = {
+      tenantId?: string;
+      status?: 'SUSPENDED' | 'ACTIVE' | 'CLOSED';
+      reason?: string | null;
+    };
+
+    const onTenantSuspended = (event: TenantLifecyclePayload): void => {
+      if (event.tenantId !== tenantId) return;
+      patchTenantLifecycle({
+        tenantStatus: 'SUSPENDED',
+        tenantStatusReason: event.reason ?? null,
+      });
+    };
+    const onTenantActivated = (event: TenantLifecyclePayload): void => {
+      if (event.tenantId !== tenantId) return;
+      patchTenantLifecycle({ tenantStatus: 'ACTIVE', tenantStatusReason: null });
+    };
+    const onTenantClosed = (event: TenantLifecyclePayload): void => {
+      if (event.tenantId !== tenantId) return;
+      patchTenantLifecycle({ tenantStatus: 'CLOSED', tenantStatusReason: event.reason ?? null });
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('events.authError', onAuthError);
@@ -117,6 +145,9 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
     socket.on('events.tableTransferred', onTableTransferred);
     socket.on('events.kitchenItemReady', onKitchenItemReady);
     socket.on('events.paymentCompleted', onPaymentCompleted);
+    socket.on(TENANT_LIFECYCLE_SOCKET_EVENTS.SUSPENDED, onTenantSuspended);
+    socket.on(TENANT_LIFECYCLE_SOCKET_EVENTS.ACTIVATED, onTenantActivated);
+    socket.on(TENANT_LIFECYCLE_SOCKET_EVENTS.CLOSED, onTenantClosed);
     socket.io.on('reconnect_attempt', onReconnectAttempt);
     socket.io.on('reconnect', onReconnect);
     socket.io.on('reconnect_error', onReconnectError);
@@ -136,6 +167,9 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
       socket.off('events.tableTransferred', onTableTransferred);
       socket.off('events.kitchenItemReady', onKitchenItemReady);
       socket.off('events.paymentCompleted', onPaymentCompleted);
+      socket.off(TENANT_LIFECYCLE_SOCKET_EVENTS.SUSPENDED, onTenantSuspended);
+      socket.off(TENANT_LIFECYCLE_SOCKET_EVENTS.ACTIVATED, onTenantActivated);
+      socket.off(TENANT_LIFECYCLE_SOCKET_EVENTS.CLOSED, onTenantClosed);
       socket.io.off('reconnect_attempt', onReconnectAttempt);
       socket.io.off('reconnect', onReconnect);
       socket.io.off('reconnect_error', onReconnectError);
@@ -145,7 +179,7 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       socket.disconnect();
     };
-  }, [queryClient, sessionId, tenantId]);
+  }, [queryClient, sessionId, tenantId, tenantSlug, patchTenantLifecycle]);
 
   return status;
 }

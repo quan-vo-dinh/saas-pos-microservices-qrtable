@@ -20,7 +20,7 @@ export default auth((request) => {
 
   if (pathname === '/') {
     if (!roles.length) {
-      return NextResponse.redirect(new URL(ROUTES.LOGIN, request.url));
+      return NextResponse.next();
     }
     return NextResponse.redirect(new URL(getRoleHomeRoute(roles), request.url));
   }

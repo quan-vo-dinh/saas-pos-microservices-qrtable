@@ -12,6 +12,7 @@ import { StaffOrderController } from './controllers/staff-order.controller';
       TcpProvider(TCP_SERVICES.ORDER_SERVICE),
       TcpProvider(TCP_SERVICES.KITCHEN_SERVICE),
       TcpProvider(TCP_SERVICES.PAYMENT_SERVICE),
+      TcpProvider(TCP_SERVICES.SAAS_SERVICE),
     ]),
     RealtimeModule,
   ],

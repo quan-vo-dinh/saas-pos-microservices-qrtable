@@ -4,6 +4,7 @@ import { BillStatus } from '@einvoice/types';
 import { toast } from 'sonner';
 import { Button } from '@einvoice/frontend-ui';
 import { useSession } from '@/features/session/context/session-provider';
+import { useTenantStatus } from '@/features/tenant/use-tenant-status';
 import { ROUTES } from '@/constants/routes';
 import { useCurrentBillQuery, useRequestBillMutation } from '@/features/order/hooks/use-order-query';
 import {
@@ -27,6 +28,7 @@ async function copyText(label: string, value: string): Promise<void> {
 export function RequestPaymentPage() {
   const navigate = useNavigate();
   const { isActive } = useSession();
+  const { canOrder } = useTenantStatus();
   const { data, isLoading, isError, refetch } = useCurrentBillQuery();
   const requestBill = useRequestBillMutation();
   const [vietQr, setVietQr] = useState<CustomerVietQrResponse | null>(null);
@@ -41,7 +43,7 @@ export function RequestPaymentPage() {
   const lockActive = cart?.status === 'LOCKED' || billPending;
 
   const onRequestBill = async (): Promise<void> => {
-    if (billPending || requestBill.isPending) return;
+    if (!canOrder || billPending || requestBill.isPending) return;
     try {
       await requestBill.mutateAsync();
       toast.success('Đã gửi yêu cầu thanh toán');
@@ -196,7 +198,12 @@ export function RequestPaymentPage() {
         </div>
       ) : null}
 
-      <Button className="w-full" size="lg" onClick={() => void onRequestBill()} disabled={requestBill.isPending || billPending}>
+      <Button
+        className="w-full"
+        size="lg"
+        onClick={() => void onRequestBill()}
+        disabled={requestBill.isPending || billPending || !canOrder}
+      >
         {billPending ? 'Đã gửi yêu cầu thanh toán' : requestBill.isPending ? 'Đang gửi yêu cầu…' : 'Yêu cầu thanh toán'}
       </Button>
       <Button variant="outline" onClick={() => navigate(ROUTES.MENU)}>

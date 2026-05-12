@@ -7,6 +7,8 @@ import {
 } from '@/lib/api-client';
 import { PWA_SESSION_STORAGE_KEY } from '@/constants/api';
 
+export type TenantLifecycleStatus = 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
+
 export type SessionInfo = {
   sessionId: string;
   tenantId: string;
@@ -15,6 +17,10 @@ export type SessionInfo = {
   restaurantName?: string;
   startedAt?: string;
   lastActivity?: string;
+  tenantStatus?: TenantLifecycleStatus;
+  tenantStatusReason?: string | null;
+  /** Public slug from QR URL — used for optional Socket.io slug room. */
+  tenantSlug?: string;
 };
 
 type SessionContextValue = {
@@ -23,6 +29,7 @@ type SessionContextValue = {
   hydrated: boolean;
   startSession: (info: SessionInfo) => void;
   endSession: () => void;
+  patchTenantLifecycle: (patch: { tenantStatus: TenantLifecycleStatus; tenantStatusReason?: string | null }) => void;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -37,7 +44,11 @@ function persistSession(info: SessionInfo | null): void {
 }
 
 /** Maps Order `Session` entity from join response into UI + persistence shape. */
-export function sessionEntityToInfo(entity: Session, restaurantName?: string): SessionInfo {
+export function sessionEntityToInfo(
+  entity: Session,
+  restaurantName?: string,
+  tenantSlug?: string,
+): SessionInfo {
   return {
     sessionId: entity.id,
     tenantId: entity.tenantId,
@@ -46,6 +57,9 @@ export function sessionEntityToInfo(entity: Session, restaurantName?: string): S
     restaurantName: restaurantName ?? entity.tableName,
     startedAt: entity.startedAt,
     lastActivity: entity.lastActivity,
+    tenantStatus: entity.tenantStatus,
+    tenantStatusReason: entity.tenantStatusReason ?? null,
+    tenantSlug,
   };
 }
 
@@ -97,6 +111,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     persistSession(null);
   }, []);
 
+  const patchTenantLifecycle = useCallback(
+    (patch: { tenantStatus: TenantLifecycleStatus; tenantStatusReason?: string | null }) => {
+      setSession((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const next: SessionInfo = {
+          ...prev,
+          tenantStatus: patch.tenantStatus,
+          tenantStatusReason: patch.tenantStatusReason ?? null,
+        };
+        persistSession(next);
+        return next;
+      });
+    },
+    [],
+  );
+
   const value = useMemo(
     () => ({
       session,
@@ -104,8 +136,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       hydrated,
       startSession,
       endSession,
+      patchTenantLifecycle,
     }),
-    [session, hydrated, startSession, endSession],
+    [session, hydrated, startSession, endSession, patchTenantLifecycle],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

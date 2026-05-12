@@ -64,7 +64,7 @@ export class RealtimeAuthService implements OnModuleInit {
     const handshakeAuth = socket.handshake.auth as Record<string, unknown> | undefined;
     const tenantId = getHandshakeAuthString(handshakeAuth, 'tenantId') ?? getHandshakeHeader(headers, 'x-tenant-id');
     const sessionId = getHandshakeAuthString(handshakeAuth, 'sessionId') ?? getHandshakeHeader(headers, 'x-session-id');
-    return this.buildCustomerRooms(tenantId, sessionId);
+    return this.buildCustomerRooms(socket, tenantId, sessionId);
   }
 
   private extractBearer(authHeader: unknown): string | undefined {
@@ -132,7 +132,11 @@ export class RealtimeAuthService implements OnModuleInit {
     return [...rooms];
   }
 
-  private async buildCustomerRooms(tenantId: string | undefined, sessionId: string | undefined): Promise<string[]> {
+  private async buildCustomerRooms(
+    socket: Socket,
+    tenantId: string | undefined,
+    sessionId: string | undefined,
+  ): Promise<string[]> {
     if (!tenantId?.trim() || !sessionId?.trim()) {
       throw new UnauthorizedException();
     }
@@ -141,6 +145,13 @@ export class RealtimeAuthService implements OnModuleInit {
     if (!session) {
       throw new UnauthorizedException();
     }
-    return [`session:${sessionId.trim()}:customer`];
+    const tid = tenantId.trim();
+    const sid = sessionId.trim();
+    const rooms: string[] = [`session:${sid}:customer`, `tenant:${tid}:customers`];
+    const slug = getHandshakeAuthString(socket.handshake.auth as Record<string, unknown> | undefined, 'tenantSlug');
+    if (slug?.trim()) {
+      rooms.push(`tenant-slug:${slug.trim()}:customers`);
+    }
+    return rooms;
   }
 }

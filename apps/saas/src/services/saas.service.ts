@@ -60,7 +60,7 @@ export class SaasService {
       throw new BusinessException(ErrorCode.SAAS_TENANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
-    if (!tenant.isActive) {
+    if (tenant.status === TenantStatus.CLOSED) {
       throw new BusinessException(ErrorCode.SAAS_TENANT_INACTIVE, HttpStatus.FORBIDDEN);
     }
 
@@ -110,6 +110,7 @@ export class SaasService {
       defaultCurrency: tenant.defaultCurrency ?? 'VND',
       defaultLocale: tenant.defaultLocale ?? 'vi-VN',
       ownerId: tenant.ownerId ?? null,
+      suspendedReason: tenant.suspendedReason ?? null,
       createdAt: this.toIsoString(tenant.createdAt),
       updatedAt: this.toIsoString(tenant.updatedAt),
     };

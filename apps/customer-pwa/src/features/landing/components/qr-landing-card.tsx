@@ -54,7 +54,7 @@ export function QrLandingCard() {
 
     if (tenantSlug?.trim()) {
       if (tenantQuery.isPending) return;
-      if (tenantQuery.isError || !tenantQuery.data?.isActive) return;
+      if (tenantQuery.isError || tenantQuery.data?.status === 'CLOSED') return;
       setCustomerTenantId(tenantQuery.data.id);
     }
 
@@ -79,7 +79,9 @@ export function QrLandingCard() {
     joinMutation.mutate(undefined, {
       onSuccess: (sess) => {
         const tableLabel = verifyMutation.data?.name ?? sess.tableName;
-        startSession(sessionEntityToInfo(sess, tableLabel));
+        startSession({
+          ...sessionEntityToInfo(sess, tableLabel, tenantSlug?.trim() || undefined),
+        });
         navigate(ROUTES.MENU);
       },
     });

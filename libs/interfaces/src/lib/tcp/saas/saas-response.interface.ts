@@ -10,6 +10,8 @@ export type TenantSummaryTcpResponse = {
   defaultLocale: string;
   ownerId?: string | null;
   currentPlanCode?: string | null;
+  /** Present when status is SUSPENDED (customer banner / admin). */
+  suspendedReason?: string | null;
   createdAt: string;
   updatedAt: string;
 };
