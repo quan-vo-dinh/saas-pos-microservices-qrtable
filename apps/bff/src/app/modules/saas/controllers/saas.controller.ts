@@ -10,13 +10,12 @@ import { CreateTenantRequestDto, TenantResponseDto, UpdateTenantRequestDto } fro
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import {
   CreateTenantTcpRequest,
-  DeleteTenantTcpRequest,
   GetTenantByIdTcpRequest,
   TenantTcpResponse,
   UpdateTenantTcpRequest,
 } from '@common/interfaces/tcp/saas';
 import { buildTcpRequestContext } from '@common/utils/request.util';
-import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, GoneException, Inject, Param, Patch, Post, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { map } from 'rxjs';
@@ -46,7 +45,7 @@ export class SaasController {
 
   @Post()
   @Authorization({ secured: true })
-  @Permissions([PERMISSION.SAAS_CREATE])
+  @Permissions([PERMISSION.TENANT_ONBOARD])
   @ApiOkResponse({ type: ResponseDto<TenantResponseDto> })
   @ApiOperation({ summary: 'Create a new tenant' })
   create(@Body() body: CreateTenantRequestDto, @ProcessId() processId: string, @Req() req: Request) {
@@ -69,7 +68,7 @@ export class SaasController {
 
   @Get()
   @Authorization({ secured: true })
-  @Permissions([PERMISSION.SAAS_GET_LIST])
+  @Permissions([PERMISSION.TENANT_LIST_ALL])
   @ApiOkResponse({ type: ResponseDto<TenantResponseDto[]> })
   @ApiOperation({ summary: 'Get all tenants' })
   findAll(@ProcessId() processId: string, @Req() req: Request) {
@@ -89,7 +88,7 @@ export class SaasController {
 
   @Get(':id')
   @Authorization({ secured: true })
-  @Permissions([PERMISSION.SAAS_GET_BY_ID])
+  @Permissions([PERMISSION.TENANT_READ_ANY])
   @ApiOkResponse({ type: ResponseDto<TenantResponseDto> })
   @ApiOperation({ summary: 'Get tenant by id' })
   findById(@Param('id') id: string, @ProcessId() processId: string, @Req() req: Request) {
@@ -112,7 +111,7 @@ export class SaasController {
 
   @Patch(':id')
   @Authorization({ secured: true })
-  @Permissions([PERMISSION.SAAS_UPDATE])
+  @Permissions([PERMISSION.TENANT_UPDATE])
   @ApiOkResponse({ type: ResponseDto<TenantResponseDto> })
   @ApiOperation({ summary: 'Update tenant by id' })
   update(
@@ -140,24 +139,13 @@ export class SaasController {
 
   @Delete(':id')
   @Authorization({ secured: true })
-  @Permissions([PERMISSION.SAAS_DELETE])
+  @Permissions([PERMISSION.TENANT_CLOSE])
   @ApiOkResponse({ type: ResponseDto<boolean> })
   @ApiOperation({ summary: 'Delete tenant by id' })
   remove(@Param('id') id: string, @ProcessId() processId: string, @Req() req: Request) {
-    return this.saasClient
-      .send<
-        boolean,
-        DeleteTenantTcpRequest
-      >(TCP_REQUEST_MESSAGE.SAAS.DELETE, buildTcpRequestContext<DeleteTenantTcpRequest>(req, processId, { id }))
-      .pipe(
-        map(
-          (response) =>
-            new ResponseDto<boolean>({
-              data: response.data,
-              statusCode: response.statusCode,
-              message: response.code as HTTP_MESSAGE,
-            }),
-        ),
-      );
+    void id;
+    void processId;
+    void req;
+    throw new GoneException('DELETE /saas/:id is deprecated. Use PATCH /admin/tenants/:id/status with action CLOSE.');
   }
 }

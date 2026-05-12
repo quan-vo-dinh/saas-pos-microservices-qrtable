@@ -28,7 +28,7 @@ export class CurrentTenantController {
 
   @Get('current')
   @Authorization({ secured: true })
-  @Permissions([PERMISSION.CATALOG_GET_LIST])
+  @Permissions([PERMISSION.TENANT_READ_OWN])
   @ApiOkResponse({ type: ResponseDto<PublicTenantMetadataDto> })
   @ApiOperation({ summary: 'Current tenant public metadata for staff apps' })
   getCurrent(@ProcessId() processId: string, @Req() req: Request) {
