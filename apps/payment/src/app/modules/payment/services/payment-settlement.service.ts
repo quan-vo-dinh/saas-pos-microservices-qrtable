@@ -12,6 +12,7 @@ import { PaymentEntity } from '../entities/payment.entity';
 import { AuditPaymentRepository } from '../repositories/audit-payment.repository';
 import { PaymentOutboxRepository } from '../repositories/payment-outbox.repository';
 import { PaymentRepository } from '../repositories/payment.repository';
+import { TenantPaymentSettingsRepository } from '../repositories/tenant-payment-settings.repository';
 import { PaymentMapper } from './payment.mapper';
 import { PaymentOrderGateway } from './payment-order.gateway';
 import { PaymentReferenceService } from './payment-reference.service';
@@ -37,6 +38,7 @@ export class PaymentSettlementService {
     private readonly paymentRepo: PaymentRepository,
     private readonly auditRepo: AuditPaymentRepository,
     private readonly outboxRepo: PaymentOutboxRepository,
+    private readonly tenantSettingsRepo: TenantPaymentSettingsRepository,
     private readonly reference: PaymentReferenceService,
     private readonly mapper: PaymentMapper,
   ) {}
@@ -50,7 +52,7 @@ export class PaymentSettlementService {
     const existing = await this.paymentRepo.findByTenantAndBill(dto.tenantId, dto.billId);
     if (existing) {
       if (existing.status === 'PENDING') {
-        return { ...this.mapper.toPaymentResponse(existing), ...this.vietQrPresentation(existing) };
+        return { ...this.mapper.toPaymentResponse(existing), ...(await this.vietQrPresentation(existing)) };
       }
       throw new ConflictException('Bill already paid');
     }
@@ -70,7 +72,10 @@ export class PaymentSettlementService {
     if (persisted.created) {
       await this.auditRepo.createPaymentAudit(persisted.payment, 'PAYMENT_CREATED', 'USER', dto.userId, null, null);
     }
-    return { ...this.mapper.toPaymentResponse(persisted.payment), ...this.vietQrPresentation(persisted.payment) };
+    return {
+      ...this.mapper.toPaymentResponse(persisted.payment),
+      ...(await this.vietQrPresentation(persisted.payment)),
+    };
   }
 
   async confirmCash(dto: ConfirmCashTcpRequest): Promise<PaymentTcpResponse> {
@@ -160,26 +165,26 @@ export class PaymentSettlementService {
     return this.mapper.toPaymentResponse(fresh);
   }
 
-  private vietQrPresentation(payment: PaymentEntity): { qrUrl: string; bankAccount: string; bankName: string } {
-    const qrConfig = this.getSepayQrConfig();
+  private async vietQrPresentation(
+    payment: PaymentEntity,
+  ): Promise<{ qrUrl: string; bankAccount: string; bankName: string }> {
+    const settings = await this.tenantSettingsRepo.findByTenantId(payment.tenantId);
+    const account = settings?.vietqrAccountNumber || CONFIGURATION.SEPAY_CONFIG.QR_ACCOUNT;
+    const bank = settings?.vietqrBankName || CONFIGURATION.SEPAY_CONFIG.QR_BANK;
+    if (!account || !bank) {
+      throw new ServiceUnavailableException('Tenant VietQR account and bank are not configured');
+    }
+
     return {
       qrUrl: this.reference.buildQrUrl({
-        account: qrConfig.account,
-        bank: qrConfig.bank,
+        account,
+        bank,
         amount: payment.roundedTotal,
         description: payment.billReference,
       }),
-      bankAccount: qrConfig.account,
-      bankName: qrConfig.bank,
+      bankAccount: account,
+      bankName: bank,
     };
-  }
-
-  private getSepayQrConfig(): { account: string; bank: string } {
-    const { QR_ACCOUNT, QR_BANK } = CONFIGURATION.SEPAY_CONFIG;
-    if (!QR_ACCOUNT || !QR_BANK) {
-      throw new ServiceUnavailableException('SePay QR account and bank are not configured');
-    }
-    return { account: QR_ACCOUNT, bank: QR_BANK };
   }
 
   private async persistNewPaymentWithFallbackReference(payment: PaymentEntity): Promise<PaymentPersistResult> {

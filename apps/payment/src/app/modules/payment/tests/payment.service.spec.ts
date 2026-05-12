@@ -51,9 +51,13 @@ function buildPaymentServiceForTest(opts: {
   paymentRepo: unknown;
   auditRepo: unknown;
   outboxRepo: unknown;
+  tenantPaymentSettingsRepository?: unknown;
   reference?: PaymentReferenceService;
 }): PaymentService {
   const reference = opts.reference ?? new PaymentReferenceService();
+  const tenantPaymentSettingsRepository = opts.tenantPaymentSettingsRepository ?? {
+    findByTenantId: jest.fn().mockResolvedValue(null),
+  };
   const gateway = new PaymentOrderGateway(opts.orderClient as never);
   const mapper = new PaymentMapper();
   const query = new PaymentQueryService(opts.paymentRepo as never, mapper);
@@ -63,6 +67,7 @@ function buildPaymentServiceForTest(opts: {
     opts.paymentRepo as never,
     opts.auditRepo as never,
     opts.outboxRepo as never,
+    tenantPaymentSettingsRepository as never,
     reference,
     mapper,
   );
@@ -170,6 +175,60 @@ describe('PaymentService policy checks', () => {
     expect(result.bankName).toBe('Vietcombank');
     expect(paymentRepo.findByTenantAndBill).toHaveBeenCalledTimes(2);
     expect(auditRepo.createPaymentAudit).not.toHaveBeenCalled();
+  });
+
+  it('creates VietQR using tenant payment settings instead of platform env account', async () => {
+    CONFIGURATION.SEPAY_CONFIG.QR_ACCOUNT = '0010000000355';
+    CONFIGURATION.SEPAY_CONFIG.QR_BANK = 'Vietcombank';
+    const payment = makePayment();
+    const tenantPaymentSettingsRepository = {
+      findByTenantId: jest.fn().mockResolvedValue({
+        tenantId: 'tenant-1',
+        vietqrEnabled: true,
+        vietqrAccountNumber: '9332770502',
+        vietqrBankName: 'VCB',
+        connectionStatus: 'CONNECTED',
+      }),
+    };
+    const paymentRepo = {
+      findByTenantAndBill: jest.fn().mockResolvedValueOnce(null),
+      create: jest.fn((input: Partial<PaymentEntity>) => makePayment(input)),
+      save: jest.fn().mockResolvedValue(payment),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn() };
+    const orderClient = {
+      send: jest.fn().mockReturnValue(
+        of({
+          data: {
+            billId: payment.billId,
+            tenantId: payment.tenantId,
+            sessionId: 'session-1',
+            status: BillStatus.PENDING_PAYMENT,
+            rawTotal: payment.rawTotal,
+            roundedTotal: payment.roundedTotal,
+            roundingDelta: payment.roundingDelta,
+          },
+        }),
+      ),
+    };
+    const service = buildPaymentServiceForTest({
+      dataSource: {} as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo: {} as never,
+      tenantPaymentSettingsRepository,
+    });
+
+    const result = await service.createVietQr({
+      tenantId: 'tenant-1',
+      billId: 'bill-1',
+      userId: 'user-1',
+    });
+
+    expect(result.bankAccount).toBe('9332770502');
+    expect(result.bankName).toBe('VCB');
+    expect(result.qrUrl).toContain('acc=9332770502');
   });
 });
 
