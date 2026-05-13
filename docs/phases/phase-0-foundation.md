@@ -108,7 +108,7 @@ apps/catalog/src/
 - **Cross-Platform (FE & BE chung):** `libs/shared/types/`, `libs/shared/constants/` — contract giữa FE ↔ BE, Kafka topics, Enums chung
   - First shared types file: `libs/shared/types/src/index.ts` → `export type { ITenant, IUser, IRole }`
 - **Frontend (riêng 2 app):** `libs/frontend/ui/`, `libs/frontend/hooks/`, `libs/frontend/utils/`
-- **Backend (giữ flat structure từ khóa học):** `libs/guards/`, `libs/middlewares/`, `libs/entities/`, `libs/common/` — KHÔNG nhét vào folder `backend/` để tránh vỡ import paths hiện có
+- **Backend (giữ flat structure từ khóa học):** `libs/guards/`, `libs/middlewares/`, `libs/entities/`, `libs/interfaces/`, `libs/providers/*`, `libs/utils/` — KHÔNG nhét vào folder `backend/` để tránh vỡ import paths hiện có
 
 **Verify:** Import paths hoạt động — `@common/*` cho backend, `@einvoice/*` cho frontend
 

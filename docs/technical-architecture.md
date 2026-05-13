@@ -583,7 +583,7 @@ Giao tiếp:
   - → Authorizer Service (gRPC): verify token
   - → Catalog/Order/Payment/SaaS Service (TCP): business operations
   - → Redis: token cache, rate limit counter
-  - → Kafka: subscribe domain events that BFF may bridge (`order.confirmed` → customer session tracking only, `kitchen.sla_warning`, `payment.completed`); BFF must not emit KDS queue changes directly from `order.confirmed`
+  - → Kafka: subscribe domain events that BFF may bridge (`kitchen.sla_warning`, `payment.completed`); order tracking uses BFF Direct after Order TCP response, and BFF must not emit KDS queue changes directly from `order.confirmed`
   - → Cloudinary: stream image upload (menu items)
 
 Không có Database riêng — BFF chỉ là proxy + orchestrator.
@@ -760,7 +760,7 @@ Trách nhiệm:
 Data Store (Redis — không cần PostgreSQL riêng):
   - kds:{tenant_id}:kitchen → Sorted Set { ticket_id: timestamp }
   - kds:{tenant_id}:bar → Sorted Set { ticket_id: timestamp }
-  - ticket:{ticket_id} → Hash { order_id, table_name, items, status, created_at }
+  - kds:{tenant_id}:ticket:{ticket_id} → Hash { order_id, table_name, items, status, created_at }
 
 Events emitted (Kafka):
   - kitchen.sla_warning → trigger manager alert (P2: sinh bởi internal timer)
@@ -850,8 +850,8 @@ Refund Flow (Manual — Demo/Luận văn):
   5. Ghi audit_payments, Emit Kafka: payment.refunded
 
 Events emitted (Kafka):
-  - payment.completed → Order/Catalog/Notification consumers (đóng bill, chuyển bàn Billing→Cleaning, v.v. theo Order); duplicate/idempotent với fast path TCP
-  - payment.refunded → adjust reconciliation data, notify owner
+  - payment.completed → Order consumer (idempotent BILL_MARK_PAID + Catalog TCP table status update) và BFF realtime bridge
+  - payment.refunded → outbox/audit contract hiện tại; dashboard/notification consumers là Phase 4C+ hoặc future extension
 ```
 
 #### 6.2.8 User-Access Service
@@ -901,15 +901,15 @@ Giao tiếp:
 
 **Nguyên tắc chọn lọc:** Hệ thống áp dụng bộ quy tắc 4P+2AP (xem §7.4) để quyết định event nào dùng Kafka vs BFF Direct. Chỉ 5 topics vượt qua bộ lọc:
 
-| Topic                 | Producer          | Consumer(s)                  | Principle  | Payload chính                      |
-| --------------------- | ----------------- | ---------------------------- | ---------- | ---------------------------------- |
-| `order.confirmed`     | Order Service     | Kitchen Service              | P1, P2     | `{ tenantId, orderId, items[] }`   |
-| `payment.completed`   | Payment Service   | Order, Catalog, Notification | P1, P2, P3 | `{ tenantId, billId, method }`     |
-| `payment.refunded`    | Payment Service   | Order, Notification          | P1, P3     | `{ tenantId, paymentId, amount }`  |
-| `kitchen.sla_warning` | Kitchen Service   | BFF (WS → alert manager)     | P2         | `{ tenantId, ticketId, waitTime }` |
-| `tenant.created`      | SaaS Mgmt Service | Notification, Catalog        | P1, P3     | `{ tenantId, ownerEmail, slug }`   |
+| Topic                 | Producer          | Consumer(s)                                                             | Principle  | Payload chính                      |
+| --------------------- | ----------------- | ----------------------------------------------------------------------- | ---------- | ---------------------------------- |
+| `order.confirmed`     | Order Service     | Kitchen Service                                                         | P1, P2     | `{ tenantId, orderId, items[] }`   |
+| `payment.completed`   | Payment Service   | Order Service, BFF realtime bridge                                      | P1, P2, P3 | `{ tenantId, billId, method }`     |
+| `payment.refunded`    | Payment Service   | No current runtime consumer; Phase 4C+ notification/dashboard extension | P1, P3     | `{ tenantId, paymentId, amount }`  |
+| `kitchen.sla_warning` | Kitchen Service   | BFF realtime bridge                                                     | P2         | `{ tenantId, ticketId, waitTime }` |
+| `tenant.created`      | SaaS Mgmt Service | Catalog Service; Notification is Phase 4C contract                      | P1, P3     | `{ tenantId, ownerEmail, slug }`   |
 
-> 6 event còn lại (order.created, menu.updated, table.status_changed, kitchen.item_ready, service.requested, tenant.suspended) KHÔNG dùng Kafka — thay bằng BFF Direct Side-Effects Pattern (xem §7.3).
+> Các UI-layer/lifecycle events như `order.created`, `order.status_changed`, `cart.updated`, `bill.requested`, `table.transferred`, `service.requested`, `kds.queue_changed`, `tenant.suspended/activated/closed` KHÔNG dùng Kafka làm source of truth — thay bằng BFF Direct, Redis internal hints, hoặc socket emit sau khi source service đã commit (xem §7.3).
 
 ### 7.3 BFF Direct Side-Effects Pattern
 
@@ -1172,18 +1172,18 @@ Cấu hình qua Keycloak **Protocol Mapper** (type: User Attribute → Token Cla
 
 ### 9.2 Real-time Use Cases
 
-| Use Case                     | Source                                                                         | Event                 | WebSocket Room                            | Nội dung push                       |
-| ---------------------------- | ------------------------------------------------------------------------------ | --------------------- | ----------------------------------------- | ----------------------------------- |
-| Đơn mới cho Staff            | BFF Direct                                                                     | `order.created`       | `tenant:{tid}:staff`                      | `{ tableId, items, total }`         |
-| Order tracking (Customer)    | Kafka → BFF                                                                    | `order.confirmed`     | `session:{sid}:customer`                  | `{ orderId, status: "Processing" }` |
-| KDS queue changed (Kitchen)  | Kitchen Redis hint → BFF                                                       | `kds.queue_changed`   | `tenant:{tid}:kds:*`                      | `{ station, revision, reason }`     |
-| Món xong → notify waiter     | BFF Direct                                                                     | `kitchen.item_ready`  | `tenant:{tid}:staff`                      | `{ tableId, itemName: "Phở bò" }`   |
-| Menu sync (giá/out of stock) | BFF Direct                                                                     | `menu.updated`        | `tenant:{tid}:*` (public)                 | `{ itemId, field, newValue }`       |
-| Table status change          | BFF Direct                                                                     | `table.status_chg`    | `tenant:{tid}:staff`                      | `{ tableId, status: "Billing" }`    |
-| POS payment settled          | **Phase 3 baseline: polling**; bridge Kafka tới BFF rồi WebSocket là follow-up | `payment.completed`   | (khi có bridge) `session:{sid}:customer`  | `{ status: "Paid", receipt_url }`   |
-| SLA warning (quá giờ)        | Kafka → BFF                                                                    | `kitchen.sla_warning` | `tenant:{tid}:management`                 | `{ ticketId, waitingMin: 18 }`      |
-| Yêu cầu phục vụ (Customer)   | BFF Direct                                                                     | `service.requested`   | `tenant:{tid}:staff`                      | `{ tableId, type: "CALL_STAFF" }`   |
-| Refund processed             | **Phase 3 baseline: polling**; bridge follow-up                                | `payment.refunded`    | (khi có bridge) `tenant:{tid}:management` | `{ paymentId, amount, reason }`     |
+| Use Case                     | Source                                                                    | Event                  | WebSocket Room                            | Nội dung push                       |
+| ---------------------------- | ------------------------------------------------------------------------- | ---------------------- | ----------------------------------------- | ----------------------------------- |
+| Đơn mới cho Staff            | BFF Direct                                                                | `order.created`        | `tenant:{tid}:staff`                      | `{ tableId, items, total }`         |
+| Order tracking (Customer)    | BFF Direct sau Order TCP response                                         | `order.status_changed` | `session:{sid}:customer`                  | `{ orderId, status: "Processing" }` |
+| KDS queue changed (Kitchen)  | Kitchen Redis hint → BFF                                                  | `kds.queue_changed`    | `tenant:{tid}:kds:*`                      | `{ station, revision, reason }`     |
+| Món xong → notify waiter     | BFF Direct                                                                | `kitchen.item_ready`   | `tenant:{tid}:staff`                      | `{ tableId, itemName: "Phở bò" }`   |
+| Menu sync (giá/out of stock) | BFF Direct                                                                | `menu.updated`         | `tenant:{tid}:*` (public)                 | `{ itemId, field, newValue }`       |
+| Table status change          | BFF Direct                                                                | `table.status_chg`     | `tenant:{tid}:staff`                      | `{ tableId, status: "Billing" }`    |
+| POS payment settled          | Kafka `payment.completed` → BFF realtime bridge; polling remains fallback | `payment.completed`    | `session:{sid}:customer`                  | `{ status: "Paid", receipt_url }`   |
+| SLA warning (quá giờ)        | Kafka → BFF                                                               | `kitchen.sla_warning`  | `tenant:{tid}:management`                 | `{ ticketId, waitingMin: 18 }`      |
+| Yêu cầu phục vụ (Customer)   | BFF Direct                                                                | `service.requested`    | `tenant:{tid}:staff`                      | `{ tableId, type: "CALL_STAFF" }`   |
+| Refund processed             | **Phase 3 baseline: polling**; bridge follow-up                           | `payment.refunded`     | (khi có bridge) `tenant:{tid}:management` | `{ paymentId, amount, reason }`     |
 
 ### 9.3 Scaling Strategy
 
@@ -1302,7 +1302,7 @@ Redis được sử dụng có kiểm soát theo mô hình **phân tầng (Tiere
 | --------------------- | -------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | **BFF**               | Phase 0  | Edge cache, auth cache, menu cache, rate limit, session validation, suspended-tenant guard fallback | `user-token:*`, `menu:*`, `rl:*`, `session:*`, `tenant:*:suspended` |
 | **Order Service**     | Phase 2A | Session state, shared cart, idempotency                                                             | `session:*`, `cart:*`, `idem:*`                                     |
-| **Kitchen Service**   | Phase 2B | KDS FIFO queue (Redis-only, không DB)                                                               | `kds:*`, `ticket:*`                                                 |
+| **Kitchen Service**   | Phase 2B | KDS FIFO queue (Redis-only, không DB)                                                               | `kds:*`, `lock:kds:*`, `realtime:kds:*`                             |
 | **WebSocket Gateway** | Phase 2B | Socket.io Redis Adapter (multi-instance sync)                                                       | `socket.io-adapter:*`                                               |
 | **SaaS Service**      | Phase 4B | Tenant suspend flag writer, current subscription cache                                              | `tenant:*:suspended`, `subscription:*`                              |
 | **Payment Service**   | Phase 4B | SePay OAuth state cache for tenant payment settings flow                                            | `oauth_state:*`                                                     |

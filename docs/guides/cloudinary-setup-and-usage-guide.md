@@ -1,6 +1,8 @@
 # Hướng Dẫn Setup & Sử Dụng Cloudinary — CloudinaryModule cho QRTable
 
 > **Tài liệu này giải thích chi tiết cách setup Cloudinary, hiểu rõ logic hoạt động, và sử dụng CloudinaryModule đã được xây dựng ở Step 1.45.**
+>
+> **Current code status (2026-05-13):** Cloudinary module nằm tại `libs/providers/cloudinary/src/lib/*` và được BFF Catalog module sử dụng trực tiếp (`apps/bff/src/app/modules/catalog`). Catalog Service lưu metadata qua TCP, không upload file trực tiếp.
 
 ---
 
@@ -137,7 +139,7 @@ CLOUDINARY_API_SECRET=your_api_secret
 
 ```typescript
 import { ConfigService } from '@nestjs/config';
-import { CloudinaryModule } from '@common/providers/cloudinary';
+import { CloudinaryModule } from '@common/providers/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -780,7 +782,7 @@ export type { CloudinaryUploadResponse, ResponsiveUrls } from './lib/interfaces/
 
 **Tại sao pattern này:**
 
-- **Clean API:** Import từ `@common/providers/cloudinary` thay vì `@common/providers/cloudinary/src/lib/...`
+- **Clean API:** Import qua alias `@common/providers/cloudinary/*` thay vì trỏ thẳng vào `libs/providers/cloudinary/src/lib/...`
 - **Encapsulation:** Ẩn internal structure, chỉ expose public API
 - **Single entry point:** Developer biết nơi import
 
@@ -969,11 +971,12 @@ interface ResponsiveUrls {
 
 ### 7.2 Code: MenuItemService (Catalog)
 
-**File: `apps/catalog/src/features/menu-item/menu-item.service.ts`**
+**File hiện tại:** `apps/bff/src/app/modules/catalog/controllers/menu-item.controller.ts` dùng `CloudinaryService`; `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts` chỉ xử lý metadata/domain qua TCP.
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { CloudinaryService, CloudinaryFolder } from '@common/providers/cloudinary';
+import { CloudinaryService } from '@common/providers/cloudinary/cloudinary.service';
+import { CloudinaryFolder } from '@common/providers/cloudinary/cloudinary.constants';
 import { InjectRepository } from '@typeorm/typeorm';
 import { Repository } from 'typeorm';
 import { MenuItem } from '@common/entities';
@@ -1105,7 +1108,7 @@ export class MenuItemService {
 
 ### 7.3 Code: Controller (BFF)
 
-**File: `apps/bff/src/features/catalog/menu-item.controller.ts`**
+**File: `apps/bff/src/app/modules/catalog/controllers/menu-item.controller.ts`**
 
 ```typescript
 import { Controller, Post, Put, Body, Param, UseGuards, BadRequestException } from '@nestjs/common';

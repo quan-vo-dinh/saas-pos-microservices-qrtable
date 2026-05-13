@@ -99,14 +99,14 @@ Content-Type: application/json
 
 ### 3.1 Ownership
 
-| Domain object   | Owner                    | Storage                          | Ghi chú                                                               |
-| --------------- | ------------------------ | -------------------------------- | --------------------------------------------------------------------- |
-| Bill            | Order Service            | `qrtable_order.bills`            | Payment Service chỉ nhận `billId`, không sở hữu lifecycle bill.       |
-| Payment         | Payment Service          | `qrtable_payment.payments`       | Source of truth cho method, paid amount, SePay transaction.           |
-| Refund          | Payment Service          | `qrtable_payment.refunds`        | Manual full refund, audit bắt buộc.                                   |
-| Payment audit   | Payment Service          | `qrtable_payment.audit_payments` | Truy vết payment/refund.                                              |
-| Table status    | Catalog Service          | `qrtable_catalog.tables`         | Được cập nhật sau `payment.completed` qua consumer/BFF pattern đã có. |
-| User/permission | User-Access + Authorizer | MongoDB + Keycloak               | BFF enforce permission với staff routes.                              |
+| Domain object   | Owner                    | Storage                          | Ghi chú                                                                                                                   |
+| --------------- | ------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Bill            | Order Service            | `qrtable_order.bills`            | Payment Service chỉ nhận `billId`, không sở hữu lifecycle bill.                                                           |
+| Payment         | Payment Service          | `qrtable_payment.payments`       | Source of truth cho method, paid amount, SePay transaction.                                                               |
+| Refund          | Payment Service          | `qrtable_payment.refunds`        | Manual full refund, audit bắt buộc.                                                                                       |
+| Payment audit   | Payment Service          | `qrtable_payment.audit_payments` | Truy vết payment/refund.                                                                                                  |
+| Table status    | Catalog Service          | `qrtable_catalog.tables`         | Order `BillService.markPaid` gọi Catalog TCP `TABLE.UPDATE_STATUS` sau fast path hoặc Kafka `payment.completed` consumer. |
+| User/permission | User-Access + Authorizer | MongoDB + Keycloak               | BFF enforce permission với staff routes.                                                                                  |
 
 ### 3.2 Communication
 
@@ -718,7 +718,7 @@ If SePay wins:
 ### 8.1 Topic `payment.completed`
 
 Producer: Payment Service  
-Consumers: Order Service, Catalog Service, Notification Service, BFF bridge
+Current consumers in code: Order Service and BFF realtime bridge. Catalog table status is updated by Order through TCP inside `BillService.markPaid`; Notification is Phase 4C+.
 
 ```json
 {
@@ -741,13 +741,13 @@ Rules:
 - `eventId` must be stable per outbox row.
 - Consumers must be idempotent:
   - Order Service: if bill already `PAID`, no-op.
-  - Catalog/Table: if table already `Cleaning`, no-op.
+  - Order → Catalog TCP table update: if table already `Cleaning`, no-op/equivalent idempotent transition.
   - BFF: WebSocket hint only.
 
 ### 8.2 Topic `payment.refunded`
 
 Producer: Payment Service  
-Consumers: Order Service, Notification Service, BFF bridge
+Current consumers in code: none. The event is emitted by Payment outbox for audit/future integration; Notification and BFF dashboard handling are Phase 4C+ extensions.
 
 ```json
 {

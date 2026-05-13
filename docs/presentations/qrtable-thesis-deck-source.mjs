@@ -703,7 +703,7 @@ export async function slide14(presentation) {
       jsxs('hstack', { width: 'fill', gap: 14, children: [
         surface(jsxs('vstack', { gap: 8, children: [
           textBlock(t('Why Kafka here?', { size: 18, weight: 700, color: C.coral })),
-          textBlock(t('order.confirmed là domain event có thể kích hoạt nghiệp vụ ở Kitchen/Notification/Analytics. Producer không nên chờ consumer; event được ghi qua simplified outbox để giảm dual-write risk.', { size: 15, color: C.muted })),
+          textBlock(t('order.confirmed là domain event hiện kích hoạt Kitchen; Notification/Analytics là mở rộng tương lai. Producer không chờ consumer; event được ghi qua simplified outbox để giảm dual-write risk.', { size: 15, color: C.muted })),
         ]}), { height: 150, fill: '#FFF1E8' }),
         matrix([
           ['Failure case', 'Expected behavior'],
@@ -891,7 +891,7 @@ export async function slide20(presentation) {
       surface(jsxs('vstack', { gap: 12, children: [
         textBlock(t('Chưa overclaim', { size: 20, weight: 700, color: C.coral })),
         bulletList([
-          'Cash/Stripe payment confirmation thuộc Phase 3.',
+          'Cash/SePay VietQR payment confirmation thuộc Phase 3.',
           'KDS full realtime và Redis Adapter thuộc Phase 2B.',
           'Full saga/outbox hardening thuộc Phase 4A.',
           'SaaS onboarding self-service thuộc Phase 4B.',

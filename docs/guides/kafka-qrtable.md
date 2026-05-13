@@ -2,6 +2,8 @@
 
 > **Triết lý tài liệu:** Hiểu _tại sao_ trước _như thế nào_. Mọi khái niệm được neo vào ngữ cảnh
 > cụ thể của QRTable để bạn không học lý thuyết trừu tượng mà học để áp dụng được ngay.
+>
+> **Current code status (2026-05-13):** Tài liệu này là supporting guide. Kafka consumers đã có trong code gồm `order.confirmed → Kitchen`, `payment.completed → Order + BFF realtime bridge`, `kitchen.sla_warning → BFF realtime bridge`, và `tenant.created → Catalog`. Notification Service chưa tồn tại trong `apps/*`; các ví dụ Notification bên dưới là Phase 4C+/future extension, không phải trạng thái runtime hiện tại.
 
 ---
 
@@ -32,14 +34,14 @@ Trước khi học Kafka là gì, cần hiểu Kafka ra đời để giải quy�
 Hãy tưởng tượng hệ thống QRTable không có Kafka. Khi một đơn hàng được xác nhận, Order Service cần thông báo cho nhiều bên:
 
 - Kitchen Service phải biết để tạo ticket bếp
-- Notification Service muốn ghi audit log
+- (Phase 4C+) Notification Service muốn ghi audit log
 - (Trong tương lai) Analytics Service muốn thống kê doanh thu
 
 Không có Kafka, Order Service phải gọi trực tiếp vào từng service:
 
 ```
 Order Service ──TCP──► Kitchen Service
-Order Service ──TCP──► Notification Service
+Order Service ──TCP──► Notification Service (Phase 4C+)
 Order Service ──TCP──► Analytics Service (tương lai)
 ```
 
@@ -53,7 +55,7 @@ graph LR
         OS["🛒 Order Service"]
         PS["💳 Payment Service"]
         KS["🍳 Kitchen Service"]
-        NS["📧 Notification Service"]
+        NS["📧 Notification Service<br/>Phase 4C+"]
         AS["📊 Analytics Service"]
 
         OS -->|"TCP (blocking)"| KS
@@ -82,7 +84,7 @@ graph LR
         PS2["💳 Payment Service"]
         K["📋 Kafka Cluster"]
         KS2["🍳 Kitchen Service"]
-        NS2["📧 Notification Service"]
+        NS2["📧 Notification Service<br/>Phase 4C+"]
         AS2["📊 Analytics Service"]
 
         OS2 -->|"publish"| K
@@ -218,7 +220,7 @@ graph LR
 
 Thiết kế append-only log tạo ra những đặc tính hoàn toàn khác với message queue:
 
-**Đặc tính 1 — Nhiều consumer độc lập:** Vì message không bị xóa sau khi đọc, nhiều consumer có thể đọc cùng một message hoàn toàn độc lập, mỗi người theo dõi vị trí của riêng mình. Trong QRTable, `order.confirmed` được Kitchen Service và Notification Service cùng đọc — hai service này không biết nhau, không ảnh hưởng nhau.
+**Đặc tính 1 — Nhiều consumer độc lập:** Vì message không bị xóa sau khi đọc, nhiều consumer có thể đọc cùng một message hoàn toàn độc lập, mỗi người theo dõi vị trí của riêng mình. Trong QRTable hiện tại, `payment.completed` được Order Service và BFF realtime bridge đọc độc lập; `tenant.created` được Catalog Service đọc để seed area mặc định. Notification là consumer Phase 4C+.
 
 **Đặc tính 2 — Replay:** Consumer có thể "tua lại" về một vị trí cũ trong log và đọc lại message. Nếu Kitchen Service bị bug và xử lý sai 100 đơn hàng trong 2 giờ qua, team có thể fix code, reset offset về 2 giờ trước, và để Kitchen Service xử lý lại toàn bộ — mà không cần Order Service làm gì thêm.
 
@@ -383,7 +385,7 @@ Headers: {
 
 #### Sơ đồ: Luồng Message `order.confirmed` Trong QRTable
 
-> Sơ đồ sequence thể hiện hành trình đầy đủ của message `order.confirmed` — từ khi khách hàng submit đơn hàng, Order Service publish lên Kafka, đến khi Kitchen Service và BFF nhận và xử lý message đó. Chú ý Order Service **không chờ** Kitchen Service xử lý xong.
+> Sơ đồ sequence thể hiện hành trình hiện tại của message `order.confirmed` — từ khi staff xác nhận đơn, Order Service publish lên Kafka, đến khi Kitchen Service consume và ghi Redis KDS. BFF không consume `order.confirmed`; realtime order status đi qua BFF Direct từ TCP response, còn KDS queue hint đi qua Kitchen Redis Pub/Sub sau khi Redis đã được ghi.
 
 ```mermaid
 sequenceDiagram
@@ -392,7 +394,8 @@ sequenceDiagram
     participant OS as 🛒 Order Service
     participant K as 📋 Kafka
     participant KS as 🍳 Kitchen Service
-    participant BFF2 as 🌐 BFF (Consumer)
+    participant R as 🔴 Redis Pub/Sub
+    participant BFF2 as 🌐 BFF (Redis subscriber)
 
     C->>BFF: Submit đơn hàng
     BFF->>OS: TCP: confirmOrder()
@@ -407,8 +410,9 @@ sequenceDiagram
     KS->>KS: Tạo KDS ticket<br/>Ghi Redis sorted set
     KS->>K: commit offset
 
-    K->>BFF2: pull (bff-kafka-bridge)
-    BFF2->>C: WebSocket: "Bếp đang làm"
+    KS->>R: publish realtime:kds:{tenantId}
+    R->>BFF2: kds.queue_changed hint
+    BFF2->>C: WebSocket hint/refetch
 ```
 
 Lưu ý trường `version` trong value và `schema-version` trong header: đây là chuẩn bị cho việc thay đổi schema trong tương lai mà không phá vỡ consumer cũ.
@@ -1170,7 +1174,7 @@ _Trường hợp 2 — Event sinh từ timer nội bộ:_ `kitchen.sla_warning` 
 
 Kafka đặc biệt phù hợp khi cùng một event cần trigger phản ứng nghiệp vụ ở nhiều bounded context khác nhau. Producer publish một lần, mọi consumer nhận đều đặn.
 
-Ví dụ: `payment.completed` cần đến tay Order Service (đóng session), Catalog Service (cập nhật trạng thái bàn), và Notification Service (gửi email receipt). Nếu dùng TCP, Payment Service phải gọi 3 service riêng lẻ — kết quả là structural coupling (Payment biết về Order, Catalog, Notification) và temporal coupling (Payment chờ cả 3 xong). Với Kafka, Payment chỉ publish một event, không biết ai subscribe.
+Ví dụ hiện tại: `payment.completed` cần đến tay Order Service (đóng session, đánh dấu bill paid, gọi Catalog TCP để cập nhật trạng thái bàn) và BFF realtime bridge (hint UI). Nếu dùng TCP fan-out cho mọi side-effect, Payment Service sẽ biết quá nhiều downstream. Với Kafka, Payment publish một event; Order/BFF tự consume. Notification/email receipt là consumer Phase 4C+.
 
 #### Sơ đồ: Fan-out — payment.completed
 
@@ -1183,9 +1187,9 @@ graph LR
 
     PAY -->|"publish"| TOPIC
 
-    TOPIC -->|"consume"| OS["🛒 Order Service<br/>Đóng session<br/>Cập nhật trạng thái đơn"]
-    TOPIC -->|"consume"| CS["📋 Catalog Service<br/>Cập nhật trạng thái bàn<br/>→ AVAILABLE"]
-    TOPIC -->|"consume"| NS["📧 Notification Service<br/>Gửi email receipt<br/>Ghi audit log"]
+    TOPIC -->|"consume"| OS["🛒 Order Service<br/>Đóng session/bill<br/>Gọi Catalog TCP"]
+    TOPIC -->|"consume"| BFF["🌐 BFF Bridge<br/>WebSocket hint"]
+    TOPIC -.->|"Phase 4C+"| NS["📧 Notification Service<br/>Email receipt/audit"]
     TOPIC -.->|"tương lai"| AS2["📊 Analytics Service<br/><i>Chỉ cần subscribe</i><br/><i>Không sửa Payment!</i>"]
 
     style PAY fill:#748ffc,stroke:#333,color:#fff
@@ -1221,7 +1225,7 @@ Không dùng TCP/gRPC cho tác vụ mà producer không cần response, đặc b
 
 #### Sơ đồ: Bản Đồ Event — Tất Cả Topics Trong QRTable
 
-> Bản đồ toàn cảnh 5 Kafka topics và 6 BFF Direct events trong QRTable. Mỗi topic được gắn nhãn nguyên tắc 4P+2AP tương ứng. Nhìn từ trên xuống, bạn thấy rõ producer nào publish event nào, và event đó đi đến consumer nào.
+> Bản đồ toàn cảnh 5 Kafka topics và các event BFF Direct tiêu biểu trong QRTable. Mỗi topic được gắn nhãn nguyên tắc 4P+2AP tương ứng. Nhìn từ trên xuống, bạn thấy rõ producer nào publish event nào, và event đó đi đến consumer nào.
 
 ```mermaid
 graph TB
@@ -1229,14 +1233,12 @@ graph TB
         subgraph T1["order.confirmed (P1+P2)"]
             T1_PROD["🛒 Order Service"]
             T1_CONS1["🍳 Kitchen Service"]
-            T1_CONS2["🌐 BFF Bridge"]
         end
         subgraph T2["payment.completed (P1+P2+P3)"]
             T2_PROD["💳 Payment Service"]
             T2_CONS1["🛒 Order Service"]
-            T2_CONS2["📋 Catalog Service"]
-            T2_CONS3["📧 Notification"]
-            T2_CONS4["🌐 BFF Bridge"]
+            T2_CONS2["🌐 BFF Bridge"]
+            T2_CONS3["📧 Notification<br/>Phase 4C+"]
         end
         subgraph T3["kitchen.sla_warning (P2)"]
             T3_PROD["🍳 Kitchen Timer"]
@@ -1244,22 +1246,23 @@ graph TB
         end
         subgraph T4["tenant.created (P1+P3)"]
             T4_PROD["🏢 SaaS Mgmt"]
-            T4_CONS1["📧 Notification"]
-            T4_CONS2["📋 Catalog Service"]
+            T4_CONS1["📋 Catalog Service"]
+            T4_CONS2["📧 Notification<br/>Phase 4C+"]
         end
         subgraph T5["payment.refunded"]
             T5_PROD["💳 Payment Service"]
-            T5_CONS1["📧 Notification"]
+            T5_CONS1["📧 Notification<br/>Phase 4C+"]
         end
     end
 
-    subgraph BFF_EVENTS["🌐 BFF Direct — 6 Events"]
+    subgraph BFF_EVENTS["🌐 BFF Direct / Socket Events"]
         BE1["order.created"]
-        BE2["menu.updated"]
-        BE3["table.status_changed"]
-        BE4["order.status_changed"]
-        BE5["kitchen.ticket_updated"]
-        BE6["session.updated"]
+        BE2["order.status_changed"]
+        BE3["service.requested"]
+        BE4["cart.updated"]
+        BE5["bill.requested"]
+        BE6["table.transferred"]
+        BE7["tenant.suspended/activated/closed"]
     end
 
     style KAFKA_EVENTS fill:#e3fafc,stroke:#339af0
@@ -1274,11 +1277,11 @@ P2: Order Service không được chờ Kitchen tạo ticket xong. Kitchen có t
 
 **`payment.completed` → Kafka (P1 + P2 + P3)**
 
-P1: Ba consumer có business logic hoàn toàn khác nhau — đóng session (Order), cập nhật bàn (Catalog), gửi email (Notification).
+P1: Current code có hai consumer runtime — Order đóng session/bill và gọi Catalog TCP cập nhật bàn; BFF realtime bridge phát UI hint. Notification/email là Phase 4C+.
 
-P2: Payment Service không được chờ cả 3 service xử lý xong.
+P2: Payment Service không được chờ downstream consumer xử lý xong.
 
-P3: Fan-out 3 consumer, tuân thủ Open/Closed Principle — thêm Analytics Service sau này chỉ cần subscribe, không sửa Payment Service.
+P3: Fan-out hiện tại gồm Order và BFF; thêm Notification/Analytics sau này chỉ cần subscribe, không sửa Payment Service.
 
 **`kitchen.sla_warning` → Kafka (P2 thuần túy)**
 
@@ -1286,9 +1289,9 @@ P3: Fan-out 3 consumer, tuân thủ Open/Closed Principle — thêm Analytics Se
 
 **`tenant.created` → Kafka (P1 + P3)**
 
-P1: Notification Service gửi welcome email (logic riêng), Catalog Service seed default categories (logic riêng khác hoàn toàn).
+P1: Catalog Service seed default area từ `tenant.created` trong code hiện tại; Notification Service gửi welcome email là Phase 4C+.
 
-P3: Fan-out 2 consumer — thêm IAM Service hay Billing Service sau này không sửa SaaS Mgmt code.
+P3: Current consumer là Catalog; Notification/IAM/Billing future consumers có thể subscribe sau này mà không sửa SaaS Mgmt code.
 
 ---
 
@@ -1605,25 +1608,21 @@ graph LR
 
     subgraph GROUPS["🏷️ Consumer Groups"]
         G1["kitchen-service-group<br/>🍳 Kitchen Service"]
-        G2["notification-service-group<br/>📧 Notification Service"]
-        G3["payment-order-sync-group<br/>🛒 Order Service"]
+        G2["notification-service-group<br/>📧 Notification Service<br/>Phase 4C+"]
+        G3["order-payment-consumer-group<br/>🛒 Order Service"]
         G4["bff-kafka-bridge<br/>🌐 BFF Gateway"]
-        G5["catalog-tenant-setup-group<br/>📋 Catalog Service"]
+        G5["catalog-tenant-created-consumer-group<br/>📋 Catalog Service"]
     end
 
     T1 --> G1
-    T1 --> G4
-
-    T2 --> G2
     T2 --> G3
     T2 --> G4
 
     T3 --> G4
 
-    T4 --> G2
     T4 --> G5
 
-    T5 --> G2
+    T5 -.-> G2
 
     style T1 fill:#339af0,stroke:#333,color:#fff
     style T2 fill:#339af0,stroke:#333,color:#fff
@@ -1639,36 +1638,36 @@ graph LR
 
 **`kitchen-service-group`:** Consume `order.confirmed` để tạo KDS ticket. Kitchen Service là consumer duy nhất trong group này. Nếu scale lên nhiều instance, các instance chia sẻ partition trong group.
 
-**`notification-service-group`:** Consume `payment.completed`, `payment.refunded`, `tenant.created` để gửi email và ghi audit log. Hoàn toàn độc lập với `kitchen-service-group` — Notification Service tự quản lý offset của mình, không ảnh hưởng gì đến Kitchen Service.
+**`notification-service-group` (Phase 4C+):** Khi Notification Service được bổ sung, group này có thể consume `payment.completed`, `payment.refunded`, `tenant.created` để gửi email và ghi audit log. Hiện current `apps/*` chưa có service này.
 
-**`payment-order-sync-group`:** Order Service consume `payment.completed` để đóng session và cập nhật trạng thái đơn hàng. Tên group này thể hiện rõ: Order Service đang sync trạng thái từ Payment domain.
+**`order-payment-consumer-group`:** Order Service consume `payment.completed` để đóng session/bill và gọi Catalog TCP cập nhật bàn. Tên group này thể hiện rõ: Order Service đang sync trạng thái từ Payment domain.
 
-**`bff-kafka-bridge`:** BFF consume `order.confirmed`, `kitchen.sla_warning`, `payment.completed` để bridge sang WebSocket. BFF là điểm kết hợp — nó bridge từ Kafka event stream sang WebSocket push cho client. Tên group phản ánh vai trò bridge này.
+**`bff-kafka-bridge`:** BFF consume `kitchen.sla_warning` và `payment.completed` để bridge sang WebSocket. Order tracking đi qua BFF Direct sau TCP response, không consume `order.confirmed`.
 
-**`catalog-tenant-setup-group`:** Catalog Service consume `tenant.created` để seed default categories. Tên group cho thấy đây là setup operation, không phải regular business processing.
+**`catalog-tenant-created-consumer-group`:** Catalog Service consume `tenant.created` để seed default area. Tên group cho thấy đây là setup operation, không phải regular business processing.
 
 ### 12.2 Tại Sao Group ID Quan Trọng
 
 #### Sơ đồ: Độc Lập Offset Giữa Consumer Groups
 
-> Minh họa tính độc lập offset. `kitchen-service-group` đang ở offset 8 (realtime). `notification-service-group` đang lag ở offset 3 (chậm). Hai group này **hoàn toàn không ảnh hưởng nhau** — Kitchen vẫn chạy bình thường dù Notification bị chậm.
+> Minh họa tính độc lập offset. `order-payment-consumer-group` đang ở offset 8 (realtime). `notification-service-group` là ví dụ Phase 4C+ và đang lag ở offset 3 (chậm). Hai group này **hoàn toàn không ảnh hưởng nhau** — Order/BFF hiện tại vẫn chạy bình thường dù Notification tương lai bị chậm.
 
 ```mermaid
 graph TB
-    subgraph LOG["📋 order.confirmed — Partition 0"]
+    subgraph LOG["📋 payment.completed — Partition 0"]
         direction LR
         M0["0"] --- M1["1"] --- M2["2"] --- M3["3"] --- M4["4"] --- M5["5"] --- M6["6"] --- M7["7"] --- M8["8"]
     end
 
-    G1["🍳 kitchen-service-group<br/>offset = 8 ✅ Realtime<br/>lag = 0"]
-    G2["📧 notification-service-group<br/>offset = 3 ⚠️ Lagging<br/>lag = 5"]
+    G1["🛒 order-payment-consumer-group<br/>offset = 8 ✅ Realtime<br/>lag = 0"]
+    G2["📧 notification-service-group<br/>Phase 4C+<br/>offset = 3 ⚠️ Lagging<br/>lag = 5"]
     G3["🌐 bff-kafka-bridge<br/>offset = 7 ✅ Near-realtime<br/>lag = 1"]
 
     M8 -.-> G1
     M3 -.-> G2
     M7 -.-> G3
 
-    INDEPENDENT["✅ Hoàn toàn ĐỘC LẬP<br/>Notification lag ≠ Kitchen bị ảnh hưởng"]
+    INDEPENDENT["✅ Hoàn toàn ĐỘC LẬP<br/>Notification lag ≠ Order/BFF bị ảnh hưởng"]
 
     style G1 fill:#51cf66,stroke:#333,color:#fff
     style G2 fill:#ff6b6b,stroke:#333,color:#fff
@@ -1676,11 +1675,11 @@ graph TB
     style INDEPENDENT fill:#e8e8e8,stroke:#333
 ```
 
-**Lý do 1 — Độc lập hoàn toàn:** Mỗi group có offset riêng. `notification-service-group` lag hay fail không ảnh hưởng gì đến offset của `kitchen-service-group`. Đây là điều không thể làm được với TCP fan-out.
+**Lý do 1 — Độc lập hoàn toàn:** Mỗi group có offset riêng. `notification-service-group` Phase 4C+ lag hay fail không ảnh hưởng gì đến offset của `order-payment-consumer-group` hoặc `bff-kafka-bridge`. Đây là điều không thể làm được với TCP fan-out.
 
-**Lý do 2 — Restart và recovery độc lập:** Khi Notification Service bị restart sau maintenance, nó tiếp tục từ offset đã commit — không bỏ qua event nào, không phải hỏi lại Payment Service. Kitchen Service đang chạy bình thường không biết gì về việc Notification bị restart.
+**Lý do 2 — Restart và recovery độc lập:** Khi Notification Service Phase 4C+ bị restart sau maintenance, nó tiếp tục từ offset đã commit — không bỏ qua event nào, không phải hỏi lại Payment Service. Order/BFF đang chạy bình thường không biết gì về việc Notification bị restart.
 
-**Lý do 3 — Debug và monitoring rõ ràng:** Kafka UI hiển thị consumer lag (số message chưa xử lý) theo từng group. Nhìn vào `bff-kafka-bridge` lag = 0 nghĩa là WebSocket events đang được deliver real-time. `notification-service-group` lag = 500 nghĩa là Notification Service đang bị chậm — team có thể xử lý độc lập.
+**Lý do 3 — Debug và monitoring rõ ràng:** Kafka UI hiển thị consumer lag (số message chưa xử lý) theo từng group. Nhìn vào `bff-kafka-bridge` lag = 0 nghĩa là WebSocket events đang được deliver real-time. Nếu Phase 4C thêm `notification-service-group`, lag = 500 nghĩa là Notification Service đang bị chậm — team có thể xử lý độc lập.
 
 **Lý do 4 — Không dùng chung group giữa các service khác nhau:** Đây là sai lầm phổ biến. Nếu Kitchen Service và Notification Service cùng group ID, Kafka sẽ assign partition cho "pool" gồm cả Kitchen và Notification instances — một instance Kitchen có thể nhận được event mà đáng ra Notification phải xử lý, và ngược lại. Luôn luôn: một service = một group.
 
@@ -1787,7 +1786,7 @@ mindmap
     Kiến Trúc
       4P+2AP Framework
       5 Kafka Topics
-      6 BFF Direct Events
+      BFF Direct Events
       Outbox Pattern cho Atomicity
     Multi-Tenant
       tenantId = Partition Key
@@ -1815,10 +1814,10 @@ Sau khi đọc toàn bộ tài liệu, đây là mental model ngắn gọn để
 
 > Bảng tổng hợp nhanh 5 Kafka topics với producer, consumers, partition key, acks level, và delivery semantics. Dùng như "quick reference" khi implement.
 
-| Topic                 | Producer        | Consumer Groups                                                        | Key      | acks | Delivery      | Nguyên tắc   |
-| --------------------- | --------------- | ---------------------------------------------------------------------- | -------- | ---- | ------------- | ------------ |
-| `order.confirmed`     | Order Service   | kitchen-service-group, bff-kafka-bridge                                | tenantId | all  | at-least-once | P1 + P2      |
-| `payment.completed`   | Payment Service | payment-order-sync-group, notification-service-group, bff-kafka-bridge | tenantId | all  | at-least-once | P1 + P2 + P3 |
-| `kitchen.sla_warning` | Kitchen Service | bff-kafka-bridge                                                       | tenantId | 1    | at-least-once | P2           |
-| `tenant.created`      | SaaS Mgmt       | notification-service-group, catalog-tenant-setup-group                 | tenantId | all  | at-least-once | P1 + P3      |
-| `payment.refunded`    | Payment Service | notification-service-group                                             | tenantId | all  | at-least-once | P1           |
+| Topic                 | Producer        | Consumer Groups                                       | Key      | acks | Delivery      | Nguyên tắc   |
+| --------------------- | --------------- | ----------------------------------------------------- | -------- | ---- | ------------- | ------------ |
+| `order.confirmed`     | Order Service   | kitchen-service-group                                 | tenantId | all  | at-least-once | P1 + P2      |
+| `payment.completed`   | Payment Service | order-payment-consumer-group, bff-kafka-bridge        | tenantId | all  | at-least-once | P1 + P2 + P3 |
+| `kitchen.sla_warning` | Kitchen Service | bff-kafka-bridge                                      | tenantId | 1    | at-least-once | P2           |
+| `tenant.created`      | SaaS Mgmt       | catalog-tenant-created-consumer-group                 | tenantId | all  | at-least-once | P1 + P3      |
+| `payment.refunded`    | Payment Service | none current; notification-service-group is Phase 4C+ | tenantId | all  | at-least-once | P1           |

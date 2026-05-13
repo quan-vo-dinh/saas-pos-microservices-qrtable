@@ -113,7 +113,7 @@ Step 2.4 định nghĩa luồng nghiệp vụ backend cho:
 Step 2.4 **không** triển khai hoặc chốt hành vi cuối cùng cho:
 
 1. Xác nhận thanh toán tiền mặt.
-2. Thanh toán qua Stripe hoặc chuyển khoản ngân hàng.
+2. Thanh toán SePay/VietQR, Cash hoặc payment gateway đầy đủ; Phase 3 chốt phạm vi Payment Service.
 3. Refunds.
 4. Split bill.
 5. Tích hợp Payment Service đầy đủ.
@@ -138,7 +138,7 @@ Step 2.4 **không** triển khai hoặc chốt hành vi cuối cùng cho:
 | Order/order items                         | Order Service       | Order PostgreSQL                      | DB orders bắt đầu ở `PENDING`; `DRAFT` chỉ thuộc cart/UI.                                    |
 | Bill                                      | Order Service       | Order PostgreSQL                      | Một active bill cho mỗi session; payment completion để lại Phase 3.                          |
 | Service request                           | Order Service       | Order PostgreSQL                      | Notification side effects được emit bởi BFF.                                                 |
-| Kafka `order.confirmed`                   | Order Service       | Kafka via simplified outbox           | Payload self-contained cho Kitchen/Notification/Analytics.                                   |
+| Kafka `order.confirmed`                   | Order Service       | Kafka via simplified outbox           | Payload self-contained cho Kitchen hiện tại; Notification/Analytics là consumer future.      |
 | WebSocket UI events                       | BFF                 | Runtime                               | BFF phát trực tiếp sau TCP response thành công.                                              |
 
 ### 2.2 Quy tắc ranh giới nghiêm ngặt
@@ -1608,7 +1608,7 @@ Các mục sau **đã được đồng bộ trong repo** (2026-04-28); phần tr
 4. `libs/shared/types/src/lib/realtime-events.types.ts` — `OrderConfirmedEvent` enrich, `CartUpdatedEvent`, `BillRequestedEvent`, `TableTransferredEvent`.
 5. `libs/shared/types/src/lib/menu.types.ts` + `order.types.ts` — `PreparationStation` / snapshot `station` trên order item.
 6. Catalog sở hữu station — cột `station` + ngữ nghĩa TCP stock thuộc Catalog; code hiện tại và `technical-architecture.md` là điểm kiểm chứng.
-7. `libs/utils/request.util.ts` + `SessionGuard` + `TenantGuard` — key `session:{tenantId}:{sessionId}`, optional `orderCount` idle (C14/C15); `docs/references/auth-system-reference.md` + `technical-architecture.md` đã cập nhật tương ứng.
+7. `libs/utils/src/lib/request.util.ts` + `SessionGuard` + `TenantGuard` — key `session:{tenantId}:{sessionId}`, optional `orderCount` idle (C14/C15); `docs/references/auth-system-reference.md` + `technical-architecture.md` đã cập nhật tương ứng.
 8. `libs/constants/.../tcp-request-message.ts` — pattern `MENU_ITEM.VALIDATE_ORDERABLE`, `STOCK_DEDUCT_FOR_ORDER`, `STOCK_RELEASE_FOR_ORDER`.
 
 ---

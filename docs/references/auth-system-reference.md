@@ -1745,20 +1745,16 @@ node tools/seed.js apps/user-access/src/seeder migrate
 
 ### 13.1 Auth Error Codes
 
-**File:** `libs/constants/src/lib/enum/auth-error-code.enum.ts`
+**File:** `libs/error-messages/src/lib/error-code.enum.ts`
 
 ```typescript
-export enum AUTH_ERROR_CODE {
-  // HTTP 401: Authentication failed
-  INVALID_TOKEN = 'INVALID_TOKEN', // Token malformed/expired
-  USER_NOT_PROVISIONED = 'USER_NOT_PROVISIONED', // User profile missing/roles mismatched
-  ROLE_MAPPING_MISMATCH = 'ROLE_MAPPING_MISMATCH', // Keycloak roles ∩ internal roles = ∅
-
-  // HTTP 403: Authorization failed
-  TENANT_REQUIRED = 'TENANT_REQUIRED', // No tenant context
-  TENANT_MISMATCH = 'TENANT_MISMATCH', // Tenant claim ≠ request tenant
-  SESSION_NOT_FOUND = 'SESSION_NOT_FOUND', // Session expired/invalid
-  PERMISSION_DENIED = 'PERMISSION_DENIED', // User lacks required permission
+export enum ErrorCode {
+  AUTH_TOKEN_NOT_PROVIDED = 'AUTH_TOKEN_NOT_PROVIDED',
+  AUTH_TOKEN_INVALID = 'AUTH_TOKEN_INVALID',
+  AUTH_USER_NOT_PROVISIONED = 'AUTH_USER_NOT_PROVISIONED',
+  AUTH_ROLE_MAPPING_MISMATCH = 'AUTH_ROLE_MAPPING_MISMATCH',
+  AUTH_USER_DATA_NOT_FOUND = 'AUTH_USER_DATA_NOT_FOUND',
+  AUTH_PERMISSION_DENIED = 'AUTH_PERMISSION_DENIED',
 }
 ```
 

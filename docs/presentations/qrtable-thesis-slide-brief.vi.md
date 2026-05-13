@@ -810,25 +810,28 @@ Redis được dùng có kiểm soát cho dữ liệu nóng, runtime state và q
 
 **Bảng usage:**
 
-| Use case        | Key pattern                        | Owner            |
-| --------------- | ---------------------------------- | ---------------- |
-| Token cache     | `user-token:{sha256(jwt)}`         | BFF/Auth         |
-| Menu cache      | `menu:{tenant_id}`                 | BFF/Catalog flow |
-| Session         | `session:{tenant_id}:{session_id}` | Order            |
-| Shared cart     | `cart:{tenant_id}:{session_id}`    | Order            |
-| Rate limit      | `rl:{endpoint}:{ip/token}`         | BFF              |
-| KDS queue       | `kds:{tenant_id}:{station}`        | Kitchen          |
-| Ticket snapshot | `ticket:{ticket_id}`               | Kitchen          |
+| Use case        | Key pattern                          | Owner            |
+| --------------- | ------------------------------------ | ---------------- |
+| Token cache     | `user-token:{sha256(jwt)}`           | BFF/Auth         |
+| Menu cache      | `menu:{tenant_id}`                   | BFF/Catalog flow |
+| Session         | `session:{tenant_id}:{session_id}`   | Order            |
+| Shared cart     | `cart:{tenant_id}:{session_id}`      | Order            |
+| Rate limit      | `rl:{endpoint}:{ip/token}`           | BFF              |
+| KDS queue       | `kds:{tenant_id}:{station}`          | Kitchen          |
+| Ticket snapshot | `kds:{tenant_id}:ticket:{ticket_id}` | Kitchen          |
+| Tenant suspend  | `tenant:{tenant_id}:suspended`       | SaaS/BFF         |
+| Subscription    | `subscription:{tenant_id}`           | SaaS             |
+| OAuth state     | `oauth_state:{state}`                | Payment          |
 
 **Policy callout:**
 
-Không phải service nào cũng được kết nối Redis. Catalog, SaaS, Payment, Auth, Notification, User-Access không dùng Redis trực tiếp nếu không có runtime-state reason.
+Không phải service nào cũng được kết nối Redis. Hiện tại Redis users là BFF, Order, Kitchen/WebSocket, SaaS và Payment. Catalog, Authorizer, User-Access không dùng Redis trực tiếp; Notification chưa tồn tại trong current `apps/*`.
 
 ### Visual / layout
 
 Redis ở giữa, xung quanh là các owner service được phép:
 
-`BFF`, `Order`, `Kitchen`, `WebSocket Gateway`.
+`BFF`, `Order`, `Kitchen`, `WebSocket Gateway`, `SaaS`, `Payment`.
 
 Không nối Redis với mọi service.
 

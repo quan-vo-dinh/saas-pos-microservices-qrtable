@@ -95,7 +95,7 @@ Phase 1 xây dựng hệ thống quản lý menu và bàn — nền tảng cho t
 
 **Yêu cầu chính:**
 
-- `libs/shared/types/catalog.types.ts`: ICategory, IMenuItem, IArea, ITable
+- `libs/shared/types/src/lib/menu.types.ts` và `libs/shared/types/src/lib/table.types.ts`: `Category`, `MenuItem`, `Area`, `RestaurantTable`
 - Enums: CategoryStatus, MenuItemStatus, TableStatus
 - Request/Response DTOs: ICreateCategoryDto, IMenuResponse, etc.
 
