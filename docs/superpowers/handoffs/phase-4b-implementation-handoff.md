@@ -72,9 +72,14 @@ rg -n "QRTBL|QRSUB|tenant\\.suspended|payment_settings\\.update_own|subscription
 BFF_BASE_URL=http://localhost:3300/api/v1 ACCESS_TOKEN=... TENANT_ID=... bash tools/demo/phase-4b-smoke.sh
 ```
 
-**Browser (desktop ~1440×900, mobile ~390×844):** `/`, `/dashboard/subscription`, `/dashboard/payment-settings`, admin SaaS routes as in plan, customer PWA menu for active vs suspended tenant — confirm no blank screens, no horizontal scroll, suspended banner does not fully obscure primary navigation.
+**Browser verification (2026-05-13):**
 
-**Browser automation note:** Cursor IDE browser MCP in this environment did not load `http://localhost:3001/` (Chrome showed `chrome-error://chromewebdata/`). A local `next dev --port 3001` was started successfully for smoke; **use a real browser** (or Browser MCP against a reachable host) for the full desktop/mobile checklist. Prior stabilization session reported dashboard pages and smoke script passing on real browser.
+- Chrome desktop authenticated as SUPER_ADMIN: `/admin/tenants`, `/admin/tenants/023772bb-391b-401c-936a-ed7034b69cec`, `/admin/plans`, `/admin/billing` rendered without blank pages or console errors. Tenant filters/table, row action menu, onboard dialog, tenant tabs, destructive close dialog, plan dialog, and billing filters were reachable. Destructive close action is visually differentiated and requires typed tenant name.
+- Chrome desktop authenticated as OWNER: `/dashboard/subscription`, `/dashboard/payment-settings`, and `/dashboard/payment-settings/sepay-callback?code=test&state=test` rendered without blank pages or console errors. Dashboard routes did not show 401/500 in the UI. Payment settings showed masked/empty account fields and no frontend secrets. Callback handled invalid test state as an in-page OAuth error with a return link, not a crash.
+- Browser in-app viewport 390x844: `/`, `/admin/tenants`, `/dashboard/subscription`, `/dashboard/payment-settings`, and customer-pwa active QR flow `http://localhost:5173/landing?tenant=pho-viet&table=<seed-table-id>&token=<seed-qr-token>` were visually checked. Landing first viewport identifies QRTable and pricing context; mobile admin filters stack; onboard dialog fits; dashboard pages and payment settings remain readable; active customer menu shows menu/cart controls without being covered.
+- Suspended customer-pwa route: blocker/data gap. The current seed/UI exposed only active tenant `pho-viet`; no suspended seed/test route was available. Suspended-state component behavior remains covered by automated tests, but browser verification was not marked as a real suspended tenant pass.
+
+No access tokens, cookies, SePay client secrets, or screenshots with secrets were written to this handoff.
 
 ## Known limitations
 

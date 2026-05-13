@@ -74,11 +74,33 @@ Use this script after starting BFF/SaaS/Payment/Authorizer/User-Access and obtai
 
 ## Browser Verification
 
-- `/dashboard/subscription` loads without 401 or 500: not run; requires authenticated browser session
-- `/dashboard/payment-settings` loads without 401 or 500: not run; requires authenticated browser session
-- Network tab confirms Authorization header is present: covered by management-app auth-readiness unit test; browser not run
-- Network tab confirms `x-tenant-id` header is present: covered indirectly by authenticated client path; browser not run
-- No layout overlap at mobile width: not run; plan 06 Task 9 still needs manual/browser visual QA
+- Date: 2026-05-13
+- Tools: Chrome plugin with existing local Keycloak sessions for desktop authenticated routes; Browser in-app viewport override for 390x844 mobile routes.
+- Dev servers observed running: management-app `http://localhost:3000`, customer-pwa `http://localhost:5173`, BFF `http://localhost:3300`.
+- Desktop SUPER_ADMIN routes passed visual smoke with no blank page and no console errors:
+  - `/admin/tenants`
+  - `/admin/tenants/023772bb-391b-401c-936a-ed7034b69cec`
+  - `/admin/plans`
+  - `/admin/billing`
+- Desktop OWNER routes passed visual smoke with no blank page and no console errors:
+  - `/dashboard/subscription`
+  - `/dashboard/payment-settings`
+  - `/dashboard/payment-settings/sepay-callback?code=test&state=test`
+- Dashboard 401/500 check: `/dashboard/subscription` and `/dashboard/payment-settings` rendered authenticated OWNER UI; no 401/500 screen was observed.
+- OAuth callback check: invalid test `state` rendered an in-page `INVALID_SEPAY_OAUTH_STATE` message with a return link; it did not blank or crash.
+- Payment settings secrecy check: page showed `NOT_CONNECTED`, masked/empty account fields, and no SePay client secret/access token/refresh token text.
+- Desktop interaction checks passed:
+  - `/admin/tenants`: filters/table visible, row action menu opened, onboard dialog fields fit.
+  - Tenant detail: tabs visible, destructive close dialog is red/destructive and requires typed tenant name.
+  - `/admin/plans`: table visible, create-plan dialog fields fit and long feature labels wrap.
+  - `/admin/billing`: filters/table visible; no pending invoice existed, so manual confirm/QR dialog was not data-available.
+- Mobile 390x844 Browser pass:
+  - `/`: QRTable and pricing CTA visible in first viewport; no blank screen or obvious overlap.
+  - `/admin/tenants`: filters stack; table remains inside a horizontal table area; onboard dialog fits.
+  - `/dashboard/subscription`: page renders; no blank screen or obvious overlap. No invoice/plan row existed, so checkout QR dialog was not data-available.
+  - `/dashboard/payment-settings`: page renders; no blank screen, no full account number, no secrets.
+  - customer-pwa active QR flow for `pho-viet`: seed QR landing verified, `Vào Menu` opened `/menu`, menu/cards/cart controls visible.
+- Suspended customer-pwa browser check: blocked by data gap. Current seed/UI exposed only active tenant `pho-viet`; no real suspended tenant route was available. Do not mark this as passed from browser. Automated suspended-state tests remain the evidence for component behavior.
 
 ## Notes
 
