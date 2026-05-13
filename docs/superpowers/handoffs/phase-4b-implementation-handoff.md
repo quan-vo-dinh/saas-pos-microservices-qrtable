@@ -37,18 +37,24 @@ Commands below were executed on **2026-05-13** in this workspace (representative
 | Command                                                                                                                                      | Result                                                                                                                                                                    |
 | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm nx run-many -t test --projects=constants,entities,interfaces,saas,payment,bff,guards,authorizer,user-access,catalog,order --runInBand` | **Pass** (Nx skipped `entities`/`interfaces` — no `test` target). 9 projects: constants, guards, user-access, order, authorizer, catalog, payment, saas, bff — all green. |
-| `pnpm nx run-many -t test --projects=management-app,customer-pwa --runInBand`                                                                | **Pass** — customer-pwa 11 suites / 50 tests; management-app 33 suites / 140 tests.                                                                                       |
+| `pnpm nx test customer-pwa --runInBand --skip-nx-cache`                                                                                      | **Pass** — 13 suites / 57 tests after adding tenant suspended-state regression coverage.                                                                                  |
+| `pnpm nx test bff --runInBand --skip-nx-cache`                                                                                               | **Pass** — 25 suites / 128 tests after adding customer tenant lifecycle guard + realtime lifecycle emit coverage.                                                         |
+| `pnpm nx test management-app --runInBand --skip-nx-cache`                                                                                    | **Pass** — 33 suites / 140 tests.                                                                                                                                         |
 | `pnpm nx run-many -t lint --projects=saas,payment,bff,guards,authorizer,user-access,catalog,order,management-app,customer-pwa`               | **Pass** (0 errors; pre-existing warnings in user-access, authorizer, bff specs, management-app POS/tests).                                                               |
 | `pnpm nx run customer-pwa:typecheck`                                                                                                         | **Pass** (`tsc --noEmit -p tsconfig.app.json`).                                                                                                                           |
+| `pnpm nx build customer-pwa --skip-nx-cache`                                                                                                 | **Pass** (Vite build; chunk-size warning only).                                                                                                                           |
 | `pnpm nx build management-app`                                                                                                               | **Pass** (Next.js production build + TS). _Note:_ `management-app` has no Nx `typecheck` target; production build covers TS.                                              |
 | `pnpm nx affected -t build --base=origin/main`                                                                                               | **Pass** — 16 affected projects built (bff, customer-pwa, management-app, saas, microservices, libs).                                                                     |
 | `git diff --check`                                                                                                                           | **Pass** (no whitespace errors).                                                                                                                                          |
 
 ```bash
 pnpm nx run-many -t test --projects=constants,entities,interfaces,saas,payment,bff,guards,authorizer,user-access,catalog,order --runInBand
-pnpm nx run-many -t test --projects=management-app,customer-pwa --runInBand
+pnpm nx test management-app --runInBand
+pnpm nx test customer-pwa --runInBand
+pnpm nx test bff --runInBand
 pnpm nx run-many -t lint --projects=saas,payment,bff,guards,authorizer,user-access,catalog,order,management-app,customer-pwa
 pnpm nx run-many -t typecheck --projects=management-app,customer-pwa   # management-app: omit if target missing; use nx build management-app instead
+pnpm nx build customer-pwa
 pnpm nx affected -t build
 git diff --check
 ```
@@ -76,6 +82,7 @@ BFF_BASE_URL=http://localhost:3300/api/v1 ACCESS_TOKEN=... TENANT_ID=... bash to
 - **SePay production webhook** validation depends on a publicly reachable BFF URL and platform webhook secret configuration.
 - **OAuth mock** is for automated tests / local isolation only.
 - **Auto-suspend (cron) → WebSocket:** lifecycle emit is wired from BFF admin tenant status updates; paths that change tenant status **without** going through that BFF flow may not emit until the next customer reconnect or admin action.
+- **Suspended tenant payment exception:** Customer order mutations are blocked while suspended/closed, but pending customer VietQR generation remains available so an already requested bill can still be settled.
 
 ## References
 

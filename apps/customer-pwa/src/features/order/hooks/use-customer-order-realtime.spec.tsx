@@ -11,6 +11,7 @@ const emitMock = jest.fn();
 const disconnectMock = jest.fn();
 const managerOnMock = jest.fn();
 const managerOffMock = jest.fn();
+const patchTenantLifecycleMock = jest.fn();
 
 jest.mock('@/constants/api', () => ({
   API_CONFIG: {
@@ -29,7 +30,7 @@ jest.mock('@/features/session/context/session-provider', () => ({
       sessionId: 'session-1',
       tenantSlug: 'my-rest',
     },
-    patchTenantLifecycle: jest.fn(),
+    patchTenantLifecycle: patchTenantLifecycleMock,
   }),
 }));
 
@@ -47,6 +48,7 @@ describe('useCustomerOrderRealtime', () => {
     disconnectMock.mockReset();
     managerOnMock.mockReset();
     managerOffMock.mockReset();
+    patchTenantLifecycleMock.mockReset();
 
     ioMock.mockReturnValue({
       on: onMock,
@@ -256,6 +258,30 @@ describe('useCustomerOrderRealtime', () => {
     });
 
     expect(result.current).toBe('degraded');
+  });
+
+  it('patches customer tenant status from lifecycle socket events', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    renderHook(() => useCustomerOrderRealtime(), { wrapper: createWrapper(queryClient) });
+
+    const onCalls = onMock.mock.calls as Array<[string, (...args: unknown[]) => void]>;
+    const suspended = onCalls.find(([event]) => event === 'tenant.suspended')?.[1];
+    const activated = onCalls.find(([event]) => event === 'tenant.activated')?.[1];
+    const closed = onCalls.find(([event]) => event === 'tenant.closed')?.[1];
+
+    suspended?.({ tenantId: 'tenant-1', reason: 'expired' });
+    activated?.({ tenantId: 'tenant-1' });
+    closed?.({ tenantId: 'tenant-1', reason: 'closed' });
+
+    expect(patchTenantLifecycleMock).toHaveBeenCalledWith({
+      tenantStatus: 'SUSPENDED',
+      tenantStatusReason: 'expired',
+    });
+    expect(patchTenantLifecycleMock).toHaveBeenCalledWith({ tenantStatus: 'ACTIVE', tenantStatusReason: null });
+    expect(patchTenantLifecycleMock).toHaveBeenCalledWith({ tenantStatus: 'CLOSED', tenantStatusReason: 'closed' });
   });
 
   it('unsubscribes socket and manager listeners on unmount', () => {

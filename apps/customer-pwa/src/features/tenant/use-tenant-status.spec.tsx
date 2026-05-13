@@ -1,25 +1,49 @@
-jest.mock('@/constants/api', () => ({
-  PWA_SESSION_STORAGE_KEY: 'qrtable:pwa:order-session-test',
-  API_CONFIG: {
-    DEFAULT_BASE_URL: 'http://localhost:3300/api/v1',
-    TENANT_ID: '023772bb-391b-401c-936a-ed7034b69cec',
-    ENDPOINTS: {},
-  },
-}));
-
 import { renderHook } from '@testing-library/react';
-import { SessionProvider } from '@/features/session/context/session-provider';
 import { useTenantStatus } from './use-tenant-status';
 
-function wrapper({ children }: { children: React.ReactNode }): React.ReactElement {
-  return <SessionProvider>{children}</SessionProvider>;
-}
+const useSessionMock = jest.fn();
+
+jest.mock('@/features/session/context/session-provider', () => ({
+  useSession: () => useSessionMock(),
+}));
 
 describe('useTenantStatus', () => {
+  beforeEach(() => {
+    useSessionMock.mockReturnValue({ session: null });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('defaults to ACTIVE when session has no tenantStatus', () => {
-    const { result } = renderHook(() => useTenantStatus(), { wrapper });
+    useSessionMock.mockReturnValue({ session: { tenantStatus: undefined } });
+
+    const { result } = renderHook(() => useTenantStatus());
 
     expect(result.current.status).toBe('ACTIVE');
     expect(result.current.canOrder).toBe(true);
+  });
+
+  it('blocks ordering for suspended tenant', () => {
+    useSessionMock.mockReturnValue({
+      session: { tenantStatus: 'SUSPENDED', tenantStatusReason: 'SUBSCRIPTION_EXPIRED' },
+    });
+
+    const { result } = renderHook(() => useTenantStatus());
+
+    expect(result.current.status).toBe('SUSPENDED');
+    expect(result.current.reason).toBe('SUBSCRIPTION_EXPIRED');
+    expect(result.current.canOrder).toBe(false);
+  });
+
+  it('blocks ordering for closed tenant', () => {
+    useSessionMock.mockReturnValue({ session: { tenantStatus: 'CLOSED', tenantStatusReason: 'closed by admin' } });
+
+    const { result } = renderHook(() => useTenantStatus());
+
+    expect(result.current.status).toBe('CLOSED');
+    expect(result.current.reason).toBe('closed by admin');
+    expect(result.current.canOrder).toBe(false);
   });
 });

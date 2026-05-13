@@ -123,12 +123,17 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                         }}
                         className="relative bg-card"
                       >
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={0}
                           className="flex w-full flex-col gap-2 p-3 text-left"
-                          onClick={() =>
-                            setExpandedId((id) => (id === line.cartLineId ? null : line.cartLineId))
-                          }
+                          onClick={() => setExpandedId((id) => (id === line.cartLineId ? null : line.cartLineId))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setExpandedId((id) => (id === line.cartLineId ? null : line.cartLineId));
+                            }
+                          }}
                         >
                           <div className="flex items-center gap-3">
                             <div className="min-w-0 flex-1">
@@ -226,7 +231,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
                               </Popover>
                             </div>
                           )}
-                        </button>
+                        </div>
                       </motion.div>
                     </li>
                   ))}
