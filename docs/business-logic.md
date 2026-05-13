@@ -1,8 +1,11 @@
 # TÀI LIỆU NGHIỆP VỤ HỆ THỐNG QUẢN LÝ NHÀ HÀNG
 
 > **PHÂN TÍCH DỰA TRÊN QRTABLE.IO LÀM TÔN CHỈ**
+> **Current Status:** Living business overview, last aligned with implemented Phase 4B on 2026-05-13.
 
 Tài liệu này mô tả chi tiết các luồng nghiệp vụ cốt lõi, từ thiết lập ban đầu đến vận hành nhà hàng hàng ngày, tập trung vào mô hình đặt món tại bàn sử dụng mã QR (QR-based table ordering).
+
+Khi có mâu thuẫn, ưu tiên theo thứ tự: code/tests hiện tại, accepted specs trong `docs/specs/`, phase records trong `docs/phases/`, rồi tài liệu overview này. Ma trận RBAC chi tiết nằm ở `docs/architecture/permission-matrix.md`.
 
 ---
 
@@ -10,33 +13,35 @@ Tài liệu này mô tả chi tiết các luồng nghiệp vụ cốt lõi, từ
 
 > **LƯU Ý:** Hệ thống là một **SaaS Platform** với mô hình Multi-Tenant. Quy trình này do **Super Admin** quản lý ở tầng Platform.
 
-Đây là quá trình chuyển đổi một người dùng thông thường thành một Chủ nhà hàng (Merchant/Restaurant Owner/Tenant) trên nền tảng, cho phép họ sở hữu một thực thể kinh doanh độc lập.
+Đây là quá trình tạo một tenant nhà hàng trên nền tảng, gắn Owner, subscription, cấu hình thanh toán ban đầu và trạng thái vận hành độc lập. Trạng thái hiện tại sau Phase 4B là **admin-assisted onboarding**; self-service registration wizard được để lại cho phase sau.
 
 ### A. Các bước thiết lập
 
-1.  **Đăng ký Định danh:**
-    - Người dùng cung cấp thông tin cơ bản (Email/SĐT, mật khẩu).
-    - Hệ thống thực hiện xác thực (OTP/Email Verification). Ở bước này, người dùng chỉ là tài khoản cá nhân, chưa phải chủ cửa hàng.
+1.  **Onboard tenant bởi Super Admin:**
+    - `SUPER_ADMIN` tạo tenant qua platform admin, khai báo tên quán, loại hình, địa chỉ, thông tin owner và gói ban đầu.
+    - Hệ thống tạo tenant, Owner user, subscription mặc định và payment settings row ban đầu trong cùng quy trình onboarding.
 
-2.  **Khởi tạo Thực thể Nhà hàng (Tenant Creation):**
-    - Khai báo thông tin doanh nghiệp: Tên quán, Loại hình (Café, Nhà hàng, Pub...), Địa chỉ.
+2.  **Khởi tạo Định danh Nhà hàng (Tenant Identity):**
     - **Logic Cốt lõi:** Hệ thống tự động sinh ra một Slug/Subdomain duy nhất (ví dụ: `the-coffee-house.qrtable.io`) làm định danh thương hiệu trên Internet.
 
 3.  **Lựa chọn Gói Dịch vụ (Subscription):**
-    - Chủ quán chọn gói cước (Miễn phí, Cơ bản, Cao cấp).
+    - Super Admin quản lý pricing plans; Owner có thể xem gói và tạo checkout subscription cho tenant của mình; Manager chỉ có quyền xem subscription/plan.
     - **Quy tắc:** Gói cước giới hạn tính năng và quy mô (ví dụ: Gói Miễn phí chỉ cho phép tối đa 10 bàn, không có báo cáo nâng cao). Ghi nhận ngày bắt đầu và kết thúc gói.
-    - **Actor quản lý:** Super Admin thiết lập Pricing Plans, Restaurant Owner chọn gói phù hợp.
 
-4.  **Thiết lập Cấu hình Vận hành:**
+4.  **Thiết lập Thanh toán Tenant:**
+    - Owner kết nối SePay OAuth2 trong `/dashboard/payment-settings` để tiền bill khách hàng về tài khoản ngân hàng của tenant.
+    - Payment Service sở hữu `tenant_payment_settings`; SaaS Service chỉ sở hữu tenant/subscription/invoice platform billing.
+
+5.  **Thiết lập Cấu hình Vận hành:**
     - **Mặc định Việt Nam:** Hệ thống tự động cấu hình đơn vị tiền tệ VND, ngôn ngữ Tiếng Việt.
     - **Chế độ hoạt động:** Khách hàng có thể vừa đặt món trực tiếp (Instant Order) vừa xem Menu điện tử (Digital Menu).
 
 ### B. Quy tắc Nghiệp vụ Chủ yếu (Business Rules)
 
 - **Cô lập Dữ liệu (Tenant Isolation):** Đảm bảo dữ liệu (đơn hàng, doanh thu, khách hàng) của cửa hàng này hoàn toàn tách biệt và không hiển thị cho cửa hàng khác.
-- **Trạng thái Hoạt động:** Cửa hàng có các trạng thái: `Active` (Hoạt động), `Suspended` (Tạm khóa do hết hạn gói cước), `Closed` (Đóng cửa tạm thời).
-  - **Actor:** Super Admin có quyền Suspend/Active tenant khi vi phạm chính sách hoặc hết hạn subscription.
-- **Phân quyền Ban đầu:** Người tạo cửa hàng mặc định là **Restaurant Owner** (Toàn quyền trong phạm vi Tenant) và có quyền mời thêm Staff vào làm việc.
+- **Trạng thái Hoạt động:** Cửa hàng có các trạng thái `ACTIVE`, `SUSPENDED`, `CLOSED`. `SUSPENDED` chuyển tenant sang read-only cho các thao tác vận hành mới, nhưng vẫn cho phép thanh toán bill đang chờ.
+  - **Actor:** Super Admin có quyền suspend/activate/close tenant khi vi phạm chính sách hoặc hết hạn subscription.
+- **Phân quyền Ban đầu:** Tenant được onboard với **Restaurant Owner** trong phạm vi tenant; Owner quản lý nhân sự, Manager vận hành nhưng không có quyền xóa user, checkout subscription, hoặc cập nhật payment settings.
 
 ---
 
@@ -379,7 +384,7 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
           (chấp nhận overpaid; hoàn tiền full dùng paidAmount ?? roundedTotal)
       ```
 
-      > **Lưu ý kiến trúc (2026-05):** Thanh toán chuyển khoản được xử lý thông qua **SePay + VietQR động** — QR code nhúng inline trong POS/PWA (không redirect). SePay gửi webhook với `X-Secret-Key` header khi giao dịch thành công. Xem `technical-architecture.md` §6.2.7 — Payment Service và `docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md`.
+      > **Lưu ý kiến trúc (2026-05):** Thanh toán chuyển khoản được xử lý thông qua **SePay + VietQR động** — QR code nhúng inline trong POS/PWA (không redirect). SePay gửi webhook với `X-Secret-Key` header khi giao dịch thành công. Xem `technical-architecture.md` §6.2.7 và phase record `docs/phases/phase-3-payment.md`.
 
 4.  **In Hóa đơn & Giải phóng Bàn (Closing):**
     - In hóa đơn giấy.
@@ -508,7 +513,7 @@ Retry Policy:
 
 Quản lý trạng thái đơn hàng từ lúc tạo đến hoàn thành.
 
-> **Đặc tả Step 2.4 (canonical Q1–Q12):** [`business-logic-step-2.4-spec.vi.md`](business-logic-step-2.4-spec.vi.md) — bổ sung ownership service, bill request explicit, transfer saga, RBAC cancel tách quyền. Mục §8 giữ vai trò tổng quan; khi lệch, ưu tiên đặc tả Step 2.4.
+> **Đặc tả Step 2.4 (canonical Q1–Q12):** [`business-logic-step-2.4-spec.vi.md`](specs/business-logic-step-2.4-spec.vi.md) — bổ sung ownership service, bill request explicit, transfer saga, RBAC cancel tách quyền. Mục §8 giữ vai trò tổng quan; khi lệch, ưu tiên đặc tả Step 2.4.
 
 > **Enum casing convention:** Diagram + rules dưới đây dùng **Title Case** (`Draft`, `Pending`, `Processing`, `Ready`, `Served`, `Completed`, `Canceled`) cho readability. Enum values canonical là **UPPERCASE** (`DRAFT`, `PENDING`, ...) — xem `libs/shared/types/src/lib/order.types.ts` và `docs/phases/phase-2a-order-kafka.md` Step 2.3. Ánh xạ 1-1 (`Draft` ↔ `DRAFT`, v.v.).
 
@@ -641,7 +646,7 @@ Served → Completed:
 
 Định nghĩa rõ ràng quyền hạn của từng vai trò trong hệ thống SaaS Multi-Tenant.
 
-> **Kiến trúc Actor:** Mô tả theo **nhóm vai (business language)**; ma trận RBAC thực tế (6 roles × 51 permissions) là canonical tại [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md) §6.
+> **Kiến trúc Actor:** Mô tả theo **nhóm vai (business language)**; ma trận RBAC thực tế (6 roles × 66 permissions) là canonical tại [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md) §6.
 
 > **Điều hướng ứng dụng quản trị:** `management-app` (Phase 2.x) dùng **role → tab/route** cho UX; **BFF** vẫn enforce **permission** từng endpoint. Xem [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md) §9 (nguyên tắc đồng bộ + tech debt).
 
@@ -659,7 +664,7 @@ Served → Completed:
   - Cấu hình hệ thống: Payment gateways, System settings
   - Xem tất cả dữ liệu (cho mục đích support/debug)
 
-**Microservice tương ứng:** Identity Service, SaaS Management Service
+**Microservice tương ứng:** Authorizer Service, User-Access Service, SaaS Service
 
 ---
 
@@ -669,9 +674,9 @@ Served → Completed:
 
 - **Vai trò:** Chủ nhà hàng — toàn quyền vận hành + HR (bao gồm xóa nhân viên)
 - **Keycloak role:** `OWNER`
-- **Permissions:** full operational (CRUD menu, tables, orders, payment, KDS) + `USER_DELETE` (phân biệt duy nhất với MANAGER)
+- **Permissions:** full operational (CRUD menu, tables, orders, payment, KDS), HR delete (`user.delete`), own-tenant SaaS visibility/checkout (`subscription.checkout`) và update payment settings (`payment_settings.update_own`).
 
-**Microservice tương ứng:** User-Access Service, Catalog Service, Order Service
+**Microservice tương ứng:** User-Access Service, Catalog Service, Order Service, Payment Service, SaaS Service
 
 ---
 
@@ -679,11 +684,11 @@ Served → Completed:
 
 **Phạm vi:** Tenant mà họ được phân công
 
-- **Vai trò:** Quản lý vận hành ca làm việc — same as OWNER trừ `USER_DELETE`
+- **Vai trò:** Quản lý vận hành ca làm việc — gần giống OWNER ở nghiệp vụ vận hành nhưng không có quyền tài chính/HR nhạy cảm.
 - **Keycloak role:** `MANAGER`
-- **Khác với OWNER:** không được xóa user (HR action giữ cho OWNER)
+- **Khác với OWNER:** không được xóa user, tạo/cancel subscription checkout, hoặc cập nhật SePay/payment settings; được xem tenant/subscription/plan/payment settings phục vụ vận hành.
 
-**Microservice tương ứng:** Same as OWNER (User-Access, Catalog, Order)
+**Microservice tương ứng:** Same as OWNER cho vận hành, cộng quyền xem SaaS/Payment settings trong phạm vi tenant
 
 ---
 
@@ -733,7 +738,7 @@ Served → Completed:
 
 ### B. Permission Matrix (Business-Language Summary)
 
-> **Canonical source:** Chi tiết đầy đủ 6 roles × 51 permissions xem [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md#6-canonical-permission-matrix-6--51). Bảng dưới đây là **tóm lược business-language** cho 5 nhóm actor, KHÔNG phải source of truth cho RBAC guard check.
+> **Canonical source:** Chi tiết đầy đủ 6 roles × 66 permissions xem [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md#6-canonical-permission-matrix-6-roles--66-permissions). Bảng dưới đây là **tóm lược business-language** cho 5 nhóm actor, KHÔNG phải source of truth cho RBAC guard check.
 
 | Tính năng                       | Super Admin | Restaurant Owner | Staff (Waiter) | Staff (Chef/Bar) | Customer |
 | ------------------------------- | ----------- | ---------------- | -------------- | ---------------- | -------- |
@@ -742,6 +747,9 @@ Served → Completed:
 | Tạo Subscription Plans          | ✅          | ❌               | ❌             | ❌               | ❌       |
 | Xem tất cả Tenants              | ✅          | ❌               | ❌             | ❌               | ❌       |
 | Cấu hình Payment Gateway        | ✅          | ❌               | ❌             | ❌               | ❌       |
+| Checkout subscription tenant    | ❌          | ✅ (Owner only)  | ❌             | ❌               | ❌       |
+| Xem gói/subscription tenant     | ✅          | ✅               | ❌             | ❌               | ❌       |
+| Cập nhật SePay tenant           | ❌          | ✅ (Owner only)  | ❌             | ❌               | ❌       |
 | **Restaurant Management**       |             |                  |                |                  |          |
 | Quản lý Menu (CRUD)             | ✅ (Debug)  | ✅               | ❌             | ❌               | ❌       |
 | Quản lý Tables & QR             | ❌          | ✅               | ⚠️ (View only) | ❌               | ❌       |
@@ -957,13 +965,13 @@ Scenario: Khách hủy đơn mình vừa đặt
 
 ### F. Actor Mapping to Microservices
 
-| Actor                | Primary Microservices                           | Authentication Method |
-| -------------------- | ----------------------------------------------- | --------------------- |
-| **Super Admin**      | Identity, SaaS Management, Analytics            | JWT (Long-lived)      |
-| **Restaurant Owner** | Restaurant, Catalog, Staff Management           | JWT (Session-based)   |
-| **Staff**            | Order, Kitchen, Payment, Notification           | JWT (Session-based)   |
-| **Customer**         | Menu, Order                                     | Session ID (Guest)    |
-| **External System**  | Payment Gateway, Printing, Delivery Integration | API Key + Webhook     |
+| Actor                | Primary Microservices                               | Authentication Method |
+| -------------------- | --------------------------------------------------- | --------------------- |
+| **Super Admin**      | Authorizer, User-Access, SaaS, BFF                  | JWT (Session-based)   |
+| **Restaurant Owner** | Catalog, User-Access, Order, Kitchen, Payment, SaaS | JWT (Session-based)   |
+| **Staff**            | Catalog, Order, Kitchen, Payment                    | JWT (Session-based)   |
+| **Customer**         | Catalog/Menu, Order, Payment                        | Session ID (Guest)    |
+| **External System**  | Payment Gateway, Printing, Delivery Integration     | API Key + Webhook     |
 
 ---
 

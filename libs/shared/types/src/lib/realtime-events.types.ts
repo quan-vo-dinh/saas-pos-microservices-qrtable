@@ -18,8 +18,7 @@
  *   - KDSTicket               → Phase 2A derived view cho mock/UI render
  *
  * @see docs/guides/kafka-qrtable.md (4P+2AP rationale)
- * @see docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md
- * @see docs/business-logic-step-2.4-spec.vi.md §15
+ * @see docs/specs/business-logic-step-2.4-spec.vi.md §15
  */
 
 import type { OrderItem, OrderStatus } from './order.types';

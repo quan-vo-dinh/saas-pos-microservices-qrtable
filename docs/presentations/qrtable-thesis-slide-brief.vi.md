@@ -421,7 +421,7 @@ BFF là điểm vào duy nhất, phía sau là các bounded-context services và
    - Rate limiting
 
 3. **Application Services**
-   - Auth Service
+   - Authorizer Service
    - SaaS Management Service
    - Catalog Service
    - Order Service
@@ -610,8 +610,8 @@ Tenant context được resolve từ JWT với staff và từ QR/session với c
 **Staff/Admin flow:**
 
 1. Client gửi JWT.
-2. `UserGuard` kiểm tra Redis token cache; cache miss thì gọi Auth Service qua gRPC.
-3. Auth Service verify JWT với Keycloak và lấy user profile/permissions từ user-access.
+2. `UserGuard` kiểm tra Redis token cache; cache miss thì gọi Authorizer Service qua gRPC.
+3. Authorizer Service verify JWT với Keycloak và lấy user profile/permissions từ user-access.
 4. Validate role mapping: role trong JWT phải khớp role/permission đã provision trong hệ thống.
 5. `TenantGuard` lấy `tenant_id` từ JWT claim và chặn tenant mismatch.
 6. `PermissionGuard` kiểm tra permission theo endpoint.
@@ -696,7 +696,7 @@ Thêm mini matrix role x domain ở bên phải:
 
 - Rows: Owner, Manager, Waiter, Chef, Barista, Customer.
 - Columns: Catalog, Order, Kitchen, Payment, Table, Service Request.
-- Không cần đưa toàn bộ 53 permissions lên slide chính; chỉ cần 5-7 ví dụ tiêu biểu.
+- Không cần đưa toàn bộ 66 permissions lên slide chính; chỉ cần 5-7 ví dụ tiêu biểu.
 
 ### Speaker script
 
@@ -1532,8 +1532,8 @@ Khi user nội bộ đăng nhập:
 2. Keycloak xác thực credential và cấp JWT.
 3. JWT chứa role claim và `tenant_id`.
 4. BFF nhận request, `UserGuard` kiểm tra Redis token cache.
-5. Nếu cache miss, BFF gọi Auth Service qua gRPC.
-6. Auth Service verify JWT/JWKS với Keycloak.
+5. Nếu cache miss, BFF gọi Authorizer Service qua gRPC.
+6. Authorizer Service verify JWT/JWKS với Keycloak.
 7. Hệ thống kiểm tra user đã được provision trong user-access chưa.
 8. Role trong JWT phải map được với role/permissions trong DB.
 9. `TenantGuard` kiểm tra user chỉ thao tác trong tenant của mình, trừ Super Admin.

@@ -1,6 +1,6 @@
 # Kiểm thử SePay OAuth2 (Client ID / Secret) trước khi chốt Phase 4B
 
-Tham chiếu nội bộ: `docs/superpowers/audits/phase-4b-audit-report.md` (§19.2 Tier 1, Q25 scopes).  
+Tham chiếu nội bộ: `docs/specs/business-logic-phase-4b-spec.md` (Tier 1 OAuth2 Connect, Q23/Q25 scopes) và `docs/phases/phase-4b-saas-onboarding.md`.
 Tài liệu SePay (đã đối chiếu Context7): [Bắt đầu nhanh OAuth2](https://developer.sepay.vn/vi/sepay-oauth2/bat-dau-nhanh), [Luồng xác thực](https://developer.sepay.vn/vi/sepay-oauth2/luong-xac-thuc).
 
 ## Điều kiện
@@ -58,16 +58,13 @@ Sau khi có `refresh_token`, POST lại `https://my.sepay.vn/oauth/token` với 
 
 ## Ghi nhận cho audit (Q23 = α)
 
-
 | Tiêu chí               | Cách chứng minh                                                                                                                   |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Client SePay hoạt động | Bước 1–2 thành công                                                                                                               |
 | Scope đủ cho Tier 1    | Bước 3 `bank-accounts` OK; sau này thử `webhook` API nếu cần chứng minh Q25                                                       |
 | Khớp kiến trúc §19.2   | Issuer/host `my.sepay.vn`, token exchange server-side, BFF/DB lưu token = việc Phase 4B (chưa bắt buộc để pass test thủ công này) |
 
-
 ## Lưu ý
 
 - Base URL production trong audit: `https://my.sepay.vn` — nếu SePay cấp môi trường sandbox OAuth khác, đổi host theo email support.
 - Phase 4B mới có route `/dashboard/payment-settings/sepay-callback` + lưu token; test thủ công trên không thay thế E2E trong app nhưng **đủ** để quyết định “credential + redirect + scope” trước khi chốt audit.
-

@@ -10,15 +10,15 @@
 
 ## Các Quyết Định Kiến Trúc Đã Thống Nhất
 
-| #   | Quyết định         | Tóm tắt                                                                                                                                                                                                                                                                                                                                                                                                                       | Tham chiếu                            |
-| --- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| 1   | Kafka 4P+2AP       | 5 topics: order.confirmed, payment.completed, payment.refunded, kitchen.sla_warning, tenant.created. 6 events dùng BFF Direct.                                                                                                                                                                                                                                                                                                | [§7.2-7.4](technical-architecture.md) |
-| 2   | Bills Ownership    | Bills thuộc Order Service, Payment chỉ nhận billId                                                                                                                                                                                                                                                                                                                                                                            | [§6.2.5](technical-architecture.md)   |
-| 3   | Cloudinary Upload  | CloudinaryModule shared trong `libs/providers/cloudinary/`, path: qrtable/{tenant_id}/{folder}/. Chọn `libs/providers/` thay vì `libs/configuration/` vì Cloudinary có business logic (upload, validation, URL generation), không chỉ config. `libs/providers/` là category cho external service integrations (Cloudinary, Stripe, SMTP). Xem [spec](docs/superpowers/specs/2026-04-09-cloudinary-module-setup-design.md) §2. | [§6.2.4](technical-architecture.md)   |
-| 4   | Simplified Outbox  | outbox_events table + cron poll. Full CDC (Debezium) = post-thesis                                                                                                                                                                                                                                                                                                                                                            | [§12](technical-architecture.md)      |
-| 5   | BFF Direct Pattern | BFF emit WebSocket + invalidate cache sau TCP response cho UI-layer events                                                                                                                                                                                                                                                                                                                                                    | [§7.3](technical-architecture.md)     |
-| 6   | Template-First     | Services khóa học giữ nguyên làm living templates, không sửa                                                                                                                                                                                                                                                                                                                                                                  | Phase 0 strategy                      |
-| 7   | Step 2.4 business  | Đặc tả nghiệp vụ đã chốt (stock Catalog TCP, deduct khi confirm, bill submit đầu tiên, transfer saga, session PG+Redis, RBAC cancel, WS/event scope, `MenuItem.station`, ranh giới thanh toán) — [`business-logic-step-2.4-spec.vi.md`](business-logic-step-2.4-spec.vi.md)                                                                                                                                                   | Audit Q1–Q12 → spec                   |
+| #   | Quyết định         | Tóm tắt                                                                                                                                                                                                                                                                                                                                    | Tham chiếu                            |
+| --- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| 1   | Kafka 4P+2AP       | 5 topics: order.confirmed, payment.completed, payment.refunded, kitchen.sla_warning, tenant.created. 6 events dùng BFF Direct.                                                                                                                                                                                                             | [§7.2-7.4](technical-architecture.md) |
+| 2   | Bills Ownership    | Bills thuộc Order Service, Payment chỉ nhận billId                                                                                                                                                                                                                                                                                         | [§6.2.5](technical-architecture.md)   |
+| 3   | Cloudinary Upload  | CloudinaryModule shared trong `libs/providers/cloudinary/`, path: qrtable/{tenant_id}/{folder}/. Chọn `libs/providers/` thay vì `libs/configuration/` vì Cloudinary có business logic (upload, validation, URL generation), không chỉ config. `libs/providers/` là category cho external service integrations (Cloudinary, Payment, SMTP). | [§6.2.4](technical-architecture.md)   |
+| 4   | Simplified Outbox  | outbox_events table + cron poll. Full CDC (Debezium) = post-thesis                                                                                                                                                                                                                                                                         | [§12](technical-architecture.md)      |
+| 5   | BFF Direct Pattern | BFF emit WebSocket + invalidate cache sau TCP response cho UI-layer events                                                                                                                                                                                                                                                                 | [§7.3](technical-architecture.md)     |
+| 6   | Template-First     | Services khóa học giữ nguyên làm living templates, không sửa                                                                                                                                                                                                                                                                               | Phase 0 strategy                      |
+| 7   | Step 2.4 business  | Đặc tả nghiệp vụ đã chốt (stock Catalog TCP, deduct khi confirm, bill submit đầu tiên, transfer saga, session PG+Redis, RBAC cancel, WS/event scope, `MenuItem.station`, ranh giới thanh toán) — [`business-logic-step-2.4-spec.vi.md`](specs/business-logic-step-2.4-spec.vi.md)                                                          | Audit Q1–Q12 → spec                   |
 
 ---
 
@@ -30,22 +30,24 @@ Cột **% phase** = mức hoàn thành nội bộ của phase đó (0–100%), �
 
 Cột **Phạm vi tích lũy (P0→Pn @100%)** = tổng trọng số từ **Phase 0** đến **hết phase ở hàng đó**, **giả định** mọi phase trong đoạn đó đạt **100%** hoàn thành. Đây là **trần phần trăm khối lượng toàn dự án** đã được “bao phủ” khi chạm milestone đó — **không** phải tiến độ thực tế hiện tại (tiến độ thực tế vẫn lấy theo `Σ (Trọng số × % phase)` ở dưới).
 
-| Phase     | Nội dung                         | Ước lượng   | Trọng số | % phase  | Phạm vi tích lũy (P0→Pn @100%) | Trạng thái         | File chi tiết                                                                                     |
-| --------- | -------------------------------- | ----------- | -------- | -------- | ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------- |
-| Phase 0   | Nền tảng & Kiến trúc             | ~1 tuần     | **7%**   | **100%** | **7%**                         | ✅ Hoàn thành      | [phase-0](phases/phase-0-foundation.md)                                                           |
-| Phase 1   | Catalog + Menu + Table           | ~2-3 tuần   | **20%**  | **100%** | **27%**                        | ✅ Hoàn thành      | [phase-1](phases/phase-1-catalog.md)                                                              |
-| Phase 2A  | Permissions + Order + Kafka      | ~2-2.5 tuần | **18%**  | **0%**   | **45%**                        | ⬜ Chưa bắt đầu    | [phase-2a](phases/phase-2a-order-kafka.md)                                                        |
-| Phase 2B  | Kitchen/KDS + WebSocket          | ~1-1.5 tuần | **10%**  | **0%**   | **55%**                        | ⬜ Chưa bắt đầu    | [phase-2b](phases/phase-2b-kitchen-websocket.md)                                                  |
-| Phase 3   | Payment (SePay/VietQR + Cash)    | ~1-2 tuần   | **10%**  | **70%**  | **65%**                        | 🟨 Đang triển khai | [phase-3](phases/phase-3-payment.md) — post-payment bill/session/table + docs verification report |
-| Phase 4A  | Saga + Hardening                 | ~1 tuần     | **8%**   | **0%**   | **73%**                        | ⬜ Chưa bắt đầu    | [phase-4a](phases/phase-4a-saga-hardening.md)                                                     |
-| Phase 4B  | SaaS + Tenant Onboarding         | ~1 tuần     | **7%**   | **0%**   | **80%**                        | ⬜ Chưa bắt đầu    | [phase-4b](phases/phase-4b-saas-onboarding.md)                                                    |
-| Phase 4C  | Notification + Staff Mgmt        | ~1 tuần     | **6%**   | **0%**   | **86%**                        | ⬜ Chưa bắt đầu    | [phase-4c](phases/phase-4c-notification-staff.md)                                                 |
-| Phase 5-7 | Testing + Observability + Deploy | ~3-5 tuần   | **14%**  | **0%**   | **100%**                       | ⬜ Chưa bắt đầu    | [phase-5-7](phases/phase-5-7-finalization.md)                                                     |
-| **Σ**     |                                  |             | **100%** |          | —                              |                    |                                                                                                   |
+| Phase     | Nội dung                         | Ước lượng   | Trọng số | % phase  | Phạm vi tích lũy (P0→Pn @100%) | Trạng thái      | File chi tiết                                     |
+| --------- | -------------------------------- | ----------- | -------- | -------- | ------------------------------ | --------------- | ------------------------------------------------- |
+| Phase 0   | Nền tảng & Kiến trúc             | ~1 tuần     | **7%**   | **100%** | **7%**                         | ✅ Hoàn thành   | [phase-0](phases/phase-0-foundation.md)           |
+| Phase 1   | Catalog + Menu + Table           | ~2-3 tuần   | **20%**  | **100%** | **27%**                        | ✅ Hoàn thành   | [phase-1](phases/phase-1-catalog.md)              |
+| Phase 2A  | Permissions + Order + Kafka      | ~2-2.5 tuần | **18%**  | **100%** | **45%**                        | ✅ Hoàn thành   | [phase-2a](phases/phase-2a-order-kafka.md)        |
+| Phase 2B  | Kitchen/KDS + WebSocket          | ~1-1.5 tuần | **10%**  | **100%** | **55%**                        | ✅ Hoàn thành   | [phase-2b](phases/phase-2b-kitchen-websocket.md)  |
+| Phase 3   | Payment (SePay/VietQR + Cash)    | ~1-2 tuần   | **10%**  | **100%** | **65%**                        | ✅ Hoàn thành   | [phase-3](phases/phase-3-payment.md)              |
+| Phase 4A  | Saga + Hardening                 | ~1 tuần     | **8%**   | **0%**   | **73%**                        | ⏸ Deferred     | [phase-4a](phases/phase-4a-saga-hardening.md)     |
+| Phase 4B  | SaaS + Tenant Onboarding         | ~1 tuần     | **7%**   | **100%** | **80%**                        | ✅ Hoàn thành   | [phase-4b](phases/phase-4b-saas-onboarding.md)    |
+| Phase 4C  | Notification + Staff Mgmt        | ~1 tuần     | **6%**   | **0%**   | **86%**                        | ⬜ Chưa bắt đầu | [phase-4c](phases/phase-4c-notification-staff.md) |
+| Phase 5-7 | Testing + Observability + Deploy | ~3-5 tuần   | **14%**  | **0%**   | **100%**                       | ⬜ Chưa bắt đầu | [phase-5-7](phases/phase-5-7-finalization.md)     |
+| **Σ**     |                                  |             | **100%** |          | —                              |                 |                                                   |
 
-**Tiến độ tổng dự án (có trọng số):** `Σ (Trọng số × % phase)` = **34,0%** (Phase 0 + Phase 1 đều 100%, Phase 3 đang triển khai 70%) — cập nhật đồng bộ ngày 2026-05-10.
+**Tiến độ tổng dự án (có trọng số):** `Σ (Trọng số × % phase)` = **72,0%** (Phase 0, 1, 2A, 2B, 3 và 4B đã hoàn thành; Phase 4A deferred; Phase 4C và Phase 5-7 chưa bắt đầu) — cập nhật đồng bộ ngày 2026-05-13.
 
 **Ghi chú Phase 1 (✅):** Các bước 1.1–1.6 và acceptance trong `phase-1-catalog.md` đã đóng theo phạm vi Phase 1. Việc cải tiến không chặn phase (ví dụ export QR PDF, tenant resolve động trên Customer PWA) ghi nhận là backlog hoặc phase sau.
+
+**Ghi chú sau Phase 4B (2026-05-13):** Bảng này phản ánh trạng thái triển khai hiện tại sau khi Phase 4B hoàn tất và sau đợt canonical hóa Phase 2A/2B/3/4B. Các phase tương lai hoặc historical supporting docs vẫn phải áp dụng thứ tự nguồn sự thật trong [`docs/README.md`](README.md).
 
 ---
 
@@ -70,13 +72,13 @@ Cột **Phạm vi tích lũy (P0→Pn @100%)** = tổng trọng số từ **Phas
       Phase 3 ────────────────────────────────────────────────► Phase 5-7
           │                    (Testing + Observability + Deploy)
           │
-          │   PARALLEL TRACK (sau Phase 3, tùy thời gian)
+          │   PARALLEL TRACK (trạng thái hiện tại sau Phase 4B)
           │
           ├──────────────────────────────► Phase 4A
-          │                                (song song hoặc sau Phase 3)
+          │                                (deferred)
           │
           └──────────────────────────────► Phase 4B
-                                           (song song hoặc sau Phase 3)
+                                           (đã hoàn thành)
                                                  │
                                                  ▼
                                             Phase 4C
@@ -91,7 +93,7 @@ Cột **Phạm vi tích lũy (P0→Pn @100%)** = tổng trọng số từ **Phas
 
 **Critical Path:** Phase 0 → 1 → 2A → 2B → 3 → 5-7 (Demo)
 
-**Parallel Track:** Phase 4A và Phase 4B có thể chạy song song hoặc ngay sau Phase 3; Phase 4C phụ thuộc Phase 4B.
+**Parallel Track:** Phase 4B đã hoàn thành sau Phase 3. Phase 4A hiện deferred; Phase 4C phụ thuộc Phase 4B và vẫn chưa bắt đầu.
 
 ---
 
@@ -112,30 +114,30 @@ Cột **Phạm vi tích lũy (P0→Pn @100%)** = tổng trọng số từ **Phas
 
 ## Tài Liệu Liên Quan
 
-| Tài liệu                                                                   | Mô tả                                                                           |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [technical-architecture.md](technical-architecture.md)                     | Kiến trúc tổng thể, microservices, Kafka, WebSocket, Auth, Payment              |
-| [business-logic.md](business-logic.md)                                     | Business rules, state machines, tenant isolation                                |
-| [business-logic-step-2.4-spec.vi.md](business-logic-step-2.4-spec.vi.md)   | Đặc tả Step 2.4 đã chốt (Q1–Q12); xung đột với tài liệu khác → ưu tiên file này |
-| [references/auth-system-reference.md](references/auth-system-reference.md) | Chi tiết hệ thống auth đã triển khai                                            |
-| [.github/copilot-instructions.md](../.github/copilot-instructions.md)      | Project guidelines, conventions, tech stack                                     |
+| Tài liệu                                                                       | Mô tả                                                                           |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| [technical-architecture.md](technical-architecture.md)                         | Kiến trúc tổng thể, microservices, Kafka, WebSocket, Auth, Payment              |
+| [business-logic.md](business-logic.md)                                         | Business rules, state machines, tenant isolation                                |
+| [business-logic-step-2.4-spec.vi.md](specs/business-logic-step-2.4-spec.vi.md) | Đặc tả Step 2.4 đã chốt (Q1–Q12); xung đột với tài liệu khác → ưu tiên file này |
+| [references/auth-system-reference.md](references/auth-system-reference.md)     | Chi tiết hệ thống auth đã triển khai                                            |
+| [.github/copilot-instructions.md](../.github/copilot-instructions.md)          | Project guidelines, conventions, tech stack                                     |
 
 ---
 
 ## Tiến Độ Tổng Quan
 
-| Phase     | Trọng số | % hoàn thành phase | Đóng góp vào tổng dự án | Phạm vi tích lũy (P0→Pn @100%) | Ngày cập nhật | Ghi chú                                                                                                                                                                                                                                                                    |
-| --------- | -------- | ------------------ | ----------------------- | ------------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Phase 0   | 7%       | 100%               | 7,0%                    | **7%**                         | 2026-04-17    | Nền tảng, auth, monorepo, 2 app skeleton                                                                                                                                                                                                                                   |
-| Phase 1   | 20%      | 100%               | 20,0%                   | **27%**                        | 2026-04-17    | Catalog + BFF + Cloudinary + CRUD + hooks + FE↔BE; Phase 1 đóng                                                                                                                                                                                                           |
-| Phase 2A  | 18%      | 0%                 | 0%                      | **45%**                        | —             | Order service + Kafka + mở rộng RBAC                                                                                                                                                                                                                                       |
-| Phase 2B  | 10%      | 0%                 | 0%                      | **55%**                        | —             | KDS + WebSocket                                                                                                                                                                                                                                                            |
-| Phase 3   | 10%      | 70%                | 7,0%                    | **65%**                        | 2026-05-10    | Payment service + POS `/pos/bills` + Dashboard refund real API + post-payment bill/session/table finalization; automated regression documented ([verification report](superpowers/reports/2026-05-09-phase-3-post-payment-verification.md)); manual demo checklist pending |
-| Phase 4A  | 8%       | 0%                 | 0%                      | **73%**                        | —             | Saga / outbox                                                                                                                                                                                                                                                              |
-| Phase 4B  | 7%       | 0%                 | 0%                      | **80%**                        | —             | SaaS onboarding                                                                                                                                                                                                                                                            |
-| Phase 4C  | 6%       | 0%                 | 0%                      | **86%**                        | —             | Notification + staff                                                                                                                                                                                                                                                       |
-| Phase 5-7 | 14%      | 0%                 | 0%                      | **100%**                       | —             | Test + PLG stack + deploy demo                                                                                                                                                                                                                                             |
-| **Tổng**  | **100%** | —                  | **34,0%**               | —                              | 2026-05-10    | Công thức tiến độ thực: `Σ (trọng số × % phase / 100)`                                                                                                                                                                                                                     |
+| Phase     | Trọng số | % hoàn thành phase | Đóng góp vào tổng dự án | Phạm vi tích lũy (P0→Pn @100%) | Ngày cập nhật | Ghi chú                                                                                                                                                                             |
+| --------- | -------- | ------------------ | ----------------------- | ------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 0   | 7%       | 100%               | 7,0%                    | **7%**                         | 2026-04-17    | Nền tảng, auth, monorepo, 2 app skeleton                                                                                                                                            |
+| Phase 1   | 20%      | 100%               | 20,0%                   | **27%**                        | 2026-04-17    | Catalog + BFF + Cloudinary + CRUD + hooks + FE↔BE; Phase 1 đóng                                                                                                                    |
+| Phase 2A  | 18%      | 100%               | 18,0%                   | **45%**                        | 2026-05-13    | Permissions, Order Service, Redis cart/session, Kafka `order.confirmed`, BFF Direct và FE↔BE integration đã triển khai; phase doc đã canonical hóa thành final phase record.       |
+| Phase 2B  | 10%      | 100%               | 10,0%                   | **55%**                        | 2026-05-13    | Kitchen Service, KDS, WebSocket Gateway và realtime FE↔BE đã triển khai; phase doc đã canonical hóa thành final phase record.                                                      |
+| Phase 3   | 10%      | 100%               | 10,0%                   | **65%**                        | 2026-05-09    | Payment service + POS `/pos/bills` + Dashboard refund real API + post-payment bill/session/table finalization; email/receipt durable notification được defer sang Phase 4C.         |
+| Phase 4A  | 8%       | 0%                 | 0%                      | **73%**                        | 2026-05-13    | Deferred: saga/hardening toàn diện chưa được đóng như một phase riêng; một số pattern outbox/guard hardening đã xuất hiện trong Phase 3/4B nhưng không tính là hoàn thành Phase 4A. |
+| Phase 4B  | 7%       | 100%               | 7,0%                    | **80%**                        | 2026-05-13    | SaaS onboarding, tenant lifecycle, subscription/plan, two-tier payment, tenant payment settings, landing/admin/dashboard/customer suspend behavior và verification đã hoàn tất.     |
+| Phase 4C  | 6%       | 0%                 | 0%                      | **86%**                        | —             | Notification + staff                                                                                                                                                                |
+| Phase 5-7 | 14%      | 0%                 | 0%                      | **100%**                       | —             | Test + PLG stack + deploy demo                                                                                                                                                      |
+| **Tổng**  | **100%** | —                  | **72,0%**               | —                              | 2026-05-13    | Công thức tiến độ thực: `Σ (trọng số × % phase / 100)`                                                                                                                              |
 
 > **4 highlight demo ấn tượng nhất:** Phase 1 (QR + Menu), Phase 2 (Real-time Ordering), Phase 3 (Payment), Phase 6 (Grafana Tracing).
 

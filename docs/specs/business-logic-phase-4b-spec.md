@@ -2,7 +2,7 @@
 
 > **Giai đoạn:** Phase 4B — SaaS Service mở rộng + Tenant lifecycle + Subscription/Plan + Onboarding + Feature Gating + Two-tier Payment (Tier 1 Customer→Tenant qua OAuth2 SePay Connect, Tier 2 Tenant→Platform qua VietQR auto-webhook) + Admin/Dashboard UI.
 > **Ngày:** 2026-05-11.
-> **Trạng thái:** ✅ **Chốt** sau audit `docs/superpowers/audits/phase-4b-audit-report.md` (Round 4) và quyết định Q1–Q25 của project owner.
+> **Trạng thái:** ✅ **Chốt** sau các vòng audit Phase 4B và quyết định Q1–Q25 của project owner.
 > **Mục đích:** Tài liệu này là **tiêu chuẩn nghiệp vụ + kiến trúc** cho Phase 4B. Không phải implementation plan, không phân rã task code. Input cho bước `writing-plans` tiếp theo.
 
 ---
@@ -37,7 +37,7 @@
 ### 0.1 Tài Liệu Này Override Điểm Nào?
 
 1. **Tenant entity (`libs/entities/src/lib/tenant.entity.ts`):** mở rộng từ 4 cột → 11+ cột. `isActive` được giữ làm derived field (Q1=C).
-2. **Permission matrix:** từ 53 → ~67 permissions (Q3=B). Thêm `tenant.*`, `subscription.*`, `plan.*`; deprecate `saas.*` legacy.
+2. **Permission matrix:** 66 permissions trong code hiện tại (Q3=B), gồm `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`; giữ `saas.*` legacy/backward compatibility.
 3. **Payment Service (Phase 3):** **refactor** đọc bank info từ `tenant_payment_settings` (Q22=A) thay vì env var `PAYMENT_SEPAY_QR_*` (vẫn giữ env làm fallback dev).
 4. **BFF webhook routing:** từ single endpoint `/payment/sepay/webhook` (Phase 3) → 2 endpoints + prefix-based routing (Q21):
    - `/payment/sepay/webhook/platform` cho Tier 2 (`QRSUB*`)
@@ -67,14 +67,13 @@ Hybrid giữa Path 2 và Path 3 trong audit §22:
 
 ### 1.1 Cơ Sở Trong Repo
 
-- `docs/phases/phase-4b-saas-onboarding.md` — phase doc gốc.
-- `docs/superpowers/audits/phase-4b-audit-report.md` — audit Round 1-4.
+- `docs/phases/phase-4b-saas-onboarding.md` — final phase record.
 - `docs/business-logic.md` §1 (Onboarding), §9 (Permissions), §B (Tenant Status), §D (Tenant Isolation).
 - `docs/technical-architecture.md` §5 (Multi-tenancy), §6.2.3 (SaaS Service), §7.2-7.4 (Kafka 4P+2AP), §8 (Auth), §11.2 (Redis Access Policy).
-- `docs/architecture/permission-matrix.md` (canonical 6 × 53, sẽ update lên 6 × ~67).
+- `docs/architecture/permission-matrix.md` (canonical 6 roles × 66 permissions).
 - `docs/architecture/erd.dbml` + `erd_explanation.md`.
 - `docs/specs/business-logic-phase-3-spec.vi.md` — pattern reference cho spec format.
-- `docs/superpowers/plans/2026-05-08-phase-3-payment-implementation-plan.md` — pattern outbox đã chứng minh.
+- `docs/phases/phase-3-payment.md` — Payment/outbox pattern đã triển khai.
 - Code hiện tại: `Tenant`, `SaasService`, `PaymentSettlementService`, `OutboxEventEntity` (Order), `PaymentOutboxEventEntity`, `KeycloakHttpService`, `User` (Mongo schema), `TenantGuard`, `SessionGuard`.
 
 ### 1.2 Verification từ Context7 + Live Docs (SePay)
@@ -1805,14 +1804,16 @@ Legacy `saas.*` (5 entries) → mapped to new `tenant.*` namespace; keep legacy 
 
 ### 12.3 Updated Totals
 
-| Role        | Phase 3 | Phase 4B         | Delta                                                                                                                                             |
-| ----------- | ------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SUPER_ADMIN | 47      | 47 + 19 = **66** | +19                                                                                                                                               |
-| OWNER       | 32      | 32 + 6 = **38**  | +6 (`tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, `payment_settings.read_own`, `payment_settings.update_own`) |
-| MANAGER     | 31      | 31 + 5 = **36**  | +5 (same as OWNER except `subscription.checkout` and `payment_settings.update_own`)                                                               |
-| WAITER      | 13      | 13 + 1 = **14**  | +1 (`plan.read`)                                                                                                                                  |
-| CHEF        | 5       | 5 + 1 = **6**    | +1 (`plan.read`)                                                                                                                                  |
-| BARISTA     | 5       | 5 + 1 = **6**    | +1 (`plan.read`)                                                                                                                                  |
+Current code-verified totals on 2026-05-13:
+
+| Role        | Phase 3 Baseline | Phase 4B Total | Delta                                                                                                                                             |
+| ----------- | ---------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SUPER_ADMIN | 47               | **66**         | +19                                                                                                                                               |
+| OWNER       | 32               | **38**         | +6 (`tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, `payment_settings.read_own`, `payment_settings.update_own`) |
+| MANAGER     | 31               | **35**         | +4 (`tenant.read_own`, `subscription.read_own`, `plan.read`, `payment_settings.read_own`)                                                         |
+| WAITER      | 14               | **15**         | +1 (`plan.read`)                                                                                                                                  |
+| CHEF        | 5                | **6**          | +1 (`plan.read`)                                                                                                                                  |
+| BARISTA     | 5                | **6**          | +1 (`plan.read`)                                                                                                                                  |
 
 > **Note:** `plan.read` is granted to all so any role can see plan info (FE displays plan name in widgets); only SUPER_ADMIN can mutate.
 
@@ -1823,7 +1824,7 @@ Legacy `saas.*` (5 entries) → mapped to new `tenant.*` namespace; keep legacy 
 - `apps/user-access/src/seeder/role.spec.ts` — update `EXPECTED_MATRIX`.
 - `apps/bff/src/app/guards/permission.guard.spec.ts` — add scenarios.
 - `tools/verify-permission-matrix.sh` — extend.
-- `docs/architecture/permission-matrix.md` — update §4, §6 to 6 × 72 matrix.
+- `docs/architecture/permission-matrix.md` — update §4, §6 to 6 × 66 matrix.
 
 ---
 
@@ -1876,7 +1877,7 @@ This generates `design-system/MASTER.md` + `design-system/pages/landing.md` to d
 
 ### 13.2 `/admin/*` Pages (Detailed in §13.2 audit Round 2)
 
-Refer to audit `docs/superpowers/audits/phase-4b-audit-report.md` §13.2 for layout mockups. Functional + data contracts:
+Functional + data contracts:
 
 #### 13.2.1 `/admin` (Platform Overview)
 
@@ -2027,14 +2028,20 @@ const NAV_ITEMS = {
     {
       label: 'Cài đặt thanh toán',
       href: '/dashboard/payment-settings',
-      icon: 'Wallet',
+      icon: 'Landmark',
       permission: 'payment_settings.read_own',
     },
   ],
   MANAGER: [
     ...existing,
     { label: 'Subscription', href: '/dashboard/subscription', icon: 'CreditCard', permission: 'subscription.read_own' },
-    // MANAGER không có payment-settings (no update_own permission)
+    {
+      label: 'Cài đặt thanh toán',
+      href: '/dashboard/payment-settings',
+      icon: 'Landmark',
+      permission: 'payment_settings.read_own',
+    },
+    // MANAGER can read payment settings but cannot connect/disconnect/update SePay.
   ],
   SUPER_ADMIN: [
     ...existing,

@@ -983,7 +983,7 @@ const profilePlan = `task mode: create
 primary deck-profile: engineering-platform
 secondary gates: product-platform narrative, appendix-light test matrix
 required proof objects: architecture map, communication model, RBAC flow, QR/session flow, cart/order flow, confirm/Kafka flow, test matrix, roadmap
-source requirements: local docs/business-logic.md, docs/technical-architecture.md, docs/implementation_plan.md, docs/phases/phase-2a-order-kafka.md, docs/business-logic-step-2.4-spec.vi.md, docs/architecture/permission-matrix.md, docs/references/auth-system-reference.md, Step 2.5 spec/plan, recent git log
+source requirements: local docs/business-logic.md, docs/technical-architecture.md, docs/implementation_plan.md, docs/phases/phase-2a-order-kafka.md, docs/phases/phase-2b-kitchen-websocket.md, docs/specs/business-logic-step-2.4-spec.vi.md, docs/architecture/permission-matrix.md, docs/references/auth-system-reference.md, recent git log
 known missing inputs: official university template and presenter/student metadata are not provided
 `;
 await fs.writeFile(path.join(workspace, 'profile-plan.txt'), profilePlan, 'utf8');
@@ -993,11 +993,11 @@ const sourceNotes = `Sources used:
 - docs/technical-architecture.md
 - docs/implementation_plan.md
 - docs/phases/phase-2a-order-kafka.md
-- docs/business-logic-step-2.4-spec.vi.md
+- docs/specs/business-logic-step-2.4-spec.vi.md
 - docs/architecture/permission-matrix.md
 - docs/references/auth-system-reference.md
-- docs/superpowers/specs/2026-04-30-step-2.5-fe-be-integration-design.md
-- docs/superpowers/specs/2026-05-01-step-2.5-batch-6-qr-demo-dynamic-tenant-design.md
+- docs/phases/phase-2a-order-kafka.md
+- docs/phases/phase-2b-kitchen-websocket.md
 - git log --oneline --decorate -12
 
 No external brand assets used. QRTable wordmark is represented as plain editable text only.

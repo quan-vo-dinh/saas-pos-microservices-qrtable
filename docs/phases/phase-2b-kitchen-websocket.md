@@ -1,107 +1,82 @@
 # Phase 2B — Kitchen Service + WebSocket
 
-> **Mục tiêu:** Vận hành KDS (hàng đợi bếp/bar) theo đơn đã xác nhận và đồng bộ thời gian thực tới đúng vai trò — staff, bếp, quản lý, khách — mà không lưu trữ persistence trong Kitchen Service.
-> **Ước lượng:** ~1-1.5 tuần
-> **Trạng thái:** ⬜ TODO
+> **Status:** Done
+> **Canonical Role:** Final phase record after implementation/audit.
+> **Last Updated:** 2026-05-13
 
-## Prerequisites
+## Final Scope
 
-- Phase 2A hoàn thành — [phase-2a-order-kafka.md](phase-2a-order-kafka.md) (order flow + Kafka đã ổn định)
-- Kafka cluster chạy, topic `order.confirmed` (và các topic liên quan phase 2A) đã được contract hóa
-- Order Service xử lý confirm đơn và publish sự kiện đúng payload/tenant
+Phase 2B hoàn thành KDS realtime layer cho QRTable: Kitchen Service consume Kafka `order.confirmed`, tạo Redis KDS tickets theo station, vận hành queue bếp/bar, phát SLA warnings, và BFF WebSocket Gateway phân phối realtime hints tới đúng role/session.
 
-## Tham Chiếu
+Phạm vi cuối cùng gồm:
 
-| Tài liệu                  | Section liên quan                                     |
-| ------------------------- | ----------------------------------------------------- |
-| technical-architecture.md | §6.2.6 Kitchen Service, §7.3 BFF Direct, §9 WebSocket |
-| business-logic.md         | §5 Kitchen/KDS Flow                                   |
+- Kitchen Service Redis-only cho KDS ticket state, station queues, priority, recall, void/archive, table snapshot patch, SLA metadata và recovery rebuild từ active Order snapshots.
+- Kafka consumer `order.confirmed` và producer `kitchen.sla_warning`; không thêm Kafka topic cho từng queue change.
+- WebSocket namespace `/orders` với Socket.IO Redis Adapter, server-managed room assignment, staff JWT auth, customer session auth, và legacy join rejection.
+- BFF KDS REST edge: queue snapshot, start ticket, mark done/ready, recall, set priority, station access checks and Order sync on ready.
+- Customer PWA, Management POS and Management KDS realtime hooks that treat WebSocket messages as invalidation hints and refetch REST/TanStack Query snapshots.
 
-## Tổng Quan
+## Accepted Decisions
 
-Phase 2B tách trách nhiệm: Kitchen Service chỉ đọc/ghi Redis và Kafka để duy trì hàng đợi KDS và SLA, vì tốc độ và đơn giản vận hành — không cần schema DB riêng cho layer này. WebSocket Gateway (Socket.io + Redis Adapter) là điểm hội tụ real-time: bridge từ Kafka và BFF Direct để mỗi vai trò chỉ nhận sự kiện trong phạm vi tenant và phòng (room) của họ. BFF giữ vai trò biên HTTP/TCP và phát side-effects WS sau khi có phản hồi dịch vụ hợp lệ, tránh duplicate domain logic trong gateway.
+- Kitchen Service owns KDS prep state only. Order Service remains source of truth for customer-visible order state; Redis KDS snapshot is source of truth for KDS screen state.
+- Kitchen Service has no PostgreSQL/MongoDB persistence. Redis keys are tenant-scoped and optimized for active operational queues.
+- `order.confirmed` creates at most one ticket per `(tenantId, orderId, station)`. Items are split by immutable station snapshot from the event: `KITCHEN` or `BAR`.
+- Missing item station is dead-lettered in Redis instead of guessed from category/name. Frontend never routes food/drink by display text.
+- KDS batching/gộp món/gộp đơn is rejected, not deferred. Cart line merging before submit is unrelated and remains allowed.
+- Queue order is FIFO with priority override. Priority is a separate permission-backed action, not part of generic ticket update permission.
+- BFF does not emit KDS queue hints directly from Kafka `order.confirmed`. Kitchen writes Redis first, then publishes internal Redis Pub/Sub `kds.queue_changed`; BFF emits `events.kdsQueueChanged` after that.
+- WebSocket is a realtime hint channel. REST snapshots are the rendering source after reconnect, mutation, missed event or tab wake.
+- KDS mutations are guarded HTTP commands through BFF and TCP to Kitchen/Order. Clients do not mutate KDS over WebSocket.
+- Staff rooms are derived server-side from auth context: tenant staff, station KDS rooms and management room. Customer room is derived from validated tenant/session.
+- Step 2B does not implement menu realtime. Existing menu cache/invalidation behavior remains separate.
 
-## Steps
+## Final Business Behavior
 
-### Step 2.6 — Kitchen Service + WebSocket Gateway (5-7 ngày)
+When staff confirms an order, Order Service publishes `order.confirmed`. Kitchen Service validates the event, partitions active order items by station, writes one KDS ticket per station to Redis, increments station revision and publishes a queue-changed internal event. KDS clients receive `events.kdsQueueChanged`, filter by tenant/station, then refetch queue snapshot.
 
-**Mục tiêu:** Có pipeline từ đơn đã confirm tới ticket KDS (FIFO, routing, SLA, ưu tiên) và nền tảng WS đa instance với auth và room theo vai trò. Batching/gộp món đã bị superseded và không thuộc Step 2.6 dưới bất kỳ tên gọi nào.
+Chef sees `KITCHEN` tickets; Barista sees `BAR` tickets; Owner/Manager can access both stations and may opt into station rooms. WAITER receives staff order/service hints but not station queue rooms by default.
 
-**Yêu cầu chính:**
+Ticket lifecycle is `PENDING -> PROCESSING -> READY`, with `VOIDED`/`ARCHIVED` for removal paths. Start moves a ticket into processing. Done moves ticket items to ready in Kitchen, then BFF calls Order Service to mark corresponding order items ready. If Order sync fails, BFF attempts recall compensation. When all active items on an order are ready, Order can move `PROCESSING -> READY` and emit customer/staff status hints.
 
-- **Kitchen Service (Redis-only, không database):**
-  - Consumer Kafka `order.confirmed` → tạo/cập nhật ticket KDS trong Redis
-  - Hàng đợi FIFO dùng Redis Sorted Set: `kds:{tenant_id}:kitchen`, `kds:{tenant_id}:bar` (score = thứ tự ưu tiên thời gian / sequence đã thống nhất contract)
-  - Routing ticket: **`MenuItem.station`** canonical (`KITCHEN` \| `BAR`) — đặc tả Phase 2A Step 2.4; có thể fallback category chỉ khi migration
-  - Không batching/gộp món: không tạo batch key, batch DTO/event, `prepSignature`, grouped active quantity, hoặc cross-order batch total
-  - SLA: timer theo ticket; khi vượt ngưỡng (ví dụ 15 phút, configurable per tenant) → emit `kitchen.sla_warning` + cảnh báo UI (đổi màu vàng → đỏ)
-  - Producer Kafka `kitchen.sla_warning` (ưu tiên P2): do timer nội bộ Kitchen Service, không block confirm đơn
-  - Priority flagging: Owner/Manager có thể đánh dấu ưu tiên ticket → đẩy lên đầu queue, ảnh hưởng thứ tự hiển thị/alert trong Redis contract
-  - Recall logic: Chef/Barista lỡ nhấn "Done" → recall để đưa ticket quay lại trạng thái Processing
-- **WebSocket Gateway:**
-  - Socket.io + Redis Adapter để scale ngang và đồng bộ room giữa các instance
-  - Auth handshake: Staff dùng JWT từ Authorization header khi handshake; Customer dùng session identifier (đúng trust boundary PWA vs staff app)
-  - Room assignment cố định theo contract:
-    - WAITER → `tenant:{tid}:staff`
-    - CHEF → `tenant:{tid}:kds:kitchen`
-    - BARISTA → `tenant:{tid}:kds:bar`
-    - OWNER / MANAGER → `tenant:{tid}:management`
-    - CUSTOMER → `session:{sid}:customer`
-  - **Realtime bridge:** BFF không emit queue KDS trực tiếp từ `order.confirmed`; Kitchen phải ghi Redis trước, rồi publish internal invalidation hint cho BFF emit tới KDS rooms. Kafka bridge xử lý `order.confirmed` → `session:{sid}:customer` cho customer tracking, `kitchen.sla_warning` → `tenant:{tid}:management`, và `payment.completed` → `session:{sid}:customer`
-  - **BFF Direct side-effects** (5 sự kiện sau TCP/HTTP thành công):
-    - `order.created` → staff room (thông báo đơn mới)
-    - `kitchen.item_ready` → staff room + customer session room (món đã xong)
-    - `menu.updated` → broadcast tất cả rooms tenant-wide (sync menu + invalidate cache)
-    - `table.status_changed` → staff room (cập nhật trạng thái bàn)
-    - `service.requested` → staff room (chuông gọi nhân viên)
-  - Reconnection: client disconnect → khi kết nối lại auto re-join room đúng role/session → refetch REST snapshot; WebSocket event chỉ là invalidation hint, không phải replay/source of truth
+Recall is allowed only inside the configured recall window after a ticket becomes ready. Recall returns ticket/items to processing and re-adds SLA tracking when applicable.
 
-**Lưu ý quan trọng:**
+Priority can be toggled for active pending/processing tickets, affects queue score/order and emits queue-changed hints. Priority is intended for Owner/Manager workflows and guarded by `kitchen.set_priority`.
 
-- Kitchen Service không được phụ thuộc DB — mọi durability ngắn hạn cho KDS nằm ở Redis keys đã đặt tên; nguồn sự thật đơn hàng vẫn là Order Service / event log
-- `kitchen.item_ready` phát từ BFF sau phản hồi TCP từ dịch vụ có thẩm quyền — tránh gateway tự suy luận trạng thái món
-- Phân tách rõ: topic Kafka (async domain) vs BFF Direct (side-effect đồng bộ sau command)
+SLA worker scans `kds:sla:due`, emits Kafka `kitchen.sla_warning` at warning/breach levels, updates ticket warning state and emits `events.kitchenSlaWarning`/queue invalidation to management and station rooms.
 
-**BFF REST Endpoints (Kitchen):**
+Table transfer patches active KDS tickets for the session so KDS reflects the new table name/id. Processing-order cancel voids active tickets. Reconnect, network recovery and tab visibility recovery all converge by refetching REST snapshots.
 
-- KDS queue query — Chef/Barista, KITCHEN_GET_QUEUE
-- KDS ticket start/done — Chef/Barista, KITCHEN_UPDATE_TICKET
-- KDS ticket recall — Chef/Barista, KITCHEN_RECALL
-- KDS ticket priority — Owner/Manager only
+## Final Technical Behavior
 
-**Verify:** Integration test hoặc script: publish `order.confirmed` → ticket xuất hiện đúng queue + room WS đúng role; SLA vượt ngưỡng → `kitchen.sla_warning` + management nhận WS; BFF path `kitchen.item_ready` → staff + customer nhận trong cùng scenario
+Service ownership after Phase 2B:
 
-### Step 2.7 — FE↔BE Real-time (2-3 ngày)
+- Kitchen Service owns Redis KDS keys: ticket hashes, ticket item hashes, `kds:{tenantId}:kitchen`, `kds:{tenantId}:bar`, ready queues, revision keys, dedupe keys, dead-letter keys, session/order ticket indexes, `kds:sla:due`, SLA claim/dedupe keys and rebuild locks.
+- Kitchen Kafka consumer reads `order.confirmed` with at-least-once semantics and idempotency by `eventId` plus `(tenantId, orderId, station)`.
+- Kitchen SLA worker produces `kitchen.sla_warning`; BFF Kafka bridge consumes that topic and emits `events.kitchenSlaWarning`.
+- Kitchen internal events use Redis Pub/Sub channel `realtime:kds:{tenantId}` for `kds.queue_changed`; BFF subscriber maps them to station/management WebSocket rooms.
+- BFF KDS controller exposes `GET /admin/kds/queue`, `POST /admin/kds/tickets/:ticketId/start`, `done`, `recall` and `priority`, guarded by permissions and station-role checks.
+- BFF Order/Kitchen orchestration syncs `done` to Order Service, emits `events.kitchenItemReady`, emits `events.orderStatusChanged` when order readiness changes, and patches/voids KDS tickets on table transfer or processing cancel.
+- WebSocket gateway runs namespace `/orders`, accepts staff `auth.token` or Authorization bearer fallback, accepts customer `auth.tenantId/sessionId` with header fallback, and rejects client-driven `join.session` / `join.staff`.
+- Socket.IO Redis Adapter supports multi-instance room fan-out. Realtime auth caches valid staff token checks and derives rooms from JWT roles and tenant.
+- Management KDS uses real `KdsQueueSnapshot` API, invalidates/refetches on `events.kdsQueueChanged`, `events.kitchenItemReady`, `events.kitchenSlaWarning`, reconnect and explicit mutations.
+- Customer PWA and Management POS listen to order/status/bill/payment/kitchen-ready events, filter tenant/session, and refetch snapshots instead of building domain state from packets.
 
-**Mục tiêu:** Ứng dụng staff và khách subscribe đúng kênh WS và phản ánh trạng thái đơn/KDS/menu mà không polling thừa.
+## Acceptance Evidence
 
-**Yêu cầu chính:**
+Implementation evidence present in the repo on 2026-05-13:
 
-- Hooks cho: customer order tracking (subscribe WebSocket room), KDS queue management (WS + REST hybrid), staff live orders (WS room subscribe)
-- Customer PWA: Order tracking page cập nhật real-time qua WebSocket theo session (status timeline phản ánh ngay khi trạng thái đơn/món thay đổi). Menu auto-refresh khi nhận `menu.updated` event (hoặc policy invalidate đã chốt với Catalog)
-- Management App `/pos/`: WebSocket → live order list auto-update (đơn mới slides in với animation, trạng thái đổi real-time)
-- Management App `/kds/`: tickets slide in khi có đơn mới, status updates real-time qua WS. Actions (start, done, recall) → API calls → broadcast kết quả tới rooms liên quan (staff + customer)
+- `apps/kitchen` contains the Kafka consumer, Redis repository, ticket service, SLA worker, recovery service, Kafka producer and internal Redis publisher for KDS.
+- `libs/shared/types/src/lib/kds.types.ts` defines KDS ticket, queue snapshot, queue changed, kitchen item ready, SLA warning and active-order snapshot contracts.
+- BFF realtime module includes Socket.IO gateway, auth service, Redis adapter, KDS internal subscriber, Kafka bridge and event fan-out service.
+- BFF Kitchen controller and station-access service enforce queue/action permissions, station boundaries and Order sync for ready events.
+- Management App KDS services/hooks/components consume live queue APIs, perform strict refetch-after-mutation and filter realtime by tenant/station.
+- Customer PWA and Management POS realtime hooks listen to `/orders`, clean up listeners, handle reconnect states and invalidate active query domains.
+- Focused tests exist for Kitchen Redis/Kafka/SLA/recovery behavior, BFF realtime/KDS controllers, shared KDS contracts, Management KDS query/realtime behavior and Customer/POS realtime hooks.
 
-**Lưu ý quan trọng:**
+## Handoff / Deferred Work
 
-- UI chỉ render theo payload đã version/contract; không hard-code logic routing food/drink ở FE — hiển thị theo dữ liệu từ backend/KDS
-- Reconnect phải được kiểm thử trên mạng không ổn định (tab background, sleep, VPN)
-
-**Verify:** E2E flow: Khách đặt đơn → Staff thấy ngay trên POS → Staff confirm → KDS thấy ticket ngay → Chef/Barista done → Khách thấy trạng thái Ready. Đổi menu → PWA reflect tức thì. Disconnect WS 10s → reconnect → room và events vẫn đúng
-
-## Acceptance Criteria
-
-- [ ] KDS: FIFO/priority đúng thứ tự; không có batching/gộp món dưới bất kỳ tên gọi nào
-- [ ] KDS: routing food → kitchen queue (`kds:{tid}:kitchen`), drink → bar queue (`kds:{tid}:bar`)
-- [ ] Real-time: từ sự kiện order-domain tới broadcast WS < 2 giây (trong điều kiện hạ tầng dev/staging chuẩn)
-- [ ] E2E: order → confirm → KDS → ready → served với cập nhật real-time trên staff + customer
-- [ ] WebSocket rooms: mỗi role chỉ nhận sự kiện trong phạm vi room đã định nghĩa (staff / kds:kitchen / kds:bar / management / session customer)
-- [ ] SLA: ticket vượt ngưỡng → cảnh báo màu/UI + luồng `kitchen.sla_warning` tới management
-- [ ] Reconnection: disconnect → tự join lại room → nhận pending/snapshot theo policy đã chốt
-
-## Outputs cho Phase tiếp theo
-
-- Kitchen Service vận hành trên Redis + Kafka, không persistence riêng — sẵn sàng gắn thêm billing/POS phase mà không đổi contract queue cốt lõi
-- WebSocket Gateway có Redis Adapter, map room theo role và session — có thể mở rộng topic/event mới cho thanh toán hoặc thông báo vận hành
-- FE hooks real-time (order tracking, KDS queue, live orders) dùng chung cho POS và PWA
-- Bảng tra cứu nhanh: topic `order.confirmed`, `kitchen.sla_warning`, `payment.completed`; keys `kds:{tid}:kitchen`, `kds:{tid}:bar`; rooms `tenant:{tid}:staff`, `tenant:{tid}:kds:kitchen`, `tenant:{tid}:kds:bar`, `tenant:{tid}:management`, `session:{sid}:customer`
+- Durable WebSocket replay, Redis Streams, CDC/outbox replay for KDS packets and historical kitchen analytics remain future hardening. Current contract is snapshot plus hint.
+- Production readiness still needs provider-level Kafka/Redis monitoring, SLA tuning per tenant, dead-letter dashboards, and runbooks for Redis state rebuild.
+- Menu realtime remains intentionally out of Phase 2B; do not add `menu.updated` or `events.menuUpdated` without a new product decision.
+- Payment-completed realtime bridge is present for later phases, but payment settlement behavior belongs to the payment phases, not Kitchen ownership.
+- KDS batching is not a backlog item under another name; future prep optimization must preserve ticket source-of-truth rules and pass a new design review.

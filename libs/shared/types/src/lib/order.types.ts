@@ -3,8 +3,7 @@
  * Single source of truth cho FE+BE về Order aggregate.
  *
  * @see docs/phases/phase-2a-order-kafka.md §8 (state machine)
- * @see docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md
- * @see docs/business-logic-step-2.4-spec.vi.md §14 (station snapshot)
+ * @see docs/specs/business-logic-step-2.4-spec.vi.md §14 (station snapshot)
  */
 
 import type { PreparationStation } from './menu.types';

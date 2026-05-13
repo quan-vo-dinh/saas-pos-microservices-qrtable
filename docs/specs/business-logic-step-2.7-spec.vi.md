@@ -3,7 +3,7 @@
 > **Giai đoạn:** 2B — Kitchen Service + WebSocket Gateway
 > **Bước:** 2.7 — Thời gian thực giữa Frontend và Backend
 > **Ngày:** 2026-05-07
-> **Trạng thái:** Chốt sau audit `docs/superpowers/audits/step-2.7-realtime-audit-report.vi.md` và quyết định Q1-Q8 của project owner.
+> **Trạng thái:** Chốt sau audit Step 2.7 và quyết định Q1-Q8 của project owner.
 > **Mục đích:** Tài liệu này là đặc tả contract nghiệp vụ/kỹ thuật cho realtime FE↔BE. Đây không phải kế hoạch triển khai và không phân rã thành task code.
 
 ---
@@ -35,7 +35,7 @@
 ### 1.1 Cơ Sở Trong Repo
 
 - `docs/specs/business-logic-step-2.6-spec.vi.md`
-- `docs/superpowers/audits/step-2.7-realtime-audit-report.vi.md`
+- `docs/phases/phase-2b-kitchen-websocket.md`
 - `docs/phases/phase-2b-kitchen-websocket.md`
 - `docs/architecture/permission-matrix.md`
 - Code hiện tại trong BFF, Customer PWA, Management App POS/KDS.

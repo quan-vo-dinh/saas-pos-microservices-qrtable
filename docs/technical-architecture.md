@@ -103,15 +103,15 @@ QRTable là nền tảng SaaS (Software as a Service) phục vụ ngành F&B, ch
 │                      APPLICATION LAYER (Microservices)                   │
 │                                                                         │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────────────────┐  │
-│  │ 🔐 Auth    │  │ 📋 Catalog │  │ 🍽️ Order   │  │ 🏪 SaaS Mgmt    │  │
-│  │ Service    │  │ Service    │  │ Service    │  │ Service          │  │
+│  │ 🔐 Author- │  │ 📋 Catalog │  │ 🍽️ Order   │  │ 🏪 SaaS Mgmt    │  │
+│  │ izer Svc   │  │ Service    │  │ Service    │  │ Service          │  │
 │  │ (gRPC)     │  │ (TCP)      │  │ (TCP)      │  │ (TCP)            │  │
 │  └────────────┘  └────────────┘  └────────────┘  └──────────────────┘  │
 │                                                                         │
 │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────────────────┐  │
-│  │ 💳 Payment │  │ 👨‍🍳 Kitchen │  │ 📧 Notify  │  │ 🔔 Notification  │  │
-│  │ Service    │  │ (KDS) Svc  │  │ (Mail) Svc │  │ Service          │  │
-│  │ (TCP)      │  │ (TCP)      │  │ (Kafka)    │  │ (Kafka+WS)       │  │
+│  │ 💳 Payment │  │ 👨‍🍳 Kitchen │  │ 👥 User-   │  │ 🧪 Product       │  │
+│  │ Service    │  │ (KDS) Svc  │  │ Access Svc │  │ App (legacy)     │  │
+│  │ (TCP)      │  │ (TCP)      │  │ (TCP+Mongo)│  │ (template)       │  │
 │  └────────────┘  └────────────┘  └────────────┘  └──────────────────┘  │
 │                                                                         │
 └────────┬───────────────┬──────────────┬──────────────────┬──────────────┘
@@ -198,16 +198,18 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
 qrtable/
 ├── apps/
 │   ├── # ── Backend Services ──────────────────
+│   ├── authorizer/             # Keycloak/JWT Authorizer Service (gRPC + admin ops)
 │   ├── bff/                    # API Gateway (HTTP + WebSocket)
-│   ├── auth/                   # Authorizer Service (gRPC)
 │   ├── catalog/                # Menu & Table Management (TCP)
-│   ├── order/                  # Order Processing (TCP)
 │   ├── kitchen/                # KDS Service (TCP + Kafka Consumer)
+│   ├── order/                  # Order Processing (TCP)
 │   ├── payment/                # Payment Service (TCP + Webhook)
-│   ├── saas/                   # SaaS Management Service (TCP)
-│   ├── notification/           # Mail + Push Notification (Kafka Consumer)
+│   ├── product/                # Product/Nx generated app placeholder
+│   ├── saas/                   # SaaS Management Service (TCP + Redis + outbox)
+│   ├── user-access/            # User profile, roles, staff access (TCP + Mongo)
 │   ├── # ── Frontend Apps ─────────────────────
 │   ├── customer-pwa/           # 📱 Customer PWA (React + Vite)
+│   ├── keycloak-theme/         # Keycloak login/theme assets
 │   └── management-app/         # 💻 Management App (Next.js — POS/KDS/Dashboard/Admin)
 ├── libs/
 │   ├── # ── Backend Shared (Flat structure từ khóa học) ───────
@@ -309,15 +311,15 @@ Sơ đồ §4.2 phía trên mô tả **mục tiêu** “contract chung FE & BE�
 
 #### App 1: Customer PWA
 
-| Khía cạnh         | Chi tiết                                                                       |
-| ----------------- | ------------------------------------------------------------------------------ |
-| **Actor**         | Customer / Guest (anonymous)                                                   |
-| **Entry point**   | QR Scan → `https://{slug}.qrtable.io?table={id}&token={hmac}`                  |
-| **Auth**          | Session-based (Redis) — không cần đăng nhập                                    |
-| **Tech**          | React + Vite + TypeScript + Service Worker                                     |
-| **Core features** | Menu browsing, shared cart, order submit, order tracking, payment request      |
-| **Offline**       | Service Worker cache (menu), IndexedDB queue (pending orders), auto-retry sync |
-| **Real-time**     | Socket.io → room `session:{sid}:customer` (order status, menu updates)         |
+| Khía cạnh         | Chi tiết                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Actor**         | Customer / Guest (anonymous)                                                                                                    |
+| **Entry point**   | QR Scan → `https://{slug}.qrtable.io?table={id}&token={hmac}`                                                                   |
+| **Auth**          | Session-based (Redis) — không cần đăng nhập                                                                                     |
+| **Tech**          | React + Vite + TypeScript + Service Worker                                                                                      |
+| **Core features** | Menu browsing, shared cart, order submit, order tracking, payment request; khi tenant `SUSPENDED` thì chỉ read/pay bills đã tạo |
+| **Offline**       | Service Worker cache (menu), IndexedDB queue (pending orders), auto-retry sync                                                  |
+| **Real-time**     | Socket.io → room `session:{sid}:customer` (order status, menu updates)                                                          |
 
 #### App 2: Management App (Role-based)
 
@@ -355,6 +357,8 @@ Dashboard
   ├── /staff (Staff & Role Management)
   ├── /orders (Orders & Bills: history, status, refund)
   ├── /subscription (Subscription & Plan)
+  ├── /billing/[invoiceId] (Subscription invoice VietQR + status polling)
+  ├── /payment-settings (Tenant payment settings + SePay OAuth Connect)
   └── /settings (Store profile, branding, operating mode)
 ```
 
@@ -363,8 +367,9 @@ Dashboard
 ```
 Platform Ops
   ├── / (Platform Overview)
-  ├── /tenants (Tenant Directory: search, suspend, activate)
+  ├── /tenants (Tenant Directory: onboard, search, suspend, activate, close, assign plan)
   ├── /plans (Pricing Plan Management)
+  ├── /billing (Subscription invoices reconciliation)
   ├── /analytics (Usage & Revenue Analytics)
   ├── /health (System Health: services, Kafka lag, error rate)
   └── /support (Support Tools: impersonate tenant, audit logs)
@@ -410,7 +415,9 @@ PostgreSQL Instance (1 server, port 5432)
 ├── DB "qrtable_saas"                   ← SaaS Management Service
 │   ├── tenants                          (KHÔNG có tenant_id — root entity)
 │   ├── pricing_plans                    (KHÔNG có tenant_id — platform-level)
-│   └── subscriptions                    (CÓ tenant_id)
+│   ├── subscriptions                    (CÓ tenant_id)
+│   ├── subscription_invoices             (CÓ tenant_id — Tier 2 tenant → platform)
+│   └── outbox_events                     (`tenant.created`, subscription events)
 │
 ├── DB "qrtable_catalog"                ← Catalog Service
 │   ├── categories                       (CÓ tenant_id)
@@ -426,15 +433,18 @@ PostgreSQL Instance (1 server, port 5432)
 │
 ├── DB "qrtable_payment"               ← Payment Service
 │   ├── payments                         (CÓ tenant_id)
-│   └── refunds                          (CÓ tenant_id)
+│   ├── refunds                          (CÓ tenant_id)
+│   ├── audit_payments                    (payment audit trail)
+│   ├── outbox_events                     (`payment.completed`, `payment.refunded`)
+│   └── tenant_payment_settings           (CÓ tenant_id — bank info + SePay OAuth tokens)
 │
 MongoDB Instance (1 server, port 27017)
 ├── DB "qrtable_auth"                   ← User-Access Service
 │   ├── users                            (CÓ tenant_id)
 │   └── roles                            (KHÔNG có tenant_id — global)
-│
-├── DB "qrtable_notification"           ← Notification Service
-│   └── notification_logs                (CÓ tenant_id)
+
+Phase 4C deferred:
+├── Notification Service / `qrtable_notification` nếu triển khai mail/push/audit log riêng.
 ```
 
 **Lưu ý:** Kitchen Service **không có database riêng** — sử dụng Redis only cho KDS queue (Sorted Set).
@@ -535,17 +545,20 @@ File Storage Level:
 
 ### 6.1 Service Catalog
 
-| #   | Service                  | Transport     | Database               | Vai trò                                                                                                     |
-| --- | ------------------------ | ------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 1   | **BFF Service**          | HTTP + WS     | — (stateless)          | API Gateway, WebSocket Gateway, Guard chain, Swagger                                                        |
-| 2   | **Auth Service**         | gRPC          | — (Keycloak external)  | JWT verification, token introspection, user info retrieval                                                  |
-| 3   | **SaaS Mgmt Service**    | TCP           | PG: `qrtable_saas`     | Tenant CRUD, Subscription lifecycle, Pricing Plans                                                          |
-| 4   | **Catalog Service**      | TCP           | PG: `qrtable_catalog`  | Menu (Category + Item), Table & Area, QR token management                                                   |
-| 5   | **Order Service**        | TCP           | PG: `qrtable_order`    | Order state machine, Cart/Session cache, bills; stock **không** ghi trực tiếp — gọi Catalog TCP khi confirm |
-| 6   | **Kitchen Service**      | TCP + Kafka   | Redis only             | KDS ticket/item routing, FIFO/priority queue, SLA monitoring; no batching                                   |
-| 7   | **Payment Service**      | TCP + Webhook | PG: `qrtable_payment`  | SePay VietQR, Cash flow, Payment records, Reconciliation                                                    |
-| 8   | **Notification Service** | Kafka         | Mongo: `qrtable_notif` | Email (SMTP), Push events, Audit log                                                                        |
-| 9   | **User-Access Service**  | TCP           | Mongo: `qrtable_auth`  | User profile, Role mapping, Staff management                                                                |
+| #   | Service                 | Transport     | Database              | Vai trò                                                                                                       |
+| --- | ----------------------- | ------------- | --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 1   | **BFF Service**         | HTTP + WS     | — (stateless)         | API Gateway, WebSocket Gateway, Guard chain, Swagger                                                          |
+| 2   | **Authorizer Service**  | gRPC + TCP    | — (Keycloak external) | JWT verification, token introspection, Keycloak admin operations                                              |
+| 3   | **SaaS Mgmt Service**   | TCP           | PG: `qrtable_saas`    | Tenant lifecycle, Pricing Plans, Subscription lifecycle, subscription invoices, suspend/source-of-truth cache |
+| 4   | **Catalog Service**     | TCP           | PG: `qrtable_catalog` | Menu (Category + Item), Table & Area, QR token management                                                     |
+| 5   | **Order Service**       | TCP           | PG: `qrtable_order`   | Order state machine, Cart/Session cache, bills; stock **không** ghi trực tiếp — gọi Catalog TCP khi confirm   |
+| 6   | **Kitchen Service**     | TCP + Kafka   | Redis only            | KDS ticket/item routing, FIFO/priority queue, SLA monitoring; no batching                                     |
+| 7   | **Payment Service**     | TCP + Webhook | PG: `qrtable_payment` | Customer bill payments, tenant payment settings, SePay OAuth/settings, reconciliation                         |
+| 8   | **User-Access Service** | TCP           | Mongo: `qrtable_auth` | User profile, Role mapping, Staff management, tenant staff counts                                             |
+| 9   | **Customer PWA**        | HTTP + WS     | —                     | Anonymous customer ordering UI, suspended-tenant read-only/payment behavior                                   |
+| 10  | **Management App**      | HTTP + WS     | —                     | POS/KDS/Dashboard/Admin UI, Phase 4B subscription/payment settings/admin pages                                |
+| 11  | **Keycloak Theme**      | Static assets | —                     | Keycloak login/theme customization                                                                            |
+| 12  | **Product App**         | TBD           | TBD                   | Present in `apps/product`; no current architecture ownership verified in Phase 4B anchors                     |
 
 ### 6.2 Chi tiết theo Domain
 
@@ -567,7 +580,7 @@ Trách nhiệm:
     sau TCP response cho UI-layer events (xem §7.3)
 
 Giao tiếp:
-  - → Auth Service (gRPC): verify token
+  - → Authorizer Service (gRPC): verify token
   - → Catalog/Order/Payment/SaaS Service (TCP): business operations
   - → Redis: token cache, rate limit counter
   - → Kafka: subscribe domain events that BFF may bridge (`order.confirmed` → customer session tracking only, `kitchen.sla_warning`, `payment.completed`); BFF must not emit KDS queue changes directly from `order.confirmed`
@@ -576,7 +589,7 @@ Giao tiếp:
 Không có Database riêng — BFF chỉ là proxy + orchestrator.
 ```
 
-#### 6.2.2 Auth Service
+#### 6.2.2 Authorizer Service
 
 ```
 Trách nhiệm:
@@ -601,25 +614,34 @@ Keycloak Configuration:
 
 ```
 Trách nhiệm:
-  - Tenant CRUD (create, read, update, suspend, activate)
-  - Subscription lifecycle: chọn gói → activate → renew → expire
-  - Pricing Plans management (Lite, Pro, Enterprise)
-  - Feature gating: kiểm tra giới hạn theo plan (max tables, features)
+  - Tenant lifecycle source of truth: onboard, create/read/update, suspend, activate, close
+  - Pricing Plans management (FREE/BASIC/PREMIUM seed; public list + admin CRUD)
+  - Subscription lifecycle: assign, checkout invoice, activate, cancel, expire, history
+  - Subscription invoices (`subscription_invoices`): Tier 2 tenant → platform VietQR, status, manual confirm, SePay webhook handling
+  - Feature gating support: current subscription cache + target-service backup checks for limits
   - Slug/Subdomain generation & uniqueness validation
+  - Onboarding mini-saga: create tenant owner via Authorizer/User-Access and initialize Payment settings row
+  - Tenant suspend Redis flag: SaaS writes/clears `tenant:{tenantId}:suspended`; BFF guards read for edge enforcement
+  - Subscription cache: `subscription:{tenantId}` TTL 5 phút
   - Cron job: kiểm tra subscription expiry, auto-suspend
+  - SaaS outbox: publish accepted domain events after DB commit
 
 Entities (PostgreSQL):
   - tenants: id, slug, name, type, address, status, owner_id,
              default_currency (default: VND), default_locale (default: vi-VN),
              operating_modes[] (enum: INSTANT_ORDER | DIGITAL_MENU, default: both),
              created_at
-  - pricing_plans: id, name, max_tables, max_staff, features_json, price
-  - subscriptions: id, tenant_id, plan_id, starts_at, expires_at, status
+  - pricing_plans: id, code, name, price_vnd, max_tables, max_staff, max_orders_per_day, features, is_active
+  - subscriptions: id, tenant_id, pricing_plan_id, plan_code_snapshot, price_vnd_snapshot,
+                   starts_at, expires_at, status, source, source_invoice_id
+  - subscription_invoices: id, tenant_id, pricing_plan_id, billing_reference (`QRSUB*`),
+                           amount_vnd, status, qr_url, qr_expires_at, paid/manual confirmation fields
+  - outbox_events: id, tenant_id, topic, event_type, aggregate_id, payload, status, attempts
 
 Events emitted (Kafka):
   - tenant.created → trigger default data setup
-  - tenant.suspended → block all operations
-  - subscription.renewed → update feature limits
+  - subscription.activated / subscription invoice events use SaaS outbox where implemented/accepted;
+    UI-only suspend notifications remain BFF/WebSocket side effects, not Kafka business events.
 ```
 
 #### 6.2.4 Catalog Service
@@ -667,7 +689,7 @@ Caching (Redis):
 Trách nhiệm:
   - Session Management: durable session trong PostgreSQL (Order DB); Redis là active cache/TTL cho fast path
   - Shared Cart: multi-device cart qua Redis Hash + cart version toàn cục (optimistic concurrency)
-  - Order State Machine: persist từ `PENDING` trở lên; `DRAFT` chỉ cart/UI — xem docs/business-logic-step-2.4-spec.vi.md §3.1
+  - Order State Machine: persist từ `PENDING` trở lên; `DRAFT` chỉ cart/UI — xem docs/specs/business-logic-step-2.4-spec.vi.md §3.1
   - Stock: Order Service **không** mutate `menu_items`; khi confirm (`PENDING → PROCESSING`) gọi Catalog Service (TCP) để deduct trong transaction của Catalog
   - Order cancellation (soft delete + audit log); RBAC cancel theo state — permission-matrix §6.1
   - Bill aggregation: một bill/session; tạo ở submit order đầu tiên; `OPEN → PENDING_PAYMENT` trong Step 2.4; `PAID` → Phase 3
@@ -757,6 +779,10 @@ WebSocket push (do BFF xử lý — Kitchen không emit WS trực tiếp):
 
 ```
 Trách nhiệm:
+  - Customer bill payments (Tier 1 customer → tenant): VietQR/Cash settlement for Order bills
+  - Tenant payment settings: per-tenant cash/VietQR enablement, selected bank account, connection status
+  - SePay OAuth Connect/settings: authorization URL, callback token exchange, bank list, bank selection, webhook setup, disconnect
+  - OAuth state cache: stores `oauth_state:{state}` in Redis for 5 minutes; in-memory fallback exists for isolated tests/dev
   - VietQR (SePay): build QR URL động (qr.sepay.vn) với số tiền làm tròn + bill reference
   - SePay Webhook: xác thực X-Secret-Key header, match bill reference, update payment status
   - Cash payment: staff-confirmed flow
@@ -778,6 +804,10 @@ Entities (PostgreSQL):
              customer_bank_account, customer_bank_name, customer_account_name,
              status (PENDING_STAFF_ACTION | CONFIRMED | CANCELED)
   - audit_payments: id, payment_id, action, actor_id, meta JSONB, timestamp
+  - tenant_payment_settings: id, tenant_id, cash_enabled, vietqr_enabled,
+                             vietqr_bank_name/account_number/account_holder,
+                             sepay_* token/webhook fields, connection_status
+  - outbox_events: payment domain outbox for `payment.completed` / `payment.refunded`
 
 VND Rounding Logic:
   raw_total = Σ(item_price × quantity)
@@ -788,15 +818,23 @@ VND Rounding Logic:
 VietQR Flow (SePay):
   1. Staff chọn "VietQR" trên POS → BFF → Payment Service (TCP): createVietQR({ billId })
   2. Payment Service: tính rounded_total, sinh billReference = "QRTBL" + 8 ký tự đầu của billId sau khi bỏ dấu gạch (UUID)
-  3. Build QR URL: https://qr.sepay.vn/img?acc={BANK_ACCOUNT}&bank={BANK_NAME}
+  3. Đọc `tenant_payment_settings` để lấy ngân hàng tenant đã connect; env `PAYMENT_SEPAY_QR_*` chỉ là fallback dev khi chưa có settings
+  4. Build QR URL: https://qr.sepay.vn/img?acc={BANK_ACCOUNT}&bank={BANK_NAME}
                     &amount={rounded_total}&des={billReference}
-  4. POS render <img src={qrUrl} /> — Khách quét và chuyển khoản
-  5. SePay → BFF webhook: POST /api/v1/payment/sepay/webhook
+  5. POS render <img src={qrUrl} /> — Khách quét và chuyển khoản
+  6. SePay → BFF webhook: POST /api/v1/payment/sepay/webhook hoặc `/payment/sepay/webhook/:tenantSlug` cho Tier 1
      Headers: X-Secret-Key: {SEPAY_WEBHOOK_SECRET}
-  6. BFF: so sánh X-Secret-Key → reject 401 nếu không khớp; validate body theo DTO runtime (class-validator)
-  7. Payment Service: match billReference trong code/content; nếu amount < rounded_total → giữ PENDING + audit SEPAY_WEBHOOK_UNDERPAID; nếu amount ≥ rounded_total → PAID, lưu paidAmount = số tiền thực nhận (chấp nhận overpaid)
-  8. Lưu sepay_transaction_id; sau commit có thể gọi Order TCP (BILL_MARK_PAID) làm fast path đồng bộ; Kafka payment.completed vẫn là recovery/fan-out
-  9. Ghi outbox trong cùng transaction DB → publish Kafka: payment.completed
+  7. BFF: so sánh X-Secret-Key → reject 401 nếu không khớp; validate body theo DTO runtime (class-validator)
+  8. Payment Service: match billReference trong code/content; nếu amount < rounded_total → giữ PENDING + audit SEPAY_WEBHOOK_UNDERPAID; nếu amount ≥ rounded_total → PAID, lưu paidAmount = số tiền thực nhận (chấp nhận overpaid)
+  9. Lưu sepay_transaction_id; sau commit có thể gọi Order TCP (BILL_MARK_PAID) làm fast path đồng bộ; Kafka payment.completed vẫn là recovery/fan-out
+  10. Ghi outbox trong cùng transaction DB → publish Kafka: payment.completed
+
+SePay OAuth / Tenant Payment Settings Flow (Phase 4B):
+  1. Dashboard `/dashboard/payment-settings` → BFF → Payment TCP `payment_settings.generate_authorize_url`
+  2. Payment stores `oauth_state:{state}` in Redis for 300s and returns SePay authorize URL
+  3. Callback exchanges code for tokens, stores encrypted tokens in `tenant_payment_settings`, then lists bank accounts
+  4. Tenant selects a bank; Payment calls SePay webhook API and marks settings CONNECTED
+  5. BFF routes `QRTBL*` webhooks to Payment and `QRSUB*` platform webhooks to SaaS subscription invoice handler
 
 Cash Flow:
   1. Staff confirms "Đã thu tiền mặt" on POS
@@ -816,27 +854,31 @@ Events emitted (Kafka):
   - payment.refunded → adjust reconciliation data, notify owner
 ```
 
-#### 6.2.8 Notification Service
+#### 6.2.8 User-Access Service
 
 ```
 Trách nhiệm:
-  - Kafka consumer: subscribe multiple topics
-  - Email sending: welcome email, payment receipt, daily report
-  - Audit log persistence: lưu mọi business event vào MongoDB
-  - Template rendering: EJS templates cho email
-
-Kafka Subscriptions:
-  - tenant.created → send welcome email to owner
-  - payment.completed → send receipt email (if email provided)
-  - payment.refunded → notify owner, log audit trail
+  - Application user profile source of truth sau khi Keycloak verify identity
+  - Role mapping, staff membership, tenant assignment (`tenantId` trên user profile)
+  - Staff management cho dashboard
+  - TCP `user.count_by_tenant` phục vụ Phase 4B feature gating `max_staff`
+  - Upsert profile trong onboarding mini-saga do SaaS orchestrate
 
 Data Store:
-  - MongoDB: audit_logs collection (flexible schema, time-series)
-  - Email templates: EJS files trong service
+  - MongoDB `qrtable_auth`: users, roles
 
 Giao tiếp:
-  - → SMTP Server: send email (Nodemailer)
-  - → Cloudinary (optional): download attachment
+  - ← BFF / SaaS Service (TCP): profile lookup/upsert/staff operations/counts
+  - ← Authorizer/Keycloak claims are identity input, not the application profile source of truth
+```
+
+#### 6.2.9 Notification Service (Deferred / Phase 4C)
+
+```
+Current `apps/*` inventory does not contain `apps/notification`.
+Email/push/audit notification behavior remains a Phase 4C or later service unless reintroduced in code.
+Giao tiếp:
+  - Kafka consumers and SMTP/push integrations must be documented when the service exists again.
 ```
 
 ---
@@ -849,7 +891,7 @@ Giao tiếp:
 | ----------------- | ------------------------ | ---------------- | ---------------------------------------------- |
 | **HTTP REST**     | Client → BFF             | Request/Response | External API, Swagger                          |
 | **TCP**           | BFF → Business Services  | RPC (sync)       | Gọi nội bộ cần response ngay                   |
-| **gRPC**          | BFF → Auth Service       | RPC (sync)       | Authentication — cần hiệu năng cao             |
+| **gRPC**          | BFF → Authorizer Service | RPC (sync)       | Authentication — cần hiệu năng cao             |
 | **Kafka**         | Service → Service        | Pub/Sub (async)  | Side-effects, event notification, decoupling   |
 | **WebSocket**     | BFF → Clients            | Push (real-time) | KDS updates, order tracking, menu sync         |
 | **HTTP Webhook**  | SePay → BFF              | Event callback   | Payment confirmation (X-Secret-Key header)     |
@@ -885,18 +927,18 @@ BFF Controller (pseudo-code):
   return response;
 ```
 
-| Trigger (TCP response tại BFF) | WebSocket Room                                  | Cache Action                  |
-| ------------------------------ | ----------------------------------------------- | ----------------------------- |
-| Order created                  | `tenant:{tid}:staff`                            | —                             |
-| Order status changed           | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                             |
-| Cart updated / conflict        | `session:{sid}:customer`                        | —                             |
-| Bill requested (explicit)      | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                             |
-| Table transferred              | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                             |
-| Menu item CRUD                 | `tenant:{tid}:*` (broadcast all customers)      | `DEL menu:{tid}`              |
-| Table status changed           | `tenant:{tid}:staff`                            | `SET table:{tid}:{id}:status` |
-| Kitchen item ready             | `tenant:{tid}:staff` + `session:{sid}:customer` | —                             |
-| Service requested              | `tenant:{tid}:staff`                            | —                             |
-| Tenant suspended               | —                                               | `SET tenant:{tid}:suspended`  |
+| Trigger (TCP response tại BFF) | WebSocket Room                                  | Cache Action                      |
+| ------------------------------ | ----------------------------------------------- | --------------------------------- |
+| Order created                  | `tenant:{tid}:staff`                            | —                                 |
+| Order status changed           | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                                 |
+| Cart updated / conflict        | `session:{sid}:customer`                        | —                                 |
+| Bill requested (explicit)      | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                                 |
+| Table transferred              | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                                 |
+| Menu item CRUD                 | `tenant:{tid}:*` (broadcast all customers)      | `DEL menu:{tid}`                  |
+| Table status changed           | `tenant:{tid}:staff`                            | `SET table:{tid}:{id}:status`     |
+| Kitchen item ready             | `tenant:{tid}:staff` + `session:{sid}:customer` | —                                 |
+| Service requested              | `tenant:{tid}:staff`                            | —                                 |
+| Tenant suspended               | —                                               | `SET tenant:{tenantId}:suspended` |
 
 **Lý do thiết kế (AP1):** BFF là API Gateway duy nhất. Khi BFF gọi TCP và nhận response, nó đã có đủ thông tin để thực hiện UI side-effects. Dùng Kafka làm trung gian cho single-consumer UI events vi phạm AP1 — thêm latency, complexity, và infrastructure cost mà không giải quyết bài toán domain nào.
 
@@ -984,7 +1026,7 @@ Kết luận quan trọng:
 │    2. Check Redis cache: user-token:{sha256(token)}    │
 │       → Cache HIT: return cached user data             │
 │       → Cache MISS:                                    │
-│         3. gRPC call → Auth Service → Keycloak verify  │
+│         3. gRPC call → Authorizer Service → Keycloak verify │
 │         4. Cache result in Redis (TTL: 30 min)         │
 │    5. TenantGuard: extract tenant_id from JWT claims   │
 │    6. PermissionGuard: verify permissions vs endpoint  │
@@ -1191,7 +1233,7 @@ Client A ──→ BFF Instance 1 ──→ Redis Pub/Sub ──→ BFF Instance
    │◄─refetch─┤           │             │           │
 ```
 
-> **Phase 3 baseline:** POS/Customer cập nhật trạng thái thanh toán chủ yếu bằng **polling**; WebSocket real-time qua bridge Kafka → BFF là **task tách** sau khi correctness ổn định (xem `docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md` D5).
+> **Phase 3 baseline:** POS/Customer cập nhật trạng thái thanh toán chủ yếu bằng **polling**; WebSocket real-time qua bridge Kafka → BFF chỉ là hint invalidate/refetch sau khi correctness ổn định. Xem phase record `docs/phases/phase-3-payment.md`.
 
 ### 10.2 Cash Payment Flow
 
@@ -1239,28 +1281,33 @@ QR URL Format:
 
 ### 11.1 Cache Layers
 
-| Layer            | Key Pattern                           | Data                             | TTL                | Invalidation                  |
-| ---------------- | ------------------------------------- | -------------------------------- | ------------------ | ----------------------------- |
-| **Token Cache**  | `user-token:{sha256(jwt)}`            | User data + permissions          | 30 min             | Token expiry / logout         |
-| **Menu Cache**   | `menu:{tenant_id}`                    | Full menu JSON                   | 10 min             | On menu.updated event         |
-| **Table Status** | `table:{tenant_id}:{table_id}:status` | Status enum                      | No expire          | Explicit update on change     |
-| **Session**      | `session:{tenant_id}:{session_id}`    | Session metadata + last_activity | 2 hours (lifetime) | On session close / idle 30min |
-| **Cart**         | `cart:{tenant_id}:{session_id}`       | Hash of cart items               | 2 hours            | Bound to session TTL          |
-| **Rate Limit**   | `rl:{endpoint}:{ip/token}`            | Request count                    | Window (s)         | Auto-expire                   |
-| **KDS Queue**    | `kds:{tenant_id}:{station}`           | Sorted Set of tickets            | No expire          | On ticket complete/remove     |
+| Layer                    | Key Pattern                           | Data                               | TTL                | Invalidation                  |
+| ------------------------ | ------------------------------------- | ---------------------------------- | ------------------ | ----------------------------- |
+| **Token Cache**          | `user-token:{sha256(jwt)}`            | User data + permissions            | 30 min             | Token expiry / logout         |
+| **Menu Cache**           | `menu:{tenant_id}`                    | Full menu JSON                     | 10 min             | On menu.updated event         |
+| **Table Status**         | `table:{tenant_id}:{table_id}:status` | Status enum                        | No expire          | Explicit update on change     |
+| **Session**              | `session:{tenant_id}:{session_id}`    | Session metadata + last_activity   | 2 hours (lifetime) | On session close / idle 30min |
+| **Cart**                 | `cart:{tenant_id}:{session_id}`       | Hash of cart items                 | 2 hours            | Bound to session TTL          |
+| **Rate Limit**           | `rl:{endpoint}:{ip/token}`            | Request count                      | Window (s)         | Auto-expire                   |
+| **KDS Queue**            | `kds:{tenant_id}:{station}`           | Sorted Set of tickets              | No expire          | On ticket complete/remove     |
+| **Tenant Suspend**       | `tenant:{tenantId}:suspended`         | Suspend edge flag                  | No expire          | SaaS lifecycle activate/close |
+| **Current Subscription** | `subscription:{tenantId}`             | Current plan/subscription snapshot | 5 min              | SaaS subscription changes     |
+| **Payment OAuth State**  | `oauth_state:{state}`                 | SePay OAuth CSRF/tenant binding    | 5 min              | Callback consumes key         |
 
 ### 11.2 Chính Sách Truy Cập Redis (Redis Access Policy)
 
 Redis được sử dụng có kiểm soát theo mô hình **phân tầng (Tiered Access)**. Không phải mọi microservice đều được phép kết nối Redis — chỉ những service có nhu cầu kiến trúc chính đáng cho ephemeral state hoặc cache.
 
-| Service               | Phase    | Redis Use Case                                         | Key Pattern                      |
-| --------------------- | -------- | ------------------------------------------------------ | -------------------------------- |
-| **BFF**               | Phase 0  | Auth cache, menu cache, rate limit, session validation | `user-token:*`, `menu:*`, `rl:*` |
-| **Order Service**     | Phase 2A | Session state, shared cart, idempotency                | `session:*`, `cart:*`, `idem:*`  |
-| **Kitchen Service**   | Phase 2B | KDS FIFO queue (Redis-only, không DB)                  | `kds:*`, `ticket:*`              |
-| **WebSocket Gateway** | Phase 2B | Socket.io Redis Adapter (multi-instance sync)          | `socket.io-adapter:*`            |
+| Service               | Phase    | Redis Use Case                                                                                      | Key Pattern                                                         |
+| --------------------- | -------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **BFF**               | Phase 0  | Edge cache, auth cache, menu cache, rate limit, session validation, suspended-tenant guard fallback | `user-token:*`, `menu:*`, `rl:*`, `session:*`, `tenant:*:suspended` |
+| **Order Service**     | Phase 2A | Session state, shared cart, idempotency                                                             | `session:*`, `cart:*`, `idem:*`                                     |
+| **Kitchen Service**   | Phase 2B | KDS FIFO queue (Redis-only, không DB)                                                               | `kds:*`, `ticket:*`                                                 |
+| **WebSocket Gateway** | Phase 2B | Socket.io Redis Adapter (multi-instance sync)                                                       | `socket.io-adapter:*`                                               |
+| **SaaS Service**      | Phase 4B | Tenant suspend flag writer, current subscription cache                                              | `tenant:*:suspended`, `subscription:*`                              |
+| **Payment Service**   | Phase 4B | SePay OAuth state cache for tenant payment settings flow                                            | `oauth_state:*`                                                     |
 
-**Service KHÔNG được kết nối Redis:** Catalog, SaaS, Payment, Auth, Notification, User-Access. Các service này sử dụng PostgreSQL/MongoDB/Keycloak làm source of truth — không có ephemeral state cần Redis.
+**Service không có quyền Redis đã xác minh trong Phase 4B anchors:** Catalog, Authorizer, User-Access. `Notification` không tồn tại trong current `apps/*`; nếu được bổ sung lại ở Phase 4C thì cần khai báo Redis access riêng nếu có use case chính đáng.
 
 **Lý do:**
 
@@ -1268,6 +1315,8 @@ Redis được sử dụng có kiểm soát theo mô hình **phân tầng (Tiere
 - **Order Service (Tier 2):** Session và Cart là **ephemeral state thuộc Order domain** — không phải cache. Cần direct access để đảm bảo optimistic locking và TTL/idle management.
 - **Kitchen Service (Tier 3):** Redis là **primary data store** cho KDS queue (Sorted Set FIFO). Service này không có database riêng — Redis-only by design. Queue operations cần O(log N) access, không thể proxy qua TCP.
 - **WebSocket Gateway (Tier 4):** Socket.io multi-instance yêu cầu shared pub/sub adapter — đây là yêu cầu kỹ thuật của thư viện, không phải business logic.
+- **SaaS Service (Tier 5):** PostgreSQL vẫn là source of truth cho tenant/subscription. Redis chỉ giữ suspend edge flag và current subscription snapshot để BFF/guards phản hồi nhanh; SaaS là writer cho lifecycle/cache invalidation.
+- **Payment Service (Tier 6):** PostgreSQL `tenant_payment_settings` vẫn là source of truth. Redis chỉ giữ OAuth `state` ngắn hạn để callback chống replay/CSRF và map về tenant/owner.
 
 ### 11.3 Cache-Aside Pattern (Menu Example)
 
@@ -1371,16 +1420,16 @@ Implementation:
 
 Mỗi service expose health endpoint kiểm tra:
 
-| Service      | Health Checks                                      |
-| ------------ | -------------------------------------------------- |
-| BFF          | Redis connection, TCP clients reachable            |
-| Auth         | Keycloak reachable, gRPC listener active           |
-| Catalog      | PostgreSQL connection                              |
-| Order        | PostgreSQL connection, Redis connection, Kafka     |
-| Kitchen      | Redis connection, Kafka consumer status            |
-| Payment      | PostgreSQL connection, SePay webhook config loaded |
-| SaaS Mgmt    | PostgreSQL connection                              |
-| Notification | Kafka consumer status, SMTP connection             |
+| Service     | Health Checks                                                                     |
+| ----------- | --------------------------------------------------------------------------------- |
+| BFF         | Redis connection, TCP clients reachable                                           |
+| Authorizer  | Keycloak reachable, gRPC listener active                                          |
+| Catalog     | PostgreSQL connection                                                             |
+| Order       | PostgreSQL connection, Redis connection, Kafka                                    |
+| Kitchen     | Redis connection, Kafka consumer status                                           |
+| Payment     | PostgreSQL connection, Redis OAuth state cache, SePay webhook/OAuth config loaded |
+| SaaS Mgmt   | PostgreSQL connection, Redis suspend/subscription cache                           |
+| User-Access | MongoDB connection                                                                |
 
 ### 13.3 Alerting Rules (Grafana)
 
@@ -1390,7 +1439,7 @@ Mỗi service expose health endpoint kiểm tra:
 | Kafka Consumer Lag > 1000 | Consumer offset lag exceeds threshold | Warning  |
 | KDS SLA Breach            | Ticket waiting > 20 min               | High     |
 | Error Rate > 5%           | HTTP 5xx / total requests > 0.05      | High     |
-| Redis Memory > 80%        | Used memory exceeds threshold         | Warning  |
+| Redis Memory > 80 percent | Used memory exceeds threshold         | Warning  |
 
 ---
 
@@ -1414,13 +1463,13 @@ services:
 # docker-compose.app.yaml — Application Services
 services:
   bff:          # Port 3000 — API Gateway + WebSocket
-  auth:         # gRPC — Authorizer
+  authorizer:   # gRPC/TCP — Authorizer
   catalog:      # TCP — Menu & Table
   order:        # TCP — Order processing
   kitchen:      # TCP — KDS
   payment:      # TCP — Payment + SePay webhook
-  saas:         # TCP — Tenant management
-  notification: # Kafka consumer — Mail & audit
+  saas:         # TCP — Tenant/subscription management
+  user-access:  # TCP — User profiles/roles
 ```
 
 ### 14.2 Build Pipeline
@@ -1471,38 +1520,35 @@ docker compose -f docker-compose.prod.yaml up -d    # Full stack
 
 ### 15.2 Ưu tiên Triển khai (Phased)
 
-```
-Phase 1 — Core Foundation (MVP):
-  ├── BFF + Auth + Catalog + Order + Payment Services
-  ├── PostgreSQL + Redis + Keycloak + Kafka
-  ├── Multi-tenancy enforcement
-  ├── Basic WebSocket (order notification)
-  └── SePay VietQR + Cash payment
+Thứ tự dưới đây là roadmap canonical sau khi đã đóng Phase 4B; khi cần trạng thái chi tiết, dùng `docs/implementation_plan.md` làm nguồn sự thật.
 
-Phase 2 — Real-time & KDS:
-  ├── Kitchen Service + KDS WebSocket
-  ├── Full WebSocket Gateway (all events)
-  ├── Menu real-time sync
-  └── Table state machine
+```txt
+Phase 0 — Foundation / setup:
+  └── Hoàn thành.
 
-Phase 3 — SaaS & Observability:
-  ├── SaaS Management Service
-  ├── Subscription lifecycle
-  ├── Full PLG + Prometheus + Tempo stack
-  └── Grafana dashboards & alerts
+Phase 1 — Catalog + Menu + Table:
+  └── Hoàn thành.
 
-Phase 4 — Polish & Extended:
-  ├── PWA & Offline resilience (Service Worker, IndexedDB)
-  ├── Notification Service (email receipts, daily report)
-  ├── Refund flow (SePay manual refund + cash refund)
-  ├── Service Request (yêu cầu phục vụ từ khách)
-  ├── Shared Cart multi-device sync
-  └── KOT printing integration (ESC/POS)
+Phase 2A — Permissions + Order + Kafka:
+  └── Hoàn thành.
 
-Phase 5 — Analytics & Inventory (Future Scope):
-  ├── Analytics & Reporting module (doanh thu, món bán chạy, giờ cao điểm)
-  ├── Inventory management (định lượng nguyên liệu, tự động trừ kho)
-  └── Advanced subscription features
+Phase 2B — Kitchen/KDS + WebSocket:
+  └── Hoàn thành.
+
+Phase 3 — Payment (SePay/VietQR + Cash):
+  └── Hoàn thành.
+
+Phase 4A — Saga + Hardening:
+  └── Deferred; chưa tính là phase hoàn thành dù có một số hardening cục bộ trong Phase 3/4B.
+
+Phase 4B — SaaS + Tenant Onboarding:
+  └── Hoàn thành.
+
+Phase 4C — Notification + Staff Management:
+  └── Chưa bắt đầu.
+
+Phase 5-7 — Testing + Observability + Deploy:
+  └── Chưa bắt đầu; Phase 5 = testing, Phase 6 = observability, Phase 7 = deploy/demo.
 ```
 
 ---

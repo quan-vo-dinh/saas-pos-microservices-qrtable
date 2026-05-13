@@ -2,12 +2,12 @@
 
 > **Mục tiêu:** Chuẩn hóa giao dịch đa bước cho xác nhận đơn và hoàn tất thanh toán — có bù trừ (compensation) rõ ràng, giới hạn và idempotency chống double-submit, ràng buộc xóa dữ liệu và audit hủy đơn; đưa transactional outbox đơn giản vào Order/Payment để Kafka không mất sự kiện khi commit DB thành công.
 > **Ước lượng:** ~1 tuần
-> **Trạng thái:**
+> **Trạng thái:** ⏸ Deferred — chưa triển khai/đóng như một phase riêng sau Phase 3; một số hardening cục bộ đã xuất hiện trong Phase 3/4B nhưng không tính là hoàn thành Phase 4A.
 
 ## Prerequisites
 
 - Phase 3 hoàn thành — [phase-3-payment.md](phase-3-payment.md) (luồng thanh toán, billing/session đã ổn định làm nền cho saga thanh toán và validation)
-- Phase 2A/2B: Order, Kafka, KDS/realtime đã có — saga xác nhận đơn bám vào khóa tồn, tạo đơ, thông báo bếp
+- Phase 2A/2B: Order, Kafka, KDS/realtime đã có — saga xác nhận đơn bám vào khóa tồn, tạo đơn, thông báo bếp
 
 ## Tham Chiếu
 

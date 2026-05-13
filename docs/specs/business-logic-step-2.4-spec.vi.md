@@ -10,7 +10,7 @@
 
 ## 0. Biên bản quyết định
 
-Đặc tả này chốt các câu hỏi mở từ `docs/superpowers/audits/step-2.4-audit-report.md` như sau:
+Đặc tả này chốt các quyết định rà soát Q1–Q12 như sau:
 
 | Câu hỏi | Lựa chọn | Quyết định                                                                                                                                                                                             |
 | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -1607,7 +1607,7 @@ Các mục sau **đã được đồng bộ trong repo** (2026-04-28); phần tr
 3. `apps/user-access/src/seeder/role.json` + `role.spec.ts` + `apps/bff/.../permission.guard.spec.ts` + `tools/verify-permission-matrix.sh` — mapping WAITER pending cancel.
 4. `libs/shared/types/src/lib/realtime-events.types.ts` — `OrderConfirmedEvent` enrich, `CartUpdatedEvent`, `BillRequestedEvent`, `TableTransferredEvent`.
 5. `libs/shared/types/src/lib/menu.types.ts` + `order.types.ts` — `PreparationStation` / snapshot `station` trên order item.
-6. `docs/superpowers/specs/2026-04-11-catalog-service-backend-design.md` — cột `station` + §3.8 ngữ nghĩa TCP stock; migration DB Catalog **TODO** khi triển khai.
+6. Catalog sở hữu station — cột `station` + ngữ nghĩa TCP stock thuộc Catalog; code hiện tại và `technical-architecture.md` là điểm kiểm chứng.
 7. `libs/utils/request.util.ts` + `SessionGuard` + `TenantGuard` — key `session:{tenantId}:{sessionId}`, optional `orderCount` idle (C14/C15); `docs/references/auth-system-reference.md` + `technical-architecture.md` đã cập nhật tương ứng.
 8. `libs/constants/.../tcp-request-message.ts` — pattern `MENU_ITEM.VALIDATE_ORDERABLE`, `STOCK_DEDUCT_FOR_ORDER`, `STOCK_RELEASE_FOR_ORDER`.
 

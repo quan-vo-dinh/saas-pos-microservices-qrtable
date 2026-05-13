@@ -1,8 +1,10 @@
 # Tài Liệu Chi Tiết Hệ Thống Authentication, Authorization, Role & Permission
 
 **Phiên bản:** Step 0.6B  
-**Ngày cập nhật:** Tháng 4, 2026 (bổ sung §1.2 — điều hướng `management-app` vs BFF)  
-**Trạng thái:** Tài liệu tham khảo toàn bộ hệ thống auth
+**Ngày cập nhật:** 2026-05-13 (refresh supporting RBAC reference sau Phase 4B)
+**Trạng thái:** Tài liệu tham khảo hỗ trợ, không phải nguồn canonical cho RBAC
+
+> **Current status:** RBAC canonical source of truth là [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md), đối chiếu với `libs/constants/src/lib/enum/role.enum.ts` và `apps/user-access/src/seeder/role.json`. Snapshot hiện tại sau Phase 4B có 66 permissions: `SUPER_ADMIN=66`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. Nếu tài liệu này khác canonical matrix hoặc code/seed, hãy ưu tiên canonical matrix và code/seed.
 
 ---
 
@@ -39,7 +41,7 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
 │  1. JWT Authentication (Nhân sự hệ thống)          │
 │     - Flow: Username/Password → Keycloak            │
 │     - Token: RS256 signed JWT với tenant_id claim   │
-│     - Actor: OWNER, MANAGER, WAITER, CHEF, BARISTA │
+│     - Actor: SUPER_ADMIN, OWNER, MANAGER, WAITER, CHEF, BARISTA │
 │     - Quản lý: Keycloak Realm "qrtable"            │
 │                                                      │
 │  2. Session Authentication (Khách hàng/Guest)      │
@@ -144,14 +146,14 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
 
 ### 3.1 Bảng Tóm Lược 6 Roles (Bao gồm Super Admin)
 
-| **Role**        | **Mô Tả**                              | **Phạm Vi**                 | **Người Dùng**    | **Keycloak Role** |
-| --------------- | -------------------------------------- | --------------------------- | ----------------- | ----------------- |
-| **SUPER_ADMIN** | Admin nền tảng, quyền toàn bộ hệ thống | Cross-tenant platform-level | Admin hệ thống    | `SUPER_ADMIN`     |
-| **OWNER**       | Chủ sở hữu nhà hàng/cửa hàng           | Single-tenant (owner only)  | Chủ tiệm          | `OWNER`           |
-| **MANAGER**     | Quản lý điều hành                      | Single-tenant               | Quản lý cửa hàng  | `MANAGER`         |
-| **WAITER**      | Nhân viên phục vụ bàn                  | Single-tenant               | Nhân viên         | `WAITER`          |
-| **CHEF**        | Đầu bếp                                | Single-tenant               | Đầu bếp           | `CHEF`            |
-| **BARISTA**     | Nhân viên pha chế                      | Single-tenant               | Nhân viên pha chế | `BARISTA`         |
+| **Role**        | **Mô Tả**                                                                                    | **Phạm Vi**                 | **Người Dùng**    | **Keycloak Role** | **Permissions** |
+| --------------- | -------------------------------------------------------------------------------------------- | --------------------------- | ----------------- | ----------------- | --------------- |
+| **SUPER_ADMIN** | Admin nền tảng, quyền toàn bộ hệ thống                                                       | Cross-tenant platform-level | Admin hệ thống    | `SUPER_ADMIN`     | 66              |
+| **OWNER**       | Chủ sở hữu nhà hàng/cửa hàng, gồm checkout subscription và payment settings                  | Single-tenant (owner only)  | Chủ tiệm          | `OWNER`           | 38              |
+| **MANAGER**     | Quản lý điều hành; có own-tenant visibility, không checkout/update payment settings/xóa user | Single-tenant               | Quản lý cửa hàng  | `MANAGER`         | 35              |
+| **WAITER**      | Nhân viên phục vụ bàn                                                                        | Single-tenant               | Nhân viên         | `WAITER`          | 15              |
+| **CHEF**        | Đầu bếp                                                                                      | Single-tenant               | Đầu bếp           | `CHEF`            | 6               |
+| **BARISTA**     | Nhân viên pha chế                                                                            | Single-tenant               | Nhân viên pha chế | `BARISTA`         | 6               |
 
 ### 3.2 Actor Đặc Biệt: CUSTOMER (Guest)
 
@@ -161,7 +163,7 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
 - **Không có account** → không cần login
 - **Được xác thực** bằng SessionGuard → random session ID trong Redis
 - **Tenant binding**: Tenant từ QR code hoặc host/subdomain
-- **Permission**: Chỉ READ catalog (xem menu) + READ invoice (xem hóa đơn)
+- **Permission**: Không có RBAC role/permission trong `role.json`; customer đọc public menu và xem trạng thái order/payment của chính session qua guard/controller scope.
 
 > Chi tiết CUSTOMER endpoint + SessionGuard scope xem [Permission Matrix §7](../architecture/permission-matrix.md#7-customer-actor-no-db-role).
 
@@ -1040,11 +1042,13 @@ db.role.find()
   {
     _id: ObjectId("68a3f2f1b3e811435a8ad006"),
     name: "MANAGER",
-    description: "tenant manager",
+    description: "tenant manager with operational permissions (no user delete)",
     permissions: [
       "catalog.create", "catalog.get_list", "catalog.update",
-      "user.create",
-      "invoice.get_by_id", "invoice.get_all",
+      "user.create", "user.update",
+      "tenant.read_own", "subscription.read_own", "plan.read",
+      "payment_settings.read_own",
+      // no "subscription.checkout" or "payment_settings.update_own"
     ],
   },
   // ...
@@ -1152,12 +1156,39 @@ private validateRoleMapping(keycloakRoles: string[], internalRoles?: Role[]): bo
 
 ```typescript
 export enum PERMISSION {
-  /* SAAS */
+  /* SAAS — legacy, remove after Phase 5 */
   SAAS_CREATE = 'saas.create',
   SAAS_GET_BY_ID = 'saas.get_by_id',
   SAAS_GET_LIST = 'saas.get_list',
   SAAS_UPDATE = 'saas.update',
   SAAS_DELETE = 'saas.delete',
+
+  /* TENANT (Phase 4B) */
+  TENANT_ONBOARD = 'tenant.onboard',
+  TENANT_LIST_ALL = 'tenant.list_all',
+  TENANT_READ_ANY = 'tenant.read_any',
+  TENANT_READ_OWN = 'tenant.read_own',
+  TENANT_UPDATE = 'tenant.update',
+  TENANT_SUSPEND = 'tenant.suspend',
+  TENANT_ACTIVATE = 'tenant.activate',
+  TENANT_CLOSE = 'tenant.close',
+
+  /* SUBSCRIPTION (Phase 4B) */
+  SUBSCRIPTION_ASSIGN = 'subscription.assign',
+  SUBSCRIPTION_LIST_ANY = 'subscription.list_any',
+  SUBSCRIPTION_LIST_HISTORY_ANY = 'subscription.list_history_any',
+  SUBSCRIPTION_READ_OWN = 'subscription.read_own',
+  SUBSCRIPTION_CHECKOUT = 'subscription.checkout',
+
+  /* PLAN (Phase 4B) */
+  PLAN_CREATE = 'plan.create',
+  PLAN_READ = 'plan.read',
+  PLAN_UPDATE = 'plan.update',
+  PLAN_DELETE = 'plan.delete',
+
+  /* PAYMENT SETTINGS (Phase 4B) */
+  PAYMENT_SETTINGS_READ_OWN = 'payment_settings.read_own',
+  PAYMENT_SETTINGS_UPDATE_OWN = 'payment_settings.update_own',
 
   /* CATALOG */
   CATALOG_CREATE = 'catalog.create',
@@ -1165,14 +1196,6 @@ export enum PERMISSION {
   CATALOG_GET_LIST = 'catalog.get_list',
   CATALOG_UPDATE = 'catalog.update',
   CATALOG_DELETE = 'catalog.delete',
-
-  /* INVOICE */
-  INVOICE_CREATE = 'invoice.create',
-  INVOICE_GET_BY_ID = 'invoice.get_by_id',
-  INVOICE_GET_ALL = 'invoice.get_all',
-  INVOICE_UPDATE = 'invoice.update',
-  INVOICE_DELETE = 'invoice.delete',
-  INVOICE_SEND = 'invoice.send',
 
   /* USER */
   USER_CREATE = 'user.create',
@@ -1207,6 +1230,7 @@ export enum PERMISSION {
   KITCHEN_GET_QUEUE = 'kitchen.get_queue',
   KITCHEN_UPDATE_TICKET = 'kitchen.update_ticket',
   KITCHEN_RECALL = 'kitchen.recall',
+  KITCHEN_SET_PRIORITY = 'kitchen.set_priority',
 
   /* PAYMENT (Phase 3) */
   PAYMENT_CREATE = 'payment.create',
@@ -1228,42 +1252,41 @@ export enum PERMISSION {
 }
 ```
 
-### 9.2 Permission Matrix: Role → Permissions (Active — Step 2.0)
+### 9.2 Permission Matrix: Role → Permissions (Supporting Snapshot — Phase 4B)
 
-> Single source of truth: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md)
+> Single source of truth: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md). Bảng dưới đây chỉ là tóm tắt để đọc nhanh, không thay thế canonical matrix 6 roles × 66 permissions.
 
-| **Role**               | **SAAS** | **CATALOG**                   | **INVOICE**        | **USER**                              | **ROLE** | **PRODUCT** | **ORDER**                    | **KITCHEN**                      | **PAYMENT**                                       | **TABLE**               | **SERVICE_REQUEST**       |
-| ---------------------- | -------- | ----------------------------- | ------------------ | ------------------------------------- | -------- | ----------- | ---------------------------- | -------------------------------- | ------------------------------------------------- | ----------------------- | ------------------------- |
-| **SUPER_ADMIN**        | ✅ All   | ✅ All                        | ✅ All (+ send)    | ✅ All                                | ✅ All   | ✅ All      | ✅ All                       | ✅ All                           | ✅ All                                            | ✅ All                  | ✅ All                    |
-| **OWNER**              | ❌       | create, get\*, update, delete | get_by_id, get_all | create, get\*, update, delete         | ❌       | ❌          | ✅ All                       | ✅ All                           | ✅ All                                            | ✅ All                  | ✅ All                    |
-| **MANAGER**            | ❌       | create, get\*, update, delete | get_by_id, get_all | create, get\*, update **(no delete)** | ❌       | ❌          | ✅ All                       | ✅ All                           | ✅ All                                            | ✅ All                  | ✅ All                    |
-| **WAITER**             | ❌       | get_by_id, get_list           | get_by_id, get_all | ❌                                    | ❌       | ❌          | confirm, get_list, get_by_id | ❌                               | confirm_cash, **get_history**                     | transfer, update_status | ✅ All                    |
-| **CHEF**               | ❌       | get_by_id, get_list           | ❌                 | ❌                                    | ❌       | ❌          | ❌                           | get_queue, update_ticket, recall | ❌                                                | ❌                      | ❌                        |
-| **BARISTA**            | ❌       | get_by_id, get_list           | ❌                 | ❌                                    | ❌       | ❌          | ❌                           | get_queue, update_ticket, recall | ❌                                                | ❌                      | ❌                        |
-| **CUSTOMER** (session) | ❌       | get_by_id, get_list\*         | ❌                 | ❌                                    | ❌       | ❌          | create (via SessionGuard)    | ❌                               | request-bill (via SessionGuard, controller-level) | ❌                      | create (via SessionGuard) |
+| **Role**               | **Platform / SaaS domains**                                                                                                                        | **Operational domains**                                                                                                       | **Permission count** |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| **SUPER_ADMIN**        | All legacy `saas.*`, `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`                                                                  | All catalog/user/role/product/order/kitchen/payment/table/service-request permissions                                         | 66                   |
+| **OWNER**              | `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, `payment_settings.read_own`, `payment_settings.update_own`       | Full tenant operations except platform-only role/product/SaaS admin permissions                                               | 38                   |
+| **MANAGER**            | `tenant.read_own`, `subscription.read_own`, `plan.read`, `payment_settings.read_own`; no `subscription.checkout`, no `payment_settings.update_own` | Operational permissions similar to OWNER, but no `user.delete`                                                                | 35                   |
+| **WAITER**             | `plan.read`                                                                                                                                        | Catalog read, order confirm/cancel pending/read, payment create/cash/history, table transfer/status, service-request handling | 15                   |
+| **CHEF**               | `plan.read`                                                                                                                                        | Catalog read plus KDS `get_queue`, `update_ticket`, `recall`; no `kitchen.set_priority`                                       | 6                    |
+| **BARISTA**            | `plan.read`                                                                                                                                        | Catalog read plus KDS `get_queue`, `update_ticket`, `recall`; no `kitchen.set_priority`                                       | 6                    |
+| **CUSTOMER** (session) | none                                                                                                                                               | Session-scoped public menu, own order/payment status, service request/order submit via customer guards                        | n/a                  |
 
 **Ghi chú:**
 
-- `get*` = `get_by_id` + `get_list` (hoặc `get_all` cho INVOICE/USER/ROLE/PRODUCT — legacy naming)
-- CUSTOMER không có "role" thực sự, chỉ có session → permissions hardcoded tại controller level
-- **MANAGER không có `user.delete`** — Manager là operational role; xóa user là HR action thuộc Owner
-- **OWNER + MANAGER không có `invoice.create/update/delete/send`** — Bills thuộc Order Service, INVOICE\_\* legacy
-- **WAITER có `payment.get_history`** — cho "last bill" queries từ customer
+- `SAAS_*` và `PRODUCT_*` là legacy/backward-compat; Phase 4B dùng `TENANT_*`, `SUBSCRIPTION_*`, `PLAN_*`, `PAYMENT_SETTINGS_*`.
+- CUSTOMER không có "role" thực sự, chỉ có session → access được enforce bằng customer/session guards và ownership checks.
+- **MANAGER không có `user.delete`, `subscription.checkout`, hoặc `payment_settings.update_own`**.
+- **WAITER có `payment.get_history`** — cho "last bill" queries từ customer.
 
 ### 9.3 Data File: role.json
 
 **File:** `apps/user-access/src/seeder/role.json`
 
-**Current contents (Step 2.0 — 2026-04-19):** Full canonical matrix với 6 roles và 51 permissions distributed per [`permission-matrix.md`](../architecture/permission-matrix.md) §6. Permission counts:
+**Current contents (Phase 4B — static-verified 2026-05-13):** Full canonical matrix với 6 roles và 66 permissions distributed per [`permission-matrix.md`](../architecture/permission-matrix.md) §6. Permission counts:
 
 | Role        | Permission count |
 | ----------- | ---------------- |
-| SUPER_ADMIN | 51               |
-| OWNER       | 32               |
-| MANAGER     | 31               |
-| WAITER      | 14               |
-| CHEF        | 5                |
-| BARISTA     | 5                |
+| SUPER_ADMIN | 66               |
+| OWNER       | 38               |
+| MANAGER     | 35               |
+| WAITER      | 15               |
+| CHEF        | 6                |
+| BARISTA     | 6                |
 
 Refer to actual file `apps/user-access/src/seeder/role.json` for full content (auto-generated from canonical matrix).
 
@@ -1459,8 +1482,11 @@ me(@UserData() userData: AuthorizedMetadata): ResponseDto<AuthProfileResponseDto
       "catalog.update",
       "catalog.delete",
       "user.create",
-      "invoice.get_by_id",
-      "invoice.get_all"
+      "user.update",
+      "tenant.read_own",
+      "subscription.read_own",
+      "plan.read",
+      "payment_settings.read_own"
     ]
   },
   "message": "OK"
@@ -1990,17 +2016,17 @@ MongoDB: qrtable
 │  ├─ firstName, lastName: string
 │  └─ roles: [ObjectId] (references to role._id)
 │
-├─ [other collections: catalog, invoice, product, ...]
+├─ [other collections: catalog, order/payment/bill domain data, product legacy, ...]
 │
 
 Redis:
 ├─ user-token:{sha256_hash}: AuthorizeResponse (TTL 30 min)
-├─ session:{sid}: { tenantId?, createdAt, lastActivityAt } (TTL 2h)
+├─ bff-session:{tenantId}:{sid}: { tenantId?, createdAt, lastActivityAt } (TTL 2h)
 
 Keycloak:
 ├─ Realm: qrtable
 ├─ Client: qrtable-bff (confidential)
-├─ Roles: OWNER, MANAGER, WAITER, CHEF, BARISTA
+├─ Roles: SUPER_ADMIN, OWNER, MANAGER, WAITER, CHEF, BARISTA
 └─ Protocol Mapper: tenant_id → JWT claim
 ```
 
@@ -2013,8 +2039,8 @@ Hệ thống authentication, authorization, role, và permission của QRTable �
 1. ✅ **Hỗ trợ 2 actor loại:** Staff (JWT từ Keycloak) + Customer (Session anonymous)
 2. ✅ **Enforce tenant isolation:** Mọi request có tenantId, prevent cross-tenant access
 3. ✅ **Validate role consistency:** Keycloak roles ∩ Internal roles ≠ ∅
-4. ✅ **Granular permissions:** 6 roles + 51 permissions, flexible assignment
-5. ✅ **Caching & performance:** Token cached 30 min, session cached 24h + idle 30 min
+4. ✅ **Granular permissions:** 6 roles + 66 permissions, flexible assignment
+5. ✅ **Caching & performance:** Token cached 30 min, BFF session cached 2h + idle 30 min
 6. ✅ **Debug-friendly:** Clear error codes, processId tracking, structured logging
 
 Khi phát triển features mới:

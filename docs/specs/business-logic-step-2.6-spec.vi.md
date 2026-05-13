@@ -3,7 +3,7 @@
 > **Giai đoạn:** 2B — Kitchen Service + WebSocket Gateway  
 > **Bước:** 2.6 — KDS Redis-only, SLA Worker, WebSocket Gateway hardening  
 > **Date:** 2026-05-07  
-> **Trạng thái:** Chốt sau audit `docs/superpowers/audits/step-2.6-audit-report.md`  
+> **Trạng thái:** Chốt sau audit Step 2.6
 > **Mục đích:** Tài liệu này là blueprint kỹ thuật/nghiệp vụ cho bước lập kế hoạch triển khai tiếp theo. Đây **không** phải implementation plan và không phân rã task code.
 
 ---

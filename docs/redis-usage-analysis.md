@@ -1,8 +1,10 @@
 # Phân Tích Sử Dụng Redis — Hiện Trạng Triển Khai và Thiết Kế Dự Kiến
 
-> Ngày: 2026-05-05  
+> Ngày: 2026-05-13
 > Phạm vi: `docs/business-logic.md`, `docs/technical-architecture.md`, `docs/implementation_plan.md`, `docs/phases/*`, các tài liệu/spec Redis, và code hiện tại trong `apps/`, `libs/`, `tools/`.  
 > Mục tiêu: làm rõ mọi phần Redis trong hệ thống QRTable theo cách dễ đọc, dễ tra cứu, dễ kiểm chứng cho người Việt.
+
+> **Current status — supporting analysis:** Tài liệu này là reference hỗ trợ. Nguồn canonical cho kiến trúc Redis là [`docs/technical-architecture.md`](./technical-architecture.md) và code hiện tại. Sau Phase 4B, các Redis users đã xác minh gồm BFF, Order, Kitchen/WebSocket, SaaS và Payment. Catalog, Authorizer và User-Access chưa được xác minh là Redis users trực tiếp; Notification hiện deferred/not current.
 
 ## 1. Tóm Tắt Nhanh
 
@@ -12,6 +14,8 @@ Redis đã được dùng thật trong hệ thống, nhưng cần tách rõ hai 
    - Hạ tầng: Redis và Redis Insight trong Docker Compose.
    - BFF cache layer: `@nestjs/cache-manager` + `@keyv/redis`.
    - BFF global rate limiting: NestJS Throttler dùng Redis storage.
+   - BFF WebSocket scale-out: Socket.io Redis Adapter.
+   - BFF KDS fan-out subscriber: `realtime:kds:*`.
    - Cache xác thực JWT của nhân sự: `user-token:{sha256(jwt)}`.
    - Session ẩn danh ở BFF cho customer/guest: `bff-session:{tenantId}:{sessionId}`.
    - Cache public menu: `menu:{tenantId}`.
@@ -19,14 +23,15 @@ Redis đã được dùng thật trong hệ thống, nhưng cần tách rõ hai 
    - Cache active session của Order domain: `session:{tenantId}:{sessionId}`.
    - Shared cart: `cart:{tenantId}:{sessionId}`.
    - Lock chuyển bàn: `transfer:*` và `table-transfer:*`.
+   - Counter quota đơn theo ngày: `quota:{tenantId}:orders:{date}`.
+   - Kitchen Service Redis-only KDS store: `kds:*`, SLA/dedupe/lock keys.
+   - SaaS Service: suspend flag `tenant:{tenantId}:suspended` và current subscription cache `subscription:{tenantId}`.
+   - Payment Service: SePay OAuth state cache `oauth_state:{state}`.
    - Script dev reset/verify: flush Redis local và kiểm tra key tenant cũ.
 
 2. **Đã có trong tài liệu hoặc roadmap, nhưng chưa triển khai**
    - Cache trạng thái bàn Catalog: `table:{tenantId}:{tableId}:status`.
-   - Queue Kitchen/KDS bằng Redis-only và SLA state.
-   - Socket.io Redis Adapter để WebSocket scale nhiều instance.
    - Redis idempotency key cho order creation / hardening.
-   - Redis flag để chặn tenant suspended.
    - Redis cache tùy chọn cho Authorizer/JWKS.
    - Rate limit nghiệp vụ theo QR scan / session, ngoài global HTTP throttler hiện tại.
 
@@ -74,21 +79,23 @@ Code liên quan:
 
 Các package liên quan Redis đã có trong `package.json`:
 
-| Package                                   | Vai trò                                                      |
-| ----------------------------------------- | ------------------------------------------------------------ |
-| `@keyv/redis`                             | Redis store cho Nest CacheModule / cache-manager.            |
-| `@nestjs/cache-manager` + `cache-manager` | Abstraction cache cho BFF và guards.                         |
-| `@nest-lab/throttler-storage-redis`       | Redis storage cho NestJS Throttler.                          |
-| `@nestjs/throttler`                       | Global HTTP rate limiting.                                   |
-| `ioredis`                                 | Redis client trực tiếp cho Order Service và dev scripts.     |
-| `socket.io`                               | WebSocket transport hiện tại; package Redis Adapter chưa có. |
+| Package                                   | Vai trò                                                                  |
+| ----------------------------------------- | ------------------------------------------------------------------------ |
+| `@keyv/redis`                             | Redis store cho Nest CacheModule / cache-manager.                        |
+| `@nestjs/cache-manager` + `cache-manager` | Abstraction cache cho BFF và guards.                                     |
+| `@nest-lab/throttler-storage-redis`       | Redis storage cho NestJS Throttler.                                      |
+| `@nestjs/throttler`                       | Global HTTP rate limiting.                                               |
+| `ioredis`                                 | Redis client trực tiếp cho Order, Kitchen, SaaS, Payment và dev scripts. |
+| `redis`                                   | Node Redis client cho BFF realtime adapter/subscriber.                   |
+| `@socket.io/redis-adapter` + `socket.io`  | WebSocket transport và Redis Adapter cho multi-instance room broadcast.  |
 
 ### 3.3 Hai Kiểu Truy Cập Redis
 
-| Kiểu truy cập             | Đang dùng bởi              | Code                                         | Vì sao dùng                                                 |
-| ------------------------- | -------------------------- | -------------------------------------------- | ----------------------------------------------------------- |
-| CacheManager + Keyv Redis | BFF, guards                | `libs/configuration/src/lib/redis.config.ts` | Phù hợp dữ liệu cache đơn giản qua `get/set/del`.           |
-| Direct `ioredis`          | Order Service, dev scripts | `libs/providers/redis-client/*`              | Cần Hash, lock, `MULTI`, `PEXPIRE`, kiểm tra key trực tiếp. |
+| Kiểu truy cập                  | Đang dùng bởi                        | Code                                         | Vì sao dùng                                                          |
+| ------------------------------ | ------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------- |
+| CacheManager + Keyv Redis      | BFF, guards                          | `libs/configuration/src/lib/redis.config.ts` | Phù hợp dữ liệu cache đơn giản qua `get/set/del`.                    |
+| Direct `ioredis`               | Order, Kitchen, SaaS, Payment, tools | `libs/providers/redis-client/*`              | Cần Hash, lock, `MULTI`, `PEXPIRE`, counter, kiểm tra key trực tiếp. |
+| Node Redis / Socket.io adapter | BFF realtime/WebSocket               | `apps/bff/src/app/modules/realtime/*`        | Pub/Sub, Socket.io Redis Adapter và internal KDS fan-out.            |
 
 ## 4. Redis Đã Triển Khai Trong Code
 
@@ -394,7 +401,7 @@ Code liên quan:
 
 - `apps/order/src/app/modules/order/services/session.service.ts`
 - `apps/order/src/app/modules/order/constants/session-policy.ts`
-- `docs/business-logic-step-2.4-spec.vi.md` §4 và §19
+- `docs/specs/business-logic-step-2.4-spec.vi.md` §4 và §19
 
 ### 4.8 Shared Cart State
 
@@ -461,7 +468,7 @@ Code liên quan:
 - `apps/order/src/app/modules/order/services/cart.service.ts`
 - `apps/order/src/app/modules/order/services/bill.service.ts`
 - `apps/order/src/app/modules/order/services/order.service.ts`
-- `docs/business-logic-step-2.4-spec.vi.md` §5 và §19
+- `docs/specs/business-logic-step-2.4-spec.vi.md` §5 và §19
 
 ### 4.9 Lock Chuyển Bàn
 
@@ -506,7 +513,7 @@ Code liên quan:
 
 - `apps/order/src/app/modules/order/services/transfer.service.ts`
 - `apps/order/src/app/modules/order/tests/transfer.service.spec.ts`
-- `docs/business-logic-step-2.4-spec.vi.md` §13
+- `docs/specs/business-logic-step-2.4-spec.vi.md` §13
 
 ### 4.10 Dev Reseed / Verification
 
@@ -565,7 +572,7 @@ Tài liệu liên quan:
 
 ### 5.2 Kitchen / KDS Redis-Only Store
 
-Phase 2B thiết kế Kitchen Service là Redis-only, không có database riêng.
+Phase 2B Kitchen Service hiện dùng Redis làm KDS store chính, không có database riêng cho queue/ticket runtime.
 
 Keys đơn giản trong architecture docs:
 
@@ -575,27 +582,28 @@ kds:{tenantId}:bar
 ticket:{ticketId}
 ```
 
-Phân tích Step 2.6 đề xuất chi tiết hơn:
+Code hiện tại triển khai bộ key chi tiết hơn qua `apps/kitchen/src/app/modules/kitchen/utils/kds-keys.ts`:
 
 ```txt
 kds:{tenantId}:ticket:{ticketId}
 kds:{tenantId}:ticket:{ticketId}:items
 kds:{tenantId}:ticket-item:{ticketItemId}
-kds:{tenantId}:station:{station}:PENDING
-kds:{tenantId}:station:{station}:PROCESSING
+kds:{tenantId}:{station}
 kds:{tenantId}:station:{station}:READY
 kds:{tenantId}:order:{orderId}:tickets
+kds:{tenantId}:session:{sessionId}:tickets
 kds:{tenantId}:dedupe:event:{eventId}
-kds:{tenantId}:dedupe:order:{orderId}
+kds:{tenantId}:dedupe:order:{orderId}:{station}
+kds:{tenantId}:cmd:{requestId}
 kds:sla:due
 kds:{tenantId}:ticket:{ticketId}:sla
 kds:{tenantId}:dedupe:sla:{ticketId}:{level}:{bucket}
 kds:{tenantId}:revision
-kds:{tenantId}:settings
-lock:kds:{tenantId}:ticket:{ticketId}
+lock:kds:rebuild:{tenantId}
+realtime:kds:{tenantId}
 ```
 
-Nghiệp vụ dự kiến:
+Nghiệp vụ / cơ chế hiện tại:
 
 - Consume Kafka `order.confirmed`.
 - Tách ticket theo `MenuItem.station`.
@@ -603,39 +611,42 @@ Nghiệp vụ dự kiến:
 - Track trạng thái bếp ở mức ticket/item.
 - Hỗ trợ recall, SLA warning, snapshot revision cho KDS.
 - Không hỗ trợ batching/gộp món dưới bất kỳ tên gọi nào.
-- Deduplicate khi Kafka replay event.
+- Deduplicate khi Kafka replay event hoặc command request lặp.
+- Publish internal realtime event lên `realtime:kds:{tenantId}` để BFF fan-out qua WebSocket.
 
 Trạng thái code:
 
-- Chưa có `apps/kitchen`.
-- Chưa có key KDS nào được write.
-- KDS UI hiện vẫn dựa trên mock/fake realtime hoặc hooks dự kiến.
+- Có `apps/kitchen`.
+- `KdsRedisRepository` write/read `kds:*`, SLA, dedupe, dead-letter và rebuild lock keys.
+- `KitchenEventsPublisher` publish `realtime:kds:{tenantId}` bằng Redis Pub/Sub.
+- KDS UI/realtime phụ thuộc BFF subscriber + Socket.io path hiện tại.
 
 Tài liệu liên quan:
 
 - `docs/phases/phase-2b-kitchen-websocket.md`
-- `docs/backend-analysis-step-2.6.vi.md`
+- `docs/specs/business-logic-step-2.6-spec.vi.md`
 - `docs/architecture/erd_explanation.md`
 
 ### 5.3 Socket.io Redis Adapter
 
-Hành vi dự kiến:
+Hành vi hiện tại:
 
 - Dùng Redis Pub/Sub qua Socket.io Redis Adapter.
 - Đồng bộ room broadcast giữa nhiều BFF/WebSocket instances.
+- BFF subscribe `realtime:kds:*` để chuyển KDS internal events thành Socket.io events.
 
 Trạng thái code:
 
-- Gateway hiện tại là Nest `@WebSocketGateway` với Socket.io rooms in-memory.
+- Gateway là Nest `@WebSocketGateway` với Socket.io rooms.
 - Đã hỗ trợ `join.session` và `join.staff`.
-- Chưa thấy setup Redis Adapter.
-- `@socket.io/redis-adapter` chưa có trong `package.json`.
+- `RedisIoAdapter` connect Redis trong `apps/bff/src/main.ts`.
+- `@socket.io/redis-adapter` và `redis` đã có trong `package.json`.
 
 Tài liệu liên quan:
 
 - `docs/technical-architecture.md` §9.3
 - `docs/phases/phase-2b-kitchen-websocket.md`
-- `docs/backend-analysis-step-2.6.vi.md`
+- `docs/specs/business-logic-step-2.6-spec.vi.md`
 
 ### 5.4 Redis Idempotency Keys
 
@@ -664,32 +675,81 @@ Tài liệu liên quan:
 
 - `docs/technical-architecture.md` §12.2
 - `docs/phases/phase-4a-saga-hardening.md`
-- `docs/business-logic-step-2.4-spec.vi.md`
+- `docs/specs/business-logic-step-2.4-spec.vi.md`
 
 ### 5.5 Tenant Suspend Redis Flag
 
-Key theo tài liệu:
+Key hiện tại:
 
 ```txt
 tenant:{tenantId}:suspended
 ```
 
-Vai trò dự kiến:
+Vai trò hiện tại:
 
 - SaaS Service set Redis flag nhanh khi tenant bị suspended.
-- Guards có thể chặn request sớm mà không phụ thuộc Kafka pipeline.
+- SaaS Service clear flag khi tenant được activate/close theo lifecycle.
+- BFF `CustomerTenantLifecycleGuard` đọc flag này như edge/fallback signal cho customer/menu routes.
+- Guard cho phép các read/join/VietQR pending flows cần thiết, nhưng chặn customer mutations khi tenant suspended.
 
 Trạng thái code:
 
-- Chưa thấy guard lookup key này.
-- Phase SaaS onboarding/subscription vẫn đang ở trạng thái planned trong tài liệu.
+- `TenantStatusCacheService` dùng `buildTenantSuspendedRedisKey(tenantId)` và ghi `tenant:{tenantId}:suspended`.
+- `CustomerTenantLifecycleGuard` đọc key qua CacheManager fallback khi SaaS status unavailable.
+- `buildTenantSuspendedRedisKey` nằm trong `libs/constants/src/lib/saas.constants.ts`.
 
 Tài liệu liên quan:
 
 - `docs/phases/phase-4b-saas-onboarding.md`
 - `docs/technical-architecture.md` §7.3
 
-### 5.6 Optional Authorizer / JWKS Cache
+### 5.6 SaaS Current Subscription Cache
+
+Key hiện tại:
+
+```txt
+subscription:{tenantId}
+```
+
+Vai trò hiện tại:
+
+- SaaS Service cache current subscription snapshot để target services có thể check plan/limits nhanh.
+- TTL hiện tại là 300 giây.
+- Cache bị clear/update theo subscription lifecycle.
+
+Trạng thái code:
+
+- `SubscriptionCacheService` dùng `buildCurrentSubscriptionRedisKey(tenantId)`.
+- Key canonical hiện tại là `subscription:{tenantId}`; không dùng legacy tenant-prefixed current-subscription variants.
+
+Tài liệu liên quan:
+
+- `docs/technical-architecture.md` §7.3 và §11.1
+
+### 5.7 Payment OAuth State Cache
+
+Key hiện tại:
+
+```txt
+oauth_state:{state}
+```
+
+Vai trò hiện tại:
+
+- Payment Service lưu state SePay OAuth 5 phút để bind callback với `tenantId` và `ownerUserId`.
+- Callback consume key rồi delete để tránh replay.
+- Có in-memory fallback cho isolated tests/dev khi Redis client không được inject.
+
+Trạng thái code:
+
+- `TenantPaymentSettingsService.storeOAuthState` ghi `oauth_state:{state}` với `EX 300`.
+- `consumeOAuthState` đọc rồi xóa cùng key.
+
+Tài liệu liên quan:
+
+- `docs/technical-architecture.md` §7.5 và §11.1
+
+### 5.8 Optional Authorizer / JWKS Cache
 
 Architecture docs có nhắc Redis cache tùy chọn cho JWKS public key.
 
@@ -702,7 +762,7 @@ Tài liệu liên quan:
 
 - `docs/technical-architecture.md` §6.2.2
 
-### 5.7 Business-Specific QR / Abuse Rate Limits
+### 5.9 Business-Specific QR / Abuse Rate Limits
 
 Business docs quy định:
 
@@ -882,26 +942,31 @@ Vai trò Redis:
 | `cart:{tenantId}:{sessionId}`                           | Hash                           | Order Service        | 2h          | Đã triển khai   | Shared cart draft state.               |
 | `transfer:{tenantId}:{sessionId}`                       | String                         | Order Service        | 30s         | Đã triển khai   | Transfer lock cho session.             |
 | `table-transfer:{tenantId}:{tableId}`                   | String                         | Order Service        | 30s         | Đã triển khai   | Transfer lock cho bàn nguồn/đích.      |
+| `quota:{tenantId}:orders:{date}`                        | String counter                 | Order Service        | 48h         | Đã triển khai   | Daily order quota counter.             |
 | `table:{tenantId}:{tableId}:status`                     | String                         | BFF/Catalog boundary | none        | Dự kiến         | Cache nhanh trạng thái bàn.            |
-| `kds:{tenantId}:*`                                      | Hash/Set/ZSet/String           | Kitchen              | tùy key     | Dự kiến         | KDS queue/ticket/SLA state.            |
-| `socket.io-adapter:*`                                   | Pub/Sub internal               | WebSocket Gateway    | n/a         | Dự kiến         | Broadcast room đa instance.            |
+| `kds:{tenantId}:*`                                      | Hash/Set/ZSet/String           | Kitchen              | tùy key     | Đã triển khai   | KDS queue/ticket/SLA state.            |
+| `lock:kds:rebuild:{tenantId}`                           | String lock                    | Kitchen              | short TTL   | Đã triển khai   | Rebuild lock cho KDS recovery.         |
+| `realtime:kds:{tenantId}`                               | Pub/Sub channel                | Kitchen/BFF          | n/a         | Đã triển khai   | Internal KDS fan-out.                  |
+| `socket.io-adapter:*`                                   | Pub/Sub internal               | WebSocket Gateway    | n/a         | Đã triển khai   | Broadcast room đa instance.            |
 | `idempotency:order-submit:{tenantId}:{sessionId}:{key}` | String                         | Order Service        | planned TTL | Dự kiến         | Chặn duplicate submit nhanh.           |
-| `tenant:{tenantId}:suspended`                           | String/flag                    | SaaS/BFF Guard       | theo policy | Dự kiến         | Chặn tenant suspended nhanh.           |
+| `tenant:{tenantId}:suspended`                           | String/flag                    | SaaS/BFF Guard       | no expire   | Đã triển khai   | Chặn tenant suspended nhanh.           |
+| `subscription:{tenantId}`                               | String JSON                    | SaaS Service         | 5m          | Đã triển khai   | Cache current subscription.            |
+| `oauth_state:{state}`                                   | String JSON                    | Payment Service      | 5m          | Đã triển khai   | SePay OAuth state one-time consume.    |
 
 ## 8. Matrix Theo Service
 
-| Service / app | Truy cập Redis hiện tại              | Key đã triển khai                                         | Key dự kiến                                                  | Ghi chú                                                                  |
-| ------------- | ------------------------------------ | --------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| BFF           | Có, CacheManager + Throttler storage | `user-token:*`, `bff-session:*`, `menu:*`, throttler keys | `table:*:status`, `tenant:*:suspended`, Socket adapter       | BFF là cache/edge layer chính.                                           |
-| Authorizer    | Chưa thấy direct Redis               | none                                                      | optional JWKS cache                                          | Auth result cache hiện nằm ở BFF.                                        |
-| Catalog       | Chưa thấy direct Redis               | none                                                      | table status cache qua BFF/direct policy                     | Menu cache do BFF sở hữu, không phải Catalog.                            |
-| Order         | Có, direct `ioredis`                 | `session:*`, `cart:*`, `transfer:*`, `table-transfer:*`   | Redis idempotency hardening                                  | PostgreSQL vẫn là durable source.                                        |
-| Kitchen       | Chưa có service                      | none                                                      | `kds:*`, `ticket:*`, SLA/dedupe keys                         | Phase 2B dự kiến.                                                        |
-| SaaS          | Chưa thấy Redis trong code           | none                                                      | `tenant:{tid}:suspended`                                     | Phase 4B dự kiến.                                                        |
-| Payment       | Chưa có service riêng                | none                                                      | chưa có Redis key cụ thể ngoài pattern idempotency tương lai | Payment dự kiến PostgreSQL + Kafka.                                      |
-| Notification  | Chưa có service                      | none                                                      | none                                                         | Kafka/Mongo dự kiến.                                                     |
-| Frontends     | Không dùng Redis                     | none                                                      | none                                                         | Dùng React Query, local/session storage, IndexedDB/service worker cache. |
-| Dev tools     | Có, direct `ioredis`                 | tất cả key trong DB qua `flushdb`, scan legacy key        | n/a                                                          | Reset/verify local-only.                                                 |
+| Service / app   | Truy cập Redis hiện tại                           | Key đã triển khai                                                                                                 | Key dự kiến                              | Ghi chú                                                                  |
+| --------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
+| BFF             | Có, CacheManager + Throttler storage + Node Redis | `user-token:*`, `bff-session:*`, `menu:*`, throttler keys, `tenant:*:suspended`, Socket adapter, `realtime:kds:*` | `table:*:status`                         | BFF là cache/edge/realtime layer chính.                                  |
+| Authorizer      | Chưa thấy direct Redis                            | none                                                                                                              | optional JWKS cache                      | Auth result cache hiện nằm ở BFF.                                        |
+| Catalog         | Chưa thấy direct Redis                            | none                                                                                                              | table status cache qua BFF/direct policy | Menu cache do BFF sở hữu, không phải Catalog.                            |
+| Order           | Có, direct `ioredis`                              | `session:*`, `cart:*`, `transfer:*`, `table-transfer:*`, `quota:*`                                                | Redis idempotency hardening              | PostgreSQL vẫn là durable source.                                        |
+| Kitchen         | Có, direct `ioredis`                              | `kds:*`, `lock:kds:*`, `realtime:kds:*`                                                                           | none currently verified                  | Redis là KDS runtime store hiện tại.                                     |
+| SaaS Service    | Có, direct `ioredis`                              | `tenant:{tenantId}:suspended`, `subscription:{tenantId}`                                                          | none currently verified                  | Phase 4B tenant lifecycle/subscription cache.                            |
+| Payment Service | Có, direct `ioredis`                              | `oauth_state:{state}`                                                                                             | none currently verified                  | Phase 4B SePay OAuth state.                                              |
+| Notification    | Deferred/not current                              | none                                                                                                              | none                                     | Không tính là Redis user hiện tại.                                       |
+| Frontends       | Không dùng Redis                                  | none                                                                                                              | none                                     | Dùng React Query, local/session storage, IndexedDB/service worker cache. |
+| Dev tools       | Có, direct `ioredis`                              | tất cả key trong DB qua `flushdb`, scan legacy key                                                                | n/a                                      | Reset/verify local-only.                                                 |
 
 ## 9. Gaps và Ghi Chú Kiểm Chứng
 
@@ -961,17 +1026,17 @@ Order submit hiện dựa vào PostgreSQL unique index và replay lookup. Redis 
 
 Architecture và Phase 1 docs liệt kê `table:{tenantId}:{tableId}:status`, nhưng chưa thấy implementation.
 
-### 9.7 WebSocket Redis Adapter Chỉ Mới Có Trong Tài Liệu
+### 9.7 WebSocket Redis Adapter Đã Có Trong Code
 
-`OrderEventsGateway` hiện dùng Socket.io rooms in-memory. Cách này ổn cho một BFF instance, nhưng multi-instance fan-out cần Redis Adapter ở Phase 2B.
+BFF hiện connect `RedisIoAdapter` trong `apps/bff/src/main.ts`, dùng `@socket.io/redis-adapter` để đồng bộ Socket.io room broadcast giữa nhiều instance. KDS internal fan-out cũng dùng Redis Pub/Sub qua `realtime:kds:*`.
 
 ### 9.8 Menu Cache Đã Invalidate, Nhưng Chưa Broadcast Menu
 
 Admin category/menu-item write hiện xóa `menu:{tenantId}`. Docs cũng nhắc WebSocket broadcast cho menu sync, nhưng code chưa emit `menu.updated`.
 
-### 9.9 Tenant Suspend Flag Chỉ Mới Có Trong Tài Liệu
+### 9.9 Tenant Suspend Flag Đã Có Trong Phase 4B
 
-Phase 4B dự kiến chặn suspended tenant qua Redis flag. Guards hiện chưa đọc flag đó.
+SaaS hiện ghi/xóa `tenant:{tenantId}:suspended`; BFF `CustomerTenantLifecycleGuard` đọc flag này làm fallback/edge signal. Khi thay đổi semantics suspend/activate, cần cập nhật đồng thời SaaS cache writer, BFF guard và `docs/technical-architecture.md`.
 
 ### 9.10 QR-Specific Rate Limit Chỉ Mới Có Trong Tài Liệu
 
@@ -1016,7 +1081,11 @@ Kỳ vọng khi chạy local hiện tại:
 - Sau QR join/order flow: có `session:{tenantId}:{sessionId}` dạng hash.
 - Sau cart mutation: có `cart:{tenantId}:{sessionId}` dạng hash với `cartVersion`.
 - Trong lúc transfer: lock keys xuất hiện rất ngắn rồi biến mất.
-- `kds:*`, `tenant:*:suspended`, `table:*:status`, và Redis idempotency keys không nên xuất hiện cho tới khi các feature roadmap được triển khai.
+- Sau KDS/order-confirmed flow: có thể có `kds:*`, `lock:kds:*` ngắn hạn và Pub/Sub `realtime:kds:*`.
+- Khi tenant bị suspend: có `tenant:{tenantId}:suspended`; khi activate/close thì key được xóa.
+- Khi subscription cache được warm: có `subscription:{tenantId}` với TTL khoảng 5 phút.
+- Trong SePay OAuth flow: có `oauth_state:{state}` trong tối đa 5 phút và callback sẽ consume/delete key.
+- `table:*:status` và Redis idempotency keys không nên xuất hiện cho tới khi các feature roadmap tương ứng được triển khai.
 
 ## 11. Tài Liệu và Code Tham Chiếu
 
@@ -1030,8 +1099,8 @@ Tài liệu chính:
 - `docs/phases/phase-2b-kitchen-websocket.md`
 - `docs/phases/phase-4a-saga-hardening.md`
 - `docs/phases/phase-4b-saas-onboarding.md`
-- `docs/business-logic-step-2.4-spec.vi.md`
-- `docs/backend-analysis-step-2.6.vi.md`
+- `docs/specs/business-logic-step-2.4-spec.vi.md`
+- `docs/specs/business-logic-step-2.6-spec.vi.md`
 - `docs/guides/redis-qrtable.md`
 
 Code chính:

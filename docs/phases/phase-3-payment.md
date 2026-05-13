@@ -1,462 +1,99 @@
-# Phase 3 — Payment
+# Phase 3 - Payment
 
-> **Mục tiêu:** Khép kín luồng thanh toán tiền mặt và VietQR/SePay (VND) trên POS/Dashboard và Customer PWA — làm tròn đúng quy tắc VND, bill bất biến sau Paid, hoàn tiền có vết audit — để doanh thu và trạng thái bàn/session phản ánh thực tế thu ngân.
-> **Ước lượng:** ~1-2 tuần
-> **Trạng thái:** 🟨 Đang triển khai
+> **Status:** Done
+> **Canonical Role:** Final phase record after implementation/audit.
+> **Last Updated:** 2026-05-13
 
-> **Post-payment finalization (2026-05-09):** Sau khi thanh toán hoàn tất, Payment completion được đồng bộ vào Order qua `BILL_MARK_PAID`: bill **PAID**, session **đóng**, Catalog chuyển bàn **billing → cleaning**. POS/Customer/PWA lấy đúng trạng thái chủ yếu qua **polling/refetch**; Kafka → BFF WebSocket chỉ phát **hint** (`events.paymentCompleted`) để invalidate query, không thay thế nguồn dữ liệu chuẩn.
->
-> **Safe refactor (2026-05):** Quyết định kiến trúc/nghiệp vụ tại [`docs/superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md`](../superpowers/specs/2026-05-09-phase-3-payment-refactor-decisions.md). Phạm vi cốt lõi: thanh toán đúng, đồng bộ bill/`payment_id`, SePay webhook + guard/DTO. **Email biên lai / Notification Service:** Phase 4C — không nằm trong Phase 3.
+## Final Scope
 
-## Prerequisites
+Phase 3 completed the restaurant bill payment layer for QRTable: cash settlement, VietQR/SePay settlement, payment history, manual full refund, payment audit trail, and post-payment synchronization back to Order.
 
-- Phase 2B hoàn thành — [phase-2b-kitchen-websocket.md](phase-2b-kitchen-websocket.md) (đơn/bếp ổn định, WebSocket và Kafka nền tảng sẵn sàng cho sự kiện downstream)
-- Order Service cung cấp `billId` và tổng hợp bill là nguồn sự thật cho tổng tiền trước thanh toán — Payment Service không sở hữu nghiệp vụ bill
-- Tài khoản ngân hàng doanh nghiệp đã kết nối SePay (sandbox cho dev/demo, live cho production)
+The final scope includes:
 
-## Tham Chiếu
+- Payment Service ownership of `payments`, `refunds`, `audit_payments`, payment outbox events, cash confirmation, VietQR creation, SePay webhook settlement, payment history, and manual refund state.
+- Order Service ownership of bill/session lifecycle: bill request, `PENDING_PAYMENT`, final `PAID`, session close, and table transition through Catalog.
+- BFF HTTP surfaces for staff payment actions, Customer PWA payment actions, and SePay webhook routing.
+- UI surfaces in Customer PWA `/request-payment`, POS `/pos/bills`, POS legacy `/pos/payment` redirect, and Dashboard `/dashboard/orders` refund controls.
+- Kafka contracts `payment.completed` and `payment.refunded` for downstream synchronization and realtime hints.
 
-| Tài liệu                  | Section liên quan                                         |
-| ------------------------- | --------------------------------------------------------- |
-| technical-architecture.md | §6.2.7 Payment Service, §10 Tích hợp thanh toán           |
-| business-logic.md         | §6 Luồng thanh toán & đối soát (Payment & Reconciliation) |
+This phase record complements [business-logic.md](../business-logic.md), [technical-architecture.md](../technical-architecture.md), [implementation_plan.md](../implementation_plan.md), and [permission-matrix.md](../architecture/permission-matrix.md). When behavior conflicts, current code and tests on `main` are the source of truth.
 
-## Tổng Quan
+## Accepted Decisions
 
-Phase 3 sử dụng **SePay** làm cổng nhận thanh toán chuyển khoản ngân hàng qua **VietQR động** — không có redirect sang hosted page. Payment Service tách trách nhiệm thanh toán khỏi Order Service theo đúng bounded context: chỉ ghi nhận và điều phối tiền (VietQR/SePay, tiền mặt), làm tròn VND, refund và audit — còn bill/order lifecycle vẫn do Order Service dẫn dắt qua `billId`.
+- Phase 3 payment methods are `CASH` and `VIETQR`. Other gateways are out of scope.
+- Bill lifecycle remains in Order. Payment Service stores payment/refund facts and calls Order through `BILL_MARK_PAID`; Order marks the bill `PAID`, closes the active session, and requests Catalog table status `CLEANING`.
+- Payment totals come from the Order bill snapshot. Payment persists `rawTotal`, `roundedTotal`, and `roundingDelta`; the rounding rule is represented on the bill snapshot and reused by Payment.
+- VietQR references use `QRTBL` plus the first eight non-dash characters of `billId`, uppercased. On unique collision, Payment retries with the next eight characters.
+- Creating a VietQR payment is idempotent for a pending bill: an existing `PENDING` payment is reused instead of creating a second row.
+- Cash settlement is staff-confirmed. Staff must provide `amountReceived >= roundedTotal`; Payment stores the received amount, change, method `CASH`, status `PAID`, and completion audit.
+- VietQR settlement is webhook-confirmed. Underpaid transfers keep payment `PENDING` and record `SEPAY_WEBHOOK_UNDERPAID`; sufficient or overpaid transfers mark `PAID`, store actual `paidAmount`, and do not create an automatic refund for the difference.
+- Duplicate SePay transaction IDs, webhook events after payment is already terminal, and unmatched/non-incoming payloads do not create a second settlement. Matched duplicates/after-paid cases are audited; unmatched/non-incoming cases are application logs only.
+- Refund is manual full refund only. A paid payment can have at most one active or confirmed refund; request moves payment to `REFUND_PENDING`, staff confirmation moves refund to `CONFIRMED` and payment to `REFUNDED`.
+- Realtime payment events are hints for UI invalidation/refetch. Polling and canonical BFF/Order/Payment reads remain the source of truth.
 
-**Luồng VietQR:** Payment Service tạo URL QR tĩnh nhúng trực tiếp (`qr.sepay.vn/img?acc=...&bank=...&amount=...&des=...`) với **amount = rounded_total** và mã tham chiếu bill **`QRTBL` + 8 ký tự đầu của `billId` sau khi bỏ dấu gạch** (UUID) trong `des`/nội dung CK → POS/Customer hiển thị QR → Khách quét và chuyển khoản → SePay phát hiện giao dịch → POST webhook tới BFF với `X-Secret-Key` header → BFF xác thực secret + validate body (DTO runtime) → extract `code` hoặc khớp `content` → Payment Service: **underpaid** giữ PENDING + audit `SEPAY_WEBHOOK_UNDERPAID`; **đủ hoặc thừa tiền** → PAID, lưu `paidAmount` thực nhận (overpaid được chấp nhận).
+## Final Business Behavior
 
-**Tiền mặt** không đi SePay: staff xác nhận trên POS là điểm cam kết nghiệp vụ, sau đó `payment.completed` qua Kafka.
+Customer payment starts from the current table session. The Customer PWA can request the bill only after the cart is empty and non-canceled bill orders are served. Order moves the bill from `OPEN` to `PENDING_PAYMENT`, locks the cart, creates the service request, and moves the table to billing. While the bill is pending payment, the customer cannot place more orders from that session.
 
-**Refund (Demo/Luận văn):** SePay không cung cấp API chuyển tiền hoàn lại tự động cho tài khoản ngân hàng thông thường. Luồng refund được thiết kế theo mô hình **Staff-confirmed Manual Refund**: Owner/Manager tạo refund record trên Dashboard (ghi rõ số tiền + lý do + số tài khoản khách), Staff thực hiện chuyển khoản tay qua app ngân hàng, sau đó bấm **"Xác nhận đã hoàn tiền"** trên Dashboard để hệ thống ghi `refunds` + `audit_payments` + emit `payment.refunded`.
+For VietQR, Customer PWA or staff creates/reuses a pending payment for the bill. The UI shows the bank account, bank name, bill reference, rounded amount, and SePay QR image URL. The customer transfers with the `QRTBL...` reference; the payment remains `PENDING` until a matching webhook with enough money is processed.
 
-Làm tròn `Math.ceil(amount / 1000) * 1000` với lưu `raw_total`, `rounded_total`, `rounding_delta` phục vụ đối soát. Hai topic `payment.completed` và `payment.refunded` là contract ổn định cho các consumer P1–P3.
+For cash, staff uses the POS bill settlement panel, enters received VND, sees change calculated client-side, and confirms. Payment marks the payment paid and emits completion; Order then finalizes the bill/session/table. If Order finalization is temporarily unavailable, Payment still persists `PAID` and writes the outbox event so the Order consumer can apply `payment.completed`.
 
----
+When a payment completes by cash or VietQR, the bill is treated as immutable. Order records `paymentId`, `paymentMethod`, and `paidAt`; the session closes; the table moves to cleaning. Customer PWA and POS/Dashboard observe the result by refetching bill/payment state, with websocket events only accelerating the refresh.
 
-## SePay — Tổng quan Tích hợp
+Refunds do not reopen the bill and do not transfer money automatically. Owner/Manager creates a refund request with a reason and optional customer bank details, performs the external transfer manually, then confirms the refund in the Dashboard. Payment records audit entries and emits `payment.refunded`.
 
-### VietQR URL Format
+## Final Technical Behavior
 
-SePay cung cấp endpoint tạo ảnh QR code trực tiếp, không cần SDK:
+Service boundaries after Phase 3:
 
-```
-https://qr.sepay.vn/img?acc={SO_TAI_KHOAN}&bank={TEN_NGAN_HANG}&amount={SO_TIEN}&des={NOI_DUNG}
-```
+- BFF owns HTTP routing, request validation, auth/permission guards, customer session scoping, raw webhook response shape, and forwarding to TCP services.
+- Payment Service owns payment persistence, SePay reference extraction, QR URL creation, cash/VietQR settlement transactions, duplicate handling, audit rows, refund rows, payment history, and payment outbox publishing.
+- Order Service owns bill snapshots, bill request rules, `BILL_MARK_PAID`, idempotent paid-bill handling, session close, and Catalog table status updates.
+- Catalog owns final table state; BFF realtime owns websocket emission and query invalidation hints.
 
-| Tham số  | Ví dụ           | Mô tả                                             |
-| -------- | --------------- | ------------------------------------------------- |
-| `acc`    | `9332770502`    | Số tài khoản ngân hàng (bắt buộc)                 |
-| `bank`   | `Vietcombank`   | Tên ngân hàng SePay-compatible (bắt buộc)         |
-| `amount` | `128000`        | Số tiền VND đã làm tròn (tùy chọn, nên truyền)    |
-| `des`    | `QRTBLB1A2C3D4` | Nội dung chuyển khoản có mã tham chiếu (tùy chọn) |
+Implemented HTTP surfaces include:
 
-**Ví dụ thực tế:**
+- Staff BFF: `POST /payment/vietqr/create-qr`, `POST /payment/cash/confirm`, `GET /payment/history`, `POST /payment/refund/request`, `POST /payment/refund/confirm`.
+- Customer BFF: `POST /customer/bill/request`, `GET /customer/bill/current`, `POST /customer/payment/vietqr/create-qr`.
+- SePay webhook routes: the direct Phase 3 route `POST /payment/sepay/webhook` returns raw `{ "success": true }` after Payment TCP succeeds and currently verifies raw-body HMAC headers `X-SePay-Signature` / `X-SePay-Timestamp`. The post-Phase-4B tenant route `POST /payment/sepay/webhook/:tenantSlug` routes Tier 1 webhook payloads to Payment Service with `x-secret-key` presence checking at the BFF edge.
 
-```
-https://qr.sepay.vn/img?acc=9332770502&bank=Vietcombank&amount=128000&des=QRTBLB1A2C3D4
-```
+Implemented TCP/event contracts include:
 
-QR code này nhúng trực tiếp qua thẻ `<img>` hoặc hiển thị bằng `next/image`. Không cần redirect. POS/PWA render ảnh và **poll/refetch** trạng thái thanh toán (baseline Phase 3); BFF có thể subscribe Kafka `payment.completed` và emit WebSocket như **hint** invalidate — không thay polling làm nguồn đúng.
+- Payment TCP: `CREATE_VIETQR`, `CONFIRM_CASH`, `HANDLE_SEPAY_WEBHOOK`, `REFUND_REQUEST`, `REFUND_CONFIRM`, `GET_HISTORY`, `GET_STATUS`.
+- Order TCP: `BILL_GET_PAYMENT_SNAPSHOT` and `BILL_MARK_PAID`.
+- Kafka: Payment outbox publishes `payment.completed` and `payment.refunded`; Order consumes `payment.completed` and maps it back to `BILL_MARK_PAID`; BFF realtime consumes `payment.completed`, enriches with session data from Order, and emits `events.paymentCompleted`.
 
-### Webhook Payload (SePay → BFF)
+Persistence and idempotency behavior:
 
-Khi giao dịch phát sinh, SePay POST tới `BFF_WEBHOOK_URL` đã cấu hình:
+- `payments` has unique tenant/bill protection, unique bill reference protection, and unique non-null SePay transaction ID protection.
+- Payment settlement uses database transactions and row-level locking around cash confirmation and webhook settlement.
+- `createVietQr` reuses an existing pending payment; webhook duplicates do not settle again; `BillService.markPaid` is idempotent for already-paid bills.
+- Payment records audit actions for payment creation, cash confirmation, webhook received/duplicate/underpaid/after-paid, payment completed, refund requested, and refund confirmed.
 
-```json
-{
-  "id": 92704,
-  "gateway": "Vietcombank",
-  "transactionDate": "2026-05-08 14:02:37",
-  "accountNumber": "0010000000355",
-  "code": "QRTBLB1A2C3D4",
-  "content": "QRTBLB1A2C3D4 thanh toan ban 05",
-  "transferType": "in",
-  "transferAmount": 128000,
-  "accumulated": 1919000,
-  "subAccount": null,
-  "referenceCode": "MBVCB.3278907687",
-  "description": "SMS raw content here"
-}
-```
+UI behavior implemented:
 
-| Field            | Ý nghĩa                                                                    |
-| ---------------- | -------------------------------------------------------------------------- |
-| `transferType`   | `"in"` = tiền vào, `"out"` = tiền ra — chỉ xử lý `"in"`                    |
-| `transferAmount` | Số tiền thực tế chuyển (integer, VND)                                      |
-| `code`           | Mã thanh toán SePay tự detect từ `content`. Có thể `null` nếu không detect |
-| `content`        | Nội dung chuyển khoản do khách nhập                                        |
+- Customer PWA `/request-payment` renders bill state, blocks ordering when the bill is `PENDING_PAYMENT`, creates VietQR for the current session bill, displays QR/reference/amount, and shows the paid state after refetch.
+- POS `/pos/bills` lists `PENDING_PAYMENT` bills and shows the settlement panel with cash and VietQR tabs; `/pos/payment` redirects to `/pos/bills`.
+- Dashboard `/dashboard/orders` shows recent paid payments and exposes manual refund request/confirm actions.
 
-**Matching logic** (theo thứ tự ưu tiên):
+## Acceptance Evidence
 
-```typescript
-// 1. Ưu tiên: khớp qua field `code` (SePay tự detect)
-if (payload.code && payload.code.startsWith('QRTBL')) {
-  billRef = payload.code; // "QRTBLB1A2C3D4"
-}
-// 2. Fallback: tìm pattern trong content
-else {
-  const match = payload.content.match(/QRTBL[A-Z0-9]{8}/i);
-  billRef = match ? match[0] : null;
-}
+Implementation and stabilization evidence for Phase 3 includes:
 
-// Verify
-const isValid = payload.transferType === 'in' && billRef !== null && payload.transferAmount >= bill.rounded_total;
-```
+- Payment service tests cover VietQR creation/reuse, tenant payment settings fallback, bill reference extraction/collision fallback, underpaid webhook behavior, duplicate webhook behavior, after-paid webhook behavior, overpaid settlement, cash settlement, and persistence when Order finalization is temporarily unavailable.
+- Refund service tests cover full refund amount selection, duplicate refund prevention, request transition to `REFUND_PENDING`, confirm transition to `REFUNDED`, audit, and `payment.refunded` outbox creation.
+- BFF payment tests cover SePay webhook DTO validation, raw success response, HMAC verification helper behavior, and bounded Payment TCP timeout.
+- Order payment consumer tests cover parsing `payment.completed`, validating method/amount, and mapping Kafka events back to `BillService.markPaid`.
+- BFF realtime bridge tests cover consuming `payment.completed`, loading the Order bill snapshot for `sessionId`, and emitting the customer/staff payment completion event.
+- Customer PWA and management-app component/service tests cover request-payment UI, VietQR display, POS cash/VietQR settlement panel behavior, payment history calls, and refund controls.
+- Optional Playwright smoke exists for Customer PWA payment screen, POS cash/VietQR tabs, and Dashboard refund visibility when the local dev stack and credentials are available.
+- Recorded post-payment verification confirmed the payment/order regression path with `payment` and `order` test projects and documented that email receipt/notification delivery is outside Phase 3.
 
-### Webhook Authentication (X-Secret-Key)
+## Handoff / Deferred Work
 
-SePay xác thực webhook bằng `**X-Secret-Key` header\*\* — khác hoàn toàn với Stripe raw-body HMAC. BFF đọc header và so sánh trực tiếp:
-
-```typescript
-// BFF Webhook Controller
-@Post('sepay/webhook')
-async handleSepayWebhook(
-  @Headers('x-secret-key') secretKey: string,
-  @Body() payload: SepayWebhookDto,
-) {
-  const expectedSecret = this.configService.get('SEPAY_WEBHOOK_SECRET');
-
-  if (!secretKey || secretKey !== expectedSecret) {
-    throw new UnauthorizedException('Invalid webhook secret');
-  }
-
-  // Delegate to Payment Service via TCP, then return SePay's required raw body.
-  await this.paymentClient.send(TCP_SEPAY_WEBHOOK, payload);
-  return { success: true };
-}
-```
-
-> **Lưu ý:** Không cần parse raw body riêng, không cần HMAC. BFF có thể dùng `@Body()` bình thường — không bị ảnh hưởng bởi JSON parse vì SePay không yêu cầu raw body.
-> **Lưu ý response:** endpoint webhook là ngoại lệ của internal `ResponseDto` wrapper; SePay yêu cầu body thành công đúng dạng `{"success": true}` và phản hồi trong 30 giây.
-
-### Environment Variables
-
-```yaml
-# Payment Service / BFF
-SEPAY_WEBHOOK_SECRET: 'your_sepay_webhook_secret_key' # Khớp với secret_key trong SePay dashboard
-BFF_PAYMENT_TCP_TIMEOUT_MS: 5000 # BFF chờ Payment Service qua TCP
-PAYMENT_SEPAY_QR_ACCOUNT: '0010000000355' # Số tài khoản ngân hàng nhận tiền
-PAYMENT_SEPAY_QR_BANK: 'Vietcombank' # Tên ngân hàng
-PAYMENT_ORDER_TCP_TIMEOUT_MS: 5000 # Payment Service chờ Order Service qua TCP
-BILL_REF_PREFIX: 'QRTBL' # Prefix nhận diện trong content
-```
-
----
-
-## Steps
-
-### Step 3.1 — Tìm hiểu SePay + Thiết lập Tài khoản (1-2 ngày)
-
-**Mục tiêu:** Hiểu mô hình webhook SePay, cách SePay detect payment code từ content, cấu hình tài khoản ngân hàng và webhook endpoint — để quyết định tại §6.2.7 / §10 được triển khai đúng.
-
-**Phạm vi:**
-
-- Đăng ký/đăng nhập SePay, kết nối tài khoản ngân hàng (sandbox hoặc real)
-- Cấu hình webhook: `webhook_url = https://<bff-host>/api/v1/payment/sepay/webhook`, `auth_type = SECRET_KEY`, `event_type = In_only`, `is_verify_payment = 1`
-- Cấu hình payment code detection trong SePay dashboard (Công ty → Cấu hình chung): nhận diện pattern `QRTBL` prefix
-- Test thủ công: gửi chuyển khoản sandbox → verify BFF nhận webhook với `X-Secret-Key` hợp lệ
-- Hiểu luồng end-to-end: tạo QR → khách quét → SePay detect giao dịch → POST webhook → BFF xác thực → Payment Service cập nhật
-
-**Verify:** Có thể giải thích được: (1) khác gì Stripe về UX (không redirect, QR inline), (2) xác thực `X-Secret-Key` không phải HMAC, (3) `code` field là optional và fallback sang content regex, (4) refund phải manual.
-
----
-
-### Step 3.2 — UI Contract (Customer + POS + Dashboard)
-
-**Mục tiêu:** Cố định UX và dữ liệu hiển thị trước khi gắn service thật — sau khi tích hợp, UI phải giữ cùng contract nhưng đọc dữ liệu qua BFF/Payment/Order thay vì mock store.
-
-**Phạm vi:**
-
-- **Customer PWA (`/table/[id]`):** Nút "Yêu cầu thanh toán" → hiển thị **confirmation dialog** (chặn khi còn món chưa xong per §6 business-logic). Sau xác nhận → bàn chuyển trạng thái Billing → Customer thấy màn hình chờ "Đang thanh toán, vui lòng đợi nhân viên xác nhận" (polling/WS).
-- **POS (`/pos/bills` canonical; `/pos/payment` chỉ redirect):** Staff thấy danh sách bill `PENDING_PAYMENT`, chọn bill bằng `?billId=...`, rồi thao tác **Bill settlement** ở panel bên phải.
-  - **Tab "Tiền mặt":** Input tiền khách đưa → auto tính tiền thừa (`change = received − rounded_total`) → nút Confirm.
-  - **Tab "VietQR":** Hiển thị **ảnh QR** (`<img src="https://qr.sepay.vn/img?...">`) với số tiền và mã bill. UI theo dõi trạng thái bằng payment history polling/WS khi có webhook.
-- **Dashboard (`/dashboard/orders`):** Lịch sử thanh toán lấy từ `GET /payment/history` + nút **Refund** trên mỗi payment đã `PAID` (không dùng mock bill store). Refund dialog gồm: số tiền, lý do, số tài khoản/SĐT khách nếu cần đối soát, nút "Xác nhận đã chuyển khoản xong".
-
-**Verify:** Màn render không phụ thuộc mock bill/payment store; rounding đúng công thức (ví dụ 127.500 → 128.000); QR hiển thị bằng URL trả về từ Payment Service; refund đọc payment history thật.
-
----
-
-### Step 3.3 & 3.4 — Shared Types + Payment Service (PostgreSQL)
-
-**Mục tiêu:** Contract type dùng chung FE/BFF/service và persistence layer thanh toán tách biệt — audit, refund và Kafka payload không phụ thuộc implementation UI.
-
-**Shared types:**
-
-```typescript
-// libs/shared/types/src/lib/payment.types.ts
-export enum PaymentMethod {
-  CASH = 'CASH',
-  VIETQR = 'VIETQR', // SePay chuyển khoản ngân hàng
-  // MOMO = 'MOMO',             // mở rộng sau
-  // ZALOPAY = 'ZALOPAY',       // mở rộng sau
-}
-
-export enum PaymentStatus {
-  PENDING = 'PENDING',
-  PAID = 'PAID',
-  REFUND_PENDING = 'REFUND_PENDING',
-  REFUNDED = 'REFUNDED',
-  FAILED = 'FAILED',
-}
-
-export interface Payment {
-  id: string;
-  tenantId: string;
-  billId: string;
-  method: PaymentMethod | null; // null khi payment record mới tạo và chưa xác nhận phương thức
-  rawTotal: number;
-  roundedTotal: number;
-  roundingDelta: number;
-  paidAmount?: number; // VietQR có thể lớn hơn roundedTotal
-  amountReceived?: number; // tiền mặt: khách đưa bao nhiêu
-  changeAmount?: number; // tiền mặt: tiền thừa
-  sepayTransactionId?: number; // SePay webhook payload.id
-  sepayReferenceCode?: string; // payload.referenceCode
-  billReference: string; // "QRTBL" + billId_8chars (dùng trong QR content)
-  status: PaymentStatus;
-  paidAt?: Date;
-}
-
-export interface Refund {
-  id: string;
-  tenantId: string;
-  paymentId: string;
-  amount: number;
-  reason: string;
-  requestedByUserId: string; // userId tạo yêu cầu refund
-  requestedAt: Date;
-  confirmedByUserId?: string; // userId xác nhận đã chuyển tiền
-  customerBankAccount?: string; // số TK/SĐT khách để staff tham chiếu khi chuyển tay
-  customerBankName?: string;
-  customerAccountName?: string;
-  confirmedAt?: Date; // khi staff bấm "Xác nhận đã chuyển"
-  status: 'PENDING_STAFF_ACTION' | 'CONFIRMED' | 'CANCELED';
-}
-```
-
-**Payment Service (PostgreSQL — `qrtable_payment`):**
-
-- **Entities:** `payments`, `refunds`, `audit_payments`
-- **BFF REST Endpoints:**
-  - `POST /payment/vietqr/create-qr` — tạo QR data cho bill (Customer/Staff) — không cần auth SePay API, chỉ build URL
-  - `POST /payment/cash/confirm` — Staff xác nhận thu tiền mặt — `PAYMENT_CONFIRM_CASH`
-  - `POST /payment/sepay/webhook` — SePay webhook receiver — `X-Secret-Key` verify (raw body không cần)
-  - `POST /payment/refund/request` — Owner/Manager tạo refund record — `PAYMENT_REFUND`
-  - `POST /payment/refund/confirm` — Owner/Manager xác nhận đã chuyển tiền tay — `PAYMENT_REFUND`
-  - `GET /payment/history` — Staff, `PAYMENT_GET_HISTORY`
-
-**VietQR Flow (chi tiết):**
-
-```
-1. Customer nhấn "Yêu cầu thanh toán"
-   → Order Service: bill chuyển PENDING_PAYMENT, table chuyển Billing
-   → BFF emit WS → POS thấy yêu cầu
-
-2. Staff mở `/pos/bills`, chọn bill `PENDING_PAYMENT` → chọn tab "VietQR"
-   → BFF → Payment Service (TCP): createVietQR({ billId, tenantId })
-   → Payment Service:
-       a. Tính rounded_total từ bill (qua Order Service TCP lấy billId subtotal)
-       b. Sinh billReference = "QRTBL" + 8 ký tự đầu của billId sau khi bỏ dấu gạch (UUID), uppercase khi cần cho regex
-       c. Build QR URL:
-          "https://qr.sepay.vn/img?acc={BANK_ACCOUNT}&bank={BANK_NAME}
-           &amount={rounded_total}&des={billReference}"
-       d. Tạo payment record với status = PENDING
-       e. Trả về { qrUrl, rounded_total, billReference, paymentId }
-
-3. POS render <img src={qrUrl} /> — Khách/Staff quét mã
-
-4. Khách chuyển khoản qua app ngân hàng với nội dung tự điền từ QR
-
-5. SePay detect giao dịch → POST /api/v1/payment/sepay/webhook
-   Headers: { X-Secret-Key: "..." }
-   Body: { id, gateway, transferType: "in", transferAmount, code, content, ... }
-
-6. BFF:
-   a. So sánh header X-Secret-Key với env.SEPAY_WEBHOOK_SECRET
-   b. Nếu khớp → gửi TCP tới Payment Service
-
-7. Payment Service:
-   a. Tìm billReference trong code hoặc content (regex QRTBL[A-Z0-9]{8})
-   b. Nếu transferAmount < rounded_total: giữ PENDING, audit SEPAY_WEBHOOK_UNDERPAID
-   c. Nếu transferAmount >= rounded_total: status = PAID, paidAmount = transferAmount (ghi nhận overpaid)
-   d. Ghi outbox; sau commit có thể TCP Order (BILL_MARK_PAID) idempotent; publish Kafka payment.completed
-
-8. Kafka consumer (Order Service) + duplicate/idempotent với fast path TCP:
-   → Bill status = PAID (bất biến)
-   → Session đóng; Redis active session/cart gỡ theo luồng Order
-   → Catalog: table **billing → cleaning** (staff sau đó cleaning → available)
-
-9. **Baseline Phase 3:** POS/PWA **poll/refetch** server state để hiển thị "Đã thanh toán". Kafka → BFF → WebSocket (`payment.completed` / `events.paymentCompleted`) là **bổ trợ realtime** để invalidate/refetch nhanh hơn, không thay thế polling.
-```
-
-**Cash Flow:**
-
-```
-1. Staff chọn tab "Tiền mặt" trên POS
-2. Nhập số tiền khách đưa → hệ thống hiển thị tiền thừa = received - rounded_total
-3. Staff nhấn "Xác nhận đã thu tiền"
-4. BFF → Payment Service (TCP): confirmCash({ billId, amountReceived })
-5. Payment Service:
-   - calculate change = amountReceived - rounded_total
-   - update payment: status = PAID, method = CASH, amountReceived, changeAmount
-   - Emit Kafka: payment.completed
-```
-
-**VND Rounding:**
-
-```typescript
-raw_total = Σ(item_price × quantity)
-rounded_total = Math.ceil(raw_total / 1000) * 1000
-rounding_delta = rounded_total - raw_total
-// Lưu cả 3 giá trị: raw_total, rounded_total, rounding_delta (align §6.2.7)
-```
-
-**Refund Flow (Demo — Manual Bank Transfer):**
-
-```
-Luận văn Context: SePay không có API chuyển tiền hoàn lại tự động
-cho tài khoản ngân hàng thông thường → Dùng mô hình Staff-confirmed Manual Refund.
-
-1. Owner/Manager trên Dashboard → chọn bill đã Paid → nhấn "Refund"
-2. Điền form: amount (partial/full), reason, customer_bank_account (SĐT/TK nhận tiền)
-3. BFF → Payment Service: createRefundRequest({ paymentId, amount, reason, customerBankAccount })
-4. Payment Service:
-   - Tạo refund record status = PENDING_STAFF_ACTION
-   - Update payment status = REFUND_PENDING
-   - Ghi audit_payments { action: "REFUND_REQUESTED", actor, timestamp }
-   - Trả về refund record
-
-5. Staff/Owner thấy refund trên Dashboard với trạng thái "Chờ chuyển khoản"
-   → Thông tin hiển thị: số tiền cần hoàn, tài khoản nhận
-
-6. Staff/Owner thực hiện chuyển khoản tay qua app ngân hàng cá nhân
-
-7. Staff/Owner bấm "Xác nhận đã hoàn tiền" trên Dashboard
-8. BFF → Payment Service: confirmRefund({ refundId, confirmedBy })
-9. Payment Service:
-   - Update refund: status = CONFIRMED, confirmedAt = now()
-   - Update payment: status = REFUNDED
-   - Ghi audit_payments { action: "REFUND_CONFIRMED", actor, timestamp }
-   - Emit Kafka: payment.refunded { tenantId, paymentId, amount }
-   - Bill status giữ PAID (không reopen) — immutability cho reconciliation
-```
-
-> **Trade-off accepted (Luận văn):** Manual refund đủ để demo audit trail và immutability của bill. Không có SLA guarantee về thời gian hoàn tiền — đây là constraint của việc không dùng payment gateway có API payout (Stripe, VNPAY, ZaloPay doanh nghiệp).
-
-**Kafka Events:**
-
-- `payment.completed` → Order Service (PAID bill, đóng session, cleaning table), consumers downstream
-- `payment.refunded` → Order Service (adjust revenue), consumers downstream
-- **Email biên lai / Notification Service:** Phase 4C — không triển khai trong Phase 3 này
-
-**Bill finalization:** Bill **bất biến sau trạng thái PAID** — mọi điều chỉnh đi qua refund flow, không sửa bill đã khóa.
-
-**Entity schemas (PostgreSQL — `qrtable_payment`):**
-
-```sql
--- payments
-id UUID PRIMARY KEY,
-tenant_id VARCHAR(64) NOT NULL,
-bill_id UUID NOT NULL,
-bill_reference VARCHAR(32) NOT NULL,      -- "QRTBLXXXXXXXX" dùng trong QR
-method VARCHAR(20),                       -- CASH | VIETQR; nullable khi PENDING
-raw_total INTEGER NOT NULL,
-rounded_total INTEGER NOT NULL,
-rounding_delta INTEGER NOT NULL,
-paid_amount INTEGER,                      -- số tiền thực nhận qua VietQR/cash
-amount_received INTEGER,                  -- tiền mặt: tiền khách đưa
-change_amount INTEGER,                    -- tiền mặt: tiền thừa
-sepay_transaction_id INTEGER,             -- webhook payload.id
-sepay_reference_code VARCHAR(120),        -- webhook payload.referenceCode
-sepay_gateway VARCHAR(80),
-sepay_account_number VARCHAR(64),
-sepay_transfer_content TEXT,
-sepay_transaction_date TIMESTAMPTZ,
-status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
-paid_at TIMESTAMPTZ,
-created_at TIMESTAMPTZ DEFAULT now()
-
--- refunds
-id UUID PRIMARY KEY,
-tenant_id VARCHAR(64) NOT NULL,
-payment_id UUID NOT NULL REFERENCES payments(id),
-amount INTEGER NOT NULL,
-reason TEXT NOT NULL,
-requested_by_user_id UUID NOT NULL,      -- userId tạo yêu cầu refund
-requested_at TIMESTAMPTZ DEFAULT now(),
-confirmed_by_user_id UUID,               -- userId xác nhận đã chuyển tiền
-customer_bank_account VARCHAR(100),      -- SĐT/TK nhận tiền hoàn
-customer_bank_name VARCHAR(80),
-customer_account_name VARCHAR(120),
-status VARCHAR(30) NOT NULL DEFAULT 'PENDING_STAFF_ACTION',
-confirmed_at TIMESTAMPTZ,
-created_at TIMESTAMPTZ DEFAULT now()
-
--- audit_payments
-id UUID PRIMARY KEY,
-payment_id UUID NOT NULL,
-action VARCHAR(50) NOT NULL,             -- PAYMENT_INITIATED | PAID | REFUND_REQUESTED | REFUND_CONFIRMED
-actor_id UUID NOT NULL,
-meta JSONB,
-timestamp TIMESTAMPTZ DEFAULT now()
-```
-
-**Verify:** Unit/integration tại mức service: rounding, immutability sau Paid, webhook path xác thực `X-Secret-Key`, matching logic `code`/`content`, Kafka message schema ổn định.
-
----
-
-### Step 3.5 — Tích hợp FE ↔ BE + Xác minh E2E
-
-**Mục tiêu:** Thay mock bằng luồng thật qua BFF/guard chain và TCP tới Payment Service — tiền mặt và VietQR đều kết thúc ở cùng contract Kafka và UI phản ánh đúng.
-
-**Phạm vi:** Hooks/API clients, xử lý lỗi và trạng thái loading; kịch bản E2E tiền mặt + VietQR (sandbox SePay hoặc test webhook thủ công); kiểm tra rounding và refund trên UI sau khi backend emit đúng topic.
-
-**POS bill source:** `/pos/bills` phải lấy danh sách bill từ BFF/Order Service (`GET /admin/bills?status=PENDING_PAYMENT`) và chia sẻ bill được chọn bằng URL query (`?billId=...`). Không giữ danh sách bill/payment state trong mock store ở luồng POS settlement; sau mutation chỉ invalidate/refetch server-state query.
-
-**Kịch bản xác minh cụ thể:**
-
-- **Yêu cầu thanh toán:** Customer nhấn nút → confirmation dialog → bàn chuyển Billing → Staff thấy yêu cầu trên POS.
-- **VietQR:** Staff chọn tab VietQR → POS hiển thị QR với số tiền đúng + mã bill → Khách quét → chuyển khoản (sandbox hoặc real) → SePay POST webhook → BFF verify `X-Secret-Key` + DTO body → match `code`/`content` → Payment Service cập nhật PAID (hoặc PENDING nếu underpaid) → **poll/refetch** → POS/Customer thấy "Đã thanh toán" → bill lock → bàn chuyển Cleaning.
-- **Cash:** Staff chọn tab Tiền mặt → nhập tiền nhận → confirm → bill lock → bàn chuyển Cleaning.
-- **Refund:** Owner vào Dashboard → chọn payment đã `PAID` từ `GET /payment/history` → nhấn Refund → điền lý do/thông tin ngân hàng nếu có → Tạo record `PENDING_STAFF_ACTION` → Staff/Owner chuyển khoản tay → bấm "Xác nhận đã hoàn tiền" → audit log ghi nhận → `payment.refunded` emit.
-
-**Polling / Real-time strategy cho tab VietQR:**
-
-Khi POS đang hiển thị QR và chờ khách thanh toán, UI cần phản ánh kết quả ngay khi webhook arrive:
-
-```typescript
-// BFF nhận webhook → emit WS tới room tenant:{tid}:staff + session:{sid}:customer
-// POS đang mở /pos/bills?billId=... → subscribe WS event "payment.received"
-// Customer PWA → subscribe WS event "payment.completed"
-
-// Fallback polling (nếu WS disconnected):
-// GET /payment/{paymentId}/status mỗi 3s, tối đa 10 phút
-```
-
-**Verify:** Một phiên bàn đi từ yêu cầu thanh toán → POS xác nhận (cash) hoặc VietQR webhook → bill PAID không chỉnh sửa được → refund hiển thị và event `payment.refunded` phù hợp.
-
----
-
-## Acceptance Criteria
-
-- **Cash + VietQR E2E:** Hai luồng đều đưa bill tới PAID và các màn Customer/POS/Dashboard phản ánh đúng.
-- **VND rounding:** Ví dụ 127.500 → 128.000; `rounding_delta` và tổng làm tròn khớp công thức đã chọn.
-- **Bill immutable after PAID:** Không chỉnh sửa bill đã đóng; điều chỉnh chỉ qua refund có audit.
-- **Webhook security:** Endpoint BFF xác thực `X-Secret-Key` header so sánh với `SEPAY_WEBHOOK_SECRET`; reject nếu không khớp (401).
-- **Payment matching:** Webhook chỉ xử lý khi `transferType == "in"` AND `transferAmount >= rounded_total` AND `billReference` tìm được trong `code` hoặc `content`.
-- **Refund (manual):** Owner/Manager tạo refund request có `customer_bank_account`, Staff confirm sau khi chuyển tay → `refunds` + `audit_payments` ghi đầy đủ + `payment.refunded` emit.
-- **Kafka:** `payment.completed` và `payment.refunded` xuất hiện với payload đủ cho consumer P1–P3 đã thống nhất.
-- **QR display:** QR image load từ `qr.sepay.vn` hiển thị đúng trên POS với số tiền và mã bill; không có bước redirect sang trang ngoài.
-
----
-
-## Outputs cho Phase tiếp theo
-
-- Contract type thanh toán (`Payment`, `PaymentMethod` enum với `CASH`/`VIETQR`, `Refund`, `Bill` final) tái sử dụng được trên toàn monorepo.
-- Payment Service với schema `payments` / `refunds` / `audit_payments` và sự kiện Kafka ổn định — Order Service chỉ phản ứng theo `billId` và topic, không duplicate logic làm tròn.
-- BFF webhook SePay (`POST /payment/sepay/webhook`) với xác thực `X-Secret-Key` header — làm template cho cổng thanh toán VN mở rộng (MoMo, ZaloPay, VNPAY) nếu cần.
-- UI POS/Dashboard/Customer đã chứng minh được UX rounding, tiền thừa, VietQR inline và refund manual — sẵn sàng gắn báo cáo đối soát, thông báo, hoặc in hóa đơn ở phase sau mà không đổi contract cốt lõi.
-- Pattern **manual refund with audit trail** phù hợp demo luận văn; nếu cần tự động hóa sau, có thể thay `confirmRefund` bằng gọi API payout khi nâng cấp lên SePay Enterprise hoặc chuyển sang cổng có payout API.
+- Live SePay provider validation still requires public BFF URLs, registered webhook settings, real/sandbox banking credentials, and a final decision on whether production Tier 1 webhooks use the direct HMAC route or the tenant-scoped `x-secret-key` route.
+- Email receipt delivery, durable customer/staff notifications, and notification-service integration are deferred to Phase 4C.
+- Split bill, partial refund, automated refund payout, daily bank reconciliation, webhook replay dashboard, and multi-gateway routing are out of Phase 3 scope.
+- Stronger saga/compensation for rare cases where Payment is `PAID` but Order finalization repeatedly fails belongs to later hardening. The implemented baseline is Payment outbox plus Order consumer/idempotent `BILL_MARK_PAID`.
+- Tenant payment settings, SePay OAuth Connect, and two-tier platform subscription payment behavior are recorded in the Phase 4B SaaS onboarding record, not this Phase 3 record.

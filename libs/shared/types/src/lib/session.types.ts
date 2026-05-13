@@ -5,7 +5,7 @@
  * Cart scope: per-session ephemeral state (Redis Hash với optimistic version).
  *
  * @see docs/phases/phase-2a-order-kafka.md §8 (auto-close rules)
- * @see docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md
+ * @see docs/specs/business-logic-step-2.4-spec.vi.md §4
  */
 
 import type { PreparationStation } from './menu.types';

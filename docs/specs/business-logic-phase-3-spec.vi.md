@@ -2,7 +2,7 @@
 
 > **Giai đoạn:** Phase 3 — Payment Service (SePay/VietQR + Cash)  
 > **Ngày:** 2026-05-08  
-> **Trạng thái:** Chốt sau audit `docs/superpowers/audits/phase-3-payment-audit-report.md` và quyết định Q1-Q6 của project owner.  
+> **Trạng thái:** Chốt sau audit Phase 3 và quyết định Q1-Q6 của project owner.
 > **Mục đích:** Tài liệu này là tiêu chuẩn nghiệp vụ/kỹ thuật cho Phase 3. Đây không phải implementation plan và không phân rã task code.
 
 ---
@@ -33,13 +33,13 @@
 ### 1.1 Cơ Sở Trong Repo
 
 - `docs/phases/phase-3-payment.md`
-- `docs/superpowers/audits/phase-3-payment-audit-report.md`
+- `docs/phases/phase-3-payment.md`
 - `docs/business-logic.md` §6
 - `docs/technical-architecture.md` §6.2.7, §7.2-7.4, §10
 - `docs/implementation_plan.md`
 - `docs/architecture/permission-matrix.md`
 - `docs/references/auth-system-reference.md`
-- `docs/business-logic-step-2.4-spec.vi.md`
+- `docs/specs/business-logic-step-2.4-spec.vi.md`
 - Code hiện tại: `Bill`, `BillStatus`, `PaymentMethod`, `OutboxEvent`, Order outbox publisher.
 
 ### 1.2 Kết Quả Context7 Dùng Cho Spec

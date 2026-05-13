@@ -5,7 +5,7 @@
  * Phase 3 sẽ EXTEND file này (thêm paidAmount, change, refund references).
  * Phase 3: PaymentMethod includes CASH, VIETQR (future methods may extend further).
  *
- * @see docs/superpowers/specs/2026-04-19-step-2.3-shared-types-design.md
+ * @see docs/specs/business-logic-step-2.4-spec.vi.md §5
  */
 
 // ─── Enums ──────────────────────────────────────────

@@ -1,227 +1,237 @@
 # Permission Matrix — QRTable
 
-> **Status:** ✅ Active · §6 cập nhật 2026-05-07 (`kitchen.set_priority` + ma trận 53 dòng) · §9 cập nhật 2026-04-26
-> **Version:** 1.5
-> **Single source of truth** cho role-permission mapping. Mọi thay đổi `PERMISSION` enum, `role.json`, hoặc test cases PHẢI được phản ánh ở đây trước.
+> **Status:** Active after Phase 4B · static-verified against `PERMISSION` enum and `role.json` on 2026-05-13
+> **Version:** 2.0
+> **Single source of truth:** RBAC documentation is derived from `libs/constants/src/lib/enum/role.enum.ts` and `apps/user-access/src/seeder/role.json`.
 
-## 1. Mục đích & Nguyên tắc
+## 1. Purpose And Principles
 
-File này là **canonical reference** cho RBAC trong QRTable. Quy trình thay đổi permission:
+This file is the canonical reference for QRTable role-permission mapping. When permissions change:
 
-1. Cập nhật bảng matrix tại §6 (proposal)
-2. Code change: `PERMISSION` enum → `role.json` → tests
-3. Re-seed MongoDB
-4. Verify qua 3 lớp (Layer 1/2/3 — xem §8.4)
+1. Update `PERMISSION` enum.
+2. Update `apps/user-access/src/seeder/role.json`.
+3. Update this matrix.
+4. Re-seed MongoDB.
+5. Verify with the role/unit/integration checks in §8.
 
-**Nguyên tắc thiết kế:**
+Design principles:
 
-- Roles là **global** (không per-tenant override). Multi-tenant role customization thuộc backlog Phase 4B.
-- Permissions follow format `domain.action_snake_case` (e.g., `catalog.get_by_id`, `service_request.create`).
-- CUSTOMER không có entry trong `role.json` — kiểm soát qua `SessionGuard` (xem §7).
-- SUPER_ADMIN bypass `TenantGuard`, nhận **tất cả** permissions cross-tenant.
+- Roles are global templates; tenant-specific role customization is future work.
+- Permissions use `domain.action_snake_case`.
+- CUSTOMER has no `role.json` entry and is controlled by session-scoped customer guards.
+- SUPER_ADMIN receives every permission in the enum and bypasses tenant scoping for platform administration.
+- `SAAS_*` permissions are legacy aliases kept for backward compatibility; Phase 4B uses `TENANT_*`, `SUBSCRIPTION_*`, `PLAN_*`, and `PAYMENT_SETTINGS_*`.
 
 ## 2. Glossary
 
-| Term                        | Definition                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------- |
-| **Role**                    | Vai trò người dùng (e.g., OWNER). Lưu trong Keycloak realm + MongoDB `role` collection.           |
-| **Permission**              | Capability cụ thể (e.g., `catalog.create`). Lưu trong MongoDB `role.permissions[]`.               |
-| **Domain**                  | Nhóm permissions theo feature area (e.g., `CATALOG`, `ORDER`).                                    |
-| **JWT-claim role**          | Role trong Keycloak access token, claim `realm_access.roles[]`.                                   |
-| **DB-permission**           | Permission trong MongoDB `role` collection — nguồn cho `PermissionGuard`.                         |
-| **Role mapping validation** | Logic ở `Authorizer` đảm bảo Keycloak roles ∩ DB roles ≠ ∅ (xem `auth-system-reference.md` §8.3). |
+| Term          | Definition                                                   |
+| ------------- | ------------------------------------------------------------ |
+| Role          | User role stored in Keycloak and MongoDB `role` collection.  |
+| Permission    | Capability string stored in `role.permissions[]`.            |
+| Domain        | Feature area prefix such as `tenant`, `catalog`, or `order`. |
+| JWT role      | Role claim in Keycloak access token.                         |
+| DB permission | MongoDB permission source consumed by permission guards.     |
+| CUSTOMER      | Session actor from QR flow, not an RBAC role.                |
 
 ## 3. Roles Catalog
 
-6 roles + 1 special actor (CUSTOMER):
+| Role        | Scope                 | Description                                                                                    | Tenant binding                        |
+| ----------- | --------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------- |
+| SUPER_ADMIN | Cross-tenant platform | Platform administrator for tenants, plans, subscriptions, and global RBAC                      | Platform claim; bypasses TenantGuard  |
+| OWNER       | Single tenant         | Restaurant owner with full operational, staff, billing, and own-tenant settings permissions    | Bound to `tenant_id` claim            |
+| MANAGER     | Single tenant         | Operational manager; similar to OWNER but no user delete, checkout, or payment-settings update | Bound to `tenant_id` claim            |
+| WAITER      | Single tenant         | Floor service role for order confirmation, cash payment, table status, and service requests    | Bound to `tenant_id` claim            |
+| CHEF        | Single tenant         | Kitchen staff for KDS food tickets                                                             | Bound to `tenant_id` claim            |
+| BARISTA     | Single tenant         | Bar staff for KDS drink tickets                                                                | Bound to `tenant_id` claim            |
+| CUSTOMER    | Session scoped        | Anonymous diner using QR session APIs                                                          | Tenant from signed QR/session context |
 
-| Role                 | Scope                   | Description                                                                  | Tenant binding                                      |
-| -------------------- | ----------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
-| **SUPER_ADMIN**      | Cross-tenant (platform) | Platform administrator (manage tenants, subscriptions)                       | `tenant_id="platform"` claim, bypass TenantGuard    |
-| **OWNER**            | Single-tenant           | Restaurant owner — full operational + HR (incl. user delete)                 | Bound to `tenant_id` claim                          |
-| **MANAGER**          | Single-tenant           | Operational manager — same as OWNER except `user.delete` (HR action)         | Bound to `tenant_id` claim                          |
-| **WAITER**           | Single-tenant           | Floor service — confirm order, cash payment, table transfer, service request | Bound to `tenant_id` claim                          |
-| **CHEF**             | Single-tenant           | Kitchen staff — manage food tickets in KDS                                   | Bound to `tenant_id` claim                          |
-| **BARISTA**          | Single-tenant           | Bar staff — manage drink tickets in KDS                                      | Bound to `tenant_id` claim                          |
-| **CUSTOMER** (actor) | Session-scoped          | Anonymous diner — session via QR scan, no role.json entry                    | Tenant from QR token (HMAC) + session lock in Redis |
+## 4. Permission Catalog (66 Values)
 
-## 4. Permission Catalog (53 values)
+| #   | Enum                            | Value                           | Notes                                    |
+| --- | ------------------------------- | ------------------------------- | ---------------------------------------- |
+| 1   | `SAAS_CREATE`                   | `saas.create`                   | Legacy SaaS alias; SUPER_ADMIN only.     |
+| 2   | `SAAS_GET_BY_ID`                | `saas.get_by_id`                | Legacy SaaS alias; SUPER_ADMIN only.     |
+| 3   | `SAAS_GET_LIST`                 | `saas.get_list`                 | Legacy SaaS alias; SUPER_ADMIN only.     |
+| 4   | `SAAS_UPDATE`                   | `saas.update`                   | Legacy SaaS alias; SUPER_ADMIN only.     |
+| 5   | `SAAS_DELETE`                   | `saas.delete`                   | Legacy SaaS alias; SUPER_ADMIN only.     |
+| 6   | `TENANT_ONBOARD`                | `tenant.onboard`                | Onboard a tenant.                        |
+| 7   | `TENANT_LIST_ALL`               | `tenant.list_all`               | List tenants platform-wide.              |
+| 8   | `TENANT_READ_ANY`               | `tenant.read_any`               | Read any tenant platform-wide.           |
+| 9   | `TENANT_READ_OWN`               | `tenant.read_own`               | Read own tenant.                         |
+| 10  | `TENANT_UPDATE`                 | `tenant.update`                 | Update tenant.                           |
+| 11  | `TENANT_SUSPEND`                | `tenant.suspend`                | Suspend tenant.                          |
+| 12  | `TENANT_ACTIVATE`               | `tenant.activate`               | Reactivate tenant.                       |
+| 13  | `TENANT_CLOSE`                  | `tenant.close`                  | Close tenant.                            |
+| 14  | `SUBSCRIPTION_ASSIGN`           | `subscription.assign`           | Assign subscription platform-wide.       |
+| 15  | `SUBSCRIPTION_LIST_ANY`         | `subscription.list_any`         | List subscriptions platform-wide.        |
+| 16  | `SUBSCRIPTION_LIST_HISTORY_ANY` | `subscription.list_history_any` | List subscription history platform-wide. |
+| 17  | `SUBSCRIPTION_READ_OWN`         | `subscription.read_own`         | Read own tenant subscription.            |
+| 18  | `SUBSCRIPTION_CHECKOUT`         | `subscription.checkout`         | Start own-tenant checkout.               |
+| 19  | `PLAN_CREATE`                   | `plan.create`                   | Create SaaS plan.                        |
+| 20  | `PLAN_READ`                     | `plan.read`                     | Read SaaS plans.                         |
+| 21  | `PLAN_UPDATE`                   | `plan.update`                   | Update SaaS plan.                        |
+| 22  | `PLAN_DELETE`                   | `plan.delete`                   | Delete SaaS plan.                        |
+| 23  | `PAYMENT_SETTINGS_READ_OWN`     | `payment_settings.read_own`     | Read own tenant payment settings.        |
+| 24  | `PAYMENT_SETTINGS_UPDATE_OWN`   | `payment_settings.update_own`   | Update own tenant payment settings.      |
+| 25  | `CATALOG_CREATE`                | `catalog.create`                | Create catalog entity.                   |
+| 26  | `CATALOG_GET_BY_ID`             | `catalog.get_by_id`             | Read catalog entity.                     |
+| 27  | `CATALOG_GET_LIST`              | `catalog.get_list`              | List catalog entities.                   |
+| 28  | `CATALOG_UPDATE`                | `catalog.update`                | Update catalog entity.                   |
+| 29  | `CATALOG_DELETE`                | `catalog.delete`                | Delete catalog entity.                   |
+| 30  | `USER_CREATE`                   | `user.create`                   | Create staff user.                       |
+| 31  | `USER_GET_BY_ID`                | `user.get_by_id`                | Read staff user.                         |
+| 32  | `USER_GET_ALL`                  | `user.get_all`                  | List staff users.                        |
+| 33  | `USER_UPDATE`                   | `user.update`                   | Update staff user.                       |
+| 34  | `USER_DELETE`                   | `user.delete`                   | Delete staff user.                       |
+| 35  | `ROLE_CREATE`                   | `role.create`                   | Create role.                             |
+| 36  | `ROLE_GET_BY_ID`                | `role.get_by_id`                | Read role.                               |
+| 37  | `ROLE_GET_ALL`                  | `role.get_all`                  | List roles.                              |
+| 38  | `ROLE_UPDATE`                   | `role.update`                   | Update role.                             |
+| 39  | `ROLE_DELETE`                   | `role.delete`                   | Delete role.                             |
+| 40  | `PRODUCT_CREATE`                | `product.create`                | Legacy template permission.              |
+| 41  | `PRODUCT_GET_BY_ID`             | `product.get_by_id`             | Legacy template permission.              |
+| 42  | `PRODUCT_GET_ALL`               | `product.get_all`               | Legacy template permission.              |
+| 43  | `PRODUCT_UPDATE`                | `product.update`                | Legacy template permission.              |
+| 44  | `PRODUCT_DELETE`                | `product.delete`                | Legacy template permission.              |
+| 45  | `ORDER_CREATE`                  | `order.create`                  | Create order.                            |
+| 46  | `ORDER_CONFIRM`                 | `order.confirm`                 | Confirm pending order.                   |
+| 47  | `ORDER_CANCEL_PENDING`          | `order.cancel_pending`          | Reject/cancel pending order.             |
+| 48  | `ORDER_CANCEL_PROCESSING`       | `order.cancel_processing`       | Cancel confirmed or processing order.    |
+| 49  | `ORDER_GET_LIST`                | `order.get_list`                | List orders.                             |
+| 50  | `ORDER_GET_BY_ID`               | `order.get_by_id`               | Read order detail.                       |
+| 51  | `KITCHEN_GET_QUEUE`             | `kitchen.get_queue`             | Read KDS queue.                          |
+| 52  | `KITCHEN_UPDATE_TICKET`         | `kitchen.update_ticket`         | Update KDS ticket status.                |
+| 53  | `KITCHEN_RECALL`                | `kitchen.recall`                | Recall completed KDS ticket.             |
+| 54  | `KITCHEN_SET_PRIORITY`          | `kitchen.set_priority`          | Set or clear KDS ticket priority.        |
+| 55  | `PAYMENT_CREATE`                | `payment.create`                | Create payment.                          |
+| 56  | `PAYMENT_CONFIRM_CASH`          | `payment.confirm_cash`          | Confirm cash payment.                    |
+| 57  | `PAYMENT_REFUND`                | `payment.refund`                | Refund payment.                          |
+| 58  | `PAYMENT_GET_HISTORY`           | `payment.get_history`           | Read payment history.                    |
+| 59  | `TABLE_CREATE`                  | `table.create`                  | Create table.                            |
+| 60  | `TABLE_UPDATE`                  | `table.update`                  | Update table.                            |
+| 61  | `TABLE_DELETE`                  | `table.delete`                  | Delete table.                            |
+| 62  | `TABLE_TRANSFER`                | `table.transfer`                | Transfer session/order between tables.   |
+| 63  | `TABLE_UPDATE_STATUS`           | `table.update_status`           | Update table status.                     |
+| 64  | `SERVICE_REQUEST_CREATE`        | `service_request.create`        | Create service request.                  |
+| 65  | `SERVICE_REQUEST_ACKNOWLEDGE`   | `service_request.acknowledge`   | Acknowledge service request.             |
+| 66  | `SERVICE_REQUEST_RESOLVE`       | `service_request.resolve`       | Resolve service request.                 |
 
-Tất cả permissions in format `domain.action_snake_case`:
+## 5. Removed Or Legacy Items
 
-### Existing (31 values)
+| Item                                                           | Current status                                                                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `INVOICE_*` permissions                                        | Not present in current `PERMISSION` enum or `role.json`; bills/payment history use payment/order permissions.             |
+| Legacy template roles such as `administrator` and `accountant` | Not active RBAC roles.                                                                                                    |
+| `SAAS_*` permissions                                           | Still present in code for SUPER*ADMIN backward compatibility; use Phase 4B `TENANT*\*` permissions for new SaaS behavior. |
+| `PRODUCT_*` permissions                                        | Still present for SUPER_ADMIN backward compatibility with template code.                                                  |
 
-| Enum                | Value               | Description                                              |
-| ------------------- | ------------------- | -------------------------------------------------------- |
-| `SAAS_CREATE`       | `saas.create`       | Create new tenant (SaaS provisioning)                    |
-| `SAAS_GET_BY_ID`    | `saas.get_by_id`    | Get tenant detail                                        |
-| `SAAS_GET_LIST`     | `saas.get_list`     | List all tenants                                         |
-| `SAAS_UPDATE`       | `saas.update`       | Update tenant config                                     |
-| `SAAS_DELETE`       | `saas.delete`       | Delete/suspend tenant                                    |
-| `CATALOG_CREATE`    | `catalog.create`    | Create category/menu item                                |
-| `CATALOG_GET_BY_ID` | `catalog.get_by_id` | Get single catalog entity                                |
-| `CATALOG_GET_LIST`  | `catalog.get_list`  | List catalog entities                                    |
-| `CATALOG_UPDATE`    | `catalog.update`    | Update catalog entity                                    |
-| `CATALOG_DELETE`    | `catalog.delete`    | Delete catalog entity                                    |
-| `INVOICE_CREATE`    | `invoice.create`    | Create invoice (legacy template, no QRTable use yet)     |
-| `INVOICE_GET_BY_ID` | `invoice.get_by_id` | Get invoice detail                                       |
-| `INVOICE_GET_ALL`   | `invoice.get_all`   | List invoices                                            |
-| `INVOICE_UPDATE`    | `invoice.update`    | Update invoice (legacy)                                  |
-| `INVOICE_DELETE`    | `invoice.delete`    | Delete invoice (legacy)                                  |
-| `INVOICE_SEND`      | `invoice.send`      | Send invoice to customer (legacy)                        |
-| `USER_CREATE`       | `user.create`       | Create staff user                                        |
-| `USER_GET_BY_ID`    | `user.get_by_id`    | Get user detail                                          |
-| `USER_GET_ALL`      | `user.get_all`      | List users                                               |
-| `USER_UPDATE`       | `user.update`       | Update user profile                                      |
-| `USER_DELETE`       | `user.delete`       | Delete user (HR action — OWNER only)                     |
-| `ROLE_CREATE`       | `role.create`       | Create role (RBAC self-service — SUPER_ADMIN only)       |
-| `ROLE_GET_BY_ID`    | `role.get_by_id`    | Get role detail                                          |
-| `ROLE_GET_ALL`      | `role.get_all`      | List roles                                               |
-| `ROLE_UPDATE`       | `role.update`       | Update role permissions                                  |
-| `ROLE_DELETE`       | `role.delete`       | Delete role                                              |
-| `PRODUCT_CREATE`    | `product.create`    | Legacy template (course material) — kept for SUPER_ADMIN |
-| `PRODUCT_GET_BY_ID` | `product.get_by_id` | Legacy                                                   |
-| `PRODUCT_GET_ALL`   | `product.get_all`   | Legacy                                                   |
-| `PRODUCT_UPDATE`    | `product.update`    | Legacy                                                   |
-| `PRODUCT_DELETE`    | `product.delete`    | Legacy                                                   |
+## 6. Canonical Permission Matrix (6 Roles × 66 Permissions)
 
-### NEW in Step 2.x (22 values — Step 2.4 thay `order.cancel` bằng hai quyền, Step 2.6 thêm priority KDS)
+Legend: `✅` = granted; blank = not granted.
 
-| Enum                          | Value                         | Description                                                     |
-| ----------------------------- | ----------------------------- | --------------------------------------------------------------- |
-| `ORDER_CREATE`                | `order.create`                | Customer creates order (via SessionGuard at endpoint level)     |
-| `ORDER_CONFIRM`               | `order.confirm`               | Staff confirms pending order → triggers Kafka `order.confirmed` |
-| `ORDER_CANCEL_PENDING`        | `order.cancel_pending`        | Staff reject / cancel đơn `PENDING` (WAITER, MANAGER, OWNER)    |
-| `ORDER_CANCEL_PROCESSING`     | `order.cancel_processing`     | Manager/Owner cancel đơn đã confirm (`PROCESSING`+) + lý do     |
-| `ORDER_GET_LIST`              | `order.get_list`              | List orders (POS view)                                          |
-| `ORDER_GET_BY_ID`             | `order.get_by_id`             | Get order detail                                                |
-| `KITCHEN_GET_QUEUE`           | `kitchen.get_queue`           | Get KDS queue (food/drink tickets)                              |
-| `KITCHEN_UPDATE_TICKET`       | `kitchen.update_ticket`       | Update ticket status (Pending → Processing → Ready)             |
-| `KITCHEN_RECALL`              | `kitchen.recall`              | Recall completed ticket (mistake handling)                      |
-| `KITCHEN_SET_PRIORITY`        | `kitchen.set_priority`        | Set/unset KDS ticket priority; OWNER/MANAGER/SUPER_ADMIN only   |
-| `PAYMENT_CREATE`              | `payment.create`              | Initiate payment (e.g., SePay VietQR QR creation)               |
-| `PAYMENT_CONFIRM_CASH`        | `payment.confirm_cash`        | Staff confirms cash received                                    |
-| `PAYMENT_REFUND`              | `payment.refund`              | Refund payment (Manager override)                               |
-| `PAYMENT_GET_HISTORY`         | `payment.get_history`         | View payment history (Waiter needs for "last bill" queries)     |
-| `TABLE_CREATE`                | `table.create`                | Create table layout entry                                       |
-| `TABLE_UPDATE`                | `table.update`                | Update table config (capacity, area)                            |
-| `TABLE_DELETE`                | `table.delete`                | Delete table                                                    |
-| `TABLE_TRANSFER`              | `table.transfer`              | Transfer order/session between tables                           |
-| `TABLE_UPDATE_STATUS`         | `table.update_status`         | Mark table Available → Occupied → Billing → Cleaning            |
-| `SERVICE_REQUEST_CREATE`      | `service_request.create`      | Customer/Staff create service request                           |
-| `SERVICE_REQUEST_ACKNOWLEDGE` | `service_request.acknowledge` | Staff acknowledges request                                      |
-| `SERVICE_REQUEST_RESOLVE`     | `service_request.resolve`     | Staff marks request resolved                                    |
+| #         | Permission                      | SUPER_ADMIN | OWNER  | MANAGER | WAITER | CHEF  | BARISTA |
+| --------- | ------------------------------- | :---------: | :----: | :-----: | :----: | :---: | :-----: |
+| 1         | `saas.create`                   |     ✅      |        |         |        |       |         |
+| 2         | `saas.get_by_id`                |     ✅      |        |         |        |       |         |
+| 3         | `saas.get_list`                 |     ✅      |        |         |        |       |         |
+| 4         | `saas.update`                   |     ✅      |        |         |        |       |         |
+| 5         | `saas.delete`                   |     ✅      |        |         |        |       |         |
+| 6         | `tenant.onboard`                |     ✅      |        |         |        |       |         |
+| 7         | `tenant.list_all`               |     ✅      |        |         |        |       |         |
+| 8         | `tenant.read_any`               |     ✅      |        |         |        |       |         |
+| 9         | `tenant.read_own`               |     ✅      |   ✅   |   ✅    |        |       |         |
+| 10        | `tenant.update`                 |     ✅      |        |         |        |       |         |
+| 11        | `tenant.suspend`                |     ✅      |        |         |        |       |         |
+| 12        | `tenant.activate`               |     ✅      |        |         |        |       |         |
+| 13        | `tenant.close`                  |     ✅      |        |         |        |       |         |
+| 14        | `subscription.assign`           |     ✅      |        |         |        |       |         |
+| 15        | `subscription.list_any`         |     ✅      |        |         |        |       |         |
+| 16        | `subscription.list_history_any` |     ✅      |        |         |        |       |         |
+| 17        | `subscription.read_own`         |     ✅      |   ✅   |   ✅    |        |       |         |
+| 18        | `subscription.checkout`         |     ✅      |   ✅   |         |        |       |         |
+| 19        | `plan.create`                   |     ✅      |        |         |        |       |         |
+| 20        | `plan.read`                     |     ✅      |   ✅   |   ✅    |   ✅   |  ✅   |   ✅    |
+| 21        | `plan.update`                   |     ✅      |        |         |        |       |         |
+| 22        | `plan.delete`                   |     ✅      |        |         |        |       |         |
+| 23        | `payment_settings.read_own`     |     ✅      |   ✅   |   ✅    |        |       |         |
+| 24        | `payment_settings.update_own`   |     ✅      |   ✅   |         |        |       |         |
+| 25        | `catalog.create`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 26        | `catalog.get_by_id`             |     ✅      |   ✅   |   ✅    |   ✅   |  ✅   |   ✅    |
+| 27        | `catalog.get_list`              |     ✅      |   ✅   |   ✅    |   ✅   |  ✅   |   ✅    |
+| 28        | `catalog.update`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 29        | `catalog.delete`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 30        | `user.create`                   |     ✅      |   ✅   |   ✅    |        |       |         |
+| 31        | `user.get_by_id`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 32        | `user.get_all`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 33        | `user.update`                   |     ✅      |   ✅   |   ✅    |        |       |         |
+| 34        | `user.delete`                   |     ✅      |   ✅   |         |        |       |         |
+| 35        | `role.create`                   |     ✅      |        |         |        |       |         |
+| 36        | `role.get_by_id`                |     ✅      |        |         |        |       |         |
+| 37        | `role.get_all`                  |     ✅      |        |         |        |       |         |
+| 38        | `role.update`                   |     ✅      |        |         |        |       |         |
+| 39        | `role.delete`                   |     ✅      |        |         |        |       |         |
+| 40        | `product.create`                |     ✅      |        |         |        |       |         |
+| 41        | `product.get_by_id`             |     ✅      |        |         |        |       |         |
+| 42        | `product.get_all`               |     ✅      |        |         |        |       |         |
+| 43        | `product.update`                |     ✅      |        |         |        |       |         |
+| 44        | `product.delete`                |     ✅      |        |         |        |       |         |
+| 45        | `order.create`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 46        | `order.confirm`                 |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 47        | `order.cancel_pending`          |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 48        | `order.cancel_processing`       |     ✅      |   ✅   |   ✅    |        |       |         |
+| 49        | `order.get_list`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 50        | `order.get_by_id`               |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 51        | `kitchen.get_queue`             |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
+| 52        | `kitchen.update_ticket`         |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
+| 53        | `kitchen.recall`                |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
+| 54        | `kitchen.set_priority`          |     ✅      |   ✅   |   ✅    |        |       |         |
+| 55        | `payment.create`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 56        | `payment.confirm_cash`          |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 57        | `payment.refund`                |     ✅      |   ✅   |   ✅    |        |       |         |
+| 58        | `payment.get_history`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 59        | `table.create`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 60        | `table.update`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 61        | `table.delete`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 62        | `table.transfer`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 63        | `table.update_status`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 64        | `service_request.create`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 65        | `service_request.acknowledge`   |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 66        | `service_request.resolve`       |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| **Total** |                                 |   **66**    | **38** | **35**  | **15** | **6** |  **6**  |
 
-## 5. Removed in Step 2.0
+## 7. Assignment Notes
 
-| Item                                   | Reason                                                                               |
-| -------------------------------------- | ------------------------------------------------------------------------------------ |
-| `ROLE.ADMINISTRATOR = 'administrator'` | Legacy template role; 0 references in codebase                                       |
-| `ROLE.ACCOUNTANT = 'accountant'`       | Legacy template role; 1 reference in `user.repository.ts:84` (fallback) — also fixed |
+- SUPER_ADMIN has every enum permission: 66/66.
+- OWNER has full tenant operations plus own-tenant SaaS self-service: `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, and own payment-settings read/update.
+- MANAGER has operational permissions plus own-tenant SaaS visibility: `tenant.read_own`, `subscription.read_own`, `plan.read`, and `payment_settings.read_own`.
+- WAITER has catalog read, plan read, order confirm/cancel pending/read, payment create/cash/history, table transfer/status, and service-request handling.
+- CHEF and BARISTA have catalog read, plan read, and KDS queue/update/recall. They do not have `kitchen.set_priority`.
+- `order.cancel_pending` is granted to OWNER, MANAGER, and WAITER; `order.cancel_processing` is restricted to OWNER and MANAGER.
 
-## 6. Canonical Permission Matrix (6 × 53)
+## 8. CUSTOMER Actor
 
-Legend: ✅ = granted; (blank) = not granted.
+CUSTOMER has no DB role. Customer actions are guarded by session/ownership checks, not by `role.permissions[]`.
 
-| #         | Permission                    | SUPER_ADMIN | OWNER  | MANAGER | WAITER | CHEF  | BARISTA |
-| --------- | ----------------------------- | :---------: | :----: | :-----: | :----: | :---: | :-----: |
-| 1         | `saas.create`                 |     ✅      |        |         |        |       |         |
-| 2         | `saas.get_by_id`              |     ✅      |        |         |        |       |         |
-| 3         | `saas.get_list`               |     ✅      |        |         |        |       |         |
-| 4         | `saas.update`                 |     ✅      |        |         |        |       |         |
-| 5         | `saas.delete`                 |     ✅      |        |         |        |       |         |
-| 6         | `catalog.create`              |     ✅      |   ✅   |   ✅    |        |       |         |
-| 7         | `catalog.get_by_id`           |     ✅      |   ✅   |   ✅    |   ✅   |  ✅   |   ✅    |
-| 8         | `catalog.get_list`            |     ✅      |   ✅   |   ✅    |   ✅   |  ✅   |   ✅    |
-| 9         | `catalog.update`              |     ✅      |   ✅   |   ✅    |        |       |         |
-| 10        | `catalog.delete`              |     ✅      |   ✅   |   ✅    |        |       |         |
-| 11        | `invoice.create`              |     ✅      |        |         |        |       |         |
-| 12        | `invoice.get_by_id`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 13        | `invoice.get_all`             |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 14        | `invoice.update`              |     ✅      |        |         |        |       |         |
-| 15        | `invoice.delete`              |     ✅      |        |         |        |       |         |
-| 16        | `invoice.send`                |     ✅      |        |         |        |       |         |
-| 17        | `user.create`                 |     ✅      |   ✅   |   ✅    |        |       |         |
-| 18        | `user.get_by_id`              |     ✅      |   ✅   |   ✅    |        |       |         |
-| 19        | `user.get_all`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 20        | `user.update`                 |     ✅      |   ✅   |   ✅    |        |       |         |
-| 21        | `user.delete`                 |     ✅      |   ✅   |         |        |       |         |
-| 22        | `role.create`                 |     ✅      |        |         |        |       |         |
-| 23        | `role.get_by_id`              |     ✅      |        |         |        |       |         |
-| 24        | `role.get_all`                |     ✅      |        |         |        |       |         |
-| 25        | `role.update`                 |     ✅      |        |         |        |       |         |
-| 26        | `role.delete`                 |     ✅      |        |         |        |       |         |
-| 27        | `product.create`              |     ✅      |        |         |        |       |         |
-| 28        | `product.get_by_id`           |     ✅      |        |         |        |       |         |
-| 29        | `product.get_all`             |     ✅      |        |         |        |       |         |
-| 30        | `product.update`              |     ✅      |        |         |        |       |         |
-| 31        | `product.delete`              |     ✅      |        |         |        |       |         |
-| 32        | `order.create`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 33        | `order.confirm`               |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 34        | `order.cancel_pending`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 35        | `order.cancel_processing`     |     ✅      |   ✅   |   ✅    |        |       |         |
-| 36        | `order.get_list`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 37        | `order.get_by_id`             |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 38        | `kitchen.get_queue`           |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 39        | `kitchen.update_ticket`       |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 40        | `kitchen.recall`              |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 41        | `kitchen.set_priority`        |     ✅      |   ✅   |   ✅    |        |       |         |
-| 42        | `payment.create`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 43        | `payment.confirm_cash`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 44        | `payment.refund`              |     ✅      |   ✅   |   ✅    |        |       |         |
-| 45        | `payment.get_history`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 46        | `table.create`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 47        | `table.update`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 48        | `table.delete`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 49        | `table.transfer`              |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 50        | `table.update_status`         |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 51        | `service_request.create`      |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 52        | `service_request.acknowledge` |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 53        | `service_request.resolve`     |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| **Total** |                               |   **47**    | **32** | **31**  | **13** | **5** |  **5**  |
+| Action                   | Typical endpoint pattern                 | Guard source                                   |
+| ------------------------ | ---------------------------------------- | ---------------------------------------------- |
+| Submit order             | `POST /api/v1/customer/orders`           | Session guard and tenant/session ownership     |
+| Cancel own pending order | `DELETE /api/v1/customer/orders/:id`     | Session guard, order ownership, pending status |
+| Submit service request   | `POST /api/v1/customer/service-requests` | Session guard and tenant/session ownership     |
+| View own order status    | `GET /api/v1/customer/orders/:id`        | Session guard and order ownership              |
+| Add/update cart          | `POST/PATCH /api/v1/customer/cart`       | Session guard and Redis session/cart ownership |
 
-### Pragmatic decisions explained (Why)
+## 9. Operational Procedures
 
-- **OWNER + MANAGER có FULL `ORDER_*` (trừ không áp dụng), `KITCHEN_*`, `PAYMENT_*`, `TABLE_*`, `SERVICE_REQUEST_*`:** quản lý vận hành cần permissions toàn diện; cancel tách `order.cancel_pending` / `order.cancel_processing` (Step 2.4). Bỏ SAAS*\* (platform admin), ROLE*\_ (RBAC self-service không có UI), PRODUCT\_\_ (legacy template).
-- **OWNER + MANAGER chỉ có `invoice.get_by_id`, `invoice.get_all`:** Bills thuộc Order Service per Phase 2A spec; INVOICE\_\* là legacy template không có endpoint thật trong QRTable.
-- **MANAGER không có `user.delete`:** Manager là operational role; xóa user là HR action thuộc Owner.
-- **WAITER có `payment.get_history`:** Waiter ở quầy POS cần đọc lịch sử bill khi customer hỏi.
-- **CHEF/BARISTA chỉ có CATALOG*GET + KITCHEN*\*:** không cần xem orders raw, chỉ làm tickets từ KDS view (Kitchen Service consumes Kafka `order.confirmed` và route ticket xuống bếp/bar).
+### 9.1 Add Or Change A Permission
 
-### 6.1 Step 2.4 — Cancel theo trạng thái đơn (đã triển khai trong `libs/constants` + `role.json`)
+1. Update `libs/constants/src/lib/enum/role.enum.ts`.
+2. Update `apps/user-access/src/seeder/role.json`.
+3. Update this document's catalog, matrix, totals, and assignment notes.
+4. Update tests that encode the expected role matrix.
+5. Re-seed MongoDB.
+6. Re-login or clear cached authorizer responses before manual verification.
 
-Đã thay `order.cancel` bằng **`order.cancel_pending`** (WAITER + MANAGER + OWNER) và **`order.cancel_processing`** (MANAGER + OWNER). Customer self-cancel pending vẫn qua `SessionGuard`, không dùng các permission này.
-
-### 6.2 Step 2.6 — Priority thao tác KDS
-
-Thêm **`kitchen.set_priority`** cho thao tác set/unset priority trên KDS ticket. Quyền này chỉ cấp cho SUPER_ADMIN, OWNER, và MANAGER; CHEF/BARISTA vẫn xử lý ticket theo station nhưng không được thay đổi priority.
-
-## 7. CUSTOMER Actor (No DB Role)
-
-CUSTOMER không có entry trong `role.json`. Permissions hardcoded ở controller-level qua `SessionGuard` + ownership check. Reference cho future implementer (Step 2.4):
-
-| Action                   | Endpoint pattern                         | Guard chain                  | Notes                                                                      |
-| ------------------------ | ---------------------------------------- | ---------------------------- | -------------------------------------------------------------------------- |
-| Submit order             | `POST /api/v1/customer/orders`           | `SessionGuard → TenantGuard` | Validates session, no `@Permissions` decorator                             |
-| Cancel own pending order | `DELETE /api/v1/customer/orders/:id`     | `SessionGuard → TenantGuard` | + check `order.sessionId === req.sessionId` + `order.status === 'PENDING'` |
-| Submit service request   | `POST /api/v1/customer/service-requests` | `SessionGuard → TenantGuard` |                                                                            |
-| View own order status    | `GET /api/v1/customer/orders/:id`        | `SessionGuard → TenantGuard` | + ownership check                                                          |
-| Add/update cart          | `POST/PATCH /api/v1/customer/cart`       | `SessionGuard → TenantGuard` | Cart in Redis: `cart:{tenant_id}:{session_id}`                             |
-
-## 8. Operational Procedures
-
-### 8.1 Add a new permission
-
-1. Update bảng matrix tại §6 (đề xuất + rationale)
-2. Add enum value tại `libs/constants/src/lib/enum/role.enum.ts`
-3. Update `apps/user-access/src/seeder/role.json` cho mỗi role được cấp quyền
-4. Update Layer 2 test `apps/user-access/src/seeder/role.spec.ts` (`EXPECTED_MATRIX`)
-5. Update Layer 1 test `apps/bff/src/app/guards/permission.guard.spec.ts` (thêm scenarios)
-6. Update Layer 3 script `tools/verify-permission-matrix.sh` (thêm assertions)
-7. Re-seed: `node tools/seed.js apps/user-access/src/seeder prune`
-8. Verify all 3 layers PASS
-
-### 8.2 Re-seed MongoDB
+### 9.2 Re-seed MongoDB
 
 ```bash
 MONGODB_URI='mongodb://root:password@localhost:27017/?authSource=admin' \
@@ -229,46 +239,23 @@ MONGO_DB_NAME='qrtable' \
 node tools/seed.js apps/user-access/src/seeder prune
 ```
 
-**Why `prune` is safe:** `_id` cố định trong `role.json` → re-insert đúng `_id` → `user.roles` references không bị orphan.
+### 9.3 Verification
 
-### 8.3 Cache invalidation gotcha
+| Layer                      | What                                                      | Command                                  |
+| -------------------------- | --------------------------------------------------------- | ---------------------------------------- |
+| PermissionGuard unit tests | Guard mechanics and permission behavior                   | `npx nx test bff`                        |
+| Role seed validation       | `role.json` schema and expected matrix                    | `npx nx test user-access`                |
+| Integration verification   | Keycloak login → BFF `/authorizer/me` → permissions array | `bash tools/verify-permission-matrix.sh` |
 
-`UserGuard` cache `AuthorizeResponse` trong Redis với key `user-token:{sha256(token)}` TTL **30 phút**. Sau khi seed permissions mới:
+`tools/verify-permission-matrix.sh` is an integration smoke test. It requires BFF/Authorizer and seeded MongoDB to be running, and it checks representative permissions rather than parsing this markdown file.
 
-| Scenario                          | Action                                                   |
-| --------------------------------- | -------------------------------------------------------- |
-| Dev/test cần permissions mới ngay | **Re-login** (token mới → cache key mới)                 |
-| Cần test mà không muốn re-login   | `docker exec qrtable-provider-redis-1 redis-cli FLUSHDB` |
-| Production scenario               | Wait 30 min hoặc chấp nhận stale cache                   |
+> **2026-05-13 verification note:** Static code/seed verification confirms 66 enum permissions and role seed counts `SUPER_ADMIN=66`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. The integration smoke script still depends on live seeded credentials; in the current local environment, OWNER/WAITER/CHEF/BARISTA passed, while SUPER_ADMIN and MANAGER login returned 401 and require seed/credential refresh before the smoke is fully green.
 
-### 8.4 Verification (3 Layers)
+## 10. Frontend Navigation Vs API Enforcement
 
-| Layer                                     | What                                                        | Run command                              | Speed |
-| ----------------------------------------- | ----------------------------------------------------------- | ---------------------------------------- | ----- |
-| **Layer 1** — PermissionGuard unit tests  | Verify guard mechanics + matrix invariants per role         | `npx nx test bff`                        | < 5s  |
-| **Layer 2** — role.json schema validation | Anti-drift firewall: role.json must match `EXPECTED_MATRIX` | `npx nx test user-access`                | < 1s  |
-| **Layer 3** — Integration verification    | E2E: Keycloak login → BFF /me → DB → permissions            | `bash tools/verify-permission-matrix.sh` | ~30s  |
+| Layer               | Responsibility                                                                      | Source of truth                                         |
+| ------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| BFF / microservices | Enforce `UserGuard` → `TenantGuard` → `PermissionGuard` on protected API endpoints. | `role.json`, controller `@Permissions`, and this matrix |
+| `management-app`    | Hide or redirect role-inappropriate navigation as UX only.                          | Role-routing and sidebar configuration in the frontend  |
 
-Layer 3 prerequisites:
-
-- Stack chạy: `pnpm dev:bff-auth` (BFF + Authorizer)
-- DB seeded (Step 8 đã chạy)
-
-## 9. Frontend navigation (Management App) vs API enforcement
-
-> **Status (Phase 2.x — hai tầng FE vs BFF):** Step **2.2** mock POS/KDS/PWA đã triển khai; §9 vẫn mô tả **điều hướng theo role** + **API theo permission** cho đến khi có work map từng nút UI ↔ `permissions[]` (tech debt, thường sau Step 2.5).
-
-**Hai tầng tách bạch:**
-
-| Tầng                           | Trách nhiệm                                                                                                                                                                                       | Nguồn sự thật                                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **BFF / microservices**        | Mỗi HTTP endpoint được bảo vệ bởi `UserGuard` → `TenantGuard` → `PermissionGuard`; kiểm tra **permission** (chuỗi `domain.action`, xem §4–§6).                                                    | §6 matrix + `role.json` + `@Permissions` trên controller                                                           |
-| **`management-app` (Next.js)** | **Điều hướng & sidebar theo role** (JWT session `realm_access` / profile): user chỉ thấy **nhóm tab / prefix route** tương ứng khu vực họ được vào; middleware redirect nếu URL không thuộc role. | `apps/management-app/src/lib/auth/role-routing.ts` + `components/layout/data/sidebar-data.ts` (lọc theo cùng rule) |
-
-**Nguyên tắc:**
-
-- **FE không thay thế BFF:** Ẩn menu chỉ là UX; gọi API sai quyền vẫn phải nhận **403** từ BFF.
-- **Đồng bộ nghĩa là:** mỗi **vùng route** (`/dashboard`, `/pos`, `/kds/...`, `/admin`) phải **không** cho phép role nào thấy tab mà **toàn bộ** API cần cho tab đó nằm ngoài permission của role đó (tránh “vào được nhưng toàn 403”). Khi siết permission chi tiết hơn trong cùng một trang, cần bổ sung **ẩn/disable nút** hoặc xử lý 403 ở UI.
-- **TODO (tech debt):** tùy chọn map **mục menu / hành động** ↔ `permissions[]` từ session (tinh chỉnh theo matrix từng dòng) — thường sau khi Step 2.5 nối API ổn định; xem `AGENTS.md` (Frontend RBAC).
-
-**Cross-reference:** Kiến trúc tổng thể & monorepo: `docs/technical-architecture.md` §4.2.1, §8.1.2 · Blueprint UI: `docs/ui-blueprint-step-2.2.md` §0.
+Frontend navigation does not replace backend authorization. A hidden menu is only convenience; an API call outside the role's permissions must still return 403.
