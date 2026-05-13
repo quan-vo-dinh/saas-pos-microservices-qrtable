@@ -1,70 +1,56 @@
 import Link from 'next/link';
+import clsx from 'clsx';
+
+type LandingHeaderProps = {
+  productName: string;
+};
 
 const nav = [
-  { href: '#tong-quan', label: 'Tổng quan' },
-  { href: '#ban-va-qr', label: 'Bàn & QR' },
-  { href: '#so-sanh', label: 'So sánh' },
+  { href: '#flow', label: 'Khách đến thanh toán' },
+  { href: '#automation', label: 'Cách triển khai' },
   { href: '#pricing', label: 'Bảng giá' },
-  { href: '#thanh-toan', label: 'Thanh toán' },
+  { href: '#payment', label: 'Thu tiền an toàn' },
   { href: '#contact', label: 'Liên hệ' },
 ] as const;
 
-export function LandingHeader({ productName }: { productName: string }): React.ReactElement {
+export function LandingHeader({ productName }: LandingHeaderProps): React.ReactElement {
   return (
-    <header
-      role="banner"
-      className="sticky top-0 z-50 border-b border-border/60 bg-background/55 shadow-sm backdrop-blur-xl supports-[backdrop-filter]:bg-background/45"
-    >
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="flex h-14 min-h-[3.5rem] items-center justify-between gap-4 sm:h-[4.25rem]">
-          <Link
-            href="/"
-            className="text-base font-semibold tracking-tight text-foreground sm:text-lg"
-            aria-label={`${productName} — về đầu trang`}
-          >
-            {productName}
-          </Link>
-          <nav aria-label="Điều hướng chính" className="hidden items-center gap-1 md:flex">
-            {nav.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-          <div className="flex shrink-0 items-center gap-2">
+    <header className="sticky top-0 z-50 border-b border-zinc-800/80 bg-zinc-950/85 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:h-[72px]">
+        <Link
+          href="/"
+          className="font-sans text-sm font-semibold tracking-tight text-zinc-100 transition hover:text-cyan-300 sm:text-base"
+        >
+          {productName}
+          <span className="ml-2 hidden font-mono text-[10px] font-normal text-zinc-500 sm:inline">QR · POS</span>
+        </Link>
+        <nav className="hidden items-center gap-1 md:flex" aria-label="Điều hướng landing">
+          {nav.map((item) => (
             <a
-              href="#pricing"
-              className="hidden rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted sm:inline-flex sm:h-11 sm:items-center"
+              key={item.href}
+              href={item.href}
+              className={clsx(
+                'cursor-pointer rounded-md px-3 py-2 font-mono text-xs text-zinc-400 transition',
+                'hover:bg-zinc-900 hover:text-cyan-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500',
+              )}
             >
-              Xem gói
+              {item.label}
             </a>
-            <Link
-              href="/login"
-              className="inline-flex h-11 min-w-[2.75rem] items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Đăng nhập
-            </Link>
-          </div>
-        </div>
-        <div className="border-t border-border/60 pb-2 md:hidden">
-          <nav
-            aria-label="Điều hướng nhanh"
-            className="flex gap-1 overflow-x-auto py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          ))}
+        </nav>
+        <div className="flex shrink-0 items-center gap-2">
+          <a
+            href="#pricing"
+            className="cursor-pointer rounded-md bg-cyan-500 px-3 py-2 font-mono text-xs font-medium text-zinc-950 transition hover:bg-cyan-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
           >
-            {nav.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="shrink-0 rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
+            Bảng giá
+          </a>
+          <Link
+            href="/login"
+            className="cursor-pointer rounded-md border border-zinc-700 px-3 py-2 font-mono text-xs font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+          >
+            Đăng nhập
+          </Link>
         </div>
       </div>
     </header>

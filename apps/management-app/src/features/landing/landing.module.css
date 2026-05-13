@@ -1,0 +1,315 @@
+/* QRTable public landing — scoped motion (ui-ux-pro-max: reduced-motion) */
+@keyframes qrtDashShift {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+
+@keyframes qrtPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.flowEdge {
+  stroke-dasharray: 8 8;
+  animation: qrtDashShift 1.4s linear infinite;
+}
+
+.liveDot {
+  animation: qrtPulse 1.8s ease-in-out infinite;
+}
+
+.gridMesh {
+  background-image:
+    linear-gradient(to right, rgb(39 39 42 / 0.45) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(39 39 42 / 0.45) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 20%, transparent 75%);
+}
+
+/* Hero SaaS QR emblem */
+@keyframes qrtQrSweep {
+  0%,
+  100% {
+    top: -35%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  50% {
+    top: 105%;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    top: 130%;
+    opacity: 0;
+  }
+}
+
+@keyframes qrtQrGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgb(34 211 238 / 0.2),
+      0 0 36px -10px rgb(34 211 238 / 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgb(34 211 238 / 0.35),
+      0 0 52px -6px rgb(34 211 238 / 0.55);
+  }
+}
+
+.qrScanOverlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  pointer-events: none;
+}
+
+.qrScanLine {
+  position: absolute;
+  left: -5%;
+  width: 110%;
+  height: 32%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(34 211 238 / 0.06),
+    rgb(34 211 238 / 0.28),
+    rgb(34 211 238 / 0.06),
+    transparent
+  );
+  animation: qrtQrSweep 2.8s ease-in-out infinite;
+}
+
+.qrEmblemGlow {
+  animation: qrtQrGlow 3.2s ease-in-out infinite;
+}
+
+/* 3D tilt on hover — whole emblem card */
+.qrTiltHost {
+  perspective: 1180px;
+  transform-style: preserve-3d;
+}
+
+.qrTiltInner {
+  transform-style: preserve-3d;
+  transform: rotateX(0deg) rotateY(0deg) translateZ(0);
+  transition: transform 0.45s cubic-bezier(0.23, 1, 0.32, 1);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .qrTiltHost:hover .qrTiltInner {
+    transform: rotateX(8deg) rotateY(-12deg) translateZ(14px) scale3d(1.02, 1.02, 1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qrScanLine {
+    animation: none;
+    opacity: 0;
+  }
+
+  .qrEmblemGlow {
+    animation: none;
+  }
+
+  .qrTiltInner {
+    transition: none;
+    will-change: auto;
+  }
+
+  .qrTiltHost:hover .qrTiltInner {
+    transform: none;
+  }
+
+  .flowLoopPath,
+  .flowLoopPathH,
+  .flowEdge {
+    animation: none !important;
+  }
+
+  .liveDot {
+    animation: none;
+  }
+
+  .cardFlowShimmer::after {
+    animation: none !important;
+    opacity: 0;
+  }
+}
+
+/* —— Section backgrounds (below hero) —— */
+.sectionShell {
+  position: relative;
+  overflow: hidden;
+}
+
+.bgAbs {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.bgGridFine {
+  background-image:
+    linear-gradient(to right, rgb(39 39 42 / 0.4) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(39 39 42 / 0.4) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.bgGridLarge {
+  background-image:
+    linear-gradient(to right, rgb(63 63 70 / 0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(63 63 70 / 0.22) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, black 0%, black 70%, transparent 100%);
+}
+
+.bgDotField {
+  background-image: radial-gradient(circle at center, rgb(113 113 122 / 0.14) 1px, transparent 1px);
+  background-size: 16px 16px;
+  opacity: 0.55;
+}
+
+.bgDiagonal {
+  background-image: repeating-linear-gradient(
+    -22deg,
+    transparent,
+    transparent 14px,
+    rgb(24 24 27 / 0.55) 14px,
+    rgb(24 24 27 / 0.55) 15px
+  );
+  opacity: 0.22;
+}
+
+.bgRadialCyan {
+  background: radial-gradient(ellipse 90% 60% at 50% -15%, rgb(34 211 238 / 0.11), transparent 58%);
+}
+
+.bgRadialEmerald {
+  background: radial-gradient(ellipse 65% 55% at 85% 45%, rgb(16 185 129 / 0.09), transparent 55%);
+}
+
+.bgVignette {
+  background: radial-gradient(ellipse 120% 80% at 50% 100%, rgb(9 9 11 / 0.55), transparent 62%);
+}
+
+/* Data flow section — full-bleed photo + dark wash (no grid) */
+.flowSectionPhoto {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: rgb(9 9 11);
+  background-image: url('/landing-qr-payment-flow-bg.png');
+  background-position: center 42%;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.flowSectionOverlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, rgb(9 9 11 / 0.62) 0%, rgb(9 9 11 / 0.78) 42%, rgb(9 9 11 / 0.88) 100%);
+}
+
+/* Animated loop around card grids (desktop) */
+@keyframes qrtLoopDashLong {
+  to {
+    stroke-dashoffset: -280;
+  }
+}
+
+.flowLoopPath {
+  fill: none;
+  stroke: rgb(34 211 238 / 0.42);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+  stroke-dasharray: 9 12;
+  vector-effect: non-scaling-stroke;
+  animation: qrtLoopDashLong 14s linear infinite;
+}
+
+.flowLoopPathH {
+  fill: none;
+  stroke: rgb(34 211 238 / 0.38);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-dasharray: 8 10;
+  vector-effect: non-scaling-stroke;
+  animation: qrtLoopDashLong 10s linear infinite;
+}
+
+/* Light sweep across cards (staggered via nth-child) */
+@keyframes qrtCardSweep {
+  0%,
+  100% {
+    transform: translateX(-130%);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  45% {
+    transform: translateX(130%);
+    opacity: 1;
+  }
+  55% {
+    opacity: 0;
+  }
+}
+
+.cardFlowShimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.cardFlowShimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.045) 45%,
+    rgb(34 211 238 / 0.07) 50%,
+    rgb(255 255 255 / 0.045) 55%,
+    transparent 100%
+  );
+  transform: translateX(-130%);
+  animation: qrtCardSweep 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.cardFlowShimmer:nth-child(1)::after {
+  animation-delay: 0s;
+}
+
+.cardFlowShimmer:nth-child(2)::after {
+  animation-delay: 0.75s;
+}
+
+.cardFlowShimmer:nth-child(3)::after {
+  animation-delay: 1.5s;
+}
+
+.cardFlowShimmer:nth-child(4)::after {
+  animation-delay: 2.25s;
+}

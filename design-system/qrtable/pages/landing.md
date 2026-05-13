@@ -1,37 +1,48 @@
-# Landing — QRTable (management-app)
+# Landing Page Overrides
 
-> Overrides `design-system/qrtable/MASTER.md` for the **public marketing / landing** route only (`/`).
+> **PROJECT:** QRTable
+> **Generated:** 2026-05-13 03:32:55
+> **Page Type:** Dashboard / Data View
 
-## Intent
+> ⚠️ **IMPORTANT:** Rules in this file **override** the Master file (`design-system/MASTER.md`).
+> Only deviations from the Master are documented here. For all other rules, refer to the Master.
 
-- **Product:** SaaS POS đa tenant, QR đặt món theo bàn, catalog realtime, thanh toán VietQR + SePay (hai tầng).
-- **Audience:** Chủ quán / điều hành F&B Việt Nam đang đánh giá nền tảng vận hành.
-- **Tone:** SaaS vận hành — rõ ràng, có số liệu, có luồng; **không** marketing rỗng, **không** gradient orb / card lồng chỉ để trang trí (theo Phase 4B plan).
+---
 
-## Layout (implemented)
+## Page-Specific Rules
 
-1. Skip link + sticky header (desktop nav + mobile pill strip).
-2. Hero: value prop POS + minh họa luồng Khách / POS / Thanh toán.
-3. Tổng quan: 3 trụ (đa tenant, QR & POS, realtime).
-4. Bàn & QR: vòng đời Available → Occupied → Billing → Cleaning (theo `docs/business-logic.md`).
-5. Triển khai: 4 bước onboarding có kiểm soát.
-6. So sánh: bảng QRTable vs nhiều công cụ rời (pattern Comparison + CTA từ ui-ux-pro-max).
-7. Pricing: thẻ gói + checklist tính năng (Lucide `Check`).
-8. Thanh toán: hai cột Tier 1 / Tier 2.
-9. Liên hệ: CTA + aside gợi ý nội dung email.
-10. Footer.
+### Layout Overrides
 
-## Motion
+- **Max Width:** 1400px or full-width
+- **Grid:** 12-column grid for data flexibility
+- **Sections:** 1. Hero (product + live preview or status), 2. Key metrics/indicators, 3. How it works, 4. CTA (Start trial / Contact)
 
-- `landing.css`: `prefers-reduced-motion` tắt animation flow nền; giảm transition trên nút/liên kết trong shell.
-- Hero: blob gradient `animate-pulse` rất nhẹ — ẩn hoàn toàn khi `motion-reduce`.
-- CTA chính: `motion-safe:hover:scale` ngắn (200ms) — không dùng khi reduced motion.
+### Spacing Overrides
 
-## Ambient background
+- **Content Density:** High — optimize for information display
 
-- Ảnh nhà hàng mờ: `public/landing/bg-restaurant.jpg` (Unsplash, xem README trong thư mục).
-- Lớp cố định: blur + mesh tech + scanline siêu nhẹ + flow gradient 22s + veil + backdrop-blur để chữ đạt contrast.
+### Typography Overrides
 
-## Typography / color
+- No overrides — use Master typography
 
-- Dùng **Geist + theme tokens** (`globals.css`) — không ép palette “Vibrant red” từ script nếu phá contrast với theme hiện tại; nội dung và hierarchy là ưu tiên.
+### Color Overrides
+
+- **Strategy:** Dark or neutral. Status colors (green/amber/red). Data-dense but scannable.
+
+### Component Overrides
+
+- Avoid: No indication of progress
+
+---
+
+## Page-Specific Components
+
+- No unique components for this page
+
+---
+
+## Recommendations
+
+- Effects: Real-time chart animations, alert pulse/glow, status indicator blink animation, smooth data stream updates, loading effect
+- Feedback: Step indicators or progress bar
+- CTA Placement: Primary CTA in nav + After metrics

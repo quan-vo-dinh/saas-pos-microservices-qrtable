@@ -120,6 +120,14 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Public landing (`/`) — next/font variables applied on root in page.tsx */
+.landing-font-root {
+  font-family: var(--font-landing-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Tailwind `font-sans` / `font-mono` read these tokens — scope to landing only */
+  --font-sans: var(--font-landing-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-landing-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

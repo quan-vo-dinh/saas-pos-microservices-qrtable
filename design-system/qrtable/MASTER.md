@@ -7,8 +7,8 @@
 ---
 
 **Project:** QRTable
-**Generated:** 2026-05-13 03:18:55
-**Category:** Restaurant/Food Service
+**Generated:** 2026-05-13 03:32:55
+**Category:** Smart Home/IoT Dashboard
 
 ---
 
@@ -18,30 +18,30 @@
 
 | Role        | Hex       | CSS Variable          |
 | ----------- | --------- | --------------------- |
-| Primary     | `#DC2626` | `--color-primary`     |
+| Primary     | `#0F766E` | `--color-primary`     |
 | On Primary  | `#FFFFFF` | `--color-on-primary`  |
-| Secondary   | `#F87171` | `--color-secondary`   |
-| Accent/CTA  | `#A16207` | `--color-accent`      |
-| Background  | `#FEF2F2` | `--color-background`  |
-| Foreground  | `#450A0A` | `--color-foreground`  |
-| Muted       | `#F0EDF1` | `--color-muted`       |
-| Border      | `#FECACA` | `--color-border`      |
+| Secondary   | `#14B8A6` | `--color-secondary`   |
+| Accent/CTA  | `#0369A1` | `--color-accent`      |
+| Background  | `#F0FDFA` | `--color-background`  |
+| Foreground  | `#134E4A` | `--color-foreground`  |
+| Muted       | `#E8F0F3` | `--color-muted`       |
+| Border      | `#99F6E4` | `--color-border`      |
 | Destructive | `#DC2626` | `--color-destructive` |
-| Ring        | `#DC2626` | `--color-ring`        |
+| Ring        | `#0F766E` | `--color-ring`        |
 
-**Color Notes:** Appetizing red + warm gold [Accent adjusted from #CA8A04 for WCAG 3:1]
+**Color Notes:** Trust teal + professional blue
 
 ### Typography
 
-- **Heading Font:** Playfair Display SC
-- **Body Font:** Karla
-- **Mood:** restaurant, menu, culinary, elegant, foodie, hospitality
-- **Google Fonts:** [Playfair Display SC + Karla](https://fonts.google.com/share?selection.family=Karla:wght@300;400;500;600;700|Playfair+Display+SC:wght@400;700)
+- **Heading Font:** Cinzel
+- **Body Font:** Josefin Sans
+- **Mood:** real estate, luxury, elegant, sophisticated, property, premium
+- **Google Fonts:** [Cinzel + Josefin Sans](https://fonts.google.com/share?selection.family=Cinzel:wght@400;500;600;700|Josefin+Sans:wght@300;400;500;600;700)
 
 **CSS Import:**
 
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display+SC:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Josefin+Sans:wght@300;400;500;600;700&display=swap');
 ```
 
 ### Spacing Variables
@@ -74,7 +74,7 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #a16207;
+  background: #0369a1;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -91,8 +91,8 @@
 /* Secondary Button */
 .btn-secondary {
   background: transparent;
-  color: #dc2626;
-  border: 2px solid #dc2626;
+  color: #0f766e;
+  border: 2px solid #0f766e;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -105,7 +105,7 @@
 
 ```css
 .card {
-  background: #fef2f2;
+  background: #f0fdfa;
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
@@ -131,9 +131,9 @@
 }
 
 .input:focus {
-  border-color: #dc2626;
+  border-color: #0f766e;
   outline: none;
-  box-shadow: 0 0 0 3px #dc262620;
+  box-shadow: 0 0 0 3px #0f766e20;
 }
 ```
 
@@ -159,28 +159,28 @@
 
 ## Style Guidelines
 
-**Style:** Vibrant & Block-based
+**Style:** Dark Mode (OLED)
 
-**Keywords:** Bold, energetic, playful, block layout, geometric shapes, high color contrast, duotone, modern, energetic
+**Keywords:** Dark theme, low light, high contrast, deep black, midnight blue, eye-friendly, OLED, night mode, power efficient
 
-**Best For:** Startups, creative agencies, gaming, social media, youth-focused, entertainment, consumer
+**Best For:** Night-mode apps, coding platforms, entertainment, eye-strain prevention, OLED devices, low-light
 
-**Key Effects:** Large sections (48px+ gaps), animated patterns, bold hover (color shift), scroll-snap, large type (32px+), 200-300ms
+**Key Effects:** Minimal glow (text-shadow: 0 0 10px), dark-to-light transitions, low white emission, high readability, visible focus
 
 ### Page Pattern
 
-**Pattern Name:** Comparison Table + CTA
+**Pattern Name:** Real-Time / Operations Landing
 
-- **Conversion Strategy:** Use comparison to show unique value. Highlight your product row. Include 'free trial' in pricing row.
-- **CTA Placement:** Table: Right column. CTA: Below table
-- **Section Order:** 1. Hero, 2. Problem intro, 3. Comparison table (product vs competitors), 4. Pricing (optional), 5. CTA
+- **Conversion Strategy:** For ops/security/iot products. Demo or sandbox link. Trust signals.
+- **CTA Placement:** Primary CTA in nav + After metrics
+- **Section Order:** 1. Hero (product + live preview or status), 2. Key metrics/indicators, 3. How it works, 4. CTA (Start trial / Contact)
 
 ---
 
 ## Anti-Patterns (Do NOT Use)
 
-- ❌ Low-quality imagery
-- ❌ Outdated hours
+- ❌ Slow updates
+- ❌ No automation
 
 ### Additional Forbidden Patterns
 

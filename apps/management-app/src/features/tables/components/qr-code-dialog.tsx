@@ -11,7 +11,7 @@ import {
   DialogTitle,
   Separator,
 } from '@einvoice/frontend-ui';
-import { Copy, Download, Printer } from 'lucide-react';
+import { Copy, Download } from 'lucide-react';
 import { QRCodeCanvas, QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useTables } from './tables-provider';

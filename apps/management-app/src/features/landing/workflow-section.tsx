@@ -1,58 +1,81 @@
-import { ClipboardList, Globe2, Link2, Users } from 'lucide-react';
+import { Bot, CreditCard, Link2, UserCog } from 'lucide-react';
+import styles from './landing.module.css';
 
 const steps = [
   {
-    title: 'Định danh & tenant',
-    body: 'Người dùng có tài khoản; Super Admin tạo tenant nhà hàng, slug riêng và gán gói — dữ liệu tách biệt theo cửa hàng.',
-    icon: Users,
+    title: 'Mở quán cùng chuyên viên',
+    body: 'Chúng tôi tạo không gian riêng cho thương hiệu, gán gói phù hợp số bàn và nhân sự — bạn không phải tự mò cấu hình.',
+    icon: UserCog,
+    tag: '01',
   },
   {
-    title: 'Thiết lập vận hành VN',
-    body: 'Mặc định VND và tiếng Việt; cấu hình khu vực, bàn, in QR theo template — sẵn sàng phục vụ khách tại bàn.',
-    icon: Globe2,
-  },
-  {
-    title: 'Catalog & realtime',
-    body: 'Danh mục và món: hiển thị theo khung giờ, trạng thái còn/hết; thay đổi đồng bộ ngay tới PWA khách và POS.',
-    icon: ClipboardList,
-  },
-  {
-    title: 'SePay & hai tầng tiền',
-    body: 'OAuth theo từng nhà hàng; webhook Tier 1 cho bill (QRTBL…) và Tier 2 cho subscription (QRSUB…) — tách bạch luồng tiền.',
+    title: 'Kết nối ngân hàng (SePay)',
+    body: 'Bạn ủy quyền một lần; tiền bill và phí dịch vụ được định tuyến đúng tài khoản — không lưu mật khẩu ngân hàng trên trình duyệt.',
     icon: Link2,
+    tag: '02',
+  },
+  {
+    title: 'Phục vụ hằng ngày',
+    body: 'Cập nhật menu, nhận đơn từ khách, in bếp và chốt bill trên cùng một luồng — giảm gọi điện nội bộ.',
+    icon: Bot,
+    tag: '03',
+  },
+  {
+    title: 'Đối soát cuối ngày',
+    body: 'Bill khách về tài khoản quán; phí gói QRTable tách riêng — nhìn báo cáo là biết thực thu.',
+    icon: CreditCard,
+    tag: '04',
   },
 ] as const;
 
 export function WorkflowSection(): React.ReactElement {
   return (
-    <section aria-labelledby="trien-khai-heading" className="qrt-landing__band border-b border-border/60 py-16 md:py-24">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <h2 id="trien-khai-heading" className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-          Triển khai có kiểm soát cho chủ quán
-        </h2>
-        <p className="mt-3 max-w-3xl text-base leading-relaxed text-muted-foreground md:text-lg">
-          Không phải “đăng ký xong tự mò”. Luồng Phase 4B ưu tiên onboarding qua vận hành nền tảng: đảm bảo tenant, gói và
-          kết nối thanh toán được cấu hình đúng trước khi mở rộng quy mô.
-        </p>
-        <ul className="mt-12 grid list-none gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {steps.map((s, i) => (
-            <li
-              key={s.title}
-              className="qrt-glass flex flex-col rounded-xl p-5 shadow-sm"
-            >
-              <div className="flex items-start gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden>
-                  <s.icon className="size-5" strokeWidth={1.75} />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground">Bước {i + 1}</p>
-                  <p className="mt-0.5 font-semibold leading-snug text-foreground">{s.title}</p>
+    <section
+      id="automation"
+      className={`${styles.sectionShell} border-b border-zinc-800/90 bg-zinc-900 py-14 sm:py-20`}
+      aria-labelledby="qrt-auto-heading"
+    >
+      <div className={`${styles.bgAbs} ${styles.bgDiagonal}`} aria-hidden />
+      <div className={`${styles.bgAbs} ${styles.bgGridFine}`} aria-hidden />
+      <div className={`${styles.bgAbs} ${styles.bgRadialEmerald}`} aria-hidden />
+      <div className="relative z-10 mx-auto max-w-7xl px-4">
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 id="qrt-auto-heading" className="font-sans text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">
+            Bốn bước để quán chạy QRTable
+          </h2>
+          <p className="mt-3 font-sans text-sm text-zinc-500">
+            Chúng tôi xử lý phần kỹ thuật lặp lại; chủ quán tập trung menu, nhân sự và trải nghiệm khách — can thiệp khi cần
+            đổi quy trình riêng.
+          </p>
+        </div>
+
+        <div className="relative mt-12">
+          <svg
+            className="pointer-events-none absolute left-1/2 top-[6%] z-0 hidden h-[82%] w-[min(100%,72rem)] max-w-[calc(100%-1rem)] -translate-x-1/2 opacity-[0.36] lg:block"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden
+          >
+            <path className={styles.flowLoopPath} d="M 5 80 L 95 80 L 95 18 L 5 18 Z" />
+          </svg>
+          <ol className="relative z-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {steps.map((s) => (
+              <li
+                key={s.tag}
+                className={`${styles.cardFlowShimmer} relative flex flex-col rounded-xl border border-zinc-800 bg-zinc-950/65 p-5 backdrop-blur-[2px] transition hover:border-zinc-600`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs font-bold text-cyan-400">{s.tag}</span>
+                  <div className="flex size-9 items-center justify-center rounded-md border border-zinc-700 bg-zinc-900 text-cyan-300">
+                    <s.icon className="size-4" aria-hidden />
+                  </div>
                 </div>
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
-            </li>
-          ))}
-        </ul>
+                <h3 className="mt-4 font-sans text-base font-semibold text-zinc-100">{s.title}</h3>
+                <p className="mt-2 font-sans text-sm leading-relaxed text-zinc-500">{s.body}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
     </section>
   );
