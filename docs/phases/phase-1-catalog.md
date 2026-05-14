@@ -179,7 +179,7 @@ IMenuResponse { categories: (ICategory & { items: IMenuItem[] })[] }
 
 **Lưu ý quan trọng:**
 
-- **Side-effects Pattern (Phase 1):** Chưa có Kafka ở Phase 1 (setup ở Phase 2A). Cache invalidation: BFF gọi Redis DEL trực tiếp sau TCP response. WebSocket chưa triển khai (Phase 2B). KHÔNG dùng Kafka cho menu.updated, table.status_changed (AP1)
+- **Side-effects Pattern (Phase 1):** Chưa có Kafka ở Phase 1 (setup ở Phase 2A). Cache invalidation: BFF gọi Redis DEL trực tiếp sau TCP response. WebSocket chưa triển khai (Phase 2B). KHÔNG dùng Kafka cho menu write/cache invalidation hoặc table status UI hints (AP1); Step 2.7 cũng không có `menu.updated` contract.
 - **Delete constraints:**
   - Không xóa Category có MenuItem
   - Không xóa MenuItem có active orders

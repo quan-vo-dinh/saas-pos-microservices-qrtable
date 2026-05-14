@@ -4,7 +4,7 @@
 > **Bước:** 2.4 — Backend Order Service, Redis, Kafka, BFF trực tiếp  
 > **Date:** 2026-04-27  
 > **Trạng thái:** Chốt từ các quyết định rà soát Q1–Q12  
-> **Mục đích:** Tài liệu này là đầu vào đặc tả nghiệp vụ chuẩn cho phiên lập kế hoạch triển khai tiếp theo. Đây không phải kế hoạch triển khai và không chứa phân rã tác vụ code.
+> **Mục đích:** Tài liệu này lưu đặc tả nghiệp vụ đã chốt cho Step 2.4. Đây không phải implementation plan; trạng thái triển khai cuối cùng xem [`docs/phases/phase-2a-order-kafka.md`](../phases/phase-2a-order-kafka.md).
 
 ---
 
@@ -1602,7 +1602,7 @@ Step 2.4 được coi là hoàn tất về nghiệp vụ khi toàn bộ tiêu ch
 
 Các mục sau **đã được đồng bộ trong repo** (2026-04-28); phần triển khai Order/BFF vẫn cần nối endpoint/service theo đặc tả:
 
-1. `docs/architecture/permission-matrix.md` — ma trận §6 (52 quyền) + §6.1 mô tả cancel tách quyền.
+1. `docs/architecture/permission-matrix.md` — ma trận RBAC hiện tại (66 quyền sau các phase sau) vẫn phải giữ cancel tách quyền của Step 2.4.
 2. `libs/constants/src/lib/enum/role.enum.ts` — `ORDER_CANCEL_PENDING` / `ORDER_CANCEL_PROCESSING` (đã thay `ORDER_CANCEL`).
 3. `apps/user-access/src/seeder/role.json` + `role.spec.ts` + `apps/bff/.../permission.guard.spec.ts` + `tools/verify-permission-matrix.sh` — mapping WAITER pending cancel.
 4. `libs/shared/types/src/lib/realtime-events.types.ts` — `OrderConfirmedEvent` enrich, `CartUpdatedEvent`, `BillRequestedEvent`, `TableTransferredEvent`.
@@ -1637,6 +1637,6 @@ Trừ khi có tài liệu được phê duyệt sau này thay thế đặc tả 
 
 ## 22. Điểm dừng
 
-Tài liệu này chốt luồng nghiệp vụ cho Step 2.4 và sẵn sàng làm đầu vào cho kế hoạch triển khai trong tương lai.
+Tài liệu này chốt luồng nghiệp vụ cho Step 2.4 và được giữ như spec chi tiết; phase record hiện tại là nguồn trạng thái triển khai cuối cùng.
 
 Các phần tiền đề RBAC / shared types / TCP pattern / session cache đã được merge trong repo; tài liệu này vẫn không chứa kế hoạch triển khai đầy đủ cho Order Service.

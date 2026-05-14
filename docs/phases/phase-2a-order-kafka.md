@@ -23,7 +23,7 @@ Phạm vi cuối cùng gồm:
 - Session là durable entity trong PostgreSQL. Redis key `session:{tenantId}:{sessionId}` là cache active với TTL 2 giờ; idle close sau 30 phút chỉ áp dụng khi `orderCount == 0`.
 - Cart nằm trong Redis key `cart:{tenantId}:{sessionId}` với `cartVersion`. REST snapshot là nguồn dữ liệu chuẩn sau reconnect; WebSocket/realtime event chỉ là hint để invalidate/refetch.
 - `DRAFT` không tạo DB order row. Submit cart tạo order `PENDING`, clear cart sau khi thành công, và dùng `idempotencyKey` để tránh submit lặp.
-- Submit chỉ validate snapshot availability. Stock deduct chỉ xảy ra khi staff confirm `PENDING -> PROCESSING` qua Catalog TCP transactional command; cancel processing gọi release/restore qua Catalog policy.
+- Submit chỉ validate snapshot availability. Stock deduct chỉ xảy ra khi staff confirm `PENDING -> PROCESSING` qua Catalog TCP transactional command (`STOCK_DEDUCT_FOR_ORDER`); cancel processing gọi release/restore qua Catalog policy (`STOCK_RELEASE_FOR_ORDER`).
 - Kafka chỉ được dùng cho domain event hậu xác nhận: Order Service ghi outbox `order.confirmed`, publisher gửi topic với partition key `tenantId` và payload có table/session/item/station snapshot.
 - UI realtime không đi qua Kafka trong Phase 2A. BFF phát direct events sau TCP success: `events.cartUpdated`, `events.orderCreated`, `events.orderStatusChanged`, `events.serviceRequested`, `events.billRequested`, `events.tableTransferred`.
 - Bill request là explicit command. `REQUEST_BILL` service request là side effect thông báo/audit, không thay thế command request bill.

@@ -4,6 +4,7 @@
 > **Ngày:** 2026-05-08  
 > **Trạng thái:** Chốt sau audit Phase 3 và quyết định Q1-Q6 của project owner.
 > **Mục đích:** Tài liệu này là tiêu chuẩn nghiệp vụ/kỹ thuật cho Phase 3. Đây không phải implementation plan và không phân rã task code.
+> **Implementation note (2026-05-14):** Spec gốc Phase 3 chốt theo cơ chế `X-Secret-Key`. Code hiện tại cho route trực tiếp `POST /api/v1/payment/sepay/webhook` đã harden sang HMAC raw-body (`X-SePay-Signature` + `X-SePay-Timestamp`). Các route tenant/platform thêm ở Phase 4B vẫn dùng `x-secret-key` path riêng. Khi lệch, ưu tiên phase record hiện tại và code/tests.
 
 ---
 
@@ -20,7 +21,7 @@
 
 ### 0.1 Tài Liệu Này Override Điểm Nào?
 
-1. Phase 3 không dùng Stripe, không redirect sang hosted checkout, không verify raw-body signature.
+1. Phase 3 không dùng Stripe, không redirect sang hosted checkout. Spec gốc không yêu cầu raw-body signature, nhưng implementation hiện tại đã đổi route trực tiếp sang HMAC raw-body để harden webhook.
 2. Payment online của Phase 3 là **SePay + VietQR inline**: hệ thống build QR URL và chờ webhook xác nhận.
 3. `PaymentMethod` Phase 3 chỉ mở rộng thêm `VIETQR`. Không thêm `CARD`, `MOMO`, `ZALOPAY`, `BANK_TRANSFER` trong scope này.
 4. Refund Phase 3 là **manual full refund**: staff/owner chuyển khoản tay ngoài hệ thống rồi xác nhận trong Dashboard.
@@ -53,12 +54,14 @@ https://qr.sepay.vn/img?acc=SO_TAI_KHOAN&bank=NGAN_HANG&amount=SO_TIEN&des=NOI_D
 ```
 
 - SePay webhook gửi JSON body thông thường.
-- Webhook có header:
+- Spec Phase 3 gốc chọn SECRET_KEY mode nên webhook có header:
 
 ```http
 X-Secret-Key: <secret_key>
 Content-Type: application/json
 ```
+
+- Implementation hiện tại của direct Phase 3 route đã harden sang HMAC raw-body (`X-SePay-Signature` / `X-SePay-Timestamp`). Các route tenant/platform Phase 4B vẫn theo `x-secret-key` path riêng.
 
 - Payload webhook có các field chính: `id`, `gateway`, `transactionDate`, `accountNumber`, `code`, `content`, `transferType`, `transferAmount`, `accumulated`, `subAccount`, `referenceCode`, `description`.
 - `code` có thể `null`; hệ thống phải fallback parse từ `content`.
@@ -71,7 +74,7 @@ Content-Type: application/json
 
 1. Tạo Payment Service mới (`apps/payment`) với PostgreSQL riêng `qrtable_payment`.
 2. Tạo và hiển thị VietQR cho bill ở trạng thái `PENDING_PAYMENT`.
-3. Nhận webhook SePay qua BFF endpoint public có `X-Secret-Key`.
+3. Nhận webhook SePay qua BFF endpoint public. Spec gốc dùng `X-Secret-Key`; code hiện tại của route trực tiếp dùng HMAC headers `X-SePay-Signature` / `X-SePay-Timestamp`.
 4. Xác nhận thanh toán tiền mặt trên POS.
 5. Chống duplicate webhook bằng DB unique constraint.
 6. Chống race Cash vs VietQR bằng transaction + row lock trên payment.
@@ -384,7 +387,7 @@ CREATE INDEX idx_payment_outbox_status_created
 | --------------------------------------- | -------------------- | --------------------------------------------------------------- | ------------------------------------------- |
 | `POST /api/v1/payment/vietqr/create-qr` | OWNER/MANAGER/WAITER | `UserGuard -> TenantGuard -> PermissionGuard`, `payment.create` | Tạo/reuse payment pending và trả QR URL.    |
 | `POST /api/v1/payment/cash/confirm`     | OWNER/MANAGER/WAITER | `payment.confirm_cash`                                          | Xác nhận thu tiền mặt.                      |
-| `POST /api/v1/payment/sepay/webhook`    | SePay                | Public endpoint + `X-Secret-Key`                                | Nhận webhook SePay. Không dùng JWT guards.  |
+| `POST /api/v1/payment/sepay/webhook`    | SePay                | Public endpoint + HMAC raw-body verification                    | Nhận webhook SePay. Không dùng JWT guards.  |
 | `POST /api/v1/payment/refund/request`   | OWNER/MANAGER        | `payment.refund`                                                | Tạo yêu cầu full refund.                    |
 | `POST /api/v1/payment/refund/confirm`   | OWNER/MANAGER        | `payment.refund`                                                | Xác nhận đã hoàn tiền tay.                  |
 | `GET /api/v1/payment/history`           | OWNER/MANAGER/WAITER | `payment.get_history`                                           | Xem lịch sử payment theo tenant/bill/table. |
@@ -490,9 +493,10 @@ The BFF must return HTTP 200 for:
 - Outbound `transferType`.
 - Payment already paid by cash.
 
-The BFF must return HTTP 401 for:
+The BFF must return HTTP 401 for the current direct Phase 3 route when:
 
-- Missing or invalid `X-Secret-Key`.
+- Missing or invalid `X-SePay-Signature` / `X-SePay-Timestamp`.
+- Webhook secret is not configured.
 
 ### 6.5 Refund Request
 
@@ -615,17 +619,13 @@ Priority:
 
 ### 7.4 Verify SePay Webhook
 
-```ts
-function verifySepaySecret(received: string | undefined, expected: string): boolean {
-  return Boolean(received) && received === expected;
-}
-```
+Current direct Phase 3 route verification is HMAC-based in BFF: signature over `{timestamp}.{rawBody}` using `SEPAY_WEBHOOK_SECRET`.
 
 Rules:
 
 - This happens in BFF before TCP call.
-- No raw body required.
-- No HMAC required.
+- Raw body is required for the direct route HMAC verification.
+- Tenant/platform routes introduced by Phase 4B use a separate `x-secret-key` path.
 - Invalid secret returns 401.
 - Valid secret delegates payload to Payment Service.
 
@@ -814,10 +814,10 @@ Required doc/code update:
 
 ### 9.2 SePay Webhook Endpoint
 
-Webhook endpoint does not use JWT guards:
+Webhook endpoint does not use JWT guards. Current direct Phase 3 route:
 
 ```text
-Public HTTP endpoint -> X-Secret-Key verification -> Payment Service TCP
+Public HTTP endpoint -> HMAC signature verification -> Payment Service TCP
 ```
 
 Rules:
@@ -950,9 +950,9 @@ Dashboard refund UI:
 
 ---
 
-## 15. Inputs Cho Bước `writing-plans`
+## 15. Historical Implementation Scope
 
-Implementation plan sau tài liệu này nên tạo các nhóm việc:
+Implementation plan Phase 3 đã dùng tài liệu này để tổ chức các nhóm việc:
 
 1. Scaffold `apps/payment` + PostgreSQL connection.
 2. Add Payment entities and migrations.

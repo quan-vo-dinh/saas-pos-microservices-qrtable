@@ -8,6 +8,7 @@
 
 - Phase 3 hoàn thành — [phase-3-payment.md](phase-3-payment.md) (luồng thanh toán, billing/session đã ổn định làm nền cho saga thanh toán và validation)
 - Phase 2A/2B: Order, Kafka, KDS/realtime đã có — saga xác nhận đơn bám vào khóa tồn, tạo đơn, thông báo bếp
+- Phase 4B đã hoàn thành một onboarding mini-saga trong SaaS Service — nếu Phase 4A được mở lại, phần hardening phải xem đó là luồng hiện hữu để chuẩn hóa/retry/observe, không thiết kế lại từ con số không.
 
 ## Tham Chiếu
 
@@ -19,7 +20,7 @@
 
 ## Tổng Quan
 
-Phase 4A nâng độ tin cậy của luồng lõi POS: mọi "chuỗi hành động" có nhiều bước (tồn kho → đơn → thông báo; kiểm tra billing → đóng phiên → cập nhật bàn → lưu trữ bill) được mô hình hóa như saga có compensation — để khi một bước thất bại, hệ thống không để lại trạng thái nửa vời mà có đường lui có kiểm soát. Đồng thời phase cố định các policy vận hành (giới hạn đơn theo phiên, idempotency, delete constraints, audit hủy) và một lớp outbox tối giản để đồng bộ "đã ghi DB" với "đã publish Kafka", tránh mất sự kiện. Full CDC (Debezium) được ghi nhận là hướng sau luận án — không nằm trong phạm vi phase này.
+Phase 4A nâng độ tin cậy của luồng lõi POS: mọi "chuỗi hành động" có nhiều bước (tồn kho → đơn → thông báo; kiểm tra billing → đóng phiên → cập nhật bàn → lưu trữ bill) được mô hình hóa như saga có compensation — để khi một bước thất bại, hệ thống không để lại trạng thái nửa vời mà có đường lui có kiểm soát. Sau Phase 4B, phase này cũng phải nhận diện onboarding tenant/Owner/payment settings là một mini-saga hiện hữu trong SaaS Service: phạm vi 4A là harden retry/observability/compensation nếu cần, không đổi ownership nghiệp vụ đã chốt. Đồng thời phase cố định các policy vận hành (giới hạn đơn theo phiên, idempotency, delete constraints, audit hủy) và một lớp outbox tối giản để đồng bộ "đã ghi DB" với "đã publish Kafka", tránh mất sự kiện. Full CDC (Debezium) được ghi nhận là hướng sau luận án — không nằm trong phạm vi phase này.
 
 ## Steps
 
@@ -84,6 +85,14 @@ Compensation thực hiện theo thứ tự ngược: Step 4 → Step 3 → Step 
 | Delete constraints       | Không xóa **Category** còn **MenuItem**; không xóa **MenuItem** còn **OrderItem** đang active (status IN PROCESSING, READY) | Bảo toàn tham chiếu và lịch sử đơn; tránh orphan và sai báo cáo |
 | Audit cancel             | **BẮT BUỘC** ghi log khi Cancel order — **actor** (who), **reason** (why), **timestamp** (when)                             | Phục vụ điều tra, đối soát và trách nhiệm vận hành              |
 
+#### SaaS Onboarding Mini-Saga (đã có từ Phase 4B)
+
+**WHAT:** Chuỗi onboarding tenant hiện hữu gồm tạo tenant/subscription mặc định, tạo Owner qua Authorizer/User-Access, khởi tạo `tenant_payment_settings`, ghi outbox `tenant.created`, và rollback/cleanup khi bước giữa chừng thất bại.
+
+**WHY:** Đây là business flow đa service phát sinh sau spec Phase 4B. Nếu Phase 4A được triển khai sau Phase 4B, nó phải harden flow này cùng với Order/Payment: idempotency key cho onboarding request, compensation có audit rõ, retry/cleanup orphan Keycloak user có metric/log, và không làm mất outbox event sau DB commit.
+
+**Ranh giới:** Không biến onboarding thành self-service registration wizard; quyết định đó vẫn deferred/post-thesis theo Phase 4B.
+
 #### Simplified Transactional Outbox
 
 **WHAT:** Bảng `outbox_events` (hoặc tên tương đương) trong **Order** và **Payment**; ghi event **cùng transaction** với thay đổi nghiệp vụ; job/cron nền poll → publish Kafka → đánh dấu đã gửi.
@@ -103,6 +112,7 @@ Compensation thực hiện theo thứ tự ngược: Step 4 → Step 3 → Step 
 - **Idempotency:** Gửi trùng cùng idempotency key (double-submit) → **một** đơn/hành động tương ứng, không nhân đôi side-effect.
 - **Delete constraints:** Không xóa được Category còn MenuItem; không xóa được MenuItem còn OrderItem active — API/DB phản hồi lỗi rõ ràng.
 - **Audit cancel:** Mọi thao tác hủy đơn có bản ghi audit với **actor, reason, timestamp** đủ để tra cứu sau.
+- **Onboarding mini-saga hardening:** Nếu Phase 4A mở lại sau Phase 4B, onboarding tenant có idempotency/compensation/audit/observability rõ và không làm thay đổi quyết định admin-assisted onboarding.
 
 ## Outputs
 

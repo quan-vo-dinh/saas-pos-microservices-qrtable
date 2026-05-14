@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import clsx from 'clsx';
 import { Radio, Shield } from 'lucide-react';
+import { Cover } from '@/components/ui/cover';
 import styles from './landing.module.css';
 import { HeroSaasQrEmblem } from './hero-saas-qr-emblem';
 
@@ -48,7 +49,12 @@ export function HeroSection(): React.ReactElement {
             <div>
               <h1 id="qrt-hero-heading" className="font-sans text-5xl font-semibold tracking-tight text-zinc-50 sm:text-6xl lg:text-7xl">
                 Vận hành nhà hàng của bạn theo{' '}
-                <span className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">dòng chảy số</span>
+                <Cover
+                  containerClassName="border border-cyan-500/20 bg-zinc-950/70 hover:bg-zinc-900/85 dark:border-cyan-500/20 dark:bg-zinc-950/70 dark:hover:bg-zinc-900/85"
+                  className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent"
+                >
+                  dòng chảy số
+                </Cover>
               </h1>
               <p className="mt-4 max-w-xl font-sans text-base leading-relaxed text-zinc-400 sm:text-lg">
                 QRTable gom menu, đơn từ khách và màn hình nhân viên vào một luồng: ít nhầm bàn, bếp nhận đúng món, thanh toán

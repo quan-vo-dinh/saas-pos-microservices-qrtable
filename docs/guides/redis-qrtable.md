@@ -1,6 +1,10 @@
 # Tài Liệu Redis & ioredis — NestJS Microservices
 
 > **Mục tiêu:** Hiểu Redis từ nền tảng đến nâng cao, áp dụng trực tiếp vào dự án NestJS microservices với `ioredis` — bao gồm cart, session cache, distributed lock, atomic operations, và các pattern thực tế.
+>
+> **Vai trò canonical:** Đây là supporting guide / tutorial. Hiện trạng Redis đã triển khai được theo dõi ở [`../redis-usage-analysis.md`](../redis-usage-analysis.md), [`../technical-architecture.md`](../technical-architecture.md), và code trên `main`.
+>
+> **Current implementation note (2026-05-14):** Order cart/session hiện dùng Redis Hash `cart:{tenantId}:{sessionId}` với `cartVersion` check ở `CartService`, không dùng Lua script cho mutation cart. Các pattern Lua/lock trong tài liệu này là reference hardening cho tình huống cần atomic read-check-write mạnh hơn. Phase 4B cũng đã dùng Redis keys `tenant:{tenantId}:suspended`, `subscription:{tenantId}`, và `oauth_state:{state}`.
 
 ---
 
@@ -17,7 +21,7 @@
 9. [Lua Scripting — Atomic Operations](#9-lua-scripting--atomic-operations)
 10. [Distributed Lock — Redlock Pattern](#10-distributed-lock--redlock-pattern)
 11. [Optimistic Locking — Version Conflict](#11-optimistic-locking--version-conflict)
-12. [Cart Service Pattern — Dự án thực tế](#12-cart-service-pattern--dự-án-thực-tế)
+12. [Cart Service Pattern — Reference Variant](#12-cart-service-pattern--reference-variant)
 13. [Session Caching Pattern](#13-session-caching-pattern)
 14. [Pub/Sub](#14-pubsub)
 15. [NestJS Integration](#15-nestjs-integration)
@@ -49,7 +53,7 @@ Redis không chỉ là cache — nó là một **data structure server** có th�
 - **Cart**: Cần đọc/ghi nhanh từ nhiều request đồng thời → Redis Hash
 - **Session cache**: Tránh query PostgreSQL mỗi request → Redis String/Hash
 - **Distributed lock**: Đảm bảo chỉ 1 process xử lý tại một thời điểm → `SET NX PX`
-- **Optimistic locking**: Cart version conflict detection → Lua script atomic
+- **Optimistic locking**: Cart version conflict detection → current code check `cartVersion`; Lua/WATCH là hardening option
 - **Rate limiting**: Đếm request theo thời gian → `INCR` + `EXPIRE`
 - **Pub/Sub**: Broadcast event giữa service instances → `PUBLISH`/`SUBSCRIBE`
 
@@ -885,9 +889,9 @@ const sha = await redis.script(
 const result = await redis.evalsha(sha, 1, 'mykey');
 ```
 
-### Ví dụ thực tế: Cart Version Check & Update (Optimistic Lock)
+### Reference hardening: Cart Version Check & Update (Optimistic Lock)
 
-Đây là trái tim của cart service trong dự án — đảm bảo không có cart conflict:
+Đây là pattern hardening cho cart mutation có cạnh tranh cao. Code hiện tại đã check `cartVersion` trong Order `CartService`; Lua script dưới đây là thiết kế tham khảo nếu cần atomic read-check-write hoàn toàn trong Redis.
 
 ```typescript
 const CART_MUTATE_SCRIPT = `
@@ -1130,7 +1134,7 @@ Trong hệ thống QR Table:
 - Mỗi thiết bị có thể thêm/sửa/xoá món cùng lúc.
 - Optimistic locking đảm bảo không có mutation nào bị "ghi đè ngầm" — luôn báo conflict rõ ràng.
 
-### Triển khai Lua script atomic
+### Hardening option: Lua script atomic
 
 ```typescript
 // Script kiểm tra version và update nếu version khớp
@@ -1206,7 +1210,9 @@ async mutateCart(
 
 ---
 
-## 12. Cart Service Pattern — Dự án thực tế
+## 12. Cart Service Pattern — Reference Variant
+
+> **Current-code note:** Key inventory hiện tại dùng `cart:{tenantId}:{sessionId}` làm Redis Hash trong Order `CartService`. Thiết kế tách `snapshot`/`meta` dưới đây là reference variant cho hardening hoặc refactor tương lai, không phải shape bắt buộc của code hiện tại.
 
 ### Cấu trúc dữ liệu Cart trong Redis
 
@@ -2027,7 +2033,7 @@ async function findCartKeys(redis: Redis, tenantId: string): Promise<string[]> {
 **Khi cần atomic operation:**
 
 - [ ] Single command (SET, INCR, ...): tự atomic — không cần thêm gì
-- [ ] Read-check-write: PHẢI dùng Lua script (không dùng GET rồi SET riêng lẻ)
+- [ ] Read-check-write có nguy cơ cạnh tranh cao: ưu tiên Lua script/WATCH/lock; nếu dùng app-level check như current `CartService` thì phải có conflict response và tests rõ ràng
 - [ ] Nhóm lệnh cần atomic + không có logic phức tạp: dùng MULTI/EXEC
 - [ ] Cần lock: dùng `SET NX PX` + Lua release
 

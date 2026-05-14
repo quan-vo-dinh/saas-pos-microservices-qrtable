@@ -1200,7 +1200,7 @@ Realtime updates được route theo room để mỗi actor chỉ nhận đúng 
 - `order.created` -> staff room.
 - `kds.queue_changed` -> KDS room.
 - `kitchen.item_ready` -> staff + customer session.
-- `menu.updated` -> tenant-wide invalidate/refetch.
+- Menu mutation -> cache/query invalidation; no current `menu.updated` WS contract.
 - `payment.completed` -> customer session or polling baseline.
 
 **Rule:**
@@ -1297,7 +1297,7 @@ Payment Service ghi nhận thanh toán, còn bill lifecycle vẫn thuộc Order 
 2. QR có amount = `rounded_total`.
 3. Nội dung chuyển khoản chứa `QRTBL` + 8 ký tự billId.
 4. SePay gửi webhook về BFF.
-5. BFF verify `X-Secret-Key`.
+5. BFF verify webhook auth theo route.
 6. Payment match bill reference, kiểm tra amount.
 7. Đủ/thừa tiền -> `PAID`; thiếu tiền -> giữ `PENDING` + audit.
 

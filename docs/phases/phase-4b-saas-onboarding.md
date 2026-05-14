@@ -20,13 +20,19 @@ Phạm vi cuối cùng gồm:
 ## Accepted Decisions
 
 - Onboarding Phase 4B là admin-assisted, không phải self-service registration wizard. `SUPER_ADMIN` tạo tenant, Owner, subscription mặc định và payment settings ban đầu.
+- Onboarding chạy như mini-saga trong SaaS Service; failure giữa chừng phải rollback DB-side effects và cleanup orphan Keycloak users. Phase 4B dùng password nhập thủ công cho Owner, còn reset link/Required Action thuộc Phase 4C.
 - `TenantStatus` là trạng thái vận hành chính: `ACTIVE` cho phép thao tác, `SUSPENDED` chuyển sang read-only có ngoại lệ thanh toán bill đang chờ, `CLOSED` là trạng thái đóng tenant và không activate lại trong Phase 4B.
 - `isActive` chỉ còn ý nghĩa tương thích DTO cũ; hành vi mới derive từ `status`.
+- Slug tenant phải normalize tiếng Việt, unique toàn platform và chặn reserved words ở shared constants.
+- Auto-suspend chạy daily `02:00 Asia/Ho_Chi_Minh` với grace period 24h; `max_orders_per_day` cũng tính theo timezone Việt Nam.
+- Legacy tenant migration backfill `FREE` plan không hết hạn, map `isActive=false` thành `SUSPENDED`, và set default `VND` / `vi-VN`.
 - Permission mới được tách theo domain `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`; nhóm `saas.*` là legacy/backward compatibility.
 - Feature gating dùng mô hình hybrid: BFF/guard chặn sớm cho UX, service sở hữu resource vẫn có backup check/counter để giữ correctness.
 - Payment Service sở hữu `tenant_payment_settings`; SaaS Service không lưu OAuth token hay thông tin ngân hàng tenant.
 - BFF là HTTP edge và webhook router: endpoint tenant-scoped cho Tier 1, platform endpoint cho Tier 2, route theo billing reference prefix `QRTBL` / `QRSUB`.
 - Suspend phải có hiệu lực nhanh qua Redis key `tenant:{tenantId}:suspended`; subscription hiện hành được cache bằng `subscription:{tenantId}` để guard đọc nhanh.
+- Suspended tenant vẫn được xử lý SePay webhook cho bill đã tạo, order đang `PROCESSING` vẫn được kitchen hoàn tất, và client nhận banner cảnh báo thay vì force-disconnect.
+- `/admin/*` thuộc `management-app`; Phase 4B không tách app platform admin riêng. Landing page là static pricing/contact/login page đọc public plans.
 - Phase 4B không thêm notification/email suspend; phần đó thuộc Phase 4C.
 
 ## Final Business Behavior
@@ -41,6 +47,8 @@ Thanh toán hai tầng được tách rõ:
 - Tier 2 tenant -> platform: Owner tạo/cancel checkout subscription, Owner/Manager xem gói và subscription hiện hành, thanh toán platform VietQR với reference `QRSUB`; SaaS Service xử lý invoice và kích hoạt/renew subscription khi webhook hợp lệ.
 
 Tenant tự kết nối SePay trên `/dashboard/payment-settings`: BFF tạo authorize URL, Payment Service trao đổi OAuth2 code, lưu token đã mã hóa, đọc danh sách bank accounts, tenant chọn tài khoản nhận tiền, và Payment Service cấu hình/lưu webhook settings cần thiết. Trình duyệt không nhận client secret, access token, refresh token.
+
+Subscription/plan behavior trong Phase 4B dùng một active subscription tại một thời điểm. Checkout subscription tạo invoice `QRSUB*`; webhook hợp lệ hoặc manual confirm của `SUPER_ADMIN` kích hoạt/renew gói. Multi-bank active, proration, partial subscription refund, promotion/discount và transfer ownership nằm ngoài phạm vi phase.
 
 ## Final Technical Behavior
 
@@ -74,6 +82,8 @@ Implementation and stabilization evidence on 2026-05-13 showed the phase is comp
 
 - Self-service restaurant registration wizard remains deferred; Phase 4B keeps admin-assisted onboarding plus public landing/contact path.
 - Phase 4C owns notification/email flows such as welcome/suspend/expiry messaging and reset-password email improvements.
+- Phase 4C should absorb deferred Phase 4B communication flows: welcome email from `tenant.created`, tenant suspended email via direct task/TCP (not Kafka), subscription warning/expired email, and Owner password reset/Required Action handoff.
 - Suspended Customer PWA browser verification still needs a reliable suspended seed route or demo fixture so manual route-level smoke can match automated coverage.
 - Production SePay setup still requires public BFF/webhook URLs, platform webhook secret, OAuth redirect registration, and live provider-side validation.
+- Tenant/platform `x-secret-key` webhook value verification needs production hardening against stored platform/tenant secrets; current documented route shape is correct, but security verification must be rechecked before go-live.
 - Hard-delete, retention cleanup, tenant data erasure policy, transfer ownership, promotions/discounts, webhook replay dashboard, and partial subscription refund/proration are out of scope for Phase 4B.

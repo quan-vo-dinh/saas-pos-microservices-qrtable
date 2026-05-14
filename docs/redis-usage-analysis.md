@@ -1,6 +1,6 @@
 # Phân Tích Sử Dụng Redis — Hiện Trạng Triển Khai và Thiết Kế Dự Kiến
 
-> Ngày: 2026-05-13
+> Ngày: 2026-05-14
 > Phạm vi: `docs/business-logic.md`, `docs/technical-architecture.md`, `docs/implementation_plan.md`, `docs/phases/*`, các tài liệu/spec Redis, và code hiện tại trong `apps/`, `libs/`, `tools/`.  
 > Mục tiêu: làm rõ mọi phần Redis trong hệ thống QRTable theo cách dễ đọc, dễ tra cứu, dễ kiểm chứng cho người Việt.
 
@@ -296,10 +296,10 @@ Nghiệp vụ / cơ chế:
 - Cache giảm tải Catalog DB/TCP.
 - Khi admin đổi menu, cache bị xóa để lần refetch sau lấy dữ liệu mới.
 
-Gap hiện tại:
+Trạng thái hiện tại:
 
-- Tài liệu mô tả WebSocket broadcast để customer sync menu realtime.
-- Code hiện tại mới xóa Redis cache, chưa emit `menu.updated`.
+- Canonical docs hiện đã chốt không có Kafka/WS `menu.updated`.
+- Code hiện tại xóa Redis cache; client refetch qua React Query/BFF Direct flow thay vì nhận menu broadcast.
 
 Code liên quan:
 
@@ -1032,7 +1032,7 @@ BFF hiện connect `RedisIoAdapter` trong `apps/bff/src/main.ts`, dùng `@socket
 
 ### 9.8 Menu Cache Đã Invalidate, Nhưng Chưa Broadcast Menu
 
-Admin category/menu-item write hiện xóa `menu:{tenantId}`. Docs cũng nhắc WebSocket broadcast cho menu sync, nhưng code chưa emit `menu.updated`.
+Admin category/menu-item write hiện xóa `menu:{tenantId}`. Canonical docs hiện đã chốt không có Kafka/WS `menu.updated`; write path chỉ invalidate cache/query để client refetch.
 
 ### 9.9 Tenant Suspend Flag Đã Có Trong Phase 4B
 

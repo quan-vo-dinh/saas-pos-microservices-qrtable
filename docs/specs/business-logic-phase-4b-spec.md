@@ -3,7 +3,7 @@
 > **Giai đoạn:** Phase 4B — SaaS Service mở rộng + Tenant lifecycle + Subscription/Plan + Onboarding + Feature Gating + Two-tier Payment (Tier 1 Customer→Tenant qua OAuth2 SePay Connect, Tier 2 Tenant→Platform qua VietQR auto-webhook) + Admin/Dashboard UI.
 > **Ngày:** 2026-05-11.
 > **Trạng thái:** ✅ **Chốt** sau các vòng audit Phase 4B và quyết định Q1–Q25 của project owner.
-> **Mục đích:** Tài liệu này là **tiêu chuẩn nghiệp vụ + kiến trúc** cho Phase 4B. Không phải implementation plan, không phân rã task code. Input cho bước `writing-plans` tiếp theo.
+> **Mục đích:** Tài liệu này là **tiêu chuẩn nghiệp vụ + kiến trúc đã chốt** cho Phase 4B. Không phải implementation plan, không phân rã task code. Trạng thái triển khai cuối cùng xem [`docs/phases/phase-4b-saas-onboarding.md`](../phases/phase-4b-saas-onboarding.md).
 
 ---
 
@@ -78,16 +78,16 @@ Hybrid giữa Path 2 và Path 3 trong audit §22:
 
 ### 1.2 Verification từ Context7 + Live Docs (SePay)
 
-| Capability                                                                                                               | Verified | Source                                                              |
-| ------------------------------------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------- |
-| OAuth2 Authorization Code flow (`/oauth/authorize` + `/oauth/token`)                                                     | ✅       | `developer.sepay.vn/vi/sepay-oauth2/luong-xac-thuc`                 |
-| Scopes: `bank-account:read`, `transaction:read`, `webhook:read`, `webhook:write`, `webhook:delete`, `profile`, `company` | ✅       | `docs.sepay.vn/oauth2/`                                             |
-| Self-service OAuth2 app registration                                                                                     | ❌       | `docs.sepay.vn/oauth2/dang-ky-ung-dung.html` — phải liên hệ support |
-| `GET /api/v1/bank-accounts` (list bank accounts của tenant)                                                              | ✅       | `developer.sepay.vn/vi/sepay-oauth2/tai-khoan-ngan-hang`            |
-| `POST /v1/webhook` (programmatic webhook upsert)                                                                         | ✅       | `developer.sepay.vn/vi/bankhub/api/api-webhook/cap-nhat-webhook`    |
-| Webhook `X-Secret-Key` authentication                                                                                    | ✅       | Phase 3 đã implement                                                |
-| Pricing FREE 50tx/month + full API access                                                                                | ✅       | `sepay.vn/bang-gia.html`                                            |
-| Không giới hạn bank accounts mỗi SePay account                                                                           | ✅       | FAQ `sepay.vn/bang-gia.html`                                        |
+| Capability                                                                                                               | Verified | Source                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------- |
+| OAuth2 Authorization Code flow (`/oauth/authorize` + `/oauth/token`)                                                     | ✅       | `developer.sepay.vn/vi/sepay-oauth2/luong-xac-thuc`                                                 |
+| Scopes: `bank-account:read`, `transaction:read`, `webhook:read`, `webhook:write`, `webhook:delete`, `profile`, `company` | ✅       | `docs.sepay.vn/oauth2/`                                                                             |
+| Self-service OAuth2 app registration                                                                                     | ❌       | `docs.sepay.vn/oauth2/dang-ky-ung-dung.html` — phải liên hệ support                                 |
+| `GET /api/v1/bank-accounts` (list bank accounts của tenant)                                                              | ✅       | `developer.sepay.vn/vi/sepay-oauth2/tai-khoan-ngan-hang`                                            |
+| `POST /v1/webhook` (programmatic webhook upsert)                                                                         | ✅       | `developer.sepay.vn/vi/bankhub/api/api-webhook/cap-nhat-webhook`                                    |
+| Webhook authentication                                                                                                   | ✅       | Phase 3 direct route hiện dùng HMAC; Phase 4B tenant/platform routes dùng `x-secret-key` path riêng |
+| Pricing FREE 50tx/month + full API access                                                                                | ✅       | `sepay.vn/bang-gia.html`                                                                            |
+| Không giới hạn bank accounts mỗi SePay account                                                                           | ✅       | FAQ `sepay.vn/bang-gia.html`                                                                        |
 
 **Cost analysis cho thesis demo:** 0đ (1 platform SePay free + N tenant SePay free, mỗi cái 50 tx/tháng).
 
@@ -628,12 +628,14 @@ type User = {
 
 #### 6.1.1 Public (no auth)
 
-| Method | Path                                        | Description                                                           | Auth                             |
-| ------ | ------------------------------------------- | --------------------------------------------------------------------- | -------------------------------- |
-| GET    | `/api/v1/public/plans`                      | List active pricing plans (for landing page).                         | None                             |
-| GET    | `/api/v1/public/landing-info`               | Platform info: hero copy, contact email, feature highlights (static). | None                             |
-| POST   | `/api/v1/payment/sepay/webhook/platform`    | Tier 2 webhook (subscription invoices).                               | `X-Secret-Key`                   |
-| POST   | `/api/v1/payment/sepay/webhook/:tenantSlug` | Tier 1 webhook (bill payments per-tenant).                            | `X-Secret-Key` (tenant-specific) |
+| Method | Path                                        | Description                                                           | Auth                              |
+| ------ | ------------------------------------------- | --------------------------------------------------------------------- | --------------------------------- |
+| GET    | `/api/v1/public/plans`                      | List active pricing plans (for landing page).                         | None                              |
+| GET    | `/api/v1/public/landing-info`               | Platform info: hero copy, contact email, feature highlights (static). | None                              |
+| POST   | `/api/v1/payment/sepay/webhook/platform`    | Tier 2 webhook (subscription invoices).                               | `x-secret-key` path               |
+| POST   | `/api/v1/payment/sepay/webhook/:tenantSlug` | Tier 1 webhook (bill payments per-tenant).                            | tenant-scoped `x-secret-key` path |
+
+> **Implementation verification note (2026-05-14):** Current BFF tenant/platform webhook controllers enforce presence of `x-secret-key` and pass it downstream. Before production, value verification must be hardened against the platform/tenant stored secret, or the spec must be explicitly amended.
 
 #### 6.1.2 SUPER_ADMIN (auth + role gated)
 
@@ -1485,8 +1487,8 @@ PAYMENT_SECRETS_ENCRYPTION_KEY: <64-hex char = 32 bytes AES-256>
 6. UI polls GET /api/v1/dashboard/billing/invoices/:id/status every 5s
 7. Owner scans QR, transfers from their bank app
 8. Money arrives at platform bank → SePay detects → POSTs to
-   /api/v1/payment/sepay/webhook/platform with X-Secret-Key
-9. BFF verifies secret, extracts code, matches "QRSUB*" → TCP saas.handle_webhook
+   /api/v1/payment/sepay/webhook/platform with the Phase 4B `x-secret-key` path
+9. BFF enforces webhook auth presence/value per production hardening, extracts code, matches "QRSUB*" → TCP saas.handle_webhook
 10. SaaS Service:
     a. Extract billingReference from code or content
     b. SELECT invoice WHERE billing_reference = ? FOR UPDATE
@@ -2311,9 +2313,9 @@ db.users.createIndex({ tenantId: 1, isActive: 1 });
 
 ---
 
-## 18. Inputs Cho Bước `writing-plans`
+## 18. Historical Implementation Scope
 
-The next step in the workflow is `writing-plans` (skill `superpowers:writing-plans`). This spec provides:
+Trong quá trình triển khai Phase 4B, spec này đã cung cấp phạm vi quyết định cho implementation plan:
 
 - **Domain model** (§5) — table-level schema, indexes, encryption notes.
 - **State machines** (§4) — explicit transitions, side-effects, invariants.
@@ -2325,7 +2327,7 @@ The next step in the workflow is `writing-plans` (skill `superpowers:writing-pla
 - **Skill requirements** (§13.1) — `ui-ux-pro-max` mandatory for landing.
 - **Risks & mitigations** — refer to audit §9 + §16 + §23 (R1-R20).
 
-The implementation plan should organize work into ~6 releases (§14.2) with ~30-40 distinct tasks. Recommended approach: **subagent-driven-development** with one subagent per release.
+Implementation plan sau đó đã được tổ chức thành nhiều batch/release nhỏ và Phase 4B hiện đã đóng theo final phase record.
 
 ---
 
@@ -2339,4 +2341,4 @@ The implementation plan should organize work into ~6 releases (§14.2) with ~30-
 > - Migration MongoDB tenantId backfill (legacy data accuracy).
 > - Customer PWA suspend banner edge cases (existing WS connection state).
 >
-> **Next step:** Invoke `superpowers:writing-plans` skill với spec này làm input.
+> **Current status:** Phase 4B đã triển khai xong; xem final phase record tại [`docs/phases/phase-4b-saas-onboarding.md`](../phases/phase-4b-saas-onboarding.md).

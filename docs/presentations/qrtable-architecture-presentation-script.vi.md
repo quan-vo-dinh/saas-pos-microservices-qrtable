@@ -311,7 +311,7 @@ Provider đầu tiên là **Keycloak**. Đây là hệ thống IAM dùng để q
 
 Provider thứ hai là **Cloudinary**. Khi quản lý nhà hàng upload ảnh món ăn, BFF sẽ xử lý upload lên Cloudinary. Catalog Service lưu URL ảnh, còn frontend sử dụng URL này để hiển thị ảnh menu. Cách này giúp backend không phải tự lưu file ảnh trong server, đồng thời tận dụng CDN và image delivery của Cloudinary.
 
-Provider thứ ba là **SePay/VietQR**. Payment Service tạo URL ảnh QR theo thông tin tài khoản ngân hàng, số tiền và mã tham chiếu bill. Frontend hiển thị QR này cho khách hoặc nhân viên. Khi khách chuyển khoản, SePay phát hiện giao dịch và gửi webhook về BFF. BFF kiểm tra `X-Secret-Key`, sau đó chuyển payload sang Payment Service để xác nhận bill tương ứng.
+Provider thứ ba là **SePay/VietQR**. Payment Service tạo URL ảnh QR theo thông tin tài khoản ngân hàng, số tiền và mã tham chiếu bill. Frontend hiển thị QR này cho khách hoặc nhân viên. Khi khách chuyển khoản, SePay phát hiện giao dịch và gửi webhook về BFF. BFF kiểm tra webhook auth theo route đang dùng, sau đó chuyển payload sang Payment Service để xác nhận bill tương ứng.
 
 Ba provider này giúp hệ thống tập trung vào nghiệp vụ chính, còn những phần chuẩn như identity, image storage và bank webhook được giao cho dịch vụ chuyên dụng.
 
@@ -512,7 +512,7 @@ Luồng chính:
 5. Client hiển thị ảnh QR từ SePay.
 6. Khách chuyển khoản.
 7. SePay gửi webhook về BFF.
-8. BFF kiểm tra `X-Secret-Key`, forward sang Payment.
+8. BFF kiểm tra webhook auth, forward sang Payment.
 9. Payment match bill ref, ghi payment, gọi Order mark paid, publish `payment.completed`.
 
 ### Script đọc
@@ -525,7 +525,7 @@ Sau khi có bill snapshot, Payment Service tạo URL ảnh VietQR. URL này ch�
 
 Frontend nhận URL và hiển thị ảnh QR cho khách quét bằng app ngân hàng. Lưu ý ở đây hệ thống không nhất thiết gọi API để tạo một payment session phức tạp như cổng thanh toán online. Với mô hình VietQR này, QR là ảnh chuyển khoản ngân hàng có số tiền và nội dung cụ thể.
 
-Sau khi khách chuyển khoản, SePay phát hiện giao dịch tiền vào tài khoản ngân hàng và gửi webhook về endpoint của BFF: `/api/v1/payment/sepay/webhook`. Webhook có header `X-Secret-Key`. BFF kiểm tra secret này để đảm bảo request thật sự đến từ SePay đã cấu hình.
+Sau khi khách chuyển khoản, SePay phát hiện giao dịch tiền vào tài khoản ngân hàng và gửi webhook về endpoint của BFF: `/api/v1/payment/sepay/webhook`. Direct route hiện dùng HMAC raw-body, còn route tenant/platform sau Phase 4B dùng `x-secret-key` path riêng. BFF kiểm tra auth này để đảm bảo request thật sự đến từ endpoint đã cấu hình.
 
 Sau khi xác thực webhook, BFF forward payload sang Payment Service qua TCP 3208. Payment Service kiểm tra giao dịch là tiền vào, khớp mã bill từ field `code` hoặc nội dung chuyển khoản, kiểm tra số tiền đã đủ chưa, xử lý chống duplicate, ghi payment và audit vào PostgreSQL.
 
@@ -719,7 +719,7 @@ Khái niệm quan trọng ở đây là **eventual consistency**. Nghĩa là d�
 - Customer dùng QR/session scope.
 - Tenant context bắt buộc trong request.
 - Permission kiểm soát hành động cụ thể.
-- Webhook SePay dùng `X-Secret-Key`.
+- Webhook SePay dùng auth theo route: direct HMAC hoặc tenant/platform `x-secret-key`.
 
 ### Script đọc
 
@@ -731,7 +731,7 @@ Với customer, hệ thống không bắt đăng nhập. Thay vào đó, custome
 
 Với multi-tenancy, tenant context là bắt buộc. Mọi dữ liệu nghiệp vụ quan trọng đều gắn với tenant. Đây là lớp bảo vệ để dữ liệu các nhà hàng không bị trộn.
 
-Với thanh toán SePay, webhook từ bên ngoài phải có `X-Secret-Key`. BFF kiểm tra secret trước khi chuyển payload sang Payment Service. Nhờ vậy, người ngoài không thể giả lập webhook thanh toán thành công nếu không biết secret đã cấu hình.
+Với thanh toán SePay, webhook từ bên ngoài phải pass auth theo route đang dùng: direct HMAC hoặc tenant/platform `x-secret-key`. BFF kiểm tra auth trước khi chuyển payload sang Payment Service. Nhờ vậy, người ngoài không thể giả lập webhook thanh toán thành công nếu không biết secret đã cấu hình.
 
 Nhìn tổng thể, hệ thống không chỉ bảo vệ ở một điểm đăng nhập, mà kiểm soát theo nhiều lớp: identity, tenant, permission, session và provider secret.
 
@@ -834,7 +834,7 @@ Hệ thống thiết kế theo hướng at-least-once, nghĩa là ưu tiên khô
 
 **Gợi ý trả lời:**
 
-Webhook SePay phải có header `X-Secret-Key` khớp với secret đã cấu hình. BFF kiểm tra secret này trước khi chuyển payload vào Payment Service. Payment Service còn kiểm tra giao dịch là tiền vào, mã bill có khớp không, số tiền có đủ không và có bị duplicate không.
+Webhook SePay phải pass auth theo route đang dùng: direct HMAC hoặc tenant/platform `x-secret-key`. BFF kiểm tra auth này trước khi chuyển payload vào Payment Service. Payment Service còn kiểm tra giao dịch là tiền vào, mã bill có khớp không, số tiền có đủ không và có bị duplicate không.
 
 ---
 

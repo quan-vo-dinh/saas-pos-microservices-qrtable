@@ -20,17 +20,26 @@ Khi có mâu thuẫn, ưu tiên theo thứ tự: code/tests hiện tại, accept
 1.  **Onboard tenant bởi Super Admin:**
     - `SUPER_ADMIN` tạo tenant qua platform admin, khai báo tên quán, loại hình, địa chỉ, thông tin owner và gói ban đầu.
     - Hệ thống tạo tenant, Owner user, subscription mặc định và payment settings row ban đầu trong cùng quy trình onboarding.
+    - Onboarding Phase 4B là một mini-saga trong SaaS Service: nếu bước tạo user/profile/payment settings thất bại, hệ thống rollback dữ liệu đã tạo trong DB và có cleanup path cho orphan Keycloak users.
+    - Phase 4B dùng cơ chế `SUPER_ADMIN` nhập password thủ công cho Owner; gửi email reset/required action được chuyển sang Phase 4C sau khi có SMTP/Notification.
 
 2.  **Khởi tạo Định danh Nhà hàng (Tenant Identity):**
     - **Logic Cốt lõi:** Hệ thống tự động sinh ra một Slug/Subdomain duy nhất (ví dụ: `the-coffee-house.qrtable.io`) làm định danh thương hiệu trên Internet.
+    - Slug phải normalize tiếng Việt, unique toàn platform và chặn reserved words như `admin`, `api`, `www`, `app` để không xung đột route hoặc brand nội bộ.
 
 3.  **Lựa chọn Gói Dịch vụ (Subscription):**
     - Super Admin quản lý pricing plans; Owner có thể xem gói và tạo checkout subscription cho tenant của mình; Manager chỉ có quyền xem subscription/plan.
     - **Quy tắc:** Gói cước giới hạn tính năng và quy mô (ví dụ: Gói Miễn phí chỉ cho phép tối đa 10 bàn, không có báo cáo nâng cao). Ghi nhận ngày bắt đầu và kết thúc gói.
+    - Mỗi tenant chỉ có một subscription `ACTIVE` tại một thời điểm. Subscription mới có thể supersede subscription cũ và phải invalidate cache/guard liên quan.
+    - Auto-suspend subscription hết hạn chạy theo giờ Việt Nam: daily `02:00 Asia/Ho_Chi_Minh`, grace period 24h (`expires_at + 1 day < now()`).
+    - Counter `max_orders_per_day` dùng timezone `Asia/Ho_Chi_Minh` cho thị trường Việt Nam.
+    - Tenant thanh toán platform bằng subscription invoice `QRSUB*`; `SUPER_ADMIN` có manual confirm fallback khi webhook lỗi nhưng đã đối soát được tiền.
 
 4.  **Thiết lập Thanh toán Tenant:**
     - Owner kết nối SePay OAuth2 trong `/dashboard/payment-settings` để tiền bill khách hàng về tài khoản ngân hàng của tenant.
     - Payment Service sở hữu `tenant_payment_settings`; SaaS Service chỉ sở hữu tenant/subscription/invoice platform billing.
+    - Thanh toán hai tầng dùng prefix tách biệt: `QRTBL*` cho customer bill payment vào tài khoản tenant, `QRSUB*` cho subscription invoice tenant trả platform.
+    - Phase 4B hỗ trợ một SePay account / một active bank account cho mỗi tenant; multi-bank active, proration và partial subscription refund được defer.
 
 5.  **Thiết lập Cấu hình Vận hành:**
     - **Mặc định Việt Nam:** Hệ thống tự động cấu hình đơn vị tiền tệ VND, ngôn ngữ Tiếng Việt.
@@ -41,7 +50,11 @@ Khi có mâu thuẫn, ưu tiên theo thứ tự: code/tests hiện tại, accept
 - **Cô lập Dữ liệu (Tenant Isolation):** Đảm bảo dữ liệu (đơn hàng, doanh thu, khách hàng) của cửa hàng này hoàn toàn tách biệt và không hiển thị cho cửa hàng khác.
 - **Trạng thái Hoạt động:** Cửa hàng có các trạng thái `ACTIVE`, `SUSPENDED`, `CLOSED`. `SUSPENDED` chuyển tenant sang read-only cho các thao tác vận hành mới, nhưng vẫn cho phép thanh toán bill đang chờ.
   - **Actor:** Super Admin có quyền suspend/activate/close tenant khi vi phạm chính sách hoặc hết hạn subscription.
+  - `isActive` chỉ là field tương thích DTO cũ; hành vi vận hành lấy từ `status`.
+  - Khi tenant bị `SUSPENDED`, SePay webhook cho bill đã tạo vẫn được xử lý idempotent; order đang `PROCESSING` vẫn được kitchen hoàn tất tới served; UI hiển thị banner cảnh báo thay vì force-disconnect.
+  - `CLOSED` là trạng thái kết thúc hợp đồng trong Phase 4B, soft-flag tenant và disable owner khi cần. Hard-delete/retention/data erasure policy được defer.
 - **Phân quyền Ban đầu:** Tenant được onboard với **Restaurant Owner** trong phạm vi tenant; Owner quản lý nhân sự, Manager vận hành nhưng không có quyền xóa user, checkout subscription, hoặc cập nhật payment settings.
+- **Migration tenant cũ:** Legacy tenants được backfill plan `FREE` không hết hạn; `isActive=false` map sang `SUSPENDED`; currency/locale mặc định là `VND` / `vi-VN`.
 
 ---
 
@@ -68,7 +81,7 @@ Hệ thống tuân thủ cấu trúc 2 tầng đơn giản:
 - **Tính giá đơn giản:** Giá cuối cùng = Giá món × Số lượng. Không có phụ phí, thuế, hay giảm giá.
 - **Hiển thị:** Chỉ hiển thị món ăn thuộc danh mục `Active` và có trạng thái `Available`.
 - **Sắp xếp tùy chỉnh:** Chủ quán có quyền sắp xếp thứ tự hiển thị của Danh mục và Món ăn (drag & drop).
-- **Đồng bộ Real-time:** Mọi thay đổi về giá hoặc trạng thái `Out of Stock` phải được cập nhật tức thì trên giao diện khách hàng (WebSocket/Server-Sent Events).
+- **Đồng bộ menu hiện tại:** Menu mutation invalidate cache/query hiện có; hệ thống hiện không có Kafka/WS `menu.updated`. Customer/POS hội tụ bằng refetch theo vòng đời query hoặc explicit invalidation sau mutation.
 - **Ràng buộc xóa:** Không được xóa món ăn đang có trong đơn hàng `Pending` hoặc `Processing`.
 
 ---
@@ -285,7 +298,7 @@ Quy trình từ lúc khách quét QR đến khi đơn hàng được gửi đế
 
     Nếu không đủ tồn → lỗi có cấu trúc cho nhân viên (khách đã submit trước đó chỉ là pending)
 
-  Broadcast stock/menu updates: Catalog/BFF như kiến trúc realtime (menu cache / WS).
+  Stock/menu visibility: Catalog/BFF invalidate cache/query theo write path; không claim menu realtime WS.
   ```
 
   **Timestamp:** Sử dụng `server_timestamp` (UTC), KHÔNG dùng `client_timestamp`.
@@ -323,7 +336,7 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
 
 3.  **Xử lý theo Yêu cầu:**
     - Đầu bếp xem chính xác yêu cầu Modifiers và Ghi chú của khách.
-    - **Logic Gộp đơn (Batching):** KDS hiển thị tổng số lượng của cùng một món đang chờ từ nhiều bàn (Ví dụ: "Tổng: 5 bát Phở bò"), giúp tối ưu hiệu suất nấu nướng.
+    - **Không batching/gộp món:** KDS hiển thị ticket/item theo snapshot backend; không có batch queue, tổng cùng món xuyên bàn, hay API/UI contract cho gộp món. Cart trước submit vẫn có thể gộp cùng món/cùng ghi chú trong cùng session.
 
 4.  **Hoàn thành Chế biến (Ready to Serve):**
     - Đầu bếp nhấn "Hoàn thành" (Done/Ready). Thẻ biến mất khỏi màn hình bếp.
@@ -336,7 +349,7 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
 
 - **FIFO (First In - First Out):** Đơn hàng vào trước phải hiển thị trước.
 - **Cảnh báo Trễ (SLA Warning):** Thẻ món quá X phút chưa hoàn thành phải đổi màu/nhấp nháy để cảnh báo quá tải/quên đơn.
-- **Đồng bộ Trạng thái:** Trạng thái trên KDS phải đồng bộ tuyệt đối với trạng thái khách hàng thấy trên điện thoại.
+- **Đồng bộ Trạng thái:** WebSocket là hint realtime; KDS/PWA/POS phải refetch REST snapshot sau mutation, reconnect hoặc missed event. Order Service vẫn là source of truth cho trạng thái customer-visible.
 - **Ưu tiên Món (Priority):** Cho phép đánh dấu bàn/món "Ưu tiên" để đưa lên đầu danh sách KDS.
 
 ---
@@ -384,7 +397,7 @@ Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵ
           (chấp nhận overpaid; hoàn tiền full dùng paidAmount ?? roundedTotal)
       ```
 
-      > **Lưu ý kiến trúc (2026-05):** Thanh toán chuyển khoản được xử lý thông qua **SePay + VietQR động** — QR code nhúng inline trong POS/PWA (không redirect). SePay gửi webhook với `X-Secret-Key` header khi giao dịch thành công. Xem `technical-architecture.md` §6.2.7 và phase record `docs/phases/phase-3-payment.md`.
+      > **Lưu ý kiến trúc (2026-05):** Thanh toán chuyển khoản được xử lý thông qua **SePay + VietQR động** — QR code nhúng inline trong POS/PWA (không redirect). Route webhook trực tiếp Phase 3 hiện verify HMAC raw-body; route tenant/platform Phase 4B dùng `x-secret-key` path riêng và cần hardening value verification trước production. Xem `technical-architecture.md` §6.2.7 và phase record `docs/phases/phase-3-payment.md`.
 
 4.  **In Hóa đơn & Giải phóng Bàn (Closing):**
     - In hóa đơn giấy.
@@ -956,9 +969,8 @@ Scenario: Khách hủy đơn mình vừa đặt
     IF order.status != "Pending" OR order.confirmed == true THEN
       RETURN 400 Bad Request "Cannot cancel confirmed order. Please ask staff for help."
 
-    # Soft delete & restore stock
+    # Soft cancel only; no stock restore because pending orders have not deducted stock
     order.update(status: "Canceled", canceled_by: "Customer", canceled_at: now())
-    inventory.restore_stock(order.items)
 ```
 
 ---

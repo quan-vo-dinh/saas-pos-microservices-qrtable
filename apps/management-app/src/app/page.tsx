@@ -6,6 +6,7 @@ import { LandingHeader } from '@/features/landing/landing-header';
 import { HeroSection } from '@/features/landing/hero-section';
 import { DashboardMacbookSection } from '@/features/landing/dashboard-macbook-section';
 import { MetricsSection } from '@/features/landing/metrics-section';
+import { TechPlatformReveal } from '@/features/landing/tech-platform-reveal';
 import { DataFlowSection } from '@/features/landing/data-flow-section';
 import { WorkflowSection } from '@/features/landing/workflow-section';
 import { PricingSection } from '@/features/landing/pricing-section';
@@ -41,6 +42,7 @@ export default async function Home(): Promise<React.ReactElement> {
       <main id="main" tabIndex={-1} className="outline-none">
         <HeroSection />
         <MetricsSection />
+        <TechPlatformReveal />
         <DataFlowSection />
         <WorkflowSection />
         <DashboardMacbookSection />

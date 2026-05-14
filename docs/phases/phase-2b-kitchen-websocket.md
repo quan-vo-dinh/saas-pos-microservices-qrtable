@@ -23,7 +23,7 @@ Phạm vi cuối cùng gồm:
 - `order.confirmed` creates at most one ticket per `(tenantId, orderId, station)`. Items are split by immutable station snapshot from the event: `KITCHEN` or `BAR`.
 - Missing item station is dead-lettered in Redis instead of guessed from category/name. Frontend never routes food/drink by display text.
 - KDS batching/gộp món/gộp đơn is rejected, not deferred. Cart line merging before submit is unrelated and remains allowed.
-- Queue order is FIFO with priority override. Priority is a separate permission-backed action, not part of generic ticket update permission.
+- Queue order is FIFO with priority override. Priority is a separate permission-backed action (`kitchen.set_priority` / `KITCHEN_SET_PRIORITY`), not part of generic ticket update permission.
 - BFF does not emit KDS queue hints directly from Kafka `order.confirmed`. Kitchen writes Redis first, then publishes internal Redis Pub/Sub `kds.queue_changed`; BFF emits `events.kdsQueueChanged` after that.
 - WebSocket is a realtime hint channel. REST snapshots are the rendering source after reconnect, mutation, missed event or tab wake.
 - KDS mutations are guarded HTTP commands through BFF and TCP to Kitchen/Order. Clients do not mutate KDS over WebSocket.

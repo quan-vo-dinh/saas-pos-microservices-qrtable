@@ -4,7 +4,7 @@
 > **Bước:** 2.6 — KDS Redis-only, SLA Worker, WebSocket Gateway hardening  
 > **Date:** 2026-05-07  
 > **Trạng thái:** Chốt sau audit Step 2.6
-> **Mục đích:** Tài liệu này là blueprint kỹ thuật/nghiệp vụ cho bước lập kế hoạch triển khai tiếp theo. Đây **không** phải implementation plan và không phân rã task code.
+> **Mục đích:** Tài liệu này lưu đặc tả kỹ thuật/nghiệp vụ đã chốt cho Step 2.6. Đây **không** phải implementation plan; trạng thái triển khai cuối cùng xem [`docs/phases/phase-2b-kitchen-websocket.md`](../phases/phase-2b-kitchen-websocket.md).
 
 ---
 
@@ -1469,9 +1469,9 @@ These are scenario requirements, not implementation tasks.
 
 ---
 
-## 18. Notes for the Next Writing-Plans Step
+## 18. Historical Implementation Boundaries
 
-When turning this spec into an implementation plan, preserve these boundaries:
+Khi đối chiếu implementation hoặc viết plan hardening sau này, vẫn phải giữ các boundary đã chốt:
 
 1. Do not reintroduce batching as "small helper" or UI convenience.
 2. Add `KITCHEN_SET_PRIORITY` before exposing priority endpoint.

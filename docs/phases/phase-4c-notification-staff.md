@@ -18,7 +18,7 @@
 
 ## Tổng Quan
 
-Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản lý staff**. Thông báo qua email giúp tenant và khách nhận xác nhận đúng thời điểm (chào mừng, biên lai, hoàn tiền) mà không chặn luồng HTTP chính; ghi nhận gửi và thử lại có giới hạn giảm mất dữ liệu vận hành và hỗ trợ điều tra. Quản lý staff trong **user-access** (mở rộng thay vì tách service) vì nguồn sự thật nhân sự và phân quyền cần một biên rõ ràng — BFF chỉ proxy và áp guard chain — tránh phân mảnh logic tạo user/role giữa nhiều dịch vụ. UI `/dashboard/staff` hoàn thiện vòng đời vận hành: mời → đăng nhập đúng role → điều chỉnh hoặc vô hiệu hóa khi cần.
+Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản lý staff**. Thông báo qua email giúp tenant và khách nhận xác nhận đúng thời điểm (chào mừng, biên lai, hoàn tiền, cảnh báo suspend/expiry) mà không chặn luồng HTTP chính; ghi nhận gửi và thử lại có giới hạn giảm mất dữ liệu vận hành và hỗ trợ điều tra. Quản lý staff trong **user-access** (mở rộng thay vì tách service) vì nguồn sự thật nhân sự và phân quyền cần một biên rõ ràng — BFF chỉ proxy và áp guard chain — tránh phân mảnh logic tạo user/role giữa nhiều dịch vụ. UI `/dashboard/staff` hoàn thiện vòng đời vận hành: mời → đăng nhập đúng role → điều chỉnh hoặc vô hiệu hóa khi cần.
 
 ## Steps
 
@@ -28,7 +28,8 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 
 **Phạm vi & lý do:**
 
-- **Consumer Kafka** cho 3 sự kiện (đúng registry §7.2): `tenant.created` → email chào mừng (thiết lập quan hệ và hướng dẫn bước tiếp); `payment.completed` → Receipt email cho Customer (nếu có email); `payment.refunded` → thông báo tới chủ sở hữu và luồng audit (trách nhiệm và phát hiện bất thường). **Không** map `order.canceled` vào notification (audit fix #3). `tenant.suspended` không qua Kafka — dùng Redis flag (AP1, xem Phase 4B) nên warning email cho Owner được trigger bởi SaaS Service trực tiếp hoặc cron job, không phải Kafka consumer.
+- **Consumer Kafka** cho 3 sự kiện (đúng registry §7.2): `tenant.created` → welcome/onboarding email; `payment.completed` → receipt email cho Customer nếu có email; `payment.refunded` → thông báo tới chủ sở hữu và luồng audit. **Không** map `order.canceled` vào notification.
+- **Tenant lifecycle tasks từ Phase 4B:** `tenant.suspended` không qua Kafka — dùng Redis flag để chặn nhanh — nên email suspend cho Owner đi qua direct task/TCP từ SaaS Service hoặc cron job. Phase 4C cũng nhận subscription warning/expired email và Owner reset-password/Keycloak Required Action handoff sau khi SMTP sẵn sàng.
 - **Email templates:** HTML templates với **tenant branding** (logo, tên nhà hàng, màu thương hiệu) — nhất quán thương hiệu và giảm nhầm lẫn với email generic.
 - **Retry logic:** Tối đa **3 retries** với **exponential backoff** cho failed emails — cân bằng giữa khả năng phục hồi tạm thời (hạ tầng email) và không giữ tải vô hạn trên consumer.
 - **Audit log:** MongoDB collection `notification_logs` (hoặc tương đương) lưu **tất cả notification sent/failed** — dùng cho troubleshooting, tra cứu sau gửi, hỗ trợ CS và tuân thủ "đã gửi gì, khi nào, cho ai".
@@ -88,6 +89,8 @@ Phase 4C bổ sung hai trục: **thông báo không đồng bộ** và **quản 
 ## Acceptance Criteria
 
 - [ ] Email chào mừng được kích hoạt khi có sự kiện `tenant.created`
+- [ ] Email suspend/expiry được kích hoạt từ SaaS task/TCP/cron, không phụ thuộc Kafka `tenant.suspended`
+- [ ] Owner onboarding có email reset/setup password hoặc Keycloak Required Action khi SMTP sẵn sàng
 - [ ] Owner mời staff → staff đăng nhập được với đúng role đã gán
 - [ ] Đổi role cập nhật đồng thời Keycloak và MongoDB
 - [ ] Vô hiệu hóa staff → không thể đăng nhập

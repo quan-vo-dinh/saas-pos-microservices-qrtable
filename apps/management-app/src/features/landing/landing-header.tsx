@@ -7,6 +7,7 @@ type LandingHeaderProps = {
 
 const nav = [
   { href: '#flow', label: 'Khách đến thanh toán' },
+  { href: '#tech-platform', label: 'Công nghệ' },
   { href: '#automation', label: 'Cách triển khai' },
   { href: '#pricing', label: 'Bảng giá' },
   { href: '#payment', label: 'Thu tiền an toàn' },

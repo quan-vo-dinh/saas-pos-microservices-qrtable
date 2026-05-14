@@ -3,7 +3,7 @@
 > **Triết lý tài liệu:** Hiểu _tại sao_ trước _như thế nào_. Mọi khái niệm được neo vào ngữ cảnh
 > cụ thể của QRTable để bạn không học lý thuyết trừu tượng mà học để áp dụng được ngay.
 >
-> **Current code status (2026-05-13):** Tài liệu này là supporting guide. Kafka consumers đã có trong code gồm `order.confirmed → Kitchen`, `payment.completed → Order + BFF realtime bridge`, `kitchen.sla_warning → BFF realtime bridge`, và `tenant.created → Catalog`. Notification Service chưa tồn tại trong `apps/*`; các ví dụ Notification bên dưới là Phase 4C+/future extension, không phải trạng thái runtime hiện tại.
+> **Current code status (2026-05-14):** Tài liệu này là supporting guide. Kafka consumers đã có trong code gồm `order.confirmed → Kitchen`, `payment.completed → Order + BFF realtime bridge`, `kitchen.sla_warning → BFF realtime bridge`, và `tenant.created → Catalog`. Notification Service chưa tồn tại trong `apps/*`; các ví dụ Notification bên dưới là Phase 4C+/future extension, không phải trạng thái runtime hiện tại.
 
 ---
 
@@ -144,7 +144,7 @@ Kafka giải quyết cả ba vấn đề bằng một cơ chế duy nhất: **t�
 
 ### 1.2 Khi Nào Kafka KHÔNG Phải Giải Pháp
 
-Kafka không phải câu trả lời cho mọi bài toán giao tiếp. Trong QRTable, có 6 sự kiện UI (`order.created`, `menu.updated`, `table.status_changed`, v.v.) được xử lý theo cách khác — BFF Direct Pattern — vì chúng chỉ cần đẩy dữ liệu lên WebSocket cho client, không cần logic nghiệp vụ ở bounded context khác. Dùng Kafka cho những sự kiện này sẽ thêm độ trễ và phức tạp vô ích.
+Kafka không phải câu trả lời cho mọi bài toán giao tiếp. Trong QRTable, các sự kiện UI như `order.created`, `order.status_changed`, `cart.updated`, `bill.requested`, `table.transferred` hoặc `service.requested` được xử lý theo cách khác — BFF Direct Pattern — vì chúng chỉ cần invalidate/refetch hoặc đẩy hint lên WebSocket cho client, không cần logic nghiệp vụ ở bounded context khác. Menu mutation hiện tại chỉ invalidate cache/query, không có Kafka/WS `menu.updated` contract. Dùng Kafka cho những side-effect này sẽ thêm độ trễ và phức tạp vô ích.
 
 #### Sơ đồ: Decision Tree — Kafka hay BFF Direct?
 
@@ -1134,7 +1134,7 @@ graph TB
     end
 
     subgraph NEGATIVE["❌ 2AP — KHÔNG Dùng Kafka Khi..."]
-        AP1["AP1: Kafka as UI Proxy<br/><i>BFF đã có đủ info → BFF Direct</i><br/>📌 order.created, menu.updated"]
+        AP1["AP1: Kafka as UI Proxy<br/><i>BFF đã có đủ info → BFF Direct</i><br/>📌 order.created, bill.requested"]
         AP2["AP2: Sync for Fire-and-Forget<br/><i>Không dùng TCP cho tác vụ<br/>không cần response</i>"]
     end
 
@@ -1215,7 +1215,7 @@ Test nhanh: "Side-effect này có cần business logic ở bounded context khác
 - Không → BFF đã có đủ info → BFF Direct
 - Có → Kafka
 
-Dùng Kafka cho `order.created` (BFF đã biết sau khi customer submit đơn) hay `menu.updated` (BFF vừa gọi Catalog Service và nhận response) là lãng phí infrastructure, thêm latency, và không giải quyết bài toán business nào.
+Dùng Kafka cho `order.created` (BFF đã biết sau khi customer submit đơn) hay `bill.requested` (BFF đã có response sau command) là lãng phí infrastructure, thêm latency, và không giải quyết bài toán business nào. Với menu mutation hiện tại, không tạo `menu.updated`; write path chỉ invalidate cache/query để client refetch.
 
 **AP2 — Sync for Fire-and-Forget (Cấm):**
 
@@ -1802,7 +1802,7 @@ Sau khi đọc toàn bộ tài liệu, đây là mental model ngắn gọn để
 
 **Về consumer group:** Mỗi group đọc topic độc lập với offset riêng. Một partition → tối đa một consumer trong group. Mỗi service cần có group riêng. Consumer group ID thể hiện "ai đang đọc để làm gì".
 
-**Về delivery semantics:** At-least-once là thực tế của hầu hết hệ thống. Consumer phải idempotent — xử lý duplicate an toàn. Idempotency key + Redis là pattern đơn giản nhất để đạt được điều này.
+**Về delivery semantics:** At-least-once là thực tế của hầu hết hệ thống. Consumer phải idempotent — xử lý duplicate an toàn. Trong code hiện tại, order submit dùng PostgreSQL unique index/replay lookup; Redis idempotency key là hardening option cho các luồng cần chặn duplicate nhanh hơn ở edge/runtime.
 
 **Về quyết định dùng Kafka:** Không phải mọi event cần đi qua Kafka. Test bằng AP1: "BFF có đủ info từ TCP response để xử lý không?" → Có → BFF Direct. "Event có trigger business logic ở bounded context khác không?" → Có → Kafka. "Event sinh từ timer nội bộ?" → Kafka.
 

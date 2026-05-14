@@ -149,7 +149,7 @@ flowchart LR
   customerPwa -->|"Fetch QR image when paying online"| sepayQr
   managementApp -->|"Fetch QR image for POS payment"| sepayQr
 
-  sepayProvider -->|"HTTP webhook with X-Secret-Key<br/>POST api/v1/payment/sepay/webhook"| bffRest
+  sepayProvider -->|"HTTP webhook with route auth<br/>POST api/v1/payment/sepay/webhook"| bffRest
   bffRest -->|"Forward validated webhook command<br/>TCP 3208"| payment
 
   kafka -->|"payment.completed<br/>payment.refunded<br/>future tenant events"| notificationPlanned
