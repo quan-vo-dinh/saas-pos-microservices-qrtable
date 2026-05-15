@@ -7,6 +7,12 @@
       "skillPath": "skills/code-review-and-quality/SKILL.md",
       "computedHash": "83931d7416bcff73c24d976c1e45f09f80259541d33e9fdfe3ee521d39b27428"
     },
+    "e2e-testing-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-essentials/skills/e2e-testing-patterns/SKILL.md",
+      "computedHash": "37ea37e42a81c926ebd81924691a15fb657df7c8a52b863c34967e5ab99cdc22"
+    },
     "frontend-design": {
       "source": "affaan-m/everything-claude-code",
       "sourceType": "github",

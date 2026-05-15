@@ -1,2052 +1,708 @@
-# Tài Liệu Redis & ioredis — NestJS Microservices
+# Hướng Dẫn Redis Trong QRTable
 
-> **Mục tiêu:** Hiểu Redis từ nền tảng đến nâng cao, áp dụng trực tiếp vào dự án NestJS microservices với `ioredis` — bao gồm cart, session cache, distributed lock, atomic operations, và các pattern thực tế.
+> **Vai trò:** Tài liệu hỗ trợ (supporting guide), không phải nguồn sự thật chính (canonical source).
+> Hiện trạng Redis đã triển khai được theo dõi ở [`../redis-usage-analysis.md`](../redis-usage-analysis.md), [`../technical-architecture.md`](../technical-architecture.md), và code trên `main`.
 >
-> **Vai trò canonical:** Đây là supporting guide / tutorial. Hiện trạng Redis đã triển khai được theo dõi ở [`../redis-usage-analysis.md`](../redis-usage-analysis.md), [`../technical-architecture.md`](../technical-architecture.md), và code trên `main`.
+> **Mục tiêu:** Giải thích Redis vừa đủ để đọc code, gỡ lỗi local (debug local), và mở rộng đúng phạm vi QRTable. Tài liệu này không còn là giáo trình Redis tổng quát.
 >
-> **Current implementation note (2026-05-14):** Order cart/session hiện dùng Redis Hash `cart:{tenantId}:{sessionId}` với `cartVersion` check ở `CartService`, không dùng Lua script cho mutation cart. Các pattern Lua/lock trong tài liệu này là reference hardening cho tình huống cần atomic read-check-write mạnh hơn. Phase 4B cũng đã dùng Redis keys `tenant:{tenantId}:suspended`, `subscription:{tenantId}`, và `oauth_state:{state}`.
+> **Ghi chú triển khai hiện tại (2026-05-14):** QRTable dùng Redis cho bộ nhớ đệm (cache), trạng thái tạm thời (temporary state), khóa phân tán (lock), bộ đếm hạn mức (quota counter), trạng thái runtime của KDS, Socket.io adapter, Redis Pub/Sub nội bộ, flag tenant suspended, subscription cache và SePay OAuth state. Order cart/session dùng Redis Hash `cart:{tenantId}:{sessionId}` / `session:{tenantId}:{sessionId}` với `cartVersion` check trong code; Lua script là phương án tăng cứng (hardening option), không phải implementation hiện tại.
 
 ---
 
-## Mục lục
+## Mục Lục
 
-1. [Redis là gì & tại sao dùng](#1-redis-là-gì--tại-sao-dùng)
-2. [Cách Redis hoạt động bên trong](#2-cách-redis-hoạt-động-bên-trong)
-3. [Data Types — Kiểu dữ liệu](#3-data-types--kiểu-dữ-liệu)
-4. [Key Design & Naming Conventions](#4-key-design--naming-conventions)
-5. [TTL & Expiration](#5-ttl--expiration)
-6. [ioredis — Thư viện Node.js](#6-ioredis--thư-viện-nodejs)
-7. [Pipeline & Batching](#7-pipeline--batching)
-8. [Transactions — MULTI/EXEC](#8-transactions--multiexec)
-9. [Lua Scripting — Atomic Operations](#9-lua-scripting--atomic-operations)
-10. [Distributed Lock — Redlock Pattern](#10-distributed-lock--redlock-pattern)
-11. [Optimistic Locking — Version Conflict](#11-optimistic-locking--version-conflict)
-12. [Cart Service Pattern — Reference Variant](#12-cart-service-pattern--reference-variant)
-13. [Session Caching Pattern](#13-session-caching-pattern)
-14. [Pub/Sub](#14-pubsub)
-15. [NestJS Integration](#15-nestjs-integration)
-16. [Redis CLI — Debug & Inspect](#16-redis-cli--debug--inspect)
-17. [Lỗi thường gặp & Cách xử lý](#17-lỗi-thường-gặp--cách-xử-lý)
+1. [Đọc nhanh](#1-đọc-nhanh)
+2. [Redis đang dùng ở đâu](#2-redis-đang-dùng-ở-đâu)
+3. [Nguyên tắc lựa chọn Redis](#3-nguyên-tắc-lựa-chọn-redis)
+4. [Danh sách key hiện tại](#4-danh-sách-key-hiện-tại)
+5. [Lý thuyết vừa đủ](#5-lý-thuyết-vừa-đủ)
+6. [Các luồng chính](#6-các-luồng-chính)
+7. [Quy tắc triển khai](#7-quy-tắc-triển-khai)
+8. [Hướng dẫn cấu hình, triển khai và conflict Redis](#8-hướng-dẫn-cấu-hình-triển-khai-và-conflict-redis)
+9. [Gỡ lỗi local](#9-gỡ-lỗi-local)
+10. [Đọc code ở đâu](#10-đọc-code-ở-đâu)
+11. [Checklist](#11-checklist)
 
 ---
 
-## 1. Redis là gì & tại sao dùng
+## 1. Đọc nhanh
 
-### Định nghĩa
+Redis trong QRTable là nơi lưu dữ liệu nhanh, ngắn hạn hoặc có thể dựng lại. PostgreSQL vẫn là nguồn sự thật bền vững (source of truth) cho tenant, menu, order, bill, payment và các dữ liệu cần audit.
 
-**Redis** (Remote Dictionary Server) là một **in-memory data store** mã nguồn mở. Dữ liệu được lưu trực tiếp trên RAM, không phải đĩa cứng, nên tốc độ đọc/ghi cực nhanh (< 1ms).
+Một câu dễ nhớ:
 
-Redis không chỉ là cache — nó là một **data structure server** có thể lưu String, Hash, List, Set, Sorted Set, Stream, và nhiều hơn nữa.
-
-### Redis vs Database truyền thống
-
-| Tiêu chí     | Redis                             | PostgreSQL                |
-| ------------ | --------------------------------- | ------------------------- |
-| Nơi lưu      | RAM (có thể persist ra đĩa)       | Đĩa cứng                  |
-| Tốc độ đọc   | ~100k ops/giây                    | ~1k–10k ops/giây          |
-| Kiểu dữ liệu | Đa dạng (String, Hash, List, ...) | Row/Column                |
-| Phù hợp      | Cache, session, real-time, queue  | Dữ liệu bền vững, quan hệ |
-| Durability   | Tuỳ cấu hình                      | Luôn bền vững             |
-
-### Tại sao dùng trong microservices?
-
-- **Cart**: Cần đọc/ghi nhanh từ nhiều request đồng thời → Redis Hash
-- **Session cache**: Tránh query PostgreSQL mỗi request → Redis String/Hash
-- **Distributed lock**: Đảm bảo chỉ 1 process xử lý tại một thời điểm → `SET NX PX`
-- **Optimistic locking**: Cart version conflict detection → current code check `cartVersion`; Lua/WATCH là hardening option
-- **Rate limiting**: Đếm request theo thời gian → `INCR` + `EXPIRE`
-- **Pub/Sub**: Broadcast event giữa service instances → `PUBLISH`/`SUBSCRIBE`
-
----
-
-## 2. Cách Redis hoạt động bên trong
-
-### Single-threaded Event Loop
-
-Redis xử lý tất cả lệnh trên **một thread duy nhất** (single-threaded). Điều này có nghĩa là:
-
-- **Không có race condition** ở cấp lệnh đơn — mỗi lệnh được thực thi hoàn toàn trước khi lệnh tiếp theo bắt đầu.
-- Lệnh nào cũng là **atomic** về mặt single-command.
-- Nhưng **chuỗi lệnh** (multi-command sequence) **không** atomic nếu không dùng `MULTI/EXEC` hoặc Lua script.
-
-```
-Client A: SET cart:s1  ← bắt đầu
-Client B: GET cart:s1  ← phải đợi A xong
-Client A: ... xong
-Client B: ... bắt đầu chạy
+```txt
+PostgreSQL giữ sự thật bền vững.
+Redis giữ trạng thái nhanh, tạm thời, hoặc trạng thái runtime cần phản hồi rất nhanh.
 ```
 
-### Persistence Modes
+### Thuật ngữ tối thiểu
 
-Redis có thể persist dữ liệu ra đĩa theo hai cách:
+| Thuật ngữ                                       | Nghĩa trong QRTable                                                                                              |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Redis                                           | Kho dữ liệu trong RAM (in-memory data store), dùng cho cache/state nhanh.                                        |
+| Key (khóa)                                      | Tên truy cập dữ liệu, ví dụ `cart:{tenantId}:{sessionId}`.                                                       |
+| Value (giá trị)                                 | Nội dung lưu trong key. Có thể là string, hash, set, sorted set.                                                 |
+| TTL / Time To Live (thời gian sống)             | Thời gian key còn tồn tại trước khi Redis tự xóa.                                                                |
+| Cache (bộ nhớ đệm)                              | Bản sao nhanh của dữ liệu nguồn, ví dụ menu public.                                                              |
+| Hash (bảng field-value)                         | Kiểu dữ liệu Redis lưu nhiều field trong một key; QRTable dùng cho cart/session.                                 |
+| String (chuỗi)                                  | Kiểu dữ liệu đơn giản; dùng cho flag, OAuth state, counter.                                                      |
+| Sorted Set / ZSet (tập có điểm sắp xếp)         | Dùng khi cần queue theo điểm/thời gian, ví dụ SLA due trong KDS.                                                 |
+| Pub/Sub (phát/nhận nội bộ)                      | Redis channel để service phát tín hiệu nhanh trong runtime.                                                      |
+| Distributed lock (khóa phân tán)                | Key tạm thời để tránh hai process cùng xử lý một việc.                                                           |
+| Pipeline / MULTI (gom lệnh / transaction Redis) | Gửi nhiều lệnh Redis cùng lúc; `MULTI` giúp một nhóm lệnh chạy liền nhau.                                        |
+| Lua script (script Lua)                         | Cách chạy logic nguyên tử (atomic) trong Redis; hiện chỉ xem là phương án tăng cứng (hardening option) cho cart. |
 
-**RDB (Redis Database Snapshot):**
+---
 
-- Tạo snapshot toàn bộ data tại một thời điểm.
-- Ghi ra file `dump.rdb`.
-- Nhanh khi restore, nhưng có thể mất data giữa 2 snapshot.
+## 2. Redis đang dùng ở đâu
 
-**AOF (Append-Only File):**
+| Service   | Vai trò Redis hiện tại                                                                                                                                               |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BFF       | Cache JWT verification, anonymous customer session, public menu, throttling, Socket.io Redis adapter, KDS internal fan-out, đọc tenant suspend flag qua cache layer. |
+| Order     | Active session cache, shared cart, transfer locks, daily order quota counter.                                                                                        |
+| Kitchen   | Runtime store của KDS, ticket queues, SLA due set, dedupe keys, internal `realtime:kds:*` Pub/Sub.                                                                   |
+| SaaS      | Tenant suspend flag và current subscription cache.                                                                                                                   |
+| Payment   | SePay OAuth state cache để chống CSRF và bind tenant/user trong callback.                                                                                            |
+| Dev tools | Flush/verify Redis local khi reset dữ liệu dev.                                                                                                                      |
 
-- Ghi log từng lệnh ghi vào file.
-- An toàn hơn nhưng file lớn hơn và restore chậm hơn.
-- Thường dùng `appendfsync everysec` để cân bằng.
+Redis chưa phải nơi lưu bền vững cho:
 
-**Trong môi trường dev/microservices dự án này:** thường dùng Redis không có persistence (chỉ in-memory) vì cart/session là temporary data. Nếu Redis khởi động lại, cart sẽ trống — đây là behavior được chấp nhận.
+- Menu canonical.
+- Order/bill/payment canonical.
+- Tenant/subscription canonical.
+- Audit/history dài hạn.
 
-### Memory Management
+---
 
-Khi RAM đầy, Redis áp dụng **eviction policy**:
+## 3. Nguyên tắc lựa chọn Redis
 
-| Policy           | Ý nghĩa                                    |
-| ---------------- | ------------------------------------------ |
-| `noeviction`     | Báo lỗi khi đầy (mặc định)                 |
-| `allkeys-lru`    | Xoá key ít dùng nhất (Least Recently Used) |
-| `volatile-lru`   | Chỉ xoá key có TTL, theo LRU               |
-| `allkeys-random` | Xoá ngẫu nhiên                             |
+Redis không chỉ là "database nhanh hơn". Redis là lựa chọn kiến trúc cho dữ liệu cần phản hồi nhanh, có thể hết hạn, có thể dựng lại, hoặc cần chia sẻ giữa nhiều process. Nếu dữ liệu không thể mất, cần audit, cần transaction quan hệ, hoặc cần query phức tạp, PostgreSQL vẫn là lựa chọn chính.
+
+### 3.1 Khi nên dùng Redis
+
+| Tín hiệu                   | Ý nghĩa                                                           | Ví dụ trong QRTable                                                        |
+| -------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Cần đọc/ghi rất nhanh      | Request cần phản hồi nhanh và dữ liệu có shape nhỏ/gọn.           | Public menu cache `menu:{tenantId}`, JWT verification cache.               |
+| Dữ liệu có vòng đời ngắn   | Dữ liệu chỉ hợp lệ trong vài phút/giờ và nên tự hết hạn bằng TTL. | BFF session, Order session/cart, OAuth state.                              |
+| Có thể dựng lại khi mất    | Redis restart hoặc key hết hạn không làm mất sự thật bền vững.    | Order session cache rehydrate từ PostgreSQL; KDS rebuild từ active orders. |
+| Cần phối hợp nhiều process | Nhiều instance cần cùng nhìn thấy lock/counter/state.             | Transfer table lock, quota counter, Socket.io Redis Adapter.               |
+| Cần runtime projection     | Dữ liệu phục vụ vận hành realtime, tối ưu cho màn hình hiện tại.  | KDS queue/ticket state trong Redis.                                        |
+| Chỉ cần tín hiệu nhanh     | Message có thể mất, client vẫn refetch được snapshot.             | `realtime:kds:{tenantId}` Pub/Sub từ Kitchen sang BFF.                     |
+
+### 3.2 Khi không nên dùng Redis
+
+| Tín hiệu                                          | Lý do                                                                       | Lựa chọn đúng hơn                                                             |
+| ------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Cần lưu bền vững, audit, báo cáo                  | Redis có thể mất key do TTL/restart/flush; không phù hợp làm lịch sử chính. | PostgreSQL.                                                                   |
+| Cần ràng buộc quan hệ phức tạp                    | Redis không thay thế foreign key, unique constraint, transaction SQL.       | PostgreSQL.                                                                   |
+| Cần đọc lại event bền vững (durable event replay) | Redis Pub/Sub không lưu message cho consumer đọc lại.                       | Kafka/outbox.                                                                 |
+| Chỉ một process cần cache nhỏ                     | Redis có thể là overkill nếu không cần chia sẻ giữa instance.               | In-memory cache có TTL, nếu chấp nhận mất khi restart.                        |
+| Dữ liệu nhạy cảm dài hạn                          | Redis không phải kho secret/token dài hạn.                                  | DB có encryption/secret store; Redis chỉ dùng state ngắn hạn như OAuth state. |
+| Không có invalidation rõ ràng                     | Cache dễ stale và gây hiểu sai nghiệp vụ.                                   | Đọc trực tiếp source service/DB cho tới khi có contract invalidation.         |
+
+### 3.3 Câu hỏi quyết định
+
+```txt
+1. Dữ liệu này có phải nguồn sự thật bền vững không?
+   Có  -> PostgreSQL hoặc service owner DB.
+   Không -> xét Redis.
+
+2. Nếu Redis mất key, hệ thống có rebuild/refetch được không?
+   Có  -> Redis phù hợp.
+   Không -> không lưu duy nhất ở Redis.
+
+3. Dữ liệu có cần tự hết hạn không?
+   Có  -> Redis + TTL phù hợp.
+
+4. Có nhiều instance/service cần nhìn cùng state nhanh không?
+   Có  -> Redis phù hợp hơn in-memory cache.
+
+5. Đây là event cần replay/durable delivery không?
+   Có  -> Kafka/outbox, không dùng Redis Pub/Sub.
+```
+
+### 3.4 Redis khác PostgreSQL, Kafka và bộ nhớ local thế nào
+
+| Công cụ                     | Dùng tốt cho                                                                                                       | Không dùng cho                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| PostgreSQL                  | Source of truth, transaction, quan hệ dữ liệu, audit/report.                                                       | Dữ liệu realtime ngắn hạn cần update rất nhanh từng request.                |
+| Redis                       | Cache, state có TTL, lock, counter, queue/projection runtime, tín hiệu Pub/Sub (Pub/Sub hint).                     | Lịch sử bền vững (durable history), replay event, quan hệ dữ liệu phức tạp. |
+| Kafka                       | Sự kiện nghiệp vụ bền vững (durable domain event), fan-out, consumer replay, xử lý bất đồng bộ (async processing). | Cache nhanh, lock, session/cart state, Pub/Sub hint không cần durable.      |
+| Bộ nhớ local (local memory) | Cache rất nhỏ, chỉ cần trong một process, không quan trọng khi restart.                                            | Multi-instance consistency, session chung, lock/counter shared.             |
+
+### 3.5 Mapping theo nhóm Redis trong QRTable
+
+| Nhóm                            | Redis giữ gì                                                                         | Source of truth / fallback                                         | Cảnh báo                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Cache-aside                     | `menu:{tenantId}`, JWT verify result, subscription snapshot.                         | Catalog/Authorizer/SaaS hoặc DB owner.                             | Phải có TTL/invalidation; cache stale phải được chấp nhận trong giới hạn. |
+| Runtime state                   | `cart:{tenantId}:{sessionId}`, `session:{tenantId}:{sessionId}`, `kds:{tenantId}:*`. | Order DB cho session/order; KDS có rebuild từ Order active orders. | Redis mất state phải có đường refetch/rebuild.                            |
+| Coordination                    | Transfer locks, quota counters, KDS rebuild lock.                                    | DB/service command là nơi quyết định nghiệp vụ cuối.               | Lock phải có TTL và release an toàn.                                      |
+| Tín hiệu Pub/Sub (Pub/Sub hint) | `realtime:kds:{tenantId}`, Socket.io Redis Adapter.                                  | REST snapshot và trạng thái của service owner.                     | Message có thể mất; client phải refetch.                                  |
+| Security short-lived state      | `oauth_state:{state}`.                                                               | OAuth flow + callback validation.                                  | TTL ngắn, one-time consume, không lưu token dài hạn.                      |
+| Edge enforcement                | `tenant:{tenantId}:suspended`.                                                       | SaaS tenant status trong DB.                                       | Guard policy phải rõ khi Redis/SaaS unavailable.                          |
+
+### 3.6 Chi phí khi chọn Redis
+
+Redis làm hệ thống nhanh hơn nhưng thêm trách nhiệm:
+
+- Phải đặt tên key nhất quán và luôn scope theo `tenantId`.
+- Phải định nghĩa TTL hoặc lý do không có TTL.
+- Phải xử lý cache miss, wrong type, stale cache và Redis unavailable.
+- Phải biết service nào là owner của key.
+- Phải có test cho conflict/duplicate/expired key nếu flow quan trọng.
+
+---
+
+## 4. Danh sách key hiện tại
+
+| Key pattern                                             | Owner                | Type                 | TTL         | Trạng thái      | Mục đích                                                                            |
+| ------------------------------------------------------- | -------------------- | -------------------- | ----------- | --------------- | ----------------------------------------------------------------------------------- |
+| `user-token:{sha256(jwt)}`                              | BFF                  | Cache object/string  | 30m         | Đã triển khai   | Cache kết quả Authorizer verification.                                              |
+| `bff-session:{tenantId}:{sessionId}`                    | BFF                  | Cache object/string  | 2h          | Đã triển khai   | Anonymous customer session ở edge.                                                  |
+| `bff-session:{sessionId}`                               | BFF                  | Cache object/string  | 2h          | Legacy fallback | Hỗ trợ lookup session thiếu tenant.                                                 |
+| `menu:{tenantId}`                                       | BFF                  | Cache object/string  | 10m         | Đã triển khai   | Cache public menu cho Customer PWA.                                                 |
+| Throttler internal keys                                 | BFF                  | Library-owned        | 60s         | Đã triển khai   | Global HTTP rate limiting.                                                          |
+| `socket.io-adapter:*`                                   | BFF                  | Pub/Sub internal     | n/a         | Đã triển khai   | Scale WebSocket nhiều instance.                                                     |
+| `session:{tenantId}:{sessionId}`                        | Order                | Hash                 | 2h          | Đã triển khai   | Active session cache của Order domain.                                              |
+| `cart:{tenantId}:{sessionId}`                           | Order                | Hash                 | 2h          | Đã triển khai   | Shared cart draft state.                                                            |
+| `transfer:{tenantId}:{sessionId}`                       | Order                | String lock          | 30s         | Đã triển khai   | Lock chuyển bàn theo session.                                                       |
+| `table-transfer:{tenantId}:{tableId}`                   | Order                | String lock          | 30s         | Đã triển khai   | Lock bàn nguồn/đích khi chuyển bàn.                                                 |
+| `quota:{tenantId}:orders:{date}`                        | Order                | String counter       | 48h         | Đã triển khai   | Daily order quota counter.                                                          |
+| `kds:{tenantId}:*`                                      | Kitchen              | Hash/Set/ZSet/String | Tùy key     | Đã triển khai   | KDS ticket, queue, SLA, dedupe.                                                     |
+| `lock:kds:rebuild:{tenantId}`                           | Kitchen              | String lock          | Short TTL   | Đã triển khai   | Rebuild lock cho KDS recovery.                                                      |
+| `realtime:kds:{tenantId}`                               | Kitchen/BFF          | Pub/Sub channel      | n/a         | Đã triển khai   | Internal KDS fan-out.                                                               |
+| `tenant:{tenantId}:suspended`                           | SaaS/BFF guard       | String flag          | No expire   | Đã triển khai   | Chặn tenant suspended nhanh ở edge.                                                 |
+| `subscription:{tenantId}`                               | SaaS                 | String JSON          | 5m          | Đã triển khai   | Cache current subscription.                                                         |
+| `oauth_state:{state}`                                   | Payment              | String JSON          | 5m          | Đã triển khai   | SePay OAuth state one-time consume.                                                 |
+| `table:{tenantId}:{tableId}:status`                     | BFF/Catalog boundary | String               | n/a         | Dự kiến         | Cache trạng thái bàn nếu cần tối ưu.                                                |
+| `idempotency:order-submit:{tenantId}:{sessionId}:{key}` | Order                | String               | Planned TTL | Dự kiến         | Tăng cứng duplicate submit ở Redis; hiện order submit dựa PostgreSQL unique/replay. |
+
+Nếu key không có trong bảng này, đừng mặc định xem nó là triển khai hiện tại (current implementation). Kiểm tra code hoặc [`../redis-usage-analysis.md`](../redis-usage-analysis.md) trước.
+
+---
+
+## 5. Lý thuyết vừa đủ
+
+### 5.1 Redis primitives trong guide này
+
+Guide này chỉ giải thích những primitive (khả năng cơ bản) Redis đang dùng hoặc có thể cần rất gần trong QRTable:
+
+- `String`: flag, OAuth state, counter.
+- `Hash`: cart/session snapshot nhỏ.
+- `Sorted Set`: queue theo điểm/thời gian, ví dụ SLA due.
+- `Pub/Sub`: tín hiệu runtime không durable.
+- `SET NX PX`: lock ngắn hạn.
+- `MULTI/EXEC`: nhóm lệnh Redis cần chạy liền nhau.
+
+### 5.2 Quy tắc đặt tên key
+
+Quy tắc QRTable:
+
+```txt
+{domain}:{tenantId}:{resourceId}
+```
+
+Ví dụ:
+
+```txt
+cart:{tenantId}:{sessionId}
+session:{tenantId}:{sessionId}
+tenant:{tenantId}:suspended
+subscription:{tenantId}
+kds:{tenantId}:ticket:{ticketId}
+```
+
+Luôn đưa `tenantId` vào key khi dữ liệu thuộc tenant. Không dùng key global cho dữ liệu tenant.
+
+### 5.3 TTL
+
+TTL (thời gian sống) giúp Redis tự dọn dữ liệu tạm.
+
+Dữ liệu nên có TTL:
+
+- Customer/BFF session tạm.
+- Cart/session active.
+- Transfer lock.
+- OAuth state.
+- Quota counter theo ngày.
+- Cache menu/subscription.
+
+Dữ liệu có thể không có TTL khi đó là flag runtime cần giữ tới khi service xóa rõ ràng, ví dụ `tenant:{tenantId}:suspended`.
+
+### 5.4 Hash
+
+Hash (bảng field-value) phù hợp khi một key có nhiều field nhỏ.
+
+Order cart hiện lưu kiểu:
+
+```txt
+cart:{tenantId}:{sessionId}
+  tenantId
+  sessionId
+  cartVersion
+  status
+  updatedAt
+  items
+```
+
+Lý do:
+
+- Đọc/ghi một key theo session.
+- Dễ refresh TTL.
+- `cartVersion` giúp phát hiện conflict (xung đột phiên bản).
+
+### 5.5 String
+
+String (chuỗi) dùng cho dữ liệu đơn giản:
+
+```txt
+tenant:{tenantId}:suspended = "1"
+oauth_state:{state} = JSON string
+quota:{tenantId}:orders:{date} = number string
+```
+
+### 5.6 Sorted Set
+
+Sorted Set / ZSet (tập có điểm sắp xếp) dùng khi cần sắp theo điểm hoặc thời gian.
+
+Kitchen dùng cho hàng đợi SLA tới hạn (SLA due queue), nơi điểm số (score) thường là timestamp. Worker scan các item tới hạn để phát `kitchen.sla_warning`.
+
+### 5.7 Pub/Sub
+
+Pub/Sub (phát/nhận nội bộ) là tín hiệu runtime nhanh, không bền vững như Kafka.
+
+QRTable dùng:
+
+```txt
+Kitchen ghi Redis KDS
+  -> publish realtime:kds:{tenantId}
+  -> BFF subscriber nhận
+  -> BFF emit WebSocket hint
+```
+
+Nếu BFF đang down đúng lúc publish, message Pub/Sub có thể mất. Vì vậy frontend phải refetch snapshot, không dựa Pub/Sub như nguồn sự thật (source of truth).
+
+### 5.8 Lock
+
+Distributed lock (khóa phân tán) dùng để tránh hai request cùng xử lý một tài nguyên.
+
+Pattern đủ dùng:
+
+```txt
+SET lockKey lockValue NX PX ttlMs
+```
+
+Khi release, chỉ xóa lock nếu `lockValue` vẫn là của mình. Lua script có thể dùng để kiểm tra và xóa nguyên tử (check-and-delete atomic).
+
+QRTable dùng lock cho chuyển bàn và KDS rebuild. Không nên lock quá lâu; lock phải có TTL.
+
+### 5.9 Pipeline, MULTI và Lua
+
+| Cơ chế                         | Khi dùng                                                                                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pipeline (gom lệnh)            | Gửi nhiều lệnh độc lập để giảm lượt đi-về mạng (round trip).                                                                                        |
+| MULTI/EXEC (transaction Redis) | Nhóm lệnh cần chạy liền nhau. Order cart hiện dùng multi `hset` + `pexpire`.                                                                        |
+| Lua script (script Lua)        | Khi cần đọc-kiểm tra-ghi nguyên tử (read-check-write atomic) phức tạp. Hiện không bắt buộc cho cart, chỉ là phương án tăng cứng (hardening option). |
+
+Không thêm Lua nếu kiểm tra ở tầng ứng dụng (app-level check) + tests đã đủ cho rủi ro hiện tại. Lua làm logic khó đọc và khó debug hơn.
+
+---
+
+## 6. Các luồng chính
+
+### 6.1 Customer session và cart
+
+```txt
+Customer quét QR
+  -> BFF/Order resolve active session
+  -> Order cache session:{tenantId}:{sessionId}
+  -> Customer mutate cart
+  -> Order đọc cart:{tenantId}:{sessionId}
+  -> check cartVersion
+  -> ghi cart hash + refresh TTL
+  -> BFF emit cart/order realtime hint nếu cần
+```
+
+Điểm quan trọng:
+
+- `cartVersion` là khóa lạc quan (optimistic locking) ở tầng ứng dụng.
+- Nếu client gửi `expectedCartVersion` cũ, Order trả conflict.
+- Redis cart là draft state; order/bill sau khi submit/confirm vẫn nằm ở PostgreSQL.
+
+### 6.2 Public menu cache
+
+```txt
+Customer mở menu
+  -> BFF thử đọc menu:{tenantId}
+  -> cache miss (không có cache) thì gọi Catalog
+  -> BFF ghi menu:{tenantId} TTL 10m
+
+Admin đổi menu/category/menu item
+  -> BFF/Catalog write path thành công
+  -> DEL menu:{tenantId}
+  -> client refetch lần sau lấy dữ liệu mới
+```
+
+Không có Kafka/WS `menu.updated` contract hiện tại.
+
+### 6.3 KDS runtime
+
+```txt
+Kitchen consume order.confirmed
+  -> tạo KDS ticket trong Redis kds:{tenantId}:*
+  -> ghi dedupe key để chống duplicate Kafka event
+  -> publish realtime:kds:{tenantId}
+  -> BFF emit events.kdsQueueChanged
+  -> KDS client refetch queue snapshot
+```
+
+KDS state ở Redis là runtime state phục vụ bếp/bar. Consumer phải chống duplicate vì Kafka có kiểu giao ít nhất một lần (at-least-once delivery).
+
+### 6.4 Payment completed và cleanup
+
+```txt
+Payment completed
+  -> Order mark bill/session/table paid
+  -> Order cleanup active Redis session/cart keys khi session đóng
+```
+
+Redis không phải nơi quyết định bill paid. PostgreSQL + Order finalization là nguồn chính.
+
+### 6.5 Tenant suspend và subscription cache
+
+```txt
+SaaS suspend tenant
+  -> SET tenant:{tenantId}:suspended = "1"
+  -> BFF guard đọc flag để chặn nhanh customer mutation
+
+SaaS activate/close tenant
+  -> DEL tenant:{tenantId}:suspended
+
+Subscription change
+  -> update DB
+  -> set/delete subscription:{tenantId}
+```
+
+Flag Redis là cơ chế chặn nhanh ở rìa (edge enforcement). Khi Redis/SaaS không sẵn sàng, guard policy phải rõ fail-open/fail-closed theo loại request.
+
+### 6.6 SePay OAuth state
+
+```txt
+Owner starts SePay OAuth
+  -> Payment tạo random state
+  -> SET oauth_state:{state} JSON EX 300
+  -> redirect sang SePay
+
+SePay callback
+  -> Payment đọc oauth_state:{state}
+  -> validate tenant/user/CSRF
+  -> consume/delete state
+```
+
+OAuth state phải TTL ngắn và chỉ dùng một lần.
+
+---
+
+## 7. Quy tắc triển khai
+
+### 7.1 Redis key phải có owner rõ ràng
+
+Mỗi key pattern phải có service owner. Service khác không tự ý ghi key nếu không có contract.
+
+Ví dụ:
+
+- `menu:{tenantId}` do BFF cache layer sở hữu.
+- `cart:{tenantId}:{sessionId}` do Order sở hữu.
+- `kds:{tenantId}:*` do Kitchen sở hữu.
+- `tenant:{tenantId}:suspended` do SaaS ghi, BFF đọc.
+
+### 7.2 Luôn handle cache miss
+
+Redis key có thể không tồn tại vì:
+
+- TTL hết hạn.
+- Redis restart.
+- Dev reset.
+- Key bị cleanup.
+
+Code đọc Redis phải có fallback hợp lý: đọc PostgreSQL, gọi service owner, hoặc trả lỗi rõ ràng nếu state bắt buộc không thể dựng lại.
+
+### 7.3 Không dùng `KEYS` trong code production
+
+`KEYS pattern` có thể block Redis nếu dữ liệu lớn. Dùng `SCAN` khi cần duyệt key.
+
+Trong local debug nhỏ có thể dùng `KEYS`, nhưng không đưa vào service runtime.
+
+### 7.4 Lock phải có TTL và owner value
+
+Lock đúng cần:
+
+- Key rõ tài nguyên bị lock.
+- Value unique, ví dụ request id/UUID.
+- TTL ngắn.
+- Release an toàn, không xóa lock của request khác.
+
+### 7.5 Không biến Redis thành database thứ hai
+
+Nếu dữ liệu cần join, audit, report, hoặc giữ lâu dài, đưa vào PostgreSQL. Redis chỉ giữ bản nhanh/tạm hoặc projection runtime.
+
+### 7.6 Thay đổi Redis contract phải cập nhật docs
+
+Khi thêm key mới hoặc đổi owner/TTL:
+
+- Cập nhật [`../redis-usage-analysis.md`](../redis-usage-analysis.md).
+- Cập nhật [`../technical-architecture.md`](../technical-architecture.md) nếu ảnh hưởng kiến trúc.
+- Cập nhật phase/spec nếu là business contract.
+
+---
+
+## 8. Hướng dẫn cấu hình, triển khai và conflict Redis
+
+Phần này giúp hiểu Redis đang chạy thế nào trong QRTable, vì sao các thông số cấu hình ảnh hưởng đến code, và cách xử lý các conflict thường gặp khi dùng Redis làm cache/state runtime.
+
+### 8.1 Cấu hình local hiện tại
+
+Redis local nằm trong `docker-compose.provider.yaml`:
+
+```txt
+redis:
+  image: redis
+  ports:
+    - "6379:6379"
+  healthcheck:
+    redis-cli ping
+  volumes:
+    - ./docker/docker_data/redis_data:/data
+```
+
+Ý nghĩa:
+
+| Thông số                     | Nghĩa                                          | QRTable local/dev                                        |
+| ---------------------------- | ---------------------------------------------- | -------------------------------------------------------- |
+| `image: redis`               | Dùng image Redis mặc định.                     | Chưa pin version rõ trong compose hiện tại.              |
+| `6379:6379`                  | Map port Redis ra host.                        | App local dùng `localhost:6379`.                         |
+| Volume `/data`               | Nơi Redis có thể lưu file persistence nếu bật. | Có mount volume, nhưng compose chưa cấu hình rõ RDB/AOF. |
+| Healthcheck `redis-cli ping` | Kiểm tra Redis trả `PONG`.                     | Dùng để Docker biết service sẵn sàng.                    |
+| Không password/TLS           | Redis local mở đơn giản.                       | Chỉ phù hợp local/dev, không public.                     |
+
+Biến môi trường app:
+
+```txt
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_TTL=1800000
+```
+
+Trong `RedisConfiguration`, `REDIS_TTL` là TTL mặc định cho `CacheModule`/Keyv, đơn vị là millisecond theo cách code hiện tại dùng. Một số service dùng ioredis trực tiếp và set TTL riêng bằng `EX` seconds, ví dụ `subscription:{tenantId}` TTL 300 giây.
+
+### 8.2 Redis client trong code
+
+QRTable có hai kiểu dùng Redis:
+
+| Kiểu dùng                     | Code                                                          | Khi nào dùng                                                                   |
+| ----------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Nest CacheModule + Keyv Redis | `libs/configuration/src/lib/redis.config.ts`                  | Cache ở BFF/guard/controller, TTL mặc định.                                    |
+| ioredis client trực tiếp      | `libs/providers/redis-client/src/lib/redis-client.service.ts` | Service cần lệnh Redis cụ thể như `set EX`, `del`, Pub/Sub, lock, KDS runtime. |
+
+Điểm cần nhớ:
+
+- `CacheModule` phù hợp cache đơn giản.
+- ioredis phù hợp khi cần Redis primitive rõ ràng.
+- Không trộn owner tùy tiện: key do service nào sở hữu thì service đó quyết định format/TTL/invalidation.
+
+### 8.3 Persistence: RDB, AOF và ý nghĩa với QRTable
+
+Redis là in-memory store, nhưng có thể bật persistence:
+
+| Cơ chế                 | Nghĩa                               | Khi nào quan tâm                                                           |
+| ---------------------- | ----------------------------------- | -------------------------------------------------------------------------- |
+| RDB snapshot           | Redis ghi snapshot định kỳ ra disk. | Khôi phục tương đối sau restart, có thể mất dữ liệu sau snapshot gần nhất. |
+| AOF / Append Only File | Redis ghi log lệnh write.           | Bền hơn RDB cho write gần đây, nhưng cần quản lý file và hiệu năng.        |
+| RDB + AOF              | Kết hợp snapshot và log write.      | Production Redis cần cân nhắc nếu dữ liệu Redis khó rebuild.               |
+
+QRTable hiện thiết kế Redis theo hướng **có thể mất và dựng lại được**, ngoại trừ một số runtime state cần quy trình rebuild/cleanup rõ. Vì vậy không được dựa vào Redis persistence như nguồn sự thật nghiệp vụ. PostgreSQL/service owner vẫn là nguồn chính.
+
+### 8.4 Maxmemory và eviction policy
+
+Redis có thể bị giới hạn bộ nhớ bằng `maxmemory`. Khi đạt giới hạn, Redis dùng `maxmemory-policy` để quyết định có xóa key hay trả lỗi.
+
+Các policy hay gặp:
+
+| Policy           | Nghĩa ngắn                                         | Cảnh báo với QRTable                                          |
+| ---------------- | -------------------------------------------------- | ------------------------------------------------------------- |
+| `noeviction`     | Không tự xóa key; lệnh ghi mới có thể lỗi khi đầy. | An toàn hơn cho state quan trọng, nhưng phải monitor memory.  |
+| `allkeys-lru`    | Xóa key ít dùng gần đây trong toàn bộ keyspace.    | Tốt cho pure cache, nguy hiểm nếu có lock/session quan trọng. |
+| `volatile-lru`   | Chỉ xóa key có TTL theo LRU.                       | Phù hợp hơn nếu key không TTL là flag cần giữ.                |
+| `allkeys-random` | Xóa ngẫu nhiên key bất kỳ.                         | Khó dự đoán, không nên nếu có nhiều loại key quan trọng.      |
+
+Với QRTable, vì Redis chứa cả cache, session, lock, KDS runtime và tenant suspend flag, không nên chọn eviction policy như thể mọi key đều chỉ là cache. Nếu production đặt `maxmemory`, cần phân loại key và có monitoring memory.
+
+### 8.5 Standalone, Sentinel, Cluster
+
+| Kiểu triển khai | Dùng khi nào                                                             | Ghi chú                                                        |
+| --------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| Standalone      | Local/dev, demo, tải nhỏ.                                                | Compose hiện tại đang là standalone.                           |
+| Sentinel        | Cần failover cho Redis primary/replica nhưng vẫn giữ API gần standalone. | Phù hợp khi muốn HA vừa phải.                                  |
+| Cluster         | Cần shard dữ liệu trên nhiều node.                                       | Phức tạp hơn; multi-key operation bị ràng buộc theo hash slot. |
+
+QRTable hiện chưa thiết kế theo Redis Cluster. Nếu sau này dùng Cluster, các operation multi-key như lock nhiều key, cart/session multi-key hoặc Lua nhiều key phải kiểm tra lại hash slot. Khi cần multi-key atomic trong Cluster, key có thể phải dùng hash tag như `cart:{tenantId}:...` để cùng slot, nhưng đây là thay đổi kiến trúc cần spec riêng.
+
+### 8.6 TTL, cache miss và stale cache
+
+TTL không chỉ để dọn bộ nhớ; TTL là một phần contract.
+
+| Tình huống               | Ví dụ                               | Cách xử lý                                                     |
+| ------------------------ | ----------------------------------- | -------------------------------------------------------------- |
+| TTL quá ngắn             | Menu cache miss liên tục.           | Tăng TTL hoặc tối ưu source query, nhưng vẫn giữ invalidation. |
+| TTL quá dài              | Menu/subscription cache stale.      | Giảm TTL hoặc invalidate khi write thành công.                 |
+| Key hết hạn giữa request | Cart/session/OAuth state không còn. | Trả lỗi rõ ràng hoặc refetch/rebuild từ source owner.          |
+| Cache stale sau write    | User thấy dữ liệu cũ.               | Xóa key/invalidate trong write path.                           |
+
+Với dữ liệu bảo mật ngắn hạn như `oauth_state:{state}`, TTL ngắn là bắt buộc. Với cache như `subscription:{tenantId}`, TTL 5 phút là trade-off giữa tốc độ và độ mới.
+
+### 8.7 Conflict và failure playbook
+
+| Tình huống              | Dấu hiệu                                            | Cách xử lý trong QRTable                                                             |
+| ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Cart version conflict   | Client gửi `expectedCartVersion` cũ.                | Trả conflict, client refetch cart mới; không ghi đè im lặng.                         |
+| Lock expired giữa chừng | Request A giữ lock quá lâu, request B lấy lock mới. | Operation trong lock phải ngắn; release phải kiểm tra owner value.                   |
+| Cache stampede          | Nhiều request cùng miss và gọi source service/DB.   | Dùng TTL hợp lý, request coalescing/lock nhẹ nếu endpoint nóng.                      |
+| Pub/Sub message lost    | BFF down đúng lúc Kitchen publish hint.             | Frontend refetch snapshot; Pub/Sub không là nguồn sự thật.                           |
+| Wrong type              | Code `HGETALL` vào key string hoặc ngược lại.       | Prefix/type phải rõ; debug bằng `TYPE key`; không tái dùng prefix cho type khác.     |
+| Key collision           | Hai service dùng cùng key pattern khác nghĩa.       | Key phải có owner và domain prefix; cập nhật key inventory khi thêm key.             |
+| Redis unavailable       | Guard/cache/lock không đọc được Redis.              | Có policy theo nghiệp vụ: cache miss fallback, mutation nhạy cảm có thể fail-closed. |
+| Eviction ngoài ý muốn   | Key biến mất dù chưa hết TTL.                       | Kiểm tra `maxmemory-policy`, memory usage, và phân loại key quan trọng.              |
+| Flush nhầm môi trường   | Mất session/cache/runtime state.                    | Script flush hiện chặn non-development và non-local; không chạy thủ công bừa bãi.    |
+
+### 8.8 Lệnh cấu hình/quan sát nên biết
 
 ```bash
-# Cấu hình trong redis.conf hoặc Docker env
-maxmemory 256mb
-maxmemory-policy allkeys-lru
+# Xem memory và policy
+INFO memory
+CONFIG GET maxmemory
+CONFIG GET maxmemory-policy
+
+# Xem persistence
+CONFIG GET save
+CONFIG GET appendonly
+INFO persistence
+
+# Xem client đang kết nối
+CLIENT LIST
 ```
+
+Các lệnh `CONFIG SET`, `FLUSHDB`, `FLUSHALL` chỉ dùng khi hiểu rõ môi trường. Nếu cần đổi production Redis config, nên đi qua IaC/deployment config thay vì thao tác tay trong `redis-cli`.
 
 ---
 
-## 3. Data Types — Kiểu dữ liệu
+## 9. Gỡ lỗi local
 
-### 3.1 String
-
-Kiểu cơ bản nhất. Lưu text, số, JSON serialized, hoặc binary.
-
-**Giá trị tối đa:** 512 MB mỗi key.
+### 9.1 Kết nối Redis CLI
 
 ```bash
-# Cú pháp cơ bản
-SET key value
-GET key
-DEL key
-
-# Với TTL (Time To Live) — seconds
-SET key value EX 3600       # Hết hạn sau 3600 giây (1 giờ)
-SET key value PX 60000      # Hết hạn sau 60000 milliseconds (1 phút)
-
-# SET chỉ khi key CHƯA tồn tại (NX = Not eXists)
-SET key value NX             # Trả về OK nếu thành công, nil nếu key đã tồn tại
-
-# SET chỉ khi key ĐÃ tồn tại (XX = eXists)
-SET key value XX
-
-# Kết hợp NX + PX — dùng cho distributed lock
-SET lock:resource "owner-id" NX PX 5000
-
-# Tăng/giảm số nguyên — ATOMIC
-INCR counter             # counter += 1
-INCRBY counter 5         # counter += 5
-DECR counter             # counter -= 1
-DECRBY counter 3         # counter -= 3
-
-# Append chuỗi
-APPEND key " world"
-
-# Lấy độ dài
-STRLEN key
-
-# Lấy/set nhiều key cùng lúc
-MSET key1 val1 key2 val2
-MGET key1 key2
+docker exec -it redis redis-cli
 ```
 
-**Dùng trong dự án:**
-
-- `session:{tenantId}:{sessionId}` → lưu JSON serialized của `SessionEntity` (cache)
-- `lock:{tenantId}:{sessionId}:cart` → distributed lock cho cart
-- `idempotency:{tenantId}:{idempotencyKey}` → lưu kết quả để deduplicate
-
----
-
-### 3.2 Hash
-
-Lưu **map của field → value** trong một key duy nhất. Tương tự một row trong database nhưng cực nhanh.
-
-**Giới hạn:** Lên đến 4 tỷ field mỗi Hash.
+Nếu container name khác, xem bằng:
 
 ```bash
-# Ghi một field
-HSET key field value
-HSET user:1 name "Alice" age "30" role "admin"
-
-# Đọc một field
-HGET key field
-HGET user:1 name                   # "Alice"
-
-# Đọc nhiều field
-HMGET key field1 field2
-HMGET user:1 name age              # ["Alice", "30"]
-
-# Đọc toàn bộ fields và values
-HGETALL key
-HGETALL user:1                     # ["name", "Alice", "age", "30", "role", "admin"]
-
-# Lấy tất cả field names
-HKEYS key
-HKEYS user:1                       # ["name", "age", "role"]
-
-# Lấy tất cả values
-HVALS key
-HVALS user:1                       # ["Alice", "30", "admin"]
-
-# Xoá một field
-HDEL key field
-HDEL user:1 role
-
-# Kiểm tra field tồn tại
-HEXISTS key field
-HEXISTS user:1 name                # 1 (true) hoặc 0 (false)
-
-# Đếm số field
-HLEN key
-HLEN user:1                        # 2 (sau khi xoá role)
-
-# Tăng số nguyên trong field
-HINCRBY key field increment
-HINCRBY stats:tenant1 orderCount 1
-
-# Ghi nhiều field cùng lúc
-HMSET key field1 val1 field2 val2  # Deprecated, dùng HSET nhiều arg thay thế
-HSET key field1 val1 field2 val2   # Từ Redis 4.0+: HSET chấp nhận nhiều field-value
+docker ps
 ```
 
-**Khi nào dùng Hash thay vì String + JSON?**
-
-| Tình huống             | Hash                     | String + JSON                                  |
-| ---------------------- | ------------------------ | ---------------------------------------------- |
-| Cần cập nhật 1 field   | ✅ `HSET key field val`  | ❌ Phải GET → parse → modify → stringify → SET |
-| Cần đọc 1-2 field      | ✅ `HMGET`               | ❌ GET rồi parse toàn bộ                       |
-| Cần đọc toàn bộ object | ⚠️ `HGETALL` (cần parse) | ✅ `GET` rồi `JSON.parse`                      |
-| Dữ liệu lồng nhau sâu  | ❌ Không hỗ trợ nested   | ✅ JSON hỗ trợ                                 |
-
-**Dùng trong dự án:**
-
-- `cart:{tenantId}:{sessionId}` → lưu từng field là từng `cartLine` (JSON per field) + `_meta` field cho cartVersion
-
----
-
-### 3.3 List
-
-Danh sách các phần tử theo thứ tự. Cho phép **push/pop từ cả hai đầu** (double-ended queue — deque).
-
-**Giới hạn:** Lên đến 4 tỷ phần tử.
+### 9.2 Lệnh kiểm tra an toàn
 
 ```bash
-# Push vào đầu (Left Push)
-LPUSH key element1 element2
-LPUSH queue "task3" "task4"        # queue = [task4, task3, ...]
-
-# Push vào cuối (Right Push)
-RPUSH key element1 element2
-RPUSH queue "task1" "task2"        # queue = [..., task1, task2]
-
-# Pop từ đầu (Left Pop)
-LPOP key                           # Lấy và xoá phần tử đầu tiên
-LPOP key 3                         # Lấy và xoá 3 phần tử đầu (Redis 6.2+)
-
-# Pop từ cuối (Right Pop)
-RPOP key
-
-# Blocking pop — chờ cho đến khi có phần tử (dùng cho queue/worker)
-BLPOP key1 key2 timeout            # timeout=0 là chờ mãi mãi
-BRPOP key timeout
-
-# Đọc một khoảng (không xoá)
-LRANGE key start stop
-LRANGE queue 0 -1                  # Lấy tất cả phần tử (-1 là cuối)
-LRANGE queue 0 9                   # Lấy 10 phần tử đầu
-
-# Đọc theo index
-LINDEX key index
-LINDEX queue 0                     # Phần tử đầu tiên
-LINDEX queue -1                    # Phần tử cuối cùng
-
-# Ghi theo index
-LSET key index value
-
-# Độ dài list
-LLEN key
-
-# Trim (giữ lại một khoảng, xoá phần còn lại)
-LTRIM key start stop
-LTRIM logs 0 999                   # Chỉ giữ 1000 phần tử gần nhất
-```
-
-**Pattern — Message Queue đơn giản:**
-
-```
-Producer:  RPUSH jobs "{task: 'sendEmail', ...}"
-Consumer:  BLPOP jobs 0   ← chờ và lấy job
-```
-
-**Dùng trong dự án (tiềm năng):**
-
-- `outbox:{tenantId}` → queue event chờ publish lên Kafka
-- `audit:{tenantId}:{orderId}` → log các thay đổi trạng thái order
-
----
-
-### 3.4 Set
-
-Tập hợp các phần tử **không trùng lặp**, **không có thứ tự**.
-
-```bash
-# Thêm phần tử
-SADD key member1 member2 member3
-SADD online_users "user1" "user2"
-
-# Xoá phần tử
-SREM key member
-SREM online_users "user1"
-
-# Kiểm tra tồn tại
-SISMEMBER key member
-SISMEMBER online_users "user2"     # 1 hoặc 0
-
-# Lấy tất cả thành viên
-SMEMBERS key
-
-# Đếm số thành viên
-SCARD key
-
-# Lấy ngẫu nhiên (không xoá)
-SRANDMEMBER key count
-
-# Pop ngẫu nhiên (xoá)
-SPOP key count
-
-# Phép toán tập hợp
-SUNION key1 key2               # Hợp
-SINTER key1 key2               # Giao
-SDIFF key1 key2                # Hiệu
-
-# Phép toán và lưu kết quả
-SUNIONSTORE dest key1 key2
-SINTERSTORE dest key1 key2
-```
-
-**Dùng trong dự án (tiềm năng):**
-
-- `active_sessions:{tenantId}` → tập hợp sessionId đang active
-- `processed_idempotency:{tenantId}` → tập hợp các idempotencyKey đã xử lý
-
----
-
-### 3.5 Sorted Set (ZSet)
-
-Tập hợp không trùng lặp, mỗi phần tử kèm theo một **score** (số thực). Phần tử được **sắp xếp tự động theo score**.
-
-```bash
-# Thêm phần tử với score
-ZADD key score member
-ZADD leaderboard 1500 "Alice" 2000 "Bob" 800 "Carol"
-
-# Đọc theo rank (thứ hạng) — thứ tự tăng dần
-ZRANGE key start stop [WITHSCORES]
-ZRANGE leaderboard 0 -1 WITHSCORES   # Từ thấp đến cao
-
-# Đọc theo rank — thứ tự giảm dần
-ZREVRANGE key start stop [WITHSCORES]
-ZREVRANGE leaderboard 0 2 WITHSCORES  # Top 3
-
-# Lấy rank của một member
-ZRANK key member                   # Rank tính từ thấp nhất (0-indexed)
-ZREVRANK key member                # Rank tính từ cao nhất
-
-# Lấy score
-ZSCORE key member
-ZSCORE leaderboard "Bob"           # 2000
-
-# Tăng score
-ZINCRBY key increment member
-ZINCRBY leaderboard 100 "Alice"    # score của Alice thành 1600
-
-# Xoá member
-ZREM key member
-
-# Đọc theo khoảng score
-ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
-ZRANGEBYSCORE leaderboard 1000 2000 WITHSCORES
-
-# Đếm số member theo khoảng score
-ZCOUNT key min max
-ZCOUNT leaderboard 1000 2000
-
-# Đếm tổng
-ZCARD key
-```
-
-**Dùng trong dự án (tiềm năng):**
-
-- Rate limiting: `ZADD rate:{userId} {timestamp} {requestId}` + `ZREMRANGEBYSCORE` theo sliding window
-- Xếp hạng order theo thời gian: score = timestamp
-
----
-
-### 3.6 Stream (Redis Streams)
-
-Cấu trúc dữ liệu dạng **append-only log**, tương tự Kafka nhưng nhẹ hơn. Hỗ trợ consumer groups.
-
-> Nâng cao — dự án này dùng Kafka cho event streaming, Redis Stream có thể dùng cho lightweight queue nội bộ.
-
-```bash
-# Thêm entry (Redis tự tạo ID dạng timestamp-sequence)
-XADD stream * field1 value1 field2 value2
-XADD orders * orderId "order-1" status "PENDING"
-
-# Đọc từ một vị trí
-XREAD COUNT 10 STREAMS stream 0    # Đọc 10 entry từ đầu
-XREAD COUNT 10 STREAMS stream $    # Chỉ đọc entry mới
-
-# Độ dài
-XLEN stream
-
-# Đọc khoảng
-XRANGE stream - +                  # Tất cả
-XRANGE stream - + COUNT 10         # 10 entry đầu tiên
-```
-
----
-
-## 4. Key Design & Naming Conventions
-
-### Quy tắc đặt tên key
-
-Key trong Redis là **binary-safe string** — có thể chứa bất kỳ byte nào, kể cả binary. Tuy nhiên trong thực tế, mọi người dùng chuỗi có nghĩa với dấu `:` làm separator.
-
-**Pattern chuẩn:**
-
-```
-{domain}:{tenantId}:{resource}:{id}
-```
-
-**Ví dụ từ dự án:**
-
-```
-cart:{tenantId}:{sessionId}                  # Cart của session trong tenant
-lock:cart:{tenantId}:{sessionId}             # Distributed lock cho cart mutation
-session:cache:{tenantId}:{sessionId}         # Cache của SessionEntity
-idempotency:{tenantId}:{idempotencyKey}      # Deduplicate submitted order
-lock:transfer:{tenantId}:{sessionId}         # Lock cho table transfer saga
-```
-
-### Rules quan trọng
-
-1. **Không dùng key quá dài** — Key là memory overhead. Nếu cần identifier dài, dùng hash của nó.
-2. **Không dùng key quá ngắn** — `u:1000` tiết kiệm vài byte nhưng khó debug. Ưu tiên `user:1000`.
-3. **Nhất quán về separator** — Chỉ dùng `:` không dùng `/` hoặc `.`.
-4. **Tránh whitespace trong key** — Gây khó khăn khi debug bằng CLI.
-5. **Namespace theo service** — Nếu nhiều service dùng chung Redis instance: `order:cart:...` thay vì chỉ `cart:...`
-
-### Scan key theo pattern (production-safe)
-
-`KEYS pattern` sẽ **block Redis** vì duyệt toàn bộ keyspace — **TUYỆT ĐỐI KHÔNG DÙNG trong production** khi có nhiều key.
-
-Thay vào đó dùng `SCAN`:
-
-```bash
-# SCAN cursor [MATCH pattern] [COUNT hint]
-SCAN 0 MATCH cart:tenant1:* COUNT 100
-# Redis trả về [cursor_tiếp_theo, [keys...]]
-# Khi cursor trả về = 0 nghĩa là đã scan xong
-```
-
-```typescript
-// ioredis: scan tất cả key theo pattern
-async function scanKeys(redis: Redis, pattern: string): Promise<string[]> {
-  const keys: string[] = [];
-  let cursor = '0';
-  do {
-    const [nextCursor, batch] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-    cursor = nextCursor;
-    keys.push(...batch);
-  } while (cursor !== '0');
-  return keys;
-}
-```
-
----
-
-## 5. TTL & Expiration
-
-### Các lệnh TTL
-
-```bash
-# Đặt TTL khi SET
-SET key value EX 3600          # Hết hạn sau 3600 giây
-SET key value PX 3600000       # Hết hạn sau 3600000 ms
-SET key value EXAT 1700000000  # Hết hạn tại Unix timestamp (seconds)
-SET key value PXAT 1700000000000  # Hết hạn tại Unix timestamp (ms)
-
-# Đặt TTL cho key đã tồn tại
-EXPIRE key seconds             # Đặt TTL tính bằng giây
-PEXPIRE key milliseconds       # Đặt TTL tính bằng ms
-EXPIREAT key timestamp         # Đặt hết hạn theo Unix timestamp (giây)
-PEXPIREAT key timestamp        # Đặt hết hạn theo Unix timestamp (ms)
+# Xem type của key
+TYPE cart:tenant-1:session-1
 
 # Xem TTL còn lại
-TTL key                        # Trả về giây, -1 = không có TTL, -2 = key không tồn tại
-PTTL key                       # Trả về ms
+TTL cart:tenant-1:session-1
 
-# Xoá TTL (làm cho key tồn tại mãi mãi)
-PERSIST key
+# Đọc hash
+HGETALL cart:tenant-1:session-1
 
-# Kiểm tra key có tồn tại không
-EXISTS key                     # 1 hoặc 0
-EXISTS key1 key2 key3          # Trả về số key tồn tại
+# Đọc string
+GET tenant:tenant-1:suspended
+
+# Scan key theo pattern
+SCAN 0 MATCH "cart:tenant-1:*" COUNT 100
 ```
 
-### Khi nào dùng TTL?
+### 9.3 Khi thấy dữ liệu lạ
 
-| Use case              | TTL gợi ý      | Lý do                                    |
-| --------------------- | -------------- | ---------------------------------------- |
-| Cart (active session) | 2–4 giờ        | Tự động dọn khi session hết              |
-| Session cache         | 30–60 phút     | Phải re-validate sau thời gian nhất định |
-| Distributed lock      | 3–10 giây      | Prevent deadlock nếu holder crash        |
-| Idempotency key       | 24 giờ         | Đủ thời gian để client retry             |
-| Rate limit counter    | 1 phút / 1 giờ | Sliding/fixed window                     |
+Kiểm tra theo thứ tự:
 
-### Hành vi khi key expire
+1. Key có đúng tenantId không?
+2. Key owner là service nào?
+3. TTL có đúng kỳ vọng không?
+4. Type có khớp docs không?
+5. Có legacy fallback không, ví dụ `bff-session:{sessionId}`?
+6. Code có đang dùng wrong key prefix không?
 
-Khi một key hết TTL, Redis sử dụng **lazy expiration + active expiration**:
+### 9.4 Lệnh nguy hiểm
 
-- **Lazy**: Khi có request đọc key đó, Redis kiểm tra TTL → nếu expired thì xoá và trả về `nil`.
-- **Active**: Redis định kỳ scan một mẫu ngẫu nhiên các key có TTL và xoá những cái đã expired.
-
-**Lưu ý quan trọng:** Nếu một key expire mà không có ai đọc, nó sẽ vẫn chiếm memory cho đến khi active scan dọn nó.
-
----
-
-## 6. ioredis — Thư viện Node.js
-
-### Giới thiệu
-
-`ioredis` là thư viện Redis client cho Node.js, được viết bằng TypeScript. Có nhiều tính năng hơn `redis` (thư viện official) như:
-
-- Pipeline tự động
-- Cluster support
-- Sentinel support
-- Lua script caching
-- Promise-based API
-- TypeScript-native
-
-### Cài đặt
+Không chạy các lệnh này nếu chưa chắc môi trường:
 
 ```bash
-pnpm add ioredis
-```
-
-### Khởi tạo connection
-
-```typescript
-import Redis from 'ioredis';
-
-// Cách 1: Cấu hình object
-const redis = new Redis({
-  host: 'localhost',
-  port: 6379,
-  password: 'secret', // Nếu có auth
-  db: 0, // Database index (0-15, mặc định 0)
-  maxRetriesPerRequest: 3, // Retry tối đa 3 lần trước khi throw error
-  enableReadyCheck: true, // Kiểm tra Redis có sẵn sàng nhận lệnh không
-  lazyConnect: false, // Kết nối ngay khi khởi tạo
-  connectTimeout: 10000, // Timeout kết nối (ms)
-  commandTimeout: 5000, // Timeout mỗi lệnh (ms)
-  keepAlive: 30000, // TCP keepalive interval (ms)
-  retryStrategy(times) {
-    // Hàm tính delay giữa các lần retry
-    const delay = Math.min(times * 100, 2000); // Tối đa 2s
-    return delay;
-  },
-});
-
-// Cách 2: Connection string
-const redis = new Redis('redis://:password@localhost:6379/0');
-// hoặc
-const redis = new Redis('rediss://...'); // TLS
-
-// Đóng connection đúng cách
-await redis.quit(); // Gửi QUIT command, chờ server phản hồi
-redis.disconnect(); // Ngắt ngay lập tức (không gửi QUIT)
-```
-
-### Events của ioredis
-
-```typescript
-redis.on('connect', () => console.log('Đang kết nối...'));
-redis.on('ready', () => console.log('Redis sẵn sàng'));
-redis.on('error', (err) => console.error('Redis error:', err));
-redis.on('close', () => console.log('Kết nối đóng'));
-redis.on('reconnecting', () => console.log('Đang reconnect...'));
-redis.on('end', () => console.log('Kết nối kết thúc hẳn'));
-```
-
-### Các lệnh cơ bản với ioredis API
-
-Tất cả lệnh Redis đều được map thành method của ioredis client (lowercase):
-
-```typescript
-// String
-await redis.set('key', 'value');
-await redis.set('key', 'value', 'EX', 3600); // Với TTL
-await redis.set('key', 'value', 'NX'); // Chỉ khi chưa tồn tại
-await redis.set('key', 'value', 'NX', 'PX', 5000); // NX + TTL ms
-const value = await redis.get('key'); // string | null
-await redis.del('key');
-await redis.del('key1', 'key2', 'key3'); // Xoá nhiều key
-
-const count = await redis.incr('counter'); // number
-await redis.incrby('counter', 5);
-await redis.expire('key', 3600);
-const ttl = await redis.ttl('key'); // -1 | -2 | seconds
-const exists = await redis.exists('key'); // 0 | 1
-
-// Hash
-await redis.hset('user:1', 'name', 'Alice');
-await redis.hset('user:1', { name: 'Alice', age: '30' }); // ioredis hỗ trợ object
-const name = await redis.hget('user:1', 'name'); // string | null
-const all = await redis.hgetall('user:1'); // Record<string, string> | null
-await redis.hdel('user:1', 'age');
-const exists2 = await redis.hexists('user:1', 'name'); // 0 | 1
-
-// List
-await redis.rpush('queue', 'item1', 'item2');
-await redis.lpush('queue', 'item0');
-const item = await redis.lpop('queue'); // string | null
-const items = await redis.lrange('queue', 0, -1); // string[]
-const len = await redis.llen('queue');
-
-// Set
-await redis.sadd('tags', 'redis', 'nodejs', 'typescript');
-await redis.srem('tags', 'nodejs');
-const isMember = await redis.sismember('tags', 'redis'); // 0 | 1
-const members = await redis.smembers('tags'); // string[]
-const count2 = await redis.scard('tags');
-
-// Sorted Set
-await redis.zadd('board', 1500, 'Alice', 2000, 'Bob');
-const score = await redis.zscore('board', 'Bob'); // string | null
-const rank = await redis.zrevrank('board', 'Bob'); // number | null
-const top3 = await redis.zrevrange('board', 0, 2, 'WITHSCORES'); // string[]
-```
-
-### Type của giá trị trả về
-
-Điều quan trọng khi làm việc với ioredis là hiểu rõ **Redis luôn trả về string**, không tự động parse số hay object:
-
-```typescript
-await redis.set('count', 42);
-const raw = await redis.get('count'); // raw = "42" (string, không phải number!)
-const num = parseInt(raw ?? '0', 10); // Cần parse thủ công
-
-await redis.set('obj', JSON.stringify({ id: 1, name: 'Alice' }));
-const rawObj = await redis.get('obj');
-const obj = rawObj ? JSON.parse(rawObj) : null; // Cần parse thủ công
-```
-
-**Best practice — tạo helper wrapper:**
-
-```typescript
-// Helper để set/get JSON
-async function setJson<T>(redis: Redis, key: string, value: T, ttlSeconds?: number): Promise<void> {
-  const serialized = JSON.stringify(value);
-  if (ttlSeconds) {
-    await redis.set(key, serialized, 'EX', ttlSeconds);
-  } else {
-    await redis.set(key, serialized);
-  }
-}
-
-async function getJson<T>(redis: Redis, key: string): Promise<T | null> {
-  const raw = await redis.get(key);
-  if (!raw) return null;
-  return JSON.parse(raw) as T;
-}
-```
-
----
-
-## 7. Pipeline & Batching
-
-### Vấn đề: Round-trip latency
-
-Mỗi lệnh Redis cần một round-trip qua network:
-
-```
-Client → [SET key1] → Redis → [OK] → Client   (1 round-trip)
-Client → [SET key2] → Redis → [OK] → Client   (1 round-trip)
-Client → [GET key3] → Redis → [val] → Client  (1 round-trip)
-```
-
-Nếu gửi 100 lệnh tuần tự với latency 1ms/lệnh = **100ms tổng cộng** — rất chậm!
-
-### Giải pháp: Pipeline
-
-Pipeline gom nhiều lệnh vào **một TCP packet** gửi cùng lúc, Redis xử lý tuần tự và trả về tất cả kết quả trong **một response**:
-
-```
-Client → [SET k1, SET k2, GET k3] → Redis → [OK, OK, val] → Client  (1 round-trip)
-```
-
-```typescript
-// ioredis Pipeline
-const pipeline = redis.pipeline();
-
-pipeline.set('key1', 'value1');
-pipeline.set('key2', 'value2', 'EX', 3600);
-pipeline.hset('user:1', 'name', 'Alice');
-pipeline.incr('counter');
-pipeline.get('key1');
-
-// Thực thi tất cả cùng lúc
-const results = await pipeline.exec();
-// results: Array<[Error | null, unknown]>
-// Mỗi phần tử là [error, result] của từng lệnh theo thứ tự
-
-if (results) {
-  for (const [err, result] of results) {
-    if (err) console.error('Pipeline command error:', err);
-    else console.log('Result:', result);
-  }
-}
-```
-
-**Lưu ý quan trọng về Pipeline:**
-
-- Pipeline **KHÔNG phải transaction** — các lệnh được gửi theo batch nhưng không atomic. Nếu một lệnh fail, các lệnh khác vẫn thực thi.
-- Pipeline tăng throughput nhưng không đảm bảo tính nhất quán.
-
-### Chainable pipeline syntax
-
-```typescript
-const [err, results] = (await redis.pipeline().set('key1', 'val1').set('key2', 'val2').get('key1').exec()) ?? [
-  null,
-  [],
-];
-```
-
----
-
-## 8. Transactions — MULTI/EXEC
-
-### Khái niệm
-
-`MULTI/EXEC` là **transaction** trong Redis — đảm bảo một nhóm lệnh được thực thi **tuần tự, không bị gián đoạn** bởi client khác.
-
-```bash
-MULTI          # Bắt đầu transaction (server queue commands)
-SET key1 val1  # Lệnh được queue, KHÔNG thực thi ngay
-INCR counter
-GET key2
-EXEC           # Thực thi tất cả lệnh trong queue cùng lúc
-
-# Hoặc huỷ
-DISCARD        # Huỷ toàn bộ transaction
-```
-
-```typescript
-// ioredis MULTI/EXEC — dùng multi()
-const results = await redis.multi().set('key1', 'val1').incr('counter').get('key2').exec();
-```
-
-### Tại sao MULTI/EXEC không đủ cho mọi trường hợp?
-
-Giả sử logic: "Đọc giá trị → kiểm tra → ghi nếu điều kiện đúng":
-
-```
-Client A: GET cart_version   → "5"
-                                         ← Client B: SET cart_version "6"  (ghi đè!)
-Client A: MULTI
-Client A: SET cart_version "6" nếu version == 5  ← ĐÃ BỊ LỖI THỜI!
-Client A: EXEC
-```
-
-Vấn đề: Giữa GET và MULTI/EXEC, client khác có thể thay đổi dữ liệu. Đây là **race condition**.
-
-### Giải pháp: WATCH
-
-`WATCH` theo dõi key — nếu key bị thay đổi trước khi EXEC, toàn bộ transaction bị **abort** (EXEC trả về `null`):
-
-```typescript
-async function incrementWithWatch(redis: Redis, key: string): Promise<boolean> {
-  // Retry loop vì WATCH có thể fail
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await redis.watch(key);
-
-    const currentValue = await redis.get(key);
-    const newValue = parseInt(currentValue ?? '0', 10) + 1;
-
-    const result = await redis.multi().set(key, newValue).exec();
-
-    if (result !== null) {
-      // Thành công — không ai thay đổi key trong lúc chúng ta watch
-      return true;
-    }
-    // result === null nghĩa là WATCH thất bại, retry
-  }
-  return false; // Tất cả attempts đều fail
-}
-```
-
-**Hạn chế của WATCH:** Trong hệ thống có nhiều client cạnh tranh, tỷ lệ retry cao. Với các thao tác cần atomic phức tạp hơn → dùng **Lua script**.
-
----
-
-## 9. Lua Scripting — Atomic Operations
-
-### Tại sao dùng Lua?
-
-Redis thực thi Lua script **hoàn toàn atomic** — toàn bộ script chạy trên single thread, không client nào có thể xen vào giữa chừng. Đây là cách **duy nhất đáng tin cậy** để thực hiện các thao tác đọc-kiểm tra-ghi (Read-Check-Write) atomic trong Redis.
-
-**Lua script trong Redis là alternative tốt hơn WATCH trong nhiều trường hợp:**
-
-- Không cần retry loop
-- Không có race condition
-- Logic phức tạp có thể được đóng gói
-
-### Cú pháp cơ bản
-
-```lua
--- Trong Lua script Redis:
--- KEYS[1], KEYS[2], ... là tham số key (truyền từ ngoài vào)
--- ARGV[1], ARGV[2], ... là tham số value (truyền từ ngoài vào)
-
--- Gọi Redis command từ Lua
-redis.call('SET', KEYS[1], ARGV[1])
-local val = redis.call('GET', KEYS[1])
-
--- redis.call() sẽ THROW ERROR nếu command fail
--- redis.pcall() sẽ CATCH ERROR và trả về error object
-
--- Trả về giá trị
-return val
-
--- Kiểm tra nil
-if val == false then   -- Redis trả về false cho nil trong Lua
-  return 0
-end
-
--- Chuyển đổi type
-local num = tonumber(val)   -- string → number
-local str = tostring(num)   -- number → string
-```
-
-### Chạy Lua script với ioredis
-
-```typescript
-// Cách 1: eval — chạy thẳng script string
-const result = await redis.eval(
-  `
-  local current = redis.call('GET', KEYS[1])
-  if current == false then
-    redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
-    return 1
-  end
-  return 0
-  `,
-  1, // Số lượng KEYS
-  'mykey', // KEYS[1]
-  'myvalue', // ARGV[1]
-  '3600', // ARGV[2]
-);
-```
-
-```typescript
-// Cách 2: defineCommand — đăng ký command tùy chỉnh (khuyến nghị)
-const redis = new Redis();
-
-redis.defineCommand('setIfNotExists', {
-  numberOfKeys: 1,
-  lua: `
-    local current = redis.call('GET', KEYS[1])
-    if current == false then
-      redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
-      return 1
-    end
-    return 0
-  `,
-});
-
-// Gọi như một method bình thường
-const result = await (redis as any).setIfNotExists('mykey', 'myvalue', '3600');
-```
-
-```typescript
-// Cách 3: evalsha — cache script trên server (hiệu quả nhất khi gọi nhiều lần)
-const sha = await redis.script(
-  'LOAD',
-  `
-  return redis.call('GET', KEYS[1])
-`,
-);
-const result = await redis.evalsha(sha, 1, 'mykey');
-```
-
-### Reference hardening: Cart Version Check & Update (Optimistic Lock)
-
-Đây là pattern hardening cho cart mutation có cạnh tranh cao. Code hiện tại đã check `cartVersion` trong Order `CartService`; Lua script dưới đây là thiết kế tham khảo nếu cần atomic read-check-write hoàn toàn trong Redis.
-
-```typescript
-const CART_MUTATE_SCRIPT = `
-  -- KEYS[1] = cartKey (e.g. "cart:tenant1:sess1")
-  -- ARGV[1] = expectedCartVersion (string number)
-  -- ARGV[2] = cartMetaJson (JSON string của toàn bộ cart sau mutation)
-  -- ARGV[3] = ttlSeconds
-
-  local cartKey = KEYS[1]
-  local expectedVersion = tonumber(ARGV[1])
-  local newCartJson = ARGV[2]
-  local ttl = tonumber(ARGV[3])
-
-  -- Đọc meta field chứa cartVersion hiện tại
-  local currentVersionStr = redis.call('HGET', cartKey, '_version')
-  local currentVersion = tonumber(currentVersionStr) or 0
-
-  -- Kiểm tra version
-  if currentVersion ~= expectedVersion then
-    -- Trả về current snapshot để client biết version hiện tại
-    local snapshot = redis.call('GET', cartKey .. ':snapshot')
-    return {-1, snapshot or ''}  -- -1 = conflict
-  end
-
-  -- Tăng version
-  local newVersion = currentVersion + 1
-
-  -- Cập nhật cart
-  redis.call('SET', cartKey .. ':snapshot', newCartJson, 'EX', ttl)
-  redis.call('HSET', cartKey, '_version', tostring(newVersion))
-  redis.call('EXPIRE', cartKey, ttl)
-
-  return {newVersion, newCartJson}  -- Thành công
-`;
-```
-
-### Ví dụ thực tế: Acquire Distributed Lock
-
-```typescript
-const ACQUIRE_LOCK_SCRIPT = `
-  -- KEYS[1] = lockKey
-  -- ARGV[1] = lockValue (unique identifier của owner)
-  -- ARGV[2] = ttlMs
-
-  local lockKey = KEYS[1]
-  local lockValue = ARGV[1]
-  local ttlMs = tonumber(ARGV[2])
-
-  -- SET NX PX là atomic, nhưng đây là ví dụ Lua để mở rộng thêm logic
-  local existing = redis.call('GET', lockKey)
-  if existing == false then
-    redis.call('SET', lockKey, lockValue, 'PX', ttlMs)
-    return 1  -- Thành công acquire
-  end
-  return 0  -- Đã bị lock bởi người khác
-`;
-
-const RELEASE_LOCK_SCRIPT = `
-  -- QUAN TRỌNG: Chỉ release lock nếu mình là owner
-  -- Không dùng GET rồi DEL riêng lẻ vì có race condition!
-
-  if redis.call('GET', KEYS[1]) == ARGV[1] then
-    return redis.call('DEL', KEYS[1])
-  else
-    return 0
-  end
-`;
-```
-
-### Giới hạn của Lua script
-
-- **Không được dùng blocking command** (BLPOP, BRPOP...) trong Lua.
-- **Không có I/O** — không thể gọi HTTP, file, database trong Lua.
-- **Không có sleep/delay**.
-- Script chạy quá lâu sẽ bị kill bởi `lua-time-limit` (mặc định 5 giây).
-- **Tất cả key phải được khai báo qua KEYS[]** để Redis Cluster biết key nằm ở shard nào.
-
----
-
-## 10. Distributed Lock — Redlock Pattern
-
-### Vấn đề cần giải quyết
-
-Trong microservices, nhiều instance có thể xử lý cùng một resource đồng thời:
-
-```
-Instance A: Đọc cart → Đang xử lý mutation...
-Instance B: Đọc cart → Đang xử lý mutation...  ← Race condition!
-Instance A: Ghi cart v2
-Instance B: Ghi cart v2  ← Ghi đè mất mutation của A!
-```
-
-Giải pháp: **Distributed Lock** — chỉ cho phép một instance giữ "quyền xử lý" tại một thời điểm.
-
-### Pattern đơn giản: SET NX PX
-
-```typescript
-// Acquire lock
-const lockKey = `lock:cart:${tenantId}:${sessionId}`;
-const lockValue = `${instanceId}:${Date.now()}:${Math.random()}`; // Unique
-const ttlMs = 5000; // 5 giây — phải đủ để xử lý xong
-
-const acquired = await redis.set(lockKey, lockValue, 'NX', 'PX', ttlMs);
-if (acquired === null) {
-  throw new Error('Cart is being processed by another request');
-}
-
-try {
-  // Xử lý cart mutation ở đây...
-  await doCartMutation();
-} finally {
-  // QUAN TRỌNG: Release lock — phải dùng Lua để atomic check-and-delete
-  await redis.eval(
-    `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end`,
-    1,
-    lockKey,
-    lockValue,
-  );
-}
-```
-
-**Tại sao lockValue phải unique?**
-
-Tránh trường hợp:
-
-1. Process A acquire lock với TTL 5s
-2. Process A xử lý chậm, lock expire sau 5s
-3. Process B acquire cùng lock
-4. Process A xong, gọi DEL lock → **xoá lock của B!** ← Bug nguy hiểm
-
-Dùng unique lockValue + Lua check trước khi DEL giải quyết vấn đề này.
-
-### Lock class tái sử dụng
-
-```typescript
-import Redis from 'ioredis';
-import { randomUUID } from 'crypto';
-
-export class RedisLock {
-  private readonly RELEASE_SCRIPT = `
-    if redis.call('GET', KEYS[1]) == ARGV[1] then
-      return redis.call('DEL', KEYS[1])
-    else
-      return 0
-    end
-  `;
-
-  constructor(private readonly redis: Redis) {}
-
-  /**
-   * Thử acquire lock. Trả về lockValue nếu thành công, null nếu thất bại.
-   */
-  async acquire(key: string, ttlMs: number): Promise<string | null> {
-    const lockValue = randomUUID();
-    const result = await this.redis.set(key, lockValue, 'NX', 'PX', ttlMs);
-    return result === 'OK' ? lockValue : null;
-  }
-
-  /**
-   * Release lock. Chỉ release nếu lockValue khớp (mình là owner).
-   */
-  async release(key: string, lockValue: string): Promise<boolean> {
-    const result = await this.redis.eval(this.RELEASE_SCRIPT, 1, key, lockValue);
-    return result === 1;
-  }
-
-  /**
-   * Thực thi function với lock. Tự động acquire và release.
-   */
-  async withLock<T>(key: string, ttlMs: number, fn: () => Promise<T>, retries = 3, retryDelayMs = 100): Promise<T> {
-    for (let i = 0; i < retries; i++) {
-      const lockValue = await this.acquire(key, ttlMs);
-
-      if (lockValue) {
-        try {
-          return await fn();
-        } finally {
-          await this.release(key, lockValue);
-        }
-      }
-
-      if (i < retries - 1) {
-        // Chờ trước khi retry — exponential backoff
-        await new Promise((resolve) => setTimeout(resolve, retryDelayMs * (i + 1)));
-      }
-    }
-    throw new Error(`Failed to acquire lock for key: ${key} after ${retries} attempts`);
-  }
-}
-```
-
-### Sử dụng trong Cart Service
-
-```typescript
-// Trong CartService
-async mutateCart(params: CartMutateParams): Promise<CartSnapshot> {
-  const lockKey = `lock:cart:${params.tenantId}:${params.sessionId}`;
-
-  return this.redisLock.withLock(lockKey, 5000, async () => {
-    // Toàn bộ logic mutation chạy dưới lock
-    const cart = await this.getCart(params.tenantId, params.sessionId);
-
-    if (cart.cartVersion !== params.expectedCartVersion) {
-      throw new CartVersionConflictError(cart);
-    }
-
-    const updatedCart = applyMutation(cart, params);
-    await this.saveCart(updatedCart);
-    return updatedCart;
-  });
-}
-```
-
----
-
-## 11. Optimistic Locking — Version Conflict
-
-### Khái niệm
-
-**Optimistic Locking** là chiến lược giả định rằng xung đột hiếm xảy ra — thay vì lock ngay từ đầu (pessimistic), ta:
-
-1. Đọc data và ghi nhớ **version hiện tại**
-2. Thực hiện thay đổi ở application layer
-3. Khi ghi lại, **kiểm tra version vẫn còn khớp** → nếu không, báo conflict
-
-```
-Client A: đọc cart (version=5) → hiển thị cho user
-Client B: thêm item → cart version=6
-Client A: user thêm item → gửi mutation với expectedVersion=5
-          → Server kiểm tra: currentVersion(6) ≠ expectedVersion(5)
-          → Trả về 409 CART_VERSION_CONFLICT + snapshot hiện tại
-Client A: nhận conflict → refresh lại cart version=6 → user thêm lại item
-```
-
-### Tại sao cần Optimistic Locking cho Cart?
-
-Trong hệ thống QR Table:
-
-- Một session có thể được nhiều thiết bị của nhóm khách hàng truy cập đồng thời.
-- Mỗi thiết bị có thể thêm/sửa/xoá món cùng lúc.
-- Optimistic locking đảm bảo không có mutation nào bị "ghi đè ngầm" — luôn báo conflict rõ ràng.
-
-### Hardening option: Lua script atomic
-
-```typescript
-// Script kiểm tra version và update nếu version khớp
-export const CART_MUTATE_SCRIPT = `
-  local cartKey = KEYS[1]
-  local lockKey = KEYS[2]
-  local expectedVersion = tonumber(ARGV[1])
-  local newSnapshotJson = ARGV[2]
-  local newVersion = tonumber(ARGV[3])
-  local ttl = tonumber(ARGV[4])
-
-  -- Đọc version hiện tại
-  local currentVersionStr = redis.call('HGET', cartKey .. ':meta', 'version')
-  local currentVersion = tonumber(currentVersionStr) or 0
-
-  -- Kiểm tra version conflict
-  if currentVersion ~= expectedVersion then
-    local snapshot = redis.call('GET', cartKey .. ':snapshot')
-    return {0, currentVersion, snapshot or '{}'}
-    -- 0 = conflict, trả về version hiện tại và snapshot để client sync
-  end
-
-  -- Ghi snapshot mới
-  redis.call('SET', cartKey .. ':snapshot', newSnapshotJson, 'EX', ttl)
-
-  -- Cập nhật meta (version, updatedAt)
-  redis.call('HSET', cartKey .. ':meta', 'version', newVersion)
-  redis.call('EXPIRE', cartKey .. ':meta', ttl)
-
-  return {1, newVersion, newSnapshotJson}
-  -- 1 = thành công, version mới, snapshot mới
-`;
-```
-
-```typescript
-// Sử dụng trong CartService
-async mutateCart(
-  tenantId: string,
-  sessionId: string,
-  expectedCartVersion: number,
-  mutation: CartMutation
-): Promise<CartSnapshot> {
-  const cartKey = `cart:${tenantId}:${sessionId}`;
-  const ttl = 4 * 60 * 60; // 4 giờ
-
-  // Lấy cart hiện tại để áp dụng mutation
-  const currentSnapshot = await this.getCartSnapshot(tenantId, sessionId);
-  const updatedSnapshot = applyMutation(currentSnapshot, mutation);
-  const newVersion = expectedCartVersion + 1;
-
-  const result = await this.redis.eval(
-    CART_MUTATE_SCRIPT,
-    2,                                     // Số KEYS
-    cartKey,                               // KEYS[1]
-    `lock:cart:${tenantId}:${sessionId}`,  // KEYS[2]
-    String(expectedCartVersion),           // ARGV[1]
-    JSON.stringify(updatedSnapshot),       // ARGV[2]
-    String(newVersion),                    // ARGV[3]
-    String(ttl)                            // ARGV[4]
-  ) as [number, number, string];
-
-  const [success, returnedVersion, snapshotJson] = result;
-
-  if (success === 0) {
-    // Version conflict — trả về snapshot hiện tại để client sync
-    const currentCart = JSON.parse(snapshotJson) as CartSnapshot;
-    throw new CartVersionConflictException(returnedVersion, currentCart);
-  }
-
-  return JSON.parse(snapshotJson) as CartSnapshot;
-}
-```
-
----
-
-## 12. Cart Service Pattern — Reference Variant
-
-> **Current-code note:** Key inventory hiện tại dùng `cart:{tenantId}:{sessionId}` làm Redis Hash trong Order `CartService`. Thiết kế tách `snapshot`/`meta` dưới đây là reference variant cho hardening hoặc refactor tương lai, không phải shape bắt buộc của code hiện tại.
-
-### Cấu trúc dữ liệu Cart trong Redis
-
-```
-cart:{tenantId}:{sessionId}:snapshot   → String (JSON của CartSnapshot)
-cart:{tenantId}:{sessionId}:meta       → Hash { version, status, updatedAt }
-lock:cart:{tenantId}:{sessionId}       → String (lockValue khi đang bị lock)
-```
-
-**Tại sao tách snapshot và meta?**
-
-- `meta` dùng Hash để có thể đọc chỉ `version` mà không phải deserialize toàn bộ snapshot.
-- `snapshot` dùng String (JSON) để dễ serialize/deserialize toàn bộ.
-
-### CartSnapshot type
-
-```typescript
-export type CartLine = {
-  cartLineId: string; // UUID của line này
-  menuItemId: string;
-  menuItemName: string;
-  quantity: number;
-  unitPrice: number;
-  note?: string;
-  station?: 'KITCHEN' | 'BAR';
-  lineVersion: number; // Version của line (để track changes)
-};
-
-export type CartSnapshot = {
-  tenantId: string;
-  sessionId: string;
-  cartVersion: number;
-  status: 'ACTIVE' | 'LOCKED';
-  updatedAt: string; // ISO string
-  items: CartLine[];
-};
-```
-
-### Full CartService implementation
-
-```typescript
-import { Injectable } from '@nestjs/common';
-import { RedisService } from '@common/providers/redis';
-import Redis from 'ioredis';
-import { v4 as uuidv4 } from 'uuid';
-import type { CartSnapshot, CartLine } from '@einvoice/types';
-
-@Injectable()
-export class CartService {
-  private readonly redis: Redis;
-  private readonly CART_TTL_SECONDS = 4 * 60 * 60; // 4 giờ
-
-  // Script atomic để check version và mutate
-  private readonly MUTATE_SCRIPT = `
-    local snapshotKey = KEYS[1]
-    local metaKey = KEYS[2]
-    local expectedVersion = tonumber(ARGV[1])
-    local newSnapshotJson = ARGV[2]
-    local newVersion = tonumber(ARGV[3])
-    local ttl = tonumber(ARGV[4])
-    local updatedAt = ARGV[5]
-
-    local currentVersionStr = redis.call('HGET', metaKey, 'version')
-    local currentVersion = tonumber(currentVersionStr) or 0
-
-    if currentVersion ~= expectedVersion then
-      local snapshot = redis.call('GET', snapshotKey)
-      return {0, currentVersion, snapshot or '{}'}
-    end
-
-    redis.call('SET', snapshotKey, newSnapshotJson, 'EX', ttl)
-    redis.call('HSET', metaKey, 'version', newVersion, 'updatedAt', updatedAt)
-    redis.call('EXPIRE', metaKey, ttl)
-    return {1, newVersion, newSnapshotJson}
-  `;
-
-  constructor(redisService: RedisService) {
-    this.redis = redisService.getClient();
-  }
-
-  private snapshotKey(tenantId: string, sessionId: string): string {
-    return `cart:${tenantId}:${sessionId}:snapshot`;
-  }
-
-  private metaKey(tenantId: string, sessionId: string): string {
-    return `cart:${tenantId}:${sessionId}:meta`;
-  }
-
-  /** Lấy cart snapshot hiện tại. Trả về empty cart nếu chưa có. */
-  async getCart(tenantId: string, sessionId: string): Promise<CartSnapshot> {
-    const raw = await this.redis.get(this.snapshotKey(tenantId, sessionId));
-    if (!raw) {
-      return {
-        tenantId,
-        sessionId,
-        cartVersion: 0,
-        status: 'ACTIVE',
-        updatedAt: new Date().toISOString(),
-        items: [],
-      };
-    }
-    return JSON.parse(raw) as CartSnapshot;
-  }
-
-  /** Thêm item hoặc tăng quantity nếu đã có */
-  async addItem(
-    tenantId: string,
-    sessionId: string,
-    expectedCartVersion: number,
-    item: {
-      menuItemId: string;
-      menuItemName: string;
-      unitPrice: number;
-      quantity: number;
-      note?: string;
-      station?: string;
-    },
-  ): Promise<CartSnapshot> {
-    const current = await this.getCart(tenantId, sessionId);
-
-    // Kiểm tra version trước khi apply mutation (để detect conflict nhanh)
-    if (current.cartVersion !== expectedCartVersion) {
-      throw this.createConflictError(current);
-    }
-
-    // Tìm line đã có cùng menuItemId
-    const existingLine = current.items.find((l) => l.menuItemId === item.menuItemId);
-    let updatedItems: CartLine[];
-
-    if (existingLine) {
-      updatedItems = current.items.map((l) =>
-        l.menuItemId === item.menuItemId
-          ? { ...l, quantity: l.quantity + item.quantity, lineVersion: l.lineVersion + 1 }
-          : l,
-      );
-    } else {
-      const newLine: CartLine = {
-        cartLineId: uuidv4(),
-        menuItemId: item.menuItemId,
-        menuItemName: item.menuItemName,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        note: item.note,
-        station: item.station as any,
-        lineVersion: 1,
-      };
-      updatedItems = [...current.items, newLine];
-    }
-
-    const newSnapshot: CartSnapshot = {
-      ...current,
-      cartVersion: expectedCartVersion + 1,
-      updatedAt: new Date().toISOString(),
-      items: updatedItems,
-    };
-
-    return this.atomicUpdate(tenantId, sessionId, expectedCartVersion, newSnapshot);
-  }
-
-  /** Xoá một line khỏi cart */
-  async removeLine(
-    tenantId: string,
-    sessionId: string,
-    expectedCartVersion: number,
-    cartLineId: string,
-  ): Promise<CartSnapshot> {
-    const current = await this.getCart(tenantId, sessionId);
-    if (current.cartVersion !== expectedCartVersion) {
-      throw this.createConflictError(current);
-    }
-
-    const updatedItems = current.items.filter((l) => l.cartLineId !== cartLineId);
-    const newSnapshot: CartSnapshot = {
-      ...current,
-      cartVersion: expectedCartVersion + 1,
-      updatedAt: new Date().toISOString(),
-      items: updatedItems,
-    };
-
-    return this.atomicUpdate(tenantId, sessionId, expectedCartVersion, newSnapshot);
-  }
-
-  /** Clear toàn bộ cart (khi submit order xong) */
-  async clearCart(tenantId: string, sessionId: string, expectedCartVersion: number): Promise<CartSnapshot> {
-    const current = await this.getCart(tenantId, sessionId);
-    if (current.cartVersion !== expectedCartVersion) {
-      throw this.createConflictError(current);
-    }
-
-    const newSnapshot: CartSnapshot = {
-      ...current,
-      cartVersion: expectedCartVersion + 1,
-      updatedAt: new Date().toISOString(),
-      items: [],
-    };
-
-    return this.atomicUpdate(tenantId, sessionId, expectedCartVersion, newSnapshot);
-  }
-
-  /** Lock cart khi bill được request — không cho phép thêm items nữa */
-  async lockCart(tenantId: string, sessionId: string): Promise<void> {
-    const current = await this.getCart(tenantId, sessionId);
-    const newSnapshot: CartSnapshot = {
-      ...current,
-      status: 'LOCKED',
-      updatedAt: new Date().toISOString(),
-    };
-    // Lock không cần version check — đây là admin action
-    await this.redis.set(
-      this.snapshotKey(tenantId, sessionId),
-      JSON.stringify(newSnapshot),
-      'EX',
-      this.CART_TTL_SECONDS,
-    );
-  }
-
-  /** Xoá hoàn toàn cart key (khi session kết thúc) */
-  async deleteCart(tenantId: string, sessionId: string): Promise<void> {
-    const pipeline = this.redis.pipeline();
-    pipeline.del(this.snapshotKey(tenantId, sessionId));
-    pipeline.del(this.metaKey(tenantId, sessionId));
-    await pipeline.exec();
-  }
-
-  /** Atomic update với version check */
-  private async atomicUpdate(
-    tenantId: string,
-    sessionId: string,
-    expectedCartVersion: number,
-    newSnapshot: CartSnapshot,
-  ): Promise<CartSnapshot> {
-    const result = (await this.redis.eval(
-      this.MUTATE_SCRIPT,
-      2,
-      this.snapshotKey(tenantId, sessionId),
-      this.metaKey(tenantId, sessionId),
-      String(expectedCartVersion),
-      JSON.stringify(newSnapshot),
-      String(newSnapshot.cartVersion),
-      String(this.CART_TTL_SECONDS),
-      newSnapshot.updatedAt,
-    )) as [number, number, string];
-
-    const [success, currentVersion, snapshotJson] = result;
-
-    if (success === 0) {
-      const latestCart = JSON.parse(snapshotJson) as CartSnapshot;
-      throw this.createConflictError(latestCart);
-    }
-
-    return JSON.parse(snapshotJson) as CartSnapshot;
-  }
-
-  private createConflictError(currentCart: CartSnapshot) {
-    // Throw business exception với snapshot hiện tại để client có thể sync
-    return Object.assign(new Error('CART_VERSION_CONFLICT'), {
-      code: 'CART_VERSION_CONFLICT',
-      currentCart,
-    });
-  }
-}
-```
-
----
-
-## 13. Session Caching Pattern
-
-### Vấn đề
-
-Mỗi request từ customer cần biết session nào đang active trên bàn nào của tenant nào. Nếu mỗi lần query PostgreSQL, hệ thống sẽ chậm và tốn DB connection.
-
-### Giải pháp: Cache-aside Pattern
-
-```
-Request đến → kiểm tra Redis cache
-  → Có: trả về từ cache (nhanh)
-  → Không có: query PostgreSQL → lưu vào Redis → trả về
-```
-
-```typescript
-@Injectable()
-export class SessionService {
-  private readonly CACHE_TTL = 30 * 60; // 30 phút
-
-  constructor(
-    private readonly redis: Redis,
-    private readonly sessionRepository: SessionRepository,
-  ) {}
-
-  private cacheKey(tenantId: string, sessionId: string): string {
-    return `session:cache:${tenantId}:${sessionId}`;
-  }
-
-  async getSession(tenantId: string, sessionId: string): Promise<SessionEntity | null> {
-    // 1. Thử lấy từ cache
-    const cached = await this.redis.get(this.cacheKey(tenantId, sessionId));
-    if (cached) {
-      return JSON.parse(cached) as SessionEntity;
-    }
-
-    // 2. Cache miss → query DB
-    const session = await this.sessionRepository.findOne({ tenantId, sessionId });
-    if (!session) return null;
-
-    // 3. Lưu vào cache
-    await this.redis.set(this.cacheKey(tenantId, sessionId), JSON.stringify(session), 'EX', this.CACHE_TTL);
-
-    return session;
-  }
-
-  /** Khi session thay đổi (e.g. transfer table), invalidate cache */
-  async invalidateCache(tenantId: string, sessionId: string): Promise<void> {
-    await this.redis.del(this.cacheKey(tenantId, sessionId));
-  }
-
-  /** Cập nhật cache sau khi update session */
-  async updateCache(session: SessionEntity): Promise<void> {
-    await this.redis.set(this.cacheKey(session.tenantId, session.id), JSON.stringify(session), 'EX', this.CACHE_TTL);
-  }
-}
-```
-
-### Cache Stampede — Vấn đề khi cache expire đồng loạt
-
-Khi nhiều request đến cùng lúc và cache vừa expire:
-
-```
-Request 1: cache miss → bắt đầu query DB...
-Request 2: cache miss → bắt đầu query DB...  (chưa ai set lại cache)
-Request 3: cache miss → bắt đầu query DB...
-→ N query DB đồng thời (thundering herd)
-```
-
-**Giải pháp: Soft TTL + Lock**
-
-```typescript
-async getSessionWithSoftExpiry(tenantId: string, sessionId: string): Promise<SessionEntity | null> {
-  const key = this.cacheKey(tenantId, sessionId);
-  const lockKey = `lock:session:refresh:${tenantId}:${sessionId}`;
-
-  const cached = await this.redis.get(key);
-  if (cached) return JSON.parse(cached) as SessionEntity;
-
-  // Cache miss: try to acquire refresh lock
-  const lockAcquired = await this.redis.set(lockKey, '1', 'NX', 'PX', 5000);
-
-  if (!lockAcquired) {
-    // Ai đó đang refresh, chờ một chút rồi thử lại
-    await new Promise(r => setTimeout(r, 100));
-    const retry = await this.redis.get(key);
-    if (retry) return JSON.parse(retry) as SessionEntity;
-  }
-
-  try {
-    const session = await this.sessionRepository.findOne({ tenantId, sessionId });
-    if (session) {
-      await this.redis.set(key, JSON.stringify(session), 'EX', this.CACHE_TTL);
-    }
-    return session;
-  } finally {
-    await this.redis.del(lockKey);
-  }
-}
-```
-
----
-
-## 14. Pub/Sub
-
-### Khái niệm
-
-Redis Pub/Sub cho phép **broadcast message** từ publisher đến tất cả subscriber đang lắng nghe trên cùng một channel.
-
-**Đặc điểm quan trọng:**
-
-- Messages **không được lưu trữ** — nếu subscriber offline khi message được gửi, nó sẽ mất message đó.
-- Không có delivery guarantee → phù hợp cho real-time notification, không phù hợp cho critical events (dùng Kafka thay thế).
-
-```bash
-# Terminal 1 — Subscriber
-SUBSCRIBE channel1 channel2
-# Lắng nghe messages
-
-# Terminal 2 — Publisher
-PUBLISH channel1 "hello world"
-# Terminal 1 nhận: 1) "message" 2) "channel1" 3) "hello world"
-```
-
-### ioredis — Pub/Sub
-
-```typescript
-import Redis from 'ioredis';
-
-// QUAN TRỌNG: Phải dùng connection riêng cho subscriber
-// Khi một connection đang SUBSCRIBE, nó không thể dùng cho lệnh thường
-const publisher = new Redis({ host: 'localhost', port: 6379 });
-const subscriber = new Redis({ host: 'localhost', port: 6379 });
-
-// Subscribe
-await subscriber.subscribe('cart.updated', 'order.confirmed');
-
-subscriber.on('message', (channel, message) => {
-  console.log(`[${channel}]:`, JSON.parse(message));
-});
-
-// Pattern subscribe (wildcard)
-await subscriber.psubscribe('cart.*');
-subscriber.on('pmessage', (pattern, channel, message) => {
-  console.log(`Pattern: ${pattern}, Channel: ${channel}`);
-});
-
-// Publish
-await publisher.publish(
-  'cart.updated',
-  JSON.stringify({
-    tenantId: 'tenant1',
-    sessionId: 'sess1',
-    cartVersion: 5,
-  }),
-);
-
-// Unsubscribe
-await subscriber.unsubscribe('cart.updated');
-await subscriber.punsubscribe('cart.*');
-```
-
-### Trong dự án này
-
-Pub/Sub của Redis chủ yếu dùng cho **Socket.IO Redis Adapter** (deferred trong Step 2.4 nhưng cần hiểu):
-
-```
-[Order Service] → redis.publish('socket.io#tenant1#...', event)
-[BFF Instance 1] ← nhận event → emit đến connected client
-[BFF Instance 2] ← nhận event → emit đến connected client
-```
-
-Khi chưa có Redis Adapter (Step 2.4), BFF emit trực tiếp từ TCP response — không dùng Pub/Sub.
-
----
-
-## 15. NestJS Integration
-
-### RedisModule — Global Provider
-
-```typescript
-// libs/providers/redis/src/lib/redis.service.ts
-import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
-import Redis, { RedisOptions } from 'ioredis';
-
-@Injectable()
-export class RedisService implements OnModuleDestroy {
-  private readonly client: Redis;
-  private readonly logger = new Logger(RedisService.name);
-
-  constructor() {
-    const options: RedisOptions = {
-      host: process.env['REDIS_HOST'] || 'localhost',
-      port: Number(process.env['REDIS_PORT'] || 6379),
-      password: process.env['REDIS_PASSWORD'] || undefined,
-      maxRetriesPerRequest: 3,
-      enableReadyCheck: true,
-      retryStrategy(times) {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
-      },
-    };
-
-    this.client = new Redis(options);
-
-    this.client.on('connect', () => this.logger.log('Redis connecting...'));
-    this.client.on('ready', () => this.logger.log('Redis ready'));
-    this.client.on('error', (err) => this.logger.error('Redis error', err));
-    this.client.on('reconnecting', () => this.logger.warn('Redis reconnecting...'));
-  }
-
-  getClient(): Redis {
-    return this.client;
-  }
-
-  async onModuleDestroy(): Promise<void> {
-    this.logger.log('Closing Redis connection...');
-    await this.client.quit();
-  }
-}
-```
-
-```typescript
-// libs/providers/redis/src/lib/redis.module.ts
-import { Global, Module } from '@nestjs/common';
-import { RedisService } from './redis.service';
-
-@Global() // Global: inject vào bất kỳ module nào mà không cần import lại
-@Module({
-  providers: [RedisService],
-  exports: [RedisService],
-})
-export class RedisModule {}
-```
-
-### Inject RedisService vào service
-
-```typescript
-// apps/order/src/app/modules/order/services/cart.service.ts
-import { Injectable } from '@nestjs/common';
-import { RedisService } from '@common/providers/redis';
-import Redis from 'ioredis';
-
-@Injectable()
-export class CartService {
-  private readonly redis: Redis;
-
-  constructor(private readonly redisService: RedisService) {
-    this.redis = redisService.getClient();
-  }
-
-  // ...methods
-}
-```
-
-### Đăng ký RedisModule trong AppModule
-
-```typescript
-// apps/order/src/app/app.module.ts
-import { Module } from '@nestjs/common';
-import { RedisModule } from '@common/providers/redis';
-
-@Module({
-  imports: [
-    RedisModule, // @Global() nên chỉ cần import một lần ở root
-    OrderModule,
-  ],
-})
-export class AppModule {}
-```
-
-### Health check cho Redis
-
-```typescript
-// Trong health check module
-import { Injectable } from '@nestjs/common';
-import { RedisService } from '@common/providers/redis';
-
-@Injectable()
-export class RedisHealthIndicator {
-  constructor(private readonly redisService: RedisService) {}
-
-  async isHealthy(): Promise<boolean> {
-    try {
-      const result = await this.redisService.getClient().ping();
-      return result === 'PONG';
-    } catch {
-      return false;
-    }
-  }
-}
-```
-
----
-
-## 16. Redis CLI — Debug & Inspect
-
-### Kết nối vào Redis CLI
-
-```bash
-# Trong Docker
-docker exec -it <redis_container_name> redis-cli
-
-# Kết nối remote
-redis-cli -h localhost -p 6379
-
-# Với password
-redis-cli -h localhost -p 6379 -a yourpassword
-
-# Kết nối và chạy command một lần
-redis-cli GET mykey
-redis-cli -n 1 GET mykey   # Database 1
-```
-
-### Các lệnh debug hữu ích
-
-```bash
-# Xem tất cả key (KHÔNG dùng trong production)
 KEYS *
-KEYS cart:*
-KEYS cart:tenant1:*
-
-# Production-safe scan
-SCAN 0 MATCH cart:* COUNT 100
-
-# Xem loại của key
-TYPE cart:tenant1:sess1:snapshot   # string
-TYPE cart:tenant1:sess1:meta       # hash
-
-# Xem TTL
-TTL cart:tenant1:sess1:snapshot    # giây còn lại
-PTTL cart:tenant1:sess1:snapshot   # ms còn lại
-
-# Monitor tất cả commands real-time (NGUY HIỂM trong production vì overhead lớn)
-MONITOR
-
-# Xem thông tin server
-INFO
-INFO memory
-INFO keyspace    # Thống kê số key theo database
-INFO clients     # Số connection hiện tại
-
-# Flush toàn bộ database hiện tại (NGUY HIỂM)
 FLUSHDB
-
-# Flush tất cả database (RẤT NGUY HIỂM)
 FLUSHALL
-
-# Debug một key cụ thể
-DEBUG OBJECT mykey   # Encoding, serialized length, ...
-
-# Xem memory của một key
-MEMORY USAGE mykey   # Bytes
-
-# Xem encoding nội tại
-OBJECT ENCODING mykey
+MONITOR
 ```
 
-### Theo dõi một key trong terminal
-
-```bash
-# Lặp lại mỗi giây
-watch -n 1 'redis-cli GET cart:tenant1:sess1:snapshot | python3 -m json.tool'
-
-# Theo dõi TTL
-watch -n 1 'redis-cli TTL cart:tenant1:sess1:snapshot'
-```
-
-### Slow log — Tìm lệnh chậm
-
-```bash
-# Cấu hình: log lệnh > 1ms
-CONFIG SET slowlog-log-slower-than 1000   # microseconds
-
-# Xem 10 lệnh chậm nhất
-SLOWLOG GET 10
-
-# Reset slow log
-SLOWLOG RESET
-```
+`MONITOR` hữu ích khi debug local, nhưng có overhead lớn. `FLUSHDB`/`FLUSHALL` chỉ dùng trong dev reset có chủ đích.
 
 ---
 
-## 17. Lỗi thường gặp & Cách xử lý
+## 10. Đọc code ở đâu
 
-### ECONNREFUSED
-
-```
-Error: connect ECONNREFUSED 127.0.0.1:6379
-```
-
-**Nguyên nhân:** Redis chưa chạy hoặc sai host/port.
-
-**Cách xử lý:**
-
-```bash
-# Kiểm tra Redis có chạy không
-docker ps | grep redis
-redis-cli ping   # Phải trả về PONG
-
-# Kiểm tra env
-echo $REDIS_HOST
-echo $REDIS_PORT
-```
+| Nội dung                               | File / thư mục                                                                                                  |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Redis config chung                     | `libs/configuration/src/lib/redis.config.ts`                                                                    |
+| ioredis provider                       | `libs/providers/redis-client/src/lib/redis-client.service.ts`                                                   |
+| BFF cache/session/guard Redis          | `apps/bff/src/app/app.module.ts`, `libs/guards/src/lib/user.guard.ts`, `libs/guards/src/lib/session.guard.ts`   |
+| BFF menu cache                         | `apps/bff/src/app/modules/catalog/controllers/menu.controller.ts`                                               |
+| Socket.io Redis adapter                | `apps/bff/src/app/modules/realtime/adapters/redis-io.adapter.ts`                                                |
+| KDS Redis runtime                      | `apps/kitchen/src/app/modules/kitchen/**`                                                                       |
+| Order session/cart/locks/quota         | `apps/order/src/app/modules/order/**`                                                                           |
+| SaaS tenant suspend/subscription cache | `apps/saas/src/services/tenant-status-cache.service.ts`, `apps/saas/src/services/subscription-cache.service.ts` |
+| Payment OAuth state                    | `apps/payment/src/app/modules/payment/services/tenant-payment-settings.service.ts`                              |
+| Dev flush guard                        | `tools/dev-seed/flush-redis.js`                                                                                 |
 
 ---
 
-### WRONGTYPE Operation
+## 11. Checklist
 
-```
-ReplyError: WRONGTYPE Operation against a key holding the wrong kind of value
-```
+Khi thêm Redis key mới:
 
-**Nguyên nhân:** Dùng lệnh của một type lên key của type khác (vd: dùng `HGET` lên key đang là String).
+- [ ] Có service owner rõ ràng.
+- [ ] Key có `tenantId` nếu dữ liệu thuộc tenant.
+- [ ] Type được chọn đúng: String, Hash, Set, ZSet hoặc Pub/Sub.
+- [ ] TTL rõ ràng, hoặc giải thích vì sao không TTL.
+- [ ] Có fallback khi key miss.
+- [ ] Đã nghĩ tới eviction/stale cache nếu key là cache nóng.
+- [ ] Không lưu dữ liệu cần audit/durable chỉ trong Redis.
+- [ ] Có test cho conflict/duplicate/expired key nếu luồng quan trọng.
+- [ ] Docs key inventory được cập nhật.
 
-```typescript
-// Sai: key là String nhưng dùng HGET
-await redis.set('user:1', 'Alice');
-await redis.hget('user:1', 'name'); // WRONGTYPE error!
+Khi dùng Redis cho cache:
 
-// Đúng: dùng đúng type
-await redis.get('user:1');
-```
+- [ ] Source of truth vẫn là DB/service owner.
+- [ ] Invalidation path rõ ràng.
+- [ ] Cache miss không làm hỏng nghiệp vụ.
+- [ ] Không emit realtime event chỉ vì cache bị xóa nếu client có thể refetch.
 
-**Debug:** Dùng `TYPE key` để xem loại thực sự.
+Khi dùng Redis cho lock:
 
----
+- [ ] Lock value unique.
+- [ ] Lock có TTL.
+- [ ] Release không xóa nhầm lock của request khác.
+- [ ] Operation bên trong lock đủ ngắn.
+- [ ] Đã có hành vi rõ khi không lấy được lock hoặc Redis unavailable.
 
-### Race Condition khi không dùng atomic operation
+Khi dùng Redis cho realtime:
 
-```typescript
-// SAI — không atomic
-const current = await redis.get('counter'); // "5"
-const next = parseInt(current!) + 1; // 6
-// ... người khác cũng đọc "5" và tính được 6...
-await redis.set('counter', next); // Cả hai đều set "6" thay vì "7"
-
-// ĐÚNG — atomic
-const next = await redis.incr('counter'); // Atomic, guaranteed correct
-```
-
----
-
-### Quên TTL → Memory leak
-
-```typescript
-// SAI — không có TTL
-await redis.set('lock:resource', lockValue); // Sẽ tồn tại mãi mãi!
-
-// ĐÚNG — luôn có TTL cho lock
-await redis.set('lock:resource', lockValue, 'NX', 'PX', 5000);
-```
-
----
-
-### Không release lock khi có exception
-
-```typescript
-// SAI — exception có thể khiến lock không được release
-const lockValue = await acquireLock(lockKey);
-await doSomething(); // Nếu throw exception...
-await releaseLock(lockKey, lockValue); // Không bao giờ chạy!
-
-// ĐÚNG — luôn dùng try/finally
-const lockValue = await acquireLock(lockKey);
-try {
-  await doSomething();
-} finally {
-  await releaseLock(lockKey, lockValue); // Luôn chạy dù có exception
-}
-```
-
----
-
-### Dùng JSON.parse mà không kiểm tra null
-
-```typescript
-// SAI — crash khi key không tồn tại
-const raw = await redis.get('cart:tenant1:sess1:snapshot');
-const cart = JSON.parse(raw); // TypeError: Cannot read null!
-
-// ĐÚNG
-const raw = await redis.get('cart:tenant1:sess1:snapshot');
-const cart = raw ? JSON.parse(raw) : null;
-// hoặc
-if (!raw) return defaultValue;
-const cart = JSON.parse(raw);
-```
-
----
-
-### Blocking operation trong connection đang SUBSCRIBE
-
-```typescript
-// SAI — dùng chung connection cho sub và command thường
-const redis = new Redis();
-await redis.subscribe('channel');
-
-// Không thể dùng GET/SET/... trên connection đang subscribe!
-await redis.get('key'); // Error hoặc timeout!
-
-// ĐÚNG — tách connection
-const subscriber = new Redis();
-const redis = new Redis(); // Connection riêng cho commands thường
-
-await subscriber.subscribe('channel');
-subscriber.on('message', handler);
-
-await redis.get('key'); // OK, connection riêng
-```
-
----
-
-### Dùng KEYS trong production
-
-```bash
-# SAI — KEYS block Redis, nguy hiểm khi có hàng triệu key
-KEYS cart:*
-
-# ĐÚNG — SCAN không block
-SCAN 0 MATCH cart:* COUNT 100
-```
-
-```typescript
-// ĐÚNG trong code
-async function findCartKeys(redis: Redis, tenantId: string): Promise<string[]> {
-  const keys: string[] = [];
-  let cursor = '0';
-  do {
-    const [next, batch] = await redis.scan(cursor, 'MATCH', `cart:${tenantId}:*`, 'COUNT', 100);
-    cursor = next;
-    keys.push(...batch);
-  } while (cursor !== '0');
-  return keys;
-}
-```
-
----
-
-## Tổng kết: Checklist khi làm việc với Redis
-
-**Khi thiết kế key:**
-
-- [ ] Có namespace đủ rõ ràng không? (`cart:{tenantId}:{sessionId}`)
-- [ ] Có TTL chưa? (Tất cả temporary data phải có TTL)
-- [ ] Key có quá dài không? (> 200 bytes là dấu hiệu vấn đề)
-
-**Khi ghi/đọc data:**
-
-- [ ] Luôn handle `null` khi `redis.get()` (key có thể không tồn tại)
-- [ ] Luôn `JSON.parse` sau khi `GET`, `JSON.stringify` trước khi `SET`
-- [ ] Dùng Pipeline khi cần thực hiện nhiều lệnh độc lập cùng lúc
-
-**Khi cần atomic operation:**
-
-- [ ] Single command (SET, INCR, ...): tự atomic — không cần thêm gì
-- [ ] Read-check-write có nguy cơ cạnh tranh cao: ưu tiên Lua script/WATCH/lock; nếu dùng app-level check như current `CartService` thì phải có conflict response và tests rõ ràng
-- [ ] Nhóm lệnh cần atomic + không có logic phức tạp: dùng MULTI/EXEC
-- [ ] Cần lock: dùng `SET NX PX` + Lua release
-
-**Khi dùng Distributed Lock:**
-
-- [ ] lockValue phải unique (UUID)
-- [ ] Luôn có TTL hợp lý (đủ cho operation nhưng không quá dài)
-- [ ] Luôn dùng `try/finally` để release lock
-- [ ] Release bằng Lua script (check owner trước khi DEL)
-
-**Khi debug:**
-
-- [ ] Dùng `TYPE key` để xác nhận type
-- [ ] Dùng `TTL key` để xem còn bao lâu
-- [ ] Dùng `SCAN` thay vì `KEYS` trong production
-- [ ] Dùng `MONITOR` để xem lệnh real-time (chỉ trong dev)
+- [ ] Pub/Sub chỉ là hint, không là nguồn sự thật.
+- [ ] Client có đường refetch snapshot.
+- [ ] Message mất không làm sai trạng thái bền vững.

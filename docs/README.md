@@ -29,6 +29,7 @@ If current code and an accepted spec disagree, verify the behavior in code first
 | `guides/`        | Setup and operation guides that are still useful for development, deployment, or maintenance.                                                                      |
 | `references/`    | Long-form references that are too detailed for core docs but still current and linked from canonical docs when relevant.                                           |
 | `specs/`         | Accepted specs that still add detail not yet absorbed into phase or core docs.                                                                                     |
+| `testing/`       | Testing execution plans, traceability matrices, and handoff notes derived from canonical phase/testing strategy.                                                   |
 | `presentations/` | Thesis and presentation assets; not an engineering source of truth.                                                                                                |
 
 ## Execution Artifacts Policy

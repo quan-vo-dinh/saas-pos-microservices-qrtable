@@ -162,8 +162,11 @@ Phase 5 canonical hóa test cho **hành vi đã triển khai hoặc đã chốt 
 | Auth credentials | Seed credentials dùng trong Playwright và integration phải nằm trong dev seed hoặc env documented, không hardcode secret thật                         |
 | Determinism      | Tests dùng timestamp/server time có thể kiểm soát hoặc assert theo khoảng; không phụ thuộc giờ chạy trừ các rule cố ý như timezone `Asia/Ho_Chi_Minh` |
 | Concurrency      | Stock/idempotency/payment duplicate tests phải assert final state trong DB/service response, không chỉ assert mock call count                         |
+| External SePay   | Automated Phase 5 mặc định dùng unit mock hoặc mock SePay provider local; không yêu cầu Vercel redirect, public tunnel, hoặc SePay live               |
 
 **Security gap bắt buộc ghi nhận:** Phase 4B tenant/platform `x-secret-key` webhook route split là contract hiện tại; value verification với stored tenant/platform secret là hardening trước production. Nếu chưa có implementation, Phase 5 phải ghi `security-gap` thay vì coi test route-presence là đủ.
+
+**SePay local/mock policy:** Các test OAuth/payment settings/webhook phải tuân theo `docs/testing/phase-5/specs/phase-5-sepay-local-mock-testing-policy.md` và bản VI tương ứng trong `docs/testing/vi/phase-5/specs/`. Local dev có thể dùng `localhost` cho Keycloak/BFF/frontend; automated test không phụ thuộc redirect URI Vercel đã đăng ký hoặc tunnel. Live SePay chỉ là smoke check manual/opt-in trước demo public.
 
 **Verify:** Integration suite có seed/reset rõ ràng, không phụ thuộc dữ liệu cá nhân trên máy dev. Nếu dùng local compose thay vì Testcontainers, tài liệu hóa lệnh chuẩn và skip policy.
 
@@ -178,6 +181,8 @@ Phase 5 canonical hóa test cho **hành vi đã triển khai hoặc đã chốt 
 - **Flow C — SaaS onboarding:** SUPER_ADMIN onboard tenant -> Owner login -> Owner xem subscription/payment settings -> tạo hoặc xem được resource tenant-scoped tối thiểu.
 - **Flow D — Suspended tenant:** Tenant suspended -> Customer PWA vẫn đọc được menu/trạng thái cần thiết, không tạo order/cart mutation mới, nhưng pending bill payment route vẫn hoạt động.
 - **Flow E — Admin/dashboard smoke:** Public landing, `/admin/tenants`, `/admin/plans`, `/admin/billing`, `/dashboard/subscription`, `/dashboard/payment-settings`, OAuth invalid-state page không blank/401/500 với seed đúng role.
+
+**SePay/OAuth trong E2E:** Flow payment settings không automate login SePay thật. Test mặc định seed OAuth state hợp lệ, dùng fake code, exchange qua mock SePay provider, hiển thị bank mock, chọn bank mock, và verify settings đã lưu. Invalid-state có thể điều hướng trực tiếp tới callback page với state sai để assert UI lỗi. Live provider login/webhook thật tách sang checklist manual.
 
 **Hiện trạng E2E cần phản ánh trong matrix:**
 
@@ -224,7 +229,7 @@ Phase 5 canonical hóa test cho **hành vi đã triển khai hoặc đã chốt 
 - **Không yêu cầu pass test cho Phase 4A full saga-hardening** như durable compensation toàn diện, full CDC/Debezium hoặc audit framework mới nếu chưa triển khai. Phase 5 chỉ test baseline outbox/idempotency/compensation cục bộ đã có.
 - **Không yêu cầu notification/staff management của Phase 4C** như email receipt, welcome/suspend email, staff invite UI, reset-password email hoặc notification logs nếu service chưa tồn tại.
 - **Không yêu cầu offline queue đầy đủ** như IndexedDB action queue, auto-sync POS/KDS/customer khi mất mạng dài hạn, hoặc conflict resolver đầy đủ nếu code hiện tại chưa triển khai. Phase 5 chỉ test reconnect/refetch/snapshot behavior đã có.
-- **Không thay thế live provider certification.** SePay/OAuth/webhook provider thật cần manual/live validation riêng khi có public BFF URL và credential hợp lệ; automated Phase 5 chỉ khóa contract nội bộ và route behavior.
+- **Không thay thế live provider certification.** SePay/OAuth/webhook provider thật cần manual/live validation riêng khi có public BFF URL và credential hợp lệ; automated Phase 5 chỉ khóa contract nội bộ và route behavior bằng mock/provider local. Không dùng domain Vercel tạm hoặc tunnel local làm điều kiện pass mặc định.
 - **Không thêm business behavior mới chỉ để test.** Nếu test phát hiện docs yêu cầu một hành vi chưa có, ghi thành `implementation gap` hoặc `deferred scope`, không âm thầm đổi product contract.
 
 ### Acceptance Criteria — Phase 5
@@ -233,6 +238,7 @@ Phase 5 canonical hóa test cho **hành vi đã triển khai hoặc đã chốt 
 - [ ] **Unit/contract:** Order + Payment đạt tối thiểu **60%** coverage theo công cụ trong monorepo và mọi invariant P0 về state/money/idempotency/webhook có test cụ thể.
 - [ ] **Catalog/QR:** Có test cho QR token/invalid token, public menu tenant isolation, CRUD tenant filter, table/menu delete constraints và upload validation/path nếu behavior đã có.
 - [ ] **SaaS Phase 4B:** Có test cho onboarding, tenant lifecycle, subscription/plan, payment settings/OAuth state, `QRSUB` invoice matching, feature gating và suspended/closed customer behavior.
+- [ ] **SePay testing policy:** Default automated tests dùng mock SePay hoặc unit mock; mọi live SePay check có `RUN_LIVE_SEPAY=1`, public URL hợp lệ, skip reason rõ, và không nằm trong PR gate mặc định.
 - [ ] **Integration:** Có ít nhất các kịch bản tenant isolation, concurrent stock locking, payment finalization, Redis suspend/subscription cache, live/auth permission representative smoke và webhook route split `QRTBL`/`QRSUB`.
 - [ ] **Security gap visibility:** Phase 4B `x-secret-key` route value verification được test nếu đã implement; nếu chưa, được ghi là `security-gap` blocker trước go-live/demo public.
 - [ ] **E2E Playwright:** Các flow QR ordering realtime, payment close session, tenant onboarding và suspended tenant pass ổn định trên seed/dev stack chuẩn hóa, hoặc được đánh dấu `missing` với fixture/credential cần bổ sung.

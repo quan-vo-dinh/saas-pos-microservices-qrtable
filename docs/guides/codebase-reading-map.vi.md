@@ -37,31 +37,68 @@ Câu hỏi nên lặp lại khi đọc mỗi file:
 ## Bản Đồ Kiến Trúc Tổng Thể
 
 ```mermaid
-flowchart LR
-  Customer["Customer PWA"] --> BFF["BFF HTTP + WebSocket"]
-  Staff["Management App"] --> BFF
+flowchart TB
+%% ================= CLIENT LAYER =================
+subgraph CLIENTS
+  Customer["Customer PWA"]
+  Staff["Management App"]
+end
 
-  BFF --> Authorizer["Authorizer"]
-  BFF --> SaaS["SaaS Management"]
-  BFF --> Catalog["Catalog"]
-  BFF --> Order["Order"]
-  BFF --> Kitchen["Kitchen"]
-  BFF --> Payment["Payment"]
-  BFF --> UserAccess["User Access"]
+%% ================= EDGE LAYER =================
+subgraph EDGE
+  BFF["BFF (HTTP + WebSocket)"]
+end
 
-  Order --> Catalog
-  Payment --> Order
-  SaaS --> Authorizer
-  SaaS --> UserAccess
-  SaaS --> Payment
+%% ================= CORE SERVICES =================
+subgraph CORE_MICROSERVICES
+  Authorizer["Authorizer"]
+  SaaS["SaaS Management"]
+  Catalog["Catalog Service"]
+  Order["Order Service"]
+  Kitchen["Kitchen Service"]
+  Payment["Payment Service"]
+  UserAccess["User Access Service"]
+end
 
-  Order -- "Kafka: order.confirmed" --> Kitchen
-  Payment -- "Kafka: payment.completed" --> Order
-  SaaS -- "Kafka: tenant.created" --> Catalog
-  Kitchen -- "Kafka: kitchen.sla_warning" --> BFF
+%% ================= EVENT BUS =================
+subgraph EVENT_STREAM
+  Kafka["Kafka Event Bus"]
+end
 
-  BFF -- "Socket.IO /orders" --> Customer
-  BFF -- "Socket.IO /orders" --> Staff
+%% -------- Client -> BFF --------
+Customer --> BFF
+Staff --> BFF
+
+%% -------- BFF -> Services (sync) --------
+BFF --> Authorizer
+BFF --> SaaS
+BFF --> Catalog
+BFF --> Order
+BFF --> Kitchen
+BFF --> Payment
+BFF --> UserAccess
+
+%% -------- Internal Sync Calls --------
+Order --> Catalog
+Payment --> Order
+SaaS --> Authorizer
+SaaS --> UserAccess
+SaaS --> Payment
+
+%% -------- Async Events (Kafka) --------
+Order -- "order.confirmed" --> Kafka
+Payment -- "payment.completed" --> Kafka
+SaaS -- "tenant.created" --> Kafka
+
+Kafka --> Kitchen
+Kafka --> Order
+Kafka --> Catalog
+Kitchen -- "kitchen.sla_warning" --> Kafka
+Kafka --> BFF
+
+%% -------- Realtime Push --------
+BFF -- "Socket.IO /orders" --> Customer
+BFF -- "Socket.IO /orders" --> Staff
 ```
 
 ## Vai Trò Từng App
