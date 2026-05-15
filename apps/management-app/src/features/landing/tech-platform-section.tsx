@@ -104,26 +104,10 @@ export function TechPlatformSection(): ReactElement {
             Công nghệ hiện đại — sẵn sàng mở rộng cùng quán
           </h2>
           <p className="mt-3 font-sans text-sm leading-relaxed text-zinc-500 sm:text-base">
-            QRTable được mô tả trong{' '}
-            <strong className="font-medium text-zinc-300">§4 Ngăn xếp công nghệ</strong> như một nền tảng
-            microservice trên <strong className="font-medium text-zinc-300">Nx</strong>, backend{' '}
-            <strong className="font-medium text-zinc-300">NestJS</strong>,{' '}
-            <strong className="font-medium text-zinc-300">PostgreSQL</strong> &amp;{' '}
-            <strong className="font-medium text-zinc-300">MongoDB</strong>, cache{' '}
-            <strong className="font-medium text-zinc-300">Redis</strong>, sự kiện{' '}
-            <strong className="font-medium text-zinc-300">Kafka</strong>, IAM{' '}
-            <strong className="font-medium text-zinc-300">Keycloak</strong>, real-time{' '}
-            <strong className="font-medium text-zinc-300">Socket.io</strong>, media{' '}
-            <strong className="font-medium text-zinc-300">Cloudinary</strong>, thanh toán{' '}
-            <strong className="font-medium text-zinc-300">SePay / VietQR</strong>, quan sát{' '}
-            <strong className="font-medium text-zinc-300">Grafana · Loki · Prometheus · Tempo · OpenTelemetry</strong>,
-            frontend <strong className="font-medium text-zinc-300">React · Vite · Next.js</strong> cùng chuỗi công cụ
-            UI/quality trong tài liệu — bảng đầy đủ và logo thương hiệu nằm ngay bên dưới.
+            Được phát triển dựa trên kiến trúc{' '}
+            <strong className="font-medium text-zinc-300">Microservices</strong>
           </p>
-          <p className="mt-2 font-mono text-[10px] text-zinc-600 sm:text-[11px]">
-            Mọi lớp công nghệ đều hội tụ về <span className="text-zinc-500">NỀN TẢNG</span> (QRTable) — minh họa,
-            không phản ánh thời gian thực tế từng API.
-          </p>
+
         </div>
 
         <div
