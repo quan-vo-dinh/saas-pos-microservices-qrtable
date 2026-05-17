@@ -614,11 +614,11 @@
 
 **Sources:** `permission-matrix` (4, 6, 9.3).
 
-**Tests:** User-Access role seeder spec; BFF permission guard spec; repository script `tools/verify-permission-matrix.sh`.
+**Tests:** User-Access role seeder spec; BFF permission guard spec; repository script `tools/verify-permission-matrix.sh` using `tools/auth-bootstrap-users.json` as the deterministic credential source and asserting exact role permission counts.
 
 **Target layer:** integration. **Stack:** Keycloak, BFF, Authorizer, seeded MongoDB credentials.
 
-**Notes:** Static seed and guard coverage exists; live smoke is partial because documentation records SUPER_ADMIN and MANAGER credential or login failures on 2026-05-13.
+**Notes:** Static seed and guard coverage exists. The live smoke script now reads deterministic credentials from the bootstrap user catalog, checks `/authorizer/me` role identity, and asserts exact permission counts, but status remains `partial` until Keycloak/BFF/Authorizer/Mongo are started, re-seeded, and `bash tools/verify-permission-matrix.sh` passes.
 
 ---
 
@@ -742,7 +742,7 @@ Ordered by urgency; each line is **priority**, **rule id**, **status**, and **ne
 
 1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Run Step 5.3 external-stack integration for concurrent stock locking and final state (`stock=1`, two confirms, one success).
 2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Run the opt-in external-stack harness for Payment completion to Order `BILL_MARK_PAID` to table Cleaning with idempotent replay.
-3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Refresh deterministic SUPER_ADMIN and MANAGER seed credentials and rerun `tools/verify-permission-matrix.sh`.
+3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Start/reseed the auth stack and rerun `tools/verify-permission-matrix.sh`.
 4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Add suspended tenant or session seed fixture and a Playwright journey for read-only behavior plus payment exception.
 5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Add Phase 4B Playwright route smoke after seeded roles are reliable.
 6. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Add static test for the canonical topic registry and absence of UI-only topics.

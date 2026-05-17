@@ -6,6 +6,7 @@
 set -euo pipefail
 
 BFF_URL="${BFF_URL:-http://localhost:3300/api/v1}"
+AUTH_BOOTSTRAP_USERS_FILE="${AUTH_BOOTSTRAP_USERS_FILE:-tools/auth-bootstrap-users.json}"
 
 required_cmds=(curl jq)
 for cmd in "${required_cmds[@]}"; do
@@ -15,6 +16,11 @@ for cmd in "${required_cmds[@]}"; do
   fi
 done
 
+if [[ ! -f "${AUTH_BOOTSTRAP_USERS_FILE}" ]]; then
+  echo "❌ Auth bootstrap users file not found: ${AUTH_BOOTSTRAP_USERS_FILE}"
+  exit 1
+fi
+
 # Pre-flight: BFF reachable?
 if ! curl -sS -o /dev/null -w '%{http_code}' "${BFF_URL}/health" 2>/dev/null | grep -q "200\|404"; then
   echo "❌ BFF not reachable at ${BFF_URL}. Start with: pnpm dev:bff-auth"
@@ -22,22 +28,42 @@ if ! curl -sS -o /dev/null -w '%{http_code}' "${BFF_URL}/health" 2>/dev/null | g
 fi
 
 echo "🔍 Verifying permission matrix end-to-end via ${BFF_URL}"
+echo "🔐 Using bootstrap credentials from ${AUTH_BOOTSTRAP_USERS_FILE}"
 echo ""
 
-# Format per role: "username:password:expected_role:must_have_csv:must_not_have_csv"
+# Format per role: "expected_role:expected_count:must_have_csv:must_not_have_csv"
+# Usernames and passwords are resolved from tools/auth-bootstrap-users.json to avoid
+# drifting from the deterministic dev seed.
 declare -a TEST_CASES=(
-  "superadmin.1700000001@gmail.com:superadmin123:SUPER_ADMIN:saas.create,role.create,product.create,order.create:"
-  "owner.1700000002@gmail.com:owner:OWNER:catalog.create,user.delete,table.delete,order.cancel_pending,order.cancel_processing:saas.create,role.create,product.create"
-  "manager.1700000003@gmail.com:manager123:MANAGER:catalog.create,user.update,order.cancel_pending,order.cancel_processing,payment.refund:saas.create,user.delete,role.create,product.create"
-  "waiter.1700000004@gmail.com:waiter123:WAITER:order.confirm,order.cancel_pending,payment.confirm_cash,payment.get_history,table.transfer,service_request.acknowledge:order.create,order.cancel_processing,kitchen.get_queue,user.create,catalog.create"
-  "chef.1700000005@gmail.com:chef123:CHEF:catalog.get_list,kitchen.get_queue,kitchen.recall:order.confirm,payment.confirm_cash,catalog.create"
-  "barista.1700000006@gmail.com:barista123:BARISTA:catalog.get_list,kitchen.update_ticket,kitchen.recall:order.confirm,payment.confirm_cash,catalog.create"
+  "SUPER_ADMIN:66:saas.create,role.create,product.create,order.create:"
+  "OWNER:38:catalog.create,user.delete,table.delete,order.cancel_pending,order.cancel_processing:saas.create,role.create,product.create"
+  "MANAGER:35:catalog.create,user.update,order.cancel_pending,order.cancel_processing,payment.refund:saas.create,user.delete,role.create,product.create"
+  "WAITER:15:order.confirm,order.cancel_pending,payment.confirm_cash,payment.get_history,table.transfer,service_request.acknowledge:order.create,order.cancel_processing,kitchen.get_queue,user.create,catalog.create"
+  "CHEF:6:catalog.get_list,kitchen.get_queue,kitchen.recall:order.confirm,payment.confirm_cash,catalog.create"
+  "BARISTA:6:catalog.get_list,kitchen.update_ticket,kitchen.recall:order.confirm,payment.confirm_cash,catalog.create"
 )
+
+bootstrap_field() {
+  local role="$1"
+  local field="$2"
+
+  jq -r --arg role "${role}" --arg field "${field}" \
+    '.[] | select(.role == $role) | .[$field] // empty' \
+    "${AUTH_BOOTSTRAP_USERS_FILE}" | head -n 1
+}
 
 failures=0
 
 for case_spec in "${TEST_CASES[@]}"; do
-  IFS=':' read -r username password expected_role must_have_csv must_not_have_csv <<< "${case_spec}"
+  IFS=':' read -r expected_role expected_count must_have_csv must_not_have_csv <<< "${case_spec}"
+  username="$(bootstrap_field "${expected_role}" "username")"
+  password="$(bootstrap_field "${expected_role}" "password")"
+
+  if [[ -z "${username}" || -z "${password}" ]]; then
+    echo "❌ ${expected_role}: missing username/password in ${AUTH_BOOTSTRAP_USERS_FILE}"
+    failures=$((failures + 1))
+    continue
+  fi
 
   # Step 1: Login via BFF authorizer
   login_response="$(curl -sS -X POST "${BFF_URL}/authorizer/login" \
@@ -66,6 +92,17 @@ for case_spec in "${TEST_CASES[@]}"; do
 
   # Step 3: Assert must-have permissions
   case_failed=0
+  if ! echo "${me_response}" | jq -e --arg role "${expected_role}" '(.data.roles // []) | index($role) != null' >/dev/null; then
+    echo "❌ ${username} (${expected_role}): /me roles did not include '${expected_role}'"
+    case_failed=1
+  fi
+
+  perm_count="$(echo "${permissions_json}" | jq 'length')"
+  if [[ "${perm_count}" != "${expected_count}" ]]; then
+    echo "❌ ${username} (${expected_role}): expected ${expected_count} permissions, got ${perm_count}"
+    case_failed=1
+  fi
+
   if [[ -n "${must_have_csv}" ]]; then
     IFS=',' read -ra must_have <<< "${must_have_csv}"
     for perm in "${must_have[@]}"; do
@@ -88,7 +125,6 @@ for case_spec in "${TEST_CASES[@]}"; do
   fi
 
   if [[ "${case_failed}" -eq 0 ]]; then
-    perm_count="$(echo "${permissions_json}" | jq 'length')"
     echo "✅ ${username} (${expected_role}) — ${perm_count} permissions, matrix verified"
   else
     failures=$((failures + 1))

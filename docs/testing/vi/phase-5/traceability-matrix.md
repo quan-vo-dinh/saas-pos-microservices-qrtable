@@ -614,11 +614,11 @@
 
 **Nguồn:** `permission-matrix` (4, 6, 9.3).
 
-**Test:** Spec User-Access role seeder; spec BFF permission guard; script repo `tools/verify-permission-matrix.sh`.
+**Test:** Spec User-Access role seeder; spec BFF permission guard; script repo `tools/verify-permission-matrix.sh` dùng `tools/auth-bootstrap-users.json` làm nguồn credential deterministic và assert exact permission count theo role.
 
 **Tầng đích:** integration. **Stack:** Keycloak, BFF, Authorizer, credential MongoDB seed.
 
-**Ghi chú:** Static seed và guard coverage đã có; smoke live partial vì tài liệu ghi credential SUPER_ADMIN và MANAGER hoặc lỗi login 2026-05-13.
+**Ghi chú:** Static seed và guard coverage đã có. Script live smoke hiện đọc credential deterministic từ bootstrap user catalog, kiểm tra role identity từ `/authorizer/me`, và assert exact permission count, nhưng status vẫn là `partial` cho đến khi start Keycloak/BFF/Authorizer/Mongo, re-seed, và `bash tools/verify-permission-matrix.sh` pass.
 
 ---
 
@@ -742,7 +742,7 @@ Sắp xếp theo độ khẩn; mỗi dòng là **priority**, **rule id**, **stat
 
 1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Chạy integration external-stack Step 5.3 cho lock stock đồng thời và trạng thái cuối (`stock=1`, hai confirm, một thành công).
 2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Chạy harness external-stack opt-in cho hoàn tất Payment đến Order `BILL_MARK_PAID` đến bàn Cleaning với replay idempotent.
-3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Refresh credential seed SUPER_ADMIN và MANAGER deterministic và chạy lại `tools/verify-permission-matrix.sh`.
+3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Start/reseed auth stack và chạy lại `tools/verify-permission-matrix.sh`.
 4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Thêm fixture seed tenant suspended hoặc session và hành trình Playwright read-only cộng exception thanh toán.
 5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Thêm route smoke Playwright Phase 4B sau khi role seed tin cậy.
 6. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Thêm static test cho topic registry chuẩn và không có topic chỉ UI.

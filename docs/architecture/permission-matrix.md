@@ -249,7 +249,7 @@ node tools/seed.js apps/user-access/src/seeder prune
 
 `tools/verify-permission-matrix.sh` is an integration smoke test. It requires BFF/Authorizer and seeded MongoDB to be running, and it checks representative permissions rather than parsing this markdown file.
 
-> **2026-05-13 verification note:** Static code/seed verification confirms 66 enum permissions and role seed counts `SUPER_ADMIN=66`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. The integration smoke script still depends on live seeded credentials; in the current local environment, OWNER/WAITER/CHEF/BARISTA passed, while SUPER_ADMIN and MANAGER login returned 401 and require seed/credential refresh before the smoke is fully green.
+> **2026-05-13 verification note, updated in Phase 5:** Static code/seed verification confirms 66 enum permissions and role seed counts `SUPER_ADMIN=66`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. The integration smoke script depends on live seeded credentials and now resolves username/password from `tools/auth-bootstrap-users.json`, checks `/authorizer/me` role identity, and asserts exact permission counts to avoid drift from the dev seed. Run Keycloak bootstrap, sync Mongo users, then rerun `bash tools/verify-permission-matrix.sh` before marking live RBAC smoke fully green.
 
 ## 10. Frontend Navigation Vs API Enforcement
 
