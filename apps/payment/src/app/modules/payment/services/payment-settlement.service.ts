@@ -4,6 +4,8 @@ import type {
   CreateVietQrTcpResponse,
   PaymentTcpResponse,
 } from '@common/interfaces/tcp/payment';
+import type { BillPaymentSnapshotTcpResponse } from '@common/interfaces/tcp/order';
+import { assertValidVndRoundingSnapshot } from '@common/utils/vnd-rounding.util';
 import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { BillStatus, PaymentMethod } from '@einvoice/types';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
@@ -48,6 +50,7 @@ export class PaymentSettlementService {
     if (snapshot.status !== BillStatus.PENDING_PAYMENT) {
       throw new ConflictException('Bill is not pending payment');
     }
+    this.assertValidOrderBillSnapshot(snapshot);
 
     const existing = await this.paymentRepo.findByTenantAndBill(dto.tenantId, dto.billId);
     if (existing) {
@@ -83,6 +86,7 @@ export class PaymentSettlementService {
     if (snapshot.status !== BillStatus.PENDING_PAYMENT) {
       throw new ConflictException('Bill is not pending payment');
     }
+    this.assertValidOrderBillSnapshot(snapshot);
 
     let billPaidMarker:
       | {
@@ -216,6 +220,21 @@ export class PaymentSettlementService {
         return await manager.save(PaymentEntity, payment);
       }
       throw e;
+    }
+  }
+
+  private assertValidOrderBillSnapshot(snapshot: BillPaymentSnapshotTcpResponse): void {
+    try {
+      assertValidVndRoundingSnapshot({
+        rawTotal: snapshot.rawTotal,
+        roundedTotal: snapshot.roundedTotal,
+        roundingDelta: snapshot.roundingDelta,
+      });
+    } catch (error) {
+      if (error instanceof RangeError) {
+        throw new BadRequestException('Order bill snapshot has inconsistent VND rounding totals');
+      }
+      throw error;
     }
   }
 }

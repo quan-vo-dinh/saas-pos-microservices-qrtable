@@ -276,9 +276,9 @@ describe('BillService', () => {
         sessionId: 'sess-1',
         orderIds: [],
         status: BillStatus.PENDING_PAYMENT,
-        subtotal: 100,
-        total: 110,
-        roundingAmount: 10,
+        subtotal: 127_500,
+        total: 128_000,
+        roundingAmount: 500,
         paymentMethod: null,
         closedAt: null,
         paidAt: null,
@@ -291,9 +291,9 @@ describe('BillService', () => {
         tenantId: 't1',
         sessionId: 'sess-1',
         status: BillStatus.PENDING_PAYMENT,
-        rawTotal: 100,
-        roundedTotal: 110,
-        roundingDelta: 10,
+        rawTotal: 127_500,
+        roundedTotal: 128_000,
+        roundingDelta: 500,
       });
     });
   });

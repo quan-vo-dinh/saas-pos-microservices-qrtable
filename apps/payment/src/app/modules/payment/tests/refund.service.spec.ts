@@ -105,7 +105,7 @@ describe('RefundService', () => {
 
   it('requestRefund falls back to roundedTotal when paidAmount is null', async () => {
     const payment = makePayment({ paidAmount: null });
-    const { service } = buildService({ payment });
+    const { service, manager } = buildService({ payment });
 
     const result = await service.requestRefund({
       tenantId: 'tenant-1',
@@ -115,6 +115,8 @@ describe('RefundService', () => {
     });
 
     expect(result.amount).toBe(128_000);
+    const refundSaveArg = manager.save.mock.calls.find((c) => c[0] === RefundEntity)?.[1] as RefundEntity | undefined;
+    expect(refundSaveArg?.amount).toBe(payment.roundedTotal);
   });
 
   it('requestRefund rejects when a blocking refund already exists', async () => {

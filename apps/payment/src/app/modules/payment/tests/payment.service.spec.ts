@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import type { SepayWebhookPayload } from '@common/interfaces/tcp/payment';
 import { BillStatus, PaymentMethod } from '@einvoice/types';
 import { of, throwError } from 'rxjs';
@@ -229,6 +229,59 @@ describe('PaymentService policy checks', () => {
     expect(result.bankAccount).toBe('9332770502');
     expect(result.bankName).toBe('VCB');
     expect(result.qrUrl).toContain('acc=9332770502');
+    expect(result.qrUrl).toContain('amount=128000');
+    expect(paymentRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rawTotal: 127_500,
+        roundedTotal: 128_000,
+        roundingDelta: 500,
+      }),
+    );
+  });
+
+  it('rejects an inconsistent Order bill snapshot before creating a VietQR payment', async () => {
+    CONFIGURATION.SEPAY_CONFIG.QR_ACCOUNT = '0010000000355';
+    CONFIGURATION.SEPAY_CONFIG.QR_BANK = 'Vietcombank';
+    const paymentRepo = {
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn((input: Partial<PaymentEntity>) => makePayment(input)),
+      save: jest.fn().mockImplementation(async (payment: PaymentEntity) => payment),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn() };
+    const orderClient = {
+      send: jest.fn().mockReturnValue(
+        of({
+          data: {
+            billId: 'bill-1',
+            tenantId: 'tenant-1',
+            sessionId: 'session-1',
+            status: BillStatus.PENDING_PAYMENT,
+            rawTotal: 127_500,
+            roundedTotal: 127_500,
+            roundingDelta: 0,
+          },
+        }),
+      ),
+    };
+    const service = buildPaymentServiceForTest({
+      dataSource: {} as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo: {} as never,
+    });
+
+    await expect(
+      service.createVietQr({
+        tenantId: 'tenant-1',
+        billId: 'bill-1',
+        userId: 'user-1',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(paymentRepo.create).not.toHaveBeenCalled();
+    expect(paymentRepo.save).not.toHaveBeenCalled();
+    expect(auditRepo.createPaymentAudit).not.toHaveBeenCalled();
   });
 });
 
@@ -278,6 +331,18 @@ describe('PaymentService settlement behavior', () => {
 
     const actions = auditRepo.createPaymentAudit.mock.calls.map((c) => c[1]);
     expect(actions).toContain('SEPAY_WEBHOOK_UNDERPAID');
+    expect(auditRepo.createPaymentAudit).toHaveBeenCalledWith(
+      payment,
+      'SEPAY_WEBHOOK_UNDERPAID',
+      'SEPAY',
+      null,
+      null,
+      expect.objectContaining({
+        expectedAmount: payment.roundedTotal,
+        actualAmount: 100_000,
+      }),
+      expect.anything(),
+    );
     expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
     expect(orderClient.send).not.toHaveBeenCalled();
   });
@@ -472,5 +537,109 @@ describe('PaymentService settlement behavior', () => {
       expect.any(String),
     );
     expect(orderClient.send).toHaveBeenCalledWith(TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID, expect.anything());
+  });
+
+  it('confirmCash: rejects cash below roundedTotal even when amountReceived covers rawTotal', async () => {
+    const payment = makePayment({ status: 'PENDING', method: null, paidAmount: null });
+    const manager = { save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e) };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn(),
+      findByTenantBillForUpdate: jest.fn().mockResolvedValue(payment),
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = {
+      send: jest.fn().mockReturnValue(of({ data: snapshot })),
+    };
+
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
+
+    await expect(
+      service.confirmCash({
+        tenantId: 'tenant-1',
+        billId: payment.billId,
+        userId: 'user-1',
+        amountReceived: 127_500,
+        processId: 'p1',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
+  });
+
+  it('confirmCash: rejects an inconsistent Order bill snapshot before creating a cash payment', async () => {
+    const manager = {
+      save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e),
+    };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const inconsistentPayment = makePayment({
+      roundedTotal: 127_500,
+      roundingDelta: 0,
+      paidAmount: null,
+      amountReceived: null,
+      changeAmount: null,
+    });
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn(),
+      findByTenantBillForUpdate: jest.fn(),
+      findByTenantAndBill: jest.fn().mockResolvedValue({
+        ...inconsistentPayment,
+        status: 'PAID',
+        method: PaymentMethod.CASH,
+        paidAmount: 127_500,
+        amountReceived: 127_500,
+        changeAmount: 0,
+      }),
+      create: jest.fn(() => inconsistentPayment),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = {
+      send: jest.fn().mockReturnValue(
+        of({
+          data: {
+            ...snapshot,
+            roundedTotal: 127_500,
+            roundingDelta: 0,
+          },
+        }),
+      ),
+    };
+
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
+
+    await expect(
+      service.confirmCash({
+        tenantId: 'tenant-1',
+        billId: snapshot.billId,
+        userId: 'user-1',
+        amountReceived: 127_500,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(paymentRepo.create).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
   });
 });
