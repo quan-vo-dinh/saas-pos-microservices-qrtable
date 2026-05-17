@@ -184,7 +184,7 @@
 
 ---
 
-### `P0-ORD-STATE-STOCK` — `partial` (P0, money)
+### `P0-ORD-STATE-STOCK` — `covered` (P0, money)
 
 **Yêu cầu:** Staff confirm chuyển `PENDING` sang `PROCESSING`, trừ stock qua transaction Catalog TCP, emit `order.confirmed`, và rollback khi lỗi stock.
 
@@ -194,7 +194,7 @@
 
 **Tầng đích:** integration. **Stack:** PostgreSQL, Catalog TCP, Kafka hoặc outbox harness.
 
-**Ghi chú:** Coverage unit-contract Step 5.2 hiện chứng minh shape call trừ stock, chuyển `PROCESSING`, persist outbox, replay không trừ lại, contract lock sorted unique của Catalog, và simulation concurrent stock=1. Step 5.3A-1 bổ sung integration harness opt-in; chạy `RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand` sau khi PostgreSQL, Order TCP, và Catalog TCP sẵn sàng. Giữ `partial` cho đến khi lệnh external-stack đó được chạy và pass.
+**Ghi chú:** Coverage unit-contract Step 5.2 chứng minh shape call trừ stock, chuyển `PROCESSING`, persist outbox, replay không trừ lại, contract lock sorted unique của Catalog, và simulation concurrent stock=1. Coverage external-stack Step 5.3A-1 đã pass với PostgreSQL cùng Order và Catalog TCP live bằng `RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand`; Order hiện preserve payload lỗi business TCP live như `CATALOG_STOCK_INSUFFICIENT`.
 
 ---
 
@@ -394,7 +394,7 @@
 
 ---
 
-### `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` (P0, money)
+### `P0-PAY-COMPLETED-ORDER-BRIDGE` — `covered` (P0, money)
 
 **Yêu cầu:** Hoàn tất payment ghi payment và outbox và đồng bộ Order qua `BILL_MARK_PAID`; bridge realtime BFF chỉ hint UI refetch.
 
@@ -404,7 +404,7 @@
 
 **Tầng đích:** integration. **Stack:** DB Payment, DB Order, DB Catalog, TCP Order, TCP Catalog, Redis cho close session của Order.
 
-**Ghi chú:** Unit và bridge test đã có, và harness opt-in đã được thêm. Mặc định harness bị skip, chỉ chạy bằng `RUN_PHASE5_PAY_COMPLETED_ORDER_BRIDGE=1 pnpm nx test payment --testPathPatterns=payment-completed-order-bridge.integration.spec.ts --runInBand` sau khi start local external stack. Giữ status `partial` cho đến khi lần chạy opt-in chứng minh một trạng thái DB cuối thống nhất qua Payment, Order, và Catalog với replay idempotent.
+**Ghi chú:** Unit và bridge test đã có, và harness opt-in đã pass trên local external stack với Order và Catalog TCP live bằng `RUN_PHASE5_PAY_COMPLETED_ORDER_BRIDGE=1 pnpm nx test payment --testPathPatterns=payment-completed-order-bridge.integration.spec.ts --runInBand`. Harness chứng minh một trạng thái DB cuối thống nhất qua Payment, Order, và Catalog với replay idempotent.
 
 ---
 
@@ -498,7 +498,7 @@
 
 **Tầng đích:** browser-e2e. **Stack:** PWA, BFF, tenant suspended và session seed.
 
-**Ghi chú:** Unit/component coverage đã có, và dev seed hiện có fixture `pho-viet-suspended`. Playwright smoke đã có nhưng vẫn phụ thuộc stack; giữ status `partial` cho đến khi `pnpm dev:reseed -- --yes`, `pnpm dev:bff-order`, `nx serve customer-pwa`, và `pnpm e2e:phase5:suspended` pass trên cùng local stack. Exception thanh toán bill pending được cover ở component và BFF guard; browser pending-bill payment đầy đủ sẽ ghép sau khi Flow B seed ổn định.
+**Ghi chú:** Unit/component coverage đã có, dev seed hiện có fixture `pho-viet-suspended`, và browser smoke local đã pass bằng `pnpm e2e:phase5:suspended` trên BFF đã seed cùng `customer-pwa`. Giữ status `partial` vì exception thanh toán bill pending vẫn mới được cover ở component và BFF guard; browser pending-bill payment đầy đủ sẽ ghép sau khi Flow B/B+D seed ổn định.
 
 ---
 
@@ -580,17 +580,17 @@
 
 ---
 
-### `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` (P1, demo)
+### `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `covered` (P1, demo)
 
 **Yêu cầu:** Public landing, `/admin/tenants`, `/admin/plans`, `/admin/billing`, `/dashboard/subscription`, `/dashboard/payment-settings`, và OAuth invalid-state không được trắng, 401, hoặc 500 với role seed.
 
 **Nguồn:** UI surface `phase-4b-saas-onboarding`; `phase-5-7-finalization` Bước 5.4.
 
-**Test:** Spec contract Phase 4B BFF; spec SaaS controller; spec management-app dashboard query auth readiness.
+**Test:** Spec contract Phase 4B BFF; spec SaaS controller; spec management-app dashboard query auth readiness; route smoke Playwright `tests/e2e/phase-5-admin-dashboard-routes.spec.ts`.
 
 **Tầng đích:** browser-e2e. **Stack:** management-app, BFF, Keycloak, SUPER_ADMIN, OWNER, và MANAGER seed.
 
-**Ghi chú:** Không có spec Playwright Phase 4B dedicated; thêm route smoke sau khi credential seed deterministic. OAuth invalid-state và callback smoke dùng policy SePay local/mock, không dùng login provider thật.
+**Ghi chú:** Route smoke Playwright Phase 4B dedicated cover public landing, route admin SUPER_ADMIN, route dashboard OWNER, và OAuth invalid-state với skip readiness local rõ ràng. Stack local đã seed pass `pnpm e2e:phase5:admin-routes` với đủ bảy test pass sau khi frontend và Keycloak warm-up.
 
 ---
 
@@ -608,7 +608,7 @@
 
 ---
 
-### `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` (P0, rbac)
+### `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `covered` (P0, rbac)
 
 **Yêu cầu:** RBAC seed chuẩn có sáu role và sáu mươi sáu permission với count role `SUPER_ADMIN=66`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`; smoke login live nên verify permission đại diện.
 
@@ -618,7 +618,7 @@
 
 **Tầng đích:** integration. **Stack:** Keycloak, BFF, Authorizer, credential MongoDB seed.
 
-**Ghi chú:** Static seed và guard coverage đã có. Script live smoke hiện đọc credential deterministic từ bootstrap user catalog, kiểm tra role identity từ `/authorizer/me`, và assert exact permission count, nhưng status vẫn là `partial` cho đến khi start Keycloak/BFF/Authorizer/Mongo, re-seed, và `bash tools/verify-permission-matrix.sh` pass.
+**Ghi chú:** Static seed và guard coverage đã có. Script live smoke đọc credential deterministic từ bootstrap user catalog, kiểm tra role identity từ `/authorizer/me`, và assert exact permission count. Auth stack local đã seed pass `BFF_URL=http://localhost:3300/api/v1 AUTH_BOOTSTRAP_USERS_FILE=tools/auth-bootstrap-users.json bash tools/verify-permission-matrix.sh` với đủ sáu role được verify.
 
 ---
 
@@ -740,18 +740,18 @@
 
 Sắp xếp theo độ khẩn; mỗi dòng là **priority**, **rule id**, **status**, và **next action**.
 
-1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Chạy integration external-stack Step 5.3 cho lock stock đồng thời và trạng thái cuối (`stock=1`, hai confirm, một thành công).
-2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Chạy harness external-stack opt-in cho hoàn tất Payment đến Order `BILL_MARK_PAID` đến bàn Cleaning với replay idempotent.
-3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Start/reseed auth stack và chạy lại `tools/verify-permission-matrix.sh`.
-4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Chạy Playwright smoke tenant suspended trên dev stack; mở rộng browser pending-bill payment sau khi seed Flow B ổn định.
-5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Thêm route smoke Playwright Phase 4B sau khi role seed tin cậy.
+1. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Mở rộng browser smoke với đường thanh toán pending-bill đã seed sau khi dữ liệu Flow B/B+D ổn định.
+2. **P0** — `P0-ORD-CART-VERSION-LOCK` — `partial` — Thêm integration DB/Redis chứng minh conflict version khi mutate cart đồng thời và trạng thái cart cuối ổn định.
+3. **P0** — `P0-ORD-SUBMIT-IDEMPOTENCY` — `partial` — Thêm integration DB/Redis chứng minh submit trùng chỉ tạo một order `PENDING`, xóa cart một lần, và không persist `DRAFT`.
+4. **P0** — `P0-ORD-BILL-REQUEST` — `partial` — Thêm integration cho cart rỗng, mọi order đã served, lock cart, và chuyển bàn sang billing.
+5. **P0** — `P0-ORD-PAYMENT-FINALIZATION` — `partial` — Thêm integration cho finalization bill exactly-once, lock cart/session, và chuyển bàn sang Cleaning.
 
 ---
 
 ## Ứng viên lô P0 đầu tiên
 
-1. **Integration:** `P0-ORD-STATE-STOCK`, `P0-ORD-CART-VERSION-LOCK`, `P0-PAY-COMPLETED-ORDER-BRIDGE`, `P0-SAAS-ONBOARDING-SAGA`.
-2. **Browser E2E:** `P0-SAAS-SUSPENDED-CUSTOMER-PWA`, sau đó coverage close-session thanh toán từ `P1-PAY-BROWSER-CLOSE-SESSION` nếu nâng mức rủi ro demo.
+1. **Integration:** `P0-ORD-CART-VERSION-LOCK`, `P0-ORD-SUBMIT-IDEMPOTENCY`, `P0-ORD-BILL-REQUEST`, `P0-ORD-PAYMENT-FINALIZATION`, `P0-SAAS-ONBOARDING-SAGA`.
+2. **Browser E2E:** Mở rộng `P0-SAAS-SUSPENDED-CUSTOMER-PWA` với pending-bill payment, sau đó coverage close-session thanh toán từ `P1-PAY-BROWSER-CLOSE-SESSION` nếu nâng mức rủi ro demo.
 3. **Fast feedback tùy chọn:** BFF quota edge checks cho `P0-SAAS-FEATURE-GATING-QUOTAS` nếu UI cần upgrade prompt trước khi forward.
 
 ---

@@ -51,7 +51,7 @@ async function verifyPostgres() {
         throw new Error(`PostgreSQL ${table} count too low: ${count.rows[0].count}`);
       }
 
-      const bad = await client.query(`select count(*)::int as count from ${table} where tenant_id <> all($1::uuid[])`, [
+      const bad = await client.query(`select count(*)::int as count from ${table} where tenant_id <> all($1::text[])`, [
         allowedTenantIds,
       ]);
       if (bad.rows[0].count !== 0) {

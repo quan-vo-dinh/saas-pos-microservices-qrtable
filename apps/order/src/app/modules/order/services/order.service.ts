@@ -89,6 +89,8 @@ type ConfirmTxOutcome =
 
 const SAAS_ORDER_QUOTA_TIMEOUT_MS = 2500;
 
+type TcpBusinessErrorPayload = { code?: number; errorCode?: ErrorCode; message?: string };
+
 @Injectable()
 export class OrderService {
   constructor(
@@ -939,11 +941,9 @@ export class OrderService {
       if (e instanceof BusinessException) {
         throw e;
       }
-      if (e instanceof RpcException) {
-        const err = e.getError() as { code?: number; errorCode?: ErrorCode; message?: string };
-        if (err?.errorCode) {
-          throw new BusinessException(err.errorCode, (err.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
-        }
+      const tcpError = this.getTcpBusinessError(e);
+      if (tcpError?.errorCode) {
+        throw new BusinessException(tcpError.errorCode, (tcpError.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
       }
       throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
     }
@@ -966,14 +966,21 @@ export class OrderService {
       if (e instanceof BusinessException) {
         throw e;
       }
-      if (e instanceof RpcException) {
-        const err = e.getError() as { code?: number; errorCode?: ErrorCode; message?: string };
-        if (err?.errorCode) {
-          throw new BusinessException(err.errorCode, (err.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
-        }
+      const tcpError = this.getTcpBusinessError(e);
+      if (tcpError?.errorCode) {
+        throw new BusinessException(tcpError.errorCode, (tcpError.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
       }
       throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
     }
+  }
+
+  private getTcpBusinessError(error: unknown): TcpBusinessErrorPayload | null {
+    const payload = error instanceof RpcException ? error.getError() : error;
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    const candidate = payload as TcpBusinessErrorPayload & { error?: TcpBusinessErrorPayload };
+    return candidate.errorCode ? candidate : (candidate.error ?? null);
   }
 
   private async reserveDailyOrderQuota(tenantId: string): Promise<boolean> {

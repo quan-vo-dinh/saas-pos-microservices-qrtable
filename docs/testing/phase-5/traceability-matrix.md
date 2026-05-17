@@ -184,7 +184,7 @@
 
 ---
 
-### `P0-ORD-STATE-STOCK` — `partial` (P0, money)
+### `P0-ORD-STATE-STOCK` — `covered` (P0, money)
 
 **Requirement:** Staff confirm moves `PENDING` to `PROCESSING`, deducts stock through a Catalog TCP transaction, emits `order.confirmed`, and rolls back on stock errors.
 
@@ -194,7 +194,7 @@
 
 **Target layer:** integration. **Stack:** PostgreSQL, Catalog TCP, Kafka or outbox harness.
 
-**Notes:** Step 5.2 unit-contract coverage now proves stock deduct call shape, `PROCESSING` transition, outbox persistence, replay no-rededuct, Catalog sorted unique lock contract, and a stock=1 concurrent deduction simulation. Step 5.3A-1 adds an opt-in integration harness; run with `RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand` after PostgreSQL, Order TCP, and Catalog TCP are ready. Keep `partial` until that external-stack command is run and passes.
+**Notes:** Step 5.2 unit-contract coverage proves stock deduct call shape, `PROCESSING` transition, outbox persistence, replay no-rededuct, Catalog sorted unique lock contract, and a stock=1 concurrent deduction simulation. Step 5.3A-1 external-stack coverage passed with PostgreSQL plus live Order and Catalog TCP using `RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand`; Order now preserves live TCP business error payloads such as `CATALOG_STOCK_INSUFFICIENT`.
 
 ---
 
@@ -394,7 +394,7 @@
 
 ---
 
-### `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` (P0, money)
+### `P0-PAY-COMPLETED-ORDER-BRIDGE` — `covered` (P0, money)
 
 **Requirement:** Payment completion writes payment and outbox and synchronizes to Order via `BILL_MARK_PAID`; BFF realtime bridge only hints UI refetch.
 
@@ -404,7 +404,7 @@
 
 **Target layer:** integration. **Stack:** Payment database, Order database, Catalog database, Order TCP, Catalog TCP, Redis for Order session close.
 
-**Notes:** Unit and bridge tests exist, and the opt-in harness is present. It is skipped by default and runs only with `RUN_PHASE5_PAY_COMPLETED_ORDER_BRIDGE=1 pnpm nx test payment --testPathPatterns=payment-completed-order-bridge.integration.spec.ts --runInBand` after the local external stack is started. Keep status `partial` until that opt-in run proves one final database state across Payment, Order, and Catalog with idempotent replay.
+**Notes:** Unit and bridge tests exist, and the opt-in harness passed against the local external stack with live Order and Catalog TCP using `RUN_PHASE5_PAY_COMPLETED_ORDER_BRIDGE=1 pnpm nx test payment --testPathPatterns=payment-completed-order-bridge.integration.spec.ts --runInBand`. The harness proves one final database state across Payment, Order, and Catalog with idempotent replay.
 
 ---
 
@@ -498,7 +498,7 @@
 
 **Target layer:** browser-e2e. **Stack:** PWA, BFF, seeded suspended tenant and session.
 
-**Notes:** Unit/component coverage exists, and dev seed now includes the `pho-viet-suspended` fixture. The Playwright smoke is present but remains stack-dependent; keep status `partial` until `pnpm dev:reseed -- --yes`, `pnpm dev:bff-order`, `nx serve customer-pwa`, and `pnpm e2e:phase5:suspended` pass in the same local stack. Pending-bill payment exception is covered at component and BFF guard level; full browser pending-bill payment remains a later Flow B/B+D combination.
+**Notes:** Unit/component coverage exists, dev seed includes the `pho-viet-suspended` fixture, and the local browser smoke passed with `pnpm e2e:phase5:suspended` against seeded BFF plus `customer-pwa`. Keep status `partial` because pending-bill payment exception is still covered at component and BFF guard level only; full browser pending-bill payment remains a later Flow B/B+D combination.
 
 ---
 
@@ -580,17 +580,17 @@
 
 ---
 
-### `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` (P1, demo)
+### `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `covered` (P1, demo)
 
 **Requirement:** Public landing, `/admin/tenants`, `/admin/plans`, `/admin/billing`, `/dashboard/subscription`, `/dashboard/payment-settings`, and OAuth invalid-state must not blank, 401, or 500 with seeded roles.
 
 **Sources:** `phase-4b-saas-onboarding` UI surfaces; `phase-5-7-finalization` Step 5.4.
 
-**Tests:** BFF Phase 4B contract spec; SaaS controller specs; management-app dashboard query auth readiness spec.
+**Tests:** BFF Phase 4B contract spec; SaaS controller specs; management-app dashboard query auth readiness spec; Playwright route smoke `tests/e2e/phase-5-admin-dashboard-routes.spec.ts`.
 
 **Target layer:** browser-e2e. **Stack:** management-app, BFF, Keycloak, seeded SUPER_ADMIN, OWNER, and MANAGER.
 
-**Notes:** No dedicated Phase 4B Playwright spec; add route smoke once seed credentials are deterministic. OAuth invalid-state and callback smoke should use the local/mock SePay policy, not real provider login.
+**Notes:** Dedicated Phase 4B Playwright route smoke covers public landing, SUPER_ADMIN admin routes, OWNER dashboard routes, and OAuth invalid-state with explicit local readiness skips. The seeded local stack passed `pnpm e2e:phase5:admin-routes` with all seven tests passing after frontend and Keycloak warm-up.
 
 ---
 
@@ -608,7 +608,7 @@
 
 ---
 
-### `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` (P0, rbac)
+### `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `covered` (P0, rbac)
 
 **Requirement:** Canonical RBAC seed has six roles and sixty-six permissions with role counts `SUPER_ADMIN=66`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`; live login smoke should verify representative permissions.
 
@@ -618,7 +618,7 @@
 
 **Target layer:** integration. **Stack:** Keycloak, BFF, Authorizer, seeded MongoDB credentials.
 
-**Notes:** Static seed and guard coverage exists. The live smoke script now reads deterministic credentials from the bootstrap user catalog, checks `/authorizer/me` role identity, and asserts exact permission counts, but status remains `partial` until Keycloak/BFF/Authorizer/Mongo are started, re-seeded, and `bash tools/verify-permission-matrix.sh` passes.
+**Notes:** Static seed and guard coverage exists. The live smoke script reads deterministic credentials from the bootstrap user catalog, checks `/authorizer/me` role identity, and asserts exact permission counts. The seeded local auth stack passed `BFF_URL=http://localhost:3300/api/v1 AUTH_BOOTSTRAP_USERS_FILE=tools/auth-bootstrap-users.json bash tools/verify-permission-matrix.sh` with all six roles verified.
 
 ---
 
@@ -740,18 +740,18 @@
 
 Ordered by urgency; each line is **priority**, **rule id**, **status**, and **next action**.
 
-1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Run Step 5.3 external-stack integration for concurrent stock locking and final state (`stock=1`, two confirms, one success).
-2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Run the opt-in external-stack harness for Payment completion to Order `BILL_MARK_PAID` to table Cleaning with idempotent replay.
-3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Start/reseed the auth stack and rerun `tools/verify-permission-matrix.sh`.
-4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Run the suspended tenant Playwright smoke on the dev stack; extend with browser pending-bill payment after Flow B seed is stable.
-5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Add Phase 4B Playwright route smoke after seeded roles are reliable.
+1. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Extend the browser smoke with a seeded pending-bill payment exception path after Flow B/B+D data is stable.
+2. **P0** — `P0-ORD-CART-VERSION-LOCK` — `partial` — Add DB/Redis integration proving concurrent cart mutation version conflicts and stable final cart state.
+3. **P0** — `P0-ORD-SUBMIT-IDEMPOTENCY` — `partial` — Add DB/Redis integration proving duplicate submit produces one `PENDING` order, one cart clear, and no persisted `DRAFT`.
+4. **P0** — `P0-ORD-BILL-REQUEST` — `partial` — Add integration for empty cart, all orders served, cart lock, and table billing transition.
+5. **P0** — `P0-ORD-PAYMENT-FINALIZATION` — `partial` — Add integration for exactly-once bill finalization, cart/session lock, and table Cleaning transition.
 
 ---
 
 ## First P0 batch candidates
 
-1. **Integration:** `P0-ORD-STATE-STOCK`, `P0-ORD-CART-VERSION-LOCK`, `P0-PAY-COMPLETED-ORDER-BRIDGE`, `P0-SAAS-ONBOARDING-SAGA`.
-2. **Browser E2E:** `P0-SAAS-SUSPENDED-CUSTOMER-PWA`, then payment close-session coverage from `P1-PAY-BROWSER-CLOSE-SESSION` if promoted for demo risk.
+1. **Integration:** `P0-ORD-CART-VERSION-LOCK`, `P0-ORD-SUBMIT-IDEMPOTENCY`, `P0-ORD-BILL-REQUEST`, `P0-ORD-PAYMENT-FINALIZATION`, `P0-SAAS-ONBOARDING-SAGA`.
+2. **Browser E2E:** Extend `P0-SAAS-SUSPENDED-CUSTOMER-PWA` with pending-bill payment, then payment close-session coverage from `P1-PAY-BROWSER-CLOSE-SESSION` if promoted for demo risk.
 3. **Optional fast feedback:** BFF quota edge checks for `P0-SAAS-FEATURE-GATING-QUOTAS` if the UI needs pre-forward upgrade prompts.
 
 ---

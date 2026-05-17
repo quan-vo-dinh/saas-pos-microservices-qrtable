@@ -9,7 +9,6 @@ import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { Session } from '@common/entities/session.entity';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Test, TestingModule } from '@nestjs/testing';
-import { RpcException } from '@nestjs/microservices';
 import { BillStatus, OrderItemStatus, OrderStatus, SessionStatus } from '@einvoice/types';
 import { of, throwError } from 'rxjs';
 import { DataSource } from 'typeorm';
@@ -360,7 +359,7 @@ describe('OrderService', () => {
     expect(manager.save).not.toHaveBeenCalled();
   });
 
-  it('confirmOrder propagates Catalog stock errors and does not persist confirmation', async () => {
+  it('confirmOrder propagates Catalog stock errors from live TCP payloads and does not persist confirmation', async () => {
     const managerSave = jest.fn();
     const managerFindOne = jest.fn().mockResolvedValue({
       id: 's1',
@@ -421,14 +420,11 @@ describe('OrderService', () => {
     });
 
     catalogClient.send.mockReturnValue(
-      throwError(
-        () =>
-          new RpcException({
-            code: 409,
-            message: 'Insufficient stock',
-            errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT,
-          }),
-      ),
+      throwError(() => ({
+        code: 409,
+        message: 'Insufficient stock',
+        errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT,
+      })),
     );
 
     const manager = {
