@@ -39,7 +39,8 @@ Build a small, deterministic Playwright suite that proves the demo-critical user
 - [ ] Create or update shared helpers for Keycloak login, QR landing URL generation, seed constants, and route readiness.
 - [ ] Add `e2e:phase3`, `e2e:phase4b`, and `e2e:demo` package scripts if the suite expands.
 - [ ] Implement Flow B after integration proves payment finalization semantics.
-- [ ] Implement Flow C and D after suspended/onboarding seed fixtures are available.
+- [ ] Implement Flow C after onboarding seed fixtures are available.
+- [ ] Run and stabilize Flow D with `pnpm e2e:phase5:suspended`; extend it with browser pending-bill payment after Flow B seed is stable.
 - [ ] For payment-settings OAuth, seed a valid OAuth state and complete the callback with a fake code against the mock SePay provider; do not depend on the registered Vercel redirect URI.
 - [ ] Keep screenshots/traces on failure enabled; do not commit generated report artifacts.
 - [ ] Update traceability rows with E2E spec paths and required env vars.

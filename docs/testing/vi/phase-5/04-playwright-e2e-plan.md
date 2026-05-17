@@ -39,7 +39,8 @@ Xây suite Playwright nhỏ, deterministic chứng minh hành trình người d�
 - [ ] Tạo hoặc cập nhật helper dùng chung cho Keycloak login, tạo URL landing QR, hằng số seed, và readiness route.
 - [ ] Thêm script package `e2e:phase3`, `e2e:phase4b`, và `e2e:demo` nếu suite mở rộng.
 - [ ] Triển khai Luồng B sau khi integration đã chứng minh ngữ nghĩa payment finalization.
-- [ ] Triển khai Luồng C và D sau khi có fixture seed suspended/onboarding.
+- [ ] Triển khai Luồng C sau khi có fixture seed onboarding.
+- [ ] Chạy và ổn định Luồng D bằng `pnpm e2e:phase5:suspended`; mở rộng với browser pending-bill payment sau khi seed Flow B ổn định.
 - [ ] Với OAuth payment-settings, seed OAuth state hợp lệ rồi hoàn tất callback bằng fake code qua mock SePay provider; không phụ thuộc redirect URI Vercel đã đăng ký.
 - [ ] Giữ screenshot/trace khi fail bật; không commit artifact báo cáo sinh ra.
 - [ ] Cập nhật dòng traceability với đường dẫn spec E2E và biến môi trường bắt buộc.

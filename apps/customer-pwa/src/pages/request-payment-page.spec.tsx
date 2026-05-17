@@ -130,4 +130,61 @@ describe('RequestPaymentPage', () => {
     expect(screen.getByText('0010000000355')).toBeTruthy();
     expect(screen.getByAltText('VietQR').getAttribute('src')).toContain('qr.sepay.vn');
   });
+
+  it('keeps VietQR payment available for suspended tenant with a pending bill', async () => {
+    useSessionMock.mockReturnValue({
+      isActive: true,
+      session: { tenantStatus: 'SUSPENDED', tenantStatusReason: 'SUBSCRIPTION_EXPIRED' },
+    });
+    jest.mocked(paymentService.createVietQrForCurrentBill).mockResolvedValue({
+      id: 'pay-1',
+      tenantId: 'tenant-1',
+      billId: 'bill-1',
+      billReference: 'QRTBLB1A2C3D4',
+      qrUrl: 'https://qr.sepay.vn/img?acc=1&amount=128000&des=QRTBLB1A2C3D4',
+      bankAccount: '0010000000355',
+      bankName: 'Vietcombank',
+      roundedTotal: 128000,
+      rawTotal: 127500,
+      roundingDelta: 500,
+      status: PaymentStatus.PENDING,
+      createdAt: '2026-05-10T00:00:00.000Z',
+      updatedAt: '2026-05-10T00:00:00.000Z',
+    });
+    useCurrentBillQueryMock.mockReturnValue({
+      data: {
+        bill: {
+          id: 'bill-1',
+          tenantId: 'tenant-1',
+          sessionId: 'session-1',
+          orderIds: [],
+          subtotal: 128000,
+          total: 128000,
+          roundingAmount: 0,
+          status: BillStatus.PENDING_PAYMENT,
+          createdAt: '2026-05-10T00:00:00.000Z',
+          updatedAt: '2026-05-10T00:00:00.000Z',
+        },
+        cart: makeCart({ status: 'LOCKED' }),
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <RequestPaymentPage />
+      </MemoryRouter>,
+    );
+
+    const vietQrButton = screen.getByRole('button', { name: /Thanh toán bằng VietQR/i });
+    expect(vietQrButton).toHaveProperty('disabled', false);
+
+    fireEvent.click(vietQrButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/QRTBLB1A2C3D4/)).toBeTruthy();
+    });
+  });
 });

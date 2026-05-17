@@ -1,9 +1,9 @@
 const crypto = require('crypto');
-const { DEV_TENANT } = require('../constants');
+const { DEV_TENANT, SUSPENDED_TENANT } = require('../constants');
 
 /** Opaque QR token per catalog rule: exactly 64 hex chars (see TableService.validateQrToken). */
-function devQrTokenHex(tableKey) {
-  return crypto.createHash('sha256').update(`${DEV_TENANT.id}:${tableKey}:qrtable-dev-qr`).digest('hex');
+function devQrTokenHex(tenantId, tableKey) {
+  return crypto.createHash('sha256').update(`${tenantId}:${tableKey}:qrtable-dev-qr`).digest('hex');
 }
 
 const AREAS = [
@@ -103,7 +103,7 @@ const TABLES = [
     name: 'A01',
     capacity: 2,
     status: 'available',
-    qrToken: devQrTokenHex('A01'),
+    qrToken: devQrTokenHex(DEV_TENANT.id, 'A01'),
     sessionId: null,
   },
   {
@@ -113,7 +113,7 @@ const TABLES = [
     name: 'A02',
     capacity: 4,
     status: 'available',
-    qrToken: devQrTokenHex('A02'),
+    qrToken: devQrTokenHex(DEV_TENANT.id, 'A02'),
     sessionId: null,
   },
   {
@@ -123,7 +123,7 @@ const TABLES = [
     name: 'B01',
     capacity: 4,
     status: 'available',
-    qrToken: devQrTokenHex('B01'),
+    qrToken: devQrTokenHex(DEV_TENANT.id, 'B01'),
     sessionId: null,
   },
   {
@@ -133,14 +133,63 @@ const TABLES = [
     name: 'C01',
     capacity: 6,
     status: 'available',
-    qrToken: devQrTokenHex('C01'),
+    qrToken: devQrTokenHex(DEV_TENANT.id, 'C01'),
+    sessionId: null,
+  },
+];
+
+const SUSPENDED_AREAS = [
+  {
+    id: '11111111-aaab-4111-8111-111111111111',
+    tenantId: SUSPENDED_TENANT.id,
+    name: 'Khu chính',
+    sortOrder: 1,
+  },
+];
+
+const SUSPENDED_CATEGORIES = [
+  {
+    id: '11111111-bbbc-4111-8111-111111111111',
+    tenantId: SUSPENDED_TENANT.id,
+    name: 'Menu đọc thử',
+    sortOrder: 1,
+    status: 'active',
+  },
+];
+
+const SUSPENDED_MENU_ITEMS = [
+  {
+    id: '11111111-cccd-4111-8111-111111111111',
+    tenantId: SUSPENDED_TENANT.id,
+    categoryId: SUSPENDED_CATEGORIES[0].id,
+    name: 'Phở bò tạm khóa',
+    description: 'Món dùng cho fixture tenant suspended.',
+    price: '65000.00',
+    imageUrl: null,
+    imagePublicId: null,
+    stock: 10,
+    sortOrder: 1,
+    status: 'available',
+    station: 'KITCHEN',
+  },
+];
+
+const SUSPENDED_TABLES = [
+  {
+    id: '11111111-ddde-4111-8111-111111111111',
+    tenantId: SUSPENDED_TENANT.id,
+    areaId: SUSPENDED_AREAS[0].id,
+    name: 'S01',
+    capacity: 2,
+    status: 'available',
+    qrToken: devQrTokenHex(SUSPENDED_TENANT.id, 'S01'),
     sessionId: null,
   },
 ];
 
 module.exports = {
-  AREAS,
-  CATEGORIES,
-  MENU_ITEMS,
-  TABLES,
+  AREAS: [...AREAS, ...SUSPENDED_AREAS],
+  CATEGORIES: [...CATEGORIES, ...SUSPENDED_CATEGORIES],
+  MENU_ITEMS: [...MENU_ITEMS, ...SUSPENDED_MENU_ITEMS],
+  TABLES: [...TABLES, ...SUSPENDED_TABLES],
 };

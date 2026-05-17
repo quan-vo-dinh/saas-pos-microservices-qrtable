@@ -18,6 +18,7 @@
     "dev:bff-payment": "pnpm dev --projects=bff,payment,order,catalog",
     "dev:reseed": "bash tools/dev-reseed.sh",
     "e2e:step2.7": "playwright test tests/e2e/step-2.7-realtime.spec.ts",
+    "e2e:phase5:suspended": "playwright test tests/e2e/phase-5-suspended-tenant.spec.ts",
     "e2e:install": "playwright install chromium",
     "dev:verify-seed": "node tools/dev-seed/verify/verify-dev-seed.js",
     "theme:build": "pnpm --dir apps/keycloak-theme run build-keycloak-theme",

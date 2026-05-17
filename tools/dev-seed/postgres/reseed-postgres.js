@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-const { DEV_TENANT } = require('../constants');
+const { DEV_TENANT, SUSPENDED_TENANT } = require('../constants');
 const { AREAS, CATEGORIES, MENU_ITEMS, TABLES } = require('./data');
 
 function requireYes() {
@@ -46,12 +46,53 @@ async function truncateTables(client) {
   `);
 }
 
+async function ensureTenantSaasColumns(client) {
+  await client.query(`
+    alter table tenants add column if not exists status varchar(20) not null default 'ACTIVE';
+    alter table tenants add column if not exists type varchar(30) not null default 'RESTAURANT';
+    alter table tenants add column if not exists address text;
+    alter table tenants add column if not exists owner_id uuid;
+    alter table tenants add column if not exists default_currency varchar(10) not null default 'VND';
+    alter table tenants add column if not exists default_locale varchar(20) not null default 'vi-VN';
+    alter table tenants add column if not exists operating_modes text[] not null default array['INSTANT_ORDER','DIGITAL_MENU'];
+    alter table tenants add column if not exists suspended_at timestamptz;
+    alter table tenants add column if not exists suspended_reason text;
+    alter table tenants add column if not exists closed_at timestamptz;
+    alter table tenants add column if not exists closed_reason text;
+  `);
+}
+
 async function seedTenant(client) {
-  await client.query(
-    `insert into tenants (id, name, slug, is_active, created_at, updated_at)
-     values ($1, $2, $3, true, now(), now())`,
-    [DEV_TENANT.id, DEV_TENANT.name, DEV_TENANT.slug],
-  );
+  const tenants = [
+    {
+      id: DEV_TENANT.id,
+      name: DEV_TENANT.name,
+      slug: DEV_TENANT.slug,
+      isActive: true,
+      status: 'ACTIVE',
+      suspendedAt: null,
+      suspendedReason: null,
+    },
+    {
+      id: SUSPENDED_TENANT.id,
+      name: SUSPENDED_TENANT.name,
+      slug: SUSPENDED_TENANT.slug,
+      isActive: false,
+      status: 'SUSPENDED',
+      suspendedAt: new Date(),
+      suspendedReason: SUSPENDED_TENANT.suspendedReason,
+    },
+  ];
+
+  for (const tenant of tenants) {
+    await client.query(
+      `insert into tenants
+        (id, name, slug, is_active, status, type, default_currency, default_locale, suspended_at, suspended_reason, created_at, updated_at)
+       values
+        ($1, $2, $3, $4, $5, 'RESTAURANT', 'VND', 'vi-VN', $6, $7, now(), now())`,
+      [tenant.id, tenant.name, tenant.slug, tenant.isActive, tenant.status, tenant.suspendedAt, tenant.suspendedReason],
+    );
+  }
 }
 
 async function seedAreas(client) {
@@ -129,6 +170,7 @@ async function main() {
   await client.connect();
   try {
     await client.query('begin');
+    await ensureTenantSaasColumns(client);
     await truncateTables(client);
     await seedTenant(client);
     await seedAreas(client);

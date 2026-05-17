@@ -494,11 +494,11 @@
 
 **Sources:** `business-logic` (1.B); `phase-4b-saas-onboarding` final business behavior.
 
-**Tests:** BFF customer tenant lifecycle guard; customer PWA tenant status hook and banner specs; customer order realtime hook spec.
+**Tests:** BFF customer tenant lifecycle guard; customer PWA tenant status hook and banner specs; customer PWA request payment spec; customer order realtime hook spec; optional Playwright smoke `tests/e2e/phase-5-suspended-tenant.spec.ts`.
 
 **Target layer:** browser-e2e. **Stack:** PWA, BFF, seeded suspended tenant and session.
 
-**Notes:** Unit and component coverage exists; a dedicated suspended-tenant Playwright fixture or seed route is still missing per Phase 4B handoff.
+**Notes:** Unit/component coverage exists, and dev seed now includes the `pho-viet-suspended` fixture. The Playwright smoke is present but remains stack-dependent; keep status `partial` until `pnpm dev:reseed -- --yes`, `pnpm dev:bff-order`, `nx serve customer-pwa`, and `pnpm e2e:phase5:suspended` pass in the same local stack. Pending-bill payment exception is covered at component and BFF guard level; full browser pending-bill payment remains a later Flow B/B+D combination.
 
 ---
 
@@ -743,7 +743,7 @@ Ordered by urgency; each line is **priority**, **rule id**, **status**, and **ne
 1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Run Step 5.3 external-stack integration for concurrent stock locking and final state (`stock=1`, two confirms, one success).
 2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Run the opt-in external-stack harness for Payment completion to Order `BILL_MARK_PAID` to table Cleaning with idempotent replay.
 3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Start/reseed the auth stack and rerun `tools/verify-permission-matrix.sh`.
-4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Add suspended tenant or session seed fixture and a Playwright journey for read-only behavior plus payment exception.
+4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Run the suspended tenant Playwright smoke on the dev stack; extend with browser pending-bill payment after Flow B seed is stable.
 5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Add Phase 4B Playwright route smoke after seeded roles are reliable.
 6. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Add static test for the canonical topic registry and absence of UI-only topics.
 7. **P1** — `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` — Add static test for allowed Redis access by project.

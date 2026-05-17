@@ -4,20 +4,33 @@ Thư mục này chứa script reseed môi trường dev cục bộ (có tính ph
 
 Tenant dev chuẩn:
 
-| Trường           | Giá trị                                |
-| ---------------- | -------------------------------------- |
-| Id tenant nội bộ | `023772bb-391b-401c-936a-ed7034b69cec` |
-| Slug công khai   | `pho-viet`                             |
-| Tên hiển thị     | `Nhà hàng Phở Việt`                    |
+| Fixture                | Id tenant nội bộ                       | Slug công khai       | Trạng thái  | Mục đích                       |
+| ---------------------- | -------------------------------------- | -------------------- | ----------- | ------------------------------ |
+| Active default         | `023772bb-391b-401c-936a-ed7034b69cec` | `pho-viet`           | `ACTIVE`    | Luồng dev/demo chính           |
+| Suspended customer E2E | `0f5c8b74-3c4d-47db-9a07-3a8f30f1b5d1` | `pho-viet-suspended` | `SUSPENDED` | Phase 5 Customer PWA read-only |
 
 Quy tắc:
 
 - Claim JWT `tenant_id` dùng UUID nội bộ.
 - Header BFF `x-tenant-id` dùng UUID nội bộ.
 - Dòng PostgreSQL theo tenant dùng UUID nội bộ trong cột `tenant_id`.
-- URL QR/PWA công khai dùng `tenant=pho-viet`.
+- URL QR/PWA công khai dùng `tenant=pho-viet` cho fixture active, hoặc `tenant=pho-viet-suspended` cho fixture suspended.
 - `tenant_a` chỉ là legacy; không được xuất hiện trong mặc định seed dev mới.
-- **`tables.qr_token`**: Catalog chỉ chấp nhận token **đúng 64 ký tự hex** (`/^[a-f0-9]{64}$/`) trong `TableService.validateQrToken`. Seed dev dùng SHA-256 hex sinh từ `${DEV_TENANT.id}:${tableKey}:qrtable-dev-qr` — không dùng chuỗi dạng `dev-qr-token-...`.
+- **`tables.qr_token`**: Catalog chỉ chấp nhận token **đúng 64 ký tự hex** (`/^[a-f0-9]{64}$/`) trong `TableService.validateQrToken`. Seed dev dùng SHA-256 hex sinh từ `${tenantId}:${tableKey}:qrtable-dev-qr` — không dùng chuỗi dạng `dev-qr-token-...`.
+
+Suspended tenant QR fixture:
+
+```text
+tenant=pho-viet-suspended
+table=11111111-ddde-4111-8111-111111111111
+table key=S01
+```
+
+Playwright smoke:
+
+```bash
+pnpm e2e:phase5:suspended
+```
 
 Ownership seed:
 

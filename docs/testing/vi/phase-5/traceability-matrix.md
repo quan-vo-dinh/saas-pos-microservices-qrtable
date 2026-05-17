@@ -494,11 +494,11 @@
 
 **Nguồn:** `business-logic` (1.B); business behavior cuối `phase-4b-saas-onboarding`.
 
-**Test:** BFF customer tenant lifecycle guard; spec hook tenant status và banner customer PWA; spec hook order realtime customer PWA.
+**Test:** BFF customer tenant lifecycle guard; spec hook tenant status và banner customer PWA; spec request payment customer PWA; spec hook order realtime customer PWA; Playwright smoke tùy chọn `tests/e2e/phase-5-suspended-tenant.spec.ts`.
 
 **Tầng đích:** browser-e2e. **Stack:** PWA, BFF, tenant suspended và session seed.
 
-**Ghi chú:** Unit và component coverage đã có; thiếu fixture Playwright hoặc route seed tenant suspended dedicated theo handoff Phase 4B.
+**Ghi chú:** Unit/component coverage đã có, và dev seed hiện có fixture `pho-viet-suspended`. Playwright smoke đã có nhưng vẫn phụ thuộc stack; giữ status `partial` cho đến khi `pnpm dev:reseed -- --yes`, `pnpm dev:bff-order`, `nx serve customer-pwa`, và `pnpm e2e:phase5:suspended` pass trên cùng local stack. Exception thanh toán bill pending được cover ở component và BFF guard; browser pending-bill payment đầy đủ sẽ ghép sau khi Flow B seed ổn định.
 
 ---
 
@@ -743,7 +743,7 @@ Sắp xếp theo độ khẩn; mỗi dòng là **priority**, **rule id**, **stat
 1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Chạy integration external-stack Step 5.3 cho lock stock đồng thời và trạng thái cuối (`stock=1`, hai confirm, một thành công).
 2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Chạy harness external-stack opt-in cho hoàn tất Payment đến Order `BILL_MARK_PAID` đến bàn Cleaning với replay idempotent.
 3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Start/reseed auth stack và chạy lại `tools/verify-permission-matrix.sh`.
-4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Thêm fixture seed tenant suspended hoặc session và hành trình Playwright read-only cộng exception thanh toán.
+4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Chạy Playwright smoke tenant suspended trên dev stack; mở rộng browser pending-bill payment sau khi seed Flow B ổn định.
 5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Thêm route smoke Playwright Phase 4B sau khi role seed tin cậy.
 6. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Thêm static test cho topic registry chuẩn và không có topic chỉ UI.
 7. **P1** — `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` — Thêm static test cho truy cập Redis được phép theo project.

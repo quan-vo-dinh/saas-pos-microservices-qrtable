@@ -1,7 +1,7 @@
 const { Client } = require('pg');
 const { MongoClient } = require('mongodb');
 const Redis = require('ioredis');
-const { DEV_TENANT } = require('../constants');
+const { DEV_TENANT, SUSPENDED_TENANT } = require('../constants');
 
 async function verifyPostgres() {
   const client = new Client({
@@ -13,29 +13,56 @@ async function verifyPostgres() {
   });
   await client.connect();
   try {
-    const tenant = await client.query('select id, slug, name, is_active from tenants where id = $1', [DEV_TENANT.id]);
+    const tenant = await client.query('select id, slug, name, is_active, status from tenants where id = $1', [
+      DEV_TENANT.id,
+    ]);
     if (tenant.rowCount !== 1 || tenant.rows[0].slug !== DEV_TENANT.slug || tenant.rows[0].is_active !== true) {
       throw new Error('PostgreSQL tenant seed mismatch');
     }
+    if (tenant.rows[0].status && tenant.rows[0].status !== 'ACTIVE') {
+      throw new Error(`PostgreSQL tenant status mismatch: ${tenant.rows[0].status}`);
+    }
+
+    const suspended = await client.query(
+      'select id, slug, name, is_active, status, suspended_reason from tenants where id = $1',
+      [SUSPENDED_TENANT.id],
+    );
+    if (
+      suspended.rowCount !== 1 ||
+      suspended.rows[0].slug !== SUSPENDED_TENANT.slug ||
+      suspended.rows[0].is_active !== false ||
+      suspended.rows[0].status !== 'SUSPENDED' ||
+      suspended.rows[0].suspended_reason !== SUSPENDED_TENANT.suspendedReason
+    ) {
+      throw new Error('PostgreSQL suspended tenant seed mismatch');
+    }
 
     const expectedCatalogMinimums = {
-      areas: 3,
-      categories: 3,
-      menu_items: 4,
-      tables: 4,
+      areas: 4,
+      categories: 4,
+      menu_items: 5,
+      tables: 5,
     };
 
+    const allowedTenantIds = [DEV_TENANT.id, SUSPENDED_TENANT.id];
     for (const [table, minimum] of Object.entries(expectedCatalogMinimums)) {
       const count = await client.query(`select count(*)::int as count from ${table}`);
       if (count.rows[0].count < minimum) {
         throw new Error(`PostgreSQL ${table} count too low: ${count.rows[0].count}`);
       }
 
-      const bad = await client.query(`select count(*)::int as count from ${table} where tenant_id <> $1`, [
-        DEV_TENANT.id,
+      const bad = await client.query(`select count(*)::int as count from ${table} where tenant_id <> all($1::uuid[])`, [
+        allowedTenantIds,
       ]);
       if (bad.rows[0].count !== 0) {
-        throw new Error(`PostgreSQL ${table} has rows outside canonical tenant`);
+        throw new Error(`PostgreSQL ${table} has rows outside canonical dev tenants`);
+      }
+
+      const suspendedRows = await client.query(`select count(*)::int as count from ${table} where tenant_id = $1`, [
+        SUSPENDED_TENANT.id,
+      ]);
+      if (suspendedRows.rows[0].count < 1) {
+        throw new Error(`PostgreSQL ${table} missing suspended tenant fixture row`);
       }
     }
 
