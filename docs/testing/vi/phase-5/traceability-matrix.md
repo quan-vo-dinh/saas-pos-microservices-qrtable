@@ -190,11 +190,11 @@
 
 **Nguồn:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); quyết định chấp nhận `phase-2a-order-kafka`; `phase-5-p0-order-stock-confirmation-spec`.
 
-**Test:** Spec service Order; spec service menu-item Catalog; spec repository menu-item Catalog; spec payload order-confirmed trong Order app.
+**Test:** Spec service Order; spec service menu-item Catalog; spec repository menu-item Catalog; spec payload order-confirmed trong Order app; spec external-stack opt-in `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts`.
 
 **Tầng đích:** integration. **Stack:** PostgreSQL, Catalog TCP, Kafka hoặc outbox harness.
 
-**Ghi chú:** Coverage unit-contract Step 5.2 hiện chứng minh shape call trừ stock, chuyển `PROCESSING`, persist outbox, replay không trừ lại, contract lock sorted unique của Catalog, và simulation concurrent stock=1. Giữ `partial` cho đến khi Step 5.3 chứng minh cùng race này qua PostgreSQL cộng Catalog TCP hoặc harness integration tương đương.
+**Ghi chú:** Coverage unit-contract Step 5.2 hiện chứng minh shape call trừ stock, chuyển `PROCESSING`, persist outbox, replay không trừ lại, contract lock sorted unique của Catalog, và simulation concurrent stock=1. Step 5.3A-1 bổ sung integration harness opt-in; chạy `RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand` sau khi PostgreSQL, Order TCP, và Catalog TCP sẵn sàng. Giữ `partial` cho đến khi lệnh external-stack đó được chạy và pass.
 
 ---
 

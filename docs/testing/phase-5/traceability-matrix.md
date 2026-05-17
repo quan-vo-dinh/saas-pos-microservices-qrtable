@@ -190,11 +190,11 @@
 
 **Sources:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); `phase-2a-order-kafka` accepted decisions; `phase-5-p0-order-stock-confirmation-spec`.
 
-**Tests:** Order service spec; Catalog menu-item service spec; Catalog menu-item repository spec; order-confirmed payload spec in Order app.
+**Tests:** Order service spec; Catalog menu-item service spec; Catalog menu-item repository spec; order-confirmed payload spec in Order app; opt-in external-stack spec `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts`.
 
 **Target layer:** integration. **Stack:** PostgreSQL, Catalog TCP, Kafka or outbox harness.
 
-**Notes:** Step 5.2 unit-contract coverage now proves stock deduct call shape, `PROCESSING` transition, outbox persistence, replay no-rededuct, Catalog sorted unique lock contract, and a stock=1 concurrent deduction simulation. Keep `partial` until Step 5.3 proves the same race through PostgreSQL plus Catalog TCP or an equivalent integration harness.
+**Notes:** Step 5.2 unit-contract coverage now proves stock deduct call shape, `PROCESSING` transition, outbox persistence, replay no-rededuct, Catalog sorted unique lock contract, and a stock=1 concurrent deduction simulation. Step 5.3A-1 adds an opt-in integration harness; run with `RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand` after PostgreSQL, Order TCP, and Catalog TCP are ready. Keep `partial` until that external-stack command is run and passes.
 
 ---
 
