@@ -4,7 +4,6 @@ import { Consumer, Kafka } from 'kafkajs';
 import { AreaService } from '../area/services/area.service';
 
 const DEFAULT_AREA_NAME = 'Khu vực chính';
-const TENANT_CREATED_TOPIC = process.env['KAFKA_TENANT_CREATED_TOPIC'] || 'tenant.created';
 
 export type TenantCreatedEventPayload = {
   tenantId: string;
@@ -37,7 +36,7 @@ export class TenantCreatedConsumer implements OnModuleInit, OnModuleDestroy {
       groupId: process.env['KAFKA_CATALOG_TENANT_CONSUMER_GROUP'] || 'catalog-tenant-created-consumer-group',
     });
     await this.consumer.connect();
-    await this.consumer.subscribe({ topic: TENANT_CREATED_TOPIC, fromBeginning: false });
+    await this.consumer.subscribe({ topic: CONFIGURATION.KAFKA_CONFIG.TENANT_CREATED_TOPIC, fromBeginning: false });
     await this.consumer.run({
       eachMessage: async ({ message }) => {
         const raw = message.value?.toString('utf8');

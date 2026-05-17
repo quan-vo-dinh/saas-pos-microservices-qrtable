@@ -4,9 +4,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
+import { CONFIGURATION } from '../configuration';
 
 const MAX_SEND_ATTEMPTS = 10;
-const TENANT_CREATED_TOPIC = process.env['KAFKA_TENANT_CREATED_TOPIC'] || 'tenant.created';
 
 @Injectable()
 export class SaasOutboxRepository {
@@ -92,7 +92,7 @@ export class SaasOutboxRepository {
     };
     const row = this.repo.create({
       tenantId,
-      topic: TENANT_CREATED_TOPIC,
+      topic: CONFIGURATION.KAFKA_CONFIG.TENANT_CREATED_TOPIC,
       eventType: SAAS_EVENTS.TENANT_CREATED,
       aggregateId: tenantId,
       partitionKey: tenantId,

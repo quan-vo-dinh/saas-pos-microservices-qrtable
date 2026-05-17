@@ -42,6 +42,10 @@ export class KafkaConfiguration {
 
   @IsString()
   @IsNotEmpty()
+  TENANT_CREATED_TOPIC: string;
+
+  @IsString()
+  @IsNotEmpty()
   PAYMENT_CLIENT_ID: string;
 
   constructor(data?: Partial<KafkaConfiguration>) {
@@ -65,6 +69,8 @@ export class KafkaConfiguration {
       data?.PAYMENT_COMPLETED_TOPIC || process.env['KAFKA_PAYMENT_COMPLETED_TOPIC'] || 'payment.completed';
     this.PAYMENT_REFUNDED_TOPIC =
       data?.PAYMENT_REFUNDED_TOPIC || process.env['KAFKA_PAYMENT_REFUNDED_TOPIC'] || 'payment.refunded';
+    this.TENANT_CREATED_TOPIC =
+      data?.TENANT_CREATED_TOPIC || process.env['KAFKA_TENANT_CREATED_TOPIC'] || 'tenant.created';
     this.PAYMENT_CLIENT_ID =
       data?.PAYMENT_CLIENT_ID || process.env['KAFKA_PAYMENT_CLIENT_ID'] || 'qrtable-payment-service';
   }

@@ -112,17 +112,17 @@
 
 ---
 
-### `P1-CAT-NO-MENU-KAFKA` — `missing` (P1, architecture)
+### `P1-CAT-NO-MENU-KAFKA` — `covered` (P1, architecture)
 
 **Requirement:** Menu changes should use cache or query invalidation; no Kafka or WebSocket `menu.updated` contract is in current scope.
 
 **Sources:** `business-logic` (2.B); `technical-architecture` (7.2, 11.3); `phase-1-catalog` Step 1.5; `phase-2b-kitchen-websocket` handoff.
 
-**Tests:** none found.
+**Tests:** BFF Phase 5 architecture contracts static spec.
 
 **Target layer:** unit-contract. **Stack:** none.
 
-**Notes:** Add a static architecture test that no `menu.updated`, `events.menuUpdated`, or `events.menu.updated` contract is exported or used. Do not add realtime menu behavior in Phase 5.
+**Notes:** Static architecture test asserts no `menu.updated`, `events.menuUpdated`, `events.menu.updated`, `menuUpdated`, `MENU_UPDATED`, or `MenuUpdated` contract is exported or used. Do not add realtime menu behavior in Phase 5.
 
 ---
 
@@ -636,31 +636,31 @@
 
 ---
 
-### `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` (P1, architecture)
+### `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `covered` (P1, architecture)
 
 **Requirement:** Kafka topic registry is exactly the current domain topics: `order.confirmed`, `payment.completed`, `payment.refunded`, `kitchen.sla_warning`, `tenant.created`; no UI-only Kafka topics.
 
 **Sources:** `technical-architecture` (7.2, 7.4); `phase-5-7-finalization` architecture anchors.
 
-**Tests:** Shared types enum completeness spec for event payload types; SaaS constants spec for `tenant.created` and prefix constants.
+**Tests:** BFF Phase 5 architecture contracts static spec; shared types enum completeness spec for event payload types; SaaS constants spec for `tenant.created` and prefix constants.
 
 **Target layer:** unit-contract. **Stack:** none.
 
-**Notes:** Add a static configuration or constant test for the exact five-topic registry and default environment topic names.
+**Notes:** Static configuration test locks the exact five-topic registry and default environment topic names.
 
 ---
 
-### `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` (P1, architecture)
+### `P1-ARCH-REDIS-ACCESS-POLICY` — `covered` (P1, architecture)
 
 **Requirement:** Redis access is limited to BFF, Order, Kitchen, WebSocket adapter, SaaS, and Payment OAuth state; Catalog, Authorizer, and User-Access must not add direct Redis use.
 
 **Sources:** `technical-architecture` (11.2); `phase-5-7-finalization` architecture anchors.
 
-**Tests:** Order cart service spec; Kitchen KDS keys spec; SaaS tenant status cache service spec (allowed users only).
+**Tests:** BFF Phase 5 architecture contracts static spec; Order cart service spec; Kitchen KDS keys spec; SaaS tenant status cache service spec (allowed users only).
 
 **Target layer:** unit-contract. **Stack:** none.
 
-**Notes:** Add a static architecture test that scans project imports or providers for unauthorized Redis access.
+**Notes:** Static architecture test scans production source imports/providers for unauthorized direct Redis access.
 
 ---
 
@@ -745,9 +745,6 @@ Ordered by urgency; each line is **priority**, **rule id**, **status**, and **ne
 3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Start/reseed the auth stack and rerun `tools/verify-permission-matrix.sh`.
 4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Run the suspended tenant Playwright smoke on the dev stack; extend with browser pending-bill payment after Flow B seed is stable.
 5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Add Phase 4B Playwright route smoke after seeded roles are reliable.
-6. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Add static test for the canonical topic registry and absence of UI-only topics.
-7. **P1** — `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` — Add static test for allowed Redis access by project.
-8. **P1** — `P1-CAT-NO-MENU-KAFKA` — `missing` — Add static test that no `menu.updated` contract is used; do not implement menu realtime in Phase 5.
 
 ---
 

@@ -112,17 +112,17 @@
 
 ---
 
-### `P1-CAT-NO-MENU-KAFKA` — `missing` (P1, architecture)
+### `P1-CAT-NO-MENU-KAFKA` — `covered` (P1, architecture)
 
 **Yêu cầu:** Thay đổi menu dùng cache hoặc invalidate query; không có contract Kafka hoặc WebSocket `menu.updated` trong phạm vi hiện tại.
 
 **Nguồn:** `business-logic` (2.B); `technical-architecture` (7.2, 11.3); `phase-1-catalog` Bước 1.5; handoff `phase-2b-kitchen-websocket`.
 
-**Test:** không tìm thấy.
+**Test:** Spec static Phase 5 architecture contracts của BFF.
 
 **Tầng đích:** unit-contract. **Stack:** không.
 
-**Ghi chú:** Thêm static architecture test đảm bảo không export hoặc dùng contract `menu.updated`, `events.menuUpdated`, hoặc `events.menu.updated`. Không thêm realtime menu trong Phase 5.
+**Ghi chú:** Static architecture test đảm bảo không export hoặc dùng contract `menu.updated`, `events.menuUpdated`, `events.menu.updated`, `menuUpdated`, `MENU_UPDATED`, hoặc `MenuUpdated`. Không thêm realtime menu trong Phase 5.
 
 ---
 
@@ -636,31 +636,31 @@
 
 ---
 
-### `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` (P1, architecture)
+### `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `covered` (P1, architecture)
 
 **Yêu cầu:** Kafka topic registry chính xác là các topic miền hiện tại: `order.confirmed`, `payment.completed`, `payment.refunded`, `kitchen.sla_warning`, `tenant.created`; không có topic Kafka chỉ UI.
 
 **Nguồn:** `technical-architecture` (7.2, 7.4); neo architecture `phase-5-7-finalization`.
 
-**Test:** Spec độ đầy đủ enum shared types cho event payload types; spec SaaS constants cho `tenant.created` và prefix constants.
+**Test:** Spec static Phase 5 architecture contracts của BFF; spec độ đầy đủ enum shared types cho event payload types; spec SaaS constants cho `tenant.created` và prefix constants.
 
 **Tầng đích:** unit-contract. **Stack:** không.
 
-**Ghi chú:** Thêm static configuration hoặc constant test cho registry đúng năm topic và tên topic môi trường mặc định.
+**Ghi chú:** Static configuration test khóa registry đúng năm topic và tên topic mặc định theo env.
 
 ---
 
-### `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` (P1, architecture)
+### `P1-ARCH-REDIS-ACCESS-POLICY` — `covered` (P1, architecture)
 
 **Yêu cầu:** Truy cập Redis giới hạn BFF, Order, Kitchen, WebSocket adapter, SaaS, và Payment OAuth state; Catalog, Authorizer, và User-Access không được thêm dùng Redis trực tiếp.
 
 **Nguồn:** `technical-architecture` (11.2); neo architecture `phase-5-7-finalization`.
 
-**Test:** Spec Order cart service; spec Kitchen KDS keys; spec SaaS tenant status cache service (chỉ user được phép).
+**Test:** Spec static Phase 5 architecture contracts của BFF; spec Order cart service; spec Kitchen KDS keys; spec SaaS tenant status cache service (chỉ user được phép).
 
 **Tầng đích:** unit-contract. **Stack:** không.
 
-**Ghi chú:** Thêm static architecture test quét import hoặc provider project để phát hiện truy cập Redis không được phép.
+**Ghi chú:** Static architecture test quét import/provider trong production source để phát hiện direct Redis access không được phép.
 
 ---
 
@@ -745,9 +745,6 @@ Sắp xếp theo độ khẩn; mỗi dòng là **priority**, **rule id**, **stat
 3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Start/reseed auth stack và chạy lại `tools/verify-permission-matrix.sh`.
 4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Chạy Playwright smoke tenant suspended trên dev stack; mở rộng browser pending-bill payment sau khi seed Flow B ổn định.
 5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Thêm route smoke Playwright Phase 4B sau khi role seed tin cậy.
-6. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Thêm static test cho topic registry chuẩn và không có topic chỉ UI.
-7. **P1** — `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` — Thêm static test cho truy cập Redis được phép theo project.
-8. **P1** — `P1-CAT-NO-MENU-KAFKA` — `missing` — Thêm static test đảm bảo không dùng contract `menu.updated`; không triển khai menu realtime trong Phase 5.
 
 ---
 
