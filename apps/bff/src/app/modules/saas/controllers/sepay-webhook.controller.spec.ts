@@ -24,8 +24,8 @@ describe('SepayWebhookController', () => {
     controller = module.get(SepayWebhookController);
   });
 
-  it('platform webhook forwards to SaaS without tenantSlug', async () => {
-    await firstValueFrom(controller.handlePlatformWebhook('secret', { transferAmount: 299000 }));
+  it('platform webhook forwards to SaaS without tenantSlug or returning the raw secret', async () => {
+    const response = await firstValueFrom(controller.handlePlatformWebhook('secret', { transferAmount: 299000 }));
 
     expect(saasClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.SUBSCRIPTION.HANDLE_WEBHOOK,
@@ -34,6 +34,8 @@ describe('SepayWebhookController', () => {
       }),
     );
     expect(saasClient.send.mock.calls[0][1].data).not.toHaveProperty('tenantSlug');
+    expect(paymentClient.send).not.toHaveBeenCalled();
+    expect(JSON.stringify(response)).not.toContain('secret');
   });
 
   it('tenant webhook forwards to Payment with tenantSlug', async () => {
@@ -45,6 +47,7 @@ describe('SepayWebhookController', () => {
         data: expect.objectContaining({ tenantSlug: 'tenant-a', secret: 'secret', payload: { id: 1 } }),
       }),
     );
+    expect(saasClient.send).not.toHaveBeenCalled();
   });
 
   it('missing secret returns UnauthorizedException', () => {

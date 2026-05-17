@@ -5,8 +5,12 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Area } from '@common/entities/area.entity';
 import { Table } from '@common/entities/table.entity';
 import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
+import { TCP_SERVICES } from '@common/configuration/tcp.config';
+import { SubscriptionStatus, TenantStatus } from '@common/constants/saas.constants';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
+import type { SubscriptionDashboardTcpResponse } from '@common/interfaces/tcp/saas';
+import { of, throwError } from 'rxjs';
 
 const SAMPLE_QR_TOKEN = 'a'.repeat(64);
 
@@ -14,6 +18,7 @@ describe('TableService', () => {
   let service: TableService;
   let repository: jest.Mocked<TableRepository>;
   let areaRepo: { findOne: jest.Mock };
+  let saasClient: { send: jest.Mock };
 
   const mockTable = {
     id: 'table-1',
@@ -35,6 +40,29 @@ describe('TableService', () => {
     sortOrder: 0,
   };
 
+  const subscriptionDashboard = (maxTables: number): SubscriptionDashboardTcpResponse => ({
+    tenant: { id: 'tenant-1', name: 'Tenant 1', slug: 'tenant-1', status: TenantStatus.ACTIVE },
+    current: {
+      planCode: 'PRO',
+      planName: 'Pro',
+      status: SubscriptionStatus.ACTIVE,
+      expiresAt: null,
+      billingPeriod: 'MONTHLY',
+      features: [],
+      maxTables,
+      maxStaff: 10,
+      maxOrdersPerDay: 100,
+    },
+    usage: {},
+    plans: [],
+    history: [],
+  });
+
+  const allowTableCreation = (maxTables = 10, current = 1) => {
+    saasClient.send.mockReturnValue(of({ statusCode: 200, data: subscriptionDashboard(maxTables) }));
+    repository.countByTenant.mockResolvedValue(current);
+  };
+
   beforeEach(async () => {
     const mockTableRepository = {
       create: jest.fn(),
@@ -48,12 +76,14 @@ describe('TableService', () => {
     };
 
     areaRepo = { findOne: jest.fn() };
+    saasClient = { send: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TableService,
         { provide: TableRepository, useValue: mockTableRepository },
         { provide: getRepositoryToken(Area), useValue: areaRepo },
+        { provide: TCP_SERVICES.SAAS_SERVICE, useValue: saasClient },
       ],
     }).compile();
 
@@ -63,6 +93,7 @@ describe('TableService', () => {
 
   describe('create', () => {
     it('should create a table with opaque QR token', async () => {
+      allowTableCreation();
       areaRepo.findOne.mockResolvedValue(mockArea);
       repository.existsByName.mockResolvedValue(false);
       repository.create.mockResolvedValue(mockTable);
@@ -85,7 +116,89 @@ describe('TableService', () => {
       );
     });
 
+    it('should allow create when max_tables is unlimited', async () => {
+      allowTableCreation(-1, 25);
+      areaRepo.findOne.mockResolvedValue(mockArea);
+      repository.existsByName.mockResolvedValue(false);
+      repository.create.mockResolvedValue(mockTable);
+      repository.updateByIdAndTenant.mockResolvedValue(mockTable);
+
+      await expect(
+        service.create({
+          tenantId: 'tenant-1',
+          areaId: 'area-1',
+          name: 'Table 1',
+        }),
+      ).resolves.toEqual(mockTable);
+
+      expect(repository.create).toHaveBeenCalled();
+    });
+
+    it('should block create before persistence when current table count reaches max_tables', async () => {
+      allowTableCreation(2, 2);
+      areaRepo.findOne.mockResolvedValue(mockArea);
+      repository.existsByName.mockResolvedValue(false);
+
+      await expect(
+        service.create({
+          tenantId: 'tenant-1',
+          areaId: 'area-1',
+          name: 'Table 1',
+        }),
+      ).rejects.toMatchObject({
+        errorCode: ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED,
+        response: {
+          details: {
+            limitType: 'max_tables',
+            limit: 2,
+            current: 2,
+            upgradeUrl: '/dashboard/subscription',
+          },
+        },
+      });
+
+      expect(repository.create).not.toHaveBeenCalled();
+      expect(repository.updateByIdAndTenant).not.toHaveBeenCalled();
+    });
+
+    it('should block create when current subscription is missing', async () => {
+      saasClient.send.mockReturnValue(of({ statusCode: 200, data: { ...subscriptionDashboard(5), current: null } }));
+      areaRepo.findOne.mockResolvedValue(mockArea);
+      repository.existsByName.mockResolvedValue(false);
+
+      await expect(
+        service.create({
+          tenantId: 'tenant-1',
+          areaId: 'area-1',
+          name: 'Table 1',
+        }),
+      ).rejects.toMatchObject({
+        errorCode: ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED,
+      });
+
+      expect(repository.create).not.toHaveBeenCalled();
+    });
+
+    it('should block create when SaaS subscription lookup is unavailable', async () => {
+      saasClient.send.mockReturnValue(throwError(() => new Error('unavailable')));
+      areaRepo.findOne.mockResolvedValue(mockArea);
+      repository.existsByName.mockResolvedValue(false);
+
+      await expect(
+        service.create({
+          tenantId: 'tenant-1',
+          areaId: 'area-1',
+          name: 'Table 1',
+        }),
+      ).rejects.toMatchObject({
+        errorCode: ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED,
+      });
+
+      expect(repository.create).not.toHaveBeenCalled();
+    });
+
     it('should throw BusinessException for invalid area', async () => {
+      allowTableCreation();
       areaRepo.findOne.mockResolvedValue(null);
 
       await expect(service.create({ tenantId: 'tenant-1', areaId: 'area-invalid', name: 'Table 1' })).rejects.toThrow(
@@ -94,6 +207,7 @@ describe('TableService', () => {
     });
 
     it('should throw BusinessException for duplicate name', async () => {
+      allowTableCreation();
       areaRepo.findOne.mockResolvedValue(mockArea);
       repository.existsByName.mockResolvedValue(true);
 

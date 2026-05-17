@@ -30,6 +30,8 @@ export type SepayWebhookPayload = {
 
 export type HandleSepayWebhookTcpRequest = {
   payload: SepayWebhookPayload;
+  tenantSlug?: string;
+  secret?: string;
   processId?: string;
 };
 

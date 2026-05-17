@@ -1,13 +1,17 @@
 import type { HandleSepayWebhookTcpRequest, SepayWebhookTcpResponse } from '@common/interfaces/tcp/payment';
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PaymentMethod } from '@einvoice/types';
+import { timingSafeEqual } from 'crypto';
 import { DataSource } from 'typeorm';
 import { PaymentEntity } from '../entities/payment.entity';
 import { AuditPaymentRepository } from '../repositories/audit-payment.repository';
 import { PaymentOutboxRepository } from '../repositories/payment-outbox.repository';
 import { PaymentRepository } from '../repositories/payment.repository';
+import { TenantPaymentSettingsRepository } from '../repositories/tenant-payment-settings.repository';
 import { PaymentOrderGateway } from './payment-order.gateway';
+import { PaymentSecretsService } from './payment-secrets.service';
 import { PaymentReferenceService } from './payment-reference.service';
+import { PaymentTenantGateway } from './payment-tenant.gateway';
 
 @Injectable()
 export class SepayWebhookService {
@@ -20,9 +24,13 @@ export class SepayWebhookService {
     private readonly auditRepo: AuditPaymentRepository,
     private readonly outboxRepo: PaymentOutboxRepository,
     private readonly reference: PaymentReferenceService,
+    private readonly tenantPaymentSettingsRepo: TenantPaymentSettingsRepository,
+    private readonly secrets: PaymentSecretsService,
+    private readonly tenantGateway: PaymentTenantGateway,
   ) {}
 
   async handleSepayWebhook(dto: HandleSepayWebhookTcpRequest): Promise<SepayWebhookTcpResponse> {
+    const routeTenantId = await this.verifyTenantWebhookSecret(dto);
     const payload = dto.payload;
     const billReference = this.reference.extractBillReference({
       code: payload.code,
@@ -50,6 +58,9 @@ export class SepayWebhookService {
       if (!payment) {
         this.logger.warn(`SePay webhook matched no payment for billReference=${billReference}`);
         return;
+      }
+      if (routeTenantId && payment.tenantId !== routeTenantId) {
+        throw new ForbiddenException('SEPAY_TENANT_MISMATCH');
       }
 
       await this.auditRepo.createPaymentAudit(
@@ -156,4 +167,48 @@ export class SepayWebhookService {
     const d = new Date(normalized);
     return Number.isNaN(d.getTime()) ? new Date() : d;
   }
+
+  private async verifyTenantWebhookSecret(dto: HandleSepayWebhookTcpRequest): Promise<string | undefined> {
+    const usesTenantRoute = dto.tenantSlug !== undefined || dto.secret !== undefined;
+    if (!usesTenantRoute) {
+      return undefined;
+    }
+
+    const tenantSlug = dto.tenantSlug?.trim();
+    const providedSecret = dto.secret?.trim();
+    if (!tenantSlug || !providedSecret) {
+      throw new UnauthorizedException('SEPAY_WEBHOOK_SECRET_REQUIRED');
+    }
+
+    const tenant = await this.tenantGateway.resolveBySlug(tenantSlug, dto.processId);
+    const settings = await this.tenantPaymentSettingsRepo.findByTenantId(tenant.id);
+    if (!settings?.webhookSecretEncrypted) {
+      throw new UnauthorizedException('SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED');
+    }
+
+    const expectedSecret = this.decryptWebhookSecret(settings.webhookSecretEncrypted);
+    if (!constantTimeEquals(expectedSecret, providedSecret)) {
+      throw new UnauthorizedException('SEPAY_WEBHOOK_SECRET_INVALID');
+    }
+
+    return tenant.id;
+  }
+
+  private decryptWebhookSecret(encryptedSecret: string): string {
+    try {
+      const secret = this.secrets.decrypt(encryptedSecret).trim();
+      if (!secret) {
+        throw new Error('empty secret');
+      }
+      return secret;
+    } catch {
+      throw new UnauthorizedException('SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED');
+    }
+  }
+}
+
+function constantTimeEquals(expected: string, actual: string): boolean {
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  const actualBuffer = Buffer.from(actual, 'utf8');
+  return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
 }

@@ -22,7 +22,7 @@ The current BFF route shape checks only that `x-secret-key` exists, then forward
 1. `x-secret-key` presence check at BFF remains a fast edge validation, but it is not sufficient.
 2. The authoritative verifier must be the service that owns the secret and the state mutation:
    - Tenant webhook (`QRTBL`) is verified by Payment Service against `tenant_payment_settings.webhook_secret_encrypted` for the route `tenantSlug` or resolved tenant.
-   - Platform webhook (`QRSUB`) is verified by SaaS Service against the platform webhook secret from server-side configuration or future platform settings storage.
+   - Platform webhook (`QRSUB`) is verified by SaaS Service against the current server-side `SEPAY_PLATFORM_WEBHOOK_SECRET` configuration. Future platform settings storage remains a later direction.
 3. Secret comparison must use constant-time equality after decrypting or loading the stored secret.
 4. A webhook with a missing, invalid, mismatched, or unconfigured secret must return an unauthorized/forbidden result and must not mutate domain state.
 5. The request body must not be trusted for tenant identity. Tenant identity comes from the tenant route slug and server-side lookup.
@@ -52,7 +52,7 @@ For `POST /payment/sepay/webhook/platform`:
 
 - BFF rejects a missing `x-secret-key` before forwarding.
 - BFF forwards `x-secret-key`, payload, and `processId` to SaaS.
-- SaaS verifies the value against the configured platform webhook secret before calling subscription invoice matching.
+- SaaS verifies the value against `SEPAY_PLATFORM_WEBHOOK_SECRET` before calling subscription invoice matching.
 - If the secret is missing, invalid, mismatched, or unconfigured, SaaS rejects the webhook and does not mark an invoice paid.
 - A valid secret still requires normal `QRSUB` reference matching, pending invoice status, idempotency, and amount checks.
 
@@ -77,7 +77,7 @@ Required fast tests:
 
 Optional integration test:
 
-- BFF to service-owner boundary with one seeded tenant secret and one seeded platform secret, proving invalid secret requests fail before domain mutation.
+- BFF to service-owner boundary with one seeded tenant secret and one configured `SEPAY_PLATFORM_WEBHOOK_SECRET`, proving invalid secret requests fail before domain mutation.
 
 ---
 

@@ -13,7 +13,7 @@ import { TenantUserService } from './services/tenant-user.service';
 @Module({
   imports: [
     MongooseModule.forFeature([UserDestination, RoleDestination]),
-    ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.AUTHORIZER_SERVICE)]),
+    ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.AUTHORIZER_SERVICE), TcpProvider(TCP_SERVICES.SAAS_SERVICE)]),
   ],
   controllers: [UserController, UserGrpcController],
   providers: [UserRepository, UserService, TenantUserService],

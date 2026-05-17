@@ -1253,7 +1253,8 @@ Client A ──→ BFF Instance 1 ──→ Redis Pub/Sub ──→ BFF Instance
 
 ```yaml
 Environment Variables:
-  SEPAY_WEBHOOK_SECRET: "your_secret_key"   # Secret dùng để verify webhook auth
+  SEPAY_WEBHOOK_SECRET: "your_secret_key"   # Direct Phase 3 HMAC webhook secret
+  SEPAY_PLATFORM_WEBHOOK_SECRET: "your_platform_secret"  # Phase 4B platform subscription webhook secret (QRSUB)
   BFF_PAYMENT_TCP_TIMEOUT_MS: 5000           # BFF chờ Payment Service qua TCP
   PAYMENT_SEPAY_QR_ACCOUNT: "0010000000355"  # Số TK ngân hàng nhận tiền
   PAYMENT_SEPAY_QR_BANK: "Vietcombank"       # Tên ngân hàng SePay-compatible
@@ -1271,7 +1272,10 @@ Webhook Verification:
   # Direct Phase 3 route:
   #   BFF verifies X-SePay-Signature + X-SePay-Timestamp over `{timestamp}.{rawBody}` using SEPAY_WEBHOOK_SECRET.
   # Phase 4B tenant/platform routes:
-  #   BFF receives x-secret-key and forwards route context to SaaS/Payment handlers.
+  #   Tenant QRTBL route forwards x-secret-key to Payment, which verifies against
+  #   tenant_payment_settings.webhook_secret_encrypted for the routed tenant.
+  #   Platform QRSUB route forwards x-secret-key to SaaS, which verifies against
+  #   SEPAY_PLATFORM_WEBHOOK_SECRET server-side config.
   # Success response gửi về SePay là raw JSON, không dùng internal ResponseDto wrapper
   return {"success": true}
 

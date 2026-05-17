@@ -5,14 +5,29 @@ import type {
   DisableTenantUsersResponse,
   UpsertTenantOwnerProfileRequest,
 } from '@common/interfaces/tcp/user';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { TCP_SERVICES } from '@common/configuration/tcp.config';
+import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import { UserRepository } from '../repositories/user.repository';
+import { enforceMaxStaffQuota } from './staff-quota.enforcer';
 
 @Injectable()
 export class TenantUserService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(
+    private readonly userRepository: UserRepository,
+    @Inject(TCP_SERVICES.SAAS_SERVICE) private readonly saasClient: TcpClient,
+  ) {}
 
-  upsertOwnerProfile(request: UpsertTenantOwnerProfileRequest) {
+  async upsertOwnerProfile(request: UpsertTenantOwnerProfileRequest) {
+    const isOwnerProfile = request.roleNames?.some((role) => role.toUpperCase() === 'OWNER');
+    if (!isOwnerProfile) {
+      await enforceMaxStaffQuota({
+        tenantId: request.tenantId,
+        userRepository: this.userRepository,
+        saasClient: this.saasClient,
+      });
+    }
+
     return this.userRepository.upsertTenantUserByUserId({
       userId: request.userId,
       tenantId: request.tenantId,

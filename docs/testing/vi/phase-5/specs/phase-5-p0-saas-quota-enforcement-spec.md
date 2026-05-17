@@ -10,7 +10,7 @@
 
 Phase 4B định nghĩa pricing plan với quota tài nguyên, nhưng inventory Phase 5 chỉ thấy data shape, endpoint đếm, cache summary, và check subscription active. Không thấy hành vi chặn quota khi tạo bàn thứ 11, tài khoản staff thứ 6, hoặc order ngày thứ 101 trên plan FREE.
 
-Test Phase 5 không được đánh dấu quota là `covered` cho đến khi enforcement tồn tại ở cả edge và ranh giới owner tài nguyên.
+Test Phase 5 không được đánh dấu quota là `covered` cho đến khi enforcement tồn tại ở ranh giới owner tài nguyên. Check edge vẫn có thể cho UX phản hồi nhanh hơn, nhưng không được thay thế enforcement ở owner service.
 
 ---
 
@@ -96,9 +96,8 @@ Ngữ nghĩa giá trị quota:
 
 ## 5. Contract kiểm thử
 
-Test nhanh hoặc integration bắt buộc:
+Test nhanh hoặc integration bắt buộc ở owner service:
 
-- Test BFF hoặc guard: subscription inactive chặn ghi tiêu thụ quota.
 - Test Catalog service: tenant FREE với 10 bàn active không tạo được bàn thứ 11.
 - Test Catalog service: quota bàn `-1` cho phép tạo vượt giới hạn thông thường.
 - Test User-Access service: tenant FREE với 5 staff active không tạo/mời được staff active thứ 6.
@@ -113,6 +112,11 @@ Test âm bắt buộc:
 - Tenant suspended vẫn bị chặn dù dưới quota.
 - Tạo order fail không tiêu thụ quota order ngày.
 - Retry idempotent order không double-count.
+
+Test edge-feedback tùy chọn:
+
+- Test BFF hoặc guard: subscription inactive chặn ghi tiêu thụ quota trước khi forward.
+- Test BFF hoặc route-level: response quota-exceeded giữ `details` của `TENANT_PLAN_LIMIT_EXCEEDED` cho UI prompt nâng cấp gói.
 
 ---
 

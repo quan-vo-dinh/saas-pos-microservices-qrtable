@@ -11,6 +11,8 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.TENANT_MISMATCH_IDENTITY]: 'Cửa hàng không khớp với tài khoản của bạn',
   [ErrorCode.TENANT_SESSION_NOT_FOUND]: 'Phiên làm việc không tìm thấy',
   [ErrorCode.TENANT_MISMATCH_SESSION]: 'Cửa hàng không khớp với phiên làm việc',
+  [ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED]:
+    'Cửa hàng đã chạm giới hạn của gói hiện tại. Vui lòng nâng cấp gói để tiếp tục.',
   [ErrorCode.SESSION_CLOSED]: 'Phiên đã đóng hoặc không còn hoạt động',
   [ErrorCode.CART_VERSION_CONFLICT]: 'Giỏ hàng đã được cập nhật; vui lòng tải lại và thử lại',
   [ErrorCode.CART_LOCKED]: 'Giỏ hàng đang khóa để thanh toán, không thể chỉnh sửa',

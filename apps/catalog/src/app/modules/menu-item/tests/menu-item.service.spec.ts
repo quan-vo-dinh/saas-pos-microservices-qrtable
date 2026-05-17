@@ -280,6 +280,79 @@ describe('MenuItemService', () => {
       expect(manager.save).toHaveBeenCalled();
     });
 
+    it('locks each menu item once in deterministic order before deducting stock', async () => {
+      const inventoryA = { ...mockMenuItem, id: 'item-a', stock: 10 } as MenuItem;
+      const inventoryB = { ...mockMenuItem, id: 'item-b', stock: 10 } as MenuItem;
+      const manager = {
+        save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)),
+      };
+      repository.findByIdsForUpdate.mockResolvedValue([inventoryB, inventoryA]);
+      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
+
+      await service.deductForOrder({
+        tenantId: 'tenant-1',
+        orderId: 'order-1',
+        idempotencyKey: 'idem-ordering',
+        items: [
+          { menuItemId: 'item-b', quantity: 1 },
+          { menuItemId: 'item-a', quantity: 2 },
+          { menuItemId: 'item-b', quantity: 3 },
+        ],
+      });
+
+      expect(repository.findByIdsForUpdate).toHaveBeenCalledWith('tenant-1', ['item-a', 'item-b'], manager);
+      expect(manager.save).toHaveBeenNthCalledWith(1, MenuItem, expect.objectContaining({ id: 'item-a', stock: 8 }));
+      expect(manager.save).toHaveBeenNthCalledWith(2, MenuItem, expect.objectContaining({ id: 'item-b', stock: 6 }));
+    });
+
+    it('lets only one concurrent stock=1 deduction succeed when transactions see locked final stock', async () => {
+      const inventory = { ...mockMenuItem, stock: 1 } as MenuItem;
+      const manager = {
+        save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)),
+      };
+      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
+
+      let tail = Promise.resolve();
+      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => {
+        const waitForPrevious = tail;
+        let release!: () => void;
+        tail = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        await waitForPrevious;
+        try {
+          return await fn(manager);
+        } finally {
+          release();
+        }
+      });
+
+      const attempts = await Promise.allSettled([
+        service.deductForOrder({
+          tenantId: 'tenant-1',
+          orderId: 'order-1',
+          idempotencyKey: 'idem-concurrent-1',
+          items: [{ menuItemId: 'item-1', quantity: 1 }],
+        }),
+        service.deductForOrder({
+          tenantId: 'tenant-1',
+          orderId: 'order-2',
+          idempotencyKey: 'idem-concurrent-2',
+          items: [{ menuItemId: 'item-1', quantity: 1 }],
+        }),
+      ]);
+
+      const fulfilled = attempts.filter((attempt) => attempt.status === 'fulfilled');
+      const rejected = attempts.filter((attempt) => attempt.status === 'rejected');
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0]).toMatchObject({
+        reason: expect.objectContaining({ errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT }),
+      });
+      expect(inventory.stock).toBe(0);
+      expect(manager.save).toHaveBeenCalledTimes(1);
+    });
+
     it('marks out of stock when stock hits zero', async () => {
       const inventory = { ...mockMenuItem, stock: 2 } as MenuItem;
       const manager = { save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)) };

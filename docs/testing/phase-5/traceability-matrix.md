@@ -126,17 +126,17 @@
 
 ---
 
-### `P1-CAT-TABLE-PLAN-QUOTA` — `implementation-gap` (P1, tenant-isolation)
+### `P1-CAT-TABLE-PLAN-QUOTA` — `covered` (P1, tenant-isolation)
 
 **Requirement:** Table creation must respect subscription `max_tables` quota.
 
 **Sources:** `business-logic` (3.D); `phase-4b-saas-onboarding` final business behavior.
 
-**Tests:** Catalog table service covers `countTablesByTenant` only; tenant plan guard spec covers subscription active status only.
+**Tests:** Catalog table service spec covers owner-service enforcement for `max_tables`, unlimited `-1`, missing/unavailable quota source fail-closed, and stable `TENANT_PLAN_LIMIT_EXCEEDED` details.
 
-**Target layer:** integration. **Stack:** BFF, SaaS, Catalog, Redis subscription cache.
+**Target layer:** unit-contract. **Stack:** mocked SaaS TCP.
 
-**Notes:** Count endpoints and cache exist; no enforcement path for creating an eleventh table on FREE was found. Implement or amend the spec before tests.
+**Notes:** Catalog now enforces quota before table persistence by calling SaaS `SUBSCRIPTION.GET_CURRENT` and counting owner-service tables. BFF edge feedback remains optional; owner boundary is the acceptance gate.
 
 ---
 
@@ -188,13 +188,13 @@
 
 **Requirement:** Staff confirm moves `PENDING` to `PROCESSING`, deducts stock through a Catalog TCP transaction, emits `order.confirmed`, and rolls back on stock errors.
 
-**Sources:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); `phase-2a-order-kafka` accepted decisions.
+**Sources:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); `phase-2a-order-kafka` accepted decisions; `phase-5-p0-order-stock-confirmation-spec`.
 
-**Tests:** Order service spec; Catalog menu-item service spec; order-confirmed payload spec in Order app.
+**Tests:** Order service spec; Catalog menu-item service spec; Catalog menu-item repository spec; order-confirmed payload spec in Order app.
 
 **Target layer:** integration. **Stack:** PostgreSQL, Catalog TCP, Kafka or outbox harness.
 
-**Notes:** Mocked paths cover happy and error cases; add concurrent stock locking integration (for example `stock=1` with two confirms) before calling P0 fully proven.
+**Notes:** Step 5.2 unit-contract coverage now proves stock deduct call shape, `PROCESSING` transition, outbox persistence, replay no-rededuct, Catalog sorted unique lock contract, and a stock=1 concurrent deduction simulation. Keep `partial` until Step 5.3 proves the same race through PostgreSQL plus Catalog TCP or an equivalent integration harness.
 
 ---
 
@@ -432,17 +432,17 @@
 
 ---
 
-### `P0-PAY-X-SECRET-VALUE` — `security-gap` (P0, security)
+### `P0-PAY-X-SECRET-VALUE` — `covered` (P0, security)
 
 **Requirement:** Phase 4B tenant and platform `x-secret-key` webhooks must validate the value against the stored tenant or platform secret before production or demo-public exposure.
 
 **Sources:** `business-logic` (6.A); `phase-4b-saas-onboarding` handoff; `docs/specs/business-logic-phase-4b-spec.md` webhook note.
 
-**Tests:** BFF SePay webhook controller spec (SaaS module).
+**Tests:** BFF SePay webhook controller spec (SaaS module); Payment service settlement spec; SaaS subscription invoice service spec; TCP logging interceptor redaction spec.
 
-**Target layer:** integration. **Stack:** BFF, Payment or SaaS stored secrets, provider or manual secret fixture.
+**Target layer:** unit-contract. **Stack:** none.
 
-**Notes:** Controller checks presence and forwards the secret; value verification and tests belong in a separate hardening change. Route presence is not sufficient. Use `docs/testing/phase-5/specs/phase-5-p0-webhook-secret-verification-spec.md` as the hardening contract.
+**Notes:** BFF rejects missing `x-secret-key` and forwards route context without returning the raw secret; TCP logging redacts secret-like fields before serializing params. Payment tenant webhook verification resolves `tenantSlug` server-side, decrypts the stored tenant payment-settings webhook secret, compares it with the supplied header, rejects invalid/unconfigured/mismatched secrets before payment/outbox/Order mutation, and keeps `QRSUB` payloads isolated from tenant settlement. SaaS platform webhook verification compares `x-secret-key` with `SEPAY_PLATFORM_WEBHOOK_SECRET`, rejects invalid/unconfigured secrets before invoice/subscription mutation, and keeps `QRTBL` payloads isolated from platform invoice handling. Tests use unit mocks only and do not call live SePay.
 
 ---
 
@@ -538,17 +538,17 @@
 
 ---
 
-### `P0-SAAS-FEATURE-GATING-QUOTAS` — `implementation-gap` (P0, tenant-isolation)
+### `P0-SAAS-FEATURE-GATING-QUOTAS` — `covered` (P0, tenant-isolation)
 
 **Requirement:** `max_tables`, `max_staff`, and `max_orders_per_day` must be enforced by guard or edge logic plus resource-owner backup checks.
 
 **Sources:** `business-logic` (1.A); `technical-architecture` (15.1); `phase-4b-saas-onboarding` accepted decisions.
 
-**Tests:** SaaS Phase 4B entity shape spec; Order quota service spec; tenant plan guard spec.
+**Tests:** Catalog table service spec; User-Access user and tenant-user service specs; Order service and order quota service specs; BusinessException and interceptor specs for quota error `details` propagation; SaaS Phase 4B entity shape spec.
 
-**Target layer:** integration. **Stack:** BFF, SaaS, Catalog, User-Access, Order, Redis.
+**Target layer:** unit-contract. **Stack:** mocked SaaS TCP and Redis-like quota counter.
 
-**Notes:** Data shape, counters, and active-subscription guard exist; quota blocking for table, staff, or order creation was not found. Implement `docs/testing/phase-5/specs/phase-5-p0-saas-quota-enforcement-spec.md` before acceptance tests.
+**Notes:** Owner-service enforcement now covers `max_tables`, `max_staff`, and `max_orders_per_day`; missing/inactive/unavailable quota source fails closed; `-1` is unlimited; disabled users do not count toward staff quota; order quota uses an atomic Redis reservation with release on rejected or failed creation and skips idempotency replay. BFF edge checks remain optional fast-feedback coverage.
 
 ---
 
@@ -740,25 +740,22 @@
 
 Ordered by urgency; each line is **priority**, **rule id**, **status**, and **next action**.
 
-1. **P0** — `P0-PAY-X-SECRET-VALUE` — `security-gap` — Implement `docs/testing/phase-5/specs/phase-5-p0-webhook-secret-verification-spec.md`; add focused BFF and service tests.
-2. **P0** — `P0-PAY-ROUNDING-VND` — `implementation-gap` — Implement `docs/testing/phase-5/specs/phase-5-p0-vnd-rounding-ownership-spec.md`; then test ceiling-to-thousand VND and propagation into Payment.
-3. **P0** — `P0-SAAS-FEATURE-GATING-QUOTAS` — `implementation-gap` — Implement `docs/testing/phase-5/specs/phase-5-p0-saas-quota-enforcement-spec.md`; then test guards and resource-owner backup checks.
-4. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Add integration for concurrent stock locking and final state (for example `stock=1` with two confirms, one success).
-5. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Add integration for Payment completion to Order `BILL_MARK_PAID` to table Cleaning with idempotent replay.
-6. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Refresh deterministic SUPER_ADMIN and MANAGER seed credentials and rerun `tools/verify-permission-matrix.sh`.
-7. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Add suspended tenant or session seed fixture and a Playwright journey for read-only behavior plus payment exception.
-8. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Add Phase 4B Playwright route smoke after seeded roles are reliable.
-9. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Add static test for the canonical topic registry and absence of UI-only topics.
-10. **P1** — `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` — Add static test for allowed Redis access by project.
-11. **P1** — `P1-CAT-NO-MENU-KAFKA` — `missing` — Add static test that no `menu.updated` contract is used; do not implement menu realtime in Phase 5.
+1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Run Step 5.3 external-stack integration for concurrent stock locking and final state (`stock=1`, two confirms, one success).
+2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Add integration for Payment completion to Order `BILL_MARK_PAID` to table Cleaning with idempotent replay.
+3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Refresh deterministic SUPER_ADMIN and MANAGER seed credentials and rerun `tools/verify-permission-matrix.sh`.
+4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Add suspended tenant or session seed fixture and a Playwright journey for read-only behavior plus payment exception.
+5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Add Phase 4B Playwright route smoke after seeded roles are reliable.
+6. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Add static test for the canonical topic registry and absence of UI-only topics.
+7. **P1** — `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` — Add static test for allowed Redis access by project.
+8. **P1** — `P1-CAT-NO-MENU-KAFKA` — `missing` — Add static test that no `menu.updated` contract is used; do not implement menu realtime in Phase 5.
 
 ---
 
 ## First P0 batch candidates
 
-1. **Unit or contract:** `P0-PAY-X-SECRET-VALUE`, `P0-PAY-ROUNDING-VND`, and `P0-SAAS-FEATURE-GATING-QUOTAS` after implementation decisions are locked.
-2. **Integration:** `P0-ORD-STATE-STOCK`, `P0-ORD-CART-VERSION-LOCK`, `P0-PAY-COMPLETED-ORDER-BRIDGE`, `P0-SAAS-ONBOARDING-SAGA`.
-3. **Browser E2E:** `P0-SAAS-SUSPENDED-CUSTOMER-PWA`, then payment close-session coverage from `P1-PAY-BROWSER-CLOSE-SESSION` if promoted for demo risk.
+1. **Integration:** `P0-ORD-STATE-STOCK`, `P0-ORD-CART-VERSION-LOCK`, `P0-PAY-COMPLETED-ORDER-BRIDGE`, `P0-SAAS-ONBOARDING-SAGA`.
+2. **Browser E2E:** `P0-SAAS-SUSPENDED-CUSTOMER-PWA`, then payment close-session coverage from `P1-PAY-BROWSER-CLOSE-SESSION` if promoted for demo risk.
+3. **Optional fast feedback:** BFF quota edge checks for `P0-SAAS-FEATURE-GATING-QUOTAS` if the UI needs pre-forward upgrade prompts.
 
 ---
 

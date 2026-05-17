@@ -126,17 +126,17 @@
 
 ---
 
-### `P1-CAT-TABLE-PLAN-QUOTA` — `implementation-gap` (P1, tenant-isolation)
+### `P1-CAT-TABLE-PLAN-QUOTA` — `covered` (P1, tenant-isolation)
 
 **Yêu cầu:** Tạo bàn phải tôn trọng quota subscription `max_tables`.
 
 **Nguồn:** `business-logic` (3.D); business behavior cuối `phase-4b-saas-onboarding`.
 
-**Test:** Service bàn Catalog chỉ cover `countTablesByTenant`; spec tenant plan guard chỉ cover subscription active.
+**Test:** Spec service bàn Catalog cover enforcement ở owner service cho `max_tables`, unlimited `-1`, quota source thiếu/không khả dụng fail-closed, và `details` ổn định của `TENANT_PLAN_LIMIT_EXCEEDED`.
 
-**Tầng đích:** integration. **Stack:** BFF, SaaS, Catalog, Redis subscription cache.
+**Tầng đích:** unit-contract. **Stack:** mock SaaS TCP.
 
-**Ghi chú:** Endpoint đếm và cache đã có; không tìm thấy đường enforcement tạo bàn thứ 11 trên FREE. Triển khai hoặc sửa spec trước test.
+**Ghi chú:** Catalog hiện enforce quota trước khi persist bàn bằng cách gọi SaaS `SUBSCRIPTION.GET_CURRENT` và đếm bàn ở owner service. BFF edge feedback vẫn là tùy chọn; ranh giới owner là gate chấp nhận.
 
 ---
 
@@ -188,13 +188,13 @@
 
 **Yêu cầu:** Staff confirm chuyển `PENDING` sang `PROCESSING`, trừ stock qua transaction Catalog TCP, emit `order.confirmed`, và rollback khi lỗi stock.
 
-**Nguồn:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); quyết định chấp nhận `phase-2a-order-kafka`.
+**Nguồn:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); quyết định chấp nhận `phase-2a-order-kafka`; `phase-5-p0-order-stock-confirmation-spec`.
 
-**Test:** Spec service Order; spec service menu-item Catalog; spec payload order-confirmed trong Order app.
+**Test:** Spec service Order; spec service menu-item Catalog; spec repository menu-item Catalog; spec payload order-confirmed trong Order app.
 
 **Tầng đích:** integration. **Stack:** PostgreSQL, Catalog TCP, Kafka hoặc outbox harness.
 
-**Ghi chú:** Đường mock cover happy và error; cần integration lock stock đồng thời (ví dụ `stock=1` với hai confirm) trước khi gọi P0 đã chứng minh đầy đủ.
+**Ghi chú:** Coverage unit-contract Step 5.2 hiện chứng minh shape call trừ stock, chuyển `PROCESSING`, persist outbox, replay không trừ lại, contract lock sorted unique của Catalog, và simulation concurrent stock=1. Giữ `partial` cho đến khi Step 5.3 chứng minh cùng race này qua PostgreSQL cộng Catalog TCP hoặc harness integration tương đương.
 
 ---
 
@@ -332,17 +332,17 @@
 
 ## Payment và billing
 
-### `P0-PAY-ROUNDING-VND` — `implementation-gap` (P0, money)
+### `P0-PAY-ROUNDING-VND` — `covered` (P0, money)
 
 **Yêu cầu:** Tổng bill và payment tuân policy làm tròn VND lên nghìn với `rawTotal`, `roundedTotal`, và `roundingDelta`.
 
 **Nguồn:** `business-logic` (6.B); `technical-architecture` (6.2.7, 10.1); quyết định chấp nhận `phase-3-payment`.
 
-**Test:** Spec bill service; spec payment service; spec trang request-payment customer PWA.
+**Test:** Spec policy làm tròn VND; spec roll-up bill Order và snapshot bill; spec Payment service; spec Payment refund service; spec trang request-payment customer PWA.
 
 **Tầng đích:** unit-contract. **Stack:** không.
 
-**Ghi chú:** Test assert giá trị trên snapshot bill và payment, nhưng không tìm thấy triển khai hoặc test chuẩn `Math.ceil(amount / 1000) * 1000`. Giải quyền ownership làm tròn qua `docs/testing/phase-5/specs/phase-5-p0-vnd-rounding-ownership-spec.md` (bản VI: `docs/testing/vi/phase-5/specs/phase-5-p0-vnd-rounding-ownership-spec.md`) trước test chấp nhận.
+**Ghi chú:** Helper chuẩn hiện áp dụng `Math.ceil(rawTotal / 1000) * 1000`, reject raw total âm hoặc không phải integer, và lưu `rawTotal`, `roundedTotal`, `roundingDelta` trên snapshot bill do Order sở hữu. Payment validate consistency của snapshot, persist total từ snapshot Order, dùng `roundedTotal` cho so sánh VietQR/cash/webhook, và fallback `paidAmount ?? roundedTotal` cho số tiền full refund.
 
 ---
 
@@ -432,17 +432,17 @@
 
 ---
 
-### `P0-PAY-X-SECRET-VALUE` — `security-gap` (P0, security)
+### `P0-PAY-X-SECRET-VALUE` — `covered` (P0, security)
 
 **Yêu cầu:** Webhook tenant và platform Phase 4B `x-secret-key` phải validate giá trị với secret tenant hoặc platform đã lưu trước exposure production hoặc demo công khai.
 
 **Nguồn:** `business-logic` (6.A); handoff `phase-4b-saas-onboarding`; ghi chú webhook `docs/specs/business-logic-phase-4b-spec.md`.
 
-**Test:** Spec BFF SePay webhook controller (SaaS module).
+**Test:** Spec BFF SePay webhook controller (SaaS module); spec settlement Payment service; spec subscription invoice service SaaS; spec redaction TCP logging interceptor.
 
-**Tầng đích:** integration. **Stack:** BFF, Payment hoặc SaaS secret đã lưu, provider hoặc fixture secret manual.
+**Tầng đích:** unit-contract. **Stack:** không.
 
-**Ghi chú:** Controller kiểm tra presence và forward secret; verify giá trị và test thuộc thay đổi hardening riêng. Presence route không đủ. Dùng `docs/testing/phase-5/specs/phase-5-p0-webhook-secret-verification-spec.md` (bản VI trong thư mục `specs/`) làm contract hardening.
+**Ghi chú:** BFF reject thiếu `x-secret-key` và forward route context mà không trả raw secret; TCP logging redact các field giống secret trước khi serialize params. Payment tenant webhook verify bằng cách resolve `tenantSlug` server-side, decrypt webhook secret đã lưu trong tenant payment settings, so sánh với header nhận được, reject secret invalid/unconfigured/mismatched trước mọi mutation payment/outbox/Order, và giữ payload `QRSUB` tách khỏi tenant settlement. SaaS platform webhook so sánh `x-secret-key` với `SEPAY_PLATFORM_WEBHOOK_SECRET`, reject secret invalid/unconfigured trước mọi mutation invoice/subscription, và giữ payload `QRTBL` tách khỏi xử lý invoice platform. Test dùng unit mock, không gọi SePay live.
 
 ---
 
@@ -538,17 +538,17 @@
 
 ---
 
-### `P0-SAAS-FEATURE-GATING-QUOTAS` — `implementation-gap` (P0, tenant-isolation)
+### `P0-SAAS-FEATURE-GATING-QUOTAS` — `covered` (P0, tenant-isolation)
 
 **Yêu cầu:** `max_tables`, `max_staff`, và `max_orders_per_day` phải được enforce bởi guard hoặc logic edge cộng check backup owner tài nguyên.
 
 **Nguồn:** `business-logic` (1.A); `technical-architecture` (15.1); quyết định chấp nhận `phase-4b-saas-onboarding`.
 
-**Test:** Spec entity shape Phase 4B SaaS; spec Order quota service; spec tenant plan guard.
+**Test:** Spec service bàn Catalog; spec service user và tenant-user User-Access; spec service Order và Order quota; spec BusinessException và interceptor cho propagate `details` lỗi quota; spec entity shape Phase 4B SaaS.
 
-**Tầng đích:** integration. **Stack:** BFF, SaaS, Catalog, User-Access, Order, Redis.
+**Tầng đích:** unit-contract. **Stack:** mock SaaS TCP và quota counter dạng Redis-like.
 
-**Ghi chú:** Data shape, counter, và guard subscription active đã có; không tìm thấy chặn quota khi tạo bàn, staff, hoặc order. Triển khai `docs/testing/phase-5/specs/phase-5-p0-saas-quota-enforcement-spec.md` (bản VI trong `specs/`) trước test chấp nhận.
+**Ghi chú:** Enforcement ở owner service hiện cover `max_tables`, `max_staff`, và `max_orders_per_day`; quota source thiếu/inactive/không khả dụng fail closed; `-1` là unlimited; user disabled không tính vào staff quota; order quota dùng Redis reservation atomic, release khi bị từ chối hoặc tạo fail, và bỏ qua retry idempotent. BFF edge checks vẫn là coverage fast-feedback tùy chọn.
 
 ---
 
@@ -740,25 +740,22 @@
 
 Sắp xếp theo độ khẩn; mỗi dòng là **priority**, **rule id**, **status**, và **next action**.
 
-1. **P0** — `P0-PAY-X-SECRET-VALUE` — `security-gap` — Triển khai `docs/testing/phase-5/specs/phase-5-p0-webhook-secret-verification-spec.md`; thêm test BFF và service tập trung.
-2. **P0** — `P0-PAY-ROUNDING-VND` — `implementation-gap` — Triển khai `docs/testing/phase-5/specs/phase-5-p0-vnd-rounding-ownership-spec.md`; sau đó test làm tròn VND ceiling-thousand và lan truyền vào Payment.
-3. **P0** — `P0-SAAS-FEATURE-GATING-QUOTAS` — `implementation-gap` — Triển khai `docs/testing/phase-5/specs/phase-5-p0-saas-quota-enforcement-spec.md`; sau đó test guard và check backup owner tài nguyên.
-4. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Thêm integration lock stock đồng thời và trạng thái cuối (ví dụ `stock=1` với hai confirm, một thành công).
-5. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Thêm integration hoàn tất Payment đến Order `BILL_MARK_PAID` đến bàn Cleaning với replay idempotent.
-6. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Refresh credential seed SUPER_ADMIN và MANAGER deterministic và chạy lại `tools/verify-permission-matrix.sh`.
-7. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Thêm fixture seed tenant suspended hoặc session và hành trình Playwright read-only cộng exception thanh toán.
-8. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Thêm route smoke Playwright Phase 4B sau khi role seed tin cậy.
-9. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Thêm static test cho topic registry chuẩn và không có topic chỉ UI.
-10. **P1** — `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` — Thêm static test cho truy cập Redis được phép theo project.
-11. **P1** — `P1-CAT-NO-MENU-KAFKA` — `missing` — Thêm static test đảm bảo không dùng contract `menu.updated`; không triển khai menu realtime trong Phase 5.
+1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Chạy integration external-stack Step 5.3 cho lock stock đồng thời và trạng thái cuối (`stock=1`, hai confirm, một thành công).
+2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Thêm integration hoàn tất Payment đến Order `BILL_MARK_PAID` đến bàn Cleaning với replay idempotent.
+3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Refresh credential seed SUPER_ADMIN và MANAGER deterministic và chạy lại `tools/verify-permission-matrix.sh`.
+4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Thêm fixture seed tenant suspended hoặc session và hành trình Playwright read-only cộng exception thanh toán.
+5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Thêm route smoke Playwright Phase 4B sau khi role seed tin cậy.
+6. **P1** — `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `missing` — Thêm static test cho topic registry chuẩn và không có topic chỉ UI.
+7. **P1** — `P1-ARCH-REDIS-ACCESS-POLICY` — `missing` — Thêm static test cho truy cập Redis được phép theo project.
+8. **P1** — `P1-CAT-NO-MENU-KAFKA` — `missing` — Thêm static test đảm bảo không dùng contract `menu.updated`; không triển khai menu realtime trong Phase 5.
 
 ---
 
 ## Ứng viên lô P0 đầu tiên
 
-1. **Unit hoặc contract:** `P0-PAY-X-SECRET-VALUE`, `P0-PAY-ROUNDING-VND`, và `P0-SAAS-FEATURE-GATING-QUOTAS` sau khi quyết định triển khai đã khóa.
-2. **Integration:** `P0-ORD-STATE-STOCK`, `P0-ORD-CART-VERSION-LOCK`, `P0-PAY-COMPLETED-ORDER-BRIDGE`, `P0-SAAS-ONBOARDING-SAGA`.
-3. **Browser E2E:** `P0-SAAS-SUSPENDED-CUSTOMER-PWA`, sau đó coverage close-session thanh toán từ `P1-PAY-BROWSER-CLOSE-SESSION` nếu nâng mức rủi ro demo.
+1. **Integration:** `P0-ORD-STATE-STOCK`, `P0-ORD-CART-VERSION-LOCK`, `P0-PAY-COMPLETED-ORDER-BRIDGE`, `P0-SAAS-ONBOARDING-SAGA`.
+2. **Browser E2E:** `P0-SAAS-SUSPENDED-CUSTOMER-PWA`, sau đó coverage close-session thanh toán từ `P1-PAY-BROWSER-CLOSE-SESSION` nếu nâng mức rủi ro demo.
+3. **Fast feedback tùy chọn:** BFF quota edge checks cho `P0-SAAS-FEATURE-GATING-QUOTAS` nếu UI cần upgrade prompt trước khi forward.
 
 ---
 

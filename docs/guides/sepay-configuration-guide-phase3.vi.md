@@ -40,6 +40,7 @@ SePay có nhiều sản phẩm. **QRTable Phase 3** dùng mô hình:
 
 3. **Chuẩn bị giá trị env khớp webhook auth đã chọn**
    - `SEPAY_WEBHOOK_SECRET` — secret dùng cho direct route HMAC hiện tại hoặc SECRET_KEY mode nếu route được cấu hình theo path đó.
+   - `SEPAY_PLATFORM_WEBHOOK_SECRET` — secret server-side cho route platform subscription Phase 4B (`QRSUB`).
    - `PAYMENT_SEPAY_QR_ACCOUNT`, `PAYMENT_SEPAY_QR_BANK` — **đúng** tài khoản nhận tiền dùng trong URL VietQR (`acc`, `bank`).
    - `BILL_REF_PREFIX` — mặc định dự án dùng `QRTBL` (mã tham chiếu bill trong nội dung CK).
 
@@ -124,17 +125,18 @@ Theo tài liệu SePay, field `code` được điền khi SePay **nhận diện 
 
 Sau khi đã có giá trị từ SePay và tài khoản ngân hàng, cấu hình phía monorepo (BFF + Payment Service — đúng file `.env` / secret manager của bạn):
 
-| Biến                           | Nguồn sự thật                                                                                                                                                                                                                        |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `SEPAY_WEBHOOK_SECRET`         | Secret dùng cho webhook auth đã chọn: direct Phase 3 route hiện dùng HMAC raw-body; SECRET_KEY mode của SePay dùng header `X-Secret-Key` nếu route được cấu hình theo path đó.                                                       |
-| `BFF_PAYMENT_TCP_TIMEOUT_MS`   | Timeout BFF chờ Payment Service qua TCP; mặc định `5000`                                                                                                                                                                             |
-| `PAYMENT_SEPAY_QR_ACCOUNT`     | STK nhận tiền (giống `acc` trong URL VietQR)                                                                                                                                                                                         |
-| `PAYMENT_SEPAY_QR_BANK`        | Tên ngân hàng SePay chấp nhận (giống `bank` trong URL)                                                                                                                                                                               |
-| `PAYMENT_ORDER_TCP_TIMEOUT_MS` | Timeout Payment Service chờ Order Service qua TCP; mặc định `5000`                                                                                                                                                                   |
-| `BILL_REF_PREFIX`              | Thường là `QRTBL`                                                                                                                                                                                                                    |
-| `PAYMENT_TYPEORM_DATABASE`     | **Staging/production:** database riêng cho Payment (ví dụ `qrtable_payment`). Dev có thể fallback `TYPEORM_DATABASE`; xem phase record `docs/phases/phase-3-payment.md` và kiến trúc Payment trong `docs/technical-architecture.md`. |
+| Biến                            | Nguồn sự thật                                                                                                                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SEPAY_WEBHOOK_SECRET`          | Secret dùng cho webhook auth đã chọn: direct Phase 3 route hiện dùng HMAC raw-body; SECRET_KEY mode của SePay dùng header `X-Secret-Key` nếu route được cấu hình theo path đó.                                                       |
+| `SEPAY_PLATFORM_WEBHOOK_SECRET` | Secret server-side hiện tại cho webhook platform subscription Phase 4B (`QRSUB`). Route tenant `QRTBL` không lấy secret từ env chung này; Payment verify bằng `tenant_payment_settings.webhook_secret_encrypted`.                    |
+| `BFF_PAYMENT_TCP_TIMEOUT_MS`    | Timeout BFF chờ Payment Service qua TCP; mặc định `5000`                                                                                                                                                                             |
+| `PAYMENT_SEPAY_QR_ACCOUNT`      | STK nhận tiền (giống `acc` trong URL VietQR)                                                                                                                                                                                         |
+| `PAYMENT_SEPAY_QR_BANK`         | Tên ngân hàng SePay chấp nhận (giống `bank` trong URL)                                                                                                                                                                               |
+| `PAYMENT_ORDER_TCP_TIMEOUT_MS`  | Timeout Payment Service chờ Order Service qua TCP; mặc định `5000`                                                                                                                                                                   |
+| `BILL_REF_PREFIX`               | Thường là `QRTBL`                                                                                                                                                                                                                    |
+| `PAYMENT_TYPEORM_DATABASE`      | **Staging/production:** database riêng cho Payment (ví dụ `qrtable_payment`). Dev có thể fallback `TYPEORM_DATABASE`; xem phase record `docs/phases/phase-3-payment.md` và kiến trúc Payment trong `docs/technical-architecture.md`. |
 
-**Giải thích xác thực:** Guide gốc Phase 3 cấu hình SePay SECRET_KEY mode (`X-Secret-Key`). Code BFF hiện tại cho direct route lại xác minh HMAC raw-body bằng `SEPAY_WEBHOOK_SECRET`; tenant/platform routes Phase 4B dùng `x-secret-key` path riêng. Không trộn các path này khi demo/production.
+**Giải thích xác thực:** Guide gốc Phase 3 cấu hình SePay SECRET_KEY mode (`X-Secret-Key`). Code BFF hiện tại cho direct route lại xác minh HMAC raw-body bằng `SEPAY_WEBHOOK_SECRET`; tenant/platform routes Phase 4B dùng `x-secret-key` path riêng. Tenant route `QRTBL` verify secret lưu theo tenant trong Payment DB; platform route `QRSUB` hiện verify bằng `SEPAY_PLATFORM_WEBHOOK_SECRET`. Không trộn các path này khi demo/production.
 
 **Pipeline webhook BFF (safe refactor):** (1) `SepayWebhookSecretGuard` hoặc tương đương — từ chối sớm nếu secret sai; (2) `ValidationPipe` + DTO runtime (`class-validator`) trên body Bank Hub — từ chối payload không đúng hình dạng trước khi gọi Payment qua TCP. Endpoint vẫn là public URL nhưng **không** nhận JSON tùy ý không validate.
 

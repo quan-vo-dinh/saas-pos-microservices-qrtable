@@ -22,7 +22,7 @@ Hình dạng route BFF hiện chỉ kiểm tra `x-secret-key` tồn tại, rồi
 1. Check presence `x-secret-key` ở BFF vẫn là edge validation nhanh, nhưng không đủ.
 2. Verifier có thẩm quyền phải là service sở hữu secret và state mutation:
    - Webhook tenant (`QRTBL`) được Payment Service verify với `tenant_payment_settings.webhook_secret_encrypted` cho `tenantSlug` route hoặc tenant đã resolve.
-   - Webhook platform (`QRSUB`) được SaaS Service verify với platform webhook secret từ cấu hình server-side hoặc lưu trữ platform settings tương lai.
+   - Webhook platform (`QRSUB`) được SaaS Service verify với cấu hình server-side hiện tại `SEPAY_PLATFORM_WEBHOOK_SECRET`. Lưu trữ platform settings vẫn là hướng phát triển sau.
 3. So sánh secret phải dùng constant-time equality sau decrypt hoặc load secret đã lưu.
 4. Webhook thiếu, không hợp lệ, không khớp, hoặc chưa cấu hình secret phải trả unauthorized/forbidden và không được mutate domain state.
 5. Request body không được tin cho identity tenant. Identity tenant đến từ slug route tenant và lookup server-side.
@@ -52,7 +52,7 @@ Với `POST /payment/sepay/webhook/platform`:
 
 - BFF từ chối thiếu `x-secret-key` trước khi forward.
 - BFF forward `x-secret-key`, payload, và `processId` sang SaaS.
-- SaaS verify giá trị với platform webhook secret đã cấu hình trước khi gọi subscription invoice matching.
+- SaaS verify giá trị với `SEPAY_PLATFORM_WEBHOOK_SECRET` trước khi gọi subscription invoice matching.
 - Nếu secret thiếu, không hợp lệ, không khớp, hoặc chưa cấu hình, SaaS từ chối webhook và không đánh dấu invoice paid.
 - Secret hợp lệ vẫn cần match reference `QRSUB` bình thường, trạng thái invoice pending, idempotency, và check amount.
 
@@ -77,7 +77,7 @@ Test nhanh bắt buộc:
 
 Test integration tùy chọn:
 
-- Ranh giới BFF đến service-owner với một tenant secret seed và một platform secret seed, chứng minh request secret không hợp lệ fail trước domain mutation.
+- Ranh giới BFF đến service-owner với một tenant secret seed và một `SEPAY_PLATFORM_WEBHOOK_SECRET` đã cấu hình, chứng minh request secret không hợp lệ fail trước domain mutation.
 
 ---
 

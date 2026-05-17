@@ -1,7 +1,15 @@
 import { BILL_REF_PREFIXES, SubscriptionInvoiceStatus } from '@common/constants/saas.constants';
 import { SubscriptionInvoice } from '@common/entities/subscription-invoice.entity';
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
-import { randomBytes } from 'crypto';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { randomBytes, timingSafeEqual } from 'crypto';
 import { PricingPlanRepository } from '../repositories/pricing-plan.repository';
 import { SubscriptionInvoiceRepository } from '../repositories/subscription-invoice.repository';
 import { SubscriptionService } from './subscription.service';
@@ -10,6 +18,7 @@ export type SubscriptionWebhookInput = {
   code: string;
   transferAmount: number;
   sepayTransactionId: string;
+  secret?: string;
   referenceCode?: string;
   content?: string;
 };
@@ -157,6 +166,8 @@ export class SubscriptionInvoiceService {
   }
 
   async handleWebhook(input: SubscriptionWebhookInput): Promise<void> {
+    this.verifyPlatformWebhookSecret(input.secret);
+
     if (!input.code.startsWith(BILL_REF_PREFIXES.SUBSCRIPTION)) {
       this.logger.warn(`Ignoring non-subscription webhook code=${input.code}`);
       return;
@@ -233,6 +244,14 @@ export class SubscriptionInvoiceService {
     return `https://qr.sepay.vn/img?${params.toString()}`;
   }
 
+  private verifyPlatformWebhookSecret(secret?: string): void {
+    const expectedSecret = process.env.SEPAY_PLATFORM_WEBHOOK_SECRET?.trim();
+    const providedSecret = secret?.trim();
+    if (!expectedSecret || !providedSecret || !constantTimeEquals(expectedSecret, providedSecret)) {
+      throw new UnauthorizedException('SEPAY_PLATFORM_WEBHOOK_SECRET_INVALID');
+    }
+  }
+
   private toInvoiceResponse(invoice: SubscriptionInvoice): Record<string, unknown> {
     return {
       id: invoice.id,
@@ -249,4 +268,10 @@ export class SubscriptionInvoiceService {
       createdAt: invoice.createdAt?.toISOString?.() ?? invoice.createdAt,
     };
   }
+}
+
+function constantTimeEquals(expected: string, actual: string): boolean {
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  const actualBuffer = Buffer.from(actual, 'utf8');
+  return expectedBuffer.length === actualBuffer.length && timingSafeEqual(expectedBuffer, actualBuffer);
 }

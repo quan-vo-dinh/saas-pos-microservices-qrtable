@@ -20,6 +20,9 @@ export class ResponseDto<T> {
   @ApiProperty({ type: String, required: false })
   errorCode?: string;
 
+  @ApiProperty({ required: false })
+  details?: unknown;
+
   constructor(data?: Partial<ResponseDto<T>>) {
     if (data) Object.assign(this, data);
   }

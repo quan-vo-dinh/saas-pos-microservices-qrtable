@@ -10,7 +10,7 @@
 
 Phase 4B defines pricing plans with resource quotas, but Phase 5 inventory found only data shape, count endpoints, cache summaries, and active-subscription checks. It did not find quota-blocking behavior for creating the 11th table, 6th staff account, or 101st daily order on the FREE plan.
 
-Phase 5 tests must not mark quota behavior as covered until enforcement exists at both the edge and the resource owner boundary.
+Phase 5 tests must not mark quota behavior as covered until enforcement exists at the resource-owner boundary. Edge checks can still provide faster UX feedback, but they cannot replace owner-service enforcement.
 
 ---
 
@@ -96,9 +96,8 @@ Quota value semantics:
 
 ## 5. Test Contract
 
-Required fast or integration tests:
+Required owner-service fast or integration tests:
 
-- BFF or guard test: inactive subscription blocks quota-consuming writes.
 - Catalog service test: FREE tenant with 10 active tables cannot create the 11th table.
 - Catalog service test: `-1` table quota allows creation above normal limits.
 - User-Access service test: FREE tenant with 5 active staff cannot create or invite the 6th active staff user.
@@ -113,6 +112,11 @@ Required negative tests:
 - Suspended tenant remains blocked even below quota.
 - Failed order creation does not consume daily order quota.
 - Idempotent order retry does not double-count.
+
+Optional edge-feedback tests:
+
+- BFF or guard test: inactive subscription blocks quota-consuming writes before forwarding.
+- BFF or route-level test: quota-exceeded response preserves `TENANT_PLAN_LIMIT_EXCEEDED` details for UI upgrade prompts.
 
 ---
 

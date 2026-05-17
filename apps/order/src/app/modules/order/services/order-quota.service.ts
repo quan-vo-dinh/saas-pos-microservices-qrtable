@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 
 type RedisLike = {
   incr(key: string): Promise<number>;
+  decr(key: string): Promise<number>;
   expire(key: string, seconds: number): Promise<unknown>;
   get(key: string): Promise<string | null>;
 };
@@ -31,6 +32,10 @@ export class OrderQuotaService {
       await this.client().expire(key, COUNTER_TTL_SECONDS);
     }
     return count;
+  }
+
+  async decrementDailyOrders(tenantId: string, now = new Date()): Promise<number> {
+    return this.client().decr(this.buildDailyOrderKey(tenantId, now));
   }
 
   async getDailyOrders(tenantId: string, now = new Date()): Promise<number> {

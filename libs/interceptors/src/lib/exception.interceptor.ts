@@ -59,6 +59,7 @@ export class ExceptionInterceptor implements NestInterceptor {
               errorCode: response.errorCode,
               message: response.message,
               statusCode: response.statusCode,
+              ...(response.details !== undefined ? { details: response.details } : {}),
               duration: `${durationMs} ms`,
               processID,
             }),
@@ -100,6 +101,7 @@ export class ExceptionInterceptor implements NestInterceptor {
           const statusCode = rpcPayload['code'] as number;
           const rpcMessage = (rpcPayload['message'] as string) || HTTP_MESSAGE.INTERNAL_SERVER_ERROR;
           const errorCode = rpcPayload['errorCode'] as string | undefined;
+          const details = rpcPayload['details'];
 
           throw new HttpException(
             new ResponseDto({
@@ -107,6 +109,7 @@ export class ExceptionInterceptor implements NestInterceptor {
               errorCode,
               message: rpcMessage,
               statusCode,
+              ...(details !== undefined ? { details } : {}),
               duration: `${durationMs} ms`,
               processID,
             }),

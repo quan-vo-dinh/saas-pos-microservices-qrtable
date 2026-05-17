@@ -11,6 +11,8 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.TENANT_MISMATCH_IDENTITY]: 'Tenant mismatch with user identity',
   [ErrorCode.TENANT_SESSION_NOT_FOUND]: 'Tenant session not found',
   [ErrorCode.TENANT_MISMATCH_SESSION]: 'Tenant mismatch with session',
+  [ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED]:
+    'This tenant has reached the limit of the current plan. Upgrade the subscription to continue.',
   [ErrorCode.SESSION_CLOSED]: 'Session is closed or no longer active',
   [ErrorCode.CART_VERSION_CONFLICT]: 'Cart was updated by another client; refresh and retry',
   [ErrorCode.CART_LOCKED]: 'Cart is locked for billing and cannot be modified',

@@ -29,7 +29,7 @@ import { TransferService } from './services/transfer.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Session, Order, OrderItem, Bill, ServiceRequest, OutboxEvent]),
-    ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.CATALOG_SERVICE)]),
+    ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.CATALOG_SERVICE), TcpProvider(TCP_SERVICES.SAAS_SERVICE)]),
     RedisClientModule,
   ],
   controllers: [OrderController],

@@ -23,6 +23,7 @@ import { PaymentReferenceService } from './services/payment-reference.service';
 import { PAYMENT_SECRETS_ENCRYPTION_KEY, PaymentSecretsService } from './services/payment-secrets.service';
 import { PaymentSettlementService } from './services/payment-settlement.service';
 import { PaymentService } from './services/payment.service';
+import { PaymentTenantGateway } from './services/payment-tenant.gateway';
 import { RefundService } from './services/refund.service';
 import { SEPAY_OAUTH_CLIENT_CONFIG, SepayOAuthClientService } from './services/sepay-oauth-client.service';
 import { SepayWebhookService } from './services/sepay-webhook.service';
@@ -38,7 +39,7 @@ import { TenantPaymentSettingsService } from './services/tenant-payment-settings
       TenantPaymentSettingsEntity,
     ]),
     RedisClientModule,
-    ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.ORDER_SERVICE)]),
+    ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.ORDER_SERVICE), TcpProvider(TCP_SERVICES.SAAS_SERVICE)]),
   ],
   controllers: [PaymentController],
   providers: [
@@ -46,6 +47,7 @@ import { TenantPaymentSettingsService } from './services/tenant-payment-settings
     PaymentOrderGateway,
     PaymentQueryService,
     PaymentSettlementService,
+    PaymentTenantGateway,
     SepayWebhookService,
     PaymentService,
     RefundService,

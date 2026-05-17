@@ -1,8 +1,10 @@
 import { OrderItem } from '@common/entities/order-item.entity';
 import { Order } from '@common/entities/order.entity';
 import { Bill } from '@common/entities/bill.entity';
+import { OutboxEvent } from '@common/entities/outbox-event.entity';
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { SubscriptionStatus } from '@common/constants/saas.constants';
 import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { Session } from '@common/entities/session.entity';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
@@ -16,6 +18,7 @@ import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { SessionRepository } from '../repositories/session.repository';
 import { CartService } from '../services/cart.service';
+import { OrderQuotaService } from '../services/order-quota.service';
 import { OrderService } from '../services/order.service';
 import { SessionService } from '../services/session.service';
 
@@ -24,6 +27,7 @@ describe('OrderService', () => {
   let dataSource: { transaction: jest.Mock };
   let orderRepository: {
     findByIdAndTenantForUpdate: jest.Mock;
+    findByIdempotencyKey: jest.Mock;
     findBySessionIdAndTenant: jest.Mock;
     findActiveKdsOrders: jest.Mock;
   };
@@ -36,11 +40,18 @@ describe('OrderService', () => {
     touchCustomerSessionActivity: jest.Mock;
   };
   let catalogClient: { send: jest.Mock };
+  let saasClient: { send: jest.Mock };
+  let orderQuotaService: {
+    getDailyOrders: jest.Mock;
+    incrementDailyOrders: jest.Mock;
+    decrementDailyOrders: jest.Mock;
+  };
 
   beforeEach(async () => {
     dataSource = { transaction: jest.fn() };
     orderRepository = {
       findByIdAndTenantForUpdate: jest.fn(),
+      findByIdempotencyKey: jest.fn().mockResolvedValue(null),
       findBySessionIdAndTenant: jest.fn(),
       findActiveKdsOrders: jest.fn(),
     };
@@ -56,6 +67,34 @@ describe('OrderService', () => {
     cartService = { getSnapshot: jest.fn(), mutate: jest.fn() };
     sessionService = { getActiveSessionOrThrow: jest.fn(), touchCustomerSessionActivity: jest.fn() };
     catalogClient = { send: jest.fn() };
+    saasClient = { send: jest.fn() };
+    orderQuotaService = {
+      getDailyOrders: jest.fn().mockResolvedValue(0),
+      incrementDailyOrders: jest.fn().mockResolvedValue(1),
+      decrementDailyOrders: jest.fn().mockResolvedValue(0),
+    };
+    saasClient.send.mockReturnValue(
+      of({
+        statusCode: 200,
+        data: {
+          tenant: { id: 't1', name: 'Tenant', slug: 'tenant', status: 'ACTIVE' },
+          current: {
+            planCode: 'BASIC',
+            planName: 'Basic',
+            status: SubscriptionStatus.ACTIVE,
+            expiresAt: null,
+            billingPeriod: 'MONTHLY',
+            features: [],
+            maxTables: 10,
+            maxStaff: 10,
+            maxOrdersPerDay: 100,
+          },
+          usage: {},
+          plans: [],
+          history: [],
+        },
+      }),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -67,7 +106,9 @@ describe('OrderService', () => {
         { provide: SessionRepository, useValue: sessionRepository },
         { provide: CartService, useValue: cartService },
         { provide: SessionService, useValue: sessionService },
+        { provide: OrderQuotaService, useValue: orderQuotaService },
         { provide: TCP_SERVICES.CATALOG_SERVICE, useValue: catalogClient },
+        { provide: TCP_SERVICES.SAAS_SERVICE, useValue: saasClient },
       ],
     }).compile();
 
@@ -116,6 +157,207 @@ describe('OrderService', () => {
         idempotencyKey: 'idem-1',
       }),
     ).rejects.toMatchObject({ errorCode: ErrorCode.CART_VERSION_CONFLICT });
+  });
+
+  it('confirmOrder deducts stock, moves the order to processing, and records order.confirmed outbox', async () => {
+    const now = new Date('2026-05-02T08:00:00.000Z');
+    const pendingOrder = {
+      id: 'o1',
+      tenantId: 't1',
+      sessionId: 's1',
+      tableId: 'tbl',
+      tableName: 'A1',
+      status: OrderStatus.PENDING,
+      totalAmount: 4000,
+      idempotencyKey: 'k',
+      notes: null,
+      confirmedAt: null,
+      confirmedByUserId: null,
+      cancelledAt: null,
+      cancelledByUserId: null,
+      cancelReason: null,
+      createdAt: now,
+      updatedAt: now,
+    } as Order;
+    const item = {
+      id: 'i1',
+      tenantId: 't1',
+      orderId: 'o1',
+      menuItemId: 'm1',
+      menuItemName: 'X',
+      quantity: 2,
+      unitPrice: 2000,
+      note: null,
+      status: OrderItemStatus.PROCESSING,
+      station: null,
+      createdAt: now,
+      updatedAt: now,
+    } as OrderItem;
+
+    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
+    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([item]);
+    billRepository.findByIdAndTenantForUpdate.mockResolvedValue({
+      id: 'b1',
+      tenantId: 't1',
+      sessionId: 's1',
+      orderIds: ['o1'],
+      subtotal: 4000,
+      total: 4000,
+      roundingAmount: 0,
+      paymentMethod: null,
+      status: BillStatus.OPEN,
+      closedAt: null,
+      paidAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    catalogClient.send.mockReturnValue(
+      of({
+        statusCode: 200,
+        data: [{ menuItemId: 'm1', menuItemName: 'X', requestedQuantity: 2, remainingStock: 0 }],
+      }),
+    );
+
+    const savedRows: Array<{ ctor: unknown; row: unknown }> = [];
+    const manager = {
+      findOne: jest.fn().mockResolvedValue({
+        id: 's1',
+        tenantId: 't1',
+        currentBillId: 'b1',
+      }),
+      create: jest.fn((_ctor: unknown, payload: Record<string, unknown>) => ({
+        id: 'outbox-1',
+        ...payload,
+      })),
+      save: jest.fn((ctor: unknown, row: unknown) => {
+        savedRows.push({ ctor, row });
+        return Promise.resolve(row);
+      }),
+    };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    const result = await service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' });
+
+    expect(catalogClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_DEDUCT_FOR_ORDER,
+      expect.objectContaining({
+        tenantId: 't1',
+        data: expect.objectContaining({
+          tenantId: 't1',
+          orderId: 'o1',
+          idempotencyKey: 'confirm-order:o1',
+          items: [{ menuItemId: 'm1', quantity: 2 }],
+        }),
+      }),
+    );
+    expect(result.order.status).toBe(OrderStatus.PROCESSING);
+    expect(result.events.orderStatusChanged).toEqual(
+      expect.objectContaining({
+        fromStatus: OrderStatus.PENDING,
+        toStatus: OrderStatus.PROCESSING,
+        changedByUserId: 'staff-1',
+      }),
+    );
+    expect(savedRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ctor: Order,
+          row: expect.objectContaining({ status: OrderStatus.PROCESSING, confirmedByUserId: 'staff-1' }),
+        }),
+        expect.objectContaining({
+          ctor: OrderItem,
+          row: expect.objectContaining({ status: OrderItemStatus.PROCESSING }),
+        }),
+        expect.objectContaining({
+          ctor: OutboxEvent,
+          row: expect.objectContaining({
+            tenantId: 't1',
+            eventType: 'order.confirmed',
+            aggregateId: 'o1',
+            partitionKey: 't1',
+            status: 'PENDING',
+          }),
+        }),
+      ]),
+    );
+
+    const outbox = savedRows.find((entry) => entry.ctor === OutboxEvent)?.row as { payload?: Record<string, unknown> };
+    expect(outbox.payload).toEqual(expect.objectContaining({ eventType: 'order.confirmed', orderId: 'o1' }));
+  });
+
+  it('confirmOrder replay for an already processing order does not rededuct stock or create outbox', async () => {
+    const now = new Date('2026-05-02T08:00:00.000Z');
+    const processingOrder = {
+      id: 'o1',
+      tenantId: 't1',
+      sessionId: 's1',
+      tableId: 'tbl',
+      tableName: 'A1',
+      status: OrderStatus.PROCESSING,
+      totalAmount: 4000,
+      idempotencyKey: 'k',
+      notes: null,
+      confirmedAt: now,
+      confirmedByUserId: 'staff-1',
+      cancelledAt: null,
+      cancelledByUserId: null,
+      cancelReason: null,
+      createdAt: now,
+      updatedAt: now,
+    } as Order;
+    const item = {
+      id: 'i1',
+      tenantId: 't1',
+      orderId: 'o1',
+      menuItemId: 'm1',
+      menuItemName: 'X',
+      quantity: 2,
+      unitPrice: 2000,
+      note: null,
+      status: OrderItemStatus.PROCESSING,
+      station: null,
+      createdAt: now,
+      updatedAt: now,
+    } as OrderItem;
+
+    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(processingOrder);
+    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([item]);
+    billRepository.findByIdAndTenantForUpdate.mockResolvedValue({
+      id: 'b1',
+      tenantId: 't1',
+      sessionId: 's1',
+      orderIds: ['o1'],
+      subtotal: 4000,
+      total: 4000,
+      roundingAmount: 0,
+      paymentMethod: null,
+      status: BillStatus.OPEN,
+      closedAt: null,
+      paidAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const manager = {
+      findOne: jest.fn().mockResolvedValue({
+        id: 's1',
+        tenantId: 't1',
+        currentBillId: 'b1',
+      }),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    const result = await service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' });
+
+    expect(result.order.status).toBe(OrderStatus.PROCESSING);
+    expect(catalogClient.send).not.toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_DEDUCT_FOR_ORDER,
+      expect.anything(),
+    );
+    expect(manager.create).not.toHaveBeenCalledWith(OutboxEvent, expect.anything());
+    expect(manager.save).not.toHaveBeenCalled();
   });
 
   it('confirmOrder propagates Catalog stock errors and does not persist confirmation', async () => {
@@ -384,6 +626,347 @@ describe('OrderService', () => {
     expect(savedOrderItems[0].menuItemImageUrl).toBe('https://cdn.example.com/pho.jpg');
     expect(result.order.items[0].menuItemImageUrl).toBe('https://cdn.example.com/pho.jpg');
   });
+
+  it('allows unlimited daily orders without touching the Redis quota counter', async () => {
+    const now = new Date('2026-05-02T00:00:00.000Z');
+    const session = buildActiveSession(now);
+    const { manager } = buildSubmitManager({ now, session });
+    sessionService.getActiveSessionOrThrow.mockResolvedValue(session);
+    mockCartWithOneItem(now);
+    mockCurrentSubscriptionLimit(-1);
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    await service.submitOrder({
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      expectedCartVersion: 0,
+      idempotencyKey: 'idem-1',
+    });
+
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(orderQuotaService.incrementDailyOrders).not.toHaveBeenCalled();
+    expect(orderQuotaService.decrementDailyOrders).not.toHaveBeenCalled();
+  });
+
+  it('reserves a finite daily order quota slot before creating a new order', async () => {
+    const now = new Date('2026-05-02T00:00:00.000Z');
+    const session = buildActiveSession(now);
+    const { manager } = buildSubmitManager({ now, session });
+    sessionService.getActiveSessionOrThrow.mockResolvedValue(session);
+    mockCartWithOneItem(now);
+    mockCurrentSubscriptionLimit(2);
+    orderQuotaService.incrementDailyOrders.mockResolvedValue(1);
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    await service.submitOrder({
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      expectedCartVersion: 0,
+      idempotencyKey: 'idem-1',
+    });
+
+    expect(orderQuotaService.incrementDailyOrders).toHaveBeenCalledWith('t1');
+    expect(orderQuotaService.decrementDailyOrders).not.toHaveBeenCalled();
+  });
+
+  it('blocks when daily order quota is reached before starting a DB transaction', async () => {
+    const now = new Date('2026-05-02T00:00:00.000Z');
+    sessionService.getActiveSessionOrThrow.mockResolvedValue(buildActiveSession(now));
+    mockCartWithOneItem(now);
+    mockCurrentSubscriptionLimit(2);
+    orderQuotaService.incrementDailyOrders.mockResolvedValue(3);
+
+    await expect(
+      service.submitOrder({
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        expectedCartVersion: 0,
+        idempotencyKey: 'idem-1',
+      }),
+    ).rejects.toMatchObject({
+      errorCode: ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED,
+      response: {
+        details: {
+          limitType: 'max_orders_per_day',
+          limit: 2,
+          current: 2,
+          upgradeUrl: '/dashboard/subscription',
+        },
+      },
+    });
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(orderQuotaService.incrementDailyOrders).toHaveBeenCalledWith('t1');
+    expect(orderQuotaService.decrementDailyOrders).toHaveBeenCalledWith('t1');
+  });
+
+  it('does not increment daily order quota for idempotency replay', async () => {
+    const now = new Date('2026-05-02T00:00:00.000Z');
+    const session = buildActiveSession(now);
+    const existingOrder = buildOrder(now);
+    const bill = buildBill(now, ['order-1']);
+    session.currentBillId = bill.id;
+    sessionService.getActiveSessionOrThrow.mockResolvedValue(session);
+    mockCartWithOneItem(now);
+    mockCurrentSubscriptionLimit(10);
+    orderRepository.findByIdempotencyKey.mockResolvedValue(existingOrder);
+    orderItemRepository.findByOrderIdAndTenant.mockResolvedValue([]);
+    sessionRepository.findByIdAndTenant.mockResolvedValue(session);
+    billRepository.findByIdAndTenant.mockResolvedValue(bill);
+    billRepository.findByIdAndTenantForUpdate.mockResolvedValue(bill);
+
+    const manager = {
+      getRepository: jest.fn(() => ({
+        createQueryBuilder: jest.fn(() => ({
+          setLock: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockResolvedValue(session),
+        })),
+        findOne: jest.fn().mockResolvedValue(existingOrder),
+      })),
+      find: jest.fn().mockResolvedValue([existingOrder]),
+      findOne: jest.fn().mockResolvedValue(session),
+    };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    await service.submitOrder({
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      expectedCartVersion: 0,
+      idempotencyKey: 'idem-1',
+    });
+
+    expect(saasClient.send).not.toHaveBeenCalledWith(TCP_REQUEST_MESSAGE.SUBSCRIPTION.GET_CURRENT, expect.anything());
+    expect(orderQuotaService.incrementDailyOrders).not.toHaveBeenCalled();
+    expect(orderQuotaService.decrementDailyOrders).not.toHaveBeenCalled();
+  });
+
+  it('releases a reserved daily order quota slot when creation fails', async () => {
+    const now = new Date('2026-05-02T00:00:00.000Z');
+    sessionService.getActiveSessionOrThrow.mockResolvedValue(buildActiveSession(now));
+    mockCartWithOneItem(now);
+    mockCurrentSubscriptionLimit(2);
+    orderQuotaService.incrementDailyOrders.mockResolvedValue(1);
+    dataSource.transaction.mockRejectedValue(new Error('db failed'));
+
+    await expect(
+      service.submitOrder({
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        expectedCartVersion: 0,
+        idempotencyKey: 'idem-1',
+      }),
+    ).rejects.toThrow('db failed');
+
+    expect(orderQuotaService.incrementDailyOrders).toHaveBeenCalledWith('t1');
+    expect(orderQuotaService.decrementDailyOrders).toHaveBeenCalledWith('t1');
+  });
+
+  it('blocks when current subscription is unavailable', async () => {
+    const now = new Date('2026-05-02T00:00:00.000Z');
+    sessionService.getActiveSessionOrThrow.mockResolvedValue(buildActiveSession(now));
+    mockCartWithOneItem(now);
+    saasClient.send.mockReturnValue(throwError(() => new Error('SaaS unavailable')));
+
+    await expect(
+      service.submitOrder({
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        expectedCartVersion: 0,
+        idempotencyKey: 'idem-1',
+      }),
+    ).rejects.toMatchObject({ errorCode: ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED });
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(orderQuotaService.incrementDailyOrders).not.toHaveBeenCalled();
+    expect(orderQuotaService.decrementDailyOrders).not.toHaveBeenCalled();
+  });
+
+  it('blocks when current subscription is missing', async () => {
+    const now = new Date('2026-05-02T00:00:00.000Z');
+    sessionService.getActiveSessionOrThrow.mockResolvedValue(buildActiveSession(now));
+    mockCartWithOneItem(now);
+    saasClient.send.mockReturnValue(
+      of({
+        statusCode: 200,
+        data: {
+          tenant: { id: 't1', name: 'Tenant', slug: 'tenant', status: 'ACTIVE' },
+          current: null,
+          usage: {},
+          plans: [],
+          history: [],
+        },
+      }),
+    );
+
+    await expect(
+      service.submitOrder({
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        expectedCartVersion: 0,
+        idempotencyKey: 'idem-1',
+      }),
+    ).rejects.toMatchObject({ errorCode: ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED });
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(orderQuotaService.incrementDailyOrders).not.toHaveBeenCalled();
+    expect(orderQuotaService.decrementDailyOrders).not.toHaveBeenCalled();
+  });
+
+  function buildActiveSession(now: Date): Session {
+    return {
+      id: 'sess-1',
+      tenantId: 't1',
+      tableId: 'tbl',
+      tableName: 'A1',
+      status: SessionStatus.ACTIVE,
+      startedAt: now,
+      lastActivity: now,
+      closedAt: null,
+      orderCount: 0,
+      currentBillId: null,
+      version: 1,
+    } as Session;
+  }
+
+  function buildOrder(now: Date): Order {
+    return {
+      id: 'order-1',
+      tenantId: 't1',
+      tableId: 'tbl',
+      tableName: 'A1',
+      sessionId: 'sess-1',
+      status: OrderStatus.PENDING,
+      totalAmount: 65000,
+      idempotencyKey: 'idem-1',
+      notes: null,
+      confirmedAt: null,
+      confirmedByUserId: null,
+      cancelledAt: null,
+      cancelledByUserId: null,
+      cancelReason: null,
+      createdAt: now,
+      updatedAt: now,
+    } as Order;
+  }
+
+  function buildBill(now: Date, orderIds: string[] = []): Bill {
+    return {
+      id: 'bill-1',
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      orderIds,
+      subtotal: 65000,
+      total: 65000,
+      roundingAmount: 0,
+      paymentMethod: null,
+      status: BillStatus.OPEN,
+      closedAt: null,
+      paidAt: null,
+      createdAt: now,
+      updatedAt: now,
+    } as Bill;
+  }
+
+  function buildSubmitManager({ now, session }: { now: Date; session: Session }): {
+    manager: Record<string, jest.Mock>;
+  } {
+    const savedOrderItems: OrderItem[] = [];
+    const savedOrder = buildOrder(now);
+    const savedBill = buildBill(now);
+
+    const manager = {
+      getRepository: jest.fn(() => ({
+        createQueryBuilder: jest.fn(() => ({
+          setLock: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn().mockReturnThis(),
+          getOne: jest.fn().mockResolvedValue(session),
+        })),
+        findOne: jest.fn().mockResolvedValue(null),
+      })),
+      create: jest.fn((ctor: unknown, payload: Record<string, unknown>) => {
+        if (ctor === Order) return { ...savedOrder, ...payload };
+        if (ctor === OrderItem) {
+          return { id: `item-${savedOrderItems.length + 1}`, ...payload, createdAt: now, updatedAt: now };
+        }
+        if (ctor === Bill) return { ...savedBill, ...payload };
+        return payload;
+      }),
+      save: jest.fn((_ctor: unknown, row: unknown) => {
+        if ((row as OrderItem).menuItemId) {
+          savedOrderItems.push(row as OrderItem);
+        }
+        return Promise.resolve(row);
+      }),
+      find: jest.fn().mockResolvedValue([savedOrder]),
+    };
+
+    return { manager };
+  }
+
+  function mockCartWithOneItem(now: Date): void {
+    cartService.getSnapshot
+      .mockResolvedValueOnce({
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        cartVersion: 0,
+        status: 'ACTIVE',
+        updatedAt: now.toISOString(),
+        items: [
+          {
+            cartLineId: 'line-1',
+            menuItemId: 'menu-1',
+            menuItemName: 'Phở bò',
+            quantity: 1,
+            unitPrice: 65000,
+            lineVersion: 1,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        cartVersion: 1,
+        status: 'ACTIVE',
+        updatedAt: now.toISOString(),
+        items: [],
+      });
+    cartService.mutate.mockResolvedValue({
+      tenantId: 't1',
+      sessionId: 'sess-1',
+      cartVersion: 1,
+      status: 'ACTIVE',
+      updatedAt: now.toISOString(),
+      items: [],
+    });
+  }
+
+  function mockCurrentSubscriptionLimit(maxOrdersPerDay: number): void {
+    saasClient.send.mockReturnValue(
+      of({
+        statusCode: 200,
+        data: {
+          tenant: { id: 't1', name: 'Tenant', slug: 'tenant', status: 'ACTIVE' },
+          current: {
+            planCode: 'BASIC',
+            planName: 'Basic',
+            status: SubscriptionStatus.ACTIVE,
+            expiresAt: null,
+            billingPeriod: 'MONTHLY',
+            features: [],
+            maxTables: 10,
+            maxStaff: 10,
+            maxOrdersPerDay,
+          },
+          usage: {},
+          plans: [],
+          history: [],
+        },
+      }),
+    );
+  }
 
   it('rejects customer cancel for another session order', async () => {
     const pendingOrder = {

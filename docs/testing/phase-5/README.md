@@ -23,6 +23,7 @@ Turn Phase 5 from a testing strategy into an executable rollout: trace business 
    - `docs/testing/phase-5/specs/phase-5-p0-webhook-secret-verification-spec.md`
    - `docs/testing/phase-5/specs/phase-5-p0-vnd-rounding-ownership-spec.md`
    - `docs/testing/phase-5/specs/phase-5-p0-saas-quota-enforcement-spec.md`
+   - `docs/testing/phase-5/specs/phase-5-p0-order-stock-confirmation-spec.md`
 3. Before any SePay OAuth, payment settings, webhook, or browser payment-settings work, read `docs/testing/phase-5/specs/phase-5-sepay-local-mock-testing-policy.md`. Default tests use mock SePay; live SePay is manual opt-in only.
 4. Split test implementation by layer:
    - Unit/contract workers own pure policies, guards, DTOs, constants, event payloads, and frontend hook/component behavior.

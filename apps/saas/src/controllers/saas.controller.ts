@@ -245,12 +245,13 @@ export class SaasController {
   async handleSubscriptionWebhook(
     @RequestParams() body: HandleSubscriptionWebhookTcpRequest,
   ): Promise<Response<boolean>> {
-    const { payload } = body;
+    const { payload, secret } = body;
     if (payload.code) {
       await this.subscriptionInvoiceService.handleWebhook({
         code: payload.code,
         transferAmount: payload.transferAmount,
         sepayTransactionId: String(payload.id),
+        secret,
         referenceCode: payload.referenceCode,
         content: payload.content,
       });

@@ -1,6 +1,12 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { TCP_SERVICES } from '@common/configuration/tcp.config';
+import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { SubscriptionStatus } from '@common/constants/saas.constants';
+import { Request } from '@common/interfaces/tcp/common/request.interface';
+import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
+import type { SubscriptionDashboardTcpResponse, TenantPlanLimitExceededDetails } from '@common/interfaces/tcp/saas';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { TableRepository } from '../repositories/table.repository';
 import { Table } from '@common/entities/table.entity';
@@ -19,7 +25,10 @@ import {
   CountTenantTablesResponse,
 } from '@common/interfaces/tcp/catalog';
 import { InjectRepository } from '@nestjs/typeorm';
+import { firstValueFrom, timeout } from 'rxjs';
 import { Repository } from 'typeorm';
+
+const SUBSCRIPTION_LOOKUP_TIMEOUT_MS = 5000;
 
 const VALID_TRANSITIONS: Record<TABLE_STATUS, TABLE_STATUS[]> = {
   [TABLE_STATUS.AVAILABLE]: [TABLE_STATUS.OCCUPIED],
@@ -34,6 +43,7 @@ export class TableService {
     private readonly tableRepository: TableRepository,
     @InjectRepository(Area)
     private readonly areaRepo: Repository<Area>,
+    @Inject(TCP_SERVICES.SAAS_SERVICE) private readonly saasClient: TcpClient,
   ) {}
 
   private generateQrToken(): string {
@@ -53,6 +63,8 @@ export class TableService {
       throw new BusinessException(ErrorCode.CATALOG_TABLE_DUPLICATE_NAME, HttpStatus.CONFLICT);
     }
 
+    await this.enforceMaxTablesQuota(data.tenantId);
+
     const table = await this.tableRepository.create({
       tenantId: data.tenantId,
       areaId: data.areaId,
@@ -69,6 +81,59 @@ export class TableService {
       throw new BusinessException(ErrorCode.CATALOG_TABLE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
+  }
+
+  private async enforceMaxTablesQuota(tenantId: string): Promise<void> {
+    try {
+      const response = await firstValueFrom(
+        this.saasClient
+          .send<
+            SubscriptionDashboardTcpResponse,
+            { tenantId: string }
+          >(TCP_REQUEST_MESSAGE.SUBSCRIPTION.GET_CURRENT, new Request({ tenantId, data: { tenantId } }))
+          .pipe(timeout({ first: SUBSCRIPTION_LOOKUP_TIMEOUT_MS })),
+      );
+
+      if (response.statusCode >= HttpStatus.BAD_REQUEST || !response.data?.current) {
+        this.throwMaxTablesLimitExceeded(0, 0);
+      }
+
+      const limit = response.data.current.maxTables;
+      if (response.data.current.status !== SubscriptionStatus.ACTIVE || !Number.isSafeInteger(limit)) {
+        this.throwMaxTablesLimitExceeded(0, 0);
+      }
+
+      if (limit === -1) {
+        return;
+      }
+
+      const current = await this.tableRepository.countByTenant({ tenantId, activeOnly: true });
+      if (current >= limit) {
+        this.throwMaxTablesLimitExceeded(limit, current);
+      }
+    } catch (error) {
+      if (error instanceof BusinessException) {
+        throw error;
+      }
+      this.throwMaxTablesLimitExceeded(0, 0);
+    }
+  }
+
+  private throwMaxTablesLimitExceeded(limit: number, current: number): never {
+    const details: TenantPlanLimitExceededDetails = {
+      limitType: 'max_tables',
+      limit,
+      current,
+      upgradeUrl: '/dashboard/subscription',
+    };
+
+    throw new BusinessException(
+      ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED,
+      HttpStatus.FORBIDDEN,
+      undefined,
+      undefined,
+      details,
+    );
   }
 
   async getList(data: GetTableListTcpRequest): Promise<Table[]> {

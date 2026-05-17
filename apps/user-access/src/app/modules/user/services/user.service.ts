@@ -9,6 +9,7 @@ import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { CreateKeyCloakUserTcpRequest } from '@common/interfaces/tcp/authorizer';
 import { firstValueFrom, map } from 'rxjs';
+import { enforceMaxStaffQuota } from './staff-quota.enforcer';
 
 type UpsertIdentityParams = {
   userId: string;
@@ -24,6 +25,7 @@ export class UserService {
   constructor(
     private readonly userRepository: UserRepository,
     @Inject(TCP_SERVICES.AUTHORIZER_SERVICE) private readonly authorizerClient: TcpClient,
+    @Inject(TCP_SERVICES.SAAS_SERVICE) private readonly saasClient: TcpClient,
   ) {}
 
   async create(params: CreateUserTcpRequest, processId: string) {
@@ -31,6 +33,14 @@ export class UserService {
 
     if (isExists) {
       throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS, HttpStatus.CONFLICT);
+    }
+
+    if (params.tenantId) {
+      await enforceMaxStaffQuota({
+        tenantId: params.tenantId,
+        userRepository: this.userRepository,
+        saasClient: this.saasClient,
+      });
     }
 
     const userId = await this.createKeycloakUser(

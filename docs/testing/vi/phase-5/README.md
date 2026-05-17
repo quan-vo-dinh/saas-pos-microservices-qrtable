@@ -24,6 +24,7 @@ Biến Phase 5 từ chiến lược kiểm thử thành lộ trình có thể ch
 - `[specs/phase-5-p0-webhook-secret-verification-spec.md](specs/phase-5-p0-webhook-secret-verification-spec.md)`
 - `[specs/phase-5-p0-vnd-rounding-ownership-spec.md](specs/phase-5-p0-vnd-rounding-ownership-spec.md)`
 - `[specs/phase-5-p0-saas-quota-enforcement-spec.md](specs/phase-5-p0-saas-quota-enforcement-spec.md)`
+- `[specs/phase-5-p0-order-stock-confirmation-spec.md](specs/phase-5-p0-order-stock-confirmation-spec.md)`
 
 3. Trước mọi việc liên quan SePay OAuth, payment settings, webhook hoặc browser payment-settings, đọc `[specs/phase-5-sepay-local-mock-testing-policy.md](specs/phase-5-sepay-local-mock-testing-policy.md)`. Test mặc định dùng mock SePay; SePay live chỉ chạy manual opt-in.
 4. Chia triển khai test theo tầng:

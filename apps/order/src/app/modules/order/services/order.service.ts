@@ -6,6 +6,7 @@ import { Session } from '@common/entities/session.entity';
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { SubscriptionStatus } from '@common/constants/saas.constants';
 import { Table } from '@common/entities/table.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
@@ -43,6 +44,10 @@ import type {
   SubmitOrderTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
 import type {
+  SubscriptionDashboardTcpResponse,
+  TenantPlanLimitExceededDetails,
+} from '@common/interfaces/tcp/saas/saas-response.interface';
+import type {
   Bill as BillDto,
   KitchenItemReadyEvent,
   KdsActiveOrderSnapshot,
@@ -62,7 +67,7 @@ import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { DataSource, EntityManager } from 'typeorm';
 import { randomUUID } from 'crypto';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { CONFIGURATION } from '../../../../configuration';
 import { buildOrderConfirmedKafkaPayload } from '../order-confirmed-payload';
 import { recalculateBillTotals } from '../utils/recalculate-bill-totals';
@@ -71,6 +76,7 @@ import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { SessionRepository } from '../repositories/session.repository';
 import { CartService } from './cart.service';
+import { OrderQuotaService } from './order-quota.service';
 import { SessionService } from './session.service';
 
 type SubmitTxOutcome =
@@ -80,6 +86,8 @@ type SubmitTxOutcome =
 type ConfirmTxOutcome =
   | { kind: 'replay'; order: Order; items: OrderItem[]; bill: Bill | null }
   | { kind: 'confirmed'; order: Order; items: OrderItem[]; bill: Bill | null };
+
+const SAAS_ORDER_QUOTA_TIMEOUT_MS = 2500;
 
 @Injectable()
 export class OrderService {
@@ -91,7 +99,9 @@ export class OrderService {
     private readonly sessionRepository: SessionRepository,
     private readonly cartService: CartService,
     private readonly sessionService: SessionService,
+    private readonly orderQuotaService: OrderQuotaService,
     @Inject(TCP_SERVICES.CATALOG_SERVICE) private readonly catalogClient: TcpClient,
+    @Inject(TCP_SERVICES.SAAS_SERVICE) private readonly saasClient: TcpClient,
   ) {}
 
   async joinSession(dto: JoinSessionTcpRequest): Promise<SessionTcpResponse> {
@@ -194,69 +204,91 @@ export class OrderService {
       throw new BusinessException(ErrorCode.ORDER_EMPTY_CART, HttpStatus.BAD_REQUEST);
     }
 
-    const outcome = await this.dataSource.transaction(async (manager) => {
-      const session = await this.lockSession(manager, dto.sessionId, dto.tenantId);
-      if (!session || session.status !== SessionStatus.ACTIVE) {
-        throw new BusinessException(ErrorCode.SESSION_CLOSED, HttpStatus.GONE);
-      }
+    const existingBeforeQuota = await this.orderRepository.findByIdempotencyKey(
+      dto.tenantId,
+      dto.sessionId,
+      dto.idempotencyKey,
+    );
+    let quotaReserved = false;
+    if (!existingBeforeQuota) {
+      quotaReserved = await this.reserveDailyOrderQuota(dto.tenantId);
+    }
 
-      const existing = await manager.getRepository(Order).findOne({
-        where: { tenantId: dto.tenantId, sessionId: dto.sessionId, idempotencyKey: dto.idempotencyKey },
-      });
-      if (existing) {
-        return { kind: 'replay', order: existing } satisfies SubmitTxOutcome;
-      }
+    let outcome: SubmitTxOutcome;
+    try {
+      outcome = await this.dataSource.transaction(async (manager) => {
+        const session = await this.lockSession(manager, dto.sessionId, dto.tenantId);
+        if (!session || session.status !== SessionStatus.ACTIVE) {
+          throw new BusinessException(ErrorCode.SESSION_CLOSED, HttpStatus.GONE);
+        }
 
-      const totalAmount = snapshot.items.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
-
-      const bill = await this.resolveOpenBillForSubmit(manager, session, dto.tenantId);
-
-      const order = manager.create(Order, {
-        tenantId: dto.tenantId,
-        tableId: session.tableId,
-        tableName: session.tableName,
-        sessionId: dto.sessionId,
-        status: OrderStatus.PENDING,
-        totalAmount,
-        idempotencyKey: dto.idempotencyKey,
-        notes: dto.notes?.trim() ? dto.notes.trim().slice(0, 2000) : null,
-        confirmedAt: null,
-        confirmedByUserId: null,
-        cancelledAt: null,
-        cancelledByUserId: null,
-        cancelReason: null,
-      });
-      await manager.save(Order, order);
-
-      const items: OrderItem[] = [];
-      for (const line of snapshot.items) {
-        const row = manager.create(OrderItem, {
-          tenantId: dto.tenantId,
-          orderId: order.id,
-          menuItemId: line.menuItemId,
-          menuItemName: line.menuItemName,
-          menuItemImageUrl: line.menuItemImageUrl ?? null,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-          note: line.note ?? null,
-          status: OrderItemStatus.PROCESSING,
-          station: line.station ?? null,
+        const existing = await manager.getRepository(Order).findOne({
+          where: { tenantId: dto.tenantId, sessionId: dto.sessionId, idempotencyKey: dto.idempotencyKey },
         });
-        await manager.save(OrderItem, row);
-        items.push(row);
+        if (existing) {
+          return { kind: 'replay', order: existing } satisfies SubmitTxOutcome;
+        }
+
+        const totalAmount = snapshot.items.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+
+        const bill = await this.resolveOpenBillForSubmit(manager, session, dto.tenantId);
+
+        const order = manager.create(Order, {
+          tenantId: dto.tenantId,
+          tableId: session.tableId,
+          tableName: session.tableName,
+          sessionId: dto.sessionId,
+          status: OrderStatus.PENDING,
+          totalAmount,
+          idempotencyKey: dto.idempotencyKey,
+          notes: dto.notes?.trim() ? dto.notes.trim().slice(0, 2000) : null,
+          confirmedAt: null,
+          confirmedByUserId: null,
+          cancelledAt: null,
+          cancelledByUserId: null,
+          cancelReason: null,
+        });
+        await manager.save(Order, order);
+
+        const items: OrderItem[] = [];
+        for (const line of snapshot.items) {
+          const row = manager.create(OrderItem, {
+            tenantId: dto.tenantId,
+            orderId: order.id,
+            menuItemId: line.menuItemId,
+            menuItemName: line.menuItemName,
+            menuItemImageUrl: line.menuItemImageUrl ?? null,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            note: line.note ?? null,
+            status: OrderItemStatus.PROCESSING,
+            station: line.station ?? null,
+          });
+          await manager.save(OrderItem, row);
+          items.push(row);
+        }
+
+        const orderIds = [...(bill.orderIds ?? []).filter(Boolean), order.id];
+        bill.orderIds = orderIds;
+        await recalculateBillTotals(manager, bill, dto.tenantId);
+        await manager.save(Bill, bill);
+
+        session.orderCount += 1;
+        session.currentBillId = bill.id;
+        await manager.save(Session, session);
+
+        return { kind: 'created', order, bill, items } satisfies SubmitTxOutcome;
+      });
+    } catch (error) {
+      if (quotaReserved) {
+        await this.orderQuotaService.decrementDailyOrders(dto.tenantId);
       }
+      throw error;
+    }
 
-      const orderIds = [...(bill.orderIds ?? []).filter(Boolean), order.id];
-      bill.orderIds = orderIds;
-      await recalculateBillTotals(manager, bill, dto.tenantId);
-      await manager.save(Bill, bill);
-
-      session.orderCount += 1;
-      session.currentBillId = bill.id;
-      await manager.save(Session, session);
-
-      return { kind: 'created', order, bill, items } satisfies SubmitTxOutcome;
-    });
+    if (quotaReserved && outcome.kind === 'replay') {
+      await this.orderQuotaService.decrementDailyOrders(dto.tenantId);
+    }
 
     let cartUpdated: SubmitOrderTcpResponse['events']['cartUpdated'];
     if (outcome.kind === 'created') {
@@ -942,6 +974,64 @@ export class OrderService {
       }
       throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
     }
+  }
+
+  private async reserveDailyOrderQuota(tenantId: string): Promise<boolean> {
+    const dashboard = await this.callSaasCurrentSubscription(tenantId);
+    const limit = dashboard.current?.maxOrdersPerDay;
+
+    if (dashboard.current?.status !== SubscriptionStatus.ACTIVE || !Number.isSafeInteger(limit) || limit < -1) {
+      throw this.buildTenantPlanLimitExceeded(0, 0);
+    }
+
+    if (limit === -1) {
+      return false;
+    }
+
+    const reservedCount = await this.orderQuotaService.incrementDailyOrders(tenantId);
+    if (reservedCount > limit) {
+      await this.orderQuotaService.decrementDailyOrders(tenantId);
+      throw this.buildTenantPlanLimitExceeded(limit, reservedCount - 1);
+    }
+    return true;
+  }
+
+  private async callSaasCurrentSubscription(tenantId: string): Promise<SubscriptionDashboardTcpResponse> {
+    try {
+      const response = await firstValueFrom(
+        this.saasClient
+          .send<
+            SubscriptionDashboardTcpResponse,
+            { tenantId: string }
+          >(TCP_REQUEST_MESSAGE.SUBSCRIPTION.GET_CURRENT, new Request<{ tenantId: string }>({ tenantId, data: { tenantId } }))
+          .pipe(timeout({ first: SAAS_ORDER_QUOTA_TIMEOUT_MS })),
+      );
+      if (response.error || response.statusCode >= 400 || !response.data?.current) {
+        throw this.buildTenantPlanLimitExceeded(0, 0);
+      }
+      return response.data;
+    } catch (e) {
+      if (e instanceof BusinessException) {
+        throw e;
+      }
+      throw this.buildTenantPlanLimitExceeded(0, 0);
+    }
+  }
+
+  private buildTenantPlanLimitExceeded(limit: number, current: number): BusinessException {
+    const details: TenantPlanLimitExceededDetails = {
+      limitType: 'max_orders_per_day',
+      limit,
+      current,
+      upgradeUrl: '/dashboard/subscription',
+    };
+    return new BusinessException(
+      ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED,
+      HttpStatus.FORBIDDEN,
+      undefined,
+      undefined,
+      details,
+    );
   }
 
   private toOrderDto(entity: Order, items: OrderItem[]): OrderDto {

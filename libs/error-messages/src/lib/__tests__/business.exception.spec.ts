@@ -32,4 +32,18 @@ describe('BusinessException', () => {
     const response = exception.getResponse() as Record<string, unknown>;
     expect(response['message']).toBe('Area not found');
   });
+
+  it('should preserve details when provided', () => {
+    const details = { limit: 5, current: 6 };
+    const exception = new BusinessException(
+      ErrorCode.TENANT_PLAN_LIMIT_EXCEEDED,
+      HttpStatus.FORBIDDEN,
+      undefined,
+      undefined,
+      details,
+    );
+
+    const response = exception.getResponse() as Record<string, unknown>;
+    expect(response['details']).toEqual(details);
+  });
 });

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import type { SepayWebhookPayload } from '@common/interfaces/tcp/payment';
 import { BillStatus, PaymentMethod } from '@einvoice/types';
 import { of, throwError } from 'rxjs';
@@ -52,11 +52,22 @@ function buildPaymentServiceForTest(opts: {
   auditRepo: unknown;
   outboxRepo: unknown;
   tenantPaymentSettingsRepository?: unknown;
+  paymentSecrets?: unknown;
+  tenantGateway?: unknown;
   reference?: PaymentReferenceService;
 }): PaymentService {
   const reference = opts.reference ?? new PaymentReferenceService();
   const tenantPaymentSettingsRepository = opts.tenantPaymentSettingsRepository ?? {
-    findByTenantId: jest.fn().mockResolvedValue(null),
+    findByTenantId: jest.fn().mockResolvedValue({
+      tenantId: 'tenant-1',
+      webhookSecretEncrypted: 'encrypted-tenant-secret',
+    }),
+  };
+  const paymentSecrets = opts.paymentSecrets ?? {
+    decrypt: jest.fn().mockReturnValue('tenant-secret'),
+  };
+  const tenantGateway = opts.tenantGateway ?? {
+    resolveBySlug: jest.fn().mockResolvedValue({ id: 'tenant-1', slug: 'tenant-a' }),
   };
   const gateway = new PaymentOrderGateway(opts.orderClient as never);
   const mapper = new PaymentMapper();
@@ -78,6 +89,9 @@ function buildPaymentServiceForTest(opts: {
     opts.auditRepo as never,
     opts.outboxRepo as never,
     reference,
+    tenantPaymentSettingsRepository as never,
+    paymentSecrets as never,
+    tenantGateway as never,
   );
   return new PaymentService(settlement, sepay, query);
 }
@@ -327,6 +341,8 @@ describe('PaymentService settlement behavior', () => {
 
     await service.handleSepayWebhook({
       payload: baseSepayPayload({ transferAmount: 100_000 }),
+      tenantSlug: 'tenant-a',
+      secret: 'tenant-secret',
     });
 
     const actions = auditRepo.createPaymentAudit.mock.calls.map((c) => c[1]);
@@ -376,7 +392,11 @@ describe('PaymentService settlement behavior', () => {
       outboxRepo,
     });
 
-    await service.handleSepayWebhook({ payload: baseSepayPayload({ id: 42 }) });
+    await service.handleSepayWebhook({
+      payload: baseSepayPayload({ id: 42 }),
+      tenantSlug: 'tenant-a',
+      secret: 'tenant-secret',
+    });
 
     const actions = auditRepo.createPaymentAudit.mock.calls.map((c) => c[1]);
     expect(actions).toContain('SEPAY_WEBHOOK_DUPLICATE');
@@ -413,7 +433,11 @@ describe('PaymentService settlement behavior', () => {
       outboxRepo,
     });
 
-    await service.handleSepayWebhook({ payload: baseSepayPayload({ id: 99 }) });
+    await service.handleSepayWebhook({
+      payload: baseSepayPayload({ id: 99 }),
+      tenantSlug: 'tenant-a',
+      secret: 'tenant-secret',
+    });
 
     const actions = auditRepo.createPaymentAudit.mock.calls.map((c) => c[1]);
     expect(actions).toContain('SEPAY_WEBHOOK_AFTER_PAID');
@@ -460,6 +484,8 @@ describe('PaymentService settlement behavior', () => {
     await service.handleSepayWebhook({
       payload: baseSepayPayload({ transferAmount: 200_000 }),
       processId: 'proc-1',
+      tenantSlug: 'tenant-a',
+      secret: 'tenant-secret',
     });
 
     expect(payment.status).toBe('PAID');
@@ -476,6 +502,185 @@ describe('PaymentService settlement behavior', () => {
         }),
       }),
     );
+  });
+
+  it('handleSepayWebhook: invalid tenant secret rejects before mutating payment, outbox, or Order', async () => {
+    const payment = makePayment({
+      billReference: 'QRTBL11111111',
+      status: 'PENDING',
+      sepayTransactionId: null,
+    });
+    const manager = { save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e) };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn().mockResolvedValue(payment),
+      findByTenantBillForUpdate: jest.fn(),
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = {
+      send: jest.fn().mockReturnValue(of({ data: { ok: true } })),
+    };
+
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
+
+    await expect(
+      service.handleSepayWebhook({
+        payload: baseSepayPayload({ transferAmount: 200_000 }),
+        tenantSlug: 'tenant-a',
+        secret: 'wrong-secret',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(payment.status).toBe('PENDING');
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(auditRepo.createPaymentAudit).not.toHaveBeenCalled();
+    expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
+    expect(orderClient.send).not.toHaveBeenCalled();
+  });
+
+  it('handleSepayWebhook: unconfigured tenant secret rejects before opening a settlement transaction', async () => {
+    const dataSource = {
+      transaction: jest.fn(),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn(),
+      findByTenantBillForUpdate: jest.fn(),
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = { send: jest.fn() };
+    const tenantPaymentSettingsRepository = {
+      findByTenantId: jest.fn().mockResolvedValue({
+        tenantId: 'tenant-1',
+        webhookSecretEncrypted: null,
+      }),
+    };
+
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+      tenantPaymentSettingsRepository,
+    });
+
+    await expect(
+      service.handleSepayWebhook({
+        payload: baseSepayPayload({ transferAmount: 200_000 }),
+        tenantSlug: 'tenant-a',
+        secret: 'tenant-secret',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(paymentRepo.findByBillReferenceForUpdate).not.toHaveBeenCalled();
+    expect(auditRepo.createPaymentAudit).not.toHaveBeenCalled();
+    expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
+    expect(orderClient.send).not.toHaveBeenCalled();
+  });
+
+  it('handleSepayWebhook: tenant slug mismatch rejects before mutating payment, outbox, or Order', async () => {
+    const payment = makePayment({
+      tenantId: 'tenant-b',
+      billReference: 'QRTBL11111111',
+      status: 'PENDING',
+      sepayTransactionId: null,
+    });
+    const manager = { save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e) };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn().mockResolvedValue(payment),
+      findByTenantBillForUpdate: jest.fn(),
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = {
+      send: jest.fn().mockReturnValue(of({ data: { ok: true } })),
+    };
+
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
+
+    await expect(
+      service.handleSepayWebhook({
+        payload: baseSepayPayload({ transferAmount: 200_000 }),
+        tenantSlug: 'tenant-a',
+        secret: 'tenant-secret',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(payment.status).toBe('PENDING');
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(auditRepo.createPaymentAudit).not.toHaveBeenCalled();
+    expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
+    expect(orderClient.send).not.toHaveBeenCalled();
+  });
+
+  it('handleSepayWebhook: QRSUB payload on tenant route does not mutate payment state', async () => {
+    const dataSource = {
+      transaction: jest.fn(),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn(),
+      findByTenantBillForUpdate: jest.fn(),
+      findByTenantAndBill: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = { send: jest.fn() };
+
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
+
+    await service.handleSepayWebhook({
+      payload: baseSepayPayload({
+        code: 'QRSUB123',
+        content: 'Thanh toan QRSUB123',
+        transferAmount: 999_000,
+      }),
+      tenantSlug: 'tenant-a',
+      secret: 'tenant-secret',
+    });
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(paymentRepo.findByBillReferenceForUpdate).not.toHaveBeenCalled();
+    expect(auditRepo.createPaymentAudit).not.toHaveBeenCalled();
+    expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
+    expect(orderClient.send).not.toHaveBeenCalled();
   });
 
   it('confirmCash: persists PAID payment even when BILL_MARK_PAID TCP fails afterward', async () => {

@@ -82,7 +82,7 @@ export class SepayWebhookController {
   }
 
   private assertSecret(secret?: string): void {
-    if (!secret) {
+    if (!secret?.trim()) {
       throw new UnauthorizedException('SEPAY_SECRET_REQUIRED');
     }
   }

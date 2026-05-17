@@ -42,5 +42,6 @@ export type CheckoutInvoiceTcpRequest = {
 
 export type HandleSubscriptionWebhookTcpRequest = {
   payload: SepayWebhookPayload;
+  secret?: string;
   processId?: string;
 };

@@ -17,7 +17,7 @@ export class TcpLoggingInterceptor implements NestInterceptor {
     const processId = (param?.['processId'] as string) || 'unknown_process_id';
 
     Logger.log(
-      `ProcessId: '${processId}' >> method: '${handlerName}' >> at '${now}' >> param: ${JSON.stringify(param)}`,
+      `ProcessId: '${processId}' >> method: '${handlerName}' >> at '${now}' >> param: ${JSON.stringify(sanitizeForLog(param))}`,
       TcpLoggingInterceptor.name,
     );
 
@@ -34,11 +34,15 @@ export class TcpLoggingInterceptor implements NestInterceptor {
         // BusinessException — propagate errorCode + message
         if (error instanceof BusinessException) {
           const response = error.getResponse() as BusinessExceptionResponse;
-          throw new RpcException({
+          const payload: { code: number; message: string; errorCode: string; details?: unknown } = {
             code: response.statusCode,
             message: response.message,
             errorCode: response.errorCode,
-          });
+          };
+          if (response.details !== undefined) {
+            payload.details = response.details;
+          }
+          throw new RpcException(payload);
         }
 
         // TypeORM QueryFailedError — transform then propagate
@@ -59,4 +63,21 @@ export class TcpLoggingInterceptor implements NestInterceptor {
       }),
     );
   }
+}
+
+function sanitizeForLog(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForLog(item));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, child]) => [
+      key,
+      /secret/i.test(key) ? '[REDACTED]' : sanitizeForLog(child),
+    ]),
+  );
 }
