@@ -400,11 +400,11 @@
 
 **Sources:** `technical-architecture` (7.2, 9.2, 10.1); `phase-3-payment` final technical behavior.
 
-**Tests:** Payment service spec; Order payment events consumer spec; BFF realtime Kafka bridge spec; customer PWA order realtime hook spec.
+**Tests:** Payment service spec; Order payment events consumer spec; BFF realtime Kafka bridge spec; customer PWA order realtime hook spec; opt-in external-stack harness `apps/payment/src/app/modules/payment/tests/payment-completed-order-bridge.integration.spec.ts`.
 
-**Target layer:** integration. **Stack:** Payment database, Order database, Kafka or outbox, Redis optional.
+**Target layer:** integration. **Stack:** Payment database, Order database, Catalog database, Order TCP, Catalog TCP, Redis for Order session close.
 
-**Notes:** Unit and bridge tests exist; add integration proving one final database state across Payment, Order, and Catalog with idempotent replay.
+**Notes:** Unit and bridge tests exist, and the opt-in harness is present. It is skipped by default and runs only with `RUN_PHASE5_PAY_COMPLETED_ORDER_BRIDGE=1 pnpm nx test payment --testPathPatterns=payment-completed-order-bridge.integration.spec.ts --runInBand` after the local external stack is started. Keep status `partial` until that opt-in run proves one final database state across Payment, Order, and Catalog with idempotent replay.
 
 ---
 
@@ -741,7 +741,7 @@
 Ordered by urgency; each line is **priority**, **rule id**, **status**, and **next action**.
 
 1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Run Step 5.3 external-stack integration for concurrent stock locking and final state (`stock=1`, two confirms, one success).
-2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Add integration for Payment completion to Order `BILL_MARK_PAID` to table Cleaning with idempotent replay.
+2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Run the opt-in external-stack harness for Payment completion to Order `BILL_MARK_PAID` to table Cleaning with idempotent replay.
 3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Refresh deterministic SUPER_ADMIN and MANAGER seed credentials and rerun `tools/verify-permission-matrix.sh`.
 4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Add suspended tenant or session seed fixture and a Playwright journey for read-only behavior plus payment exception.
 5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Add Phase 4B Playwright route smoke after seeded roles are reliable.

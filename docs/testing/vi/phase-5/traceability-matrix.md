@@ -400,11 +400,11 @@
 
 **Nguồn:** `technical-architecture` (7.2, 9.2, 10.1); technical behavior cuối `phase-3-payment`.
 
-**Test:** Spec payment service; spec Order payment events consumer; spec BFF realtime Kafka bridge; spec hook order realtime customer PWA.
+**Test:** Spec payment service; spec Order payment events consumer; spec BFF realtime Kafka bridge; spec hook order realtime customer PWA; harness external-stack opt-in `apps/payment/src/app/modules/payment/tests/payment-completed-order-bridge.integration.spec.ts`.
 
-**Tầng đích:** integration. **Stack:** DB Payment, DB Order, Kafka hoặc outbox, Redis tùy chọn.
+**Tầng đích:** integration. **Stack:** DB Payment, DB Order, DB Catalog, TCP Order, TCP Catalog, Redis cho close session của Order.
 
-**Ghi chú:** Unit và bridge test đã có; cần integration chứng minh một trạng thái DB cuối thống nhất qua Payment, Order, và Catalog với replay idempotent.
+**Ghi chú:** Unit và bridge test đã có, và harness opt-in đã được thêm. Mặc định harness bị skip, chỉ chạy bằng `RUN_PHASE5_PAY_COMPLETED_ORDER_BRIDGE=1 pnpm nx test payment --testPathPatterns=payment-completed-order-bridge.integration.spec.ts --runInBand` sau khi start local external stack. Giữ status `partial` cho đến khi lần chạy opt-in chứng minh một trạng thái DB cuối thống nhất qua Payment, Order, và Catalog với replay idempotent.
 
 ---
 
@@ -741,7 +741,7 @@
 Sắp xếp theo độ khẩn; mỗi dòng là **priority**, **rule id**, **status**, và **next action**.
 
 1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Chạy integration external-stack Step 5.3 cho lock stock đồng thời và trạng thái cuối (`stock=1`, hai confirm, một thành công).
-2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Thêm integration hoàn tất Payment đến Order `BILL_MARK_PAID` đến bàn Cleaning với replay idempotent.
+2. **P0** — `P0-PAY-COMPLETED-ORDER-BRIDGE` — `partial` — Chạy harness external-stack opt-in cho hoàn tất Payment đến Order `BILL_MARK_PAID` đến bàn Cleaning với replay idempotent.
 3. **P0** — `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `partial` — Refresh credential seed SUPER_ADMIN và MANAGER deterministic và chạy lại `tools/verify-permission-matrix.sh`.
 4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Thêm fixture seed tenant suspended hoặc session và hành trình Playwright read-only cộng exception thanh toán.
 5. **P1** — `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `missing` — Thêm route smoke Playwright Phase 4B sau khi role seed tin cậy.
