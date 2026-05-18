@@ -142,17 +142,17 @@
 
 ## Order, cart, và session
 
-### `P0-ORD-SESSION-JOIN` — `partial` (P0, state-machine)
+### `P0-ORD-SESSION-JOIN` — `covered` (P0, state-machine)
 
 **Yêu cầu:** Join QR khách tạo session active bền cho bàn AVAILABLE, rejoin session active OCCUPIED, và từ chối bắt đầu session cho BILLING và CLEANING.
 
 **Nguồn:** `business-logic` (3.C, 4.A); phạm vi cuối `phase-2a-order-kafka`.
 
-**Test:** Spec service Order và session; E2E realtime Bước 2.7.
+**Test:** Spec service Order và session; E2E realtime Bước 2.7; spec external-stack opt-in `apps/order/src/app/modules/order/tests/order-session-join.integration.spec.ts`.
 
 **Tầng đích:** integration. **Stack:** PostgreSQL, Redis, Catalog TCP, PWA hoặc BFF cho E2E.
 
-**Ghi chú:** Unit và hành trình browser đã có; cần integration ranh giới thật cho QR Catalog hoặc trạng thái bàn cộng ngữ nghĩa session Order trong Redis và PostgreSQL.
+**Ghi chú:** Integration external-stack Step 5.3 hiện chứng minh validation QR/trạng thái bàn Catalog live cộng ngữ nghĩa Order PostgreSQL/Redis: AVAILABLE tạo và cache session active rồi chuyển Catalog sang OCCUPIED, OCCUPIED rejoin session active và refresh activity, BILLING/CLEANING từ chối join. Chạy bằng `NX_SKIP_NX_CACHE=true RUN_PHASE5_ORDER_SESSION_JOIN_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-session-join.integration.spec.ts --runInBand` sau khi PostgreSQL, Redis, và Catalog TCP sẵn sàng.
 
 ---
 
@@ -210,31 +210,31 @@
 
 ---
 
-### `P0-ORD-BILL-REQUEST` — `partial` (P0, money)
+### `P0-ORD-BILL-REQUEST` — `covered` (P0, money)
 
 **Yêu cầu:** Yêu cầu bill cần cart rỗng và mọi order active đã served; bill chuyển `OPEN` sang `PENDING_PAYMENT`, lock cart, bàn chuyển billing.
 
 **Nguồn:** `business-logic` (3.C, 6.A); quyết định chấp nhận `phase-2a-order-kafka`.
 
-**Test:** Spec bill và service-request trong Order; spec hook order query customer PWA.
+**Test:** Spec bill và service-request trong Order; spec hook order query customer PWA; spec external-stack opt-in `apps/order/src/app/modules/order/tests/order-bill-request.integration.spec.ts`.
 
 **Tầng đích:** integration. **Stack:** PostgreSQL, Redis, Catalog TCP.
 
-**Ghi chú:** Service test cover rule; chứng minh ranh giới cart lock cộng trạng thái billing bàn Catalog vẫn là mục tiêu integration.
+**Ghi chú:** Integration external-stack Step 5.3 hiện chứng minh cart còn item thì reject, active order chưa served thì reject, request thành công chuyển bill `OPEN -> PENDING_PAYMENT`, tạo service request, lock mutation cart Redis, và chuyển bàn Catalog sang `BILLING`. Chạy bằng `NX_SKIP_NX_CACHE=true RUN_PHASE5_ORDER_BILL_REQUEST_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-bill-request.integration.spec.ts --runInBand` sau khi PostgreSQL, Redis, và Catalog TCP sẵn sàng.
 
 ---
 
-### `P0-ORD-PAYMENT-FINALIZATION` — `partial` (P0, money)
+### `P0-ORD-PAYMENT-FINALIZATION` — `covered` (P0, money)
 
 **Yêu cầu:** `BILL_MARK_PAID` idempotent, đánh dấu bill `PAID`, đóng session active, xóa key session và cart Redis, chuyển bàn `BILLING` sang `CLEANING`.
 
 **Nguồn:** `business-logic` (3.C, 6.A); quyết định chấp nhận `phase-3-payment`.
 
-**Test:** Spec bill và session service; spec payment events consumer trong Order.
+**Test:** Spec bill và session service; spec payment events consumer trong Order; spec external-stack opt-in `apps/order/src/app/modules/order/tests/order-payment-finalization.integration.spec.ts`; spec idempotency service bàn Catalog.
 
 **Tầng đích:** integration. **Stack:** PostgreSQL, Redis, Catalog TCP, payment event harness.
 
-**Ghi chú:** Unit coverage đã có; thiếu integration đầy đủ Payment → Order → Catalog trạng thái cuối hoặc E2E close-session.
+**Ghi chú:** Integration external-stack Step 5.3 hiện chứng minh finalization Order-side `BILL_MARK_PAID` idempotent, replay trả về payment id ban đầu, bill đã paid nhưng side effect cũ vẫn đóng active session, xóa key Redis session/cart, và trạng thái bàn Catalog đạt `CLEANING`. Update cùng trạng thái ở Catalog là idempotent khi contract session khớp. Ingestion event provider Payment vẫn được cover bởi `P0-PAY-COMPLETED-ORDER-BRIDGE`; proof browser close-session vẫn track riêng ở Step 5.4. Chạy bằng `NX_SKIP_NX_CACHE=true RUN_PHASE5_ORDER_PAYMENT_FINALIZATION_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-payment-finalization.integration.spec.ts --runInBand` sau khi PostgreSQL, Redis, và Catalog TCP sẵn sàng.
 
 ---
 
@@ -468,11 +468,11 @@
 
 **Nguồn:** `business-logic` (1.A); quyết định chấp nhận `phase-4b-saas-onboarding`.
 
-**Test:** Spec unit và integration saga onboarding SaaS; spec Authorizer Keycloak admin service; spec tenant user service User-Access.
+**Test:** Spec unit và integration mock saga onboarding SaaS; integration PostgreSQL SaaS opt-in `apps/saas/src/services/onboarding-saga-db.integration.spec.ts`; spec Authorizer Keycloak admin service; spec tenant user service User-Access.
 
 **Tầng đích:** integration. **Stack:** DB SaaS, Authorizer và Keycloak, User-Access, Payment TCP, Kafka hoặc outbox.
 
-**Ghi chú:** Integration mock cover orchestration và compensation; cần ranh giới service thật hoặc integration seed khi có stack harness.
+**Ghi chú:** Integration PostgreSQL SaaS Step 5.3 hiện chứng minh success persist tenant, initial subscription, contract TCP payment-settings, và outbox `tenant.created`, cùng compensation trước và sau khi assign subscription. Service hiện xóa subscription `INITIAL_ONBOARDING` khi rollback để tránh orphan row. Rule vẫn `partial` vì Authorizer + Keycloak thật, User-Access, và Payment service vẫn được đại diện bằng TCP contract double thay vì harness live nhiều service. Chạy bằng `NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm nx test saas --testPathPatterns=onboarding-saga-db.integration.spec.ts --runInBand` sau khi PostgreSQL sẵn sàng.
 
 ---
 
@@ -741,16 +741,16 @@
 Sắp xếp theo độ khẩn; mỗi dòng là **priority**, **rule id**, **status**, và **next action**.
 
 1. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Mở rộng browser smoke với đường thanh toán pending-bill đã seed sau khi dữ liệu Flow B/B+D ổn định.
-2. **P0** — `P0-ORD-BILL-REQUEST` — `partial` — Thêm integration cho cart rỗng, mọi order đã served, lock cart, và chuyển bàn sang billing.
-3. **P0** — `P0-ORD-PAYMENT-FINALIZATION` — `partial` — Thêm integration cho finalization bill exactly-once, lock cart/session, và chuyển bàn sang Cleaning.
-4. **P0** — `P0-ORD-SESSION-JOIN` — `partial` — Thêm integration ranh giới thật cho QR/trạng thái bàn Catalog cộng ngữ nghĩa session Order trong Redis và PostgreSQL.
-5. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Thêm integration cross-service cho onboarding thành công và behavior compensation hiện tại.
+2. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Thêm harness live nhiều service cho Authorizer + Keycloak, User-Access, và Payment; DB success và compensation hiện đã covered.
+3. **P0** — `P0-CAT-TENANT-ISOLATION` — `partial` — Làm rõ readiness và seed policy cho integration tenant isolation phụ thuộc stack hiện có trước khi xem là gate ổn định.
+4. **P0** — `P0-KDS-ORDER-CONFIRMED-DEDUPE` — `partial` — Thêm coverage Redis hoặc Kafka duplicate-delivery cho at-least-once behavior.
+5. **P0** — `P0-RBAC-TENANT-ISOLATION-API` — `partial` — Thêm check API live-stack đại diện khi seed policy BFF/auth/service ổn định.
 
 ---
 
 ## Ứng viên lô P0 đầu tiên
 
-1. **Integration:** `P0-ORD-BILL-REQUEST`, `P0-ORD-PAYMENT-FINALIZATION`, `P0-ORD-SESSION-JOIN`, `P0-SAAS-ONBOARDING-SAGA`.
+1. **Integration:** `P0-SAAS-ONBOARDING-SAGA` với service external live, `P0-CAT-TENANT-ISOLATION`, `P0-KDS-ORDER-CONFIRMED-DEDUPE`, `P0-RBAC-TENANT-ISOLATION-API`.
 2. **Browser E2E:** Mở rộng `P0-SAAS-SUSPENDED-CUSTOMER-PWA` với pending-bill payment, sau đó coverage close-session thanh toán từ `P1-PAY-BROWSER-CLOSE-SESSION` nếu nâng mức rủi ro demo.
 3. **Fast feedback tùy chọn:** BFF quota edge checks cho `P0-SAAS-FEATURE-GATING-QUOTAS` nếu UI cần upgrade prompt trước khi forward.
 

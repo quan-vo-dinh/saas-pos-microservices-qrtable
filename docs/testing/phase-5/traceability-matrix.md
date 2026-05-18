@@ -142,17 +142,17 @@
 
 ## Order, cart, and session
 
-### `P0-ORD-SESSION-JOIN` — `partial` (P0, state-machine)
+### `P0-ORD-SESSION-JOIN` — `covered` (P0, state-machine)
 
 **Requirement:** Customer QR join creates a durable active session for an AVAILABLE table, rejoins an OCCUPIED active session, and rejects session starts for BILLING and CLEANING.
 
 **Sources:** `business-logic` (3.C, 4.A); `phase-2a-order-kafka` final scope.
 
-**Tests:** Order and session service specs; Step 2.7 realtime E2E.
+**Tests:** Order and session service specs; Step 2.7 realtime E2E; opt-in external-stack spec `apps/order/src/app/modules/order/tests/order-session-join.integration.spec.ts`.
 
 **Target layer:** integration. **Stack:** PostgreSQL, Redis, Catalog TCP, PWA or BFF for E2E.
 
-**Notes:** Unit and browser journey exist; add a real boundary integration for Catalog QR or table status plus Order session semantics in Redis and PostgreSQL.
+**Notes:** Step 5.3 external-stack integration now proves live Catalog QR/table-state validation plus Order PostgreSQL/Redis semantics: AVAILABLE creates and caches an active session and moves Catalog to OCCUPIED, OCCUPIED rejoins the active session and refreshes activity, and BILLING/CLEANING reject joins. Run with `NX_SKIP_NX_CACHE=true RUN_PHASE5_ORDER_SESSION_JOIN_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-session-join.integration.spec.ts --runInBand` after PostgreSQL, Redis, and Catalog TCP are ready.
 
 ---
 
@@ -210,31 +210,31 @@
 
 ---
 
-### `P0-ORD-BILL-REQUEST` — `partial` (P0, money)
+### `P0-ORD-BILL-REQUEST` — `covered` (P0, money)
 
 **Requirement:** Bill request requires an empty cart and all active orders served; bill moves `OPEN` to `PENDING_PAYMENT`, locks cart, table moves to billing.
 
 **Sources:** `business-logic` (3.C, 6.A); `phase-2a-order-kafka` accepted decisions.
 
-**Tests:** Bill and service-request specs in Order; customer PWA order query hook spec.
+**Tests:** Bill and service-request specs in Order; customer PWA order query hook spec; opt-in external-stack spec `apps/order/src/app/modules/order/tests/order-bill-request.integration.spec.ts`.
 
 **Target layer:** integration. **Stack:** PostgreSQL, Redis, Catalog TCP.
 
-**Notes:** Service tests cover rules; boundary proof for cart lock plus Catalog table billing state remains an integration target.
+**Notes:** Step 5.3 external-stack integration now proves non-empty carts reject, non-served active orders reject, successful requests move the bill `OPEN -> PENDING_PAYMENT`, create a service request, lock Redis cart mutations, and move the Catalog table to `BILLING`. Run with `NX_SKIP_NX_CACHE=true RUN_PHASE5_ORDER_BILL_REQUEST_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-bill-request.integration.spec.ts --runInBand` after PostgreSQL, Redis, and Catalog TCP are ready.
 
 ---
 
-### `P0-ORD-PAYMENT-FINALIZATION` — `partial` (P0, money)
+### `P0-ORD-PAYMENT-FINALIZATION` — `covered` (P0, money)
 
 **Requirement:** `BILL_MARK_PAID` is idempotent, marks bill `PAID`, closes active session, deletes Redis session and cart keys, moves table `BILLING` to `CLEANING`.
 
 **Sources:** `business-logic` (3.C, 6.A); `phase-3-payment` accepted decisions.
 
-**Tests:** Bill and session service specs; payment events consumer spec in Order.
+**Tests:** Bill and session service specs; payment events consumer spec in Order; opt-in external-stack spec `apps/order/src/app/modules/order/tests/order-payment-finalization.integration.spec.ts`; Catalog table service idempotency spec.
 
 **Target layer:** integration. **Stack:** PostgreSQL, Redis, Catalog TCP, payment event harness.
 
-**Notes:** Unit coverage exists; full Payment to Order to Catalog final-state integration or E2E for close-session is still missing.
+**Notes:** Step 5.3 external-stack integration now proves Order-side `BILL_MARK_PAID` finalization is idempotent, replays return the original payment id, stale already-paid bills still close the active session, Redis session/cart keys are deleted, and Catalog table status reaches `CLEANING`. Catalog same-status table updates are explicitly idempotent when the session contract matches. Payment-provider event ingestion remains covered by `P0-PAY-COMPLETED-ORDER-BRIDGE`; browser close-session proof remains tracked separately under Step 5.4. Run with `NX_SKIP_NX_CACHE=true RUN_PHASE5_ORDER_PAYMENT_FINALIZATION_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-payment-finalization.integration.spec.ts --runInBand` after PostgreSQL, Redis, and Catalog TCP are ready.
 
 ---
 
@@ -468,11 +468,11 @@
 
 **Sources:** `business-logic` (1.A); `phase-4b-saas-onboarding` accepted decisions.
 
-**Tests:** SaaS onboarding saga unit and integration specs; Authorizer Keycloak admin service spec; User-Access tenant user service spec.
+**Tests:** SaaS onboarding saga unit and mocked integration specs; opt-in SaaS PostgreSQL integration `apps/saas/src/services/onboarding-saga-db.integration.spec.ts`; Authorizer Keycloak admin service spec; User-Access tenant user service spec.
 
 **Target layer:** integration. **Stack:** SaaS database, Authorizer and Keycloak, User-Access, Payment TCP, Kafka or outbox.
 
-**Notes:** Mocked integration covers orchestration and compensation; add real service boundary or seed integration when a stack harness is ready.
+**Notes:** Step 5.3 SaaS PostgreSQL integration now proves successful tenant, initial subscription, payment-settings TCP contract, and `tenant.created` outbox persistence, plus compensation before and after subscription assignment. The service now deletes `INITIAL_ONBOARDING` subscriptions during rollback to avoid orphan rows. This remains `partial` because Authorizer + real Keycloak, User-Access, and Payment services are still represented by TCP contract doubles rather than a live multi-service harness. Run with `NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm nx test saas --testPathPatterns=onboarding-saga-db.integration.spec.ts --runInBand` after PostgreSQL is ready.
 
 ---
 
@@ -741,16 +741,16 @@
 Ordered by urgency; each line is **priority**, **rule id**, **status**, and **next action**.
 
 1. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Extend the browser smoke with a seeded pending-bill payment exception path after Flow B/B+D data is stable.
-2. **P0** — `P0-ORD-BILL-REQUEST` — `partial` — Add integration for empty cart, all orders served, cart lock, and table billing transition.
-3. **P0** — `P0-ORD-PAYMENT-FINALIZATION` — `partial` — Add integration for exactly-once bill finalization, cart/session lock, and table Cleaning transition.
-4. **P0** — `P0-ORD-SESSION-JOIN` — `partial` — Add a real boundary integration for Catalog QR/table status plus Order session semantics in Redis and PostgreSQL.
-5. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Add cross-service integration for onboarding success and current compensation behavior.
+2. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Add a live multi-service harness for Authorizer + Keycloak, User-Access, and Payment; DB success and compensation are now covered.
+3. **P0** — `P0-CAT-TENANT-ISOLATION` — `partial` — Make readiness and seed policy explicit for the existing stack-dependent tenant isolation integration before treating it as a reliable gate.
+4. **P0** — `P0-KDS-ORDER-CONFIRMED-DEDUPE` — `partial` — Add Redis or Kafka duplicate-delivery coverage for at-least-once behavior.
+5. **P0** — `P0-RBAC-TENANT-ISOLATION-API` — `partial` — Add representative live-stack API checks once BFF/auth/service seed policy is stable.
 
 ---
 
 ## First P0 batch candidates
 
-1. **Integration:** `P0-ORD-BILL-REQUEST`, `P0-ORD-PAYMENT-FINALIZATION`, `P0-ORD-SESSION-JOIN`, `P0-SAAS-ONBOARDING-SAGA`.
+1. **Integration:** `P0-SAAS-ONBOARDING-SAGA` live external services, `P0-CAT-TENANT-ISOLATION`, `P0-KDS-ORDER-CONFIRMED-DEDUPE`, `P0-RBAC-TENANT-ISOLATION-API`.
 2. **Browser E2E:** Extend `P0-SAAS-SUSPENDED-CUSTOMER-PWA` with pending-bill payment, then payment close-session coverage from `P1-PAY-BROWSER-CLOSE-SESSION` if promoted for demo risk.
 3. **Optional fast feedback:** BFF quota edge checks for `P0-SAAS-FEATURE-GATING-QUOTAS` if the UI needs pre-forward upgrade prompts.
 
