@@ -193,6 +193,12 @@ export class TableService {
     const table = await this.getById({ id: data.id, tenantId: data.tenantId });
     const newStatus = data.status;
 
+    const isIdempotentSameStatus =
+      table.status === newStatus && (data.sessionId === undefined || data.sessionId === table.sessionId);
+    if (isIdempotentSameStatus) {
+      return table;
+    }
+
     const isTransferRelease =
       (table.status === TABLE_STATUS.OCCUPIED || table.status === TABLE_STATUS.BILLING) &&
       newStatus === TABLE_STATUS.AVAILABLE &&

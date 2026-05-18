@@ -102,14 +102,11 @@ export class BillService {
     if (!existing) {
       throw new BusinessException(ErrorCode.BILL_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
-    if (existing.status === BillStatus.PAID) {
-      return { bill: this.toBillDto(existing) };
-    }
-    if (existing.status !== BillStatus.PENDING_PAYMENT) {
+    if (existing.status !== BillStatus.PENDING_PAYMENT && existing.status !== BillStatus.PAID) {
       throw new BusinessException(ErrorCode.BILL_NOT_PENDING_PAYMENT, HttpStatus.CONFLICT);
     }
 
-    const paidAt = new Date(dto.paidAt);
+    const paidAt = existing.paidAt ?? new Date(dto.paidAt);
     const { bill, session } = await this.dataSource.transaction(async (manager) => {
       const lockedBill = await this.billRepository.findByIdAndTenantForUpdate(dto.billId, dto.tenantId, manager);
       if (!lockedBill) {
@@ -141,8 +138,9 @@ export class BillService {
       return { bill: lockedBill, session: lockedSession };
     });
 
+    const finalizationAt = bill.paidAt ?? paidAt;
     if (session?.status === SessionStatus.ACTIVE) {
-      await this.sessionService.closeAfterPayment(dto.tenantId, session.id, paidAt);
+      await this.sessionService.closeAfterPayment(dto.tenantId, session.id, finalizationAt);
     }
 
     if (session) {

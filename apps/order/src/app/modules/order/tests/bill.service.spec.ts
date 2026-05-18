@@ -345,10 +345,10 @@ describe('BillService', () => {
       });
     });
 
-    it('returns bill without save when already PAID (idempotent duplicate markPaid)', async () => {
+    it('does not resave an already PAID bill but finalizes stale side effects on replay', async () => {
       const now = new Date();
       const paidAt = new Date('2026-05-08T11:00:00.000Z');
-      billRepository.findByIdAndTenant.mockResolvedValue({
+      const paidBill = {
         id: 'bill-1',
         tenantId: 't1',
         sessionId: 'sess-1',
@@ -363,21 +363,50 @@ describe('BillService', () => {
         paidAt,
         createdAt: now,
         updatedAt: now,
-      } as Bill);
+      } as Bill;
+      const session = {
+        id: 'sess-1',
+        tenantId: 't1',
+        tableId: 'table-1',
+        tableName: 'Bàn 1',
+        status: SessionStatus.ACTIVE,
+        currentBillId: 'bill-1',
+      } as Session;
+
+      billRepository.findByIdAndTenant.mockResolvedValue(paidBill);
+      billRepository.findByIdAndTenantForUpdate.mockResolvedValue(paidBill);
+      sessionRepository.findByIdAndTenant.mockResolvedValue(session);
+      const managerSave = jest.fn().mockImplementation((_entity: unknown, entity: Bill) => Promise.resolve(entity));
+      dataSource.transaction.mockImplementation(async (fn: (manager: EntityManager) => Promise<unknown>) =>
+        fn({ save: managerSave } as unknown as EntityManager),
+      );
+      catalogClient.send.mockReturnValue(of({ statusCode: 200, data: { id: 'table-1', status: 'cleaning' } }));
 
       const result = await service.markPaid({
         tenantId: 't1',
         billId: 'bill-1',
-        paymentId: 'pay-existing',
+        paymentId: 'pay-replay',
         method: 'CASH',
         paidAt: '2026-05-08T12:00:00.000Z',
       });
 
       expect(result.bill.status).toBe(BillStatus.PAID);
       expect(result.bill.paymentId).toBe('pay-existing');
+      expect(managerSave).not.toHaveBeenCalled();
       expect(billRepository.save).not.toHaveBeenCalled();
-      expect(sessionService.closeAfterPayment).not.toHaveBeenCalled();
-      expect(catalogClient.send).not.toHaveBeenCalled();
+      expect(sessionService.closeAfterPayment).toHaveBeenCalledWith('t1', 'sess-1', paidAt);
+      expect(catalogClient.send).toHaveBeenCalledWith(
+        TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS,
+        expect.objectContaining({
+          tenantId: 't1',
+          data: expect.objectContaining({
+            id: 'table-1',
+            tenantId: 't1',
+            status: TABLE_STATUS.CLEANING,
+            sessionId: 'sess-1',
+          }),
+        }),
+      );
     });
 
     it('marks bill PAID, closes session, and moves table billing -> cleaning', async () => {

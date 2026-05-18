@@ -263,6 +263,25 @@ describe('TableService', () => {
       expect(result.status).toBe(TABLE_STATUS.BILLING);
     });
 
+    it('should treat matching status updates as idempotent when session id still matches', async () => {
+      const cleaningTable = {
+        ...mockTable,
+        status: TABLE_STATUS.CLEANING,
+        sessionId: 'session-1',
+      } as unknown as Table;
+      repository.findByIdAndTenant.mockResolvedValue(cleaningTable);
+
+      const result = await service.updateStatus({
+        id: 'table-1',
+        tenantId: 'tenant-1',
+        status: TABLE_STATUS.CLEANING,
+        sessionId: 'session-1',
+      });
+
+      expect(result).toBe(cleaningTable);
+      expect(repository.updateByIdAndTenant).not.toHaveBeenCalled();
+    });
+
     it('should reject invalid transition available → cleaning', async () => {
       const availableTable = { ...mockTable, status: TABLE_STATUS.AVAILABLE } as unknown as Table;
       repository.findByIdAndTenant.mockResolvedValue(availableTable);
