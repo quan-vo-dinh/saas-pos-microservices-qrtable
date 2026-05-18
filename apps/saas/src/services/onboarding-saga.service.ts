@@ -50,6 +50,7 @@ export class OnboardingSagaService {
   async onboard(params: OnboardTenantParams) {
     let tenant: { id: string; slug: string; name: string } | undefined;
     let ownerUserId: string | undefined;
+    let initialSubscriptionAssigned = false;
 
     try {
       const slug = await this.slugService.generateUnique(params.slug ?? params.tenantName, async (candidate) => {
@@ -107,6 +108,7 @@ export class OnboardingSagaService {
         startsAt: new Date(),
         expiresAt: null,
       });
+      initialSubscriptionAssigned = true;
 
       await this.resolveTcp(
         this.paymentClient.send(TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.CREATE_EMPTY, {
@@ -145,6 +147,9 @@ export class OnboardingSagaService {
         ).catch(() => undefined);
       }
       if (tenant) {
+        if (initialSubscriptionAssigned) {
+          await Promise.resolve(this.subscriptionService.compensateInitialOnboarding(tenant.id)).catch(() => undefined);
+        }
         await Promise.resolve(this.tenantRepository.deleteById(tenant.id)).catch(() => undefined);
       }
       if (ownerUserId) {

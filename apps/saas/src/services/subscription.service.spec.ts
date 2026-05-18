@@ -9,6 +9,7 @@ describe('SubscriptionService', () => {
     findActiveByTenantId: jest.fn(),
     supersedeActive: jest.fn(),
     createActive: jest.fn(),
+    deleteInitialOnboardingByTenantId: jest.fn(),
   };
 
   beforeEach(() => {
@@ -31,5 +32,15 @@ describe('SubscriptionService', () => {
 
     expect(subRepo.supersedeActive).toHaveBeenCalledWith('tenant-1', 'sub-old');
     expect(result.id).toBe('sub-new');
+  });
+
+  it('compensates initial onboarding subscription and clears current cache', async () => {
+    const subscriptionCache = { clearCurrent: jest.fn() };
+    const service = new SubscriptionService(planRepo as never, subRepo as never, subscriptionCache as never);
+
+    await service.compensateInitialOnboarding('tenant-1');
+
+    expect(subRepo.deleteInitialOnboardingByTenantId).toHaveBeenCalledWith('tenant-1');
+    expect(subscriptionCache.clearCurrent).toHaveBeenCalledWith('tenant-1');
   });
 });

@@ -33,6 +33,7 @@ export class SubscriptionService {
     private readonly subscriptionRepository: {
       findActiveByTenantId(tenantId: string): Promise<{ id: string } | null>;
       supersedeActive(tenantId: string, oldSubscriptionId: string): Promise<void>;
+      deleteInitialOnboardingByTenantId(tenantId: string): Promise<void>;
       createActive(
         params: AssignPlanParams & { pricingPlanId: string; priceVndSnapshot: number },
       ): Promise<{ id: string; expiresAt?: Date | null }>;
@@ -71,5 +72,10 @@ export class SubscriptionService {
     });
 
     return subscription;
+  }
+
+  async compensateInitialOnboarding(tenantId: string): Promise<void> {
+    await this.subscriptionRepository.deleteInitialOnboardingByTenantId(tenantId);
+    await this.subscriptionCache?.clearCurrent(tenantId);
   }
 }

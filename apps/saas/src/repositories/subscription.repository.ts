@@ -52,6 +52,13 @@ export class SubscriptionRepository {
     return this.repo.save(row);
   }
 
+  async deleteInitialOnboardingByTenantId(tenantId: string): Promise<void> {
+    await this.repo.delete({
+      tenantId,
+      source: 'INITIAL_ONBOARDING',
+    });
+  }
+
   listByTenantId(tenantId: string): Promise<Subscription[]> {
     return this.repo.find({ where: { tenantId }, order: { startsAt: 'DESC' } });
   }
