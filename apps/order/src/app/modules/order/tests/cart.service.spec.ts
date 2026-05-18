@@ -8,7 +8,14 @@ import { of } from 'rxjs';
 
 describe('CartService', () => {
   let service: CartService;
-  let redis: { hgetall: jest.Mock; pexpire: jest.Mock; multi: jest.Mock };
+  let redis: {
+    hgetall: jest.Mock;
+    hget: jest.Mock;
+    pexpire: jest.Mock;
+    multi: jest.Mock;
+    watch: jest.Mock;
+    unwatch: jest.Mock;
+  };
   let catalog: { send: jest.Mock };
   let sessionService: { getActiveSessionOrThrow: jest.Mock; touchAfterCartMutation: jest.Mock };
 
@@ -30,8 +37,11 @@ describe('CartService', () => {
     };
     redis = {
       hgetall: jest.fn(),
+      hget: jest.fn().mockResolvedValue('2'),
       pexpire: jest.fn().mockResolvedValue(1),
       multi: jest.fn(() => multi),
+      watch: jest.fn().mockResolvedValue('OK'),
+      unwatch: jest.fn().mockResolvedValue('OK'),
     };
     catalog = { send: jest.fn() };
     sessionService = {
@@ -148,6 +158,7 @@ describe('CartService', () => {
       ...baseSnapshot,
       cartVersion: '0',
     });
+    redis.hget.mockResolvedValue('0');
 
     catalog.send.mockReturnValue(
       of({
@@ -203,6 +214,7 @@ describe('CartService', () => {
         },
       ]),
     });
+    redis.hget.mockResolvedValue('4');
 
     catalog.send.mockReturnValue(
       of({

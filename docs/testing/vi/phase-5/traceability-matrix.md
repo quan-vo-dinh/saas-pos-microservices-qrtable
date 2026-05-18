@@ -156,31 +156,31 @@
 
 ---
 
-### `P0-ORD-CART-VERSION-LOCK` — `partial` (P0, state-machine)
+### `P0-ORD-CART-VERSION-LOCK` — `covered` (P0, state-machine)
 
 **Yêu cầu:** Cart dùng chung dùng Redis `cartVersion`, từ chối mutation cũ, lock khi bill `PENDING_PAYMENT`, và refetch snapshot server.
 
 **Nguồn:** `business-logic` (4.A, 6.A); `technical-architecture` (11, 12.2); quyết định chấp nhận `phase-2a-order-kafka`.
 
-**Test:** Spec cart service Order; spec hook order và realtime customer PWA.
+**Test:** Spec cart service Order; spec hook order và realtime customer PWA; integration DB/Redis opt-in `apps/order/src/app/modules/order/tests/order-submit-cart.integration.spec.ts`.
 
 **Tầng đích:** integration. **Stack:** Redis; BFF hoặc PWA tùy chọn.
 
-**Ghi chú:** Unit và hook coverage mạnh; thiếu integration conflict Redis và lock với chính sách reset và readiness rõ ràng.
+**Ghi chú:** Unit và hook coverage mạnh. Integration DB/Redis Step 5.3 hiện chứng minh mutation đồng thời với cùng expected `cartVersion` cho một thành công, một `CART_VERSION_CONFLICT`, và snapshot server cuối ổn định. Ghi cart Redis dùng compare-and-set qua `WATCH`/`MULTI`. Chạy bằng `RUN_PHASE5_ORDER_SUBMIT_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-submit-cart.integration.spec.ts --runInBand` sau khi PostgreSQL và Redis sẵn sàng.
 
 ---
 
-### `P0-ORD-SUBMIT-IDEMPOTENCY` — `partial` (P0, state-machine)
+### `P0-ORD-SUBMIT-IDEMPOTENCY` — `covered` (P0, state-machine)
 
 **Yêu cầu:** Submit order tạo `PENDING` một lần, xóa cart một lần, dùng `idempotencyKey`, và không được persist dòng order DB `DRAFT`.
 
 **Nguồn:** `business-logic` (4.B, 12.2); quyết định chấp nhận `phase-2a-order-kafka`.
 
-**Test:** Spec service Order; spec hook order query customer PWA; test transition shared types.
+**Test:** Spec service Order; spec hook order query customer PWA; test transition shared types; integration DB/Redis opt-in `apps/order/src/app/modules/order/tests/order-submit-cart.integration.spec.ts`.
 
 **Tầng đích:** integration. **Stack:** PostgreSQL, Redis.
 
-**Ghi chú:** Cần integration DB và Redis chứng minh submit trùng và trạng thái cuối idempotent.
+**Ghi chú:** Integration DB/Redis Step 5.3 chứng minh submit trùng cùng `idempotencyKey` chỉ tạo một order `PENDING`, xóa cart một lần, và không bao giờ persist `DRAFT`. Test cũng chứng minh submit đồng thời với idempotency key khác nhau nhưng cùng stale `cartVersion` rollback trước khi persist order thứ hai. Chạy bằng `RUN_PHASE5_ORDER_SUBMIT_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-submit-cart.integration.spec.ts --runInBand` sau khi PostgreSQL và Redis sẵn sàng.
 
 ---
 
@@ -741,16 +741,16 @@
 Sắp xếp theo độ khẩn; mỗi dòng là **priority**, **rule id**, **status**, và **next action**.
 
 1. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Mở rộng browser smoke với đường thanh toán pending-bill đã seed sau khi dữ liệu Flow B/B+D ổn định.
-2. **P0** — `P0-ORD-CART-VERSION-LOCK` — `partial` — Thêm integration DB/Redis chứng minh conflict version khi mutate cart đồng thời và trạng thái cart cuối ổn định.
-3. **P0** — `P0-ORD-SUBMIT-IDEMPOTENCY` — `partial` — Thêm integration DB/Redis chứng minh submit trùng chỉ tạo một order `PENDING`, xóa cart một lần, và không persist `DRAFT`.
-4. **P0** — `P0-ORD-BILL-REQUEST` — `partial` — Thêm integration cho cart rỗng, mọi order đã served, lock cart, và chuyển bàn sang billing.
-5. **P0** — `P0-ORD-PAYMENT-FINALIZATION` — `partial` — Thêm integration cho finalization bill exactly-once, lock cart/session, và chuyển bàn sang Cleaning.
+2. **P0** — `P0-ORD-BILL-REQUEST` — `partial` — Thêm integration cho cart rỗng, mọi order đã served, lock cart, và chuyển bàn sang billing.
+3. **P0** — `P0-ORD-PAYMENT-FINALIZATION` — `partial` — Thêm integration cho finalization bill exactly-once, lock cart/session, và chuyển bàn sang Cleaning.
+4. **P0** — `P0-ORD-SESSION-JOIN` — `partial` — Thêm integration ranh giới thật cho QR/trạng thái bàn Catalog cộng ngữ nghĩa session Order trong Redis và PostgreSQL.
+5. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Thêm integration cross-service cho onboarding thành công và behavior compensation hiện tại.
 
 ---
 
 ## Ứng viên lô P0 đầu tiên
 
-1. **Integration:** `P0-ORD-CART-VERSION-LOCK`, `P0-ORD-SUBMIT-IDEMPOTENCY`, `P0-ORD-BILL-REQUEST`, `P0-ORD-PAYMENT-FINALIZATION`, `P0-SAAS-ONBOARDING-SAGA`.
+1. **Integration:** `P0-ORD-BILL-REQUEST`, `P0-ORD-PAYMENT-FINALIZATION`, `P0-ORD-SESSION-JOIN`, `P0-SAAS-ONBOARDING-SAGA`.
 2. **Browser E2E:** Mở rộng `P0-SAAS-SUSPENDED-CUSTOMER-PWA` với pending-bill payment, sau đó coverage close-session thanh toán từ `P1-PAY-BROWSER-CLOSE-SESSION` nếu nâng mức rủi ro demo.
 3. **Fast feedback tùy chọn:** BFF quota edge checks cho `P0-SAAS-FEATURE-GATING-QUOTAS` nếu UI cần upgrade prompt trước khi forward.
 

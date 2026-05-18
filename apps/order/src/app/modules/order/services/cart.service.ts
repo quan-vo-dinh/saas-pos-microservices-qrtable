@@ -66,10 +66,34 @@ export class CartService {
     next.cartVersion = snapshot.cartVersion + 1;
     next.updatedAt = new Date().toISOString();
 
-    await this.persistAtomic(redis, key, next);
+    await this.persistAtomic(redis, key, next, snapshot.cartVersion);
     await this.sessionService.touchAfterCartMutation(input.tenantId, input.sessionId);
 
     return this.toCartUpdatedEvent(next, input.sessionClientId);
+  }
+
+  async clearForSubmittedOrder(
+    tenantId: string,
+    sessionId: string,
+    expectedCartVersion: number,
+  ): Promise<CartUpdatedEvent> {
+    const redis = this.redisClient.getClient();
+    const key = this.cartKey(tenantId, sessionId);
+    const snapshot = await this.loadSnapshot(redis, tenantId, sessionId);
+    if (snapshot.status === 'LOCKED') {
+      throw new BusinessException(ErrorCode.CART_LOCKED, HttpStatus.CONFLICT);
+    }
+    if (snapshot.cartVersion !== expectedCartVersion) {
+      throw new BusinessException(ErrorCode.CART_VERSION_CONFLICT, HttpStatus.CONFLICT);
+    }
+    const next: CartSnapshot = {
+      ...snapshot,
+      items: [],
+      cartVersion: snapshot.cartVersion + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.persistAtomic(redis, key, next, snapshot.cartVersion);
+    return this.toCartUpdatedEvent(next);
   }
 
   async lockCart(tenantId: string, sessionId: string, expectedCartVersion: number): Promise<CartUpdatedEvent> {
@@ -89,7 +113,7 @@ export class CartService {
       cartVersion: snapshot.cartVersion + 1,
       updatedAt: new Date().toISOString(),
     };
-    await this.persistAtomic(redis, key, next);
+    await this.persistAtomic(redis, key, next, snapshot.cartVersion);
     await this.sessionService.touchAfterCartMutation(tenantId, sessionId);
     return this.toCartUpdatedEvent(next);
   }
@@ -109,7 +133,7 @@ export class CartService {
       cartVersion: snapshot.cartVersion + 1,
       updatedAt: new Date().toISOString(),
     };
-    await this.persistAtomic(redis, key, next);
+    await this.persistAtomic(redis, key, next, snapshot.cartVersion);
     await this.sessionService.touchAfterCartMutation(tenantId, sessionId);
     return this.toCartUpdatedEvent(next);
   }
@@ -190,7 +214,19 @@ export class CartService {
     return out;
   }
 
-  private async persistAtomic(redis: Redis, key: string, snapshot: CartSnapshot): Promise<void> {
+  private async persistAtomic(
+    redis: Redis,
+    key: string,
+    snapshot: CartSnapshot,
+    expectedCartVersion: number,
+  ): Promise<void> {
+    await redis.watch(key);
+    const currentRaw = await redis.hget(key, 'cartVersion');
+    const currentVersion = Number.parseInt(currentRaw ?? '0', 10) || 0;
+    if (currentVersion !== expectedCartVersion) {
+      await redis.unwatch();
+      throw new BusinessException(ErrorCode.CART_VERSION_CONFLICT, HttpStatus.CONFLICT);
+    }
     const multi = redis.multi();
     multi.hset(key, {
       tenantId: snapshot.tenantId,
@@ -201,7 +237,10 @@ export class CartService {
       items: JSON.stringify(snapshot.items),
     });
     multi.pexpire(key, SESSION_POLICY.TTL_MS);
-    await multi.exec();
+    const result = await multi.exec();
+    if (result === null) {
+      throw new BusinessException(ErrorCode.CART_VERSION_CONFLICT, HttpStatus.CONFLICT);
+    }
   }
 
   private async applyOperation(snapshot: CartSnapshot, input: CartMutateTcpRequest): Promise<CartSnapshot> {

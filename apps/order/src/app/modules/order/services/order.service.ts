@@ -81,7 +81,13 @@ import { SessionService } from './session.service';
 
 type SubmitTxOutcome =
   | { kind: 'replay'; order: Order }
-  | { kind: 'created'; order: Order; bill: Bill; items: OrderItem[] };
+  | {
+      kind: 'created';
+      order: Order;
+      bill: Bill;
+      items: OrderItem[];
+      cartUpdated: SubmitOrderTcpResponse['events']['cartUpdated'];
+    };
 
 type ConfirmTxOutcome =
   | { kind: 'replay'; order: Order; items: OrderItem[]; bill: Bill | null }
@@ -198,14 +204,6 @@ export class OrderService {
   async submitOrder(dto: SubmitOrderTcpRequest): Promise<SubmitOrderTcpResponse> {
     await this.sessionService.getActiveSessionOrThrow(dto.tenantId, dto.sessionId);
 
-    const snapshot = await this.cartService.getSnapshot(dto.tenantId, dto.sessionId);
-    if (snapshot.cartVersion !== dto.expectedCartVersion) {
-      throw new BusinessException(ErrorCode.CART_VERSION_CONFLICT, HttpStatus.CONFLICT);
-    }
-    if (snapshot.items.length === 0) {
-      throw new BusinessException(ErrorCode.ORDER_EMPTY_CART, HttpStatus.BAD_REQUEST);
-    }
-
     const existingBeforeQuota = await this.orderRepository.findByIdempotencyKey(
       dto.tenantId,
       dto.sessionId,
@@ -213,6 +211,13 @@ export class OrderService {
     );
     let quotaReserved = false;
     if (!existingBeforeQuota) {
+      const snapshot = await this.cartService.getSnapshot(dto.tenantId, dto.sessionId);
+      if (snapshot.cartVersion !== dto.expectedCartVersion) {
+        throw new BusinessException(ErrorCode.CART_VERSION_CONFLICT, HttpStatus.CONFLICT);
+      }
+      if (snapshot.items.length === 0) {
+        throw new BusinessException(ErrorCode.ORDER_EMPTY_CART, HttpStatus.BAD_REQUEST);
+      }
       quotaReserved = await this.reserveDailyOrderQuota(dto.tenantId);
     }
 
@@ -229,6 +234,14 @@ export class OrderService {
         });
         if (existing) {
           return { kind: 'replay', order: existing } satisfies SubmitTxOutcome;
+        }
+
+        const snapshot = await this.cartService.getSnapshot(dto.tenantId, dto.sessionId);
+        if (snapshot.cartVersion !== dto.expectedCartVersion) {
+          throw new BusinessException(ErrorCode.CART_VERSION_CONFLICT, HttpStatus.CONFLICT);
+        }
+        if (snapshot.items.length === 0) {
+          throw new BusinessException(ErrorCode.ORDER_EMPTY_CART, HttpStatus.BAD_REQUEST);
         }
 
         const totalAmount = snapshot.items.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
@@ -279,7 +292,13 @@ export class OrderService {
         session.currentBillId = bill.id;
         await manager.save(Session, session);
 
-        return { kind: 'created', order, bill, items } satisfies SubmitTxOutcome;
+        const cartUpdated = await this.cartService.clearForSubmittedOrder(
+          dto.tenantId,
+          dto.sessionId,
+          snapshot.cartVersion,
+        );
+
+        return { kind: 'created', order, bill, items, cartUpdated } satisfies SubmitTxOutcome;
       });
     } catch (error) {
       if (quotaReserved) {
@@ -294,13 +313,7 @@ export class OrderService {
 
     let cartUpdated: SubmitOrderTcpResponse['events']['cartUpdated'];
     if (outcome.kind === 'created') {
-      const ev = await this.cartService.mutate({
-        tenantId: dto.tenantId,
-        sessionId: dto.sessionId,
-        expectedCartVersion: dto.expectedCartVersion,
-        operation: 'CLEAR',
-      });
-      cartUpdated = ev;
+      cartUpdated = outcome.cartUpdated;
     } else {
       const snap = await this.cartService.getSnapshot(dto.tenantId, dto.sessionId);
       cartUpdated = {

@@ -156,31 +156,31 @@
 
 ---
 
-### `P0-ORD-CART-VERSION-LOCK` — `partial` (P0, state-machine)
+### `P0-ORD-CART-VERSION-LOCK` — `covered` (P0, state-machine)
 
 **Requirement:** Shared cart uses Redis `cartVersion`, rejects stale mutations, locks while bill is `PENDING_PAYMENT`, and refetches server snapshot.
 
 **Sources:** `business-logic` (4.A, 6.A); `technical-architecture` (11, 12.2); `phase-2a-order-kafka` accepted decisions.
 
-**Tests:** Order cart service spec; customer PWA order and realtime hook specs.
+**Tests:** Order cart service spec; customer PWA order and realtime hook specs; opt-in DB/Redis integration `apps/order/src/app/modules/order/tests/order-submit-cart.integration.spec.ts`.
 
 **Target layer:** integration. **Stack:** Redis; BFF or PWA optional.
 
-**Notes:** Unit and hook coverage is strong; missing Redis conflict and lock integration with a clear reset and readiness policy.
+**Notes:** Unit and hook coverage is strong. Step 5.3 DB/Redis integration now proves concurrent mutations with the same expected `cartVersion` produce one success, one `CART_VERSION_CONFLICT`, and a stable final server snapshot. Redis cart writes use compare-and-set via `WATCH`/`MULTI`. Run with `RUN_PHASE5_ORDER_SUBMIT_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-submit-cart.integration.spec.ts --runInBand` after PostgreSQL and Redis are ready.
 
 ---
 
-### `P0-ORD-SUBMIT-IDEMPOTENCY` — `partial` (P0, state-machine)
+### `P0-ORD-SUBMIT-IDEMPOTENCY` — `covered` (P0, state-machine)
 
 **Requirement:** Submit order creates `PENDING` once, clears cart once, uses `idempotencyKey`, and must not persist a `DRAFT` database order row.
 
 **Sources:** `business-logic` (4.B, 12.2); `phase-2a-order-kafka` accepted decisions.
 
-**Tests:** Order service spec; customer PWA order query hook spec; shared types transition tests.
+**Tests:** Order service spec; customer PWA order query hook spec; shared types transition tests; opt-in DB/Redis integration `apps/order/src/app/modules/order/tests/order-submit-cart.integration.spec.ts`.
 
 **Target layer:** integration. **Stack:** PostgreSQL, Redis.
 
-**Notes:** Add database and Redis integration proving duplicate submit and idempotent final state.
+**Notes:** Step 5.3 DB/Redis integration proves duplicate submit with the same `idempotencyKey` creates one `PENDING` order, clears the cart once, and never persists `DRAFT`. It also proves concurrent submit with different idempotency keys but the same stale `cartVersion` rolls back before a second order is persisted. Run with `RUN_PHASE5_ORDER_SUBMIT_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-submit-cart.integration.spec.ts --runInBand` after PostgreSQL and Redis are ready.
 
 ---
 
@@ -741,16 +741,16 @@
 Ordered by urgency; each line is **priority**, **rule id**, **status**, and **next action**.
 
 1. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Extend the browser smoke with a seeded pending-bill payment exception path after Flow B/B+D data is stable.
-2. **P0** — `P0-ORD-CART-VERSION-LOCK` — `partial` — Add DB/Redis integration proving concurrent cart mutation version conflicts and stable final cart state.
-3. **P0** — `P0-ORD-SUBMIT-IDEMPOTENCY` — `partial` — Add DB/Redis integration proving duplicate submit produces one `PENDING` order, one cart clear, and no persisted `DRAFT`.
-4. **P0** — `P0-ORD-BILL-REQUEST` — `partial` — Add integration for empty cart, all orders served, cart lock, and table billing transition.
-5. **P0** — `P0-ORD-PAYMENT-FINALIZATION` — `partial` — Add integration for exactly-once bill finalization, cart/session lock, and table Cleaning transition.
+2. **P0** — `P0-ORD-BILL-REQUEST` — `partial` — Add integration for empty cart, all orders served, cart lock, and table billing transition.
+3. **P0** — `P0-ORD-PAYMENT-FINALIZATION` — `partial` — Add integration for exactly-once bill finalization, cart/session lock, and table Cleaning transition.
+4. **P0** — `P0-ORD-SESSION-JOIN` — `partial` — Add a real boundary integration for Catalog QR/table status plus Order session semantics in Redis and PostgreSQL.
+5. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Add cross-service integration for onboarding success and current compensation behavior.
 
 ---
 
 ## First P0 batch candidates
 
-1. **Integration:** `P0-ORD-CART-VERSION-LOCK`, `P0-ORD-SUBMIT-IDEMPOTENCY`, `P0-ORD-BILL-REQUEST`, `P0-ORD-PAYMENT-FINALIZATION`, `P0-SAAS-ONBOARDING-SAGA`.
+1. **Integration:** `P0-ORD-BILL-REQUEST`, `P0-ORD-PAYMENT-FINALIZATION`, `P0-ORD-SESSION-JOIN`, `P0-SAAS-ONBOARDING-SAGA`.
 2. **Browser E2E:** Extend `P0-SAAS-SUSPENDED-CUSTOMER-PWA` with pending-bill payment, then payment close-session coverage from `P1-PAY-BROWSER-CLOSE-SESSION` if promoted for demo risk.
 3. **Optional fast feedback:** BFF quota edge checks for `P0-SAAS-FEATURE-GATING-QUOTAS` if the UI needs pre-forward upgrade prompts.
 

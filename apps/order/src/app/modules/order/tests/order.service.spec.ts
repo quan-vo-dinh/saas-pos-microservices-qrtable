@@ -33,7 +33,7 @@ describe('OrderService', () => {
   let orderItemRepository: { findByOrderIdAndTenant: jest.Mock; findByOrderIdAndTenantWithManager: jest.Mock };
   let billRepository: { findByIdAndTenant: jest.Mock; findByIdAndTenantForUpdate: jest.Mock };
   let sessionRepository: { findByIdAndTenant: jest.Mock; save: jest.Mock; findActiveByIdAndTenant: jest.Mock };
-  let cartService: { getSnapshot: jest.Mock; mutate: jest.Mock };
+  let cartService: { getSnapshot: jest.Mock; mutate: jest.Mock; clearForSubmittedOrder: jest.Mock };
   let sessionService: {
     getActiveSessionOrThrow: jest.Mock;
     touchCustomerSessionActivity: jest.Mock;
@@ -63,7 +63,7 @@ describe('OrderService', () => {
       findByIdAndTenantForUpdate: jest.fn(),
     };
     sessionRepository = { findByIdAndTenant: jest.fn(), save: jest.fn(), findActiveByIdAndTenant: jest.fn() };
-    cartService = { getSnapshot: jest.fn(), mutate: jest.fn() };
+    cartService = { getSnapshot: jest.fn(), mutate: jest.fn(), clearForSubmittedOrder: jest.fn() };
     sessionService = { getActiveSessionOrThrow: jest.fn(), touchCustomerSessionActivity: jest.fn() };
     catalogClient = { send: jest.fn() };
     saasClient = { send: jest.fn() };
@@ -536,12 +536,30 @@ describe('OrderService', () => {
       .mockResolvedValueOnce({
         tenantId: 't1',
         sessionId: 'sess-1',
+        cartVersion: 0,
+        status: 'ACTIVE',
+        updatedAt: now.toISOString(),
+        items: [
+          {
+            cartLineId: 'line-1',
+            menuItemId: 'menu-1',
+            menuItemName: 'Phở bò',
+            menuItemImageUrl: 'https://cdn.example.com/pho.jpg',
+            quantity: 1,
+            unitPrice: 65000,
+            lineVersion: 1,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        tenantId: 't1',
+        sessionId: 'sess-1',
         cartVersion: 1,
         status: 'ACTIVE',
         updatedAt: now.toISOString(),
         items: [],
       });
-    cartService.mutate.mockResolvedValue({
+    cartService.clearForSubmittedOrder.mockResolvedValue({
       tenantId: 't1',
       sessionId: 'sess-1',
       cartVersion: 1,
@@ -924,12 +942,29 @@ describe('OrderService', () => {
       .mockResolvedValueOnce({
         tenantId: 't1',
         sessionId: 'sess-1',
+        cartVersion: 0,
+        status: 'ACTIVE',
+        updatedAt: now.toISOString(),
+        items: [
+          {
+            cartLineId: 'line-1',
+            menuItemId: 'menu-1',
+            menuItemName: 'Phở bò',
+            quantity: 1,
+            unitPrice: 65000,
+            lineVersion: 1,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        tenantId: 't1',
+        sessionId: 'sess-1',
         cartVersion: 1,
         status: 'ACTIVE',
         updatedAt: now.toISOString(),
         items: [],
       });
-    cartService.mutate.mockResolvedValue({
+    cartService.clearForSubmittedOrder.mockResolvedValue({
       tenantId: 't1',
       sessionId: 'sess-1',
       cartVersion: 1,
