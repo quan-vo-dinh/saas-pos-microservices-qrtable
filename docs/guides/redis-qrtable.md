@@ -1,209 +1,545 @@
-# Hướng Dẫn Redis Trong QRTable
+# Redis: In-depth Theory — For QRTable
 
-> **Vai trò:** Tài liệu hỗ trợ (supporting guide), không phải nguồn sự thật chính (canonical source).
-> Hiện trạng Redis đã triển khai được theo dõi ở [`../redis-usage-analysis.md`](../redis-usage-analysis.md), [`../technical-architecture.md`](../technical-architecture.md), và code trên `main`.
+> **Document philosophy:** Understand the _why_ before the _how_. Every concept is anchored in context
+> QRTable's specifics so you don't learn abstract theory but learn to apply it immediately.
 >
-> **Mục tiêu:** Giải thích Redis vừa đủ để đọc code, gỡ lỗi local (debug local), và mở rộng đúng phạm vi QRTable. Tài liệu này không còn là giáo trình Redis tổng quát.
->
-> **Ghi chú triển khai hiện tại (2026-05-14):** QRTable dùng Redis cho bộ nhớ đệm (cache), trạng thái tạm thời (temporary state), khóa phân tán (lock), bộ đếm hạn mức (quota counter), trạng thái runtime của KDS, Socket.io adapter, Redis Pub/Sub nội bộ, flag tenant suspended, subscription cache và SePay OAuth state. Order cart/session dùng Redis Hash `cart:{tenantId}:{sessionId}` / `session:{tenantId}:{sessionId}` với `cartVersion` check trong code; Lua script là phương án tăng cứng (hardening option), không phải implementation hiện tại.
+> **Current code status (2026-05-14):** This document is a supporting guide. Redis implemented for: cache JWT verification, anonymous customer session, public menu, rate limiting, Socket.io Redis Adapter, KDS runtime store, transfer/rebuild locks, daily order quota counter, tenant suspend flag, subscription cache and SePay OAuth state. Order cart/session uses Redis Hash `cart:{tenantId}:{sessionId}` / `session:{tenantId}:{sessionId}` with `cartVersion` check in the code. Lua script is a hardening option for cart, not the current implementation. The persistent source of truth (PostgreSQL) is still the place to store tenants, menus, orders, bills, payments and all data that needs auditing.
 
 ---
 
-## Mục Lục
+## Table of Contents
 
-1. [Đọc nhanh](#1-đọc-nhanh)
-2. [Redis đang dùng ở đâu](#2-redis-đang-dùng-ở-đâu)
-3. [Nguyên tắc lựa chọn Redis](#3-nguyên-tắc-lựa-chọn-redis)
-4. [Danh sách key hiện tại](#4-danh-sách-key-hiện-tại)
-5. [Lý thuyết vừa đủ](#5-lý-thuyết-vừa-đủ)
-6. [Các luồng chính](#6-các-luồng-chính)
-7. [Quy tắc triển khai](#7-quy-tắc-triển-khai)
-8. [Hướng dẫn cấu hình, triển khai và conflict Redis](#8-hướng-dẫn-cấu-hình-triển-khai-và-conflict-redis)
-9. [Gỡ lỗi local](#9-gỡ-lỗi-local)
-10. [Đọc code ở đâu](#10-đọc-code-ở-đâu)
-11. [Checklist](#11-checklist)
+1. [Redis Problem Solved](#1-redis-problem-solved)
+2. [Redis Essence — In-Memory Data Store](#2-redis-essence--in-memory-data-store)
+3. [Years Data Structure In QRTable](#3-years-data-structure-in-qrtable)
+4. [TTL — More Than Just Memory Cleanup](#4-ttl--more than-just-memory-cleanup)
+5. [Cache-Aside Pattern](#5-cache-aside-pattern)
+6. [Distributed Lock — Coordination Between Processes](#6-distributed-lock-coordination-between-processes)
+7. [Redis vs PostgreSQL vs Kafka — Architecture Decision](#7-redis-vs-postgresql-vs-kafka--architecture-decision)
+8. [Key Design and Multi-tenant](#8-key-design-and-multi-tenant)
+9. [Main Streams in QRTable](#9-main-streams-in-qrtable)
+10. [Configuration and Operational](#10-configuration-and-operational)
+11. [Summary Mental Model](#11-summary-mental-model)
 
 ---
 
-## 1. Đọc nhanh
+## 1. Redis Problem Solved
 
-Redis trong QRTable là nơi lưu dữ liệu nhanh, ngắn hạn hoặc có thể dựng lại. PostgreSQL vẫn là nguồn sự thật bền vững (source of truth) cho tenant, menu, order, bill, payment và các dữ liệu cần audit.
+Before learning what Redis is, you need to understand what problem Redis was created to solve in QRTable. If you skip this part, you will tend to use Redis everywhere (replacing PostgreSQL) or not know when you really need it.
 
-Một câu dễ nhớ:
+### 1.1 Original Problem: Fast, Short-Term, Shared Data
 
-```txt
-PostgreSQL giữ sự thật bền vững.
-Redis giữ trạng thái nhanh, tạm thời, hoặc trạng thái runtime cần phản hồi rất nhanh.
+Imagine QRTable without Redis. The system can still run because PostgreSQL is a powerful enough platform. But a series of practical problems arise when the system is loaded and has many instances:
+
+Example 1 — Customer's Cart: Customer sits at table 5, scans QR, adds items, adds more. Each addition is a small write to the temporary cart state. If cart is in PostgreSQL, each small operation creates a row write/update + transaction overhead. Carts that have not been submitted do not need to be that durable.
+
+Example 2 — JWT verification: BFF receives each request and must authenticate the JWT token. If you call the Authorizer service or query the DB every time, a BFF instance handling 500 req/s will make 500 outbound calls/s just to validate the token — when that same token was successfully authenticated on the previous request.
+
+Example 3 — Socket.io and multiple BFF instances: When scaling BFF to 2 instances, a client connects WebSocket to instance A, but the event that needs to be pushed can be triggered from code running in instance B. Without shared state, instance B does not know where the client is to emit.
+
+Example 4 — Switching tables: Two employees move tables at the same time for the same session. There is no mutual exclusion mechanism shared between instances, both can read the old state and overwrite each other.
+
+These are four different problems but have the same characteristics: **need to read/write fast, data is short-lived or can be reconstructed, and needs to be shared between multiple processes**. PostgreSQL can do it, but it's not the most suitable tool — it's designed for durability and consistency, not for in-memory speed and shared ephemeral state.
+
+#### Diagram: QRTable Without Redis — Pain Points
+
+> Illustrates the problems that arise when everything goes through PostgreSQL. Each red node is a real pain point: poor performance, failure to share state between instances, or temporary data taking up unnecessary space in the persistent DB.
+
+```mermaid
+graph TB
+subgraph "❌ No Redis — Everything via PostgreSQL"
+        BFF1["BFF Instance A"]
+        BFF2["BFF Instance B"]
+        ORDER["Order Service"]
+        PG["🗄️ PostgreSQL"]
+
+        BFF1 -->|"JWT verify → query DB"| PG
+        BFF2 -->|"JWT verify → query DB"| PG
+        ORDER -->|"cart write per tap"| PG
+BFF1 -->|"Socket.io state"| BFF1_MEM["❌ Local memory<br/>BFF A does not know the client in BFF B"]
+BFF2 -->|"Socket.io state"| BFF2_MEM["❌ Local memory<br/>BFF B does not know the client in BFF A"]
+
+PAIN1["🔴 500 req/s = 500 DB calls/s<br/>only to verify JWT"]
+PAIN2["🔴 Cart temporarily occupies row in<br/>Stable DB"]
+PAIN3["🔴 WebSocket not fan-out<br/>across multiple instances"]
+PAIN4["🔴 No common lock<br/>for switching tables"]
+    end
+
 ```
 
-### Thuật ngữ tối thiểu
+#### Diagram: QRTable With Redis — Correct Layering of Roles
 
-| Thuật ngữ                                       | Nghĩa trong QRTable                                                                                              |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Redis                                           | Kho dữ liệu trong RAM (in-memory data store), dùng cho cache/state nhanh.                                        |
-| Key (khóa)                                      | Tên truy cập dữ liệu, ví dụ `cart:{tenantId}:{sessionId}`.                                                       |
-| Value (giá trị)                                 | Nội dung lưu trong key. Có thể là string, hash, set, sorted set.                                                 |
-| TTL / Time To Live (thời gian sống)             | Thời gian key còn tồn tại trước khi Redis tự xóa.                                                                |
-| Cache (bộ nhớ đệm)                              | Bản sao nhanh của dữ liệu nguồn, ví dụ menu public.                                                              |
-| Hash (bảng field-value)                         | Kiểu dữ liệu Redis lưu nhiều field trong một key; QRTable dùng cho cart/session.                                 |
-| String (chuỗi)                                  | Kiểu dữ liệu đơn giản; dùng cho flag, OAuth state, counter.                                                      |
-| Sorted Set / ZSet (tập có điểm sắp xếp)         | Dùng khi cần queue theo điểm/thời gian, ví dụ SLA due trong KDS.                                                 |
-| Pub/Sub (phát/nhận nội bộ)                      | Redis channel để service phát tín hiệu nhanh trong runtime.                                                      |
-| Distributed lock (khóa phân tán)                | Key tạm thời để tránh hai process cùng xử lý một việc.                                                           |
-| Pipeline / MULTI (gom lệnh / transaction Redis) | Gửi nhiều lệnh Redis cùng lúc; `MULTI` giúp một nhóm lệnh chạy liền nhau.                                        |
-| Lua script (script Lua)                         | Cách chạy logic nguyên tử (atomic) trong Redis; hiện chỉ xem là phương án tăng cứng (hardening option) cho cart. |
+> Redis solves each of the above pain points by creating a middle layer that specializes in fast, short-term data processing and shared state. PostgreSQL holds the true role of source of truth. Kafka holds the correct event log role. Redis plays the role of the in-memory runtime layer.
 
----
+```mermaid
+graph LR
+subgraph "✅ Having Redis — Proper Tiering"
+        BFF["BFF / Services"]
+        REDIS["⚡ Redis<br/>In-Memory Layer"]
+        PG["🗄️ PostgreSQL<br/>Source of Truth"]
+        KAFKA["📋 Kafka<br/>Event Log"]
 
-## 2. Redis đang dùng ở đâu
+        BFF <-->|"cache, session, lock,<br/>counter, pub/sub"| REDIS
+        BFF <-->|"durable data,<br/>audit, transaction"| PG
+        BFF -->|"domain events"| KAFKA
+        KAFKA -->|"consume"| BFF
 
-| Service   | Vai trò Redis hiện tại                                                                                                                                               |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BFF       | Cache JWT verification, anonymous customer session, public menu, throttling, Socket.io Redis adapter, KDS internal fan-out, đọc tenant suspend flag qua cache layer. |
-| Order     | Active session cache, shared cart, transfer locks, daily order quota counter.                                                                                        |
-| Kitchen   | Runtime store của KDS, ticket queues, SLA due set, dedupe keys, internal `realtime:kds:*` Pub/Sub.                                                                   |
-| SaaS      | Tenant suspend flag và current subscription cache.                                                                                                                   |
-| Payment   | SePay OAuth state cache để chống CSRF và bind tenant/user trong callback.                                                                                            |
-| Dev tools | Flush/verify Redis local khi reset dữ liệu dev.                                                                                                                      |
+        R1["✅ JWT cache → ~0 DB call"]
+R2["✅ Cart hash → TTL expires"]
+        R3["✅ Socket.io adapter → fan-out multi-instance"]
+R4["✅ SET NX → switch table lock"]
+    end
 
-Redis chưa phải nơi lưu bền vững cho:
-
-- Menu canonical.
-- Order/bill/payment canonical.
-- Tenant/subscription canonical.
-- Audit/history dài hạn.
-
----
-
-## 3. Nguyên tắc lựa chọn Redis
-
-Redis không chỉ là "database nhanh hơn". Redis là lựa chọn kiến trúc cho dữ liệu cần phản hồi nhanh, có thể hết hạn, có thể dựng lại, hoặc cần chia sẻ giữa nhiều process. Nếu dữ liệu không thể mất, cần audit, cần transaction quan hệ, hoặc cần query phức tạp, PostgreSQL vẫn là lựa chọn chính.
-
-### 3.1 Khi nên dùng Redis
-
-| Tín hiệu                   | Ý nghĩa                                                           | Ví dụ trong QRTable                                                        |
-| -------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Cần đọc/ghi rất nhanh      | Request cần phản hồi nhanh và dữ liệu có shape nhỏ/gọn.           | Public menu cache `menu:{tenantId}`, JWT verification cache.               |
-| Dữ liệu có vòng đời ngắn   | Dữ liệu chỉ hợp lệ trong vài phút/giờ và nên tự hết hạn bằng TTL. | BFF session, Order session/cart, OAuth state.                              |
-| Có thể dựng lại khi mất    | Redis restart hoặc key hết hạn không làm mất sự thật bền vững.    | Order session cache rehydrate từ PostgreSQL; KDS rebuild từ active orders. |
-| Cần phối hợp nhiều process | Nhiều instance cần cùng nhìn thấy lock/counter/state.             | Transfer table lock, quota counter, Socket.io Redis Adapter.               |
-| Cần runtime projection     | Dữ liệu phục vụ vận hành realtime, tối ưu cho màn hình hiện tại.  | KDS queue/ticket state trong Redis.                                        |
-| Chỉ cần tín hiệu nhanh     | Message có thể mất, client vẫn refetch được snapshot.             | `realtime:kds:{tenantId}` Pub/Sub từ Kitchen sang BFF.                     |
-
-### 3.2 Khi không nên dùng Redis
-
-| Tín hiệu                                          | Lý do                                                                       | Lựa chọn đúng hơn                                                             |
-| ------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Cần lưu bền vững, audit, báo cáo                  | Redis có thể mất key do TTL/restart/flush; không phù hợp làm lịch sử chính. | PostgreSQL.                                                                   |
-| Cần ràng buộc quan hệ phức tạp                    | Redis không thay thế foreign key, unique constraint, transaction SQL.       | PostgreSQL.                                                                   |
-| Cần đọc lại event bền vững (durable event replay) | Redis Pub/Sub không lưu message cho consumer đọc lại.                       | Kafka/outbox.                                                                 |
-| Chỉ một process cần cache nhỏ                     | Redis có thể là overkill nếu không cần chia sẻ giữa instance.               | In-memory cache có TTL, nếu chấp nhận mất khi restart.                        |
-| Dữ liệu nhạy cảm dài hạn                          | Redis không phải kho secret/token dài hạn.                                  | DB có encryption/secret store; Redis chỉ dùng state ngắn hạn như OAuth state. |
-| Không có invalidation rõ ràng                     | Cache dễ stale và gây hiểu sai nghiệp vụ.                                   | Đọc trực tiếp source service/DB cho tới khi có contract invalidation.         |
-
-### 3.3 Câu hỏi quyết định
-
-```txt
-1. Dữ liệu này có phải nguồn sự thật bền vững không?
-   Có  -> PostgreSQL hoặc service owner DB.
-   Không -> xét Redis.
-
-2. Nếu Redis mất key, hệ thống có rebuild/refetch được không?
-   Có  -> Redis phù hợp.
-   Không -> không lưu duy nhất ở Redis.
-
-3. Dữ liệu có cần tự hết hạn không?
-   Có  -> Redis + TTL phù hợp.
-
-4. Có nhiều instance/service cần nhìn cùng state nhanh không?
-   Có  -> Redis phù hợp hơn in-memory cache.
-
-5. Đây là event cần replay/durable delivery không?
-   Có  -> Kafka/outbox, không dùng Redis Pub/Sub.
 ```
 
-### 3.4 Redis khác PostgreSQL, Kafka và bộ nhớ local thế nào
+Redis doesn't replace PostgreSQL or Kafka — it fills a gap where neither fits: **data needs RAM speed, has a short lifespan or self-expiration, and can be shared between multiple processes**.
 
-| Công cụ                     | Dùng tốt cho                                                                                                       | Không dùng cho                                                              |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| PostgreSQL                  | Source of truth, transaction, quan hệ dữ liệu, audit/report.                                                       | Dữ liệu realtime ngắn hạn cần update rất nhanh từng request.                |
-| Redis                       | Cache, state có TTL, lock, counter, queue/projection runtime, tín hiệu Pub/Sub (Pub/Sub hint).                     | Lịch sử bền vững (durable history), replay event, quan hệ dữ liệu phức tạp. |
-| Kafka                       | Sự kiện nghiệp vụ bền vững (durable domain event), fan-out, consumer replay, xử lý bất đồng bộ (async processing). | Cache nhanh, lock, session/cart state, Pub/Sub hint không cần durable.      |
-| Bộ nhớ local (local memory) | Cache rất nhỏ, chỉ cần trong một process, không quan trọng khi restart.                                            | Multi-instance consistency, session chung, lock/counter shared.             |
+### 1.2 When is Redis NOT the Solution
 
-### 3.5 Mapping theo nhóm Redis trong QRTable
+Redis is not the answer to every problem. Knowing when _not_ to use Redis is just as important as knowing when to use:
 
-| Nhóm                            | Redis giữ gì                                                                         | Source of truth / fallback                                         | Cảnh báo                                                                  |
-| ------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| Cache-aside                     | `menu:{tenantId}`, JWT verify result, subscription snapshot.                         | Catalog/Authorizer/SaaS hoặc DB owner.                             | Phải có TTL/invalidation; cache stale phải được chấp nhận trong giới hạn. |
-| Runtime state                   | `cart:{tenantId}:{sessionId}`, `session:{tenantId}:{sessionId}`, `kds:{tenantId}:*`. | Order DB cho session/order; KDS có rebuild từ Order active orders. | Redis mất state phải có đường refetch/rebuild.                            |
-| Coordination                    | Transfer locks, quota counters, KDS rebuild lock.                                    | DB/service command là nơi quyết định nghiệp vụ cuối.               | Lock phải có TTL và release an toàn.                                      |
-| Tín hiệu Pub/Sub (Pub/Sub hint) | `realtime:kds:{tenantId}`, Socket.io Redis Adapter.                                  | REST snapshot và trạng thái của service owner.                     | Message có thể mất; client phải refetch.                                  |
-| Security short-lived state      | `oauth_state:{state}`.                                                               | OAuth flow + callback validation.                                  | TTL ngắn, one-time consume, không lưu token dài hạn.                      |
-| Edge enforcement                | `tenant:{tenantId}:suspended`.                                                       | SaaS tenant status trong DB.                                       | Guard policy phải rõ khi Redis/SaaS unavailable.                          |
+**Do not use Redis when data needs to be audited or permanently saved:** If an order is lost after Redis restarts, it is a business bug, not an incident. Order, bill, payment, tenant info — it all has to be in PostgreSQL.
 
-### 3.6 Chi phí khi chọn Redis
+**Do not use Redis when you need durable event replay:** Redis Pub/Sub is "fire and forget" — if the subscriber is not online when the event is published, the event is lost forever. Use Kafka when you need consumers to re-read events after restarting.
 
-Redis làm hệ thống nhanh hơn nhưng thêm trách nhiệm:
+**Do not use Redis when there is only one process:** If only one service instance needs a small unshared cache, local memory (eg Map in Node.js) is simpler and faster. Redis has network overhead.
 
-- Phải đặt tên key nhất quán và luôn scope theo `tenantId`.
-- Phải định nghĩa TTL hoặc lý do không có TTL.
-- Phải xử lý cache miss, wrong type, stale cache và Redis unavailable.
-- Phải biết service nào là owner của key.
-- Phải có test cho conflict/duplicate/expired key nếu flow quan trọng.
+**Don't use Redis without explicit invalidation:** Cache can easily become a source of business misunderstanding if you don't know when to delete/update. There is no contract invalidation → read straight from the source service until there is one.
 
 ---
 
-## 4. Danh sách key hiện tại
+## 2. Redis Nature — In-Memory Data Store
 
-| Key pattern                                             | Owner                | Type                 | TTL         | Trạng thái      | Mục đích                                                                            |
-| ------------------------------------------------------- | -------------------- | -------------------- | ----------- | --------------- | ----------------------------------------------------------------------------------- |
-| `user-token:{sha256(jwt)}`                              | BFF                  | Cache object/string  | 30m         | Đã triển khai   | Cache kết quả Authorizer verification.                                              |
-| `bff-session:{tenantId}:{sessionId}`                    | BFF                  | Cache object/string  | 2h          | Đã triển khai   | Anonymous customer session ở edge.                                                  |
-| `bff-session:{sessionId}`                               | BFF                  | Cache object/string  | 2h          | Legacy fallback | Hỗ trợ lookup session thiếu tenant.                                                 |
-| `menu:{tenantId}`                                       | BFF                  | Cache object/string  | 10m         | Đã triển khai   | Cache public menu cho Customer PWA.                                                 |
-| Throttler internal keys                                 | BFF                  | Library-owned        | 60s         | Đã triển khai   | Global HTTP rate limiting.                                                          |
-| `socket.io-adapter:*`                                   | BFF                  | Pub/Sub internal     | n/a         | Đã triển khai   | Scale WebSocket nhiều instance.                                                     |
-| `session:{tenantId}:{sessionId}`                        | Order                | Hash                 | 2h          | Đã triển khai   | Active session cache của Order domain.                                              |
-| `cart:{tenantId}:{sessionId}`                           | Order                | Hash                 | 2h          | Đã triển khai   | Shared cart draft state.                                                            |
-| `transfer:{tenantId}:{sessionId}`                       | Order                | String lock          | 30s         | Đã triển khai   | Lock chuyển bàn theo session.                                                       |
-| `table-transfer:{tenantId}:{tableId}`                   | Order                | String lock          | 30s         | Đã triển khai   | Lock bàn nguồn/đích khi chuyển bàn.                                                 |
-| `quota:{tenantId}:orders:{date}`                        | Order                | String counter       | 48h         | Đã triển khai   | Daily order quota counter.                                                          |
-| `kds:{tenantId}:*`                                      | Kitchen              | Hash/Set/ZSet/String | Tùy key     | Đã triển khai   | KDS ticket, queue, SLA, dedupe.                                                     |
-| `lock:kds:rebuild:{tenantId}`                           | Kitchen              | String lock          | Short TTL   | Đã triển khai   | Rebuild lock cho KDS recovery.                                                      |
-| `realtime:kds:{tenantId}`                               | Kitchen/BFF          | Pub/Sub channel      | n/a         | Đã triển khai   | Internal KDS fan-out.                                                               |
-| `tenant:{tenantId}:suspended`                           | SaaS/BFF guard       | String flag          | No expire   | Đã triển khai   | Chặn tenant suspended nhanh ở edge.                                                 |
-| `subscription:{tenantId}`                               | SaaS                 | String JSON          | 5m          | Đã triển khai   | Cache current subscription.                                                         |
-| `oauth_state:{state}`                                   | Payment              | String JSON          | 5m          | Đã triển khai   | SePay OAuth state one-time consume.                                                 |
-| `table:{tenantId}:{tableId}:status`                     | BFF/Catalog boundary | String               | n/a         | Dự kiến         | Cache trạng thái bàn nếu cần tối ưu.                                                |
-| `idempotency:order-submit:{tenantId}:{sessionId}:{key}` | Order                | String               | Planned TTL | Dự kiến         | Tăng cứng duplicate submit ở Redis; hiện order submit dựa PostgreSQL unique/replay. |
+### 2.1 What Redis Really Is
 
-Nếu key không có trong bảng này, đừng mặc định xem nó là triển khai hiện tại (current implementation). Kiểm tra code hoặc [`../redis-usage-analysis.md`](../redis-usage-analysis.md) trước.
+Redis (Remote Dictionary Server) is essentially an **in-memory data structure store** — a data store that operates entirely in RAM. This is a fundamental difference compared to PostgreSQL (writes to disk before confirming) or Kafka (sequential disk I/O to achieve throughput).
+
+Because everything is in RAM, Redis has extremely low latency — typically less than 1 millisecond for simple read/write operations. This is why Redis is suitable for hot paths: JWT cache, session lookup, KDS runtime state — places where every extra millisecond can be felt on the frontend.
+
+But "in-memory" also means that Redis can lose data when restarting (if persistence is not configured). This is not a weakness — this is a **design feature**. QRTable exploits this feature by saving to Redis only what _can be reconstructed_ from PostgreSQL or from the service Owner.
+
+#### Diagram: Redis Location In Storage System
+
+> Each storage tier in QRTable has different speed and durability characteristics. Redis is on the fastest but least durable tier. Rule: data stored at any layer must match the characteristics of that layer.
+
+```mermaid
+graph TB
+subgraph "Storage Layer — From Fast to Durable"
+L1["⚡ Local Memory (RAM process)<br/>~nanoseconds | Lost on restart | Not shared"]
+L2["🔴 Redis (RAM shared)<br/>~microseconds–1ms | TTL/restart | Shared between instances"]
+L3["📋 Kafka (Sequential Disk)<br/>~ms | Retention policy | Replayable"]
+        L4["🗄️ PostgreSQL (Disk + WAL)<br/>~ms–tens of ms | Durable | ACID transaction"]
+
+        L1 --> L2 --> L3 --> L4
+    end
+
+subgraph "QRTable Data → Set Correct Floor"
+D1["Temporary variable in function → Local Memory"]
+        D2["JWT cache, cart, KDS, lock, counter → Redis"]
+        D3["order.confirmed, payment.completed → Kafka"]
+        D4["Order, Bill, Payment, Tenant, Menu canonical → PostgreSQL"]
+    end
+
+```
+
+### 2.2 Single-Threaded and Atomic Operations
+
+Redis processes commands in a **single-threaded** fashion — only one command is executed at a time. This may sound like a limitation, but it's actually the source of many of the guarantees Redis provides:
+
+All Redis commands are **atomic** by nature. `INCR counter` (increment counter by 1) never has a race condition between reading and writing — it is impossible for two processes to read counter = 5, increase it to 6, and write twice the value 6 (the correct result must be 7). This is why QRTable uses Redis `INCR` for the daily order quota counter instead of `SELECT + UPDATE` in PostgreSQL.
+
+This property is also the foundation of the distributed lock pattern: `SET key value NX PX ttl` is an atomic command — if the key does not exist, create it, if it already exists, do nothing. It is not possible for two requests to "win" the race when setting a lock.
+
+### 2.3 A Sentence to Remember
+
+```txt
+PostgreSQL keeps the truth persistent.
+Kafka keeps a replayable event history.
+Redis holds fast, transient, or runtime state that needs to respond in under 1ms.
+```
+
+If you remove Redis from QRTable, the system is still _functionally correct_ — it's just slower, more resource-intensive, and can't scale to many instances. Here's a good test to see if something is worth putting in Redis: **"If Redis loses this key, can the system rebuild?"** — if the answer is No, don't save it only in Redis.
 
 ---
 
-## 5. Lý thuyết vừa đủ
+## 3. Five Data Structure In QRTable
 
-### 5.1 Redis primitives trong guide này
+Redis is not just a simple key-value store. Redis has many data structures, each optimized for different problems. QRTable uses five types — understand each type to read the code more easily and avoid using the wrong type.
 
-Guide này chỉ giải thích những primitive (khả năng cơ bản) Redis đang dùng hoặc có thể cần rất gần trong QRTable:
+### 3.1 String — Flag, Counter, OAuth State
 
-- `String`: flag, OAuth state, counter.
-- `Hash`: cart/session snapshot nhỏ.
-- `Sorted Set`: queue theo điểm/thời gian, ví dụ SLA due.
-- `Pub/Sub`: tín hiệu runtime không durable.
-- `SET NX PX`: lock ngắn hạn.
-- `MULTI/EXEC`: nhóm lệnh Redis cần chạy liền nhau.
+String is the simplest type: a key that maps to a text or numeric value. Don't be fooled by the name "String" — Redis String can actually store any binary data, including serialized JSON.
 
-### 5.2 Quy tắc đặt tên key
+QRTable uses String for three different groups:
 
-Quy tắc QRTable:
+**Flag:** `tenant:{tenantId}:suspended = "1"`. Key exists → tenant is suspended. Key does not exist → tenant active. BFF guard reads this key before each customer mutation for fast blocking at the edge (edge ​​enforcement), no need to query SaaS service.
+
+**Counter:** `quota:{tenantId}:orders:{date}` stores the number of orders for the day as an integer string. Redis command `INCR` increases counter atomically — never has a race condition even though multiple Order instances are running in parallel.
+
+**Serialized JSON:** `oauth_state:{state}` stores a JSON blob containing tenantId, userId, and CSRF token. String type is suitable because the entire payload reads and writes as one unit (one SET, one GET + DEL).
+
+```txt
+GET tenant:abc:suspended          → "1" (suspended) or nil (active)
+INCR quota:abc:orders:2026-05-14 → 43 (43rd call)
+GET oauth_state:xyz123            → {"tenantId":"abc","userId":"u1",...}
+```
+
+### 3.2 Hash — Cart and Session Snapshot
+
+Hash is a field-value table associated with a key. Instead of serializing the entire object into a string and parsing it again each time a field needs to be modified, Hash allows reading/writing each field individually.
+
+QRTable uses Hash for `cart:{tenantId}:{sessionId}` and `session:{tenantId}:{sessionId}`. Example of a cart hash:
+
+```txt
+cart:tenant-abc:sess-001
+  tenantId    → "tenant-abc"
+  sessionId   → "sess-001"
+  cartVersion → "7"
+  status      → "active"
+  updatedAt   → "2026-05-14T10:00:00Z"
+  items       → "[{itemId:..., qty:2}, ...]"
+```
+
+Reasons to choose Hash instead of String (JSON):
+
+- Refresh the TTL of the entire hash with a command `PEXPIRE`.
+- Read a specific field (`HGET cart:... cartVersion`) without deserializing the entire field.
+- `cartVersion` is an optimistic locking indicator — when the client submits, the Order service checks if `expectedCartVersion` matches the current value. If there is no match → conflict, the client must refetch.
+
+#### Diagram: Cart Hash and cartVersion Optimistic Locking
+
+> `cartVersion` is a mechanism to detect conflicts between two tabs or two devices adding items to the cart in one session. When versions do not match, the Order service refuses to write and asks the client to retrieve the latest cart instead of silently overwriting.
+
+```mermaid
+sequenceDiagram
+    participant TabA as 📱 Tab A (v=5)
+    participant TabB as 📱 Tab B (v=5)
+    participant Order as Order Service
+    participant Redis as ⚡ Redis
+
+    TabA->>Order: addItem(expectedVersion=5)
+    TabB->>Order: addItem(expectedVersion=5)
+
+    Order->>Redis: HGET cart:...:cartVersion
+Redis-->>Order: "5" ✓ Match → ghi, version → 6
+
+    Order->>Redis: HGET cart:...:cartVersion
+Redis-->>Order: "6" ✗ does not match expectedVersion=5
+
+Order-->>TabA: 200 OK (recorded)
+    Order-->>TabB: 409 CONFLICT → refetch cart
+```
+
+### 3.3 Sorted Set (ZSet) — SLA Due Queue
+
+A Sorted Set is a collection of elements, each element has a _score_ (score\_), and Redis keeps the set always sorted by score.
+
+Kitchen uses Sorted Set for SLA due queue: each kitchen ticket is added to ZSet with a score of Unix timestamp at SLA expiration. A worker periodically uses `ZRANGEBYSCORE kds:{tenantId}:sla 0 {now}` to retrieve all tickets that have exceeded the SLA and broadcasts a `kitchen.sla_warning` event to Kafka — then BFF pushes the alert to the WebSocket KDS client.
+
+```txt
+ZADD kds:abc:sla 1715688000 "ticket-001" → ticket expires SLA at 10:00
+ZADD kds:abc:sla 1715690000 "ticket-002" → ticket expires SLA at 10:33
+
+ZRANGEBYSCORE kds:abc:sla 0 1715689000 → ["ticket-001"] ← expired
+```
+
+Sorted Set is suitable because it is both a _set_ (no duplicates) and _self-sorted_ over time — no need for external sorting code, no need to poll the entire list.
+
+### 3.4 Pub/Sub — Runtime Hint Unsustainable
+
+Pub/Sub is Redis' built-in publish-subscribe mechanism: the publisher sends a message to the channel, all listening subscribers receive it immediately.
+
+QRTable uses Pub/Sub for the KDS stream: when Kitchen updates a ticket in Redis, it publishes to channel `realtime:kds:{tenantId}`. The BFF subscriber receives this signal and emits WebSocket event `events.kdsQueueChanged` to the KDS client. The client receives the hint and performs a refetch queue snapshot from the Kitchen service.
+
+**Important differences from Kafka:** Pub/Sub is **fire-and-forget**. If no subscribers are online at the time of publishing, the message is lost forever — no saving, no replay. So Pub/Sub is just a hint, never a source of truth. The frontend KDS client is not designed as "receive Pub/Sub to update state" — but rather "receive Pub/Sub → refetch snapshot from Kitchen".
+
+```txt
+❌ Wrong: Frontend listens to Pub/Sub and updates state directly from messages
+✅ Correct: Frontend receives Pub/Sub hint → calls GET /kitchen/kds to get the latest state
+```
+
+### 3.5 SET NX PX — Distributed Lock
+
+This is not a data structure but a **command pattern** used to create distributed locks:
+
+```
+SET lockKey lockValue NX PX ttlInMilliseconds
+```
+
+- `NX` (Not eXists): only set if key does not exist. This is an important atomic property — two requests called at the same time, only one wins.
+- `PX ttl`: key is automatically deleted after `ttl` milliseconds — ensures the lock is not held forever if the process crashes.
+- `lockValue`: unique value (usually request UUID) for safe release — only remove the lock if the value is still yours.
+
+Details of this pattern are explained in more depth in [Section 6](#6-distributed-lock-coordination-between-processes).
+
+---
+
+## 4. TTL — More Than Just Memory Cleanup
+
+TTL (Time To Live) is the time a key remains alive before Redis deletes itself. A common misconception is to think of TTL as just a memory cleanup mechanism. In fact, **TTL is part of the business contract**.
+
+### 4.1 TTL Is a Contract, Not a Utility
+
+Consider `oauth_state:{state}` with a 5 minute TTL: this is not "Redis cleans itself up every 5 minutes to save RAM". This is a security requirement — OAuth state is only valid for 5 minutes after creation. If the callback arrives after 5 minutes, the key no longer exists, the flow fails. This is correct behavior.
+
+Similar to `bff-session:{tenantId}:{sessionId}` TTL 2h: when the session expires, the customer must scan the QR again. This is a business rule enforced by TTL.
+
+Important question when adding a new Redis key: **"How long is the TTL and why?"** — not "is the TTL necessary?". By default there should be TTL. Not having a TTL must be a deliberate decision for a clear reason.
+
+### 4.2 TTL Affects System Behavior
+
+#### Diagram: Consequences Of TTL Too Short vs Too Long
+
+> Three common TTL scenarios and the consequences of each scenario. Too short a TTL increases the load on the source service. TTL is too long, causing the client to see old data. TTL is truly a balance between freshness and performance.
+
+```mermaid
+graph TB
+subgraph "⏱️ TTL too short — menu cache 30s"
+S1A["Customer opens menu"] --> S1B["Cache misses continuously"]
+S1B --> S1C["All requests call Catalog service"]
+S1C --> S1D["❌ Cache has no value — Catalog download increased"]
+    end
+
+subgraph "⏱️ TTL too long — menu cache 24h"
+S2A["Admin corrected item price"] --> S2B["Invalidation did not occur"]
+S2B --> S2C["Customer sees 24-hour old price"]
+S2C --> S2D["❌ Stale data → wrong business"]
+    end
+
+subgraph "✅ TTL reasonable — menu cache 10m + invalidation on write"
+S3A["Admin edits price"] --> S3B["Write path: DEL menu:{tenantId}"]
+        S3B --> S3C["Cache miss → fetch fresh"]
+S3D["Customer reads menu"] --> S3E["Cache hit in 10m"]
+S3E --> S3F["✅ Fresh when needed, fast when not"]
+    end
+
+```
+
+### 4.3 When Keys Are Allowed Without TTL
+
+There is a case where a Redis key does not need a TTL: runtime flag, but the service Owner will clearly manage its lifecycle.
+
+`tenant:{tenantId}:suspended` has no TTL because: when SaaS suspends tenant, it SET key. When SaaS is activated again, it will be DEL key. Lifecycle is driven by business operations, not time. If you set a short TTL, the tenant will be suspended but the key will automatically expire → BFF will no longer block mutations → the business will go wrong.
+
+But non-TTL keys must be very few and must have a clear Owner. If the service Owner has a bug and does not DEL the key, the key lasts forever and takes up memory. This is why every non-TTL key must be documented for a clear reason.
+
+---
+
+## 5. Cache-Aside Pattern
+
+Cache is the most popular use case of Redis. QRTable uses **cache-aside** (also known as lazy loading) — the simplest pattern and best suited to the current architecture.
+
+### 5.1 Cache-Aside Mechanism
+
+In cache-aside, application code (not Redis or DB) is responsible for coordinating between cache and source. Reading stream:
+
+```
+1. Read from Redis
+2. If yes (cache hit) → return immediately
+3. If there is no (cache miss) → read from source (DB or service)
+4. Write results to Redis + TTL
+5. Return results to the client
+```
+
+#### Diagram: Cache-Aside Read Flow
+
+> Illustration of cache-aside read flow for public menu. The first request (cache miss) goes to the Catalog service and populates the cache. Subsequent requests within 10 minutes read from Redis directly. When the admin edits the menu, write path invalidate cache — request then cache miss again and get new data.
+
+```mermaid
+sequenceDiagram
+    participant C as 📱 Customer PWA
+    participant BFF as BFF
+    participant Redis as ⚡ Redis
+    participant Catalog as Catalog Service
+
+    C->>BFF: GET /menu
+    BFF->>Redis: GET menu:{tenantId}
+    Redis-->>BFF: nil (cache miss)
+    BFF->>Catalog: GET /catalog/menu/{tenantId}
+    Catalog-->>BFF: menu data
+    BFF->>Redis: SET menu:{tenantId} data EX 600
+    BFF-->>C: menu data
+
+Note over C,Catalog: Second time (within 10 minutes)
+    C->>BFF: GET /menu
+    BFF->>Redis: GET menu:{tenantId}
+    Redis-->>BFF: menu data ✓ (cache hit)
+BFF-->>C: data menu (does not call Catalog)
+
+Note over C,Catalog: Admin edits menu
+    BFF->>Redis: DEL menu:{tenantId}
+    Note over Redis: Cache invalidated
+```
+
+### 5.2 Cache Invalidation — A Harder Problem Than Read Cache
+
+Phil Karlton famously said: _"There are only two hard things in Computer Science: cache invalidation and naming things."_
+
+In QRTable, menu cache invalidation (`DEL menu:{tenantId}`) occurs when admin successfully writes path. This is **write-through invalidation** — after writing to the source, clear the cache. No need to write to cache right away (to avoid stale write race), just delete — next read will populate again.
+
+If DEL does not occur (e.g. write succeeds but DEL has a network error), the cache will remain stale for up to TTL (10 minutes for menu). This is an acceptable **trade-off** because: the menu does not change continuously, 10 minutes of staleness does not seriously affect business, and TTL acts as the final safety net.
+
+### 5.3 Cache Misses Must Not Damage Business
+
+Immutable rule: **cache miss must result in a proper fallback, never a business error**.
+
+If Redis goes down or the key expires, BFF must call the Catalog service and return the correct menu — slower but correct. Redis read code fails `throw` exception if cache miss; it must continue onto the fallback path.
+
+---
+
+## 6. Distributed Lock — Coordination Between Processes
+
+### 6.1 Why Need Lock
+
+When multiple service instances run in parallel, there are operations that are only allowed to occur at one time for a specific resource. QRTable has two instances:
+
+**Transfer lock:** When an employee transfers desks, the session must lock the source and destination desks during execution. If two employees move to the same desk at the same time, the result is unknown.
+
+**KDS rebuild lock:** When Kitchen service restarts, it rebuilds KDS state from the active orders list in PostgreSQL. If multiple instances rebuild at the same time, duplicate tickets can be created in the KDS Redis store.
+
+Core problem: **lock cannot be in the local memory of a process**, because the other process cannot see it. The lock must be located where all instances can see it — Redis is the natural choice.
+
+### 6.2 Pattern Correct: SET NX PX + Owner Value
+
+```txt
+Acquire lock:
+  SET transfer:{tenantId}:{sessionId} {requestUUID} NX PX 30000
+→ Returns "OK" if the lock can be obtained, nil if someone already holds it
+
+Release lock (must check Owner):
+  GET transfer:{tenantId}:{sessionId}
+→ If value == requestUUID → DEL (is my lock)
+→ If value != requestUUID → do nothing (lock has been reacquire by another request)
+```
+
+#### Diagram: Distributed Lock — Secure Acquire and Release
+
+> Illustration of two requests trying to get a table transfer lock. Request A wins and holds the lock for 30 seconds. Request B must notify the employee of the conflict. When A releases, it checks the Owner value before deleting — to avoid accidentally deleting another request's lock if the TTL has expired and B has re-acquire.
+
+```mermaid
+sequenceDiagram
+participant A as 👨‍💼 Employee A
+participant B as 👩‍💼 Employee B
+    participant Order as Order Service
+    participant Redis as ⚡ Redis
+
+    A->>Order: transferTable(table5 → table6)
+    B->>Order: transferTable(table5 → table7)
+
+    Order->>Redis: SET transfer:t1:table5 uuid-A NX PX 30000
+Redis-->>Order: OK ✓ (A holds lock)
+
+    Order->>Redis: SET transfer:t1:table5 uuid-B NX PX 30000
+Redis-->>Order: nil ✗ (key already exists)
+
+Order-->>A: 200 OK, moving tables...
+Order-->>B: 409 CONFLICT, table is being operated
+
+Note over Order, Redis: A completed table transfer
+    Order->>Redis: GET transfer:t1:table5
+Redis-->>Order: "uuid-A" → matches → DEL
+    Note over Redis: Lock released
+```
+
+### 6.3 Common Mistakes When Using Lock
+
+**Error 1 — Not checking the Owner when releasing:** If you only `DEL lockKey` without checking the value, there is a risk of deleting the lock of another request. For example: A acquires lock, A is late, TTL expires, B acquires lock, A completes and DEL — A has just deleted B's lock.
+
+**Error 2 — TTL too long:** Lock transfer table only takes a few seconds. TTL 30 seconds is a safe margin. If you set a TTL of 5 minutes, a stuck request can block all operations on that table for 5 minutes.
+
+**Error 3 — Not handling "unable to get lock":** The code must have a clear behavior when the lock fails — return a clear error message to the client, not crash or silently ignore.
+
+**Error 4 — The logic inside the lock is too long:** The lock only protects for the minimum time necessary. Don't include all business logic in the lock — just include the part that needs mutual exclusion.
+
+---
+
+## 7. Redis vs PostgreSQL vs Kafka — Architecture Decisions
+
+### 7.1 Decision Tree — Where Does This Data Belong?
+
+Before adding any data to Redis, run through this decision tree:
+
+#### Diagram: Decision Tree — Redis, PostgreSQL or Kafka?
+
+> The decision tree starts from the most important question: "Will losing this data damage the business?" If Yes → PostgreSQL. If No (can be rebuilt) → continue to consider Redis or Kafka.
+
+```mermaid
+flowchart TD
+START(["💡 Need to save new data"]) --> Q1{"Will losing this data permanently slow down the business?"}
+
+Q1 -->|"Yes — cannot rebuild"| PG["🗄️ PostgreSQL\nSource of truth"]
+
+Q1 -->|"No — can rebuild/refetch"| Q2{"Is this a domain event that needs\nfan-out or replay?"}
+
+Q2 -->|"Yes"| KAFKA["📋 Kafka\nDomain event log"]
+
+Q2 -->|"No"| Q3{"Need to share between\nmultiple service instances?"}
+
+Q3 -->|"No"| LOCAL["💾 Local memory\nor in-process cache"]
+
+Q3 -->|"Yes"| Q4{"Does the data have a natural TTL\nor can it expire?"}
+
+Q4 -->|"Yes — session, cache, lock, counter"| REDIS["⚡ Redis\nIn-memory shared state"]
+
+Q4 -->|"Unclear"| CHECK["⚠️ Check again:\nDo you need an audit?\nDo you need a replay?\n→ PostgreSQL or Kafka"]
+
+```
+
+### 7.2 Anti-Pattern — Redis As Second Database
+
+The most common mistake when first using Redis: starting to save everything in Redis because it is "faster", gradually Redis becomes the second database with no schema, no migration, no backup strategy.
+
+Signs to recognize this anti-pattern:
+
+- There is a Redis key with no TTL and no Owner to delete it.
+- There is a Redis key that if lost, the team doesn't know where to rebuild from.
+- There is a JOIN code between this Redis key and another Redis key.
+- Have Redis reading code to make important business decisions without fallback.
+
+In QRTable, every important Redis key has one of two: an explicit TTL, or the service Owner has an explicit deletion code. There is no "live forever without anyone knowing" key.
+
+### 7.3 Comparison Table According to Use Case
+
+| Use Case                       | Select            | Reason                                             |
+| ------------------------------ | ----------------- | -------------------------------------------------- | ------- |
+| Order, Bill, Payment canonical | PostgreSQL        | Need audit, transaction, cannot lose               |
+| Menu canonical                 | PostgreSQL        | Source of truth for Catalog service                |
+| JWT verification result        | Redis (cache)     | Short term, re-verifiable, high frequency          |
+| Cart draft state               | Redis (hash)      | Temporarily, rebuild from session if               | is lost |
+| KDS ticket runtime             | Redis (hash/zset) | Runtime projection, rebuild from active orders     |
+| Transfer lock                  | Redis (string NX) | Shared mutex between Order instances               |
+| Daily quota counter            | Redis (incr)      | Atomic counter, TTL by day                         |
+| order.confirmed event          | Kafka             | Domain event needs Kitchen consumption, has replay |
+| KDS update hint                | Redis Pub/Sub     | Signal is fast, lost, client refetch               |
+| tenant suspended state         | Redis (flag)      | Edge enforcement is fast, SaaS is the Owner        |
+
+### 7.4 Redis Pub/Sub vs Kafka — Clear Boundaries
+
+This is the most confusing point. Both are "messaging" but the nature is completely different:
+
+| Aspect             | Redis Pub/Sub                             | Kafka                                       |
+| ------------------ | ----------------------------------------- | ------------------------------------------- |
+| Persistence        | No — fire and forget                      | Yes — retention policy                      |
+| Replay             | Impossible                                | Rewind offset any                           |
+| Subscriber offline | Message lost                              | Consumer continues from committed offset    |
+| Suitable for       | Runtime hint, trigger refetch             | Domain events, business reactions           |
+| In QRTable         | `realtime:kds:{tenantId}` → BFF WebSocket | `order.confirmed`, `payment.completed`, ... |
+
+**Brief rule:** Losing messages is acceptable because the client can refetch → Redis Pub/Sub. If the message is lost, it means the business did not happen → Kafka.
+
+---
+
+## 8. Key Design and Multi-tenant
+
+### 8.1 Key Naming Rules
+
+The Redis key in QRTable follows the format:
 
 ```txt
 {domain}:{tenantId}:{resourceId}
 ```
 
-Ví dụ:
+For example:
 
 ```txt
 cart:{tenantId}:{sessionId}
@@ -211,498 +547,399 @@ session:{tenantId}:{sessionId}
 tenant:{tenantId}:suspended
 subscription:{tenantId}
 kds:{tenantId}:ticket:{ticketId}
+quota:{tenantId}:orders:{date}
+transfer:{tenantId}:{sessionId}
 ```
 
-Luôn đưa `tenantId` vào key khi dữ liệu thuộc tenant. Không dùng key global cho dữ liệu tenant.
+Two mandatory principles:
 
-### 5.3 TTL
+**Always have `tenantId` when the data belongs to the tenant:** Do not use `cart:{sessionId}` — if two tenants have the same sessionId (low probability but exists), they will share the same key, reading each other's data. This is a serious security bug.
 
-TTL (thời gian sống) giúp Redis tự dọn dữ liệu tạm.
+**Domain prefix must be consistent and have Owner:** `menu:{tenantId}` belongs to BFF. `cart:{tenantId}:{sessionId}` belongs to Order. No service can write to the namespace of another service without a clear contract.
 
-Dữ liệu nên có TTL:
+#### Diagram: Key Naming — True and False
 
-- Customer/BFF session tạm.
-- Cart/session active.
-- Transfer lock.
-- OAuth state.
-- Quota counter theo ngày.
-- Cache menu/subscription.
+> Illustrate two ways to name keys. The wrong key does not have a tenantId — two different tenants may collide keys. The correct key has tenantId in the prefix — the namespace is completely separate by tenant.
 
-Dữ liệu có thể không có TTL khi đó là flag runtime cần giữ tới khi service xóa rõ ràng, ví dụ `tenant:{tenantId}:suspended`.
+```mermaid
+graph TB
+subgraph "❌ WRONG: Missing tenantId"
+        K1["cart:sess-abc → {items...}"]
+        K2["menu:public → {items...}"]
+WARN["⚠️ tenant A and tenant B\ncan have the same sessionId 'sess-abc'\n→ read each other's data"]
+    end
 
-### 5.4 Hash
+subgraph "✅ RIGHT: Yes tenantId"
+        K3["cart:tenant-A:sess-abc → {items...}"]
+        K4["cart:tenant-B:sess-abc → {items...}"]
+        K5["menu:tenant-A → {items...}"]
+        K6["menu:tenant-B → {items...}"]
+OK["✅ Namespace completely separate\nby tenantId"]
+    end
 
-Hash (bảng field-value) phù hợp khi một key có nhiều field nhỏ.
-
-Order cart hiện lưu kiểu:
-
-```txt
-cart:{tenantId}:{sessionId}
-  tenantId
-  sessionId
-  cartVersion
-  status
-  updatedAt
-  items
 ```
 
-Lý do:
+### 8.2 Current Key List
 
-- Đọc/ghi một key theo session.
-- Dễ refresh TTL.
-- `cartVersion` giúp phát hiện conflict (xung đột phiên bản).
+| Key patterns                                            | Owner          | Type                 | TTL         | Status          | Purpose                                              |
+| ------------------------------------------------------- | -------------- | -------------------- | ----------- | --------------- | ---------------------------------------------------- |
+| `user-token:{sha256(jwt)}`                              | BFF            | String               | 30m         | Deployment      | Cache Authorizer verification results                |
+| `bff-session:{tenantId}:{sessionId}`                    | BFF            | String (JSON)        | 2h          | Deployment      | Anonymous customer session at edge                   |
+| `bff-session:{sessionId}`                               | BFF            | String (JSON)        | 2h          | Legacy fallback | Support for lookup session missing tenantId          |
+| `menu:{tenantId}`                                       | BFF            | String (JSON)        | 10m         | Deployment      | Cache public menu for Customer PWA                   |
+| Throttle internal keys                                  | BFF            | Library-owned        | 60s         | Deployment      | Global HTTP rate limiting                            |
+| `socket.io-adapter:*`                                   | BFF            | Pub/Sub internal     | n/a         | Deployment      | Scale WebSocket to multiple instances                |
+| `session:{tenantId}:{sessionId}`                        | Order          | Hash                 | 2h          | Deployment      | Active session cache of Order domain                 |
+| `cart:{tenantId}:{sessionId}`                           | Order          | Hash                 | 2h          | Deployment      | Shared cart draft state                              |
+| `transfer:{tenantId}:{sessionId}`                       | Order          | String lock          | 30s         | Deployment      | Lock moves tables according to session               |
+| `table-transfer:{tenantId}:{tableId}`                   | Order          | String lock          | 30s         | Deployment      | Lock source/destination tables when switching tables |
+| `quota:{tenantId}:orders:{date}`                        | Order          | String counter       | 48h         | Deployment      | Daily order quota counter                            |
+| `kds:{tenantId}:*`                                      | Kitchen        | Hash/Set/ZSet/String | Custom key  | Deployment      | KDS ticket, queue, SLA, dedupe                       |
+| `lock:kds:rebuild:{tenantId}`                           | Kitchen        | String lock          | Short TTL   | Deployment      | Rebuild lock for KDS recovery                        |
+| `realtime:kds:{tenantId}`                               | Kitchen/BFF    | Pub/Sub channel      | n/a         | Deployment      | Internal KDS fan-out hint                            |
+| `tenant:{tenantId}:suspended`                           | SaaS/BFF guard | String flag          | No expire   | Deployment      | Block suspended tenants quickly at the edge          |
+| `subscription:{tenantId}`                               | SaaS           | String (JSON)        | 5m          | Deployment      | Cache current subscription                           |
+| `oauth_state:{state}`                                   | Payment        | String (JSON)        | 5m          | Deployment      | SePay OAuth state one-time consume                   |
+| `idempotency:order-submit:{tenantId}:{sessionId}:{key}` | Order          | String               | Planned TTL | Expected        | Harden submit duplicate                              |
 
-### 5.5 String
-
-String (chuỗi) dùng cho dữ liệu đơn giản:
-
-```txt
-tenant:{tenantId}:suspended = "1"
-oauth_state:{state} = JSON string
-quota:{tenantId}:orders:{date} = number string
-```
-
-### 5.6 Sorted Set
-
-Sorted Set / ZSet (tập có điểm sắp xếp) dùng khi cần sắp theo điểm hoặc thời gian.
-
-Kitchen dùng cho hàng đợi SLA tới hạn (SLA due queue), nơi điểm số (score) thường là timestamp. Worker scan các item tới hạn để phát `kitchen.sla_warning`.
-
-### 5.7 Pub/Sub
-
-Pub/Sub (phát/nhận nội bộ) là tín hiệu runtime nhanh, không bền vững như Kafka.
-
-QRTable dùng:
-
-```txt
-Kitchen ghi Redis KDS
-  -> publish realtime:kds:{tenantId}
-  -> BFF subscriber nhận
-  -> BFF emit WebSocket hint
-```
-
-Nếu BFF đang down đúng lúc publish, message Pub/Sub có thể mất. Vì vậy frontend phải refetch snapshot, không dựa Pub/Sub như nguồn sự thật (source of truth).
-
-### 5.8 Lock
-
-Distributed lock (khóa phân tán) dùng để tránh hai request cùng xử lý một tài nguyên.
-
-Pattern đủ dùng:
-
-```txt
-SET lockKey lockValue NX PX ttlMs
-```
-
-Khi release, chỉ xóa lock nếu `lockValue` vẫn là của mình. Lua script có thể dùng để kiểm tra và xóa nguyên tử (check-and-delete atomic).
-
-QRTable dùng lock cho chuyển bàn và KDS rebuild. Không nên lock quá lâu; lock phải có TTL.
-
-### 5.9 Pipeline, MULTI và Lua
-
-| Cơ chế                         | Khi dùng                                                                                                                                            |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pipeline (gom lệnh)            | Gửi nhiều lệnh độc lập để giảm lượt đi-về mạng (round trip).                                                                                        |
-| MULTI/EXEC (transaction Redis) | Nhóm lệnh cần chạy liền nhau. Order cart hiện dùng multi `hset` + `pexpire`.                                                                        |
-| Lua script (script Lua)        | Khi cần đọc-kiểm tra-ghi nguyên tử (read-check-write atomic) phức tạp. Hiện không bắt buộc cho cart, chỉ là phương án tăng cứng (hardening option). |
-
-Không thêm Lua nếu kiểm tra ở tầng ứng dụng (app-level check) + tests đã đủ cho rủi ro hiện tại. Lua làm logic khó đọc và khó debug hơn.
+If the key is not in this table, do not default to the current implementation. Check code or `redis-usage-analysis.md`.
 
 ---
 
-## 6. Các luồng chính
+## 9. Main Flows In QRTable
 
-### 6.1 Customer session và cart
+### 9.1 Customer Session and Cart
 
-```txt
-Customer quét QR
-  -> BFF/Order resolve active session
-  -> Order cache session:{tenantId}:{sessionId}
-  -> Customer mutate cart
-  -> Order đọc cart:{tenantId}:{sessionId}
-  -> check cartVersion
-  -> ghi cart hash + refresh TTL
-  -> BFF emit cart/order realtime hint nếu cần
+This flow happens every time a customer scans the QR and works with the shopping cart. This is the most important hot path from a Redis perspective:
+
+#### Diagram: Customer Session and Cart Flow
+
+> All cart status in Redis is "draft" — not a real order yet. Only when the customer submits, Order service creates an Order record in PostgreSQL. `cartVersion` protects integrity when there is a conflict.
+
+```mermaid
+sequenceDiagram
+    participant C as 📱 Customer
+    participant BFF as BFF
+    participant Order as Order Service
+    participant Redis as ⚡ Redis
+    participant PG as 🗄️ PostgreSQL
+
+C->>BFF: Scan QR table 5
+    BFF->>Order: resolveSession(tenantId, tableId)
+    Order->>Redis: HGETALL session:t1:sess-abc
+    Redis-->>Order: nil (cache miss)
+Order->>PG: SELECT active session for tables 5
+    PG-->>Order: session data
+    Order->>Redis: HSET session:t1:sess-abc ... / PEXPIRE 7200s
+    Order-->>BFF: sessionId
+
+    C->>BFF: addItem(itemId, qty=2)
+    BFF->>Order: addItem(sessionId, expectedCartVersion=3)
+    Order->>Redis: HGET cart:t1:sess-abc cartVersion
+Redis-->>Order: "3" ✓ match
+    Order->>Redis: HSET cart:t1:sess-abc items [...] cartVersion 4
+    Order-->>BFF: cart updated (version=4)
+
+    C->>BFF: submitOrder()
+Order->>PG: INSERT order (from cart state)
+    Order->>Redis: DEL cart:t1:sess-abc session:t1:sess-abc
+    Note over Redis: Cleanup after submit
 ```
 
-Điểm quan trọng:
+**Points to remember:**
 
-- `cartVersion` là khóa lạc quan (optimistic locking) ở tầng ứng dụng.
-- Nếu client gửi `expectedCartVersion` cũ, Order trả conflict.
-- Redis cart là draft state; order/bill sau khi submit/confirm vẫn nằm ở PostgreSQL.
+- `cartVersion` is optimistic locking at the application layer, not a Redis feature.
+- Cart is draft state in Redis; order persistence is in PostgreSQL.
+- DEL cart/session after submission is proactive cleanup — do not let TTL clean up after 2 hours.
 
-### 6.2 Public menu cache
+### 9.2 Public Menu Cache
 
-```txt
-Customer mở menu
-  -> BFF thử đọc menu:{tenantId}
-  -> cache miss (không có cache) thì gọi Catalog
-  -> BFF ghi menu:{tenantId} TTL 10m
-
-Admin đổi menu/category/menu item
-  -> BFF/Catalog write path thành công
-  -> DEL menu:{tenantId}
-  -> client refetch lần sau lấy dữ liệu mới
-```
-
-Không có Kafka/WS `menu.updated` contract hiện tại.
-
-### 6.3 KDS runtime
+Simplest stream — pure cache-aside:
 
 ```txt
-Kitchen consume order.confirmed
-  -> tạo KDS ticket trong Redis kds:{tenantId}:*
-  -> ghi dedupe key để chống duplicate Kafka event
-  -> publish realtime:kds:{tenantId}
-  -> BFF emit events.kdsQueueChanged
-  -> KDS client refetch queue snapshot
+Customer opens menu
+  → BFF: GET menu:{tenantId}
+  → Cache miss → Catalog Service: GET /catalog/menu/{tenantId}
+→ BFF: SET menu:{tenantId} data EX 600 (10 minutes)
+→ Returns the menu
+
+Admin edits menu/category/item
+→ Write path successfully
+  → BFF/Catalog: DEL menu:{tenantId}
+→ The next request retrieves new data from the Catalog
 ```
 
-KDS state ở Redis là runtime state phục vụ bếp/bar. Consumer phải chống duplicate vì Kafka có kiểu giao ít nhất một lần (at-least-once delivery).
+There is no Kafka event or WebSocket for `menu.updated` in this flow — BFF actively invalidates the cache at the write path.
 
-### 6.4 Payment completed và cleanup
+### 9.3 KDS Runtime
 
-```txt
-Payment completed
-  -> Order mark bill/session/table paid
-  -> Order cleanup active Redis session/cart keys khi session đóng
+KDS (Kitchen Display System) is the most complex Redis use case in QRTable because it combines many data structures:
+
+#### Diagram: KDS Runtime Flow
+
+> KDS state in Redis is the runtime projection serving the kitchen screen. When order.confirmed arrives, Kitchen service both creates a KDS ticket in Redis and publishes Pub/Sub hint to BFF. BFF emits WebSocket to KDS client. Client refetch snapshot — independent of Pub/Sub message content.
+
+```mermaid
+graph LR
+    subgraph "Kafka → KDS Runtime"
+        KC["📋 order.confirmed\n(Kafka)"]
+        KS["🍳 Kitchen Service\n(consumer)"]
+
+        KC -->|"consume"| KS
+
+        KS -->|"HSET ticket"| RT["⚡ Redis KDS\nkds:{tenantId}:ticket:*\nkds:{tenantId}:queue:*\nkds:{tenantId}:sla (ZSet)\nkds:{tenantId}:dedupe:*"]
+
+        KS -->|"PUBLISH"| PS["realtime:kds:{tenantId}\n(Pub/Sub)"]
+    end
+
+    subgraph "Pub/Sub → WebSocket"
+        BFF["BFF\n(subscriber)"]
+        WS["WebSocket\nevents.kdsQueueChanged"]
+        KDS["🖥️ KDS Client\n(browser)"]
+
+        PS -->|"hint"| BFF
+        BFF -->|"emit"| WS
+        WS --> KDS
+        KDS -->|"refetch snapshot"| KS
+    end
+
 ```
 
-Redis không phải nơi quyết định bill paid. PostgreSQL + Order finalization là nguồn chính.
+**Important point:** The Kafka consumer must be idempotent — check `kds:{tenantId}:dedupe:{eventId}` before creating a ticket. Kafka at-least-once can deliver duplicate events when rebalancing. Dedupe key in Redis is the first layer of protection.
 
-### 6.5 Tenant suspend và subscription cache
+### 9.4 tenant Suspend and Subscription Cache
 
 ```txt
 SaaS suspend tenant
-  -> SET tenant:{tenantId}:suspended = "1"
-  -> BFF guard đọc flag để chặn nhanh customer mutation
+→ SET tenant:{tenantId}:suspended "1"  (no TTL)
+→ BFF guard reads flag → blocks customer mutations right at the edge
 
-SaaS activate/close tenant
-  -> DEL tenant:{tenantId}:suspended
+SaaS restore tenant
+  → DEL tenant:{tenantId}:suspended
 
-Subscription change
-  -> update DB
-  -> set/delete subscription:{tenantId}
+Subscription changes
+→ SaaS updates DB
+→ SET subscription:{tenantId} {json} EX 300  (or DEL to invalidate)
 ```
 
-Flag Redis là cơ chế chặn nhanh ở rìa (edge enforcement). Khi Redis/SaaS không sẵn sàng, guard policy phải rõ fail-open/fail-closed theo loại request.
+`tenant:{tenantId}:suspended` is a fast blocking mechanism at the edge — BFF does not need to call the SaaS service for each request. But when Redis or SaaS is not available, the guard must have a clear policy: fail-open or fail-closed? This decision depends on the risk level of each mutation.
 
-### 6.6 SePay OAuth state
+### 9.5 SePay OAuth State
 
 ```txt
-Owner starts SePay OAuth
-  -> Payment tạo random state
-  -> SET oauth_state:{state} JSON EX 300
-  -> redirect sang SePay
+Owner starts connecting SePay
+→ Payment creates a random state string
+  → SET oauth_state:{state} {tenantId, userId, csrf} EX 300
+  → Redirect sang SePay OAuth page
 
-SePay callback
-  -> Payment đọc oauth_state:{state}
-  -> validate tenant/user/CSRF
-  -> consume/delete state
+SePay callback (within 5 minutes)
+  → Payment: GET oauth_state:{state}
+  → Validate tenantId, userId, CSRF token
+  → DEL oauth_state:{state}  ← one-time consume
+→ Continue OAuth flow
+
+Callback after 5 minutes
+→ GET oauth_state:{state} → nil (TTL expired)
+→ Return error, request to start again
 ```
 
-OAuth state phải TTL ngắn và chỉ dùng một lần.
+Three mandatory requirements of OAuth state: short TTL (5 minutes), one-time consumption (DEL after successful reading), and no long-term token storage in Redis.
 
 ---
 
-## 7. Quy tắc triển khai
+## 10. Configuration and Operational
 
-### 7.1 Redis key phải có owner rõ ràng
+### 10.1 Local Configuration
 
-Mỗi key pattern phải có service owner. Service khác không tự ý ghi key nếu không có contract.
+Redis local is in `docker-compose.provider.yaml`:
 
-Ví dụ:
-
-- `menu:{tenantId}` do BFF cache layer sở hữu.
-- `cart:{tenantId}:{sessionId}` do Order sở hữu.
-- `kds:{tenantId}:*` do Kitchen sở hữu.
-- `tenant:{tenantId}:suspended` do SaaS ghi, BFF đọc.
-
-### 7.2 Luôn handle cache miss
-
-Redis key có thể không tồn tại vì:
-
-- TTL hết hạn.
-- Redis restart.
-- Dev reset.
-- Key bị cleanup.
-
-Code đọc Redis phải có fallback hợp lý: đọc PostgreSQL, gọi service owner, hoặc trả lỗi rõ ràng nếu state bắt buộc không thể dựng lại.
-
-### 7.3 Không dùng `KEYS` trong code production
-
-`KEYS pattern` có thể block Redis nếu dữ liệu lớn. Dùng `SCAN` khi cần duyệt key.
-
-Trong local debug nhỏ có thể dùng `KEYS`, nhưng không đưa vào service runtime.
-
-### 7.4 Lock phải có TTL và owner value
-
-Lock đúng cần:
-
-- Key rõ tài nguyên bị lock.
-- Value unique, ví dụ request id/UUID.
-- TTL ngắn.
-- Release an toàn, không xóa lock của request khác.
-
-### 7.5 Không biến Redis thành database thứ hai
-
-Nếu dữ liệu cần join, audit, report, hoặc giữ lâu dài, đưa vào PostgreSQL. Redis chỉ giữ bản nhanh/tạm hoặc projection runtime.
-
-### 7.6 Thay đổi Redis contract phải cập nhật docs
-
-Khi thêm key mới hoặc đổi owner/TTL:
-
-- Cập nhật [`../redis-usage-analysis.md`](../redis-usage-analysis.md).
-- Cập nhật [`../technical-architecture.md`](../technical-architecture.md) nếu ảnh hưởng kiến trúc.
-- Cập nhật phase/spec nếu là business contract.
-
----
-
-## 8. Hướng dẫn cấu hình, triển khai và conflict Redis
-
-Phần này giúp hiểu Redis đang chạy thế nào trong QRTable, vì sao các thông số cấu hình ảnh hưởng đến code, và cách xử lý các conflict thường gặp khi dùng Redis làm cache/state runtime.
-
-### 8.1 Cấu hình local hiện tại
-
-Redis local nằm trong `docker-compose.provider.yaml`:
-
-```txt
+```yaml
 redis:
   image: redis
   ports:
-    - "6379:6379"
+    - '6379:6379'
   healthcheck:
-    redis-cli ping
+    test: redis-cli ping
   volumes:
     - ./docker/docker_data/redis_data:/data
 ```
 
-Ý nghĩa:
+| Parameters      | Meaning                                    | Note                                       |
+| --------------- | ------------------------------------------ | ------------------------------------------ |
+| `image: redis`  | Default Redis image                        | Consider specific battery version          |
+| `6379:6379`     | Map port to host                           | Local app uses `localhost:6379`            |
+| Volume `/data`  | Where Redis records persistence if enabled | Compose has not clearly configured RDB/AOF |
+| No password/TLS | Simple open Redis local                    | Only suitable for local/dev                |
 
-| Thông số                     | Nghĩa                                          | QRTable local/dev                                        |
-| ---------------------------- | ---------------------------------------------- | -------------------------------------------------------- |
-| `image: redis`               | Dùng image Redis mặc định.                     | Chưa pin version rõ trong compose hiện tại.              |
-| `6379:6379`                  | Map port Redis ra host.                        | App local dùng `localhost:6379`.                         |
-| Volume `/data`               | Nơi Redis có thể lưu file persistence nếu bật. | Có mount volume, nhưng compose chưa cấu hình rõ RDB/AOF. |
-| Healthcheck `redis-cli ping` | Kiểm tra Redis trả `PONG`.                     | Dùng để Docker biết service sẵn sàng.                    |
-| Không password/TLS           | Redis local mở đơn giản.                       | Chỉ phù hợp local/dev, không public.                     |
-
-Biến môi trường app:
+Environment variables:
 
 ```txt
 REDIS_HOST=localhost
 REDIS_PORT=6379
-REDIS_TTL=1800000
+REDIS_TTL=1800000 ← Default TTL for CacheModule (milliseconds)
 ```
 
-Trong `RedisConfiguration`, `REDIS_TTL` là TTL mặc định cho `CacheModule`/Keyv, đơn vị là millisecond theo cách code hiện tại dùng. Một số service dùng ioredis trực tiếp và set TTL riêng bằng `EX` seconds, ví dụ `subscription:{tenantId}` TTL 300 giây.
+QRTable has two ways to use Redis in code:
 
-### 8.2 Redis client trong code
+| Type                       | When to use                                                                 |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `CacheModule` / Keyv Redis | Simple cache at BFF/guard/controller, default TTL                           |
+| `ioredis` direct client    | Need specific Redis primitives: `SET EX`, `DEL`, Pub/Sub, lock, KDS runtime |
 
-QRTable có hai kiểu dùng Redis:
+### 10.2 Persistence: RDB and AOF
 
-| Kiểu dùng                     | Code                                                          | Khi nào dùng                                                                   |
-| ----------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Nest CacheModule + Keyv Redis | `libs/configuration/src/lib/redis.config.ts`                  | Cache ở BFF/guard/controller, TTL mặc định.                                    |
-| ioredis client trực tiếp      | `libs/providers/redis-client/src/lib/redis-client.service.ts` | Service cần lệnh Redis cụ thể như `set EX`, `del`, Pub/Sub, lock, KDS runtime. |
+Redis is an in-memory store but can enable persistence:
 
-Điểm cần nhớ:
+| Mechanism              | Meaning                                     | When to care                                                        |
+| ---------------------- | ------------------------------------------- | ------------------------------------------------------------------- |
+| RDB snapshots          | Redis periodically writes snapshots to disk | Restore after restart, may lose data after the most recent snapshot |
+| AOF (Append Only File) | Redis logs every write command              | More durable than RDB, needs file management                        |
+| RDB + AOF              | Combining both                              | Production if Redis is difficult to rebuild                         |
 
-- `CacheModule` phù hợp cache đơn giản.
-- ioredis phù hợp khi cần Redis primitive rõ ràng.
-- Không trộn owner tùy tiện: key do service nào sở hữu thì service đó quyết định format/TTL/invalidation.
+QRTable designs Redis in such a way that it can be lost and restored. Do not rely on Redis persistence as the source of truth. PostgreSQL/service Owner is still the place to rebuild from.
 
-### 8.3 Persistence: RDB, AOF và ý nghĩa với QRTable
+### 10.3 Maxmemory and Eviction Policy
 
-Redis là in-memory store, nhưng có thể bật persistence:
+When Redis reaches its memory limit (`maxmemory`), it uses `maxmemory-policy` to decide:
 
-| Cơ chế                 | Nghĩa                               | Khi nào quan tâm                                                           |
-| ---------------------- | ----------------------------------- | -------------------------------------------------------------------------- |
-| RDB snapshot           | Redis ghi snapshot định kỳ ra disk. | Khôi phục tương đối sau restart, có thể mất dữ liệu sau snapshot gần nhất. |
-| AOF / Append Only File | Redis ghi log lệnh write.           | Bền hơn RDB cho write gần đây, nhưng cần quản lý file và hiệu năng.        |
-| RDB + AOF              | Kết hợp snapshot và log write.      | Production Redis cần cân nhắc nếu dữ liệu Redis khó rebuild.               |
+| Policy           | Short meaning                                  | Warning with QRTable                            |
+| ---------------- | ---------------------------------------------- | ----------------------------------------------- |
+| `noeviction`     | Do not self-delete; new write command may fail | Safer for critical state, must monitor memory   |
+| `allkeys-lru`    | Delete rarely used keys throughout keyspace    | Dangerous if there are important locks/sessions |
+| `volatile-lru`   | Only delete keys with TTL according to LRU     | More suitable if the key has no TTL to keep     |
+| `allkeys-random` | Random deletion                                | Unpredictable, should not                       |
 
-QRTable hiện thiết kế Redis theo hướng **có thể mất và dựng lại được**, ngoại trừ một số runtime state cần quy trình rebuild/cleanup rõ. Vì vậy không được dựa vào Redis persistence như nguồn sự thật nghiệp vụ. PostgreSQL/service owner vẫn là nguồn chính.
+QRTable contains cache, session, lock, KDS runtime and tenant suspend flag in the same Redis instance — do not choose a policy as if every key is cached. If production sets `maxmemory`, key classification and monitoring are needed.
 
-### 8.4 Maxmemory và eviction policy
+### 10.4 Conflict and Failure Playbook
 
-Redis có thể bị giới hạn bộ nhớ bằng `maxmemory`. Khi đạt giới hạn, Redis dùng `maxmemory-policy` để quyết định có xóa key hay trả lỗi.
+| Situation             | Signs                                                  | How to handle                                                           |
+| --------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------- |
+| Cart version conflict | Client sends `expectedCartVersion` old                 | Return 409 conflict, client refetch new cart; no silent override        |
+| Lock expired midway   | Request A keeps the lock too long, B gets a new lock   | Operation in lock must be short; release must check Owner value         |
+| Cache stampede        | Multiple requests with the same miss, calling source   | Reasonable TTL, request coalescing if endpoint is hot                   |
+| Pub/Sub message lost  | BFF downloaded right when Kitchen published            | Frontend refetch snapshot; Pub/Sub is not a source of truth             |
+| Wrong type error      | `HGETALL` into key String                              | Debug with `TYPE key`; prefix must be unique according to type          |
+| Key collision         | The two services use the same key pattern              | Key must have an Owner; Update key inventory when adding                |
+| Redis unavailable     | Guard/cache/lock unreadable                            | Policy by business: cache miss fallback; mutation sensitive fail-closed |
+| Unintended Eviction   | The key disappears even though the TTL has not expired | Check `maxmemory-policy` and memory usage                               |
 
-Các policy hay gặp:
-
-| Policy           | Nghĩa ngắn                                         | Cảnh báo với QRTable                                          |
-| ---------------- | -------------------------------------------------- | ------------------------------------------------------------- |
-| `noeviction`     | Không tự xóa key; lệnh ghi mới có thể lỗi khi đầy. | An toàn hơn cho state quan trọng, nhưng phải monitor memory.  |
-| `allkeys-lru`    | Xóa key ít dùng gần đây trong toàn bộ keyspace.    | Tốt cho pure cache, nguy hiểm nếu có lock/session quan trọng. |
-| `volatile-lru`   | Chỉ xóa key có TTL theo LRU.                       | Phù hợp hơn nếu key không TTL là flag cần giữ.                |
-| `allkeys-random` | Xóa ngẫu nhiên key bất kỳ.                         | Khó dự đoán, không nên nếu có nhiều loại key quan trọng.      |
-
-Với QRTable, vì Redis chứa cả cache, session, lock, KDS runtime và tenant suspend flag, không nên chọn eviction policy như thể mọi key đều chỉ là cache. Nếu production đặt `maxmemory`, cần phân loại key và có monitoring memory.
-
-### 8.5 Standalone, Sentinel, Cluster
-
-| Kiểu triển khai | Dùng khi nào                                                             | Ghi chú                                                        |
-| --------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| Standalone      | Local/dev, demo, tải nhỏ.                                                | Compose hiện tại đang là standalone.                           |
-| Sentinel        | Cần failover cho Redis primary/replica nhưng vẫn giữ API gần standalone. | Phù hợp khi muốn HA vừa phải.                                  |
-| Cluster         | Cần shard dữ liệu trên nhiều node.                                       | Phức tạp hơn; multi-key operation bị ràng buộc theo hash slot. |
-
-QRTable hiện chưa thiết kế theo Redis Cluster. Nếu sau này dùng Cluster, các operation multi-key như lock nhiều key, cart/session multi-key hoặc Lua nhiều key phải kiểm tra lại hash slot. Khi cần multi-key atomic trong Cluster, key có thể phải dùng hash tag như `cart:{tenantId}:...` để cùng slot, nhưng đây là thay đổi kiến trúc cần spec riêng.
-
-### 8.6 TTL, cache miss và stale cache
-
-TTL không chỉ để dọn bộ nhớ; TTL là một phần contract.
-
-| Tình huống               | Ví dụ                               | Cách xử lý                                                     |
-| ------------------------ | ----------------------------------- | -------------------------------------------------------------- |
-| TTL quá ngắn             | Menu cache miss liên tục.           | Tăng TTL hoặc tối ưu source query, nhưng vẫn giữ invalidation. |
-| TTL quá dài              | Menu/subscription cache stale.      | Giảm TTL hoặc invalidate khi write thành công.                 |
-| Key hết hạn giữa request | Cart/session/OAuth state không còn. | Trả lỗi rõ ràng hoặc refetch/rebuild từ source owner.          |
-| Cache stale sau write    | User thấy dữ liệu cũ.               | Xóa key/invalidate trong write path.                           |
-
-Với dữ liệu bảo mật ngắn hạn như `oauth_state:{state}`, TTL ngắn là bắt buộc. Với cache như `subscription:{tenantId}`, TTL 5 phút là trade-off giữa tốc độ và độ mới.
-
-### 8.7 Conflict và failure playbook
-
-| Tình huống              | Dấu hiệu                                            | Cách xử lý trong QRTable                                                             |
-| ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Cart version conflict   | Client gửi `expectedCartVersion` cũ.                | Trả conflict, client refetch cart mới; không ghi đè im lặng.                         |
-| Lock expired giữa chừng | Request A giữ lock quá lâu, request B lấy lock mới. | Operation trong lock phải ngắn; release phải kiểm tra owner value.                   |
-| Cache stampede          | Nhiều request cùng miss và gọi source service/DB.   | Dùng TTL hợp lý, request coalescing/lock nhẹ nếu endpoint nóng.                      |
-| Pub/Sub message lost    | BFF down đúng lúc Kitchen publish hint.             | Frontend refetch snapshot; Pub/Sub không là nguồn sự thật.                           |
-| Wrong type              | Code `HGETALL` vào key string hoặc ngược lại.       | Prefix/type phải rõ; debug bằng `TYPE key`; không tái dùng prefix cho type khác.     |
-| Key collision           | Hai service dùng cùng key pattern khác nghĩa.       | Key phải có owner và domain prefix; cập nhật key inventory khi thêm key.             |
-| Redis unavailable       | Guard/cache/lock không đọc được Redis.              | Có policy theo nghiệp vụ: cache miss fallback, mutation nhạy cảm có thể fail-closed. |
-| Eviction ngoài ý muốn   | Key biến mất dù chưa hết TTL.                       | Kiểm tra `maxmemory-policy`, memory usage, và phân loại key quan trọng.              |
-| Flush nhầm môi trường   | Mất session/cache/runtime state.                    | Script flush hiện chặn non-development và non-local; không chạy thủ công bừa bãi.    |
-
-### 8.8 Lệnh cấu hình/quan sát nên biết
+### 10.5 Debugging Local
 
 ```bash
-# Xem memory và policy
-INFO memory
-CONFIG GET maxmemory
-CONFIG GET maxmemory-policy
-
-# Xem persistence
-CONFIG GET save
-CONFIG GET appendonly
-INFO persistence
-
-# Xem client đang kết nối
-CLIENT LIST
-```
-
-Các lệnh `CONFIG SET`, `FLUSHDB`, `FLUSHALL` chỉ dùng khi hiểu rõ môi trường. Nếu cần đổi production Redis config, nên đi qua IaC/deployment config thay vì thao tác tay trong `redis-cli`.
-
----
-
-## 9. Gỡ lỗi local
-
-### 9.1 Kết nối Redis CLI
-
-```bash
+# Connect redis-cli
 docker exec -it redis redis-cli
-```
 
-Nếu container name khác, xem bằng:
-
-```bash
-docker ps
-```
-
-### 9.2 Lệnh kiểm tra an toàn
-
-```bash
-# Xem type của key
+# See the type of key
 TYPE cart:tenant-1:session-1
 
-# Xem TTL còn lại
+# See remaining TTL (seconds); -1 = no TTL; -2 = key does not exist
 TTL cart:tenant-1:session-1
 
-# Đọc hash
+# Read hash
 HGETALL cart:tenant-1:session-1
 
-# Đọc string
+# Read string
 GET tenant:tenant-1:suspended
 
-# Scan key theo pattern
+# Scan key according to pattern (safe, not blocked)
 SCAN 0 MATCH "cart:tenant-1:*" COUNT 100
+
+# View memory and policy
+INFO memory
+CONFIG GET maxmemory-policy
 ```
 
-### 9.3 Khi thấy dữ liệu lạ
-
-Kiểm tra theo thứ tự:
-
-1. Key có đúng tenantId không?
-2. Key owner là service nào?
-3. TTL có đúng kỳ vọng không?
-4. Type có khớp docs không?
-5. Có legacy fallback không, ví dụ `bff-session:{sessionId}`?
-6. Code có đang dùng wrong key prefix không?
-
-### 9.4 Lệnh nguy hiểm
-
-Không chạy các lệnh này nếu chưa chắc môi trường:
+**Dangerous command — do not use in production:**
 
 ```bash
-KEYS *
-FLUSHDB
-FLUSHALL
-MONITOR
+KEYS * # Block Redis if keyspace is large
+FLUSHDB # Delete the entire current DB
+FLUSHALL # Delete all DB completely
+MONITOR       # High overhead
 ```
 
-`MONITOR` hữu ích khi debug local, nhưng có overhead lớn. `FLUSHDB`/`FLUSHALL` chỉ dùng trong dev reset có chủ đích.
+When you see strange data, check in this order: Is the tenantId correct → who is the service Owner → is the TTL as expected → does the type match the docs → is there a legacy fallback key → is the prefix used incorrectly?
 
 ---
 
-## 10. Đọc code ở đâu
+## 11. Mental Model Summary
 
-| Nội dung                               | File / thư mục                                                                                                  |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Redis config chung                     | `libs/configuration/src/lib/redis.config.ts`                                                                    |
-| ioredis provider                       | `libs/providers/redis-client/src/lib/redis-client.service.ts`                                                   |
-| BFF cache/session/guard Redis          | `apps/bff/src/app/app.module.ts`, `libs/guards/src/lib/user.guard.ts`, `libs/guards/src/lib/session.guard.ts`   |
-| BFF menu cache                         | `apps/bff/src/app/modules/catalog/controllers/menu.controller.ts`                                               |
-| Socket.io Redis adapter                | `apps/bff/src/app/modules/realtime/adapters/redis-io.adapter.ts`                                                |
-| KDS Redis runtime                      | `apps/kitchen/src/app/modules/kitchen/**`                                                                       |
-| Order session/cart/locks/quota         | `apps/order/src/app/modules/order/**`                                                                           |
-| SaaS tenant suspend/subscription cache | `apps/saas/src/services/tenant-status-cache.service.ts`, `apps/saas/src/services/subscription-cache.service.ts` |
-| Payment OAuth state                    | `apps/payment/src/app/modules/payment/services/tenant-payment-settings.service.ts`                              |
-| Dev flush guard                        | `tools/dev-seed/flush-redis.js`                                                                                 |
+#### Diagram: Aggregated Mental Model — Redis In QRTable
 
----
+> Mind map summarizing all Redis knowledge applied to QRTable. From the nature (in-memory), through data structure (5 types), to architectural decisions (when to use Redis, when not). This is a "cheat sheet" to review before adding a new Redis key.
 
-## 11. Checklist
+```mermaid
+mindmap
+  root((Redis\nQRTable))
+Nature
+In-Memory → less than 1ms
+Single-threaded → every operation is atomic
+Data may be lost when restarting
+PostgreSQL is still the source of truth
+    Data Structure
+      String → flag, counter, OAuth state
+      Hash → cart, session snapshot
+      Sorted Set → SLA due queue
+Pub/Sub → runtime hint is not persistent
+      SET NX PX → distributed lock
+    TTL
+TTL is a business contract
+By default there should be TTL
+No TTL must have a clear reason
+Cache miss → fallback, no crash
+    Cache-Aside
+Read Redis first
+      Cache miss → fetch source → populate
+      Write path → invalidate cache
+Stale cache → TTL there safety net
+    Lock
+      SET NX PX → acquire atomic
+Value = UUID → release safely
+Short TTL → does not block for long
+Check Owner before DEL
+Architecture
+Redis vs PG vs Kafka = different problems
+      Pub/Sub ≠ Kafka → fire-and-forget
+Key must have Owner + tenantId
+Don't make Redis a 2nd DB
+    Multi-Tenant
+tenantId required in key
+      {domain}:{tenantId}:{resourceId}
+Namespaces are separated by tenant
+Key inventory must be updated
+```
 
-Khi thêm Redis key mới:
+After reading the entire document, here is a brief mental model to remember:
 
-- [ ] Có service owner rõ ràng.
-- [ ] Key có `tenantId` nếu dữ liệu thuộc tenant.
-- [ ] Type được chọn đúng: String, Hash, Set, ZSet hoặc Pub/Sub.
-- [ ] TTL rõ ràng, hoặc giải thích vì sao không TTL.
-- [ ] Có fallback khi key miss.
-- [ ] Đã nghĩ tới eviction/stale cache nếu key là cache nóng.
-- [ ] Không lưu dữ liệu cần audit/durable chỉ trong Redis.
-- [ ] Có test cho conflict/duplicate/expired key nếu luồng quan trọng.
-- [ ] Docs key inventory được cập nhật.
+**In essence:** Redis is an in-memory data store — all in RAM, latency under 1ms, single-threaded so all commands are atomic. Data may be lost on restart if not persisted — this is a design feature, not a bug. QRTable exploits by only saving what can be reconstructed.
 
-Khi dùng Redis cho cache:
+**About data structure:** Each type solves different problems. String for flag/counter/OAuth. Hash for multiple field snapshots (cart/session). Sorted Set for queue by time (SLA). Pub/Sub for runtime hints is not persistent. SET NX PX for distributed lock. Using the wrong type is a potential bug.
 
-- [ ] Source of truth vẫn là DB/service owner.
-- [ ] Invalidation path rõ ràng.
-- [ ] Cache miss không làm hỏng nghiệp vụ.
-- [ ] Không emit realtime event chỉ vì cache bị xóa nếu client có thể refetch.
+**About TTL:** TTL is not a memory cleaning utility — TTL is a contract. Each key needs a TTL or a clear reason why it is not TTL. Cache misses cannot cause business failure — there must be a fallback to the source.
 
-Khi dùng Redis cho lock:
+**About cache-aside:** Read Redis → miss → fetch source → populate Redis. Write successfully → DEL cache. Stale cache within the TTL limit is an acceptable trade-off for performance.
 
-- [ ] Lock value unique.
-- [ ] Lock có TTL.
-- [ ] Release không xóa nhầm lock của request khác.
-- [ ] Operation bên trong lock đủ ngắn.
-- [ ] Đã có hành vi rõ khi không lấy được lock hoặc Redis unavailable.
+**About lock:** SET NX PX with UUID value. Release by checking value before DEL. Short TTL. The logic inside the lock must be short. Failure when the lock cannot be obtained must have a clear behavior.
 
-Khi dùng Redis cho realtime:
+**About the decision to use Redis:** The core question is "If Redis loses this key, can the system rebuild?". If No → PostgreSQL. If Yes → consider Redis. Pub/Sub when hint can be lost. Kafka when the event must arrive and can be replayed.
 
-- [ ] Pub/Sub chỉ là hint, không là nguồn sự thật.
-- [ ] Client có đường refetch snapshot.
-- [ ] Message mất không làm sai trạng thái bền vững.
+**About multi-tenant:** `tenantId` is required in all tenant data keys — not negotiable. A key without a tenantId is a potential security bug. Every key must have a clear Owner service and be documented in the key inventory.
+
+#### Diagram: Cheat Sheet — Quick Decisions
+
+> Quick summary of important Redis keys with type, TTL, Owner and warnings. Use as a "quick reference" when debugging or adding new keys.
+
+| Key Pattern                          | Type             | TTL       | Owner   | Warning                                          |
+| ------------------------------------ | ---------------- | --------- | ------- | ------------------------------------------------ |
+| `user-token:{sha256(jwt)}`           | String           | 30m       | BFF     | Re-verify when missing                           |
+| `bff-session:{tenantId}:{sessionId}` | String           | 2h        | BFF     | Legacy fallback exists missing tenantId          |
+| `menu:{tenantId}`                    | String           | 10m       | BFF     | Invalidate when admin write                      |
+| `session:{tenantId}:{sessionId}`     | Hash             | 2h        | Order   | Rebuild from PG when missing                     |
+| `cart:{tenantId}:{sessionId}`        | Hash             | 2h        | Order   | `cartVersion` check required                     |
+| `transfer:{tenantId}:{sessionId}`    | String lock      | 30s       | Order   | SET NX, check Owner when releasing               |
+| `quota:{tenantId}:orders:{date}`     | String counter   | 48h       | Order   | INCR atomic                                      |
+| `kds:{tenantId}:`\*                  | Hash/ZSet/String | Depends   | Kitchen | Dedupe Kafka event before creating ticket        |
+| `tenant:{tenantId}:suspended`        | String flags     | No expire | SaaS    | SaaS is Owner DEL; policy fail-open/closed clear |
+| `subscription:{tenantId}`            | String           | 5m        | SaaS    | Invalidate when subscription change              |
+| `oauth_state:{state}`                | String           | 5m        | Payment | One-time consume, DEL after validate             |

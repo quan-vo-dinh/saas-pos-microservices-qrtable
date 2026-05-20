@@ -1,66 +1,66 @@
-# Phase 0 — Chuẩn Bị Nền Tảng & Kiến Trúc
+# Phase 0 — Foundation & Architecture Preparation
 
-> **Mục tiêu:** Tổ chức codebase, tạo services mới, setup frontend apps, và thiết lập hạ tầng auth.
-> **Ước lượng:** ~1 tuần
-> **Trạng thái:** ✅ DONE
+> **Goal:** Organize the codebase, create new services, setup frontend apps, and set up auth infrastructure.
+> **Estimated:** ~1 week
+> **Status:** ✅ DONE
 
 ## Prerequisites
 
-- Codebase khóa học đã hoạt động (services: invoice, product, user-access, bff, authorizer)
-- Docker Compose infrastructure (PostgreSQL, MongoDB, Redis, Keycloak) đã chạy
+- Course codebase is active (services: invoice, product, user-access, bff, authorizer)
+- Docker Compose infrastructure (PostgreSQL, MongoDB, Redis, Keycloak) is running
 
-## Tham Chiếu
+## Reference
 
-| Tài liệu                            | Section liên quan                                  |
-| ----------------------------------- | -------------------------------------------------- |
-| technical-architecture.md           | §4.2 Tổ chức Nx Monorepo, §8 Xác thực & Phân quyền |
-| references/auth-system-reference.md | Toàn bộ — chi tiết hệ thống auth đã triển khai     |
+| Documents                           | Related Sections                                                 |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| technical-architecture.md           | §4.2 Nx Monorepo Organization, §8 Authentication & Authorization |
+| references/auth-system-reference.md | Complete — details of implemented auth system                    |
 
-## Tổng Quan
+## Overview
 
-Phase 0 giữ nguyên codebase khóa học làm "living templates" và tạo các service QRTable mới bên cạnh. Bao gồm: tổ chức codebase, áp dụng Pragmatic Layered Architecture, phác thảo ERD, khởi tạo 2 frontend apps (Customer PWA + Management App), setup shared libraries theo Nx grouping, thiết lập hạ tầng auth (Keycloak, Guards, Middleware), và dựng layout skeleton cho 2 frontend apps.
+Phase 0 keeps the course codebase as "living templates" and creates new QRTable services alongside. Including: organizing the codebase, applying Pragmatic Layered Architecture, sketching ERD, creating 2 frontend apps (Customer PWA + Management App), setting up shared libraries according to Nx grouping, setting up auth infrastructure (Keycloak, Guards, Middleware), and building layout skeleton for 2 frontend apps.
 
 ## Steps
 
-### Step 0.1 — Đánh dấu & Tổ chức Codebase (ngày 1-2)
+### Step 0.1 — Markup & Organize the Codebase (days 1-2)
 
-**Mục tiêu:** Tổ chức rõ ràng giữa services khóa học (templates) và services QRTable mới.
+**Goal:** Clear organization between course services (templates) and new QRTable services.
 
-**Chiến lược "Template-First":** Các service khóa học (invoice, product, user-access) KHÔNG XÓA — giữ lại như "living templates" (bản mẫu đã hoạt động) cho TCP setup, TypeORM config, Guard patterns, Repository patterns. Khi tạo service QRTable mới (catalog, order, payment...):
+**"Template-First" strategy:** Course services (invoice, product, user-access) DO NOT DELETE — keep as "living templates" for TCP setup, TypeORM config, Guard patterns, Repository patterns. When creating a new QRTable service (catalog, order, payment...):
 
-1. Tham khảo template service tương ứng
-2. Copy pattern/structure cần thiết
-3. Cải tiến: áp dụng Pragmatic Layered Architecture + .agent skills
-4. KHÔNG sửa đổi service gốc — giữ nguyên để so sánh/học hỏi
+1. Refer to the corresponding service template
+2. Copy the necessary pattern/structure
+3. Improvement: apply Pragmatic Layered Architecture + .agent skills
+4. DO NOT modify the original service — keep it as it is for comparison/learning
 
-**Yêu cầu chính:**
+**Main requirements:**
 
-- Đánh dấu services khóa học (invoice, product, user-access) với README "TEMPLATE — Do not modify"
+- Mark course services (invoice, product, user-access) with README "TEMPLATE — Do not modify"
   - `invoice/` → TCP + MongoDB + Repository
   - `product/` → TCP + PostgreSQL + TypeORM
   - `user-access/` → TCP + Keycloak integration
-- Tạo services QRTable mới: catalog, saas — kế thừa patterns từ templates
-- Giữ nguyên services hạ tầng: bff (mở rộng), authorizer (giữ nguyên)
+- Create new QRTable services: catalog, saas — inherit patterns from templates
+- Maintain infrastructure services: bff (expand), authorizer (retain)
 
-**Verify:** `nx serve bff`, `nx serve catalog`, `nx serve saas` — tất cả khởi động OK
+**verify:** `nx serve bff`, `nx serve catalog`, `nx serve saas` — all boot OK
 
-### Step 0.2 — Pragmatic Layered Architecture (ngày 2-3)
+### Step 0.2 — Pragmatic Layered Architecture (days 2-3)
 
-**Mục tiêu:** Áp dụng cấu trúc Controller → Service → Repository cho mỗi service QRTable mới.
+**Goal:** Apply the Controller → service → Repository structure to each new QRTable service.
 
-**Yêu cầu chính:**
+**Main requirements:**
 
-- Mỗi service tuân thủ N-Tier: controllers/ → services/ → repositories/ → entities/ → dtos/
-- Tận dụng NestJS DI container cho test/mocking
-- Không áp dụng Clean Architecture thuần túy — quá cồng kềnh cho scope dự án
+- Each service is N-Tier compliant: controllers/ → services/ → repositories/ → entities/ → dtos/
+- Take advantage of NestJS DI container for testing/mocking
+- Do not apply pure Clean Architecture — too cumbersome for the project scope
 
-**Lợi ích cho Monorepo 8 services:**
+**Benefits for Monorepo 8 services:**
 
-- **Nhanh chóng (Velocity):** Copy pattern dễ dàng từ template khóa học
-- **Đủ linh hoạt:** NestJS DI container đã sẵn sàng cho test/mocking
-- **Chống Boilerplate:** Không cần hàng tá file interfaces/mappers như Clean Arch thuần túy
+- **Velocity:** Copy patterns easily from course templates
+- **Flexible enough:** NestJS DI container is ready for testing/mocking
+- **Anti-Boilerplate:** No need for dozens of interfaces/mappers files like pure Clean Arch
 
-**Cấu trúc folder mẫu (catalog service):**
+**Sample folder structure (service catalog):**
 
 ```
 apps/catalog/src/
@@ -72,64 +72,64 @@ apps/catalog/src/
 └── dtos/create-catalog.dto.ts
 ```
 
-**Verify:** Cấu trúc folder đúng chuẩn cho catalog và saas services
+**verify:** Correct folder structure for catalog and saas services
 
-### Step 0.3 — ERD Hệ thống Tổng thể (ngày 3)
+### Step 0.3 — Overall System ERD (day 3)
 
-**Mục tiêu:** Phác thảo ERD tổng thể cho báo cáo luận văn.
+**Objective:** Outline the overall ERD for the thesis report.
 
-**Yêu cầu chính:**
+**Main requirements:**
 
-- ERD cover quan hệ chính: Tenant, Category, MenuItem, Table, Order, Bill, Payment
-- Bản vẽ mang tính định hướng — schema thực tế sẽ tinh chỉnh theo từng phase
+- ERD covers main relationships: tenant, Category, MenuItem, Table, Order, Bill, Payment
+- Drawings are directional — the actual schema will be refined in each phase
 
-**Verify:** File ERD tồn tại tại `docs/architecture/erd.png`
+**verify:** ERD file exists at `docs/architecture/erd.png`
 
-### Step 0.4 — Khởi tạo 2 Frontend Apps (ngày 3-4)
+### Step 0.4 — Initialize 2 Frontend Apps (day 3-4)
 
-**Mục tiêu:** 2 frontend apps hoạt động: Customer PWA (React + Vite) và Management App (Next.js).
+**Goal:** 2 working frontend apps: Customer PWA (React + Vite) and Management App (Next.js).
 
-**Yêu cầu chính:**
+**Main requirements:**
 
 - Customer PWA: React + Vite + Tailwind + shadcn/ui + TanStack Query
   - Key dependencies: tailwindcss, shadcn-ui, lucide-react, @tanstack/react-query, socket.io-client
 - Management App: Next.js App Router + shadcn/ui + Zustand + React Hook Form + Zod
   - Key dependencies: shadcn-ui, lucide-react, @tanstack/react-query, zustand, react-hook-form, zod, socket.io-client
-- Cả 2 apps đều config trong Nx project.json
+- Both apps are configured in Nx project.json
 
 **Verify:** `nx serve customer-pwa` → localhost:5173, `nx serve management-app` → localhost:3000
 
-### Step 0.5 — Shared Libraries (ngày 4-5)
+### Step 0.5 — Shared Libraries (Days 4-5)
 
-**Mục tiêu:** Tổ chức shared libs theo Nx Grouping — tách rõ cross-platform, frontend, backend.
+**Goal:** Organize shared libs according to Nx Grouping — clearly separate cross-platform, frontend, backend.
 
-**Yêu cầu chính:**
+**Main requirements:**
 
-- **Cross-Platform (FE & BE chung):** `libs/shared/types/`, `libs/shared/constants/` — contract giữa FE ↔ BE, Kafka topics, Enums chung
+- **Cross-Platform (common FE & BE):** `libs/shared/types/`, `libs/shared/constants/` — contract between FE ↔ BE, Kafka topics, common Enums
   - First shared types file: `libs/shared/types/src/index.ts` → `export type { ITenant, IUser, IRole }`
-- **Frontend (riêng 2 app):** `libs/frontend/ui/`, `libs/frontend/hooks/`, `libs/frontend/utils/`
-- **Backend (giữ flat structure từ khóa học):** `libs/guards/`, `libs/middlewares/`, `libs/entities/`, `libs/interfaces/`, `libs/providers/*`, `libs/utils/` — KHÔNG nhét vào folder `backend/` để tránh vỡ import paths hiện có
+- **Frontend (2 apps only):** `libs/frontend/ui/`, `libs/frontend/hooks/`, `libs/frontend/utils/`
+- **Backend (keeps flat structure from the course):** `libs/guards/`, `libs/middlewares/`, `libs/entities/`, `libs/interfaces/`, `libs/providers/*`, `libs/utils/` — DO NOT stuff into folder `backend/` to avoid breaking existing import paths
 
-**Verify:** Import paths hoạt động — `@common/*` cho backend, `@einvoice/*` cho frontend
+**verify:** Import paths work — `@common/*` for backend, `@einvoice/*` for frontend
 
-### Step 0.6 — Setup Hạ tầng Auth (ngày 5-6)
+### Step 0.6 — Setup Auth Infrastructure (June 5)
 
-**Mục tiêu:** Hệ thống auth hoàn chỉnh: Keycloak realm, Guards, Middleware.
+**Goal:** Complete auth system: Keycloak realm, Guards, Middleware.
 
-**Yêu cầu chính:**
+**Main requirements:**
 
-- Docker Compose: PostgreSQL, Redis, Keycloak, MongoDB hoạt động
-- Keycloak realm "qrtable" với 6 roles: SUPER_ADMIN, OWNER, MANAGER, WAITER, CHEF, BARISTA
-- Guard chain: UserGuard (staff) hoặc SessionGuard (khách) → TenantGuard → PermissionGuard
-- TenantMiddleware resolve tenant từ header/subdomain
+- Docker Compose: PostgreSQL, Redis, Keycloak, MongoDB working
+- Keycloak realm "qrtable" with 6 roles: SUPER_ADMIN, Owner, MANAGER, WAITER, CHEF, BARISTA
+- Guard chain: UserGuard (staff) or SessionGuard (guest) → TenantGuard → PermissionGuard
+- TenantMiddleware resolves tenant from header/subdomain
 - Auth completion: provisioning strategy, role mapping Keycloak ↔ internal roles
 
 #### Step 0.6A — Auth Completion Details
 
-- **2-layer auth model:** Keycloak quản lý identity (login/token) + user-access DB quản lý internal profile (roles, tenant mapping)
-- **Provisioning strategy:** Pre-provision (Owner tạo staff trước) vs First-login upsert (user login lần đầu → tự tạo profile)
-- **Role mapping Keycloak → internal:** OWNER, MANAGER, WAITER, CHEF, BARISTA
-- **Tham chiếu chi tiết:** `docs/references/auth-system-reference.md`
+- **2-layer auth model:** Keycloak manages identity (login/token) + user-access DB manages internal profile (roles, tenant mapping)
+- **Provisioning strategy:** Pre-provision (Owner creates staff first) vs First-login upsert (user logs in for the first time → creates profile himself)
+- **Role mapping Keycloak → internal:** Owner, MANAGER, WAITER, CHEF, BARISTA
+- **Detailed reference:** `docs/references/auth-system-reference.md`
 
 **Verification scenarios:**
 
@@ -139,36 +139,36 @@ apps/catalog/src/
 
 **Verify:** BFF → Catalog/SaaS TCP health check OK, secured endpoints reject invalid tokens
 
-### Step 0.7 — Layout Skeleton cho 2 Frontend Apps (ngày 6-7)
+### Step 0.7 — Skeleton Layout for 2 Frontend Apps (July 6)
 
-**Mục tiêu:** Layout cơ bản cho cả 2 apps với role-based routing.
+**Goal:** Basic layout for both apps with role-based routing.
 
-**Yêu cầu chính:**
+**Main requirements:**
 
-- Management App: Sidebar + Top Bar + Content Area, role-based redirect sau login
+- Management App: Sidebar + Top Bar + Content Area, role-based redirect after login
   - Placeholder route groups: `/dashboard`, `/pos`, `/kds`, `/admin`
 - Customer PWA: Layout minimal mobile-first
 - Shared design tokens (Tailwind config)
 
-**Verify:** Login Keycloak → redirect đúng route theo role
+**verify:** Login Keycloak → redirect to correct route according to role
 
 ## Acceptance Criteria
 
-- [x] Services khóa học vẫn tồn tại, có README đánh dấu TEMPLATE
-- [x] 2 service QRTable mới (catalog, saas) khởi động được
-- [x] 2 frontend apps chạy được (customer-pwa, management-app)
-- [x] Shared libs tạo xong theo chuẩn Nx Grouping
-- [x] Keycloak realm "qrtable" + roles tạo xong
-- [x] Guard chain hoạt động (UserGuard hoặc SessionGuard → TenantGuard → PermissionGuard)
+- [x] Course Services still exists, with README marked TEMPLATE
+- [x] 2 new QRTable services (catalog, saas) can be started
+- [x] 2 running frontend apps (customer-pwa, management-app)
+- [x] Shared libs created according to Nx Grouping standards
+- [x] Keycloak realm "qrtable" + roles created
+- [x] Guard chain active (UserGuard or SessionGuard → TenantGuard → PermissionGuard)
 - [x] Role mapping pass smoke authorization
-- [x] BFF → Catalog + SaaS TCP call thành công
-- [x] Đã có bản vẽ ERD tổng thể (docs/architecture/erd.png)
-- [x] Internal actor có token hợp lệ nhưng thiếu profile nội bộ trả 401 (user_not_provisioned)
-- [x] Management App: login → redirect đúng role route
+- [x] BFF → Catalog + SaaS TCP call successful
+- [x] The overall ERD drawing is available (docs/architecture/erd.png)
+- [x] Internal actor has valid token but lacks internal profile returns 401 (user_not_provisioned)
+- [x] Management App: login → redirect to correct role route
 
-## Outputs cho Phase 1
+## Outputs for Phase 1
 
-- Catalog service sẵn sàng nhận business logic
-- Frontend apps có layout skeleton, sẵn sàng mock UI
-- Auth system hoàn chỉnh, sẵn sàng bảo vệ endpoints
-- Shared types library sẵn sàng cho type definitions
+- Catalog service is ready to receive business logic
+- Frontend apps have skeleton layout, ready to mock UI
+- Complete Auth system, ready to protect endpoints
+- Shared types library is available for type definitions

@@ -1,146 +1,146 @@
-# TÀI LIỆU GIẢI THÍCH CHI TIẾT SƠ ĐỒ CƠ SỞ DỮ LIỆU (ERD)
+# DOCUMENT DETAILED EXPLANATION OF DATABASE DIAGRAM (ERD)
 
-> **Dự án:** QRTable SaaS POS
-> **Tham chiếu:** Dựa trên `erd.dbml`, `erd.mmd` và `business-logic.md` > **Mục đích:** Tài liệu này giải thích chi tiết ý nghĩa và luồng liên kết giữa các bảng (tables) trong hệ thống, phục vụ cho việc báo cáo luận văn và hiểu biết chung của team lập trình.
+> **Project:** QRTable SaaS POS
+> **Reference:** Based on `erd.dbml`, `erd.mmd` and `business-logic.md` > **Purpose:** This document explains in detail the meaning and flow of links between tables in the system, serving thesis reporting and general understanding of the programming team.
 
 ---
 
-## 🏗️ TỔNG QUAN KIẾN TRÚC DỮ LIỆU
+## 🏗️ OVERVIEW OF DATA ARCHITECTURE
 
-Hệ thống QRTable áp dụng mô hình dữ liệu kết hợp:
+The QRTable system applies a combined data model:
 
-- **Database-per-Service** (Microservice pattern): Mỗi microservice sở hữu database riêng, không truy cập trực tiếp database service khác. Cross-service data access thông qua TCP hoặc Kafka events.
-- **Multi-Tenant — Discriminator Column** (SaaS pattern): Trong mỗi database, tất cả tenants chia sẻ cùng tables, cô lập bằng cột `tenant_id`.
+- **Database-per-service** (Microservice pattern): Each microservice owns its own database, does not directly access other database services. Cross-service data access via TCP or Kafka events.
+- **Multi-tenant — Discriminator Column** (SaaS pattern): In each database, all tenants share the same tables, isolated by column `tenant_id`.
 
 ### Database Boundaries
 
-| Database                       | Service         | Tables                                              |
-| ------------------------------ | --------------- | --------------------------------------------------- |
-| `qrtable_saas` (PostgreSQL)    | SaaS Management | tenants, pricing_plans, subscriptions               |
-| `qrtable_catalog` (PostgreSQL) | Catalog         | categories, menu_items, areas, tables               |
-| `qrtable_order` (PostgreSQL)   | Order           | sessions, orders, order_items, service_requests     |
-| `qrtable_payment` (PostgreSQL) | Payment         | bills, payments, refunds                            |
-| `qrtable_auth` (MongoDB)       | User-Access     | users, roles                                        |
-| Redis only                     | Kitchen         | KDS queues (Sorted Set, không có persistent tables) |
+| Database                       | service         | Tables                                            |
+| ------------------------------ | --------------- | ------------------------------------------------- |
+| `qrtable_saas` (PostgreSQL)    | SaaS Management | tenants, pricing_plans, subscriptions             |
+| `qrtable_catalog` (PostgreSQL) | Catalog         | categories, menu_items, areas, tables             |
+| `qrtable_order` (PostgreSQL)   | Order           | sessions, orders, order_items, service_requests   |
+| `qrtable_payment` (PostgreSQL) | Payment         | bills, payments, refunds                          |
+| `qrtable_auth` (MongoDB)       | User-Access     | users, roles                                      |
+| Redis only                     | Kitchen         | KDS queues (Sorted Set, has no persistent tables) |
 
-**Lưu ý quan trọng:** Các references giữa tables khác database (VD: `orders.table_id → tables.id`) là **logical FK** — không enforce bằng DB foreign key constraint. Data integrity được đảm bảo ở application level.
+**Important note:** References between tables in different databases (eg `orders.table_id → tables.id`) are **logical FK** — not enforced by DB foreign key constraints. Data integrity is guaranteed at the application level.
 
-Toàn bộ ERD có thể được chia làm **5 Cụm Dữ liệu Cốt lõi** sau:
-
----
-
-## 1. CỤM SAAS & ĐA KHÁCH THUÊ (MULTI-TENANCY)
-
-_Nền tảng của hệ thống, quản lý doanh nghiệp và giới hạn dịch vụ._
-
-### Bảng `tenants` (Khách thuê / Nhà hàng)
-
-- Bảng gốc rễ tạo nên định danh của mỗi nhà hàng trên hệ thống.
-- **Fields quan trọng:**
-  - `slug`: Dùng để tạo subdomain định danh trên Internet (vd: `the-coffee-house`).
-  - `status`: Quản lý vòng đời hoạt động của nhà hàng (`active`, `suspended`, `closed`).
-  - `default_currency` & `default_locale`: Thiết lập ngôn ngữ và tiền tệ mặc định (VND, vi-VN).
-- **Mối quan hệ:** Quan hệ 1-n (One-to-Many) với GẦN NHƯ TẤT CẢ các bảng khác trong hệ thống.
-
-### Bảng `pricing_plans` & `subscriptions` (Gói cước & Đăng ký)
-
-- **`pricing_plans`**: Định nghĩa các gói dịch vụ (Ví dụ: Miễn phí, Cơ bản, Nâng cao). Chứa các quota giới hạn như `max_tables` và `max_staff`. Đây là bảng cấp Platform (không có `tenant_id`).
-- **`subscriptions`**: Bảng cầu nối. Ghi nhận việc Tenant X mua Gói Y, bắt đầu từ ngày nào (`starts_at`) đến ngày nào (`expires_at`).
+The entire ERD can be divided into the following **5 Core Data Clusters**:
 
 ---
 
-## 2. CỤM THỰC ĐƠN & DANH MỤC (CATALOG DOMAIN)
+## 1. SAAS CLUSTER & MULTI-TENANCY (MULTI-TENANCY)
 
-_Quản lý danh sách món ăn hiển thị trên Menu điện tử._
+_System foundation, business management and service limitations._
 
-### Bảng `categories` (Danh mục)
+### Table `tenants` (tenant / Restaurant)
 
-- Phân nhóm món ăn (Khai vị, Món chính, Đồ uống...).
-- **Fields quan trọng:**
-  - `time_start`, `time_end`: Cho phép cấu hình hiển thị theo khung giờ (Vd: Menu ăn sáng).
-  - `sort_order`: Cho phép chủ quán kéo thả thứ tự hiển thị ưu tiên trên màn hình khách.
+- The root table creates the identity of each restaurant on the system.
+- **Important Fields:**
+  - `slug`: Used to create subdomain names on the Internet (eg: `the-coffee-house`).
+  - `status`: Manage the restaurant's operational life cycle (`active`, `suspended`, `closed`).
+  - `default_currency` & `default_locale`: Set default language and currency (VND, vi-VN).
+- **Relationship:** 1-n (One-to-Many) relationship with ALMOST ALL other tables in the system.
 
-### Bảng `menu_items` (Món ăn / Đồ uống)
+### Table `pricing_plans` & `subscriptions` (Plans & Subscriptions)
 
-- Chứa chi tiết món ăn được gán vào 1 Category.
-- **Fields quan trọng:**
-  - `price_vnd`: Giá bán bằng VND (lưu dạng số nguyên `bigint` để tránh sai số thập phân).
-  - `stock_qty`: Số lượng tồn kho. Sẽ bị trừ đi (Pessimistic Locking) trong quá trình đặt đơn.
-  - `status`: Có thể chuyển sang `out_of_stock` (hết hàng) để tự động ẩn khỏi giỏ hàng.
-
----
-
-## 3. CỤM KHÔNG GIAN BÀN & QUẢN LÝ PHIÊN (TABLE & SESSION)
-
-_Kết nối khách hàng vật lý với hệ thống qua mã QR._
-
-### Bảng `areas` & `tables` (Khu vực & Bàn)
-
-- **`areas`**: Theo dõi mặt bằng (Tầng trệt, Tầng 2, Sân vườn).
-- **`tables`**: Bàn cụ thể thuộc một Khu vực.
-- **Fields quan trọng của Bàn:**
-  - `status`: Vòng đời khép kín của bàn (`available` -> `occupied` -> `billing` -> `cleaning`). Cản trở/cho phép khách quét QR tùy trạng thái.
-  - `qr_token`: Mã băm HMAC để bảo mật mã QR, ngăn chặn giả mạo URL.
-
-### Bảng `sessions` (Phiên làm việc - Vô cùng quan trọng)
-
-- Đây là **Bảng Trung Tâm** liên kết Người Dùng (Khách quét QR) với Đơn Hàng. Khách hàng thường không có Account đăng nhập, nên họ được định danh qua `Session`.
-- Cứ mỗi lần quét QR vào một bàn `available`, một Session mới được tạo. Mọi Order do bàn đó đặt trong khoảng thời gian này đều nhét chung vào một Session này (Shared Cart).
-- **Fields quan trọng:**
-  - `status`: Phiên đang mở hay đã đóng (active, closed).
-  - `last_activity_at`: Dùng để tự động đóng Session (auto timeout) nếu khách rời đi không thông báo.
+- **`pricing_plans`**: Definition of service packages (Example: Free, Basic, Advanced). Contains limited quotas such as `max_tables` and `max_staff`. This is a Platform level table (without `tenant_id`).
+- **`subscriptions`**: Bridge table. Record the purchase of Package Y by tenant
 
 ---
 
-## 4. CỤM ĐƠN HÀNG & CHẾ BIẾN (ORDERING & KDS)
+## 2. MENU CLUSTER & LIST (CATALOG DOMAIN)
 
-_Xử lý luồng đặt món và bếp._
+_Manage the list of dishes displayed on the electronic Menu._
 
-### Bảng `orders` & `order_items`
+### Table `categories` (Category)
 
-- Khách không tạo 1 Order cho cả bữa ăn. Khách có thể **gọi nhiều lần** (Ví dụ: Order 1: Món chính. Order 2: Gọi thêm bia). Tất cả đính chung vào `session_id`.
+- Grouping dishes (Appetizers, Main dishes, Drinks...).
+- **Important Fields:**
+  - `time_start`, `time_end`: Allows configuration of display according to time frame (Ex: Breakfast menu).
+  - `sort_order`: Allows the shop Owner to drag and drop the priority display order on the guest screen.
+
+### Table `menu_items` (Food / Drink)
+
+- Contains details of dishes assigned to a Category.
+- **Important Fields:**
+  - `price_vnd`: Selling price in VND (stored as integer `bigint` to avoid decimal errors).
+  - `stock_qty`: Inventory quantity. Pessimistic Locking will be deducted during the ordering process.
+  - `status`: Can be switched to `out_of_stock` (out of stock) to automatically hide from the cart.
+
+---
+
+## 3. TABLE SPACE CLUSTER & SESSION MANAGEMENT (TABLE & SESSION)
+
+_Connect physical customers to the system via QR code._
+
+### Tables `areas` & `tables` (Areas & Tables)
+
+- **`areas`**: Monitor premises (Ground Floor, 2nd Floor, Garden).
+- **`tables`**: The specific table belongs to a Region.
+- **Important Fields of the Table:**
+  - `status`: The closed life cycle of the table (`available` -> `occupied` -> `billing` -> `cleaning`). Obstruct/allow guests to scan QR depending on status.
+  - `qr_token`: HMAC hash code to secure QR codes, prevent URL spoofing.
+
+### Table `sessions` (Session - Extremely important)
+
+- This is the **Central Table** that links Users (Customer scans QR) with Orders. Customers usually do not have a logged in Account, so they are identified via `Session`.
+- Every time a QR is scanned into a table `available`, a new Session is created. All Orders placed by that table during this time period are put together in this one Session (Shared Cart).
+- **Important Fields:**
+  - `status`: Session is open or closed (active, closed).
+  - `last_activity_at`: Used to automatically close the Session (auto timeout) if the guest leaves without notice.
+
+---
+
+## 4. ORDERING & PROCESSING (ORDERING & KDS)
+
+_Handle the ordering and kitchen flow._
+
+### Table `orders` & `order_items`
+
+- Guests do not create 1 Order for the entire meal. Customers can **order multiple times** (Example: Order 1: Main dish. Order 2: Order more beer). All attached to `session_id`.
 - **`orders`**:
-  - `idempotency_key`: Chặn double-submit nếu bấm nút "Đặt món" hai lần.
-  - `status`: Từ `pending` (chờ duyệt) -> `processing` (vào bếp) -> `ready` (Bếp làm xong) -> `served` (Đã lên bàn) -> `completed`.
+  - `idempotency_key`: Block double-submit if the "Order" button is pressed twice.
+  - `status`: From `pending` (waiting for approval) -> `processing` (go to the kitchen) -> `ready` (Kitchen finished) -> `served` (On the table) -> `completed`.
 - **`order_items`**:
-  - Lưu chi tiết từng món.
-  - `unit_price_vnd`: Phải sao chép giá từ `menu_items` tại thời điểm đặt (vì giá gốc trên menu có thể bị đổi sau đó).
-  - Trạng thái món (`status`): Hỗ trợ màn hình KDS (bếp) báo xong từng món riêng biệt.
+  - Save details of each item.
+  - `unit_price_vnd`: Prices from `menu_items` must be copied at the time of booking (because the original price on the menu may be changed later).
+  - Dish status (`status`): Supports the KDS screen (kitchen) to notify each individual dish of completion.
 
-### Bảng `service_requests` (Yêu cầu phục vụ)
+### Table `service_requests` (service Request)
 
-- Lưu trữ các tín hiệu "Gọi nhân viên", "Lấy hóa đơn". Giúp quản lý theo dõi tốc độ phản hồi SLAs của nhân viên.
-
----
-
-## 5. CỤM THANH TOÁN (BILLING & PAYMENTS)
-
-_Quy chuẩn hóa doanh thu và dòng tiền._
-
-### Bảng `bills` (Hóa đơn tổng)
-
-- Khi khách gọi tính tiền (Session đóng lại), mọi `orders` trong `session_id` đó sẽ được gom (aggregate) lại thành **một `bill` duy nhất**. Quan hệ 1-1 với Session.
-- **Fields quan trọng:**
-  - `total_vnd`: Tổng tiền gốc.
-  - `rounding_delta_vnd`: Sai số làm tròn. (Ví dụ: Hệ thống làm tròn 127.500đ thành 128.000đ thì delta là 500đ).
-
-### Bảng `payments` & `refunds` (Thanh toán & Hoàn tiền)
-
-- **`payments`**: 1 Hóa đơn có thể thanh toán nhiều lần hoặc qua nhiều hình thức (chia tiền).
-  - `method`: Tiền mặt (`CASH`), Chuyển khoản VietQR (`VIETQR`).
-  - `sepay_transaction_id`: Map với Webhook trả về từ SePay. Đảm bảo tính nhất quán (idempotency key).
-- **`refunds`**: Trong trường hợp khách khiếu nại hoặc hủy món sau khi đã thanh toán (`status = paid`), hệ thống thiết kế Dòng Hoàn Tiền riêng biệt để dấu vết kiểm toán (Audit Trail) không bị mất mát.
+- Store the signals "Call staff", "Get invoice". Helps managers monitor employees' SLAs response speed.
 
 ---
 
-## 🔄 TÓM TẮT LUỒNG DỮ LIỆU ĐIỂN HÌNH (DATA FLOW)
+## 5. BILLING & PAYMENTS
 
-1. Nhà hàng khởi tạo (Tạo bản ghi trong `tenants`, `subscriptions`).
-2. Chủ quán set up Menu (Tạo `categories`, `menu_items`) và Bàn ghế (Tạo `areas`, `tables`).
-3. Khách hàng tới quán, quét QR trên `table`. Hệ thống chuyển `table_status` thành `occupied` và sinh ra 1 bản ghi `sessions`.
-4. Khách chọn món, bấm "Gửi". Hệ thống sinh ra bản ghi `orders` (và nhiều `order_items`), trừ `stock_qty` của `menu_items`. Gắn vào `session_id` đó.
-5. Nhân viên Bếp tương tác thay đổi trạng thái của `orders` (PENDING → PROCESSING → READY → SERVED) — UPPERCASE values per Step 2.3 ADR.
-6. Khách ăn xong, gọi tính tiền. Cập nhật `table_status` thành `billing`. Hệ thống tổng hợp các `orders` sinh ra 1 bản ghi `bills`.
-7. Nhân viên thu tiền (Cash/Chuyển khoản). Sinh ra bản ghi `payments`.
-8. Thanh toán xong: Cập nhật `bills` -> closed, `sessions` -> closed, `table_status` -> `cleaning`.
-9. Dọn bàn xong: Bàn quay về `available`, sẵn sàng đón khách tiếp theo đón chu kỳ mới.
+_Standardize revenue and cash flow._
+
+### Table `bills` (Total Invoice)
+
+- When the customer calls to pay (Session closes), all `orders` in that `session_id` will be aggregated into **a single `bill`**. 1-1 relationship with Session.
+- **Important Fields:**
+  - `total_vnd`: Total principal amount.
+  - `rounding_delta_vnd`: Rounding error. (For example: The system rounds 127,500 VND to 128,000 VND, then the delta is 500 VND).
+
+### Table `payments` & `refunds` (Payments & Refunds)
+
+- **`payments`**: 1 Invoice can be paid multiple times or through multiple forms (split money).
+  - `method`: Cash (`CASH`), VietQR Transfer (`VIETQR`).
+  - `sepay_transaction_id`: Map with Webhook returned from SePay. Ensure consistency (idempotency key).
+- **`refunds`**: In case a customer complains or cancels an item after payment (`status = paid`), the system designs a separate Refund Line so that the Audit Trail is not lost.
+
+---
+
+## 🔄 TYPICAL DATA FLOW SUMMARY (DATA FLOW)
+
+1. Restaurant initialization (Create record in `tenants`, `subscriptions`).
+2. The shop Owner sets up the Menu (Create `categories`, `menu_items`) and Tables and Chairs (Create `areas`, `tables`).
+3. Customers come to the shop, scan the QR on `table`. The system converts `table_status` to `occupied` and generates a record `sessions`.
+4. Customer chooses the dish, click "Send". The system generates `orders` (and multiple `order_items`) records, excluding `stock_qty` from `menu_items`. Attach that `session_id`.
+5. Kitchen staff interactively changes the status of `orders` (PENDING → PROCESSING → READY → SERVED) — UPPERCASE values ​​per Step 2.3 ADR.
+6. When the customer finishes eating, they call to pay. Update `table_status` to `billing`. The system synthesizes `orders` and generates 1 record `bills`.
+7. Collection staff (Cash/Transfer). Generates record `payments`.
+8. Payment completed: Update `bills` -> closed, `sessions` -> closed, `table_status` -> `cleaning`.
+9. Finished cleaning the table: The table returns to `available`, ready to welcome the next customer to welcome the new cycle.

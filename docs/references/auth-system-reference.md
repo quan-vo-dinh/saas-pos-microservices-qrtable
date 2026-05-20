@@ -1,73 +1,73 @@
-# Tài Liệu Chi Tiết Hệ Thống Authentication, Authorization, Role & Permission
+# Documents detailing the Authentication, Authorization, Role & Permission System
 
-**Phiên bản:** Step 0.6B  
-**Ngày cập nhật:** 2026-05-13 (refresh supporting RBAC reference sau Phase 4B)
-**Trạng thái:** Tài liệu tham khảo hỗ trợ, không phải nguồn canonical cho RBAC
+**Version:** Step 0.6B
+**Update date:** 2026-05-13 (refresh supporting RBAC reference after Phase 4B)
+**Status:** Supporting reference, not canonical source for RBAC
 
-> **Current status:** RBAC canonical source of truth là [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md), đối chiếu với `libs/constants/src/lib/enum/role.enum.ts` và `apps/user-access/src/seeder/role.json`. Snapshot hiện tại sau Phase 4B có 66 permissions: `SUPER_ADMIN=66`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. Nếu tài liệu này khác canonical matrix hoặc code/seed, hãy ưu tiên canonical matrix và code/seed.
+> **Current status:** RBAC canonical source of truth is [permission matrix](../architecture/permission-matrix.md), compared to `libs/constants/src/lib/enum/role.enum.ts` and `apps/user-access/src/seeder/role.json`. The current snapshot after Phase 4B has 66 permissions: `SUPER_ADMIN=66`, `Owner=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. If this document differs from canonical matrix or code/seed, give priority to canonical matrix and code/seed.
 
 ---
 
-## Mục Lục
+## Table of Contents
 
-1. [Tổng Quan Hệ Thống Auth](#1-tổng-quan-hệ-thống-auth)
-2. [Kiến Trúc Tổng Thể](#2-kiến-trúc-tổng-thể)
-3. [6 Roles Chính Của Hệ Thống](#3-6-roles-chính-của-hệ-thống)
-4. [Luồng Xử Lý Request (Request Lifecycle)](#4-luồng-xử-lý-request-request-lifecycle)
-5. [Chi Tiết Từng Guard](#5-chi-tiết-từng-guard)
+1. [Auth System Overview](#1-auth-system-overview)
+2. [Overall Architecture](#2-overall-architecture)
+3. [6 Main Roles of the System](#3-6-main-roles-of-the-system)
+4. [Request Lifecycle](#4-request-lifecycle)
+5. [Details of Each Guard](#5-details-of-each-guard)
 6. [Decorators & Metadata](#6-decorators-metadata)
 7. [Keycloak Integration](#7-keycloak-integration)
 8. [MongoDB: Role & User Mapping](#8-mongodb-role-user-mapping)
-9. [Permission Matrix Chi Tiết](#9-permission-matrix-chi-tiết)
-10. [Luồng Login (JWT Flow)](#10-luồng-login-jwt-flow)
-11. [Luồng Guest/Customer Session](#11-luồng-guestcustomer-session)
+9. [Permission Matrix Details](#9-permission-matrix-details)
+10. [Login Flow (JWT Flow)](#10-login-jwt-flow)
+11. [Guest/Customer Session Stream](#11-guestcustomer-session stream)
 12. [Seed Script & Role Bootstrap](#12-seed-script-role-bootstrap)
 13. [Error Codes & Debugging](#13-error-codes-debugging)
 14. [Checklist Debug Auth Issues](#14-checklist-debug-auth-issues)
 
 ---
 
-## 1. Tổng Quan Hệ Thống Auth
+## 1. Auth System Overview
 
-### 1.1 Mô Hình Authentication Kép
+### 1.1 Dual Authentication Model
 
-Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
+The QRTable system uses **2 parallel authentication models**:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│          HỆ THỐNG XÁC THỰC QRTable                  │
+│ QRTable AUTHENTICATION SYSTEM │
 ├─────────────────────────────────────────────────────┤
 │                                                      │
-│  1. JWT Authentication (Nhân sự hệ thống)          │
+│ 1. JWT Authentication (System Personnel) │
 │     - Flow: Username/Password → Keycloak            │
-│     - Token: RS256 signed JWT với tenant_id claim   │
+│     - Token: RS256 signed JWT with tenant_id claim   │
 │     - Actor: SUPER_ADMIN, OWNER, MANAGER, WAITER, CHEF, BARISTA │
-│     - Quản lý: Keycloak Realm "qrtable"            │
+│ - Manager: Keycloak Realm "qrtable" │
 │                                                      │
-│  2. Session Authentication (Khách hàng/Guest)      │
-│     - Flow: TạoSessioID → Redis                     │
-│     - Token: UUID-based session ID trong Redis      │
-│     - Actor: Customer (ẩn danh)                     │
-│     - TTL: 2 giờ (có idle timeout 30 phút)         │
+│ 2. Session Authentication (Customer/Guest) │
+│     - Flow: CreateSessionID → Redis                     │
+│     - Token: UUID-based session ID in Redis      │
+│ - Actor: Customer (anonymous) │
+│ - TTL: 2 hours (with idle timeout of 30 minutes) │
 │                                                      │
 └─────────────────────────────────────────────────────┘
 ```
 
-**Chính sách kết hợp:**
+**Combination policy:**
 
-- Nếu route có `@Authorization({ secured: true })` → yêu cầu JWT từ UserGuard
-- Nếu route không có decorator → SessionGuard có thể tạo/tái sử dụng session anonymous
-- TenantGuard enforce tenant isolation cho cả 2 loại actor
+- If route has `@Authorization({ secured: true })` → JWT request from UserGuard
+- If the route does not have a decorator → SessionGuard can create/reuse anonymous sessions
+- TenantGuard enforces tenant isolation for both types of actors
 
-### 1.2 Điều hướng FE (Management App) vs kiểm tra Permission (BFF)
+### 1.2 FE Navigation (Management App) vs Permission Check (BFF)
 
-Ứng dụng Next.js `management-app` dùng **middleware + sidebar theo role** để người dùng chỉ thấy các **khu vực** (dashboard, POS, KDS, admin) phù hợp persona. **Đây không phải layer thay thế PermissionGuard:** mọi API staff vẫn phải khớp `permissions[]` từ Authorizer theo ma trận canonical. Mô tả đầy đủ, bảng so sánh và TODO tinh chỉnh: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md) §9 · `AGENTS.md` (mục Frontend RBAC).
+The Next.js `management-app` application uses **middleware + role-based sidebar** so that users only see **areas** (dashboard, POS, KDS, admin) that match the persona. **This is not a PermissionGuard replacement layer:** All API staff must still match `permissions[]` from Authorizer according to the canonical matrix. Full description, comparison table, and refined TODO: [permission matrix](../architecture/permission-matrix.md) §9 · `AGENTS.md` (Frontend RBAC entry).
 
 ---
 
-## 2. Kiến Trúc Tổng Thể
+## 2. Overall Architecture
 
-### 2.1 Thành Phần Chính
+### 2.1 Main Ingredients
 
 ```
 ┌─ FRONTEND ───────────────────────────────────────────────┐
@@ -78,7 +78,7 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
         ┌─ BFF GATEWAY ──────────────────────────────┐
         │  Port: 3300                                │
         │  ┌─ TenantMiddleware                       │
-        │  │  (resolve tenant từ header/subdomain)   │
+│  │  (resolve tenant from header/subdomain)   │
         │  ├─ UserGuard                             │
         │  │  (verify JWT → Authorizer gRPC)        │
         │  ├─ SessionGuard                          │
@@ -106,182 +106,182 @@ Hệ thống QRTable sử dụng **2 mô hình xác thực song song**:
 
 ```
 
-### 2.2 Dòng Chảy Dữ Liệu Authorization
+### 2.2 Authorization Data Flow
 
 ```
-1. Request vào BFF (có JWT hoặc Session ID)
+1. Request to BFF (with JWT or Session ID)
    ↓
-2. TenantMiddleware lấy tenant từ x-tenant-id header hoặc subdomain
+2. TenantMiddleware gets tenant from x-tenant-id header or subdomain
    ↓
-3. UserGuard (nếu route secured=true):
+3. UserGuard (if route secured=true):
    - Parse JWT
-   - Verify signature bằng Keycloak JWKS
+- verify signature with Keycloak JWKS
    - Call Authorizer gRPC → verifyUserToken
-   - Authorizer lấy user profile từ User-Access
-   - Validate role mapping giữa Keycloak roles và internal roles
+- Authorizer gets user profile from User-Access
+- Validate role mapping between Keycloak roles and internal roles
    ↓
-4. SessionGuard (nếu route không secured):
-   - Tạo/tái sử dụng session từ Redis
+4. SessionGuard (if the route is not secured):
+- Create/reuse sessions from Redis
    ↓
 5. TenantGuard:
-   - Enforce tenant từ JWT claim hoặc session
-   - Check consistency giữa request tenant vs claim/session
+- Enforce tenant from JWT claim or session
+- Check consistency between request tenant vs claim/session
    ↓
 6. PermissionGuard:
-   - Nếu route có @Permissions decorator
-   - Check user permissions có chứa required permissions không
+- If route has @Permissions decorator
+- Check user permissions contains the required permissions
    ↓
 7. Controller → build TCP RequestContext
-   - Gắn processId, tenantId, userId, sessionId
+- Attach processId, tenantId, userId, sessionId
    ↓
 8. Downstream service (Catalog, Invoice, etc.)
-   - Nhận context
+- Get context
    - Verify tenant consistency
    - Execute business logic (auto-filtered by tenant)
 ```
 
 ---
 
-## 3. 6 Roles Chính Của Hệ Thống
+## 3. 6 Main Roles of the System
 
-### 3.1 Bảng Tóm Lược 6 Roles (Bao gồm Super Admin)
+### 3.1 Summary Table of 6 Roles (Including Super Admin)
 
-| **Role**        | **Mô Tả**                                                                                    | **Phạm Vi**                 | **Người Dùng**    | **Keycloak Role** | **Permissions** |
-| --------------- | -------------------------------------------------------------------------------------------- | --------------------------- | ----------------- | ----------------- | --------------- |
-| **SUPER_ADMIN** | Admin nền tảng, quyền toàn bộ hệ thống                                                       | Cross-tenant platform-level | Admin hệ thống    | `SUPER_ADMIN`     | 66              |
-| **OWNER**       | Chủ sở hữu nhà hàng/cửa hàng, gồm checkout subscription và payment settings                  | Single-tenant (owner only)  | Chủ tiệm          | `OWNER`           | 38              |
-| **MANAGER**     | Quản lý điều hành; có own-tenant visibility, không checkout/update payment settings/xóa user | Single-tenant               | Quản lý cửa hàng  | `MANAGER`         | 35              |
-| **WAITER**      | Nhân viên phục vụ bàn                                                                        | Single-tenant               | Nhân viên         | `WAITER`          | 15              |
-| **CHEF**        | Đầu bếp                                                                                      | Single-tenant               | Đầu bếp           | `CHEF`            | 6               |
-| **BARISTA**     | Nhân viên pha chế                                                                            | Single-tenant               | Nhân viên pha chế | `BARISTA`         | 6               |
+| **Role**        | **Description**                                                                                  | **Scope**                   | **User**      | **Keycloak Role** | **Permissions** |
+| --------------- | ------------------------------------------------------------------------------------------------ | --------------------------- | ------------- | ----------------- | --------------- |
+| **SUPER_ADMIN** | Platform admin, entire system rights                                                             | Cross-tenant platform-level | System Admin  | `SUPER_ADMIN`     | 66              |
+| **Owner**       | Restaurant/store owners, including checkout subscription and payment settings                    | Single-tenant (Owner only)  | Shop Owner    | `Owner`           | 38              |
+| **MANAGER**     | Executive management; has own-tenant visibility, no checkout/update payment settings/delete user | Single-tenant               | Store Manager | `MANAGER`         | 35              |
+| **WAITER**      | Waitress                                                                                         | Single-tenant               | Staff         | `WAITER`          | 15              |
+| **CHEF**        | Chef                                                                                             | Single-tenant               | Chef          | `CHEF`            | 6               |
+| **BARISTA**     | Bartender                                                                                        | Single-tenant               | Bartender     | `BARISTA`         | 6               |
 
-### 3.2 Actor Đặc Biệt: CUSTOMER (Guest)
+### 3.2 Special Actor: CUSTOMER (Guest)
 
-**Customer** không phải role trong Keycloak mà là:
+**Customer** is not a role in Keycloak but is:
 
-- Khách hàng quét QR khi vào nhà hàng
-- **Không có account** → không cần login
-- **Được xác thực** bằng SessionGuard → random session ID trong Redis
-- **Tenant binding**: Tenant từ QR code hoặc host/subdomain
-- **Permission**: Không có RBAC role/permission trong `role.json`; customer đọc public menu và xem trạng thái order/payment của chính session qua guard/controller scope.
+- Customers scan QR when entering the restaurant
+- **No account** → no need to login
+- **Authenticated** using SessionGuard → random session ID in Redis
+- **tenant binding**: tenant from QR code or host/subdomain
+- **Permission**: No RBAC role/permission in `role.json`; The customer reads the public menu and views the order/payment status of the session itself through the guard/controller scope.
 
-> Chi tiết CUSTOMER endpoint + SessionGuard scope xem [Permission Matrix §7](../architecture/permission-matrix.md#7-customer-actor-no-db-role).
+> For details CUSTOMER endpoint + SessionGuard scope see [Permission Matrix §7](../architecture/permission-matrix.md#7-customer-actor-no-db-role).
 
 ---
 
-## 4. Luồng Xử Lý Request (Request Lifecycle)
+## 4. Request Lifecycle
 
-### 4.1 Request Lifecycle Chi Tiết Tại BFF
+### 4.1 Request Lifecycle Details at BFF
 
 ```typescript
-// Giả sử request: POST /api/v1/catalog/create
+// Assume request: POST /api/v1/catalog/create
 // Header: Authorization: Bearer <JWT>
 //         x-tenant-id: tenant-a
 
 STEP 1: TenantMiddleware
-├─ Đọc x-tenant-id từ header → request[MetadataKey.TENANT_ID] = "tenant-a"
-└─ Hoặc parse từ subdomain/host → request[MetadataKey.TENANT_ID]
+├─ Read x-tenant-id from header → request[MetadataKey.TENANT_ID] = "tenant-a"
+└─ Or parse from subdomain/host → request[MetadataKey.TENANT_ID]
 
-STEP 2: UserGuard (toàn cầu)
-├─ Reflector.get(SECURED) từ decorator @Authorization
-├─ Nếu decorator không có hoặc secured=false → return true (skip JWT check)
-├─ Nếu secured=true:
-│  ├─ getAccessToken từ Authorization header
-│  ├─ Check cache: user-token:{hash} trong Cache Manager (Redis)
-│  │  └─ Nếu có → setUserData(req, cacheData) → return true
-│  ├─ Nếu cache miss:
+STEP 2: UserGuard (global)
+├─ Reflector.get(SECURED) from decorator @Authorization
+├─ If decorator is not available or secured=false → return true (skip JWT check)
+├─ If secured=true:
+│  ├─ getAccessToken from Authorization header
+│  ├─ Check cache: user-token:{hash} in Cache Manager (Redis)
+│ │ └─ If that → setUserData(req, cacheData) → return true
+│ ├─ If cache miss:
 │  │  ├─ Call Authorizer gRPC → verifyUserToken(token, processId)
 │  │  ├─ Authorizer service:
-│  │  │  ├─ jwt.decode → lấy header.kid
-│  │  │  ├─ jwksClient.getSigningKey(kid) → lấy public key
+│  │  │  ├─ jwt.decode → get header.kid
+│  │  │  ├─ jwksClient.getSigningKey(kid) → get public key
 │  │  │  ├─ jwt.verify(token, publicKey) → verify RS256
 │  │  │  ├─ userId = payload.sub
 │  │  │  ├─ User-Access gRPC → getByUserId(userId)
-│  │  │  ├─ Nếu user không tồn tại:
-│  │  │  │  └─ Nếu AUTO_PROVISION_ON_FIRST_LOGIN=true
+│ │ │ ├─ If user does not exist:
+│  │  │  │  └─ If AUTO_PROVISION_ON_FIRST_LOGIN=true
 │  │  │  │     └─ autoProvisionFromToken → upsertByIdentity
 │  │  │  ├─ validateRoleMapping:
 │  │  │  │  ├─ keycloakRoles = payload.realm_access.roles
-│  │  │  │  ├─ internalRoles = user.roles (từ MongoDB)
+│  │  │  │  ├─ internalRoles = user.roles (from MongoDB)
 │  │  │  │  ├─ normalize both sets to uppercase
 │  │  │  │  └─ Check intersection: any(keycloakRoles) ∩ any(internalRoles) != ∅
-│  │  │  │     └─ Nếu ∅ → throw ROLE_MAPPING_MISMATCH
-│  │  │  └─ collectPermissions từ user.roles[*].permissions
+│  │  │  │     └─ If empty → throw ROLE_MAPPING_MISMATCH
+│  │  │  └─ collectPermissions from user.roles[*].permissions
 │  │  ├─ Return AuthorizeResponse { valid, metadata: { jwt, permissions, user } }
-│  │  ├─ Cache kết quả 30 phút
+│ │ ├─ Cache results for 30 minutes
 │  │  └─ setUserData(req, response)
 │  └─ Return true
 
-STEP 3: SessionGuard (toàn cầu)
+STEP 3: SessionGuard (global)
 ├─ Reflector.get(SECURED)
-├─ Nếu secured=true → return true (skip session)
-├─ Nếu không:
+├─ If secured=true → return true (skip session)
+├─ If not:
 │  ├─ getSessionIdFromRequest: x-session-id header/cookie
-│  ├─ Nếu có existingSessionId:
+│ ├─ If there is existingSessionId:
 │  │  ├─ getSessionCacheKey(sessionId) → "session:{sessionId}"
-│  │  ├─ Get từ cache
-│  │  ├─ Check idle timeout: (now - lastActivityAt) > IDLE_TIMEOUT_MS (30 phút)
-│  │  │  └─ Nếu idle → delete session, create new
+│ │ ├─ Get from cache
+│  │  ├─ Check idle timeout: (now - lastActivityAt) > IDLE_TIMEOUT_MS (30 minutes)
+│  │  │  └─ If idle → delete session, create new
 │  │  ├─ Update lastActivityAt
 │  │  └─ request[MetadataKey.SESSION_ID] = sessionId
-│  ├─ Nếu không có sessionId:
+│ ├─ If there is no sessionId:
 │  │  ├─ Generate: "sid_{random UUID}"
 │  │  ├─ Store Redis: { tenantId, createdAt, lastActivityAt }
-│  │  ├─ TTL: 2 giờ
+│ │ ├─ TTL: 2 hours
 │  │  └─ response.setHeader(x-session-id, sessionId)
 
-STEP 4: TenantGuard (toàn cầu)
+STEP 4: TenantGuard (global)
 ├─ Check if excluded path: /authorizer, /saas, /health → return true
-├─ Get claimTenantId từ userData.metadata.jwt.tenant_id
+├─ Get claimTenantId from userData.metadata.jwt.tenant_id
 ├─ Get tenantId = request[TENANT_ID] || claimTenantId
-├─ Nếu SUPER_ADMIN → return true (bypass tenant check)
-├─ Nếu !tenantId → throw ForbiddenException("Tenant is required")
-├─ Nếu claimTenantId && claimTenantId !== tenantId
+├─ If SUPER_ADMIN → return true (bypass tenant check)
+├─ If !tenantId → throw ForbiddenException("tenant is required")
+├─ If claimTenantId && claimTenantId !== tenantId
 │  └─ throw ForbiddenException("Tenant mismatch with user identity")
-├─ Nếu có sessionId:
-│  ├─ Get session từ cache
-│  ├─ Nếu session.tenantId && session.tenantId !== tenantId
+├─ If there is sessionId:
+│ ├─ Get session from cache
+│  ├─ If session.tenantId && session.tenantId !== tenantId
 │  │  └─ throw ForbiddenException("Tenant mismatch with session")
-│  ├─ Nếu !session.tenantId
+│  ├─ If !session.tenantId
 │  │  └─ Backfill: cache.set({ ...session, tenantId })
 │  └─ Check: tenant consistency confirmed
 ├─ request[MetadataKey.TENANT_ID] = tenantId
 └─ return true
 
-STEP 5: PermissionGuard (toàn cầu)
+STEP 5: PermissionGuard (global)
 ├─ requiredPermissions = Reflector.get(Permissions, handler)
-├─ Nếu !requiredPermissions → return true (optional)
+├─ If !requiredPermissions → return true (optional)
 ├─ userData = request[MetadataKey.USER_DATA]
-├─ Nếu !userData → throw UnauthorizedException
+├─ If !userData → throw UnauthorizedException
 ├─ userPermissions = userData.metadata.permissions
-├─ Nếu !requiredPermissions.every(p => userPermissions.includes(p))
+├─ If !requiredPermissions.every(p => userPermissions.includes(p))
 │  └─ throw ForbiddenException("Permission denied")
 └─ return true
 
-STEP 6: ThrottlerGuard (toàn cầu)
+STEP 6: ThrotlerGuard (global)
 └─ Check rate limit theo IP/user
 
 STEP 7: Controller Execution
-├─ Decorators được inject:
-│  ├─ @ProcessId() → getProcessId hoặc từ request metadata
+├─ Decorators injected:
+│  ├─ @ProcessId() → getProcessId or from request metadata
 │  ├─ @UserData() → request[MetadataKey.USER_DATA]
 │  └─ @RequestTenant() → request[MetadataKey.TENANT_ID]
 ├─ Build TCP RequestContext:
 │  ├─ processId
 │  ├─ tenantId
-│  ├─ userId (từ userData.metadata.userId)
-│  ├─ sessionId (từ request[MetadataKey.SESSION_ID])
+│ ├─ userId (from userData.metadata.userId)
+│  ├─ sessionId (from request[MetadataKey.SESSION_ID])
 │  └─ data: { ...body/params }
 ├─ Call downstream service (Catalog, Invoice, etc.) via TCP
 └─ Return response
 
 STEP 8: Response
 ├─ response.setHeader(x-process-id, processId)
-├─ response.setHeader(x-session-id, sessionId) [nếu có]
+├─ response.setHeader(x-session-id, sessionId) [if present]
 └─ return { data, statusCode, message }
 ```
 
-### 4.2 Guard Execution Order (Thứ Tự Rất Quan Trọng)
+### 4.2 Guard Execution Order (Very Important Order)
 
 ```typescript
 // File: apps/bff/src/app/app.module.ts
@@ -295,31 +295,31 @@ providers: [
 ];
 ```
 
-**Vì sao thứ tự này?**
+**Why this order?**
 
-1. **UserGuard đầu tiên**: Validate JWT signature, lấy user data từ Authorizer → set userData vào request
-2. **SessionGuard thứ hai**: Có thể bypass nếu JWT đã loại, hoặc tạo session
-3. **TenantGuard thứ ba**: Dùng userData từ UserGuard + sessionId từ SessionGuard
-4. **PermissionGuard thứ tư**: Dùng permissions từ userData (đã set bởi UserGuard)
-5. **ThrottlerGuard cuối**: Đơn giản chỉ là rate limiting, không phụ thuộc vào context
+1. **First UserGuard**: Validate JWT signature, get user data from Authorizer → set userData in request
+2. **Second SessionGuard**: Can be bypassed if JWT has been eliminated, or session created
+3. **Third TenantGuard**: Use userData from UserGuard + sessionId from SessionGuard
+4. **Fourth PermissionGuard**: Use permissions from userData (set by UserGuard)
+5. **Last ThrottlerGuard**: Simply rate limiting, independent of context
 
 ---
 
-## 5. Chi Tiết Từng Guard
+## 5. Details of Each Guard
 
 ### 5.1 UserGuard: JWT Verification & User Provisioning
 
 **File:** `libs/guards/src/lib/user.guard.ts`
 
-**Nhiệm vụ:**
+**Mission:**
 
-1. Kiểm tra route có decorator `@Authorization({ secured: true })` không
-2. Nếu có → verify JWT token
-3. Call Authorizer service để validate + get user profile + collect permissions
-4. Cache kết quả 30 phút
-5. Set userData vào request context
+1. Check if the route has decorator `@Authorization({ secured: true })`
+2. If yes → verify JWT token
+3. Call Authorizer service to validate + get user profile + collect permissions
+4. Cache results for 30 minutes
+5. Set userData into request context
 
-**Code Flow Chi Tiết:**
+**Code Flow Details:**
 
 ```typescript
 class UserGuard implements CanActivate {
@@ -337,7 +337,7 @@ class UserGuard implements CanActivate {
     const authOptions = this.reflector.get(MetadataKey.SECURED, context.getHandler());
 
     if (!authOptions?.secured) {
-      return true; // ❌ Route không secured → skip JWT check
+      return true; // ❌ Route not secured → skip JWT check
     }
 
     return this.verifyUserToken(req);
@@ -345,7 +345,7 @@ class UserGuard implements CanActivate {
 
   private async verifyUserToken(req: Request): Promise<boolean> {
     try {
-      const token = getAccessToken(req); // Từ "Authorization: Bearer ..."
+      const token = getAccessToken(req); // From "Authorization: Bearer ..."
 
       if (!token) {
         throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
@@ -372,7 +372,7 @@ class UserGuard implements CanActivate {
         throw new UnauthorizedException(AUTH_ERROR_CODE.INVALID_TOKEN);
       }
 
-      // ✅ Cache 30 phút
+      // ✅ Cache 30 minutes
       this.cacheManager.set(cacheKey, response.data, 30 * 60 * 1000);
       setUserData(req, response.data);
 
@@ -394,7 +394,7 @@ class UserGuard implements CanActivate {
 }
 ```
 
-**Output của UserGuard:**
+**UserGuard output:**
 
 - ✅ `request[MetadataKey.USER_DATA]` = AuthorizeResponse
   - `metadata.jwt` = JWT payload
@@ -402,11 +402,11 @@ class UserGuard implements CanActivate {
   - `metadata.user` = MongoDB user profile
   - `metadata.userId` = user ID
 
-**Lỗi có thể xảy ra (401 Unauthorized):**
+**Possible error (401 Unauthorized):**
 
-- `INVALID_TOKEN`: JWT malformed, expired, hoặc signature không valid
-- `USER_NOT_PROVISIONED`: User logout khỏi Keycloak, hoặc profile không tồn tại trong MongoDB
-- `ROLE_MAPPING_MISMATCH`: Token roles từ Keycloak không cắt ngang với internal roles trong MongoDB
+- `INVALID_TOKEN`: JWT malformed, expired, or signature not valid
+- `USER_NOT_PROVISIONED`: User logs out from Keycloak, or profile does not exist in MongoDB
+- `ROLE_MAPPING_MISMATCH`: Token roles from Keycloak do not intersect with internal roles in MongoDB
 
 ---
 
@@ -414,15 +414,15 @@ class UserGuard implements CanActivate {
 
 **File:** `libs/guards/src/lib/session.guard.ts`
 
-**Nhiệm vụ:**
+**Mission:**
 
-1. Nếu route secured=true → skip (JWT đã handle)
-2. Nếu route không secured → tạo/tái sử dụng session
-3. Session lưu trong Redis với TTL 2h
-4. Có idle timeout 30 phút (nếu không hoạt động → session expire)
-5. Trả x-session-id trong response header
+1. If route secured=true → skip (JWT has been handled)
+2. If route is not secured → create/reuse session
+3. Session stored in Redis with TTL 2h
+4. There is a 30-minute idle timeout (if inactive → session expires)
+5. Return x-session-id in the response header
 
-**Code Flow Chi Tiết:**
+**Code Flow Details:**
 
 ```typescript
 class SessionGuard implements CanActivate {
@@ -436,10 +436,10 @@ class SessionGuard implements CanActivate {
     const authOptions = this.reflector.get(MetadataKey.SECURED, context.getHandler());
 
     if (authOptions?.secured) {
-      return true; // ✅ Route secured → UserGuard đã xử lý, skip session
+      return true; // ✅ Route secured → UserGuard already handled, skip session
     }
 
-    // 🔍 Tìm existing session
+    // 🔍 Find existing session
     const existingSessionId = getSessionIdFromRequest(req); // x-session-id header/cookie
 
     if (existingSessionId) {
@@ -450,7 +450,7 @@ class SessionGuard implements CanActivate {
         const now = Date.now();
         const idleTime = now - (existingSession.lastActivityAt || existingSession.createdAt);
 
-        // ✅ Session còn hoạt động
+        // ✅ Session is still active
         if (idleTime <= SESSION_POLICY.IDLE_TIMEOUT_MS) {
           await this.cacheManager.set(
             cacheKey,
@@ -472,7 +472,7 @@ class SessionGuard implements CanActivate {
       }
     }
 
-    // 🆕 Tạo new session
+    // 🆕 Create new session
     const now = Date.now();
     const sessionId = this.generateSessionId(); // "sid_{uuid}"
     const cacheKey = getSessionCacheKey(sessionId);
@@ -485,7 +485,7 @@ class SessionGuard implements CanActivate {
         createdAt: now,
         lastActivityAt: now,
       },
-      SESSION_POLICY.TTL_MS, // 2 giờ
+      SESSION_POLICY.TTL_MS, // 2 hours
     );
 
     req[MetadataKey.SESSION_ID] = sessionId;
@@ -508,8 +508,8 @@ class SessionGuard implements CanActivate {
 export const SESSION_POLICY = {
   ID_PREFIX: 'sid_',
   CACHE_PREFIX: 'session',
-  TTL_MS: 2 * 60 * 60 * 1000, // 2 giờ (cập nhật từ 24h → 2h cho phù hợp ngữ cảnh nhà hàng)
-  IDLE_TIMEOUT_MS: 30 * 60 * 1000, // 30 phút
+  TTL_MS: 2 * 60 * 60 * 1000, // 2 hours (updated from 24h → 2h to suit the restaurant context)
+  IDLE_TIMEOUT_MS: 30 * 60 * 1000, // 30 minutes
   COOKIE_KEY: 'x-session-id',
 };
 ```
@@ -518,20 +518,20 @@ export const SESSION_POLICY = {
 
 ```typescript
 type SessionData = {
-  tenantId?: string; // Được backfill bởi TenantGuard
-  createdAt: number; // Timestamp tạo session
-  lastActivityAt: number; // Timestamp hoạt động cuối
+  tenantId?: string; // Backfilled by TenantGuard
+  createdAt: number; // Session creation timestamp
+  lastActivityAt: number; // Timestamp last operation
 };
 ```
 
-**Output của SessionGuard:**
+**SessionGuard output:**
 
 - ✅ `request[MetadataKey.SESSION_ID]` = "sid\_{uuid}"
 - ✅ Response header: `x-session-id: sid_{uuid}`
 
-**Lỗi có thể xảy ra:**
+**Possible error:**
 
-- Không có lỗi (SessionGuard luôn tạo/tái sử dụng session thành công)
+- No errors (SessionGuard always creates/reuses sessions successfully)
 
 ---
 
@@ -539,14 +539,14 @@ type SessionData = {
 
 **File:** `libs/guards/src/lib/tenant.guard.ts`
 
-**Nhiệm vụ:**
+**Mission:**
 
-1. Enforce tenant isolation → mọi request (trừ exceptions) phải có valid tenantId
-2. Validate tenant consistency giữa JWT claim, session, và request header
-3. Chặn cross-tenant attacks
-4. Super admin bypass (SUPER_ADMIN role không bị enforce tenant)
+1. Enforce tenant isolation → every request (except exceptions) must have a valid tenantId
+2. Validate tenant consistency between JWT claim, session, and request header
+3. Block cross-tenant attacks
+4. Super admin bypass (SUPER_ADMIN role is not enforced by tenant)
 
-**Code Flow Chi Tiết:**
+**Code Flow Details:**
 
 ```typescript
 class TenantGuard implements CanActivate {
@@ -558,7 +558,7 @@ class TenantGuard implements CanActivate {
     const req = context.switchToHttp().getRequest();
     const path = req.path as string;
 
-    // ✅ EXCLUDED PATHS (bỏ qua tenant check)
+    // ✅ EXCLUDED PATHS (skips tenant check)
     if (this.isExcludedPath(path)) {
       return true;
     }
@@ -573,7 +573,7 @@ class TenantGuard implements CanActivate {
     }
 
     // 🔍 Resolve tenantId
-    const claimTenantId = this.getClaimTenantId(userData); // Từ JWT
+    const claimTenantId = this.getClaimTenantId(userData); // From JWT
     const tenantId = (req[MetadataKey.TENANT_ID] as string | undefined) || claimTenantId;
 
     if (tenantId) {
@@ -605,7 +605,7 @@ class TenantGuard implements CanActivate {
         throw new ForbiddenException('Tenant mismatch with session');
       }
 
-      // ✅ Backfill tenant vào session nếu chưa có
+      // ✅ Backfill tenant into session if not already there
       if (!session.tenantId) {
         await this.cacheManager.set(cacheKey, { ...session, tenantId }, SESSION_POLICY.TTL_MS);
       }
@@ -627,7 +627,7 @@ class TenantGuard implements CanActivate {
     const jwt = userData?.metadata?.jwt as Record<string, unknown> | undefined;
     if (!jwt) return undefined;
 
-    // Keycloak có thể trả snake_case hoặc camelCase
+    // Keycloak can return snake_case or camelCase
     const tenantFromSnakeCase = jwt['tenant_id'];
     const tenantFromCamelCase = jwt['tenantId'];
 
@@ -663,12 +663,12 @@ export const TENANT_POLICY = {
 };
 ```
 
-**Lỗi có thể xảy ra (403 Forbidden):**
+**Possible error (403 Forbidden):**
 
-- `"Tenant is required"`: Không có tenantId trong JWT hay request
-- `"Tenant mismatch with user identity"`: JWT claim tenant_id ≠ request x-tenant-id
-- `"Session not found"`: Session ID không tồn tại trong Redis
-- `"Tenant mismatch with session"`: Session tenant ≠ request tenant
+- `"tenant is required"`: There is no tenantId in the JWT or request
+- `"tenant mismatch with user identity"`: JWT claim tenant_id ≠ request x-tenant-id
+- `"Session not found"`: Session ID does not exist in Redis
+- `"tenant mismatch with session"`: Session tenant ≠ request tenant
 
 ---
 
@@ -676,24 +676,24 @@ export const TENANT_POLICY = {
 
 **File:** `libs/guards/src/lib/permission.guard.ts`
 
-**Nhiệm vụ:**
+**Mission:**
 
-1. Đọc required permissions từ decorator `@Permissions(...)`
-2. Nếu route không có decorator → bypass (return true)
-3. Nếu có decorator → check all required permissions nằm trong user permissions
-4. Nếu user không có some permission → throw 403
+1. Read required permissions from decorator `@Permissions(...)`
+2. If the route has no decorator → bypass (return true)
+3. If there is a decorator → check all required permissions are in user permissions
+4. If the user does not have some permission → throw 403
 
-**Code Flow Chi Tiết:**
+**Code Flow Details:**
 
 ```typescript
 class PermissionGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // 🔍 Get required permissions từ decorator
+    // 🔍 Get required permissions from decorator
     const requiredPermissions = this.reflector.get<PERMISSION[]>(Permissions, context.getHandler());
 
-    // ✅ Route không có @Permissions → optional, pass
+    // ✅ Route without @Permissions → optional, pass
     if (!requiredPermissions) {
       return true;
     }
@@ -708,7 +708,7 @@ class PermissionGuard implements CanActivate {
     const permissions = userData.metadata.permissions;
     const userPermissions = Array.isArray(permissions) ? (permissions as PERMISSION[]) : [];
 
-    // ❌ Kiểm tra: user có ALL required permissions không
+    // ❌ Check: does the user have ALL required permissions?
     const isValid = requiredPermissions.every((permission) => userPermissions.includes(permission));
 
     if (!isValid) {
@@ -720,12 +720,12 @@ class PermissionGuard implements CanActivate {
 }
 ```
 
-**Ví Dụ Sử Dụng Decorator:**
+**Example of Using Decorator:**
 
 ```typescript
 @Controller('catalog')
 export class CatalogController {
-  // ✅ Endpoint này yêu cầu JWT + 2 permissions
+  // ✅ This endpoint requires JWT + 2 permissions
   @Post('create')
   @Authorization({ secured: true })
   @Permissions([PERMISSION.CATALOG_CREATE])
@@ -733,7 +733,7 @@ export class CatalogController {
     // code...
   }
 
-  // ✅ Endpoint này yêu cầu JWT + multiple permissions
+  // ✅ This endpoint requires JWT + multiple permissions
   @Put(':id')
   @Authorization({ secured: true })
   @Permissions([PERMISSION.CATALOG_UPDATE])
@@ -741,18 +741,18 @@ export class CatalogController {
     // code...
   }
 
-  // ✅ Endpoint này không yêu cầu JWT (guest có thể gọi)
+  // ✅ This endpoint does not require JWT (guest can call)
   @Get('list')
   async list() {
-    // SessionGuard tạo session, TenantGuard check tenant
-    // Nhưng không check permission vì không có @Permissions decorator
+    // SessionGuard creates a session, TenantGuard check tenant
+    // But permission is not checked because there is no @Permissions decorator
   }
 }
 ```
 
-**Lỗi có thể xảy ra (403 Forbidden):**
+**Possible error (403 Forbidden):**
 
-- `"Permission denied"`: User không có required permission
+- `"Permission denied"`: User does not have required permission
 
 ---
 
@@ -762,7 +762,7 @@ export class CatalogController {
 
 **File:** `libs/decorators/src/lib/authorizer.decorator.ts`
 
-**Mục đích:** Mark route yêu cầu JWT
+**Purpose:** Mark route requires JWT
 
 ```typescript
 export const Authorization = ({ secured = false }: { secured?: boolean }) => {
@@ -786,21 +786,21 @@ export const Authorization = ({ secured = false }: { secured?: boolean }) => {
 };
 ```
 
-**Sử dụng:**
+**Usage:**
 
 ```typescript
-// ✅ Route yêu cầu JWT
+// ✅ Route requires JWT
 @Get('me')
 @Authorization({ secured: true })
 async me(@UserData() userData: AuthorizedMetadata) {
   return userData;
 }
 
-// ✅ Route không yêu cầu JWT (guest có thể)
+// ✅ Route does not require JWT (guest may)
 @Get('list')
 @Authorization({ secured: false })
 async list() {
-  // SessionGuard tạo session
+// SessionGuard creates a session
 }
 ```
 
@@ -808,13 +808,13 @@ async list() {
 
 **File:** `libs/decorators/src/lib/permission.decorator.ts`
 
-**Mục đích:** Định nghĩa permissions yêu cầu cho route
+**Purpose:** Defines the permissions required for the route
 
 ```typescript
 export const Permissions = Reflector.createDecorator<PERMISSION[]>();
 ```
 
-**Sử dụng:**
+**Usage:**
 
 ```typescript
 @Post('create')
@@ -838,13 +838,13 @@ async delete(@Param('id') id: string) {
 
 **File:** `libs/decorators/src/lib/processId.decorator.ts`
 
-**Mục đích:** Inject processId (request tracing ID)
+**Purpose:** Inject processId (request tracing ID)
 
 ```typescript
 @Get('detail/:id')
 async getDetail(
   @Param('id') id: string,
-  @ProcessId() processId: string,  // ← Injected từ middleware/decorator logic
+@ProcessId() processId: string,  // ← Injected from middleware/decorator logic
 ) {
   console.log(`[${processId}] Getting catalog ${id}`);
 }
@@ -854,7 +854,7 @@ async getDetail(
 
 **File:** `libs/decorators/src/lib/userData.decorator.ts`
 
-**Mục đích:** Inject user data từ UserGuard
+**Purpose:** Inject user data from UserGuard
 
 ```typescript
 @Get('me')
@@ -874,21 +874,21 @@ async me(@UserData() userData: AuthorizedMetadata) {
 
 ### 7.1 Keycloak Realm & Configuration
 
-**Realm:** `qrtable` (thay vì realm cũ)
+**Realm:** `qrtable` (instead of old realm)
 
 **Client:**
 
 - **Client ID:** `qrtable-bff`
-- **Type:** Confidential (có client secret)
+- **Type:** Confidential (with client secret)
 - **Flows:**
-  - Direct Access Grants (Resource Owner Password) → dùng cho login
-  - Standard Flow → dùng cho frontend redirect
+  - Direct Access Grants (Resource Owner Password) → used for login
+  - Standard Flow → used for frontend redirect
 - **OIDC Protocol** → RS256 signed tokens
 
 ### 7.2 Keycloak Realm Roles
 
 ```
-Realm qrtable có 6 roles:
+Realm qrtable with 6 roles:
 ├─ SUPER_ADMIN (platform-level)
 ├─ OWNER
 ├─ MANAGER
@@ -899,7 +899,7 @@ Realm qrtable có 6 roles:
 
 ### 7.3 Protocol Mapper: tenant_id Claim
 
-**Keycloak bootstrap script tạo mapper này:**
+**Keycloak bootstrap script that creates this mapper:**
 
 ```bash
 # Mapper config
@@ -918,18 +918,18 @@ Realm qrtable có 6 roles:
 }
 ```
 
-**Kết quả:** User attribute `tenant_id` được đưa vào JWT claim
+**Result:** User attribute `tenant_id` is included in the JWT claim
 
 ### 7.4 Token Structure
 
-**JWT Token từ Keycloak (RS256 signed)**
+**JWT Token from Keycloak (RS256 signed)**
 
 ```json
 {
   "header": {
     "alg": "RS256",
     "typ": "JWT",
-    "kid": "Z1zOr8m_..." // Key ID để lấy public key
+    "kid": "Z1zOr8m_..." // Key ID to get the public key
   },
   "payload": {
     "sub": "74ad75a4-98a6-4bec-b528-0a0ac702d2f5", // User ID
@@ -938,7 +938,7 @@ Realm qrtable có 6 roles:
     "name": "Manager Two",
     "given_name": "Manager",
     "family_name": "Two",
-    "tenant_id": "tenant-a", // ← Mapper thêm vào
+    "tenant_id": "tenant-a", // ← Mapper added
     "realm_access": {
       "roles": ["OWNER", "MANAGER", "default-roles-qrtable"]
     },
@@ -953,24 +953,24 @@ Realm qrtable có 6 roles:
 
 ```typescript
 async verifyUserToken(token: string, processId: string): Promise<AuthorizeResponse> {
-  // Step 1: Decode KHÔNG verify lúc này
+// Step 1: Decode DO NOT verify at this time
   const decoded = jwt.decode(token, { complete: true });
 
-  // Step 2: Lấy kid từ header
+// Step 2: Get kid from header
   const kid = decoded.header.kid;
 
-  // Step 3: Lấy public key từ Keycloak JWKS endpoint
+// Step 3: Get public key from Keycloak JWKS endpoint
   const key = await this.jwksClient.getSigningKey(kid);
   const publicKey = key.getPublicKey();
 
   // Step 4: Verify signature RS256
   const payload = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
 
-  // Step 5: Extract data từ payload
+// Step 5: Extract data from payload
   const userId = payload.sub;
   const keycloakRoles = payload.realm_access.roles;
 
-  // Step 6: Validate user profile trong MongoDB
+// Step 6: Validate user profile in MongoDB
   let user = await this.userValidation(userId, processId);
   if (!user && AUTO_PROVISION_ON_FIRST_LOGIN) {
     user = await this.autoProvisionFromToken(payload, processId);
@@ -982,7 +982,7 @@ async verifyUserToken(token: string, processId: string): Promise<AuthorizeRespon
     throw new UnauthorizedException(AUTH_ERROR_CODE.ROLE_MAPPING_MISMATCH);
   }
 
-  // Step 8: Collect permissions từ internal roles
+// Step 8: Collect permissions from internal roles
   const permissions = this.collectPermissions(user.roles);
 
   return {
@@ -1018,11 +1018,11 @@ export class Role extends BaseSchema {
   description: string;
 
   @Prop({ type: [String], enum: PERMISSION, default: [] })
-  permissions: PERMISSION[]; // Array of permissions này role có
+  permissions: PERMISSION[]; // Array of permissions this role has
 }
 ```
 
-**Ví dụ data trong mongoDB:**
+**Example data in mongoDB:**
 
 ```javascript
 // Collection: role
@@ -1034,7 +1034,7 @@ db.role.find()
     name: "SUPER_ADMIN",
     description: "platform-level super admin",
     permissions: [
-      "saas.create", "saas.delete", "saas.update", // ... tất cả
+"saas.create", "saas.delete", "saas.update", // ... all
       "catalog.create", "catalog.delete", // ...
       "user.create", "user.delete", // ...
     ],
@@ -1075,14 +1075,14 @@ export class User extends BaseSchema {
   email: string;
 
   @Prop({ type: String })
-  userId: string; // UUID từ Keycloak user.sub
+  userId: string; // UUID from Keycloak user.sub
 
   @Prop({ type: [ObjectId], ref: 'Role' })
   roles: ObjectId[]; // Array of Role _id (references)
 }
 ```
 
-**Ví dụ data trong MongoDB:**
+**Example data in MongoDB:**
 
 ```javascript
 // Collection: user
@@ -1110,17 +1110,17 @@ db.user.find()
 
 ```typescript
 private validateRoleMapping(keycloakRoles: string[], internalRoles?: Role[]): boolean {
-  // Tất cả ROLE enum values (uppercase)
+// All ROLE enum values ​​(uppercase)
   const appRoles = new Set(Object.values(ROLE).map((role) => normalizeRoleName(role)));
 
-  // Keycloak roles → filter chỉ app roles (normalize uppercase)
+// Keycloak roles → filter only app roles (normalize uppercase)
   const keycloakAppRoles = new Set(
     keycloakRoles
       .map((role) => normalizeRoleName(role))
       .filter((role) => appRoles.has(role)),
   );
 
-  // Internal roles từ MongoDB → filter chỉ app roles
+// Internal roles from MongoDB → filter only app roles
   const internalAppRoles = new Set(
     (internalRoles || [])
       .map((role) => normalizeRoleName(role?.name))
@@ -1148,7 +1148,7 @@ private validateRoleMapping(keycloakRoles: string[], internalRoles?: Role[]): bo
 
 ---
 
-## 9. Permission Matrix Chi Tiết
+## 9. Permission Matrix Details
 
 ### 9.1 Permission Enum
 
@@ -1254,7 +1254,7 @@ export enum PERMISSION {
 
 ### 9.2 Permission Matrix: Role → Permissions (Supporting Snapshot — Phase 4B)
 
-> Single source of truth: [`docs/architecture/permission-matrix.md`](../architecture/permission-matrix.md). Bảng dưới đây chỉ là tóm tắt để đọc nhanh, không thay thế canonical matrix 6 roles × 66 permissions.
+> Single source of truth: [permission matrix](../architecture/permission-matrix.md). The table below is just a summary for quick reading, does not replace the canonical matrix 6 roles × 66 permissions.
 
 | **Role**               | **Platform / SaaS domains**                                                                                                                        | **Operational domains**                                                                                                       | **Permission count** |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------- |
@@ -1266,18 +1266,18 @@ export enum PERMISSION {
 | **BARISTA**            | `plan.read`                                                                                                                                        | Catalog read plus KDS `get_queue`, `update_ticket`, `recall`; no `kitchen.set_priority`                                       | 6                    |
 | **CUSTOMER** (session) | none                                                                                                                                               | Session-scoped public menu, own order/payment status, service request/order submit via customer guards                        | n/a                  |
 
-**Ghi chú:**
+**Note:**
 
-- `SAAS_*` và `PRODUCT_*` là legacy/backward-compat; Phase 4B dùng `TENANT_*`, `SUBSCRIPTION_*`, `PLAN_*`, `PAYMENT_SETTINGS_*`.
-- CUSTOMER không có "role" thực sự, chỉ có session → access được enforce bằng customer/session guards và ownership checks.
-- **MANAGER không có `user.delete`, `subscription.checkout`, hoặc `payment_settings.update_own`**.
-- **WAITER có `payment.get_history`** — cho "last bill" queries từ customer.
+- `SAAS_*` and `PRODUCT_*` are legacy/backward-compat; Phase 4B uses `TENANT_*`, `SUBSCRIPTION_*`, `PLAN_*`, `PAYMENT_SETTINGS_*`.
+- CUSTOMER has no real "role", only session → access is enforced by customer/session guards and ownership checks.
+- **MANAGER does not have `user.delete`, `subscription.checkout`, or `payment_settings.update_own`**.
+- **WAITER has `payment.get_history`** — for "last bill" queries from customer.
 
 ### 9.3 Data File: role.json
 
 **File:** `apps/user-access/src/seeder/role.json`
 
-**Current contents (Phase 4B — static-verified 2026-05-13):** Full canonical matrix với 6 roles và 66 permissions distributed per [`permission-matrix.md`](../architecture/permission-matrix.md) §6. Permission counts:
+**Current contents (Phase 4B — static-verified 2026-05-13):** Full canonical matrix with 6 roles and 66 permissions distributed per [permission matrix](../architecture/permission-matrix.md) §6. Permission counts:
 
 | Role        | Permission count |
 | ----------- | ---------------- |
@@ -1292,9 +1292,9 @@ Refer to actual file `apps/user-access/src/seeder/role.json` for full content (a
 
 ---
 
-## 10. Luồng Login (JWT Flow)
+## 10. Login Flow (JWT Flow)
 
-### 10.1 Login Workflow Chi Tiết
+### 10.1 Login Workflow Details
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -1405,7 +1405,7 @@ Response:
 }
 ```
 
-**Step 5: Client GET /authorizer/me (với JWT)**
+**Step 5: Client GET /authorizer/me (with JWT)**
 
 ```bash
 curl -X GET 'http://localhost:3300/api/v1/authorizer/me' \
@@ -1415,12 +1415,12 @@ curl -X GET 'http://localhost:3300/api/v1/authorizer/me' \
 **Step 6: BFF Routes → UserGuard → Authorizer verifyUserToken**
 
 ```
-Request vào BFF
+Request to BFF
   ↓
 UserGuard canActivate()
   ├─ @Authorization({ secured: true }) exists → YES
-  ├─ extractToken từ header
-  ├─ Check cache (30 phút)
+├─ extractToken from header
+├─ Check cache (30 minutes)
   │   └─ Cache miss
   ├─ gRPC call: authorizerService.verifyUserToken(token, processId)
   │
@@ -1433,14 +1433,14 @@ UserGuard canActivate()
     │       └─ MongoDB: db.user.findOne({ userId: ... })
     │           └─ Return: { id, firstName, lastName, email, userId, roles: [ObjectId, ...] }
     ├─ validateRoleMapping(keycloakRoles, internalRoles):
-    │   ├─ Keycloak roles từ payload.realm_access.roles
-    │   ├─ Internal roles từ user.roles (populated từ MongoDB)
+│   ├─ Keycloak roles from payload.realm_access.roles
+│   ├─ Internal roles from user.roles (populated from MongoDB)
     │   └─ Check: intersection ≠ ∅
     ├─ collectPermissions(user.roles):
     │   └─ Flatten: user.roles[*].permissions → unique Permission[]
     └─ Return: AuthorizeResponse { valid: true, metadata: {...} }
 
-  ├─ Cache result 30 phút
+├─ Cache result 30 minutes
   ├─ setUserData(request, response)
   └─ return true → next guard
 ```
@@ -1458,7 +1458,7 @@ me(@UserData() userData: AuthorizedMetadata): ResponseDto<AuthProfileResponseDto
     data: {
       userId: userData.userId,
       email: jwt['email'],
-      tenantId: jwt['tenant_id'],  // ← Mapper thêm vào
+tenantId: jwt['tenant_id'], // ← Mapper added
       roles: realmRoles,
       permissions: userData.permissions,
     },
@@ -1495,7 +1495,7 @@ me(@UserData() userData: AuthorizedMetadata): ResponseDto<AuthProfileResponseDto
 
 ---
 
-## 11. Luồng Guest/Customer Session
+## 11. Guest/Customer Session stream
 
 ### 11.1 Customer Session Workflow
 
@@ -1560,44 +1560,44 @@ CUSTOMER (Browser)        BFF                      Redis
 {
   ID_PREFIX: 'sid_',                   // Session ID prefix
   CACHE_PREFIX: 'session',            // Redis cache prefix
-  TTL_MS: 2 * 60 * 60 * 1000,         // 2 giờ lifetime (phù hợp bữa ăn 1-2h)
-  IDLE_TIMEOUT_MS: 30 * 60 * 1000,    // 30 phút idle timeout
+TTL_MS: 2 * 60 * 60 * 1000, // 2 hours lifetime (suitable for 1-2h meal)
+IDLE_TIMEOUT_MS: 30 * 60 * 1000,    // 30 minutes idle timeout
   COOKIE_KEY: 'x-session-id',         // Response header key
 }
 ```
 
 **Idle Timeout Logic:**
 
-- Nếu customer không gửi request trong 30 phút → session delete
-- Mỗi request gửi lên → update lastActivityAt
-- Nếu session vẫn active → TTL được reset (2h từ lúc cuối cùng)
+- If the customer does not send a request within 30 minutes → session delete
+- Each request sent → update lastActivityAt
+- If session is still active → TTL is reset (2 hours from last time)
 
-### 11.3 Customer Routes (Không Secured)
+### 11.3 Customer Routes (Not Secured)
 
 ```typescript
 @Controller('catalog')
 export class CatalogController {
-  // ✅ Customer có thể gọi (không cần JWT)
+  // ✅ Customer can call (no need for JWT)
   @Get('list')
-  // Không có @Authorization decorator
+  // No @Authorization decorator
   async getList() {
-    // SessionGuard tạo session
+    // SessionGuard creates a session
     // TenantGuard check tenant
-    // Nhưng không check permission
+    // But don't check permission
   }
 
-  // ✅ Customer có thể gọi
+  // ✅ Customer can call
   @Get(':id')
   async getDetail(@Param('id') id: string) {
-    // SessionGuard tạo session
+    // SessionGuard creates a session
   }
 
-  // ❌ Customer KHÔNG thể gọi (yêu cầu JWT)
+  // ❌ Customer is NOT callable (JWT request)
   @Post('create')
   @Authorization({ secured: true })
   @Permissions([PERMISSION.CATALOG_CREATE])
   async create(@Body() dto: CreateCatalogDto) {
-    // UserGuard yêu cầu JWT
+    // UserGuard requires JWT
   }
 }
 ```
@@ -1608,19 +1608,19 @@ export class CatalogController {
 
 ### 12.1 Seed Script: tools/seed.js
 
-**Mục đích:** Bootstrap initial data vào MongoDB (roles, permissions)
+**Purpose:** Bootstrap initial data into MongoDB (roles, permissions)
 
 **File:** `tools/seed.js`
 
-**Cách chạy:**
+**How to run:**
 
 ```bash
-# Đủ đầy đủ các biến
+# Full range of variables
 MONGODB_URI='mongodb://root:password@localhost:27017/?authSource=admin' \
 MONGO_DB_NAME='qrtable' \
 node tools/seed.js apps/user-access/src/seeder prune
 
-# Hoặc
+# Or
 MONGODB_URI='mongodb://root:password@localhost:27017/?authSource=admin' \
 MONGO_DB_NAME='qrtable' \
 node tools/seed.js apps/user-access/src/seeder migrate
@@ -1630,9 +1630,9 @@ node tools/seed.js apps/user-access/src/seeder migrate
 
 ```
 ┌─────────────────────┬──────────────────────────┬────────────────────────┐
-│      Mode           │       Hành động          │      Sử dụng khi       │
+│ Mode │ Action │ Use when │
 ├─────────────────────┼──────────────────────────┼────────────────────────┤
-│ prune (destructive) │ DELETE ALL + INSERT NEW  │ Role taxonomy thay đổi │
+│ prune (destructive) │ DELETE ALL + INSERT NEW  │ Role taxonomy changes │
 │                     │                          │ Database reset         │
 │                     │                          │ Development           │
 ├─────────────────────┼──────────────────────────┼────────────────────────┤
@@ -1718,22 +1718,22 @@ async function processFile(filePath, mode, db) {
 }
 ```
 
-**Khi nào cần reseed?**
+**When do I need to reseed?**
 
-1. ✅ **Role taxonomy thay đổi** (thêm role mới, rename, xóa)
-2. ✅ **Permission matrix cập nhật** (thêm/xóa permissions)
+1. ✅ **Role taxonomy changes** (add new roles, rename, delete)
+2. ✅ **Permission matrix updated** (add/remove permissions)
 3. ✅ **Database reset** (dev environment cleanup)
-4. ❌ **KHÔNG cần** khi: app restarted, code changed (không touch auth)
+4. ❌ **NOT needed** when: app restarted, code changed (no touch auth)
 
 **Reseed command:**
 
 ```bash
-# Prune mode (destructive, dùng cho dev)
+# Prune mode (destructive, used for dev)
 MONGODB_URI='mongodb://root:password@localhost:27017/?authSource=admin' \
 MONGO_DB_NAME='qrtable' \
 node tools/seed.js apps/user-access/src/seeder prune
 
-# Migrate mode (safe, dùng cho production)
+# Migrate mode (safe, uses for production)
 MONGODB_URI='mongodb://root:password@localhost:27017/?authSource=admin' \
 MONGO_DB_NAME='qrtable' \
 node tools/seed.js apps/user-access/src/seeder migrate
@@ -1772,28 +1772,28 @@ export enum ErrorCode {
 
 ### 13.3 Debugging Checklist
 
-**Khi gặp 401 Unauthorized:**
+**When encountering 401 Unauthorized:**
 
 ```
 1️⃣ Token valid?
    curl -X GET http://localhost:3300/api/v1/authorizer/me \
      -H "Authorization: Bearer <token>"
-   └─ Nếu 401 USER_NOT_PROVISIONED → Step 3
-   └─ Nếu 401 INVALID_TOKEN → Refresh token hoặc re-login
+└─ If 401 USER_NOT_PROVISIONED → Step 3
+└─ If 401 INVALID_TOKEN → Refresh token or re-login
 
-2️⃣ User profile tồn tại trong MongoDB?
+2️⃣ User profile exists in MongoDB?
    docker exec qrtable-provider-mongodb-1 mongosh mongodb://root:password@localhost:27017/qrtable?authSource=admin
    db.user.find({ userId: "<token.sub>" })
-   └─ Nếu không tồn tại → Check AUTO_PROVISION_ON_FIRST_LOGIN
+└─ If does not exist → Check AUTO_PROVISION_ON_FIRST_LOGIN
 
-3️⃣ Role mapping hợp lệ?
+3️⃣ Is Role mapping valid?
    db.user.findOne({ userId: "..." })
-   └─ Lấy roles ObjectId, check tên role:
+└─ Get roles ObjectId, check role name:
    db.role.find({ _id: { $in: [ObjectId(...)] } })
-   └─ Token roles (realm_access.roles) phải giao nhau với DB role names
-   └─ Nếu không → Update user role trong MongoDB
+└─ Token roles (realm_access.roles) must intersect with DB role names
+└─ Otherwise → Update user role in MongoDB
 
-4️⃣ Keycloak roles tồn tại?
+4️⃣ Does Keycloak roles exist?
    Token payload realm_access.roles = ["OWNER", "MANAGER"]
    DB user roles = [ObjectId("...MANAGER...")]
    └─ Check MANAGER exists in MongoDB roles collection
@@ -1803,22 +1803,22 @@ export enum ErrorCode {
    node tools/seed.js apps/user-access/src/seeder prune
 ```
 
-**Khi gặp 403 Forbidden:**
+**When encountering 403 Forbidden:**
 
 ```
 1️⃣ Tenant context?
    Header x-tenant-id present OR JWT tenant_id claim?
-   └─ Nếu không → Add x-tenant-id header
+└─ Otherwise → Add x-tenant-id header
 
 2️⃣ Tenant mismatch?
    x-tenant-id = "tenant-a"
    JWT tenant_id = "tenant-b"
    └─ Use same tenant ID
 
-3️⃣ Session exists? (nếu customer)
+3️⃣ Session exists? (if customer)
    x-session-id present?
    └─ Redis: get session:{id}
-   └─ Nếu không → Create new session (remove header)
+└─ Otherwise → Create new session (remove header)
 
 4️⃣ Permission check
    @Permissions([PERMISSION.CATALOG_CREATE]) decorator?
@@ -1838,14 +1838,14 @@ export enum ErrorCode {
 **Causes & Fixes:**
 
 ```
-Cause 1: User profile không tồn tại trong MongoDB
+Cause 1: User profile does not exist in MongoDB
 ├─ Check: db.user.findOne({ userId: "<token.sub>" })
 ├─ Solution:
 │  └─ Option A: Enable AUTO_PROVISION_ON_FIRST_LOGIN=true, re-login
 │  └─ Option B: Manual insert user into MongoDB
 │  └─ Option C: Use User API to create user (if available)
 
-Cause 2: User profile exists nhưng roles mismatch
+Cause 2: User profile exists but roles mismatch
 ├─ Check:
 │  ├─ Token roles (realm_access.roles): ["OWNER", "MANAGER", ...]
 │  ├─ DB user.roles: [ObjectId(...), ...]
@@ -1929,36 +1929,36 @@ POST /authorizer/login
 
 ---
 
-## 15. Những Điểm Quan Trọng Cần Nhớ
+## 15. Important Points to Remember
 
 ### 15.1 Key Concepts
 
-1. **2 mô hình xác thực song song:**
-   - JWT (nhân sự): Keycloak + User-Access + Authorizer gRPC
-   - Session (khách hàng/guest): Redis + SessionGuard
+1. **2 parallel authentication models:**
+   - JWT (personnel): Keycloak + User-Access + Authorizer gRPC
+   - Session (customer/guest): Redis + SessionGuard
 
 2. **Role mapping validation:**
-   - Keycloak roles (từ realm) ≠ Internal roles (từ MongoDB)
-   - MUST have intersection (giao nhau) để hợp lệ
-   - Nếu token có `OWNER` nhưng các role trong MongoDB không có tên trùng với realm roles → ROLE_MAPPING_MISMATCH 401
+   - Keycloak roles (from realm) ≠ Internal roles (from MongoDB)
+   - MUST have intersection to be valid
+   - If the token has `Owner` but the roles in MongoDB do not have the same name as realm roles → ROLE_MAPPING_MISMATCH 401
 
 3. **Permission collection:**
-   - Permissions đến từ user.roles[*].permissions
-   - Metadata.permissions được collect ở Authorizer
-   - Cached 30 phút cùng với JWT verification
+   - Permissions come from user.roles[*].permissions
+   - Metadata.permissions is collected in Authorizer
+   - Cached 30 minutes with JWT verification
 
-4. **Tenant isolation:**
-   - Default enforce cho mọi route (trừ /authorizer, /saas, /health)
+4. **tenant isolation:**
+   - Default enforce for all routes (except /authorizer, /saas, /health)
    - SUPER_ADMIN bypass tenant check
-   - Session backfill tenant nếu chưa có
+   - Session backfill tenant if not available
 
 5. **Guard execution order:**
-   - UserGuard → SessionGuard → TenantGuard → PermissionGuard → ThrottlerGuard
-   - Không được thay đổi
+   - UserGuard → SessionGuard → TenantGuard → PermissionGuard → ThrottleGuard
+   - Do not change
 
 ### 15.2 Common Patterns
 
-**Dùng JWT (staff):**
+**Using JWT (staff):**
 
 ```typescript
 @Post('create')
@@ -1967,7 +1967,7 @@ POST /authorizer/login
 async create(@Body() dto: CreateCatalogDto, @UserData() userData: AuthorizedMetadata) {
   // UserGuard: JWT verify
   // PermissionGuard: check CATALOG_CREATE permission
-  // userData có: userId, permissions, jwt
+// userData code: userId, permissions, jwt
 }
 ```
 
@@ -1975,11 +1975,11 @@ async create(@Body() dto: CreateCatalogDto, @UserData() userData: AuthorizedMeta
 
 ```typescript
 @Get('list')
-// Không có @Authorization → SessionGuard tạo session
+// No @Authorization → SessionGuard creates session
 async list() {
-  // SessionGuard: create/reuse session từ Redis
+// SessionGuard: create/reuse session from Redis
   // TenantGuard: enforce tenant
-  // No permission check (decorator không có)
+// No permission check (decorator not available)
 }
 ```
 
@@ -1989,9 +1989,9 @@ async list() {
 @Delete('user/:id')
 @Authorization({ secured: true })
 async deleteUser(@Param('id') id: string) {
-  // Yêu cầu JWT
-  // Nếu user là SUPER_ADMIN → TenantGuard bypass
-  // Nếu không → TenantGuard enforce tenant
+// Request JWT
+// If user is SUPER_ADMIN → TenantGuard bypass
+// Otherwise → TenantGuard enforce tenant
 }
 ```
 
@@ -2028,23 +2028,23 @@ Keycloak:
 
 ---
 
-## Kết Luận
+## Conclusion
 
-Hệ thống authentication, authorization, role, và permission của QRTable được thiết kế để:
+QRTable's authentication, authorization, role, and permission system is designed to:
 
-1. ✅ **Hỗ trợ 2 actor loại:** Staff (JWT từ Keycloak) + Customer (Session anonymous)
-2. ✅ **Enforce tenant isolation:** Mọi request có tenantId, prevent cross-tenant access
+1. ✅ **Supports 2 actor types:** Staff (JWT from Keycloak) + Customer (Session anonymous)
+2. ✅ **Enforce tenant isolation:** Every request has tenantId, prevent cross-tenant access
 3. ✅ **Validate role consistency:** Keycloak roles ∩ Internal roles ≠ ∅
 4. ✅ **Granular permissions:** 6 roles + 66 permissions, flexible assignment
 5. ✅ **Caching & performance:** Token cached 30 min, BFF session cached 2h + idle 30 min
 6. ✅ **Debug-friendly:** Clear error codes, processId tracking, structured logging
 
-Khi phát triển features mới:
+When developing new features:
 
-- ✅ Add @Authorization decorator nếu route cần JWT
-- ✅ Add @Permissions decorator với specific permissions
-- ✅ Update role.json nếu permission matrix thay đổi
-- ✅ Reseed (prune mode) trong local dev
-- ✅ Use GET /authorizer/me để verify permissions
+- ✅ Add @Authorization decorator if route needs JWT
+- ✅ Add @Permissions decorator with specific permissions
+- ✅ Update role.json if permission matrix changes
+- ✅ Reseed (prune mode) in local dev
+- ✅ Use GET /authorizer/me to verify permissions
 
 Happy coding! 🚀

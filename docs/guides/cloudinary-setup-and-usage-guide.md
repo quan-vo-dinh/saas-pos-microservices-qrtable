@@ -1,40 +1,40 @@
-# Hướng Dẫn Setup & Sử Dụng Cloudinary — CloudinaryModule cho QRTable
+# Instructions for Setup & Using Cloudinary — CloudinaryModule for QRTable
 
-> **Tài liệu này giải thích chi tiết cách setup Cloudinary, hiểu rõ logic hoạt động, và sử dụng CloudinaryModule đã được xây dựng ở Step 1.45.**
+> **This document explains in detail how to set up Cloudinary, understand the operating logic, and use the CloudinaryModule built in Step 1.45.**
 >
-> **Current code status (2026-05-13):** Cloudinary module nằm tại `libs/providers/cloudinary/src/lib/*` và được BFF Catalog module sử dụng trực tiếp (`apps/bff/src/app/modules/catalog`). Catalog Service lưu metadata qua TCP, không upload file trực tiếp.
+> **Current code status (2026-05-13):** Cloudinary module is located at `libs/providers/cloudinary/src/lib/*` and is used directly by the BFF Catalog module (`apps/bff/src/app/modules/catalog`). Catalog service stores metadata via TCP, does not upload files directly.
 
 ---
 
-## 📌 Mục Lục
+## 📌 Table of Contents
 
-1. [Cloudinary là gì?](#overview)
-2. [Tại sao chọn Cloudinary?](#why-cloudinary)
-3. [Setup tài khoản Cloudinary](#account-setup)
-4. [Cấu hình credentials trong dự án](#project-config)
-5. [Kiến trúc của CloudinaryModule](#architecture)
-6. [Logic hoạt động chi tiết](#how-it-works)
-7. [Cách sử dụng CloudinaryModule](#usage)
-8. [Tích hợp với Step 1.5 Catalog Service](#integration-catalog)
-9. [Cấu trúc thư mục multi-tenant](#multi-tenant)
-10. [Xử lý lỗi & Gỡ rối](#troubleshooting)
-11. [Các best practice](#best-practices)
+1. [What is Cloudinary?](#overview)
+2. [Why choose Cloudinary?](#why-cloudinary)
+3. [Cloudinary account setup](#account-setup)
+4. [Configure credentials in the project](#project-config)
+5. [Architecture of CloudinaryModule](#architecture)
+6. [Detailed operation logic](#how-it-works)
+7. [How to use CloudinaryModule](#usage)
+8. [Integration with Step 1.5 Catalog service](#integration-catalog)
+9. [Multi-tenant folder structure](#multi-tenant)
+10. [Error Handling & Troubleshooting](#troubleshooting)
+11. [Best practices](#best-practices)
 
 ---
 
-## <a id="overview"></a>1️⃣ Cloudinary là gì?
+## <a id="overview"></a>1️⃣ What is Cloudinary?
 
-**Cloudinary** là một nền tảng **quản lý ảnh/video trên cloud** cung cấp:
+**Cloudinary** is a **cloud photo/video management** platform that provides:
 
-- **Lưu trữ ảnh**: Lưu ảnh trên server của Cloudinary (không cần ổ cứng riêng)
-- **Biến đổi ảnh**: Resize, crop, optimize, chuyển format real-time
-- **CDN phục vụ**: Phục vụ ảnh qua mạng CDN toàn cầu (nhanh, được cache)
-- **API upload**: Cung cấp API để upload/xóa ảnh từ backend
+- **Photo storage**: Store photos on Cloudinary's server (no need for a separate hard drive)
+- **Image transformation**: Resize, crop, optimize, real-time format conversion
+- **Serving CDN**: Serve images via global CDN network (fast, cached)
+- **Upload API**: Provides API to upload/delete images from the backend
 
-**Quy trình đơn giản:**
+**Simple process:**
 
 ```
-Client (Trình duyệt)
+Client (Browser)
     ↓
 Backend QRTable (BFF)
     ↓
@@ -42,98 +42,98 @@ CloudinaryModule (Upload stream)
     ↓
 Cloudinary API
     ↓
-Cloudinary CDN (Phục vụ ảnh + biến đổi)
+Cloudinary CDN (Serve images + transforms)
     ↓
-Client (Tải ảnh đã tối ưu)
+Client (Download optimized images)
 ```
 
 ---
 
-## <a id="why-cloudinary"></a>2️⃣ Tại sao chọn Cloudinary?
+## <a id="why-cloudinary"></a>2️⃣ Why choose Cloudinary?
 
-### Vấn đề cần giải quyết:
+### Problem to solve:
 
-1. **Lưu trữ ảnh ở đâu?**
-   - Phương án A: Ổ cứng riêng → I/O chậm, dễ hết chỗ, khó scale
-   - Phương án B: Database (BLOB) → chậm, tốn bộ nhớ
-   - Phương án C: Cloud storage (S3/Cloudinary) → ✅ được chọn
+1. **Where to store photos?**
+   - Option A: Separate hard drive → Slow I/O, easy to run out of space, difficult to scale
+   - Option B: Database (BLOB) → slow, wastes memory
+   - Option C: Cloud storage (S3/Cloudinary) → ✅ is selected
 
-2. **Phục vụ ảnh như thế nào?**
-   - Cần resize tự động cho mobile/tablet/desktop
-   - Cần optimize kích thước (giảm chất lượng JPEG, chuyển WebP)
-   - Cần cache tại CDN để load nhanh
+2. **How to serve photos?**
+   - Need automatic resizing for mobile/tablet/desktop
+   - Need to optimize size (reduce JPEG quality, convert WebP)
+   - Need cache at CDN for fast loading
 
-3. **Quản lý upload tách biệt theo khách hàng (tenant) thế nào?**
-   - Mỗi khách hàng muốn ảnh của mình tách biệt
-   - Không được xem/xóa ảnh của khách hàng khác
-   - Cần audit trail (không thực sự xóa, chỉ soft-delete)
+3. **How to manage uploads separately by customer (tenant)?**
+   - Each customer wants their photos to be separate
+   - Do not view/delete other customers' photos
+   - Need audit trail (not actually deleted, just soft-delete)
 
-### So sánh các lựa chọn:
+### Compare options:
 
-| Nhu cầu              | Cloudinary    | S3                | Ổ cứng local    |
-| -------------------- | ------------- | ----------------- | --------------- |
-| Upload API           | ✅ Dễ         | ⚠️ Cần config     | ❌ Không có     |
-| Resize on-the-fly    | ✅ URL params | ❌ Pre-generate   | ❌ Không có     |
-| CDN built-in         | ✅ Có         | ❌ Cần CloudFront | ❌ Không có     |
-| Multi-tenant folders | ✅ Hỗ trợ     | ✅ Hỗ trợ         | ✅ Hỗ trợ       |
-| Chi phí (dự án nhỏ)  | ✅ Free tier  | ⚠️ Có phí         | ✅ Miễn phí     |
-| Dễ setup             | ✅ Đơn giản   | ❌ Phức tạp       | ✅ Rất đơn giản |
-
----
-
-## <a id="account-setup"></a>3️⃣ Setup tài khoản Cloudinary
-
-### Bước 1: Tạo tài khoản
-
-1. Truy cập [https://cloudinary.com/users/register/free](https://cloudinary.com/users/register/free)
-2. Đăng ký bằng email (hoặc GitHub/Google)
-3. Verify email
-4. Chọn "Create Account" → Chọn gói: **Free** (1GB/tháng, miễn phí)
-
-### Bước 2: Lấy thông tin credentials
-
-Sau khi login, vào **Account Settings** → **API Keys**:
-
-```
-Cloud Name:    your_cloud_name         (ví dụ: qrtable-staging)
-API Key:       your_api_key            (ví dụ: 8271629847293...)
-API Secret:    your_api_secret         (ví dụ: -9sH_Kx8sKd...)
-```
-
-**⚠️ QUAN TRỌNG:** API Secret là mật khẩu → lưu vào `.env`, KHÔNG commit lên Git!
-
-### Bước 3: (Tùy chọn) Tạo Upload Presets
-
-Vào **Upload** → **Upload Presets**:
-
-- Tạo preset `signed` cho backend (yêu cầu signature)
-- Tạo preset `unsigned` cho mobile client (tùy chọn, Phase 2)
-
-CloudinaryModule mặc định dùng signed upload (backend kiểm soát).
+| Demand               | Cloudinary    | S3                 | Local hard drive |
+| -------------------- | ------------- | ------------------ | ---------------- |
+| Upload API           | ✅ Easy       | ⚠️ Need config     | ❌ None          |
+| Resize on-the-fly    | ✅ URL params | ❌ Pre-generate    | ❌ None          |
+| CDN built-in         | ✅ Yes        | ❌ Need CloudFront | ❌ None          |
+| Multi-tenant folders | ✅ Support    | ✅ Support         | ✅ Support       |
+| Cost (small project) | ✅ Free tier  | ⚠️ There is a fee  | ✅ Free          |
+| Easy setup           | ✅ Simple     | ❌ Complex         | ✅ Very simple   |
 
 ---
 
-## <a id="project-config"></a>4️⃣ Cấu hình credentials trong dự án
+## <a id="account-setup"></a>3️⃣ Cloudinary account setup
 
-### 4.1 Cập nhật `.env.local` (Phát triển - không commit)
+### Step 1: Create an account
+
+1. Access [https://cloudinary.com/users/register/free](https://cloudinary.com/users/register/free)
+2. Sign up by email (or GitHub/Google)
+3. verify email
+4. Select "Create Account" → Choose package: **Free** (1GB/month, free)
+
+### Step 2: Get credentials information
+
+After logging in, go to **Account Settings** → **API Keys**:
+
+```
+Cloud Name:    your_cloud_name         (example: qrtable-staging)
+API Key: your_api_key (eg: 8271629847293...)
+API Secret: your_api_secret (e.g. -9sH_Kx8sKd...)
+```
+
+**⚠️ IMPORTANT:** API Secret is the password → save to `.env`, DO NOT commit to Git!
+
+### Step 3: (Optional) Create Upload Presets
+
+Go to **Upload** → **Upload Presets**:
+
+- Create preset `signed` for backend (signature required)
+- Create preset `unsigned` for mobile client (optional, Phase 2)
+
+CloudinaryModule uses signed upload (control backend) by default.
+
+---
+
+## <a id="project-config"></a>4️⃣ Configure credentials in the project
+
+### 4.1 Update `.env.local` (Development - no commit)
 
 ```bash
-# .env.local (KHÔNG commit vào Git)
+# .env.local (DO NOT commit to Git)
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 ```
 
-### 4.2 Cập nhật `.env.example` (Template - đã làm ở Task 8)
+### 4.2 Update `.env.example` (Template - done in Task 8)
 
 ```bash
-# .env.example (commit vào repo)
+# .env.example (commit to repo)
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 ```
 
-### 4.3 Load trong Catalog Service (Step 1.5)
+### 4.3 Load in Catalog service (Step 1.5)
 
 **File: `apps/catalog/src/main.ts`**
 
@@ -144,7 +144,7 @@ import { CloudinaryModule } from '@common/providers/cloudinary/cloudinary.module
 @Module({
   imports: [
     ConfigModule.forRoot(),
-    // Dùng forRootAsync để inject ConfigService
+    // Use forRootAsync to inject ConfigService
     CloudinaryModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -161,19 +161,19 @@ export class CatalogModule {}
 
 ---
 
-## <a id="architecture"></a>5️⃣ Kiến trúc của CloudinaryModule
+## <a id="architecture"></a>5️⃣ Architecture of CloudinaryModule
 
-### Cấu trúc thư mục
+### Directory structure
 
 ```
 libs/providers/cloudinary/
 ├── src/lib/
-│   ├── cloudinary.constants.ts         # Token keys, folder enums, giới hạn kích thước
+│ ├── cloudinary.constants.ts # Token keys, folder enums, size limit
 │   ├── interfaces/
 │   │   ├── cloudinary-options.interface.ts    # ModuleOptions, UploadOptions
 │   │   └── cloudinary-response.interface.ts   # Response types
 │   ├── cloudinary.config.ts            # Validate environment (class-validator)
-│   ├── cloudinary.provider.ts          # SDK factory (cấu hình v2 instance)
+│   ├── cloudinary.provider.ts          # SDK factory (configures the v2 instance)
 │   ├── cloudinary.service.ts           # Business logic (upload, delete, URL gen)
 │   ├── cloudinary.module.ts            # DynamicModule (forRoot, forRootAsync)
 │   └── __tests__/
@@ -182,127 +182,127 @@ libs/providers/cloudinary/
 └── src/index.ts                        # Public barrel exports
 ```
 
-### Giải thích chi tiết từng file
+### Explain each file in detail
 
-#### 📄 `cloudinary.constants.ts` — Các hằng số và enum
+#### 📄 `cloudinary.constants.ts` — Constants and enums
 
-**Mục đích:** Tập trung tất cả các giá trị cố định, không thay đổi.
+**Purpose:** Concentrate all fixed, unchanging values.
 
-**Nội dung:**
+**Content:**
 
 ```typescript
-// Token DI (Dependency Injection) — NestJS dùng để đánh dấu các dependencies
+// Token DI (Dependency Injection) — NestJS is used to mark dependencies
 export const CLOUDINARY_INJECTION_TOKEN = 'CLOUDINARY';
 export const CLOUDINARY_MODULE_OPTIONS = 'CLOUDINARY_MODULE_OPTIONS';
 
-// Giới hạn file — áp dụng trên CloudinaryService
+// File limit — applied on CloudinaryService
 export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-// Thư mục gốc trên Cloudinary
+// Root directory on Cloudinary
 export const BASE_FOLDER = 'qrtable';
 
-// Kích thước tối ưu mặc định cho responsive images
+// Default optimal size for responsive images
 export const DEFAULT_THUMBNAIL_WIDTH = 200; // Mobile
 export const DEFAULT_MEDIUM_WIDTH = 400; // Tablet
 export const DEFAULT_LARGE_WIDTH = 800; // Desktop
 
-// Enum loại ảnh — giúp developer không bị nhầm lẫn loại thư mục
+// Enum image type — helps developers not to confuse folder types
 export enum CloudinaryFolder {
-  MENU = 'menu', // Ảnh menu item
+  MENU = 'menu', // Menu item image
   BRANDING = 'branding', // Logo, banner
   QR_EXPORTS = 'qr-exports', // QR code
 }
 ```
 
-**Tại sao tách file này:**
+**Why split this file:**
 
-- **Không lặp code:** Nếu MAX_FILE_SIZE thay đổi, chỉ cần sửa ở 1 chỗ
-- **Dễ cấu hình:** Tất cả cài đặt ở 1 file dễ tìm
-- **Type-safe enum:** Dùng `CloudinaryFolder.MENU` thay vì string `'menu'` → compiler sẽ bắt lỗi typo
+- **Do not duplicate code:** If MAX_FILE_SIZE changes, only need to fix it in one place
+- **Easy to configure:** All settings are in one easy-to-find file
+- **Type-safe enum:** Use `CloudinaryFolder.MENU` instead of string `'menu'` → compiler will catch typo errors
 
 ---
 
-#### 📄 `cloudinary-options.interface.ts` — Định nghĩa kiểu dữ liệu
+#### 📄 `cloudinary-options.interface.ts` — Defines the data type
 
-**Mục đích:** TypeScript interfaces định nghĩa hình dạng dữ liệu truyền vào/ra.
+**Purpose:** TypeScript interfaces define the shape of input/output data.
 
-**Nội dung:**
+**Content:**
 
 ```typescript
-// 1️⃣ Cấu hình module — truyền vào CloudinaryModule.forRootAsync()
+// 1️⃣ Module configuration — pass in CloudinaryModule.forRootAsync()
 interface CloudinaryModuleOptions {
   cloudName: string; // "qrtable-staging"
   apiKey: string; // "8271629847293..."
   apiSecret: string; // "-9sH_Kx8sKd..."
 }
 
-// 2️⃣ Cấu hình tùy chọn cho async initialization
-// (NestJS pattern để inject dependencies vào factory)
+// 2️⃣ Configure options for async initialization
+// (NestJS pattern to inject dependencies into factory)
 interface CloudinaryModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
-  inject?: any[]; // Dependencies để inject
+  inject?: any[]; // Dependencies to inject
   useFactory: (...args: any[]) => Promise<CloudinaryModuleOptions> | CloudinaryModuleOptions;
-  // ^-- Hàm factory nhận dependencies, trả config
+  // ^-- Factory function receives dependencies, returns config
 }
 
-// 3️⃣ Tham số upload — truyền vào uploadImage()
+// 3️⃣ Upload parameter — passed to uploadImage()
 interface UploadImageOptions {
-  tenantId: string; // "tenant-001" — để tách biệt theo khách hàng
+  tenantId: string; // "tenant-001" — to separate by customer
   folder: CloudinaryFolder; // MENU | BRANDING | QR_EXPORTS
-  fileName?: string; // Tùy chọn, auto UUID nếu bỏ qua
-  mimetype: string; // "image/png" — validate trước upload
+  fileName?: string; // Optional, auto UUID if omitted
+  mimetype: string; // "image/png" — validate before upload
 }
 
-// 4️⃣ Tùy chọn transform URL — truyền vào getOptimizedUrl()
+// 4️⃣ Transform URL option — passed to getOptimizedUrl()
 interface UrlTransformOptions {
-  thumbnailWidth?: number; // Override mặc định 200px
-  mediumWidth?: number; // Override mặc định 400px
-  largeWidth?: number; // Override mặc định 800px
+  thumbnailWidth?: number; // Default override 200px
+  mediumWidth?: number; // Default override 400px
+  largeWidth?: number; // Default override 800px
 }
 ```
 
-**Tại sao có interface:**
+**Why is there an interface:**
 
-- **Type safety:** TypeScript kiểm tra ở compile time → bắt lỗi sớm
-- **IDE autocomplete:** Editor gợi ý các field khả dụng
-- **Documentation:** Developer thấy rõ cần truyền cái gì
+- **Type safety:** TypeScript checks at compile time → catches errors early
+- **IDE autocomplete:** Editor suggests available fields
+- **Documentation:** Developer clearly sees what needs to be transmitted
 
 ---
 
-#### 📄 `cloudinary-response.interface.ts` — Kiểu phản hồi
+#### 📄 `cloudinary-response.interface.ts` — Response type
 
-**Mục đích:** Định nghĩa hình dạng dữ liệu trả về từ Cloudinary.
+**Purpose:** Defines the shape of data returned from Cloudinary.
 
 ```typescript
-// Kết quả upload ảnh lên Cloudinary
+// Results of uploading images to Cloudinary
 interface CloudinaryUploadResponse {
-  publicId: string; // "qrtable/tenant-001/menu/uuid-123" — dùng để xóa
+  publicId: string; // "qrtable/tenant-001/menu/uuid-123" — used to delete
   secureUrl: string; // "https://res.cloudinary.com/..." — URL HTTPS
-  width: number; // 1200 — chiều rộng ảnh gốc
-  height: number; // 800 — chiều cao ảnh gốc
-  format: string; // "png" — định dạng file
-  bytes: number; // 3145728 — dung lượng (bytes)
+  width: number; // 1200 — original image width
+  height: number; // 800 — original image height
+  format: string; // "png" — file format
+  bytes: number; // 3145728 — size (bytes)
 }
 
-// URLs tối ưu cho các kích thước khác nhau
+// Optimal URLs for different sizes
 interface ResponsiveUrls {
   thumbnail: string; // "...?w=200&..." — mobile size
   medium: string; // "...?w=400&..." — tablet size
   large: string; // "...?w=800&..." — desktop size
-  original: string; // "..." — không thay đổi
+  original: string; // "..." - constant
 }
 ```
 
-**Tại sao riêng file:**
+**Why separate files:**
 
-- **Tách concerns:** Cấu hình (input) ≠ Phản hồi (output)
-- **Reuse:** Có thể dùng interface ở many places
+- **Separate concerns:** Configuration (input) ≠ Response (output)
+- **Reuse:** Interface can be used in many places
 
 ---
 
-#### 📄 `cloudinary.config.ts` — Validate cấu hình
+#### 📄 `cloudinary.config.ts` — Validate configuration
 
-**Mục đích:** Validate environment variables & cấu hình khi module khởi động.
+**Purpose:** Validate environment variables & configuration when module starts.
 
 ```typescript
 import { IsString, IsNotEmpty } from 'class-validator';
@@ -310,95 +310,95 @@ import { IsString, IsNotEmpty } from 'class-validator';
 export class CloudinaryConfiguration {
   @IsString()
   @IsNotEmpty()
-  cloudName: string; // Validate: bắt buộc, kiểu string
+  cloudName: string; // Validate: required, string type
 
   @IsString()
   @IsNotEmpty()
-  apiKey: string; // Validate: bắt buộc, kiểu string
+  apiKey: string; // Validate: required, string type
 
   @IsString()
   @IsNotEmpty()
-  apiSecret: string; // Validate: bắt buộc, kiểu string
+  apiSecret: string; // Validate: required, string type
 }
 ```
 
-**Logic:** Khi CatalogModule load, nó gọi CloudinaryModule.forRootAsync(), factory trả config object. NestJS/class-validator sẽ validate object này. Nếu thiếu field hoặc sai kiểu → throw error → app không start → developer biết ngay!
+**Logic:** When CatalogModule loads, it calls CloudinaryModule.forRootAsync(), factory returns config object. NestJS/class-validator will validate this object. If a field is missing or the type is wrong → throw error → app doesn't start → developer knows immediately!
 
-**Tại sao cần:**
+**Why needed:**
 
-- **Fail fast:** Lỗi config phát hiện ở startup, không ở runtime
-- **Rõ ràng:** Lỗi: "cloudName is required" → developer biết chỉnh `.env`
-- **Type checking:** Compiler kiểm tra kiểu dữ liệu
+- **Fail fast:** Config error detected at startup, not at runtime
+- **Clear:** Error: "cloudName is required" → developer knows to edit `.env`
+- **Type checking:** Compiler checks the data type
 
 ---
 
 #### 📄 `cloudinary.provider.ts` — Factory SDK
 
-**Mục đích:** Tạo & cấu hình Cloudinary SDK instance để inject vào dịch vụ.
+**Purpose:** Create & configure Cloudinary SDK instance to inject into the service.
 
 ```typescript
 import * as cloudinary from 'cloudinary';
 import { Provider } from '@nestjs/common';
 import { CLOUDINARY_MODULE_OPTIONS, CLOUDINARY_INJECTION_TOKEN } from './cloudinary.constants';
 
-// NestJS Provider pattern — định nghĩa cách tạo instance
+// NestJS Provider pattern — defines how to create instances
 export const CloudinaryProvider: Provider = {
-  // Token để inject (dùng trong @Inject('CLOUDINARY'))
+  // Token to inject (used in @Inject('CLOUDINARY'))
   provide: CLOUDINARY_INJECTION_TOKEN,
 
-  // useFactory: hàm tạo instance
+  // useFactory: instance constructor
   useFactory: (config: CloudinaryModuleOptions) => {
-    // Step 1️⃣: Cấu hình SDK với credentials
+    // Step 1️⃣: Configure SDK with credentials
     cloudinary.v2.config({
       cloud_name: config.cloudName,
       api_key: config.apiKey,
       api_secret: config.apiSecret,
     });
 
-    // Step 2️⃣: Trả về SDK instance đã cấu hình
+    // Step 2️⃣: Returns the configured SDK instance
     return cloudinary.v2;
   },
 
-  // inject: những token cần inject vào factory function
+  // inject: tokens that need to be injected into the factory function
   inject: [CLOUDINARY_MODULE_OPTIONS],
 };
 ```
 
 **Logic:**
 
-1. CloudinaryModule.forRootAsync() cung cấp CLOUDINARY_MODULE_OPTIONS token
-2. CloudinaryProvider useFactory nhận config từ token đó
-3. Factory gọi `cloudinary.v2.config()` để set credentials
-4. Return cloudinary.v2 instance đã cấu hình
-5. Các service khác có thể @Inject('CLOUDINARY') để lấy instance
+1. CloudinaryModule.forRootAsync() provides CLOUDINARY_MODULE_OPTIONS token
+2. CloudinaryProvider useFactory receives config from that token
+3. Factory calls `cloudinary.v2.config()` to set credentials
+4. Return configured cloudinary.v2 instance
+5. Other services can @Inject('CLOUDINARY') to get the instance
 
-**Tại sao pattern này:**
+**Why this pattern:**
 
-- **Lazy initialization:** SDK chỉ tạo khi thực sự cần
-- **Configuration as code:** Credentials từ environment variables
-- **DI compliance:** Tuân theo NestJS DI pattern
+- **Lazy initialization:** SDK is only created when really needed
+- **Configuration as code:** Credentials from environment variables
+- **DI compliance:** Complies with NestJS DI pattern
 
 ---
 
 #### 📄 `cloudinary.service.ts` — Business logic
 
-**Mục đích:** Tất cả logic upload/delete/transform ảnh.
+**Purpose:** All image upload/delete/transform logic.
 
 ```typescript
 @Injectable()
 export class CloudinaryService {
   constructor(
     @Inject(CLOUDINARY_INJECTION_TOKEN)
-    private cloudinary: any, // SDK instance từ provider
+    private cloudinary: any, // SDK instance from provider
   ) {}
 
   /**
-   * uploadImage() — Logic bước 1: Validate
+   * uploadImage() — Step 1 logic: Validate
    *
    * 1. Validate file size (< 5MB)
    * 2. Validate MIME type (jpeg/png/webp only)
-   * 3. Nếu OK: gọi uploadToCloudinary()
-   * 4. Trả response structured
+   * 3. If OK: call uploadToCloudinary()
+   * 4. Return a structured response
    */
   async uploadImage(buffer: Buffer, options: UploadImageOptions): Promise<CloudinaryUploadResponse> {
     // Validate
@@ -407,7 +407,7 @@ export class CloudinaryService {
     // Compute folder path: qrtable/{tenant}/{folder}
     const folderPath = `${BASE_FOLDER}/${options.tenantId}/${options.folder}`;
 
-    // Generate filename (UUID nếu không cung cấp)
+    // Generate filename (UUID if not provided)
     const publicId = options.fileName || uuidv4();
 
     // Upload
@@ -417,7 +417,7 @@ export class CloudinaryService {
       resource_type: 'auto',
     });
 
-    // Map response từ SDK format → app format
+    // Map response from SDK format → app format
     return {
       publicId: response.public_id,
       secureUrl: response.secure_url,
@@ -429,72 +429,72 @@ export class CloudinaryService {
   }
 
   /**
-   * deleteImage() — Xóa ảnh từ Cloudinary
+   * deleteImage() — Delete image from Cloudinary
    *
-   * ⚠️ LƯU Ý: Trong implementation hiện tại, KHÔNG có validate tenant_id
-   * (multi-tenant check sẽ do controller/service layer xử lý bên ngoài)
+   * ⚠️ NOTE: In the current implementation, there is NO validate tenant_id
+   * (multi-tenant check will be handled externally by the controller/service layer)
    *
-   * Luồng:
-   * 1. Gọi cloudinary.uploader.destroy(publicId)
-   * 2. Nếu lỗi: log warning (không throw) → idempotent delete
-   * 3. Nếu "not found": coi là OK (ảnh đã xóa rồi)
+   * Stream:
+   * 1. Call cloudinary.uploader.destroy(publicId)
+   * 2. If error: log warning (do not throw) → idempotent delete
+   * 3. If "not found": considered OK (image has been deleted)
    */
   async deleteImage(publicId: string): Promise<void> {
     try {
       const result = await this.cloudinary.uploader.destroy(publicId);
 
-      // Cloudinary trả: { result: 'ok' } hoặc { result: 'not found' }
+      // Cloudinary returns: { result: 'ok' } or { result: 'not found' }
       if (result.result !== 'ok' && result.result !== 'not found') {
         this.logger.warn(`Unexpected delete result for ${publicId}: ${result.result}`);
       }
     } catch (error) {
-      // Không throw exception - xóa thất bại là warning, không fatal
+      // Do not throw exception - deletion failure is a warning, not fatal
       this.logger.warn(`Failed to delete image ${publicId}: ${(error as Error).message}`);
     }
   }
 
   /**
-   * getOptimizedUrl() — Tạo 3 URLs tối ưu
+   * getOptimizedUrl() — Generate 3 optimized URLs
    *
-   * Phương pháp: Dùng cloudinary.url() SDK function (KHÔNG string manipulation)
+   * Method: Use cloudinary.url() SDK function (NO string manipulation)
    *
-   * Lợi ích:
-   * - Cloudinary SDK handle tất cả complexity
-   * - URL được signed/secured tự động
-   * - Support tất cả transformation options
+   * Benefit:
+   * - Cloudinary SDK handles all complexity
+   * - URLs are signed/secured automatically
+   * - Support all transformation options
    *
-   * Tại sao cần responsive URLs:
-   * - Mobile (200px): tải nhanh, dùng crop: 'fill' (square, aggressive)
-   * - Tablet (400px): chi tiết vừa, dùng crop: 'limit' (keep aspect ratio)
-   * - Desktop (800px): chi tiết đầy đủ, dùng crop: 'limit'
+   * Why do we need responsive URLs:
+   * - Mobile (200px): fast loading, use crop: 'fill' (square, aggressive)
+   * - Tablet (400px): medium detail, use crop: 'limit' (keep aspect ratio)
+   * - Desktop (800px): full details, use crop: 'limit'
    */
   getOptimizedUrl(publicId: string, options?: UrlTransformOptions): ResponsiveUrls {
     const thumbnailWidth = options?.thumbnailWidth ?? DEFAULT_THUMBNAIL_WIDTH;
     const mediumWidth = options?.mediumWidth ?? DEFAULT_MEDIUM_WIDTH;
     const largeWidth = options?.largeWidth ?? DEFAULT_LARGE_WIDTH;
 
-    // Sử dụng cloudinary.url() để tạo URLs tối ưu
-    // Tham số transformation:
-    // - width: kích thước
-    // - crop: 'fill' (thumbnail, square) hoặc 'limit' (keep ratio)
+    // Use cloudinary.url() to generate optimal URLs
+    // Transformation parameters:
+    // - width: size
+    // - crop: 'fill' (thumbnail, square) or 'limit' (keep ratio)
     // - fetch_format: 'auto' (detect WebP support)
-    // - quality: 'auto' (tự optimize chất lượng)
-    // - secure: true (dùng HTTPS)
+    // - quality: 'auto' (self-optimize quality)
+    // - secure: true (use HTTPS)
 
     return {
       // Thumbnail: 200x200 square, aggressive crop
       thumbnail: this.cloudinary.url(publicId, {
         width: thumbnailWidth,
-        crop: 'fill', // Cắt thành hình vuông
-        fetch_format: 'auto', // WebP nếu browser support
-        quality: 'auto', // Tự optimize quality
+        crop: 'fill', // Crop into a square
+        fetch_format: 'auto', // WebP if the browser supports it
+        quality: 'auto', // Automatically optimize quality
         secure: true, // HTTPS
       }),
 
       // Medium: 400px width, keep aspect ratio
       medium: this.cloudinary.url(publicId, {
         width: mediumWidth,
-        crop: 'limit', // Giữ aspect ratio, max width
+        crop: 'limit', // Keep aspect ratio, max width
         fetch_format: 'auto',
         quality: 'auto',
         secure: true,
@@ -509,7 +509,7 @@ export class CloudinaryService {
         secure: true,
       }),
 
-      // Original: không thay đổi, chỉ optimize format & quality
+      // Original: no changes, only optimize format & quality
       original: this.cloudinary.url(publicId, {
         fetch_format: 'auto',
         quality: 'auto',
@@ -523,19 +523,19 @@ export class CloudinaryService {
   /**
    * validateFile() — Validate file size + MIME type
    *
-   * Kiểm tra:
-   * 1. Kích thước ≤ 5MB
-   * 2. MIME type là jpeg/png/webp
+   * Check:
+   * 1. Size ≤ 5MB
+   * 2. MIME type is jpeg/png/webp
    *
-   * Được gọi trong uploadImage() TRƯỚC gửi lên Cloudinary
+   * Called in uploadImage() BEFORE sending to Cloudinary
    */
   private validateFile(buffer: Buffer, mimetype: string): void {
-    // Kiểm tra kích thước
+    // Check size
     if (buffer.length > MAX_FILE_SIZE) {
       throw new BadRequestException('File size exceeds 5MB limit');
     }
 
-    // Kiểm tra loại file
+    // Check file type
     if (!ALLOWED_MIME_TYPES.includes(mimetype as (typeof ALLOWED_MIME_TYPES)[number])) {
       throw new BadRequestException('Invalid file type. Allowed: jpeg, png, webp');
     }
@@ -544,18 +544,18 @@ export class CloudinaryService {
   /**
    * uploadToCloudinary() — Stream-based upload
    *
-   * Phương pháp: Sử dụng stream.pipe() (không lưu disk)
+   * Method: Use stream.pipe() (not saved to disk)
    *
-   * Luồng:
-   * 1. Tạo upload_stream từ Cloudinary SDK
-   * 2. Tạo Readable stream từ buffer (dùng Readable.from())
+   * Stream:
+   * 1. Create upload_stream from Cloudinary SDK
+   * 2. Create Readable stream from buffer (using Readable.from())
    * 3. Pipe buffer → uploadStream
-   * 4. Cloudinary nhận stream, upload, return result
+   * 4. Cloudinary receives the stream, upload, return result
    *
-   * Lợi ích:
-   * - Không lưu ổ cứng (chỉ RAM)
-   * - Giải phóng bộ nhớ ngay sau upload
-   * - Tránh I/O bottleneck
+   * Benefit:
+   * - Does not save to hard drive (RAM only)
+   * - Free up memory immediately after upload
+   * - Avoid I/O bottlenecks
    */
   private uploadToCloudinary(
     buffer: Buffer,
@@ -580,7 +580,7 @@ export class CloudinaryService {
         }
       });
 
-      // readableStream: Convert buffer → stream (dùng Readable.from())
+      // readableStream: Convert buffer → stream (uses Readable.from())
       const readableStream = Readable.from(buffer);
 
       // Pipe: buffer → uploadStream → Cloudinary
@@ -590,53 +590,53 @@ export class CloudinaryService {
 }
 ```
 
-**Các điểm chính:**
+**Key points:**
 
 1. **Separation of concerns:** Upload ≠ Delete ≠ Transform
-2. **Validation first:** Kiểm tra trước gửi API → tiết kiệm quota
-3. **Stream upload:** Không lưu disk → nhanh
-4. **Tenant isolation:** deleteImage() kiểm tra tenant_id
-5. **URL transformation:** Client-side → không gọi API thêm
+2. **Validation first:** Check before sending to API → save quota
+3. **Stream upload:** Does not save to disk → fast
+4. **tenant isolation:** deleteImage() checks tenant_id
+5. **URL transformation:** Client-side → no additional API calls
 
 ---
 
 #### 📄 `cloudinary.module.ts` — Dynamic Module
 
-**Mục đích:** Đăng ký CloudinaryService vào NestJS DI container.
+**Purpose:** Register CloudinaryService into NestJS DI container.
 
 ```typescript
 @Module({})
 export class CloudinaryModule {
   /**
-   * forRoot() — Cấu hình tĩnh (static config)
+   * forRoot() — static config
    *
-   * Dùng khi: config cố định, không phụ thuộc vào service khác
+   * Used when: config is fixed, does not depend on other services
    */
   static forRoot(options: CloudinaryModuleOptions): DynamicModule {
     return {
       module: CloudinaryModule,
       providers: [
-        // Cung cấp options dưới token CLOUDINARY_MODULE_OPTIONS
+        // Provide options under token CLOUDINARY_MODULE_OPTIONS
         { provide: CLOUDINARY_MODULE_OPTIONS, useValue: options },
 
-        // CloudinaryProvider sẽ nhận options từ token trên
+        // CloudinaryProvider will receive options from the above token
         CloudinaryProvider,
 
         // CloudinaryService (business logic)
         CloudinaryService,
       ],
 
-      // Export CloudinaryService để các module khác import
+      // Export CloudinaryService for other modules to import
       exports: [CloudinaryService],
     };
   }
 
   /**
-   * forRootAsync() — Cấu hình async (từ environment)
+   * forRootAsync() — Async configuration (from environment)
    *
-   * Dùng khi: config từ ConfigService, database, API, v.v.
+   * Used when: config from ConfigService, database, API, etc.
    *
-   * Ví dụ:
+   * For example:
    * CloudinaryModule.forRootAsync({
    *   imports: [ConfigModule],
    *   inject: [ConfigService],
@@ -651,11 +651,11 @@ export class CloudinaryModule {
     return {
       module: CloudinaryModule,
 
-      // Import các module cần (ConfigModule, v.v.)
+      // Import necessary modules (ConfigModule, etc.)
       imports: options.imports || [],
 
       providers: [
-        // Cung cấp options từ factory function
+        // Provide options from factory function
         {
           provide: CLOUDINARY_MODULE_OPTIONS,
           useFactory: options.useFactory,
@@ -674,26 +674,26 @@ export class CloudinaryModule {
 
 **NestJS DynamicModule pattern:**
 
-- **forRoot():** Giá trị cố định, dùng 1 lần ở root module
-- **forRootAsync():** Giá trị từ factory (thường là environment variables)
-- **providers:** Tất cả injectable (services, factories, values)
-- **exports:** Những gì được export để các module khác use
+- **forRoot():** Fixed value, used once at the root module
+- **forRootAsync():** Value from factory (usually environment variables)
+- **providers:** All injectables (services, factories, values)
+- **exports:** What is exported for use by other modules
 
-**Tại sao pattern này:**
+**Why this pattern:**
 
-- **Dependency Injection:** NestJS quản lý lifecycle tất cả dependencies
-- **Decoupling:** MenuItemService không cần biết Cloudinary được cấu hình thế nào
-- **Reusability:** Nhiều service có thể inject CloudinaryService
+- **Dependency Injection:** NestJS manages the lifecycle of all dependencies
+- **Decoupling:** MenuItemService does not need to know how Cloudinary is configured
+- **Reusability:** Many services can inject CloudinaryService
 
 ---
 
 #### 📄 `__tests__/cloudinary.service.spec.ts` — Unit tests
 
-**Mục đích:** Kiểm thử CloudinaryService (TDD).
+**Purpose:** Test CloudinaryService (TDD).
 
 ```typescript
 describe('CloudinaryService', () => {
-  // 9 test cases cover tất cả edge cases:
+// 9 test cases cover all edge cases:
 
   it('should upload image successfully', async () => {
     // Arrange: mock buffer + Cloudinary SDK
@@ -712,7 +712,7 @@ describe('CloudinaryService', () => {
   });
 
   it('should reject file > 5MB', async () => {
-    // File quá lớn
+// File is too large
     const largeBuffer = Buffer.alloc(6 * 1024 * 1024);
 
     // Expect exception
@@ -720,14 +720,14 @@ describe('CloudinaryService', () => {
   });
 
   it('should reject invalid MIME type', async () => {
-    // File PDF (không phải ảnh)
+// PDF file (not image)
     expect(() => uploadImage(buffer, {
       mimetype: 'application/pdf'
     })).toThrow('MIME type not allowed');
   });
 
   it('should include tenant_id in folder path', async () => {
-    // Validate: folder path chứa tenant_id
+// Validate: folder path contains tenant_id
     const result = await uploadImage(..., {
       tenantId: 'tenant-001',
       folder: 'menu'
@@ -736,21 +736,21 @@ describe('CloudinaryService', () => {
     expect(result.publicId).toContain('tenant-001/menu');
   });
 
-  // ... 5 tests khác: delete, URL transform, error handling
+// ... 5 other tests: delete, URL transform, error handling
 });
 ```
 
-**Tại sao TDD:**
+**Why TDD:**
 
-- **Red-Green-Cyan:** Viết test trước (red), implement sau (green), refactor (cyan)
-- **Confidence:** Mỗi test xanh = 1 feature hoạt động đúng
-- **Regression:** Nếu sửa code sau này, tests sẽ bắt lỗi
+- **Red-Green-Cyan:** Write test first (red), implement later (green), refactor (cyan)
+- **Confidence:** Each green test = 1 feature that works correctly
+- **Regression:** If you edit the code later, tests will catch errors
 
 ---
 
 #### 📄 `src/index.ts` — Barrel exports
 
-**Mục đích:** Tập trung tất cả public exports.
+**Purpose:** Centralize all public exports.
 
 ```typescript
 // Module
@@ -780,15 +780,15 @@ export type {
 export type { CloudinaryUploadResponse, ResponsiveUrls } from './lib/interfaces/cloudinary-response.interface';
 ```
 
-**Tại sao pattern này:**
+**Why this pattern:**
 
-- **Clean API:** Import qua alias `@common/providers/cloudinary/*` thay vì trỏ thẳng vào `libs/providers/cloudinary/src/lib/...`
-- **Encapsulation:** Ẩn internal structure, chỉ expose public API
-- **Single entry point:** Developer biết nơi import
+- **Clean API:** Import via alias `@common/providers/cloudinary/*` instead of pointing directly to `libs/providers/cloudinary/src/lib/...`
+- **Encapsulation:** Hides internal structure, only exposes public API
+- **Single entry point:** Developer knows where to import
 
 ---
 
-### Sơ đồ tương tác giữa các file
+### Diagram of interactions between files
 
 ```
 CatalogModule imports CloudinaryModule
@@ -814,7 +814,7 @@ CloudinaryModule.forRootAsync(config)
         → uploadImage(), deleteImage(), getOptimizedUrl()
 ```
 
-### Chuỗi Dependency Injection
+### Dependency Injection chain
 
 ```
 ┌──────────────────────────────────────────┐
@@ -824,12 +824,12 @@ CloudinaryModule.forRootAsync(config)
                  ▼
         ┌────────────────────┐
         │ CloudinaryModule   │ (DynamicModule)
-        │  .forRootAsync()   │ (nhận config env)
+│  .forRootAsync()   │ (receives env config)
         └────────┬───────────┘
                  │
         ┌────────▼───────────────────────────┐
         │ DI Tokens Provided:                │
-        │  - CLOUDINARY_MODULE_OPTIONS       │ (object cấu hình)
+│  - CLOUDINARY_MODULE_OPTIONS       │ (configuration object)
         │  - cloudinary.v2 (via provider)    │ (SDK instance)
         │  - CloudinaryService               │ (injectable service)
         └────────┬───────────────────────────┘
@@ -842,36 +842,36 @@ CloudinaryModule.forRootAsync(config)
         └─────────────────────────────┘
 ```
 
-### Các Interface chính
+### Main Interfaces
 
-**`CloudinaryModuleOptions` — Cấu hình**
+**`CloudinaryModuleOptions` — Configuration**
 
 ```typescript
 interface CloudinaryModuleOptions {
-  cloudName: string; // Tên cloud của Cloudinary
-  apiKey: string; // API key (dùng để ký URL)
-  apiSecret: string; // API secret (dùng để ký upload)
+  cloudName: string; // Cloudinary's cloud name
+  apiKey: string; // API key (used to sign URL)
+  apiSecret: string; // API secret (used to sign uploads)
 }
 ```
 
-**`UploadImageOptions` — Tham số upload**
+**`UploadImageOptions` — Upload parameters**
 
 ```typescript
 interface UploadImageOptions {
-  tenantId: string; // Mã khách hàng sở hữu ảnh
+  tenantId: string; // Customer code that owns the image
   folder: CloudinaryFolder; // Enum: MENU | BRANDING | QR_EXPORTS
-  fileName?: string; // Tên file tùy chọn (auto UUID nếu bỏ qua)
+  fileName?: string; // Optional file name (auto UUID if omitted)
   mimetype: string; // MIME type (validate: jpeg/png/webp)
 }
 ```
 
-**`UrlTransformOptions` — Tạo URL responsive**
+**`UrlTransformOptions` — Create responsive URLs**
 
 ```typescript
 interface UrlTransformOptions {
-  thumbnailWidth?: number; // Mặc định 200px
-  mediumWidth?: number; // Mặc định 400px
-  largeWidth?: number; // Mặc định 800px
+  thumbnailWidth?: number; // Default 200px
+  mediumWidth?: number; // Default 400px
+  largeWidth?: number; // Default 800px
 }
 ```
 
@@ -879,45 +879,45 @@ interface UrlTransformOptions {
 
 ```typescript
 interface CloudinaryUploadResponse {
-  publicId: string; // Cloudinary public_id (dùng để xóa)
-  secureUrl: string; // HTTPS URL của ảnh đã upload
-  width: number; // Chiều rộng ảnh (pixel)
-  height: number; // Chiều cao ảnh (pixel)
-  format: string; // Định dạng file (jpeg, png, webp)
-  bytes: number; // Dung lượng (bytes)
+  publicId: string; // Cloudinary public_id (used to delete)
+  secureUrl: string; // HTTPS URL of uploaded image
+  width: number; // Image width (pixels)
+  height: number; // Image height (pixels)
+  format: string; // File format (jpeg, png, webp)
+  bytes: number; // Size (bytes)
 }
 
 interface ResponsiveUrls {
-  thumbnail: string; // Chiều rộng 200px
-  medium: string; // Chiều rộng 400px
-  large: string; // Chiều rộng 800px
-  original: string; // Ảnh gốc không thay đổi
+  thumbnail: string; // Width 200px
+  medium: string; // Width 400px
+  large: string; // Width 800px
+  original: string; // The original image remains unchanged
 }
 ```
 
 ---
 
-## <a id="how-it-works"></a>6️⃣ Logic hoạt động chi tiết
+## <a id="how-it-works"></a>6️⃣ Detailed operation logic
 
-### Giai đoạn A: Upload ảnh
+### Phase A: Upload photos
 
-**Kịch bản:** Tạo menu item mới kèm ảnh
+**Scenario:** Create a new menu item with an image
 
 ```
 ┌──────────────────────────────────────┐
-│ 1. Client gửi form                   │
+│ 1. Client sends form │
 │    POST /catalog/menu-items/upload   │
-│    - name: "Phở Bò"                  │
+│ - name: "Beef Pho" │
 │    - price: 50000                    │
 │    - file: pho.png (3MB)             │
 └──────────┬───────────────────────────┘
            │
            ▼
 ┌──────────────────────────────────────┐
-│ 2. BFF nhận form                     │
-│    - Middleware Multer tách dữ liệu  │
-│    - Lấy tenantId từ token           │
-│    - Gọi Catalog via TCP             │
+│ 2. BFF receives form │
+│ - Middleware Multer separates data │
+│ - Get tenantId from token │
+│ - Call Catalog via TCP │
 └──────────┬───────────────────────────┘
            │
            ▼
@@ -925,19 +925,19 @@ interface ResponsiveUrls {
 │ 3. Catalog Service                   │
 │    - Validate: size ≤ 5MB? ✓         │
 │    - Validate: MIME ok? ✓            │
-│    - Gọi CloudinaryService.upload()  │
+│ - Call CloudinaryService.upload() │
 └──────────┬───────────────────────────┘
            │
            ▼
 ┌──────────────────────────────────────┐
 │ 4. CloudinaryService                 │
 │    - Stream buffer → Cloudinary API  │
-│    - Nhận: URL + ID xóa + metadata   │
+│ - Get: URL + deletion ID + metadata │
 └──────────┬───────────────────────────┘
            │
            ▼
 ┌──────────────────────────────────────┐
-│ 5. Catalog lưu DB                    │
+│ 5. Catalog stored in DB │
 │    INSERT MenuItem {                 │
 │      name, price,                    │
 │      image_url, cloudinary_public_id │
@@ -947,31 +947,31 @@ interface ResponsiveUrls {
            ▼
 ┌──────────────────────────────────────┐
 │ 6. Return 201 Created                │
-│    ✅ Upload thành công!             │
+│ ✅ Upload successful!             │
 └──────────────────────────────────────┘
 ```
 
 ---
 
-## <a id="usage"></a>7️⃣ Cách sử dụng CloudinaryModule
+## <a id="usage"></a>7️⃣ How to use CloudinaryModule
 
-### 7.1 Hiểu logic trước khi code
+### 7.1 Understand logic before coding
 
-**Tại sao thiết kế như vậy:**
+**Why is it designed like this:**
 
-| Phần                        | Giải thích                                                                                            |
-| --------------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Không lưu ổ cứng**        | Nếu lưu ổ cứng: file lớn → I/O chậm, dễ hết chỗ. Cloudinary: gửi trực tiếp → không để lại → nhanh hơn |
-| **Lưu URL + ID xóa**        | URL dùng hiển thị ảnh; ID là cách Cloudinary biết xóa ảnh nào                                         |
-| **Không lưu BLOB vào DB**   | BLOB lớn → query chậm, backup chậm. URL nhỏ, query nhanh                                              |
-| **Validate trước upload**   | Không validate: file xấu → lãng phí Cloudinary quota → chi phí                                        |
-| **Tách folder theo tenant** | Mỗi khách hàng có folder riêng → an toàn, không xem được ảnh khác                                     |
+| Part                            | Explanation                                                                                                             |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Does not save to hard drive** | If saving to hard drive: large file → slow I/O, easy to run out of space. Cloudinary: send directly → no leave → faster |
+| **Save URL + Delete ID**        | URL used to display images; The ID is how Cloudinary knows which photos to delete                                       |
+| **Do not save BLOB to DB**      | Large BLOB → slow query, slow backup. Small URL, fast query                                                             |
+| **Validate before upload**      | Don't validate: bad files → waste of Cloudinary quota → cost                                                            |
+| **Separate folders by tenant**  | Each customer has their own folder → safe, cannot view other photos                                                     |
 
 ---
 
 ### 7.2 Code: MenuItemService (Catalog)
 
-**File hiện tại:** `apps/bff/src/app/modules/catalog/controllers/menu-item.controller.ts` dùng `CloudinaryService`; `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts` chỉ xử lý metadata/domain qua TCP.
+**Current file:** `apps/bff/src/app/modules/catalog/controllers/menu-item.controller.ts` uses `CloudinaryService`; `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts` only handles metadata/domains over TCP.
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -990,12 +990,12 @@ export class MenuItemService {
   ) {}
 
   /**
-   * Tạo MenuItem MỚI kèm ảnh
+   * Create NEW MenuItem with image
    *
-   * Các bước:
-   * 1. Nhận buffer ảnh + thông tin
-   * 2. Upload ảnh lên Cloudinary
-   * 3. Lưu MenuItem + URL ảnh vào DB
+   * Steps:
+   * 1. Receive image buffer + information
+   * 2. Upload photos to Cloudinary
+   * 3. Save MenuItem + image URL to DB
    */
   async createWithImage(
     tenantId: string,
@@ -1003,34 +1003,34 @@ export class MenuItemService {
     imageBuffer: Buffer,
     imageMimetype: string,
   ): Promise<MenuItem> {
-    // Bước 1️⃣: Upload ảnh lên Cloudinary
+    // Step 1️⃣: Upload photos to Cloudinary
     const uploadResponse = await this.cloudinaryService.uploadImage(imageBuffer, {
-      tenantId, // Mã khách hàng → tạo thư mục riêng
-      folder: CloudinaryFolder.MENU, // Loại ảnh: 'menu'
+      tenantId, // Customer code → create separate folder
+      folder: CloudinaryFolder.MENU, // Image type: 'menu'
       mimetype: imageMimetype,
     });
 
-    // Bước 2️⃣: Tạo object MenuItem
+    // Step 2️⃣: Create MenuItem object
     const menuItem = this.menuItemRepo.create({
       tenant_id: tenantId,
       name: data.name,
       price: data.price,
-      image_url: uploadResponse.secureUrl, // URL để hiển thị
-      cloudinary_public_id: uploadResponse.publicId, // ID để xóa
+      image_url: uploadResponse.secureUrl, // URL to display
+      cloudinary_public_id: uploadResponse.publicId, // ID to delete
     });
 
-    // Bước 3️⃣: Lưu vào DB
+    // Step 3️⃣: Save to DB
     return this.menuItemRepo.save(menuItem);
   }
 
   /**
-   * Cập nhật ảnh của MenuItem
+   * Updated MenuItem's image
    *
-   * Các bước:
-   * 1. Lấy MenuItem cũ (có ID xóa ảnh cũ)
-   * 2. Xóa ảnh cũ khỏi Cloudinary
-   * 3. Upload ảnh mới
-   * 4. Cập nhật DB
+   * Steps:
+   * 1. Get the old MenuItem (with old image deletion ID)
+   * 2. Delete old photos from Cloudinary
+   * 3. Upload new photos
+   * 4. Update DB
    */
   async updateImage(
     tenantId: string,
@@ -1038,31 +1038,31 @@ export class MenuItemService {
     newImageBuffer: Buffer,
     newImageMimetype: string,
   ): Promise<MenuItem> {
-    // Lấy MenuItem cũ
+    // Get the old MenuItem
     const item = await this.menuItemRepo.findOne({
       where: { id: menuItemId, tenant_id: tenantId },
     });
 
     if (!item) {
-      throw new NotFoundException(`MenuItem ${menuItemId} không tìm thấy`);
+      throw new NotFoundException(`MenuItem ${menuItemId} not found`);
     }
 
-    // Xóa ảnh cũ
+    // Delete old photos
     if (item.cloudinary_public_id) {
       await this.cloudinaryService.deleteImage(
         item.cloudinary_public_id,
-        tenantId, // Validate: chỉ xóa ảnh của tenant này
+        tenantId, // Validate: only delete this tenant's image
       );
     }
 
-    // Upload ảnh mới
+    // Upload new photo
     const newUploadResponse = await this.cloudinaryService.uploadImage(newImageBuffer, {
       tenantId,
       folder: CloudinaryFolder.MENU,
       mimetype: newImageMimetype,
     });
 
-    // Cập nhật DB
+    // Update DB
     item.image_url = newUploadResponse.secureUrl;
     item.cloudinary_public_id = newUploadResponse.publicId;
 
@@ -1070,22 +1070,22 @@ export class MenuItemService {
   }
 
   /**
-   * Lấy menu để hiển thị (kèm URL ảnh tối ưu)
+   * Get menu to display (with optimized image URL)
    *
-   * Tại sao cần tối ưu URL?
-   * - Mobile: cần ảnh 200px (tải nhanh)
-   * - Desktop: cần ảnh 800px (chi tiết)
-   * - CloudinaryService tạo 3 URL đã tối ưu
+   * Why is it necessary to optimize URLs?
+   * - Mobile: 200px photo required (fast loading)
+   * - Desktop: requires 800px image (details)
+   * - CloudinaryService generates 3 optimized URLs
    */
   async getMenuWithImages(tenantId: string): Promise<Array<MenuItem & { responsive_images: object }>> {
     const items = await this.menuItemRepo.find({
       where: {
         tenant_id: tenantId,
-        deleted_at: IsNull(), // Chỉ items còn sống
+        deleted_at: IsNull(), // Only items are alive
       },
     });
 
-    // Tạo URLs tối ưu từ 1 URL gốc → 3 URL cho các kích thước khác nhau
+    // Create optimal URLs from 1 root URL → 3 URLs for different sizes
     return items.map((item) => ({
       ...item,
       responsive_images: this.cloudinaryService.getOptimizedUrl(item.image_url),
@@ -1094,15 +1094,15 @@ export class MenuItemService {
 }
 ```
 
-**Giải thích từng phần:**
+**Partial explanation:**
 
-| Phần code                                       | Ý nghĩa                                                |
-| ----------------------------------------------- | ------------------------------------------------------ |
-| `cloudinaryService: CloudinaryService`          | Lấy dịch vụ Cloudinary → dùng upload/xóa ảnh           |
-| `tenant_id: tenantId`                           | Bắt buộc: mỗi item gắn với khách hàng → bảo mật        |
-| `cloudinary_public_id: uploadResponse.publicId` | Lưu ID xóa ảnh sau (Cloudinary cần ID, không phải URL) |
-| `if (item.cloudinary_public_id)`                | Nếu không có ảnh cũ → không cần xóa                    |
-| `deleted_at: IsNull()`                          | Lấy items chưa bị xóa mềm (soft-delete)                |
+| Code part                                       | Meaning                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| `cloudinaryService: CloudinaryService`          | Get Cloudinary service → use to upload/delete photos          |
+| `tenant_id: tenantId`                           | Required: each item is associated with a customer → security  |
+| `cloudinary_public_id: uploadResponse.publicId` | Save ID to delete photos later (Cloudinary needs ID, not URL) |
+| `if (item.cloudinary_public_id)`                | If there are no old photos → no need to delete                |
+| `deleted_at: IsNull()`                          | Get items that have not been soft-delete                      |
 
 ---
 
@@ -1122,44 +1122,44 @@ export class MenuItemController {
 
   /**
    * Endpoint: POST /catalog/menu-items/upload
-   * Mục đích: Tạo menu item kèm ảnh
+   * Purpose: Create menu items with photos
    *
    * Guards:
-   * - UserGuard: xác thực token
-   * - TenantGuard: xác thực khách hàng
-   * - PermissionGuard: kiểm tra quyền CATALOG_CREATE
+   * - UserGuard: token authentication
+   * - TenantGuard: client authentication
+   * - PermissionGuard: check CATALOG_CREATE permission
    *
-   * Dữ liệu: multipart/form-data
-   *   - name: "Phở Bò"
+   * Data: multipart/form-data
+   * - name: "Beef Pho"
    *   - price: 50000
-   *   - file: <ảnh>
+   * - file: <image>
    */
   @Post('upload')
   @UseGuards(UserGuard, TenantGuard, PermissionGuard)
   @Permissions('CATALOG_CREATE')
   async uploadWithImage(@CurrentUser() user, @Body() dto: CreateMenuItemDto, @FileUpload() file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('File là bắt buộc');
+      throw new BadRequestException('File is required');
     }
 
     return this.menuItemService.createWithImage(
       user.tenantId,
       { name: dto.name, price: dto.price },
-      file.buffer, // Dữ liệu ảnh (bytes)
-      file.mimetype, // Loại file
+      file.buffer, // Image data (bytes)
+      file.mimetype, // File type
     );
   }
 
   /**
    * Endpoint: PUT /catalog/menu-items/:id/image
-   * Mục đích: Cập nhật ảnh menu item
+   * Purpose: Update menu item images
    */
   @Put(':id/image')
   @UseGuards(UserGuard, TenantGuard, PermissionGuard)
   @Permissions('CATALOG_UPDATE')
   async updateImage(@CurrentUser() user, @Param('id') menuItemId: string, @FileUpload() file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('File là bắt buộc');
+      throw new BadRequestException('File is required');
     }
 
     return this.menuItemService.updateImage(user.tenantId, menuItemId, file.buffer, file.mimetype);
@@ -1169,11 +1169,11 @@ export class MenuItemController {
 
 ---
 
-### 7.4 Cấu hình: Multer Middleware (BFF)
+### 7.4 Configuration: Multer Middleware (BFF)
 
-**Vấn đề:** Làm sao BFF nhận file từ form upload?
+**Problem:** How does BFF receive files from the upload form?
 
-→ Dùng **Multer** (middleware parse multipart/form-data)
+→ Duong **Multer** (middleware parse multipart/form data)
 
 **File: `apps/bff/src/main.ts`**
 
@@ -1186,37 +1186,37 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // ============================================
-  // 1️⃣ Tăng giới hạn dung lượng
+  // 1️⃣ Increase capacity limit
   // ============================================
-  // Mặc định BFF chỉ nhận 100KB → quá nhỏ
-  // Tăng lên 20MB → cho phép upload 5MB
+  // By default, BFF only receives 100KB → too small
+  // Increase to 20MB → allow 5MB upload
   app.use(json({ limit: '20mb' }));
   app.use(urlencoded({ limit: '20mb', extended: true }));
 
   // ============================================
-  // 2️⃣ Cấu hình Multer: parse file upload
+  // 2️⃣ Multer configuration: parse file upload
   // ============================================
   app.use(
     fileUpload({
-      // Giới hạn kích thước file (tối đa 5MB)
+      // File size limit (maximum 5MB)
       limits: {
         fileSize: 5 * 1024 * 1024, // 5MB
       },
 
-      // Lưu trữ: vào RAM (bộ nhớ), KHÔNG ổ cứng
-      // Lý do: không lưu disk → nhanh hơn
-      //        gửi trực tiếp Cloudinary
+      // Storage: to RAM (memory), NOT hard drive
+      // Reason: does not save to disk → faster
+      //send directly to Cloudinary
       storage: memoryStorage(),
 
-      // Validate loại file (chỉ accept ảnh)
+      // Validate file type (only accept images)
       fileFilter: (req, file, cb) => {
         const allowed = ['image/jpeg', 'image/png', 'image/webp'];
 
         if (allowed.includes(file.mimetype)) {
-          cb(null, true); // Chấp nhận
+          cb(null, true); // Accept
         } else {
-          // Từ chối → client nhận 400 Bad Request
-          cb(new Error(`Loại file không hợp lệ: ${file.mimetype}`), false);
+          // Reject → client receives 400 Bad Request
+          cb(new Error(`Invalid file type: ${file.mimetype}`), false);
         }
       },
     }),
@@ -1228,112 +1228,112 @@ async function bootstrap() {
 bootstrap();
 ```
 
-**Tại sao cấu hình như vậy:**
+**Why is the configuration like this:**
 
-| Cấu hình          | Giải thích                                                            |
-| ----------------- | --------------------------------------------------------------------- |
-| `limits: 5MB`     | CloudinaryModule hỗ trợ tối đa 5MB → match với backend                |
-| `memory storage`  | Không lưu ổ cứng → nhanh + tiết kiệm space → gửi trực tiếp Cloudinary |
-| `fileFilter MIME` | Validate trước → nếu sai → từ chối ngay → không lãng phí Cloudinary   |
-| `json limit 20MB` | Tăng giới hạn JSON để cover 5MB upload                                |
+| Configuration     | Explanation                                                                  |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `limits: 5MB`     | CloudinaryModule supports maximum 5MB → match with backend                   |
+| `memory storage`  | Does not save hard drive → fast + saves space → sends directly to Cloudinary |
+| `fileFilter MIME` | Validate first → if wrong → reject immediately → don't waste Cloudinary      |
+| `json limit 20MB` | Increase JSON limit to cover 5MB upload                                      |
 
 ---
 
-### 7.5 Ví dụ thực tế: Xử lý lỗi
+### 7.5 Practical example: Error handling
 
-**Kịch bản 1:** Upload file PDF (không phải ảnh)
+**Scenario 1:** Upload PDF file (not image)
 
 ```
-Client gửi: POST /catalog/menu-items/upload
+Client sends: POST /catalog/menu-items/upload
 - file: document.pdf (3MB)
            │
            ▼
-Multer fileFilter kiểm tra
-- "application/pdf" có trong danh sách? KHÔNG ❌
+Multer fileFilter checks
+- "application/pdf" is in the list? NO ❌
            │
            ▼
-BFF trả: 400 Bad Request
-"Loại file không hợp lệ: application/pdf"
+BFF returns: 400 Bad Request
+"Invalid file type: application/pdf"
            │
            ▼
-✅ File KHÔNG upload lên Cloudinary
-   (tiết kiệm dung lượng quota)
+✅ Files are NOT uploaded to Cloudinary
+(save quota capacity)
 ```
 
-**Kịch bản 2:** File quá lớn (10MB > 5MB limit)
+**Scenario 2:** File is too large (10MB > 5MB limit)
 
 ```
-Dung lượng file: 10MB (quá giới hạn)
+File size: 10MB (over limit)
            │
            ▼
 Multer limits check → size > 5MB
            │
            ▼
-Trả lỗi: "File quá lớn. Tối đa 5MB"
+Error: "File is too large. Maximum 5MB"
            │
            ▼
-CloudinaryService KHÔNG được gọi ✅
+CloudinaryService is NOT called ✅
 ```
 
 ---
 
-### 7.6 Yêu cầu/Phản hồi ví dụ
+### 7.6 Example Request/Response
 
-**Yêu cầu: POST /catalog/menu-items/upload**
+**Request: POST /catalog/menu-items/upload**
 
 ```bash
 curl -X POST http://localhost:3000/catalog/menu-items/upload \
   -H "Authorization: Bearer TOKEN_USER" \
   -H "X-Tenant-ID: tenant-001" \
-  -F "name=Phở Bò" \
+-F "name=Beef Pho" \
   -F "price=50000" \
   -F "file=@pho.png"
 ```
 
-**Phản hồi: 201 Created**
+**Response: 201 Created**
 
 ```json
 {
   "data": {
     "id": "item-001",
     "tenant_id": "tenant-001",
-    "name": "Phở Bò",
+    "name": "Beef Pho",
     "price": 50000,
     "image_url": "https://res.cloudinary.com/qrtable/image/upload/v123/qrtable/tenant-001/menu/uuid-abc.png",
     "cloudinary_public_id": "qrtable/tenant-001/menu/uuid-abc",
     "created_at": "2026-04-09T15:00:00Z"
   },
-  "message": "Thêm menu item thành công",
+  "message": "Menu item added successfully",
   "statusCode": 201,
   "duration": "2.3s"
 }
 ```
 
-**Phản hồi: 400 File quá lớn**
+**Response: 400 files are too large**
 
 ```json
 {
   "statusCode": 400,
-  "message": "File quá lớn. Tối đa 5MB",
+  "message": "File is too large. Maximum 5MB",
   "error": "Bad Request"
 }
 ```
 
 ---
 
-## <a id="integration-catalog"></a>8️⃣ Tích hợp với Step 1.5 Catalog Service
+## <a id="integration-catalog"></a>8️⃣ Integrate with Step 1.5 Catalog service
 
-### Kiến trúc tổng quan
+### Overview architecture
 
 ```
-Step 1.5 — Catalog Service sử dụng CloudinaryModule:
+Step 1.5 — Catalog service uses CloudinaryModule:
 
 ┌─────────────────────────────────────────────┐
 │  Catalog Service (apps/catalog)             │
 ├─────────────────────────────────────────────┤
 │ Modules:                                    │
 │  - CategoryModule                           │
-│  - MenuItemModule (sử dụng CloudinaryService)
+│  - MenuItemModule (uses CloudinaryService)
 │  - AreaModule                               │
 │  - TableModule                              │
 │  - CloudinaryModule (forRootAsync)          │
@@ -1343,7 +1343,7 @@ Step 1.5 — Catalog Service sử dụng CloudinaryModule:
 │  - MenuItem {                              │
 │      id, category_id,                      │
 │      image_url (← Cloudinary URL)          │
-│      cloudinary_public_id (← để xóa)       │
+│ cloudinary_public_id (← to delete) │
 │      tenant_id, ...                        │
 │    }                                        │
 │  - Area { id, tenant_id, ... }              │
@@ -1353,9 +1353,9 @@ Step 1.5 — Catalog Service sử dụng CloudinaryModule:
 
 ---
 
-## <a id="multi-tenant"></a>9️⃣ Cấu trúc thư mục multi-tenant
+## <a id="multi-tenant"></a>9️⃣ Multi-tenant directory structure
 
-### Quy ước folder
+### Folder convention
 
 ```
 Cloudinary Cloud Storage:
@@ -1384,94 +1384,94 @@ qrtable/
 
 ---
 
-## <a id="troubleshooting"></a>🔟 Xử lý lỗi & Gỡ rối
+## <a id="troubleshooting"></a>🔟 Error Handling & Troubleshooting
 
-### Lỗi thường gặp
+### Common errors
 
-| Lỗi                               | Nguyên nhân                   | Giải pháp                          |
-| --------------------------------- | ----------------------------- | ---------------------------------- |
-| `CLOUDINARY_CLOUD_NAME not found` | Env var bị thiếu              | Kiểm tra `.env.local`              |
-| `Unauthorized: invalid api_key`   | API Key sai/hết hạn           | Tạo lại từ Account Settings        |
-| `[413] Payload Too Large`         | File > 5MB                    | Tăng BFF body limit hoặc giảm file |
-| `MIME type not supported`         | File không phải jpeg/png/webp | Validate client trước upload       |
+| Error                             | Cause                     | Solution                                 |
+| --------------------------------- | ------------------------- | ---------------------------------------- |
+| `CLOUDINARY_CLOUD_NAME not found` | Env var missing           | Check `.env.local`                       |
+| `Unauthorized: invalid api_key`   | Incorrect/expired API Key | Regenerate from Account Settings         |
+| `[413] Payload Too Large`         | File > 5MB                | Increase BFF body limit or decrease file |
+| `MIME type not supported`         | File is not jpeg/png/webp | Validate client before upload            |
 
 ---
 
-## <a id="best-practices"></a>1️⃣1️⃣ Các best practice
+## <a id="best-practices"></a>1️⃣1️⃣ Best practices
 
-### 1. Bảo mật
+### 1. Security
 
-✅ **NÊN LÀM:**
+✅ ** SHOULD DO: **
 
-- Lưu API Secret trong `.env` (KHÔNG commit)
-- Validate MIME type + kích thước trước upload
-- Dùng tenant ID trong folder path
-- Dùng signed upload (backend kiểm soát)
+- Save API Secret in `.env` (DO NOT commit)
+- Validate MIME type + size before upload
+- Use tenant ID in folder path
+- Use signed upload (control backend)
 
-❌ **KHÔNG NÊN:**
+❌ **DON'T:**
 
-- Cho client biết API Secret
-- Accept mọi loại file
-- Bỏ qua validate tenant
-- Dùng unsigned upload
+- Tell the client the API Secret
+- Accept all file types
+- Skip tenant validation
+- Use unsigned upload
 
-### 2. Hiệu suất
+### 2. Performance
 
-✅ **NÊN LÀM:**
+✅ ** SHOULD DO: **
 
-- Dùng CloudinaryService.getOptimizedUrl() cho responsive
-- Cache menu JSON trong Redis (TTL 10 phút)
-- Dùng Cloudinary CDN (tự động)
+- Use CloudinaryService.getOptimizedUrl() for responsiveness
+- Cache JSON menu in Redis (TTL 10 minutes)
+- Use Cloudinary CDN (automatically)
 - Stream upload (RAM only)
 
-❌ **KHÔNG NÊN:**
+❌ **DON'T:**
 
-- Download ảnh rồi lưu local
-- Generate tất cả sizes server-side
-- Upload không validate
-- Phục vụ ảnh gốc
+- Download the image and save it locally
+- Generate all server-side sizes
+- Upload without validation
+- Serves original photos
 
 ### 3. Multi-Tenant
 
-✅ **NÊN LÀM:**
+✅ ** SHOULD DO: **
 
-- Include tenant_id trong upload folder path
-- Validate tenant_id ở deleteImage()
+- Include tenant_id in upload folder path
+- Validate tenant_id in deleteImage()
 - Index: `(tenant_id, cloudinary_public_id)`
 
-❌ **KHÔNG NÊN:**
+❌ **DON'T:**
 
-- Lưu raw URL không tenant isolation
-- Xóa mà không validate tenant
+- Save raw URL without tenant isolation
+- Delete without validating tenant
 
 ### 4. Database
 
-✅ **NÊN LÀM:**
+✅ ** SHOULD DO: **
 
-- Lưu `cloudinary_public_id` + `image_url`
-- Soft-delete items (giữ để audit)
+- Save `cloudinary_public_id` + `image_url`
+- Soft-delete items (keep for audit)
 
-❌ **KHÔNG NÊN:**
+❌ **DON'T:**
 
-- Chỉ lưu URL (không thể xóa sau)
-- Hard-delete DB trước Cloudinary xác nhận
+- Save URL only (cannot delete later)
+- Hard-delete DB before Cloudinary confirms
 
 ---
 
 ## ✅ Checklist: Step 1.5 Integration
 
-- [ ] Install CloudinaryModule ở CatalogModule
-- [ ] Inject CloudinaryService vào MenuItemService
-- [ ] Tạo MenuItem entity với columns
+- [ ] Install CloudinaryModule in CatalogModule
+- [ ] Inject CloudinaryService into MenuItemService
+- [ ] Create MenuItem entity with columns
 - [ ] Implement createWithImage()
 - [ ] Implement updateImage()
 - [ ] Implement getMenuWithImages()
-- [ ] BFF POST endpoint với Multer
-- [ ] BFF PUT endpoint với Multer
-- [ ] Cache GET /menu trong Redis
+- [ ] BFF POST endpoint with Multer
+- [ ] BFF PUT endpoint with Multer
+- [ ] Cache GET /menu in Redis
 - [ ] Invalidate cache
 - [ ] Test: upload, delete, responsive URLs
 
 ---
 
-**Cập nhật:** 2026-04-09 · **Trạng thái:** ✅ Step 1.45 HOÀN THÀNH
+**Update:** 2026-04-09 · **Status:** ✅ Step 1.45 COMPLETED

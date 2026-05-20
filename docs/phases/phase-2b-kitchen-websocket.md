@@ -6,23 +6,23 @@
 
 ## Final Scope
 
-Phase 2B hoàn thành KDS realtime layer cho QRTable: Kitchen Service consume Kafka `order.confirmed`, tạo Redis KDS tickets theo station, vận hành queue bếp/bar, phát SLA warnings, và BFF WebSocket Gateway phân phối realtime hints tới đúng role/session.
+Phase 2B completes the KDS realtime layer for QRTable: Kitchen service consumes Kafka `order.confirmed`, creates Redis KDS tickets by station, operates kitchen/bar queue, issues SLA warnings, and BFF WebSocket Gateway distributes realtime hints to the correct role/session.
 
-Phạm vi cuối cùng gồm:
+The final scope includes:
 
-- Kitchen Service Redis-only cho KDS ticket state, station queues, priority, recall, void/archive, table snapshot patch, SLA metadata và recovery rebuild từ active Order snapshots.
-- Kafka consumer `order.confirmed` và producer `kitchen.sla_warning`; không thêm Kafka topic cho từng queue change.
-- WebSocket namespace `/orders` với Socket.IO Redis Adapter, server-managed room assignment, staff JWT auth, customer session auth, và legacy join rejection.
+- Kitchen service Redis-only for KDS ticket state, station queues, priority, recall, void/archive, table snapshot patch, SLA metadata and recovery rebuild from active Order snapshots.
+- Kafka consumer `order.confirmed` and producer `kitchen.sla_warning`; Do not add a Kafka topic for each queue change.
+- WebSocket namespace `/orders` with Socket.IO Redis Adapter, server-managed room assignment, staff JWT auth, customer session auth, and legacy join rejection.
 - BFF KDS REST edge: queue snapshot, start ticket, mark done/ready, recall, set priority, station access checks and Order sync on ready.
 - Customer PWA, Management POS and Management KDS realtime hooks that treat WebSocket messages as invalidation hints and refetch REST/TanStack Query snapshots.
 
 ## Accepted Decisions
 
-- Kitchen Service owns KDS prep state only. Order Service remains source of truth for customer-visible order state; Redis KDS snapshot is source of truth for KDS screen state.
-- Kitchen Service has no PostgreSQL/MongoDB persistence. Redis keys are tenant-scoped and optimized for active operational queues.
+- Kitchen service owns KDS prep state only. Order service remains source of truth for customer-visible order state; Redis KDS snapshot is source of truth for KDS screen state.
+- Kitchen service has no PostgreSQL/MongoDB persistence. Redis keys are tenant-scoped and optimized for active operational queues.
 - `order.confirmed` creates at most one ticket per `(tenantId, orderId, station)`. Items are split by immutable station snapshot from the event: `KITCHEN` or `BAR`.
 - Missing item station is dead-lettered in Redis instead of guessed from category/name. Frontend never routes food/drink by display text.
-- KDS batching/gộp món/gộp đơn is rejected, not deferred. Cart line merging before submit is unrelated and remains allowed.
+- KDS batching/item batching/order batching is rejected, not deferred. Cart line merging before submit is unrelated and remains allowed.
 - Queue order is FIFO with priority override. Priority is a separate permission-backed action (`kitchen.set_priority` / `KITCHEN_SET_PRIORITY`), not part of generic ticket update permission.
 - BFF does not emit KDS queue hints directly from Kafka `order.confirmed`. Kitchen writes Redis first, then publishes internal Redis Pub/Sub `kds.queue_changed`; BFF emits `events.kdsQueueChanged` after that.
 - WebSocket is a realtime hint channel. REST snapshots are the rendering source after reconnect, mutation, missed event or tab wake.

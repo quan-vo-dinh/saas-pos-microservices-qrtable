@@ -223,7 +223,7 @@ export function sectionLabel(label) {
 
 const slides = [
   {
-    title: 'Nghiên cứu và xây dựng QRTable',
+title: 'Research and build QRTable',
     code: `
 import { jsx, jsxs } from '@oai/artifact-tool/presentation-jsx/jsx-runtime';
 import { slide, surface, t, textBlock, stat, C } from './deck-utils.mjs';
@@ -231,19 +231,19 @@ import { slide, surface, t, textBlock, stat, C } from './deck-utils.mjs';
 export async function slide01(presentation) {
   return slide(presentation, {
     dark: true,
-    kicker: 'Khóa luận tốt nghiệp · Báo cáo kiến trúc hệ thống',
-    title: 'QRTable: SaaS POS tích hợp đặt món qua mã QR',
+kicker: 'Graduation thesis · System architecture report',
+title: 'QRTable: SaaS POS integrates ordering via QR code',
     subtitle: 'Microservices · Multi-tenant · RBAC · Redis session/cart · Kafka domain events',
-    footer: 'Đề tài: SaaS POS with QR Code Ordering',
+footer: 'Topic: SaaS POS with QR Code Ordering',
     children: jsxs('vstack', { width: 'fill', gap: 26, children: [
       jsxs('hstack', { width: 'fill', gap: 18, children: [
-        stat('2', 'Ứng dụng frontend', 'Customer PWA và Management App', '#9EE7DC'),
+stat('2', 'Frontend applications', 'Customer PWA and Management App', '#9EE7DC'),
         stat('5+', 'Backend services', 'BFF, Authorizer, User-Access, Catalog, Order, SaaS', '#F6C177'),
-        stat('Phase 2A', 'Đã triển khai sâu', 'Ordering, permissions, Redis cart/session, Kafka outbox', '#FCA5A5'),
+stat('Phase 2A', 'Deeply implemented', 'Ordering, permissions, Redis cart/session, Kafka outbox', '#FCA5A5'),
       ]}),
       surface(jsxs('vstack', { gap: 12, children: [
-        textBlock(t('Thông điệp chính', { size: 15, weight: 700, color: '#9EE7DC' })),
-        textBlock(t('Deck này trình bày QRTable như một hệ thống luận văn hoàn chỉnh đang phát triển: đi từ bối cảnh bài toán, kiến trúc tổng quan, các flow nghiệp vụ, RBAC/auth, đến chiến lược kiểm thử và roadmap.', { size: 21, color: C.white })),
+textBlock(t('Main message', { size: 15, weight: 700, color: '#9EE7DC' })),
+textBlock(t('This deck presents QRTable as a complete thesis system in development: going from problem context, overall architecture, business flows, RBAC/auth, to testing strategy and roadmap.', { size: 21, color: C.white })),
       ]}), { fill: '#1F2937', line: '#374151', padding: 24, height: 140 }),
     ]}),
   });
@@ -251,33 +251,33 @@ export async function slide01(presentation) {
 `,
   },
   {
-    title: 'Bài toán F&B cần nhiều hơn một app đặt món đơn giản',
+title: 'The F&B problem needs more than a simple ordering app',
     code: `
 import { jsx, jsxs } from '@oai/artifact-tool/presentation-jsx/jsx-runtime';
 import { slide, surface, t, textBlock, bulletList, C } from './deck-utils.mjs';
 
 export async function slide02(presentation) {
   return slide(presentation, {
-    kicker: '01 · Bối cảnh',
-    title: 'Nhà hàng cần số hóa cả quy trình, không chỉ thay menu giấy bằng QR',
-    subtitle: 'Điểm nghẽn nằm ở order handoff, phân quyền, dữ liệu bàn và trạng thái thời gian thực.',
+kicker: '01 · Background',
+title: 'Restaurants need to digitize the whole process, not just replace paper menus with QR',
+subtitle: 'The bottleneck lies in order handoff, decentralization, table data and real-time status.',
     children: jsxs('hstack', { width: 'fill', gap: 22, children: [
       surface(jsxs('vstack', { gap: 14, children: [
-        textBlock(t('Vấn đề vận hành', { size: 21, weight: 700, color: C.coral })),
+textBlock(t('Operation problem', { size: 21, weight: 700, color: C.coral })),
         bulletList([
-          'Khách chờ nhân viên đưa menu và ghi món.',
-          'Order thủ công dễ sai, thiếu note hoặc chuyển bếp chậm.',
-          'Nhân viên khó theo dõi bàn, order, bill theo trạng thái thật.',
-          'Nhiều nhà hàng/chi nhánh cần cô lập dữ liệu và role rõ ràng.',
+'Customers wait for staff to give menus and take orders.',
+'Manual orders are prone to errors, lack of notes or slow delivery to the kitchen.',
+'It's difficult for staff to keep track of tables, orders, and bills according to their real status.',
+'Many restaurants/branches need data isolation and clear roles.',
         ], { size: 16 }),
       ]}), { width: 'fill', height: 330 }),
       surface(jsxs('vstack', { gap: 14, children: [
-        textBlock(t('Mục tiêu của QRTable', { size: 21, weight: 700, color: C.teal })),
+        textBlock(t('Goal of QRTable', { size: 21, weight: 700, color: C.teal })),
         bulletList([
-          'Customer PWA cho khách quét QR, xem menu, thêm cart, gửi order.',
-          'Management App cho owner/manager/waiter vận hành POS, menu, bàn.',
-          'Backend microservices có guard, tenant isolation, cache và event.',
-          'Kiến trúc đủ mở rộng sang KDS, payment, observability.',
+'Customer PWA for customers to scan QR, view menu, add cart, send order.',
+'Management App for Owner/manager/waiter to operate POS, menu, desk.',
+'Backend microservices has guards, tenant isolation, cache and event.',
+'Architecture is sufficiently scalable to KDS, payment, observability.',
         ], { size: 16 }),
       ]}), { width: 'fill', height: 330 }),
     ]}),
@@ -286,7 +286,7 @@ export async function slide02(presentation) {
 `,
   },
   {
-    title: 'Các yêu cầu thiết kế kéo hệ thống về microservices',
+title: 'Design requirements pull systems towards microservices',
     code: `
 import { jsx, jsxs } from '@oai/artifact-tool/presentation-jsx/jsx-runtime';
 import { slide, surface, stat, t, textBlock, C } from './deck-utils.mjs';
@@ -294,18 +294,18 @@ import { slide, surface, stat, t, textBlock, C } from './deck-utils.mjs';
 export async function slide03(presentation) {
   return slide(presentation, {
     kicker: '02 · Design drivers',
-    title: 'Bốn yêu cầu chi phối kiến trúc: tenant, permission, realtime, consistency',
-    subtitle: 'Những yêu cầu này quyết định cách chia service, lưu dữ liệu, chọn Redis/Kafka và guard chain.',
+    title: 'Four requirements that govern architecture: tenant, permission, realtime, consistency',
+    subtitle: 'These requirements determine how to divide services, store data, choose Redis/Kafka and guard chain.',
     children: jsxs('vstack', { width: 'fill', gap: 18, children: [
       jsxs('hstack', { width: 'fill', gap: 16, children: [
-        stat('Tenant', 'Cô lập dữ liệu', 'Mọi query và Redis key phải scope theo tenant_id', C.teal),
-        stat('RBAC', 'Quyền theo vai trò', 'Frontend chỉ UX; BFF PermissionGuard là source of truth', C.blue),
-        stat('Realtime', 'UI vận hành sống', 'BFF Direct/WebSocket cho hints, REST vẫn là source of truth', C.amber),
-        stat('Consistency', 'Tránh race condition', 'Cart version, idempotency, stock deduct transactional', C.coral),
+        stat('tenant', 'Data isolation', 'All queries and Redis keys must scope to tenant_id', C.teal),
+        stat('RBAC', 'Role permissions', 'Frontend only UX; BFF PermissionGuard is source of truth', C.blue),
+        stat('Realtime', 'Live UI', 'BFF Direct/WebSocket for hints, REST is still source of truth', C.amber),
+        stat('Consistency', 'Avoid race condition', 'Cart version, idempotency, stock deduct transactional', C.coral),
       ]}),
       surface(jsxs('hstack', { width: 'fill', gap: 18, children: [
-        textBlock(t('Quyết định thiết kế', { size: 20, weight: 700, color: C.ink }), { width: 240 }),
-        textBlock(t('BFF làm API Gateway duy nhất; Catalog sở hữu menu/table/stock; Order sở hữu session/cart/order/bill; Redis giữ runtime state; Kafka chỉ nhận domain event cần xử lý nghiệp vụ bất đồng bộ như order.confirmed.', { size: 19, color: C.muted }), { width: 'fill' }),
+        textBlock(t('Design decision', { size: 20, weight: 700, color: C.ink }), { width: 240 }),
+        textBlock(t('BFF is the only API Gateway; Catalog owns menu/table/stock; Order owns session/cart/order/bill; Redis holds runtime state; Kafka only receives domain event needs to process asynchronous operations like order.confirmed.', { size: 19, color: C.muted }), { width: 'fill' }),
       ]}), { height: 126, padding: 22, fill: '#FFF8EC' }),
     ]}),
   });
@@ -313,7 +313,7 @@ export async function slide03(presentation) {
 `,
   },
   {
-    title: 'Kiến trúc tổng quan',
+    title: 'Architecture overview',
     code: `
 import { jsx, jsxs } from '@oai/artifact-tool/presentation-jsx/jsx-runtime';
 import { slide, surface, node, arrow, t, textBlock, C } from './deck-utils.mjs';
@@ -321,8 +321,8 @@ import { slide, surface, node, arrow, t, textBlock, C } from './deck-utils.mjs';
 export async function slide04(presentation) {
   return slide(presentation, {
     kicker: '03 · System architecture',
-    title: 'BFF đứng giữa frontend và các bounded-context services',
-    subtitle: 'Frontend không gọi thẳng service nội bộ; mọi request đi qua guard, tenant context và response wrapper tại BFF.',
+title: 'BFF stands between frontend and bounded-context services',
+subtitle: 'Frontend does not call internal service directly; every request goes through the guard, tenant context and response wrapper at BFF.',
     children: jsxs('vstack', { width: 'fill', gap: 16, children: [
       jsxs('hstack', { width: 'fill', gap: 14, align: 'center', children: [
         surface(jsxs('vstack', { gap: 12, children: [
@@ -351,7 +351,7 @@ export async function slide04(presentation) {
         node('Redis', 'auth cache, menu cache, session, cart', { fill: '#F3F4F6', height: 74 }),
         node('Kafka', 'domain event: order.confirmed', { fill: '#F3F4F6', height: 74 }),
       ]}),
-      textBlock(t('Triển khai hiện tại dùng chung database dev qrtable nhưng đã giữ tenant_id discriminator và ownership boundary để chuẩn bị tách database-per-service sau này.', { size: 14, color: C.muted })),
+textBlock(t('Implementation current uses the shared dev database `qrtable`, while already keeping tenant_id discriminators and ownership boundaries for future database-per-service separation.', { size: 14, color: C.muted })),
     ]}),
   });
 }
@@ -366,15 +366,15 @@ import { slide, surface, node, bulletList, t, textBlock, C } from './deck-utils.
 export async function slide05(presentation) {
   return slide(presentation, {
     kicker: '04 · Frontend apps',
-    title: 'Hai ứng dụng frontend phục vụ hai loại actor khác nhau',
-    subtitle: 'Customer đi bằng session từ QR; staff đi bằng JWT/role/permission.',
+title: 'Two frontend applications serving two different types of actors',
+subtitle: 'Customer goes by session from QR; staff goes with JWT/role/permission.',
     children: jsxs('hstack', { width: 'fill', gap: 24, children: [
       surface(jsxs('vstack', { gap: 14, children: [
-        node('Customer PWA', 'Khách tại bàn · không cần login', { fill: '#E6F4F1', height: 78 }),
+node('Customer PWA', 'Guest at desk · not needs login', { fill: '#E6F4F1', height: 78 }),
         bulletList([
-          'Resolve tenant slug và validate QR token.',
-          'Join table session, lưu sessionId.',
-          'Xem menu thật theo tenant.',
+          'Resolve tenant slug and validate QR token.',
+'Join table session, stores sessionId.',
+'See real menu by tenant.',
           'Cart Redis + cartVersion.',
           'Submit order, tracking, service request, bill request.',
         ], { size: 15 }),
@@ -382,11 +382,11 @@ export async function slide05(presentation) {
       surface(jsxs('vstack', { gap: 14, children: [
         node('Management App', 'Owner / Manager / Waiter / Kitchen / Bar', { fill: '#EEF2FF', height: 78 }),
         bulletList([
-          'Login bằng Keycloak JWT.',
-          'Sidebar/route theo role để cải thiện UX.',
-          'POS live orders gọi API thật.',
+'Login using Keycloak JWT.',
+'Sidebar/route by role to improve UX.',
+'POS live orders call real API.',
           'Confirm/cancel order theo permission.',
-          'Menu, bàn, QR, service inbox, transfer table.',
+'Menu, tables, QR, service inbox, transfer table.',
         ], { size: 15 }),
       ]}), { width: 'fill', height: 380 }),
     ]}),
@@ -403,16 +403,16 @@ import { slide, matrix } from './deck-utils.mjs';
 export async function slide06(presentation) {
   return slide(presentation, {
     kicker: '05 · Backend services',
-    title: 'Service boundary được chia theo ownership, không chia theo màn hình UI',
-    subtitle: 'Mỗi service chịu trách nhiệm một miền dữ liệu và contract giao tiếp rõ ràng.',
+title: 'service boundary is divided by ownership, not by UI screen',
+subtitle: 'Each service is responsible for a clear data domain and communication contract.',
     children: matrix([
-      ['Service', 'Trách nhiệm', 'Dữ liệu sở hữu', 'Giao tiếp chính'],
-      ['BFF', 'API Gateway, guards, response wrapper, realtime hints', 'Không owner domain data', 'HTTP REST, TCP/gRPC clients, WebSocket'],
-      ['Authorizer', 'JWT validation, role mapping, collect permissions', 'Auth cache', 'gRPC/TCP với BFF, Keycloak'],
+['service', 'Responsibility', 'Owned data', 'Main communication'],
+['BFF', 'API Gateway, guards, response wrapper, realtime hints', 'Does not own domain data', 'HTTP REST, TCP/gRPC clients, WebSocket'],
+      ['Authorizer', 'JWT validation, role mapping, collect permissions', 'Auth cache', 'gRPC/TCP with BFF, Keycloak'],
       ['User-Access', 'User, role, permission profile', 'Mongo users/roles', 'TCP/gRPC'],
-      ['Catalog', 'Menu, category, area, table, QR, stock', 'Catalog tables', 'TCP commands từ BFF/Order'],
+      ['Catalog', 'Menu, category, area, table, QR, stock', 'Catalog tables', 'TCP commands from BFF/Order'],
       ['Order', 'Session, cart, order lifecycle, bill, service request, transfer', 'Order tables, Redis cart/session', 'TCP, PostgreSQL, Redis, Kafka outbox'],
-      ['SaaS', 'Tenant lifecycle roadmap', 'Tenants/subscriptions', 'Future Phase 4B'],
+      ['SaaS', 'tenant lifecycle roadmap', 'Tenants/subscriptions', 'Future Phase 4B'],
     ], { rowHeight: 56, size: 10, widths: ['0.8fr', '1.8fr', '1.4fr', '1.5fr'] }),
   });
 }
@@ -427,19 +427,19 @@ import { slide, matrix, surface, t, textBlock, C } from './deck-utils.mjs';
 export async function slide07(presentation) {
   return slide(presentation, {
     kicker: '06 · Communication',
-    title: 'Mỗi kênh giao tiếp có vai trò riêng, tránh dùng Kafka như UI proxy',
-    subtitle: 'Kiến trúc chọn kênh theo semantics: request/response, auth, runtime state, domain event hay UI hint.',
+    title: 'Each communication channel has its own role, avoid using Kafka as a UI proxy',
+    subtitle: 'Architecture selects channels according to semantics: request/response, auth, runtime state, domain event or UI hint.',
     children: jsxs('vstack', { width: 'fill', gap: 16, children: [
       matrix([
-        ['Kênh', 'Dùng cho', 'Ví dụ trong QRTable', 'Lý do'],
-        ['HTTP REST', 'Frontend gọi BFF', 'POST /customer/orders, GET /admin/orders', 'Đơn giản, thống nhất auth/response'],
-        ['TCP', 'BFF gọi microservice nội bộ', 'Order confirm, Catalog validate QR/deduct stock', 'Request-response nội bộ nhanh, typed pattern'],
-        ['gRPC', 'Auth/user verification', 'UserGuard gọi Authorizer', 'Schema rõ, phù hợp auth metadata'],
-        ['Redis', 'Runtime/cache state', 'cart:{tenantId}:{sessionId}', 'Nhanh, TTL, shared cart/session'],
-        ['Kafka', 'Domain event bất đồng bộ', 'order.confirmed', 'Consumer nghiệp vụ không chặn producer'],
-        ['WebSocket', 'Realtime UI hints', 'order.created, cart.updated', 'Client refetch REST sau event'],
+        ['Channel', 'Used for', 'Example in QRTable', 'Reason'],
+        ['HTTP REST', 'Frontend call BFF', 'POST /customer/orders, GET /admin/orders', 'Simple, unified auth/response'],
+        ['TCP', 'BFF calls internal microservice', 'Order confirm, Catalog validate QR/deduct stock', 'Fast internal request-response, typed pattern'],
+        ['gRPC', 'Auth/user verification', 'UserGuard calls Authorizer', 'Clear Schema, appropriate auth metadata'],
+        ['Redis', 'Runtime/cache state', 'cart:{tenantId}:{sessionId}', 'Fast, TTL, shared cart/session'],
+        ['Kafka', 'Domain event asynchronous', 'order.confirmed', 'Consumer business not blocking producer'],
+        ['WebSocket', 'Realtime UI hints', 'order.created, cart.updated', 'Client refetch REST after event'],
       ], { rowHeight: 48, size: 10, widths: ['0.75fr', '1.15fr', '1.5fr', '1.35fr'] }),
-      surface(textBlock(t('Decision rule: event nào cần business logic ở bounded context khác thì dùng Kafka; event chỉ cập nhật UI và BFF đã có dữ liệu thì dùng BFF Direct/WebSocket.', { size: 18, weight: 700, color: C.teal })), { height: 64, fill: '#E6F4F1', line: '#C5E5DE' }),
+      surface(textBlock(t('Decision rule: events that need business logic in another bounded context use Kafka; events that only update the UI and BFF already has data use BFF Direct/WebSocket.', { size: 18, weight: 700, color: C.teal })), { height: 64, fill: '#E6F4F1', line: '#C5E5DE' }),
     ]}),
   });
 }
@@ -454,31 +454,31 @@ import { slide, surface, node, arrow, t, textBlock, C } from './deck-utils.mjs';
 export async function slide08(presentation) {
   return slide(presentation, {
     kicker: '07 · Data ownership',
-    title: 'Order không tự sửa Catalog DB; stock đi qua Catalog TCP contract',
-    subtitle: 'Boundary này giảm coupling và chuẩn bị cho database-per-service trong tương lai.',
+    title: 'Order not auto-correct Catalog DB; stock goes through Catalog TCP contract',
+    subtitle: 'This boundary reduces coupling and prepares for database-per-service in the future.',
     children: jsxs('vstack', { width: 'fill', gap: 18, children: [
       jsxs('hstack', { width: 'fill', gap: 12, align: 'center', children: [
         node('Customer / Staff Action', 'submit, confirm, transfer, request bill', { width: 190, fill: '#FFF8EC' }),
         arrow(),
         node('BFF', 'guards + tenant context + TCP payload', { width: 170, fill: '#E6F4F1' }),
         arrow(),
-        node('Order Service', 'session/cart/order/bill state', { width: 200, fill: '#E9F2FF' }),
+        node('Order service', 'session/cart/order/bill state', { width: 200, fill: '#E9F2FF' }),
         arrow('↔'),
-        node('Catalog Service', 'menu/table/stock ownership', { width: 200, fill: '#EAF7EA' }),
+        node('Catalog service', 'menu/table/stock ownership', { width: 200, fill: '#EAF7EA' }),
         arrow(),
         node('PostgreSQL / Redis', 'durable + runtime state', { width: 190, fill: '#F3F4F6' }),
       ]}),
       jsxs('hstack', { width: 'fill', gap: 16, children: [
         surface(jsxs('vstack', { gap: 10, children: [
-          textBlock(t('Order Service owns', { size: 18, weight: 700, color: C.blue })),
+          textBlock(t('Order service owners', { size: 18, weight: 700, color: C.blue })),
           textBlock(t('sessions, carts, orders, order_items, bills, service_requests, outbox_events', { size: 16, color: C.muted })),
         ]}), { height: 130 }),
         surface(jsxs('vstack', { gap: 10, children: [
-          textBlock(t('Catalog Service owns', { size: 18, weight: 700, color: C.green })),
+          textBlock(t('Catalog service owners', { size: 18, weight: 700, color: C.green })),
           textBlock(t('categories, menu_items, preparation station, areas, tables, QR tokens, stock/table status commands', { size: 16, color: C.muted })),
         ]}), { height: 130 }),
       ]}),
-      textBlock(t('Khi staff confirm order, Order lock order PENDING rồi gọi Catalog deduct stock trong transaction của Catalog. Nếu stock thiếu, order giữ PENDING và trả lỗi nghiệp vụ.', { size: 17, color: C.ink })),
+      textBlock(t('When staff confirm order, Order locks order PENDING and then calls Catalog deduct stock in transaction of Catalog. If stock is missing, order keeps PENDING and returns operational error.', { size: 17, color: C.ink })),
     ]}),
   });
 }
@@ -493,30 +493,30 @@ import { slide, flow, surface, t, textBlock, bulletList, C } from './deck-utils.
 export async function slide09(presentation) {
   return slide(presentation, {
     kicker: '08 · Multi-tenancy',
-    title: 'Slug là định danh public; UUID tenant_id là identity nội bộ',
-    subtitle: 'Luồng QR dùng slug để vào đúng tenant, sau đó mọi request/service/query dùng tenant_id.',
+title: 'Slug is public identifier; UUID tenant_id is internal identity',
+subtitle: 'QR flow uses slug to get into the correct tenant, then every request/service/query uses tenant_id.',
     children: jsxs('vstack', { width: 'fill', gap: 20, children: [
       flow([
         ['QR URL', 'slug = pho-viet'],
         ['Resolve tenant', 'slug → UUID'],
         ['BFF context', 'x-tenant-id / JWT claim'],
-        ['Service payload', 'tenantId bắt buộc'],
+['service payload', 'required tenantId'],
         ['DB / Redis', 'WHERE tenant_id / key namespace'],
       ], { nodeWidth: 174, nodeHeight: 92 }),
       jsxs('hstack', { width: 'fill', gap: 18, children: [
         surface(jsxs('vstack', { gap: 10, children: [
-          textBlock(t('Tenant dev canonical', { size: 18, weight: 700, color: C.teal })),
+          textBlock(t('tenant dev canonical', { size: 18, weight: 700, color: C.teal })),
           textBlock(t('slug: pho-viet', { size: 20, weight: 700, color: C.ink })),
           textBlock(t('tenantId: 023772bb-391b-401c-936a-ed7034b69cec', { size: 13, color: C.muted })),
-          textBlock(t('name: Nhà hàng Phở Việt', { size: 15, color: C.muted })),
+textBlock(t('name: Vietnamese Pho Restaurant', { size: 15, color: C.muted })),
         ]}), { height: 160, fill: '#E6F4F1' }),
         surface(jsxs('vstack', { gap: 10, children: [
           textBlock(t('Isolation rules', { size: 18, weight: 700, color: C.coral })),
           bulletList([
-            'Không dùng tenant_a tiếp.',
-            'Mọi persistent query có tenant_id filter.',
-            'Redis key có namespace theo owner/tenant/session.',
-            'FE query key scope theo tenant và session.',
+'Do not use tenant_a again.',
+'Every persistent query has a tenant_id filter.',
+'Redis key is namespaced by Owner/tenant/session.',
+            'FE query key scope theo tenant and session.',
           ], { size: 14 }),
         ]}), { height: 160 }),
       ]}),
@@ -534,8 +534,8 @@ import { slide, node, arrow, surface, bulletList, t, textBlock, C } from './deck
 export async function slide10(presentation) {
   return slide(presentation, {
     kicker: '09 · Authentication / Authorization',
-    title: 'Staff dùng JWT + PermissionGuard; customer dùng session scope',
-    subtitle: 'Hai actor có auth model khác nhau nhưng đều đi qua tenant context.',
+    title: 'Staff uses JWT + PermissionGuard; customer uses session scope',
+subtitle: 'The two actors have different auth models but both go through the tenant context.',
     children: jsxs('vstack', { width: 'fill', gap: 18, children: [
       jsxs('hstack', { width: 'fill', gap: 10, align: 'center', children: [
         node('JWT Request', 'Management App', { width: 150, fill: '#EEF2FF' }),
@@ -546,21 +546,21 @@ export async function slide10(presentation) {
         arrow(),
         node('PermissionGuard', '@Permissions([...])', { width: 170 }),
         arrow(),
-        node('TCP Service Call', 'tenant-scoped payload', { width: 170, fill: '#E6F4F1' }),
+        node('TCP service Call', 'tenant-scoped payload', { width: 170, fill: '#E6F4F1' }),
       ]}),
       jsxs('hstack', { width: 'fill', gap: 18, children: [
         surface(jsxs('vstack', { gap: 12, children: [
           textBlock(t('Staff/Admin endpoints', { size: 19, weight: 700, color: C.blue })),
           bulletList([
-            'Keycloak access token trong Authorization header.',
-            'Authorizer validate token, role mapping và permissions từ MongoDB.',
-            'BFF PermissionGuard mới là source of truth.',
+            'Keycloak access token in Authorization header.',
+            'Authorizer validate token, role mapping and permissions from MongoDB.',
+'BFF PermissionGuard is the real source of truth.',
           ], { size: 15 }),
         ]}), { height: 180 }),
         surface(jsxs('vstack', { gap: 12, children: [
           textBlock(t('Customer endpoints', { size: 19, weight: 700, color: C.teal })),
           bulletList([
-            'Không có DB role CUSTOMER.',
+'There is no DB role CUSTOMER.',
             'QR validation + Order session ID.',
             'x-session-id + ownership checks theo session/table.',
           ], { size: 15 }),
@@ -580,8 +580,8 @@ import { slide, flow, matrix } from './deck-utils.mjs';
 export async function slide11(presentation) {
   return slide(presentation, {
     kicker: '10 · Flow: secured staff API',
-    title: 'Một API staff hợp lệ phải qua đủ authenticate, tenant và authorize',
-    subtitle: 'Ví dụ: waiter confirm order pending.',
+title: 'A valid API staff must pass authenticate, tenant and authorize',
+    subtitle: 'Example: waiter confirm order pending.',
     children: jsxs('vstack', { width: 'fill', gap: 18, children: [
       flow([
         ['Management App', 'JWT + x-tenant-id'],
@@ -593,11 +593,11 @@ export async function slide11(presentation) {
       ], { nodeWidth: 150, nodeHeight: 90 }),
       matrix([
         ['Test case', 'Input', 'Expected'],
-        ['Happy path', 'JWT hợp lệ, tenant đúng, permission order.confirm', '200 + order PROCESSING'],
-        ['JWT expired', 'Access token hết hạn', '401'],
-        ['Role mismatch', 'Keycloak roles không giao với DB roles', '401'],
-        ['Tenant mismatch', 'User tenant A gọi x-tenant-id tenant B', '403'],
-        ['Permission denied', 'Chef/Barista gọi raw confirm order endpoint', '403'],
+['Happy path', 'valid JWT, correct tenant, permission order.confirm', '200 + order PROCESSING'],
+['JWT expired', 'Access token expired', '401'],
+        ['Role mismatch', 'Keycloak roles not giao with DB roles', '401'],
+['tenant mismatch', 'User tenant A calls x-tenant-id tenant B', '403'],
+['Permission denied', 'Chef/Barista calls raw confirm order endpoint', '403'],
       ], { rowHeight: 50, size: 11, widths: ['1fr', '1.8fr', '1.4fr'] }),
     ]}),
   });
@@ -613,8 +613,8 @@ import { slide, flow, matrix } from './deck-utils.mjs';
 export async function slide12(presentation) {
   return slide(presentation, {
     kicker: '11 · Flow: QR join session',
-    title: 'Customer không login; QR xác thực tenant/table rồi Order tạo table session',
-    subtitle: 'Order session là source of truth cho customer ordering, khác với BFF anonymous session.',
+title: 'Customer not login; QR validates tenant/table, then Order creates the table session',
+subtitle: 'Order session is source of truth for customer ordering, separate from BFF anonymous session.',
     children: jsxs('vstack', { width: 'fill', gap: 18, children: [
       flow([
         ['QR URL', 'tenant slug + table token'],
@@ -625,12 +625,12 @@ export async function slide12(presentation) {
         ['PWA headers', 'x-tenant-id + x-session-id'],
       ], { nodeWidth: 150, nodeHeight: 88 }),
       matrix([
-        ['Case', 'Điều kiện', 'Kết quả mong đợi'],
-        ['Happy path', 'Slug và QR token hợp lệ', 'Session active, PWA vào menu/order flow'],
-        ['Invalid QR', 'Token sai hoặc bị regenerate', 'Reject, không join session'],
-        ['Unknown tenant', 'Slug không tồn tại', 'Resolve fail'],
-        ['Redis mất key', 'PostgreSQL session còn hợp lệ', 'Hydrate lại Redis session'],
-        ['Wrong session owner', 'x-session-id không thuộc tenant/table', 'Security/session error'],
+['Case', 'Condition', 'Expected result'],
+['Happy path', 'Slug and QR token valid', 'Session active, PWA into menu/order flow'],
+['Invalid QR', 'Token is wrong or has been regenerated', 'Reject, not join session'],
+['Unknown tenant', 'Slug not exists', 'Resolve fail'],
+['Redis lost key', 'PostgreSQL session is still valid', 'Rehydrate Redis session'],
+        ['Wrong session Owner', 'x-session-id not belongs to tenant/table', 'Security/session error'],
       ], { rowHeight: 48, size: 11, widths: ['1fr', '1.7fr', '1.6fr'] }),
     ]}),
   });
@@ -646,8 +646,8 @@ import { slide, flow, surface, bulletList, matrix, t, textBlock, C } from './dec
 export async function slide13(presentation) {
   return slide(presentation, {
     kicker: '12 · Flow: menu → cart → submit',
-    title: 'Cart là draft order trong Redis; order row chỉ sinh khi customer submit',
-    subtitle: 'CartVersion là concurrency token từ server, client không tự tăng.',
+title: 'Cart is draft order in Redis; order row is created only when customer submit',
+subtitle: 'CartVersion is concurrency token from server, client not incremented by the client.',
     children: jsxs('vstack', { width: 'fill', gap: 16, children: [
       flow([
         ['GET menu', 'tenant-scoped catalog/menu cache'],
@@ -662,16 +662,16 @@ export async function slide13(presentation) {
           textBlock(t('Cart rules', { size: 18, weight: 700, color: C.teal })),
           bulletList([
             'Redis key: cart:{tenantId}:{sessionId}.',
-            'Mutation phải gửi expectedCartVersion.',
+'Mutation must send expectedCartVersion.',
             '409 CART_VERSION_CONFLICT → refetch cart + toast.',
-            'Bill request sẽ lock ordering/cart.',
+'Bill request locks ordering/cart.',
           ], { size: 13 }),
         ]}), { height: 180 }),
         matrix([
           ['Case', 'Expected'],
-          ['Cart version khớp', 'Update thành công, server tăng version'],
-          ['Version cũ', '409 conflict, PWA refetch'],
-          ['Submit trùng idempotency key', 'Không tạo duplicate order'],
+['Cart version matches', 'Update successful, server increases version'],
+['Stale version', '409 conflict, PWA refetch'],
+['Submit with duplicate idempotency key', 'Do not create duplicate order'],
           ['Cross-session order detail', 'Reject ownership check'],
         ], { rowHeight: 36, size: 10, widths: ['1.2fr', '1.6fr'] }),
       ]}),
@@ -689,8 +689,8 @@ import { slide, flow, surface, matrix, t, textBlock, C } from './deck-utils.mjs'
 export async function slide14(presentation) {
   return slide(presentation, {
     kicker: '13 · Flow: staff confirm order',
-    title: 'Confirm order là giao điểm của RBAC, stock consistency và Kafka event',
-    subtitle: 'Order chuyển PENDING → PROCESSING chỉ sau khi Catalog deduct stock thành công.',
+title: 'Confirm order is intersection of RBAC, stock consistency and Kafka event',
+subtitle: 'Order changes PENDING → PROCESSING only after Catalog deduct stock successfully.',
     children: jsxs('vstack', { width: 'fill', gap: 16, children: [
       flow([
         ['POS confirm', 'POST /admin/orders/:id/confirm'],
@@ -703,13 +703,13 @@ export async function slide14(presentation) {
       jsxs('hstack', { width: 'fill', gap: 14, children: [
         surface(jsxs('vstack', { gap: 8, children: [
           textBlock(t('Why Kafka here?', { size: 18, weight: 700, color: C.coral })),
-          textBlock(t('order.confirmed là domain event hiện kích hoạt Kitchen; Notification/Analytics là mở rộng tương lai. Producer không chờ consumer; event được ghi qua simplified outbox để giảm dual-write risk.', { size: 15, color: C.muted })),
+textBlock(t('order.confirmed is domain event currently triggering Kitchen; Notification/Analytics is future expansion. Producer not waiting for consumer; event logged via simplified outbox to reduce dual-write risk.', { size: 15, color: C.muted })),
         ]}), { height: 150, fill: '#FFF1E8' }),
         matrix([
           ['Failure case', 'Expected behavior'],
-          ['Stock thiếu', 'Order giữ PENDING, trả item details'],
-          ['Order đã PROCESSING', 'Reject invalid transition'],
-          ['Kafka lỗi tạm thời', 'Outbox giữ trạng thái retry/pending'],
+['Stock missing', 'Order kept PENDING, returned item details'],
+          ['Order already PROCESSING', 'Reject invalid transition'],
+['Kafka temporary error', 'Outbox holds retry/pending status'],
         ], { rowHeight: 38, size: 10, widths: ['1.2fr', '1.8fr'] }),
       ]}),
     ]}),
@@ -726,11 +726,11 @@ import { slide, surface, node, arrow, t, textBlock, bulletList, C } from './deck
 export async function slide15(presentation) {
   return slide(presentation, {
     kicker: '14 · Realtime strategy',
-    title: 'Realtime UI dùng BFF Direct; domain event dùng Kafka',
-    subtitle: 'WebSocket chỉ là hint để client refetch REST, không thay REST làm source of truth.',
+    title: 'Realtime UI uses BFF Direct; domain event uses Kafka',
+subtitle: 'WebSocket is just a hint for the client to refetch REST, not replacing REST as the source of truth.',
     children: jsxs('vstack', { width: 'fill', gap: 18, children: [
       jsxs('hstack', { width: 'fill', gap: 14, align: 'center', children: [
-        node('Order submitted', 'BFF nhận response từ Order TCP', { width: 190, fill: '#FFF8EC' }),
+node('Order submitted', 'BFF receives response from Order TCP', { width: 190, fill: '#FFF8EC' }),
         arrow(),
         node('BFF Direct', 'order.created / cart.updated / service.requested', { width: 260, fill: '#E6F4F1' }),
         arrow(),
@@ -745,7 +745,7 @@ export async function slide15(presentation) {
         ]}), { height: 190 }),
         surface(jsxs('vstack', { gap: 10, children: [
           textBlock(t('Kafka events', { size: 18, weight: 700, color: C.coral })),
-          bulletList(['order.confirmed trong Phase 2A', 'payment.completed/refunded ở Phase 3', 'kitchen.sla_warning ở Phase 2B/4A', 'tenant.created ở SaaS onboarding'], { size: 14 }),
+bulletList(['order.confirmed in Phase 2A', 'payment.completed/refunded in Phase 3', 'kitchen.sla_warning in Phase 2B/4A', 'tenant.created in SaaS onboarding'], { size: 14 }),
         ]}), { height: 190 }),
       ]}),
     ]}),
@@ -762,12 +762,12 @@ import { slide, surface, flow, bulletList, t, textBlock, C } from './deck-utils.
 export async function slide16(presentation) {
   return slide(presentation, {
     kicker: '15 · Operational flows',
-    title: 'Service request, bill request và transfer table mở rộng luồng ordering',
-    subtitle: 'Ba flow này chứng minh session/table/order/bill không thể tách rời ở POS runtime.',
+title: 'service request, bill request and transfer table extends the ordering flow',
+subtitle: 'These three flows prove that session/table/order/bill cannot be separated at POS runtime.',
     children: jsxs('vstack', { width: 'fill', gap: 14, children: [
       surface(jsxs('vstack', { gap: 8, children: [
-        textBlock(t('Service request', { size: 18, weight: 700, color: C.teal })),
-        flow([['Customer request', 'CALL_STAFF / GENERAL_HELP'], ['Order Service', 'create service request'], ['BFF Direct', 'service.requested'], ['Staff inbox', 'acknowledge / resolve']], { nodeWidth: 178, nodeHeight: 70 }),
+        textBlock(t('service request', { size: 18, weight: 700, color: C.teal })),
+        flow([['Customer request', 'CALL_STAFF / GENERAL_HELP'], ['Order service', 'create service request'], ['BFF Direct', 'service.requested'], ['Staff inbox', 'acknowledge / resolve']], { nodeWidth: 178, nodeHeight: 70 }),
       ]}), { height: 126 }),
       surface(jsxs('vstack', { gap: 8, children: [
         textBlock(t('Bill request', { size: 18, weight: 700, color: C.amber })),
@@ -791,18 +791,18 @@ import { slide, matrix, surface, t, textBlock, C } from './deck-utils.mjs';
 export async function slide17(presentation) {
   return slide(presentation, {
     kicker: '16 · Consistency / error handling',
-    title: 'Lỗi nghiệp vụ được đặt tên rõ để UI biết refetch, retry hay dừng',
-    subtitle: 'Response wrapper thống nhất giúp frontend xử lý lỗi và logging theo processID/duration.',
+    title: 'Business errors are clearly named so the UI knows to refetch, retry or stop',
+    subtitle: 'Unified response wrapper helps frontend handle errors and logging by processID/duration.',
     children: jsxs('vstack', { width: 'fill', gap: 16, children: [
       surface(textBlock(t('{ data, message, statusCode, duration, processID }', { size: 24, weight: 700, color: C.teal })), { height: 72, fill: '#E6F4F1', line: '#C5E5DE' }),
       matrix([
-        ['Error code', 'Khi nào xảy ra', 'UI / hệ thống nên làm gì'],
-        ['CART_VERSION_CONFLICT', 'Client gửi expectedCartVersion cũ', 'Refetch cart, toast conflict, không tự tăng version'],
-        ['ITEM_UNAVAILABLE', 'Món không còn order được', 'Disable/remove item'],
-        ['PRICE_CHANGED', 'Giá thay đổi so với cart snapshot', 'Hiển thị giá mới, yêu cầu xác nhận lại'],
-        ['INSUFFICIENT_STOCK', 'Confirm thất bại do stock thiếu', 'Giữ order PENDING, staff xử lý món thay thế/cancel'],
-        ['BILL_NOT_READY', 'Gọi hóa đơn quá sớm', 'Thông báo order/item chưa đủ điều kiện'],
-        ['TENANT_MISMATCH', 'Sai tenant/session xuyên miền', 'Security error, không auto retry'],
+        ['Error code', 'When does it occur', 'What should the UI/system do'],
+        ['CART_VERSION_CONFLICT', 'Client sends old expectedCartVersion', 'Refetch cart, toast conflict, not automatically increasing version'],
+        ['ITEM_UNAVAILABLE', 'Item can no longer be ordered', 'Disable/remove item'],
+        ['PRICE_CHANGED', 'Price changed compared to cart snapshot', 'Showing new price, re-confirmation required'],
+        ['INSUFFICIENT_STOCK', 'Confirmation failed due to lack of stock', 'Hold order PENDING, staff processes replacement/cancel'],
+        ['BILL_NOT_READY', 'Calling invoice too early', 'Notification of order/item not yet qualified'],
+        ['TENANT_MISMATCH', 'Wrong tenant/session across domain', 'Security error, not auto retry'],
       ], { rowHeight: 48, size: 10, widths: ['1.1fr', '1.55fr', '1.8fr'] }),
     ]}),
   });
@@ -818,8 +818,8 @@ import { slide, surface, bulletList, t, textBlock, C } from './deck-utils.mjs';
 export async function slide18(presentation) {
   return slide(presentation, {
     kicker: '17 · Verification strategy',
-    title: 'Kiểm thử được tổ chức theo tầng và theo flow nghiệp vụ',
-    subtitle: 'Mục tiêu không chỉ là pass unit test, mà là chứng minh flow UI → BFF → service → DB/Redis/Kafka đúng.',
+    title: 'Testing is organized by layer and by business flow',
+    subtitle: 'Goal is not just passing unit test, but proving the UI → BFF → service → DB/Redis/Kafka flow is correct.',
     children: jsxs('hstack', { width: 'fill', gap: 16, children: [
       surface(jsxs('vstack', { gap: 12, children: [
         textBlock(t('Unit tests', { size: 19, weight: 700, color: C.blue })),
@@ -827,7 +827,7 @@ export async function slide18(presentation) {
       ]}), { height: 320 }),
       surface(jsxs('vstack', { gap: 12, children: [
         textBlock(t('Integration tests', { size: 19, weight: 700, color: C.teal })),
-        bulletList(['BFF controller → TCP payload', 'Order → Catalog deduct stock', 'Redis session/cart', 'Outbox event creation', 'Tenant filtering'], { size: 14 }),
+        bulletList(['BFF controller → TCP payload', 'Order → Catalog deduct stock', 'Redis session/cart', 'Outbox event creation', 'tenant filtering'], { size: 14 }),
       ]}), { height: 320 }),
       surface(jsxs('vstack', { gap: 12, children: [
         textBlock(t('Frontend tests', { size: 19, weight: 700, color: C.amber })),
@@ -835,7 +835,7 @@ export async function slide18(presentation) {
       ]}), { height: 320 }),
       surface(jsxs('vstack', { gap: 12, children: [
         textBlock(t('Manual E2E demo', { size: 19, weight: 700, color: C.coral })),
-        bulletList(['QR join', 'Menu + cart', 'Submit order', 'Staff confirm', 'Tracking update', 'Service request/transfer'], { size: 14 }),
+        bulletList(['QR join', 'Menu + cart', 'Submit order', 'Staff confirmation', 'Tracking update', 'service request/transfer'], { size: 14 }),
       ]}), { height: 320 }),
     ]}),
   });
@@ -850,17 +850,17 @@ import { slide, matrix } from './deck-utils.mjs';
 export async function slide19(presentation) {
   return slide(presentation, {
     kicker: '18 · Test matrix',
-    title: 'Các test case trọng yếu theo từng flow',
-    subtitle: 'Mỗi flow cần happy path, authorization failure, tenant/session mismatch và consistency edge case.',
+title: 'Important test cases for each flow',
+subtitle: 'Each flow needs happy path, authorization failure, tenant/session mismatch and consistency edge case.',
     children: matrix([
       ['Flow', 'Happy case', 'Failure / edge case', 'Expected'],
-      ['Login / RBAC', 'JWT hợp lệ, role khớp Mongo', 'JWT expired / missing permission', '200 hoặc 401/403 rõ ràng'],
-      ['QR join', 'Slug + token hợp lệ', 'Token sai, token cũ sau regenerate', 'Không join session'],
-      ['Menu', 'Menu đúng tenant', 'Cache cũ hoặc tenant khác', 'Không lộ cross-tenant data'],
-      ['Cart', 'Version khớp', 'Version cũ, bill locked', '409 conflict hoặc reject mutate'],
-      ['Submit order', 'Cart có item', 'Duplicate idempotency key', 'Không tạo duplicate'],
-      ['Confirm order', 'Stock đủ', 'Stock thiếu / invalid state', 'PROCESSING hoặc giữ PENDING'],
-      ['Service/Bill/Transfer', 'Session/table hợp lệ', 'Session invalid, bàn đích occupied', 'Reject không orphan data'],
+['Login / RBAC', 'Valid JWT, role matches Mongo', 'JWT expired / missing permission', '200 or 401/403 clear'],
+['QR join', 'Slug + valid token', 'Wrong token, old token after regenerate', 'Do not join session'],
+['Menu', 'Menu correct tenant', 'Old cache or other tenant', 'Do not expose cross-tenant data'],
+['Cart', 'Matching version', 'Stale version, bill locked', '409 conflict or reject mutate'],
+['Submit order', 'Cart has items', 'Duplicate idempotency key', 'Do not create duplicate'],
+['Confirm order', 'Enough stock', 'Insufficient stock / invalid state', 'PROCESSING or keep PENDING'],
+['service/Bill/Transfer', 'Session/table valid', 'Session invalid, destination table occupied', 'Reject not orphan data'],
     ], { rowHeight: 45, size: 9.5, widths: ['0.85fr', '1.35fr', '1.55fr', '1.35fr'] }),
   });
 }
@@ -874,14 +874,14 @@ import { slide, surface, bulletList, t, textBlock, C } from './deck-utils.mjs';
 
 export async function slide20(presentation) {
   return slide(presentation, {
-    kicker: '19 · Hiện trạng triển khai',
-    title: 'Phase 2A đã hiện thực hóa sâu luồng ordering end-to-end',
-    subtitle: 'Nên trình bày là “đã hoàn tất phạm vi Phase 2A”, không overclaim production-ready.',
+kicker: '19 · Implementation status',
+title: 'Phase 2A already realizes deep end-to-end ordering flow',
+subtitle: 'Should be presented as “Phase 2A scope completed”, not overclaim production-ready.',
     children: jsxs('hstack', { width: 'fill', gap: 18, children: [
       surface(jsxs('vstack', { gap: 12, children: [
-        textBlock(t('Đã có trong code', { size: 20, weight: 700, color: C.teal })),
+textBlock(t('Already implemented in code', { size: 20, weight: 700, color: C.teal })),
         bulletList([
-          'Order Service: session, cart, order, bill, service request, transfer, outbox.',
+          'Order service: session, cart, order, bill, service request, transfer, outbox.',
           'BFF: customer/admin order REST + WebSocket gateway.',
           'Customer PWA: real tenant/session/cart/order/service/bill APIs.',
           'Management App: real POS orders, service inbox, transfer, QR dynamic tenant.',
@@ -889,13 +889,13 @@ export async function slide20(presentation) {
         ], { size: 14 }),
       ]}), { height: 360 }),
       surface(jsxs('vstack', { gap: 12, children: [
-        textBlock(t('Chưa overclaim', { size: 20, weight: 700, color: C.coral })),
+textBlock(t('Do not overclaim', { size: 20, weight: 700, color: C.coral })),
         bulletList([
-          'Cash/SePay VietQR payment confirmation thuộc Phase 3.',
-          'KDS full realtime và Redis Adapter thuộc Phase 2B.',
-          'Full saga/outbox hardening thuộc Phase 4A.',
-          'SaaS onboarding self-service thuộc Phase 4B.',
-          'Observability/Grafana tracing là phase sau.',
+          'Cash/SePay VietQR payment confirmation belongs to Phase 3.',
+          'KDS full realtime and Redis Adapter belongs to Phase 2B.',
+          'Full saga/outbox hardening belongs to Phase 4A.',
+          'SaaS onboarding self-service belongs to Phase 4B.',
+          'Observability/Grafana tracing is phase sau.',
         ], { size: 14 }),
       ]}), { height: 360, fill: '#FFF1E8' }),
     ]}),
@@ -912,24 +912,24 @@ import { slide, numbered, surface, t, textBlock, C } from './deck-utils.mjs';
 export async function slide21(presentation) {
   return slide(presentation, {
     kicker: '20 · Demo narrative',
-    title: 'Demo nên chứng minh kiến trúc, không chỉ bấm qua UI',
-    subtitle: 'Mỗi bước demo nên nói rõ request đi qua thành phần nào và state đổi ở đâu.',
+    title: 'Demo should demonstrate architecture, not just click through UI',
+    subtitle: 'Each demo step should clearly state which components the request goes through and where the state changes.',
     children: jsxs('hstack', { width: 'fill', gap: 18, children: [
       surface(numbered([
-        'Reseed dev với tenant pho-viet.',
-        'Mở Management App xem bàn và QR.',
-        'Mở Customer PWA từ QR URL.',
+        'Reseed dev with tenant pho-viet.',
+        'Open Management App to see table and QR.',
+        'Open Customer PWA from QR URL.',
         'Resolve tenant, validate QR, join session.',
-        'Xem menu thật, thêm món vào cart Redis.',
-        'Submit order tạo PENDING order.',
-        'POS thấy order pending.',
-        'Waiter confirm order, Catalog deduct stock.',
-        'Customer tracking cập nhật status.',
-        'Gửi service request hoặc transfer table.',
+        'See real menu, add items to cart Redis.',
+        'Submit order creates PENDING order.',
+        'POS sees order pending.',
+        'Waiter confirmation order, Catalog deduct stock.',
+        'Customer tracking status update.',
+        'Send service request or transfer table.',
       ], { size: 14 }), { height: 390 }),
       surface(jsxs('vstack', { gap: 14, children: [
-        textBlock(t('Câu nói xuyên suốt demo', { size: 20, weight: 700, color: C.teal })),
-        textBlock(t('Một thao tác UI đi qua BFF guard/controller, chuyển thành TCP command đến service sở hữu domain, ghi PostgreSQL/Redis, rồi trả response hoặc phát realtime/Kafka event đúng vai trò.', { size: 21, color: C.ink })),
+        textBlock(t('Speech throughout demo', { size: 20, weight: 700, color: C.teal })),
+        textBlock(t('A UI operation goes through the BFF guard/controller, turns into a TCP command to the service that owns the domain, records PostgreSQL/Redis, then returns a response or broadcasts a realtime/Kafka event in the correct role.', { size: 21, color: C.ink })),
       ]}), { height: 390, fill: '#E6F4F1', padding: 26 }),
     ]}),
   });
@@ -945,8 +945,8 @@ import { slide, surface, node, arrow, t, textBlock, C } from './deck-utils.mjs';
 export async function slide22(presentation) {
   return slide(presentation, {
     kicker: '21 · Roadmap / Conclusion',
-    title: 'Kiến trúc lõi đã chứng minh được flow đặt món; các phase sau mở rộng chiều sâu vận hành',
-    subtitle: 'Deck này có thể tiếp tục lớn dần thành slide bảo vệ chính thức khi các phase tiếp theo hoàn thành.',
+    title: 'Core architecture already proves ordering flow; The following phases expand operational depth',
+    subtitle: 'This deck can continue to grow into an official protective slide when the next phases are completed.',
     children: jsxs('vstack', { width: 'fill', gap: 20, children: [
       jsxs('hstack', { width: 'fill', gap: 10, align: 'center', children: [
         node('Phase 2A', 'Permissions + Order + Kafka implemented', { width: 180, fill: '#E6F4F1' }),
@@ -960,8 +960,8 @@ export async function slide22(presentation) {
         node('Phase 5-7', 'Observability, tests, final demo', { width: 180, fill: '#F3F4F6' }),
       ]}),
       surface(jsxs('vstack', { gap: 16, children: [
-        textBlock(t('Kết luận', { size: 20, weight: 700, color: C.teal })),
-        textBlock(t('QRTable không chỉ là một app đặt món bằng QR. Đây là nền tảng SaaS POS đa tenant, có BFF kiểm soát auth/RBAC, service boundary theo ownership, Redis cho runtime state, Kafka cho domain event và flow ordering end-to-end đã được hiện thực hóa đến Phase 2A.', { size: 22, color: C.ink })),
+        textBlock(t('Conclusion', { size: 20, weight: 700, color: C.teal })),
+        textBlock(t('QRTable is not just a QR ordering app. This is a multi-tenant SaaS POS platform, with BFF controlling auth/RBAC, service boundary by ownership, Redis for runtime state, Kafka for domain event and flow ordering end-to-end already realized to Phase 2A.', { size: 22, color: C.ink })),
       ]}), { height: 190, fill: C.paper, padding: 28 }),
     ]}),
   });
@@ -983,7 +983,7 @@ const profilePlan = `task mode: create
 primary deck-profile: engineering-platform
 secondary gates: product-platform narrative, appendix-light test matrix
 required proof objects: architecture map, communication model, RBAC flow, QR/session flow, cart/order flow, confirm/Kafka flow, test matrix, roadmap
-source requirements: local docs/business-logic.md, docs/technical-architecture.md, docs/implementation_plan.md, docs/phases/phase-2a-order-kafka.md, docs/phases/phase-2b-kitchen-websocket.md, docs/specs/business-logic-step-2.4-spec.vi.md, docs/architecture/permission-matrix.md, docs/references/auth-system-reference.md, recent git log
+source requirements: local docs/business-logic.md, docs/technical-architecture.md, docs/implementation_plan.md, docs/phases/phase-2a-order-kafka.md, docs/phases/phase-2b-kitchen-websocket.md, docs/specs/business-logic-step-2.4-spec.md, docs/architecture/permission-matrix.md, docs/references/auth-system-reference.md, recent git log
 known missing inputs: official university template and presenter/student metadata are not provided
 `;
 await fs.writeFile(path.join(workspace, 'profile-plan.txt'), profilePlan, 'utf8');
@@ -993,7 +993,7 @@ const sourceNotes = `Sources used:
 - docs/technical-architecture.md
 - docs/implementation_plan.md
 - docs/phases/phase-2a-order-kafka.md
-- docs/specs/business-logic-step-2.4-spec.vi.md
+- docs/specs/business-logic-step-2.4-spec.md
 - docs/architecture/permission-matrix.md
 - docs/references/auth-system-reference.md
 - docs/phases/phase-2a-order-kafka.md

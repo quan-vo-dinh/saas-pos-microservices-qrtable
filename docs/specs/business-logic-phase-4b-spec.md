@@ -1,237 +1,259 @@
-# Phase 4B — Đặc Tả Nghiệp Vụ & Kiến Trúc SaaS Onboarding + Subscription + Payment Two-Tier
+# Phase 4B — SaaS Architecture & Business Specification Onboarding + Subscription + Payment Two-Tier
 
-> **Giai đoạn:** Phase 4B — SaaS Service mở rộng + Tenant lifecycle + Subscription/Plan + Onboarding + Feature Gating + Two-tier Payment (Tier 1 Customer→Tenant qua OAuth2 SePay Connect, Tier 2 Tenant→Platform qua VietQR auto-webhook) + Admin/Dashboard UI.
-> **Ngày:** 2026-05-11.
-> **Trạng thái:** ✅ **Chốt** sau các vòng audit Phase 4B và quyết định Q1–Q25 của project owner.
-> **Mục đích:** Tài liệu này là **tiêu chuẩn nghiệp vụ + kiến trúc đã chốt** cho Phase 4B. Không phải implementation plan, không phân rã task code. Trạng thái triển khai cuối cùng xem [`docs/phases/phase-4b-saas-onboarding.md`](../phases/phase-4b-saas-onboarding.md).
+> **Phase:** Phase 4B — SaaS service expansion + tenant lifecycle + Subscription/Plan + Onboarding + Feature Gating + Two-tier Payment (Tier 1 Customer→tenant via OAuth2 SePay Connect, Tier 2 tenant→Platform via VietQR auto-webhook) + Admin/Dashboard UI.
+> **Date:** 2026-05-11.
+> **Status:** ✅ **Finalized** after Phase 4B audit rounds and Q1–Q25 decisions of the project Owner.
+> **Purpose:** This document is the **finalized architecture + business standard** for Phase 4B. Not implementation plan, not task code decomposition. Final deployment status see [Phase 4B record](../phases/phase-4b-saas-onboarding.md).
 
 ---
 
-## 0. Biên Bản Quyết Định (Locked)
+## 0. Record of Decision (Locked)
 
-| Q                  | Quyết định         | Nội dung chốt                                                                                                                                                                                             |
-| ------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1                 | C                  | Giữ cả `isActive: boolean` (public DTO) + `status: TenantStatus` (admin DTO). Mapper derive `isActive = (status === 'ACTIVE')`.                                                                           |
-| Q2                 | B                  | Tenant `SUSPENDED` → **read-only mode**: customer xem được cart/order đã đặt, không submit thêm; cho phép thanh toán bills `PENDING_PAYMENT`; staff không tạo bàn/order mới.                              |
-| Q3                 | B                  | Tách 3 domain permission mới: `tenant.*` (lifecycle), `subscription.*`, `plan.*`. Deprecate `saas.*` legacy (migration script).                                                                           |
-| Q4                 | A                  | Reserved slug words = hardcoded const trong `libs/constants/src/lib/saas.constants.ts` (~40 keywords — §7.2).                                                                                             |
-| Q5                 | B                  | Cron auto-suspend chạy daily lúc `02:00 Asia/Ho_Chi_Minh`, grace period **24h** (suspend khi `expires_at + 1 day < now()`).                                                                               |
-| Q6                 | C                  | Hybrid feature gating: BFF `TenantPlanGuard` check optimistic (UX), target service backup check trong TX (correctness).                                                                                   |
-| Q7                 | B                  | Onboarding = mini-saga in-process (in SaaS service). Compensation: rollback DB + cleanup cron quét orphan Keycloak users.                                                                                 |
-| Q8                 | A                  | Self-service registration wizard **defer post-thesis**. Phase 4B chỉ làm admin-assisted onboarding qua `/admin/tenants/onboard`.                                                                          |
-| Q9                 | a + b + c          | (a) SePay webhook đến khi suspended → **vẫn process** (idempotent + audit `WEBHOOK_AFTER_SUSPEND`). (b) Order `PROCESSING` → kitchen finish đến `Served`. (c) WS banner cảnh báo, không force disconnect. |
-| Q10                | A                  | `/admin/*` thuộc `apps/management-app` (filter qua middleware role check). Không tách app riêng.                                                                                                          |
-| Q11                | A → D              | Phase 4B **không** thêm notification channel cho suspend. Phase 4C sẽ thêm `Notification.send_tenant_suspended` TCP endpoint (task model, không Kafka).                                                   |
-| Q12                | C                  | Data retention sau `CLOSED` = defer. Phase 4B chỉ soft-flag + disable Keycloak owner. Hard-delete cron là post-thesis.                                                                                    |
-| Q13                | C                  | Counter `max_orders_per_day` time-zone = hardcoded `Asia/Ho_Chi_Minh` (target market VN).                                                                                                                 |
-| Q14                | defaults           | Legacy tenants migrate: (a) backfill `Free` plan với `expires_at = NULL`; (b) `isActive=false` → `status='SUSPENDED'`; (c) `default_currency='VND'`, `default_locale='vi-VN'`.                            |
-| Q15                | A → C              | Phase 4B: SUPER_ADMIN nhập password thủ công khi onboard. Phase 4C (sau SMTP) upgrade thành Keycloak `Required Action: UPDATE_PASSWORD` + email reset link.                                               |
-| Q16                | B                  | Landing page = static với pricing table (đọc từ `GET /public/plans`) + CTA "Đăng nhập" + "Liên hệ admin" (mailto). **BẮT BUỘC áp dụng skill `ui-ux-pro-max` khi triển khai.**                             |
-| Q17, Q18, Q19, Q20 | **N/A** (replaced) | Round 2 questions dựa trên giả định sai. Replaced bởi Q23 + Q24 sau khi verify SePay capabilities.                                                                                                        |
-| Q21                | Confirm            | Hai webhook prefix: `QRTBL*` (Tier 1, bill payment, vào tenant's bank) và `QRSUB*` (Tier 2, subscription invoice, vào platform's bank). Document trong `BILL_REF_PREFIXES`.                               |
-| Q22                | A                  | `tenant_payment_settings` entity thuộc Payment Service (`qrtable_payment` DB). SaaS gọi TCP `payment.tenant_settings.*` khi cần.                                                                          |
-| Q23                | α (OAuth2 Connect) | Tier 1 = OAuth2 Connect. Tenant tự đăng ký SePay account → OAuth flow trong QRTable → QRTable lưu access_token + auto setup webhook qua API (`POST /v1/webhook`).                                         |
-| Q24                | C                  | Tier 2 = Auto VietQR webhook + manual fallback. SUPER_ADMIN có thể manual assign plan trong `/admin/tenants/:id` cho edge case.                                                                           |
-| Q25                | E (Resolved)       | **OAuth2 client đã có** từ SePay support (Client ID + Client Secret obtained). Triển khai real OAuth2 flow bằng env vars thật; mock OAuth2 server local chỉ phục vụ automated tests/local isolation.      |
+| Q                  | Decision           | Closing content                                                                                                                                                                                         |
+| ------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1                 | C                  | Keep both `isActive: boolean` (public DTO) + `status: TenantStatus` (admin DTO). Mapper derive `isActive = (status === 'ACTIVE')`.                                                                      |
+| Q2                 | B                  | tenant `SUSPENDED` → **read-only mode**: customer can view cart/order already placed, no further submission; authorize payment of bills `PENDING_PAYMENT`; Staff does not create new tables/orders.     |
+| Q3                 | B                  | Separate 3 new domain permissions: `tenant.*` (lifecycle), `subscription.*`, `plan.*`. Deprecate `saas.*` legacy (migration script).                                                                    |
+| Q4                 | A                  | Reserved slug words = hardcoded const in `libs/constants/src/lib/saas.constants.ts` (~40 keywords — §7.2).                                                                                              |
+| Q5                 | B                  | Cron auto-suspend runs daily at `02:00 Asia/Ho_Chi_Minh`, grace period **24h** (suspend at `expires_at + 1 day < now()`).                                                                               |
+| Q6                 | C                  | Hybrid feature gating: BFF `TenantPlanGuard` check optimism (UX), target service backup check in TX (correctness).                                                                                      |
+| Q7                 | B                  | Onboarding = mini-saga in-process (in SaaS service). Compensation: rollback DB + cleanup cron scan orphan Keycloak users.                                                                               |
+| Q8                 | A                  | Self-service registration wizard **defer post-thesis**. Phase 4B only does admin-assisted onboarding via `/admin/tenants/onboard`.                                                                      |
+| Q9                 | a + b + c          | (a) SePay webhook until suspended → **still in process** (idempotent + audit `WEBHOOK_AFTER_SUSPEND`). (b) Order `PROCESSING` → kitchen finish to `Served`. (c) WS warning banner, no force disconnect. |
+| Q10                | A                  | `/admin/*` belongs to `apps/management-app` (filtered through middleware role check). Do not separate apps.                                                                                             |
+| Q11                | A → D              | Phase 4B **does** add a notification channel for suspend. Phase 4C will add `Notification.send_tenant_suspended` TCP endpoint (task model, not Kafka).                                                  |
+| Q12                | C                  | Data retention after `CLOSED` = defer. Phase 4B only soft-flag + disable Keycloak Owner. Hard-delete cron is post-thesis.                                                                               |
+| Q13                | C                  | Counter `max_orders_per_day` time-zone = hardcoded `Asia/Ho_Chi_Minh` (target market VN).                                                                                                               |
+| Q14                | defaults           | Legacy tenants migrate: (a) backfill `Free` plan with `expires_at = NULL`; (b) `isActive=false` → `status='SUSPENDED'`; (c) `default_currency='VND'`, `default_locale='vi-VN'`.                         |
+| Q15                | A → C              | Phase 4B: SUPER_ADMIN enters password manually when onboard. Phase 4C (after SMTP) upgrade to Keycloak `Required Action: UPDATE_PASSWORD` + email reset link.                                           |
+| Q16                | B                  | Landing page = static with pricing table (read from `GET /public/plans`) + CTA "Log in" + "Contact admin" (mailto). **REQUIRED to apply skill `ui-ux-pro-max` when deploying.**                         |
+| Q17, Q18, Q19, Q20 | **N/A** (replaced) | Round 2 questions are based on false assumptions. Replaced by Q23 + Q24 after verifying SePay capabilities.                                                                                             |
+| Q21                | Confirm            | Two webhook prefixes: `QRTBL*` (Tier 1, bill payment, goes to tenant's bank) and `QRSUB*` (Tier 2, subscription invoice, goes to platform's bank). Document in `BILL_REF_PREFIXES`.                     |
+| Q22                | A                  | `tenant_payment_settings` entity belongs to Payment service (`qrtable_payment` DB). SaaS calls TCP `payment.tenant_settings.*` when needed.                                                             |
+| Q23                | α (OAuth2 Connect) | Tier 1 = OAuth2 Connect. tenant self-registers SePay account → OAuth flow in QRTable → QRTable saves access_token + auto setup webhook via API (`POST /v1/webhook`).                                    |
+| Q24                | C                  | Tier 2 = Auto VietQR webhook + manual fallback. SUPER_ADMIN can manually assign plan in `/admin/tenants/:id` for edge case.                                                                             |
+| Q25                | E (Resolved)       | **OAuth2 client available** from SePay support (Client ID + Client Secret obtained). Deploy real OAuth2 flow using real env vars; mock OAuth2 server local only serves automated tests/local isolation. |
 
-### 0.1 Tài Liệu Này Override Điểm Nào?
+### 0.1 What Points Does This Document Override?
 
-1. **Tenant entity (`libs/entities/src/lib/tenant.entity.ts`):** mở rộng từ 4 cột → 11+ cột. `isActive` được giữ làm derived field (Q1=C).
-2. **Permission matrix:** 66 permissions trong code hiện tại (Q3=B), gồm `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`; giữ `saas.*` legacy/backward compatibility.
-3. **Payment Service (Phase 3):** **refactor** đọc bank info từ `tenant_payment_settings` (Q22=A) thay vì env var `PAYMENT_SEPAY_QR_*` (vẫn giữ env làm fallback dev).
-4. **BFF webhook routing:** từ single endpoint `/payment/sepay/webhook` (Phase 3) → 2 endpoints + prefix-based routing (Q21):
-   - `/payment/sepay/webhook/platform` cho Tier 2 (`QRSUB*`)
-   - `/payment/sepay/webhook/:tenantSlug` cho Tier 1 (`QRTBL*`)
-5. **TenantGuard (`libs/guards/src/lib/tenant.guard.ts`):** mở rộng check Redis flag `tenant:{id}:suspended` trước khi pass qua PermissionGuard.
-6. **Customer PWA SessionGuard:** thêm check tenant status. Block submit order khi `SUSPENDED`, cho phép read + payment.
-7. **Phase 4B không thực hiện:**
+1. **tenant entity (`libs/entities/src/lib/tenant.entity.ts`):** expands from 4 columns → 11+ columns. `isActive` is kept as a derived field (Q1=C).
+2. **Permission matrix:** 66 permissions in the current code (Q3=B), including `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`; keep `saas.*` legacy/backward compatibility.
+3. **Payment service (Phase 3):** **refactor** reads bank info from `tenant_payment_settings` (Q22=A) instead of env var `PAYMENT_SEPAY_QR_*` (still keeping env as fallback dev).
+4. **BFF webhook routing:** from single endpoint `/payment/sepay/webhook` (Phase 3) → 2 endpoints + prefix-based routing (Q21):
+   - `/payment/sepay/webhook/platform` for Tier 2 (`QRSUB*`)
+   - `/payment/sepay/webhook/:tenantSlug` for Tier 1 (`QRTBL*`)
+5. **TenantGuard (`libs/guards/src/lib/tenant.guard.ts`):** extends Redis check flag `tenant:{id}:suspended` before passing through PermissionGuard.
+6. **Customer PWA SessionGuard:** added check tenant status. Block submit order when `SUSPENDED`, allow read + payment.
+7. **Phase 4B not implemented:**
    - Self-service registration wizard (Q8=A defer).
    - Hard-delete CLOSED tenant data (Q12=C defer).
-   - Notification email khi suspend (Q11 chờ Phase 4C).
+   - Notification email when suspending (Q11 waiting for Phase 4C).
    - Internationalization (Q13 hardcoded VN).
    - Partial subscription refund (post-thesis).
 
 ### 0.2 Path Chosen = "Path 2.5"
 
-Hybrid giữa Path 2 và Path 3 trong audit §22:
+Hybrid between Path 2 and Path 3 in audit §22:
 
-- **Onboarding admin-assisted** (Path 2): SUPER_ADMIN tạo tenant qua `/admin/tenants` modal. Không có self-service wizard.
-- **Sau onboarding: 100% automated** (Path 3):
-  - Tenant tự đăng nhập → tự kết nối SePay (OAuth2) → tự config bank → tự nhận tiền customer.
-  - Tenant tự thanh toán subscription qua VietQR auto-webhook → plan tự kích hoạt < 30s.
-- **Result:** Demo "production-grade SaaS" mà không cần xây toàn bộ wizard 4 bước. Trade-off cost-benefit tối ưu cho thesis.
+- **Onboarding admin-assisted** (Path 2): SUPER_ADMIN creates tenant via `/admin/tenants` modal. There is no self-service wizard.
+- **After onboarding: 100% automated** (Path 3):
+  - tenant automatically logs in → automatically connects to SePay (OAuth2) → automatically configures the bank → automatically receives customer money.
+  - Tenants self-pay subscriptions via VietQR auto-webhook → self-activate plan < 30 seconds.
+- **Result:** Demo "production-grade SaaS" without building the entire 4-step wizard. Trade-off cost-benefit optimal for thesis.
 
 ---
 
-## 1. Cơ Sở Tài Liệu và Verification
+## 1. Documentation and Verification
 
-### 1.1 Cơ Sở Trong Repo
+### 1.1 Facility in Repo
 
 - `docs/phases/phase-4b-saas-onboarding.md` — final phase record.
-- `docs/business-logic.md` §1 (Onboarding), §9 (Permissions), §B (Tenant Status), §D (Tenant Isolation).
-- `docs/technical-architecture.md` §5 (Multi-tenancy), §6.2.3 (SaaS Service), §7.2-7.4 (Kafka 4P+2AP), §8 (Auth), §11.2 (Redis Access Policy).
+- `docs/business-logic.md` §1 (Onboarding), §9 (Permissions), §B (tenant Status), §D (tenant Isolation).
+- `docs/technical-architecture.md` §5 (Multi-tenancy), §6.2.3 (SaaS service), §7.2-7.4 (Kafka 4P+2AP), §8 (Auth), §11.2 (Redis Access Policy).
 - `docs/architecture/permission-matrix.md` (canonical 6 roles × 66 permissions).
 - `docs/architecture/erd.dbml` + `erd_explanation.md`.
-- `docs/specs/business-logic-phase-3-spec.vi.md` — pattern reference cho spec format.
-- `docs/phases/phase-3-payment.md` — Payment/outbox pattern đã triển khai.
-- Code hiện tại: `Tenant`, `SaasService`, `PaymentSettlementService`, `OutboxEventEntity` (Order), `PaymentOutboxEventEntity`, `KeycloakHttpService`, `User` (Mongo schema), `TenantGuard`, `SessionGuard`.
+- `docs/specs/business-logic-phase-3-spec.md` — pattern reference for spec format.
+- `docs/phases/phase-3-payment.md` — Payment/outbox pattern implemented.
+- Current code: `tenant`, `SaasService`, `PaymentSettlementService`, `OutboxEventEntity` (Order), `PaymentOutboxEventEntity`, `KeycloakHttpService`, `User` (Mongo schema), `TenantGuard`, `SessionGuard`.
 
-### 1.2 Verification từ Context7 + Live Docs (SePay)
+### 1.2 Verification from Context7 + Live Docs (SePay)
 
-| Capability                                                                                                               | Verified | Source                                                                                              |
-| ------------------------------------------------------------------------------------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------- |
-| OAuth2 Authorization Code flow (`/oauth/authorize` + `/oauth/token`)                                                     | ✅       | `developer.sepay.vn/vi/sepay-oauth2/luong-xac-thuc`                                                 |
-| Scopes: `bank-account:read`, `transaction:read`, `webhook:read`, `webhook:write`, `webhook:delete`, `profile`, `company` | ✅       | `docs.sepay.vn/oauth2/`                                                                             |
-| Self-service OAuth2 app registration                                                                                     | ❌       | `docs.sepay.vn/oauth2/dang-ky-ung-dung.html` — phải liên hệ support                                 |
-| `GET /api/v1/bank-accounts` (list bank accounts của tenant)                                                              | ✅       | `developer.sepay.vn/vi/sepay-oauth2/tai-khoan-ngan-hang`                                            |
-| `POST /v1/webhook` (programmatic webhook upsert)                                                                         | ✅       | `developer.sepay.vn/vi/bankhub/api/api-webhook/cap-nhat-webhook`                                    |
-| Webhook authentication                                                                                                   | ✅       | Phase 3 direct route hiện dùng HMAC; Phase 4B tenant/platform routes dùng `x-secret-key` path riêng |
-| Pricing FREE 50tx/month + full API access                                                                                | ✅       | `sepay.vn/bang-gia.html`                                                                            |
-| Không giới hạn bank accounts mỗi SePay account                                                                           | ✅       | FAQ `sepay.vn/bang-gia.html`                                                                        |
+| Capability                                                                                                               | Verified | Source                                                                                                      |
+| ------------------------------------------------------------------------------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------- |
+| OAuth2 Authorization Code flow (`/oauth/authorize` + `/oauth/token`)                                                     | ✅       | `developer.sepay.vn/vi/sepay-oauth2/luong-xac-thuc`                                                         |
+| Scopes: `bank-account:read`, `transaction:read`, `webhook:read`, `webhook:write`, `webhook:delete`, `profile`, `company` | ✅       | `docs.sepay.vn/oauth2/`                                                                                     |
+| Self-service OAuth2 app registration                                                                                     | ❌       | `docs.sepay.vn/oauth2/dang-ky-ung-dung.html` — must contact support                                         |
+| `GET /api/v1/bank-accounts` (list bank accounts of tenant)                                                               | ✅       | `developer.sepay.vn/vi/sepay-oauth2/tai-khoan-ngan-hang`                                                    |
+| `POST /v1/webhook` (programmatic webhook upsert)                                                                         | ✅       | `developer.sepay.vn/vi/bankhub/api/api-webhook/cap-nhat-webhook`                                            |
+| Webhook authentication                                                                                                   | ✅       | Phase 3 direct route currently uses HMAC; Phase 4B tenant/platform routes uses `x-secret-key` separate path |
+| Pricing FREE 50tx/month + full API access                                                                                | ✅       | `sepay.vn/bang-gia.html`                                                                                    |
+| Unlimited bank accounts per SePay account                                                                                | ✅       | FAQ `sepay.vn/bang-gia.html`                                                                                |
 
-**Cost analysis cho thesis demo:** 0đ (1 platform SePay free + N tenant SePay free, mỗi cái 50 tx/tháng).
+**Cost analysis for thesis demo:** 0 VND (1 SePay free platform + N SePay free tenants, each 50 tx/month).
 
-### 1.3 OAuth2 Credentials đã Được Cấp (Q25=E)
+### 1.3 OAuth2 Credentials Issued (Q25=E)
 
-- ✅ **Client ID + Client Secret từ SePay support đã obtained** (xem `.env` config — Q23 + Q25 resolved).
+- ✅ **Client ID + Client Secret from SePay support already obtained** (xem `.env` config — Q23 + Q25 resolved).
 - **Redirect URI registered:** `https://saas-pos-microservices-qrtable-mana.vercel.app/dashboard/payment-settings/sepay-callback`.
-- Local dev/backend webhook: dùng tunnel (ngrok/cloudflared hoặc equivalent) để expose backend và cấu hình `PUBLIC_API_BASE_URL`; redirect URI có thể thêm `http://localhost:3001/dashboard/payment-settings/sepay-callback` cho dev nếu SePay cho phép.
-- Mock OAuth2 local không còn là fallback chiến lược cho thesis demo; chỉ dùng cho automated tests hoặc dev isolation khi không muốn gọi SePay thật.
+- Local dev/backend webhook: use tunnel (ngrok/cloudflared or equivalent) to expose backend and configure `PUBLIC_API_BASE_URL`; redirect URI can add `http://localhost:3001/dashboard/payment-settings/sepay-callback` for dev if SePay allows it.
+- Mock OAuth2 local is no longer a strategic fallback for thesis demo; Only used for automated tests or dev isolation when you don't want to call real SePay.
 
 ---
 
-## 2. Phạm Vi và Ngoài Phạm Vi
+## 2. Scope and Out of Scope
 
-### 2.1 Trong Phạm Vi Phase 4B
+### 2.1 Within Phase 4B
 
 #### 2.1.1 Backend
 
-1. **SaaS Service mở rộng (`apps/saas`):**
-   - Tenant CRUD với lifecycle (`ACTIVE` / `SUSPENDED` / `CLOSED`).
-   - Slug generation Vietnamese-aware + reserved words check.
-   - Subscription CRUD + Plan CRUD.
-   - Onboarding mini-saga in-process (orchestrate Authorizer + User-Access + Catalog + DB).
-   - Cron daily auto-suspend `02:00 Asia/Ho_Chi_Minh` (grace 24h).
-   - Subscription invoice generation + auto-activate via webhook.
-   - Outbox pattern cho `tenant.created` Kafka.
-2. **Payment Service refactor (`apps/payment`):**
-   - Thêm entity `tenant_payment_settings` (per-tenant bank info + SePay OAuth tokens).
-   - Refactor `PaymentSettlementService` đọc bank từ DB thay vì env var.
-   - OAuth2 client logic (token storage, auto-refresh, bank list, webhook setup).
-   - Webhook routing: prefix `QRTBL*` → Tier 1 bill payment; prefix `QRSUB*` → forward TCP to SaaS Service.
-3. **Authorizer Service mở rộng (`apps/authorizer`):**
-   - Thêm Keycloak Admin operations: `assignRealmRole`, `removeRealmRole`, `disableUser`, `getUserById`.
-4. **User-Access Service mở rộng (`apps/user-access`):**
-   - Thêm `tenantId` field vào `User` Mongo schema + index + auto-set khi `upsertByIdentity`.
-   - Thêm TCP `user.count_by_tenant` cho L1 gating (`max_staff`).
-5. **Catalog Service mở rộng (`apps/catalog`):**
-   - Kafka consumer `tenant.created` → seed default area "Khu vực chung".
-   - Thêm TCP `catalog.count_tables` cho L1 gating (`max_tables`).
-6. **Order Service mở rộng (`apps/order`):**
+1. **SaaS service extension (`apps/saas`):**
+
+- tenant CRUD with lifecycle (`ACTIVE` / `SUSPENDED` / `CLOSED`).
+  - Slug generation Vietnamese-aware + reserved words check.
+  - Subscription CRUD + Plan CRUD.
+  - Onboarding mini-saga in-process (orchestrate Authorizer + User-Access + Catalog + DB).
+  - Cron daily auto-suspend `02:00 Asia/Ho_Chi_Minh` (grace 24h).
+  - Subscription invoice generation + auto-activate via webhook.
+- Outbox pattern for `tenant.created` Kafka.
+
+2. **Payment service refactor (`apps/payment`):**
+
+- Add entity `tenant_payment_settings` (per-tenant bank info + SePay OAuth tokens).
+- Refactor `PaymentSettlementService` to read bank from DB instead of env var.
+  - OAuth2 client logic (token storage, auto-refresh, bank list, webhook setup).
+  - Webhook routing: prefix `QRTBL*` → Tier 1 bill payment; prefix `QRSUB*` → forward TCP to SaaS service.
+
+3. **Authorizer service extended (`apps/authorizer`):**
+
+- Add Keycloak Admin operations: `assignRealmRole`, `removeRealmRole`, `disableUser`, `getUserById`.
+
+4. **User-Access service extended (`apps/user-access`):**
+
+- Add `tenantId` field to `User` Mongo schema + index + auto-set when `upsertByIdentity`.
+- Add TCP `user.count_by_tenant` for L1 gating (`max_staff`).
+
+5. **Extended service catalog (`apps/catalog`):**
+
+- Kafka consumer `tenant.created` → seed default area "General area".
+- Add TCP `catalog.count_tables` for L1 gating (`max_tables`).
+
+6. **Extended service order (`apps/order`):**
    - Redis counter `quota:{tenantId}:orders:{YYYY-MM-DD-HCM}` (TZ Asia/Ho_Chi_Minh).
-   - L2 backup check trong submit order TX.
+
+- L2 backup check in submit order TX.
+
 7. **BFF (`apps/bff`):**
-   - Routes mới: `/admin/tenants/*`, `/admin/plans/*`, `/admin/billing/*`, `/dashboard/subscription/*`, `/dashboard/billing/*`, `/dashboard/payment-settings/*`, `/public/plans`, `/public/landing-info`.
-   - SePay OAuth callback handler.
-   - Per-tenant webhook routing `/payment/sepay/webhook/:tenantSlug`.
-   - Platform webhook `/payment/sepay/webhook/platform` cho Tier 2.
-   - `TenantPlanGuard` mới (composable với `PermissionGuard`).
-   - `TenantStatusGuard` mới (check Redis suspend flag).
-   - Migration `TenantGuard` để integrate status check.
-   - WebSocket event `tenant.suspended` → broadcast tenant rooms.
+
+- New routes: `/admin/tenants/*`, `/admin/plans/*`, `/admin/billing/*`, `/dashboard/subscription/*`, `/dashboard/billing/*`, `/dashboard/payment-settings/*`, `/public/plans`, `/public/landing-info`.
+  - SePay OAuth callback handler.
+  - Per-tenant webhook routing `/payment/sepay/webhook/:tenantSlug`.
+- Platform webhook `/payment/sepay/webhook/platform` for Tier 2.
+- new `TenantPlanGuard` (composable with `PermissionGuard`).
+- `TenantStatusGuard` new (check Redis suspend flag).
+- Migration `TenantGuard` to integrate status check.
+  - WebSocket event `tenant.suspended` → broadcast tenant rooms.
 
 #### 2.1.2 Frontend (management-app + customer-pwa)
 
-1. **Landing page (`/` của management-app):**
-   - Static với hero + pricing table (đọc `GET /public/plans`) + CTA.
-   - **BẮT BUỘC áp dụng skill `ui-ux-pro-max`** với product type = SaaS + tone = professional + modern (xem §13.1).
+1. **Landing page (`/` of management-app):**
+
+- Static with hero + pricing table (read `GET /public/plans`) + CTA.
+- **REQUIRED to apply skill `ui-ux-pro-max`** with product type = SaaS + tone = professional + modern (see §13.1).
+
 2. **Admin pages (SUPER_ADMIN):**
    - `/admin` — Platform Overview Dashboard (widgets: tenant counts, expiring soon, MRR).
-   - `/admin/tenants` — Directory với filter + onboard modal + row actions (suspend/activate/close/assign plan).
-   - `/admin/tenants/[id]` — Detail tabs (Overview / Subscription History / Usage / Audit / Billing).
-   - `/admin/plans` — CRUD pricing plans.
-   - `/admin/billing` — Subscription invoices reconciliation.
-3. **Dashboard pages (OWNER + MANAGER):**
-   - `/dashboard` — Thêm widget "Plan & Quota".
-   - `/dashboard/subscription` — Plan detail, compare, history, checkout button.
-   - `/dashboard/billing/[invoiceId]` — VietQR display + polling auto-redirect.
-   - `/dashboard/payment-settings` — SePay Connect button + bank picker + verify status.
-   - `/dashboard/payment-settings/sepay-callback` — OAuth2 callback handler.
+
+- `/admin/tenants` — Directory with filter + onboard modal + row actions (suspend/activate/close/assign plan).
+  - `/admin/tenants/[id]` — Detail tabs (Overview / Subscription History / Usage / Audit / Billing).
+  - `/admin/plans` — CRUD pricing plans.
+  - `/admin/billing` — Subscription invoices reconciliation.
+
+3. **Dashboard pages (Owner + MANAGER):**
+
+- `/dashboard` — Add widget "Plan & Quota".
+  - `/dashboard/subscription` — Plan detail, compare, history, checkout button.
+  - `/dashboard/billing/[invoiceId]` — VietQR display + polling auto-redirect.
+  - `/dashboard/payment-settings` — SePay Connect button + bank picker + verify status.
+  - `/dashboard/payment-settings/sepay-callback` — OAuth2 callback handler.
+
 4. **Customer PWA:**
-   - Banner "Cửa hàng tạm khóa" khi tenant `SUSPENDED`.
-   - Disable "Thêm vào giỏ", "Đặt món" buttons.
-   - Vẫn cho phép xem bill + thanh toán bills `PENDING_PAYMENT` đã tạo.
+
+- Banner "Store temporarily locked" when tenant `SUSPENDED`.
+- Disable "Add to cart", "Order" buttons.
+- Still allowed to view bills + pay bills `PENDING_PAYMENT` created.
+
 5. **Sidebar nav update:**
-   - OWNER: thêm `Subscription`, `Cài đặt thanh toán`, `Thanh toán gói`.
-   - MANAGER: thêm `Subscription` (read-only).
-   - SUPER_ADMIN: thêm `Tenants`, `Plans`, `Billing`.
+
+- Owner: add `Subscription`, `Payment settings`, `Pay plan`.
+- MANAGER: add `Subscription` (read-only).
+- SUPER_ADMIN: add `Tenants`, `Plans`, `Billing`.
 
 #### 2.1.3 Infrastructure
 
-1. Thêm npm deps: `@nestjs/schedule` (cron) + `slugify` (hoặc tự viết §7.1).
+1. Add npm deps: `@nestjs/schedule` (cron) + `slugify` (or write your own §7.1).
 2. SaaS service connect Redis (suspend flag, subscription cache).
-3. SaaS service connect Kafka (producer cho `tenant.created`).
+3. SaaS service connect Kafka (producer for `tenant.created`).
 4. SQL migrations theo §14.
 
-### 2.2 Ngoài Phạm Vi Phase 4B
+### 2.2 Out of Scope Phase 4B
 
 1. **Self-service registration wizard** (Q8=A) — defer post-thesis.
 2. **Hard-delete CLOSED tenant data** (Q12=C) — defer.
-3. **Notification emails** cho lifecycle (welcome / suspended / expired) — Phase 4C.
+3. **Notification emails** for lifecycle (welcome / suspended / expired) — Phase 4C.
 4. **Internationalization** — hardcoded `Asia/Ho_Chi_Minh` + `vi-VN`.
 5. **Partial subscription refund / proration on upgrade-downgrade** — post-thesis.
-6. **Multi-bank support per tenant** (Phase 4B = 1 SePay account → 1 active bank account per tenant; có thể switch nhưng không multi-active).
-7. **Tenant transfer ownership** giữa users — Phase 4C hoặc post-thesis.
+6. **Multi-bank support per tenant** (Phase 4B = 1 SePay account → 1 active bank account per tenant; can switch, but not multi-active).
+7. **tenant transfer ownership** between users — Phase 4C or post-thesis.
 8. **Subscription discount codes / promotions** — post-thesis.
 9. **Webhook replay dashboard** — post-thesis.
-10. **Audit dashboard cho compliance** — post-thesis.
+10. **Audit dashboard for compliance** — post-thesis.
 
 ---
 
-## 3. Service Boundary và Ownership
+## 3. service Boundary and Ownership
 
 ### 3.1 Ownership Matrix
 
-| Concern                                 | Service                                               | Why                                                                                                                               |
-| --------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `tenants` table                         | **SaaS Service** (`qrtable_saas`)                     | Tenant là aggregate root của SaaS domain.                                                                                         |
-| `pricing_plans` table                   | **SaaS Service**                                      | Platform-level entity, không có tenant_id.                                                                                        |
-| `subscriptions` table                   | **SaaS Service**                                      | Subscription = relation Tenant ↔ Plan.                                                                                           |
-| `subscription_invoices` table           | **SaaS Service**                                      | Invoice của Tier 2 (tenant pays platform); thuộc SaaS domain. **Khác** với Payment Service (chỉ owner của Tier 1 customer bills). |
-| `saas_outbox_events` table              | **SaaS Service**                                      | Local outbox cho `tenant.created` + `subscription.activated`.                                                                     |
-| `tenant_payment_settings` table         | **Payment Service** (`qrtable_payment`)               | Bank info + OAuth tokens là payment-domain data (Q22=A).                                                                          |
-| Payment QR generation cho Tier 1        | **Payment Service**                                   | Đã có pattern; chỉ refactor đọc từ DB thay env.                                                                                   |
-| Payment QR generation cho Tier 2        | **SaaS Service**                                      | Subscription invoice ≠ bill; SaaS reuse `PaymentReferenceService` pattern từ Payment.                                             |
-| SePay OAuth2 callback handling          | **Payment Service** (token exchange + storage)        | OAuth flow ends with bank account selection → write to Payment DB.                                                                |
-| Webhook routing                         | **BFF** (prefix-based + tenant slug routing)          | Single entrypoint; route đến TCP đúng service.                                                                                    |
-| Tier 1 webhook handler                  | **Payment Service** (giữ pattern Phase 3)             | Match `QRTBL*` → settle bill.                                                                                                     |
-| Tier 2 webhook handler                  | **SaaS Service** (mới)                                | Match `QRSUB*` → activate subscription.                                                                                           |
-| User profile (`users` Mongo collection) | **User-Access Service**                               | Đã có; thêm `tenantId` field.                                                                                                     |
-| Keycloak user CRUD                      | **Authorizer Service**                                | Đã có; mở rộng.                                                                                                                   |
-| Tenant suspend Redis flag               | **SaaS Service** writes; **BFF guards** read.         | SaaS là source of truth.                                                                                                          |
-| Feature gating logic                    | **BFF `TenantPlanGuard`** + **target service backup** | Q6=C hybrid.                                                                                                                      |
-| Counter `max_orders_per_day`            | **Order Service** (Redis incr)                        | Order là nơi sinh order.                                                                                                          |
-| Counter `max_tables`, `max_staff`       | **Catalog / User-Access** (DB COUNT)                  | Source service owns the count.                                                                                                    |
-| Sidebar nav filtering                   | **management-app** (FE)                               | Existing pattern, mở rộng.                                                                                                        |
+| Concern                                 | service                                               | Why                                                                                                                                          |
+| --------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tenants` table                         | **SaaS service** (`qrtable_saas`)                     | tenant is aggregate root of SaaS domain.                                                                                                     |
+| `pricing_plans` table                   | **SaaS service**                                      | Platform-level entity, has no tenant_id.                                                                                                     |
+| `subscriptions` table                   | **SaaS service**                                      | Subscription = relation tenant ↔ Plan.                                                                                                      |
+| `subscription_invoices` table           | **SaaS service**                                      | Tier 2 Invoice (tenant pays platform); belongs to the SaaS domain. **Different** from Payment service (only Owner of Tier 1 customer bills). |
+| `saas_outbox_events` table              | **SaaS service**                                      | Local outbox for `tenant.created` + `subscription.activated`.                                                                                |
+| `tenant_payment_settings` table         | **Payment service** (`qrtable_payment`)               | Bank info + OAuth tokens is payment-domain data (Q22=A).                                                                                     |
+| Payment QR generation for Tier 1        | **Payment service**                                   | There are already patterns; Just refactor reading from DB instead of env.                                                                    |
+| Payment QR generation for Tier 2        | **SaaS service**                                      | Subscription invoice ≠ bill; SaaS reuse `PaymentReferenceService` pattern from Payment.                                                      |
+| SePay OAuth2 callback handling          | **Payment service** (token exchange + storage)        | OAuth flow ends with bank account selection → write to Payment DB.                                                                           |
+| Webhook routing                         | **BFF** (prefix-based + tenant slug routing)          | Single entrypoint; routes to the correct TCP service.                                                                                        |
+| Tier 1 webhook handler                  | **Payment service** (keeps the pattern Phase 3)       | Match `QRTBL*` → settle bill.                                                                                                                |
+| Tier 2 webhook handler                  | **SaaS service** (new)                                | Match `QRSUB*` → activate subscription.                                                                                                      |
+| User profile (`users` Mongo collection) | **User-Access service**                               | Already exists; add `tenantId` field.                                                                                                        |
+| Keycloak user CRUD                      | **Authorizer service**                                | Already have; extend.                                                                                                                        |
+| tenant suspend Redis flag               | **SaaS service** writes; **BFF guards** read.         | SaaS is source of truth.                                                                                                                     |
+| Feature gating logic                    | **BFF `TenantPlanGuard`** + **target service backup** | Q6=C hybrid.                                                                                                                                 |
+| Counter `max_orders_per_day`            | **Order service** (Redis incr)                        | Order is where order is born.                                                                                                                |
+| Counter `max_tables`, `max_staff`       | **Catalog / User-Access** (DB COUNT)                  | Source service owns the count.                                                                                                               |
+| Sidebar nav filtering                   | **management-app** (FE)                               | Existing pattern, extended.                                                                                                                  |
 
 ### 3.2 Communication Matrix (Phase 4B Additions)
 
 | From            | To               | Protocol                            | Use case                                                                                      |
 | --------------- | ---------------- | ----------------------------------- | --------------------------------------------------------------------------------------------- |
-| BFF             | SaaS Service     | TCP                                 | Onboard tenant, list tenants, lifecycle commands, plan/subscription CRUD, get invoice status. |
-| BFF             | Payment Service  | TCP                                 | tenant_payment_settings CRUD, OAuth2 callback exchange, list SePay bank accounts.             |
+| BFF             | SaaS service     | TCP                                 | Onboard tenant, list tenants, lifecycle commands, plan/subscription CRUD, get invoice status. |
+| BFF             | Payment service  | TCP                                 | tenant_payment_settings CRUD, OAuth2 callback exchange, list SePay bank accounts.             |
 | BFF             | Authorizer       | TCP (existing gRPC for auth verify) | Keycloak admin operations (createUser + assignRole + disableUser).                            |
-| BFF             | User-Access      | TCP                                 | Upsert user profile với tenantId, count staff.                                                |
-| SaaS Service    | Authorizer       | TCP                                 | Onboarding saga step: create Keycloak user.                                                   |
-| SaaS Service    | User-Access      | TCP                                 | Onboarding saga step: upsert profile.                                                         |
-| SaaS Service    | Payment Service  | TCP                                 | Onboarding saga step: init empty `tenant_payment_settings` row.                               |
-| SaaS Service    | Catalog Service  | Kafka (`tenant.created` topic)      | Seed default area (async — outside HTTP TX).                                                  |
-| SaaS Service    | Redis            | Direct                              | Suspend flag set/unset, subscription cache invalidate.                                        |
-| Payment Service | SePay API        | HTTPS                               | OAuth token exchange + refresh + bank list + webhook upsert.                                  |
-| SaaS Service    | SePay (via BFF)  | (via BFF webhook URL)               | Tier 2 webhook reception (BFF → TCP `saas.handle_subscription_webhook`).                      |
-| Order Service   | Redis            | Direct (existing)                   | Counter `quota:*` per-day.                                                                    |
+| BFF             | User-Access      | TCP                                 | Upsert user profile with tenantId, count staff.                                               |
+| SaaS service    | Authorizer       | TCP                                 | Onboarding saga step: create Keycloak user.                                                   |
+| SaaS service    | User-Access      | TCP                                 | Onboarding saga step: upsert profile.                                                         |
+| SaaS service    | Payment service  | TCP                                 | Onboarding saga step: init empty `tenant_payment_settings` row.                               |
+| SaaS service    | Catalog service  | Kafka (`tenant.created` topic)      | Seed default area (async — outside HTTP TX).                                                  |
+| SaaS service    | Redis            | Direct                              | Suspend flag set/unset, subscription cache invalidate.                                        |
+| Payment service | SePay API        | HTTPS                               | OAuth token exchange + refresh + bank list + webhook upsert.                                  |
+| SaaS service    | SePay (via BFF)  | (via BFF webhook URL)               | Tier 2 webhook reception (BFF → TCP `saas.handle_subscription_webhook`).                      |
+| Order service   | Redis            | Direct (existing)                   | Counter `quota:*` per-day.                                                                    |
 | BFF             | Redis            | Direct (existing)                   | Read suspend flag, subscription cache (5min TTL).                                             |
-| Cron Worker     | SaaS Service     | In-process (`@nestjs/schedule`)     | Daily auto-suspend.                                                                           |
+| Cron Worker     | SaaS service     | In-process (`@nestjs/schedule`)     | Daily auto-suspend.                                                                           |
 | Authorizer Cron | Keycloak + Mongo | Direct                              | Orphan KC user cleanup (compensation for onboarding saga failure).                            |
 
 ### 3.3 Database Topology (Updated)
@@ -325,25 +347,25 @@ Redis (Phase 4B additions)
 
 #### Transition Rules
 
-| From      | To         | Trigger                                                                                      | Actor        | Side-effects                                                                                                                                |
-| --------- | ---------- | -------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| (initial) | ACTIVE     | Onboarding (Free plan, expires_at=NULL) hoặc admin assign plan hoặc Tier 2 webhook activate. | SaaS Service | Insert row. If supersede: set old `SUPERSEDED`. Update `tenant.subscription_summary` cache.                                                 |
-| ACTIVE    | EXPIRED    | Cron daily detect `expires_at + 24h < now() AND status='ACTIVE' AND plan_code != 'FREE'`.    | Cron         | Update row `status='EXPIRED'`. Trigger tenant transition `ACTIVE → SUSPENDED`. Outbox `subscription.expired` (Phase 4C consumer for email). |
-| ACTIVE    | SUPERSEDED | New subscription `ACTIVE` đã insert (upgrade scenario).                                      | SaaS Service | Set `status='SUPERSEDED'`, `superseded_by_subscription_id=<new_id>`.                                                                        |
-| ACTIVE    | CANCELED   | User clicks "Hủy" trên `/dashboard/subscription`.                                            | OWNER        | Set `status='CANCELED'`, `canceled_at=now()`, `canceled_reason`. Tenant tiếp tục dùng đến `expires_at`; sau đó cron handle như EXPIRED.     |
-| EXPIRED   | (—)        | Terminal cho subscription row. Admin can create new `ACTIVE` subscription.                   | —            | —                                                                                                                                           |
+| From      | To         | Trigger                                                                                   | Actor        | Side-effects                                                                                                                                |
+| --------- | ---------- | ----------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| (initial) | ACTIVE     | Onboarding (Free plan, expires_at=NULL) or admin assign plan or Tier 2 webhook activate.  | SaaS service | Insert row. If supersede: set old `SUPERSEDED`. Update `tenant.subscription_summary` cache.                                                 |
+| ACTIVE    | EXPIRED    | Cron daily detect `expires_at + 24h < now() AND status='ACTIVE' AND plan_code != 'FREE'`. | Cron         | Update row `status='EXPIRED'`. Trigger tenant transition `ACTIVE → SUSPENDED`. Outbox `subscription.expired` (Phase 4C consumer for email). |
+| ACTIVE    | SUPERSEDED | New subscription `ACTIVE` already insert (upgrade scenario).                              | SaaS service | Set `status='SUPERSEDED'`, `superseded_by_subscription_id=<new_id>`.                                                                        |
+| ACTIVE    | CANCELED   | User clicks "Cancel" on `/dashboard/subscription`.                                        | Owner        | Set `status='CANCELED'`, `canceled_at=now()`, `canceled_reason`. tenant continues to use `expires_at`; then cron handle like EXPIRED.       |
+| EXPIRED   | (—)        | Terminal for subscription row. Admin can create new `ACTIVE` subscription.                | —            | —                                                                                                                                           |
 
 #### Invariants
 
-- **Tại 1 thời điểm, mỗi tenant chỉ có MỘT subscription với `status='ACTIVE'`.** UNIQUE partial index `(tenant_id) WHERE status='ACTIVE'`.
-- Free plan: `expires_at=NULL`, **không** bị cron auto-suspend.
-- Khi insert subscription mới với plan khác: existing ACTIVE → SUPERSEDED (transaction atomic).
+- **At a time, each tenant has only ONE subscription with `status='ACTIVE'`.** UNIQUE partial index `(tenant_id) WHERE status='ACTIVE'`.
+- Free plan: `expires_at=NULL`, **no** cron auto-suspend.
+- When inserting a new subscription with a different plan: existing ACTIVE → SUPERSEDED (transaction atomic).
 
 ### 4.3 SubscriptionInvoice Lifecycle (Tier 2)
 
 ```
    create
-   (Owner clicks "Thanh toán")
+(Owner clicks "Payment")
         │
         ▼
    [PENDING]    ←── expire (24h TTL — cron)
@@ -351,25 +373,25 @@ Redis (Phase 4B additions)
         │  │ (terminal)
         │  │
         ▼  ▼
-   [PAID]  (terminal — kích hoạt subscription)
+[PAID] (terminal — enable subscription)
         │
-        │ (admin only — refund không có trong Phase 4B)
+│ (admin only — refund not available in Phase 4B)
         ▼
    [CANCELED] (terminal)
 ```
 
 | From    | To       | Trigger                                                 | Actor               | Side-effects                                                                                    |
 | ------- | -------- | ------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------- |
-| (init)  | PENDING  | Owner click "Thanh toán" trên `/dashboard/subscription` | OWNER               | Insert row, generate QR URL, `expires_at = now() + 24h`.                                        |
+| (init)  | PENDING  | Owner click "Pay" on `/dashboard/subscription`          | Owner               | Insert row, generate QR URL, `expires_at = now() + 24h`.                                        |
 | PENDING | PAID     | Tier 2 webhook match `QRSUB*` prefix + amount valid.    | SePay webhook       | Set `paid_at`, `sepay_transaction_id`, `paid_amount`. Trigger subscription create/renew (§9.2). |
-| PENDING | EXPIRED  | Cron detect `expires_at < now() AND status='PENDING'`.  | Cron (every 1h)     | Set `status='EXPIRED'`. Subscription **không** kích hoạt.                                       |
-| PENDING | CANCELED | SUPER_ADMIN manual override hoặc Owner click "Hủy QR".  | SUPER_ADMIN / OWNER | Set `status='CANCELED'`.                                                                        |
+| PENDING | EXPIRED  | Cron detect `expires_at < now() AND status='PENDING'`.  | Cron (every 1h)     | Set `status='EXPIRED'`. Subscription **does not** activate.                                     |
+| PENDING | CANCELED | SUPER_ADMIN manual override or Owner click "Cancel QR". | SUPER_ADMIN / Owner | Set `status='CANCELED'`.                                                                        |
 
 ---
 
-## 5. Data Schema Chính Thức
+## 5. Official Data Schema
 
-### 5.1 Bảng `tenants` (Extended)
+### 5.1 Table `tenants` (Extended)
 
 > **Migration strategy:** Add columns + backfill defaults. Keep `is_active` column for backward-compat (becomes derived/computed via mapper).
 
@@ -405,18 +427,18 @@ CREATE INDEX ix_tenants_owner_id ON tenants(owner_id);
 
 **Notes:**
 
-- `status` là discriminator chính. `is_active` là **generated column** (Postgres 12+) — read-only, auto-sync.
-- `owner_id` references Keycloak `sub` (UUID string format trong Keycloak ↔ stored as UUID here).
-- `operating_modes` default cả 2 mode.
-- `suspended_*` và `closed_*` fields cho audit trail.
+- `status` is discriminator main. `is_active` is **generated column** (Postgres 12+) — read-only, auto-sync.
+- `owner_id` references Keycloak `sub` (UUID string format in Keycloak ↔ stored as UUID here).
+- `operating_modes` default both modes.
+- `suspended_*` and `closed_*` fields for audit trail.
 
-### 5.2 Bảng `pricing_plans`
+### 5.2 Table `pricing_plans`
 
 ```sql
 CREATE TABLE pricing_plans (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code                 VARCHAR(40) NOT NULL,    -- 'FREE', 'BASIC', 'PREMIUM'
-  name                 VARCHAR(80) NOT NULL,    -- 'Miễn phí', 'Cơ bản', 'Cao cấp'
+name VARCHAR(80) NOT NULL, -- 'Free', 'Basic', 'Premium'
   description          TEXT,
   price_vnd            BIGINT NOT NULL DEFAULT 0,
   billing_period       VARCHAR(20) NOT NULL DEFAULT 'MONTHLY',  -- MONTHLY | YEARLY
@@ -436,13 +458,13 @@ CREATE INDEX ix_pricing_plans_active_order ON pricing_plans(is_active, display_o
 
 #### Default seed (Q14)
 
-| code      | name     | price_vnd | max_tables | max_staff | max_orders_per_day | features                                                                     |
-| --------- | -------- | --------- | ---------- | --------- | ------------------ | ---------------------------------------------------------------------------- |
-| `FREE`    | Miễn phí | 0         | 10         | 5         | 100                | `["basic_pos"]`                                                              |
-| `BASIC`   | Cơ bản   | 299000    | 50         | 20        | 1000               | `["basic_pos", "analytics_basic"]`                                           |
-| `PREMIUM` | Cao cấp  | 999000    | 500        | 100       | 10000              | `["basic_pos", "analytics_basic", "analytics_advanced", "priority_support"]` |
+| code      | name    | price_vnd | max_tables | max_staff | max_orders_per_day | features                                                                     |
+| --------- | ------- | --------- | ---------- | --------- | ------------------ | ---------------------------------------------------------------------------- |
+| `FREE`    | Free    | 0         | 10         | 5         | 100                | `["basic_pos"]`                                                              |
+| `BASIC`   | Basic   | 299000    | 50         | 20        | 1000               | `["basic_pos", "analytics_basic"]`                                           |
+| `PREMIUM` | Premium | 999000    | 500        | 100       | 10000              | `["basic_pos", "analytics_basic", "analytics_advanced", "priority_support"]` |
 
-### 5.3 Bảng `subscriptions`
+### 5.3 Table `subscriptions`
 
 ```sql
 CREATE TABLE subscriptions (
@@ -472,7 +494,7 @@ CREATE UNIQUE INDEX uq_subscriptions_active_per_tenant
   ON subscriptions(tenant_id) WHERE status = 'ACTIVE';
 ```
 
-### 5.4 Bảng `subscription_invoices` (Tier 2)
+### 5.4 Table `subscription_invoices` (Tier 2)
 
 ```sql
 CREATE TABLE subscription_invoices (
@@ -512,7 +534,7 @@ CREATE INDEX ix_subscription_invoices_tenant_status ON subscription_invoices(ten
 CREATE INDEX ix_subscription_invoices_qr_expires_at ON subscription_invoices(qr_expires_at) WHERE status = 'PENDING';
 ```
 
-### 5.5 Bảng `saas_outbox_events` (Outbox Pattern)
+### 5.5 Table `saas_outbox_events` (Outbox Pattern)
 
 ```sql
 CREATE TABLE outbox_events (
@@ -536,7 +558,7 @@ CREATE INDEX ix_outbox_status_created ON outbox_events(status, created_at);
 
 Same schema as Payment/Order existing outboxes.
 
-### 5.6 Bảng `tenant_payment_settings` (Payment Service)
+### 5.6 Table `tenant_payment_settings` (Payment service)
 
 ```sql
 CREATE TABLE tenant_payment_settings (
@@ -580,9 +602,9 @@ CREATE INDEX ix_tenant_payment_settings_sepay_token_expires ON tenant_payment_se
 
 #### Encryption notes
 
-- AES-256-GCM với key từ env `PAYMENT_SECRETS_ENCRYPTION_KEY` (32 bytes hex). Rotation key chiến lược post-thesis.
+- AES-256-GCM with key from env `PAYMENT_SECRETS_ENCRYPTION_KEY` (32 hex bytes). Rotation key post-thesis strategy.
 - `nonce` per-encryption stored prepended to ciphertext (24 bytes nonce + ciphertext + tag).
-- Decrypt chỉ trong-process, không log decrypted tokens.
+- Decrypt in-process only, no log decrypted tokens.
 
 ### 5.7 MongoDB: `users` Collection Migration
 
@@ -891,8 +913,8 @@ type TenantCreatedEvent = {
 
 **Consumers:**
 
-- `Catalog Service`: seed default area "Khu vực chung" (group `catalog-tenant-created-consumer-group`).
-- `Notification Service` (Phase 4C, contract documented now): welcome email (group `notification-tenant-created-consumer-group`).
+- `Catalog service`: seed default area "General area" (group `catalog-tenant-created-consumer-group`).
+- `Notification service` (Phase 4C, contract documented now): welcome email (group `notification-tenant-created-consumer-group`).
 
 #### Topic: `subscription.activated`
 
@@ -987,7 +1009,7 @@ function generateSlug(rawName: string): string {
   if (!rawName) throw new BusinessException(ErrorCode.SAAS_TENANT_NAME_REQUIRED, 400);
   let s = rawName.normalize('NFD'); // 1. decomp
   s = s.replace(/[\u0300-\u036f]/g, ''); // 2. strip marks
-  s = s.replace(/[đĐ]/g, 'd'); // 3. VN-specific
+  s = s.replace(/[\u0111\u0110]/g, 'd'); // 3. Vietnamese-specific
   s = s.toLowerCase(); // 4. lowercase
   s = s.replace(/[^a-z0-9\s-]/g, ''); // 5. strip non-alphanum
   s = s.trim().replace(/\s+/g, '-').replace(/-{2,}/g, '-'); // 6-7. collapse
@@ -1019,16 +1041,16 @@ async function findUniqueSlug(rawName: string, repo: TenantRepository): Promise<
 
 **Test cases:**
 
-| Input                     | Expected output                          |
-| ------------------------- | ---------------------------------------- |
-| `"Phở Hà Nội"`            | `"pho-ha-noi"`                           |
-| `"Cà-phê Highlands"`      | `"ca-phe-highlands"`                     |
-| `"Đông Đô F&B"`           | `"dong-do-fb"`                           |
-| `"  ABC  "`               | `"abc"`                                  |
-| `"admin"`                 | throws `SAAS_SLUG_RESERVED`              |
-| `""`                      | throws `SAAS_TENANT_NAME_REQUIRED`       |
-| `"!!!"`                   | throws `SAAS_SLUG_EMPTY_AFTER_NORMALIZE` |
-| `"Phở Hà Nội"` (2nd time) | `"pho-ha-noi-1"`                         |
+| Input                    | Expected output                          |
+| ------------------------ | ---------------------------------------- |
+| `"Pho Hanoi"`            | `"pho-ha-noi"`                           |
+| `"Highlands Coffee"`     | `"ca-phe-highlands"`                     |
+| `"Dong Do F&B"`          | `"dong-do-fb"`                           |
+| `"  ABC  "`              | `"abc"`                                  |
+| `"admin"`                | throws `SAAS_SLUG_RESERVED`              |
+| `""`                     | throws `SAAS_TENANT_NAME_REQUIRED`       |
+| `"!!!"`                  | throws `SAAS_SLUG_EMPTY_AFTER_NORMALIZE` |
+| `"Pho Hanoi"` (2nd time) | `"pho-ha-noi-1"`                         |
 
 ### 7.2 Reserved Words (canonical const)
 
@@ -1324,7 +1346,7 @@ async tenantWebhook(@Param('tenantSlug') slug, @Headers('x-secret-key') secret, 
 ### 8.1 Flow Overview
 
 ```
-Owner clicks "Kết nối SePay" on /dashboard/payment-settings
+Owner clicks "Connect SePay" on /dashboard/payment-settings
    │
    ▼
 BFF GET /api/v1/dashboard/payment-settings/sepay-authorize-url
@@ -1377,7 +1399,7 @@ POST /api/v1/dashboard/payment-settings/select-bank with sepayBankAccountUuid
    → Return { status: "CONNECTED", bankShortName, accountNumber (masked) }
    │
    ▼
-UI shows "🟢 Connected. Sẵn sàng nhận thanh toán."
+UI shows "🟢 Connected. Ready to receive payments."
 ```
 
 ### 8.2 Token Refresh Logic
@@ -1470,7 +1492,7 @@ PAYMENT_SECRETS_ENCRYPTION_KEY: <64-hex char = 32 bytes AES-256>
 ### 9.1 Checkout Flow
 
 ```
-1. Owner on /dashboard/subscription → click "Thanh toán" (chọn plan PREMIUM)
+1. Owner on /dashboard/subscription → click "Pay" (choose PREMIUM plan)
 2. POST /api/v1/dashboard/subscription/checkout body: { planCode: 'PREMIUM', billingPeriod: 'MONTHLY' }
 3. BFF → SaaS Service TCP subscription.checkout_invoice
 4. SaaS Service:
@@ -1849,20 +1871,20 @@ This generates `design-system/MASTER.md` + `design-system/pages/landing.md` to d
 ```
 / (Public)
 ├─ Hero Section
-│  ├─ H1: "QRTable — Nền tảng SaaS đặt món QR cho ngành F&B Việt Nam"
+│ ├─ H1: "QRTable — QR ordering SaaS platform for Vietnam's F&B industry"
 │  ├─ Subhead: 1-2 line value prop
-│  ├─ CTA primary: "Đăng nhập" → /login
-│  ├─ CTA secondary: "Yêu cầu tư vấn" → mailto:support@qrtable.io
-│  └─ Hero visual (mockup hoặc illustration)
+│ ├─ CTA primary: "Log in" → /login
+│ ├─ CTA secondary: "Request consultation" → mailto:support@qrtable.io
+│  └─ Hero visual (mockup or illustration)
 ├─ Features Section (3-4 highlights)
-│  ├─ "Đặt món qua QR" (icon + caption)
+│ ├─ "Order via QR" (icon + caption)
 │  ├─ "POS / KDS realtime"
-│  ├─ "Thanh toán SePay VietQR tự động"
+│ ├─ "Automatic SePay VietQR payment"
 │  └─ "Multi-tenant + Subscription model"
 ├─ Pricing Section
 │  └─ 3 plan cards: FREE / BASIC / PREMIUM (from GET /public/plans)
 │     ├─ Plan name, price/month, feature bullets, max_tables/staff/orders
-│     └─ CTA: "Đăng ký liên hệ" → mailto
+│ └─ CTA: "Sign up for contact" → mailto
 ├─ Architecture Highlights (optional, thesis demo flex)
 │  └─ Brief mention: Microservices, Kafka, Redis, OAuth2 Connect
 └─ Footer: contact, social, copyright
@@ -1873,8 +1895,8 @@ This generates `design-system/MASTER.md` + `design-system/pages/landing.md` to d
 **Constraints (from skill):**
 
 - `ui-ux-pro-max` Quick Reference §1-5 mandatory: accessibility, touch, performance, style consistency, mobile-first.
-- Color palette + typography phải từ skill recommendation (chạy `--design-system` để lấy).
-- Charts/data viz: pricing table dùng bullet list, no charts on landing.
+- Color palette + typography must be from skill recommendation (run `--design-system` to get it).
+- Charts/data viz: pricing table uses bullet list, no charts on landing.
 - Responsive: 375 / 768 / 1024 / 1440 breakpoints.
 
 ### 13.2 `/admin/*` Pages (Detailed in §13.2 audit Round 2)
@@ -1924,20 +1946,20 @@ Functional + data contracts:
 - **Existing dashboard** + new "Plan & Quota" widget.
 - **Widget data:** `GET /api/v1/dashboard/subscription` → current plan; `GET /api/v1/admin/tenants/{me}/usage` (using own tenantId from JWT) for usage. Actually expose lighter `GET /api/v1/dashboard/usage` for own tenant.
 - **UI:** Card with plan name, expiry, 3 progress bars (tables/staff/orders today).
-- **CTA:** "Quản lý gói" → /dashboard/subscription; "Nâng cấp" if not PREMIUM.
+- **CTA:** "Manage packages" → /dashboard/subscription; "Upgrade" if not PREMIUM.
 
 #### 13.3.2 `/dashboard/subscription`
 
 - **Layout per audit §13.3.2.**
 - **Current subscription card** with status badge + countdown.
-- **Plan comparison cards** (FREE/BASIC/PREMIUM). Current plan highlighted. "Chọn" buttons.
+- **Plan comparison cards** (FREE/BASIC/PREMIUM). Current plan highlighted. "Select" buttons.
 - **Payment history table.**
 - **Logic:**
-  - Click "Chọn" on plan → check if upgrade vs downgrade vs renewal.
-    - Renewal (same plan): POST checkout → /dashboard/billing/[id].
-    - Upgrade: POST checkout → /dashboard/billing/[id].
-    - Downgrade with usage > new limit: show warning dialog "Bạn đang có X bàn, gói FREE chỉ cho phép Y. Vui lòng giảm bớt trước khi downgrade." Block.
-  - Click "Hủy": confirm 2-step → POST cancel.
+- Click "Select" on plan → check if upgrade vs downgrade vs renewal.
+  - Renewal (same plan): POST checkout → /dashboard/billing/[id].
+  - Upgrade: POST checkout → /dashboard/billing/[id].
+- Downgrade with usage > new limit: show warning dialog "You currently have X tables, FREE package only allows Y. Please reduce before downgrading." Block.
+- Click "Cancel": confirm 2-step → POST cancel.
 
 #### 13.3.3 `/dashboard/billing/[invoiceId]`
 
@@ -1945,7 +1967,7 @@ Functional + data contracts:
 - **QR display:** large image from `invoice.qrUrl` (200×200+).
 - **Transfer instructions:** bank name, account number, amount, content/code.
 - **Status badge** with auto-refresh.
-- **Countdown timer:** "Hết hạn QR sau X giờ Y phút" (computed from `qr_expires_at`).
+- **Countdown timer:** "QR expires after X hours Y minutes" (computed from `qr_expires_at`).
 - **Polling:** GET `/dashboard/billing/invoices/:id/status` every 5s. When status becomes PAID → toast success + redirect to /dashboard/subscription after 2s.
 - **WebSocket alternative:** subscribe to `subscription.activated` event in `tenant:{tid}:management` room → faster than polling.
 - **Cancel button:** POST cancel → status CANCELED → back to subscription page.
@@ -1955,45 +1977,44 @@ Functional + data contracts:
 - **Initial state (NOT_CONNECTED):**
   ```
   ┌────────────────────────────────────────────────────┐
-  │ Kết nối SePay để nhận thanh toán VietQR            │
+  │ Connect SePay to receive VietQR payments │
   │                                                     │
-  │ Bạn cần một tài khoản SePay (free 50 tx/tháng).    │
-  │ Đăng ký tại: https://my.sepay.vn/dang-ky           │
+  │ You need a SePay account (free 50 tx/month).    │
+  │ Register at: https://my.sepay.vn/dang-ky │
   │                                                     │
-  │           [Kết nối SePay account của tôi]          │
+  │ [Connect my SePay account] │
   │                                                     │
-  │ Hoặc tạm thời chỉ nhận tiền mặt:                   │
-  │           [☑ Cho phép thanh toán tiền mặt]         │
+  │ Or temporarily only accept cash: │
+  │ [☑ Cash payment allowed] │
   └────────────────────────────────────────────────────┘
   ```
-- **Click "Kết nối SePay account":** GET `/dashboard/payment-settings/sepay-authorize-url` → redirect to returned URL.
+- **Click "Connect SePay account":** GET `/dashboard/payment-settings/sepay-authorize-url` → redirect to returned URL.
 - **After OAuth callback** (Next.js page `/dashboard/payment-settings/sepay-callback`):
   - Reads code+state from URL.
   - Calls GET `/api/v1/dashboard/payment-settings/sepay-callback?code=&state=` → returns bank list.
   - Render bank picker:
-    ```
-    Chọn tài khoản ngân hàng nhận tiền:
+    `Select the receiving bank account:
     ◯ Vietcombank 9332770502 — NGUYEN VAN A (5,000,000 VND)
     ◯ MBBank      1234567890 — NGUYEN VAN A (1,200,000 VND)
-    [Cancel]                                  [Chọn]
-    ```
+[Cancel] [Select]
+   `
   - On select → POST `/dashboard/payment-settings/select-bank`.
 - **Connected state:**
   ```
   ┌────────────────────────────────────────────────────┐
-  │ ✅ Đã kết nối SePay                                │
+  │ ✅ SePay connected │
   │                                                     │
-  │ Ngân hàng:    Vietcombank                          │
-  │ Số TK:        9332770502 (•••• 0502)              │
-  │ Chủ TK:       NGUYEN VAN A                         │
+  │ Bank: Vietcombank │
+  │ Account number: 9332770502 (•••• 0502) │
+  │ Account Owner: NGUYEN VAN A │
   │ Webhook:      🟢 Active                            │
   │ Verified:     2026-05-11 11:30                     │
   │                                                     │
-  │ Tùy chọn thanh toán:                              │
-  │ [☑] Nhận tiền mặt                                  │
-  │ [☑] Nhận VietQR                                    │
+  │ Payment options: │
+  │ [☑] Get cash │
+  │ [☑] Receive VietQR │
   │                                                     │
-  │ [Test webhook]            [Ngắt kết nối]          │
+  │ [Test webhook] [Disconnect] │
   └────────────────────────────────────────────────────┘
   ```
 - **Disconnect:** confirm dialog → POST disconnect.
@@ -2002,8 +2023,8 @@ Functional + data contracts:
 
 Server-side handle: read query params, call BFF, render bank picker. Edge cases:
 
-- `state` không match Redis → "Liên kết không hợp lệ hoặc đã hết hạn" + retry button.
-- SePay return `error=access_denied` → "Bạn đã từ chối ủy quyền. Bạn có thể thử lại bất cứ lúc nào."
+- `state` does not match Redis → "Link is invalid or expired" + retry button.
+- SePay return `error=access_denied` → "You declined authorization. You can try again at any time."
 - SePay return other error → show error.
 
 ### 13.4 Customer PWA Suspend Behavior
@@ -2011,10 +2032,10 @@ Server-side handle: read query params, call BFF, render bank picker. Edge cases:
 - **Detect:** SessionGuard checks Redis flag (§11.3). For backward compat in case Redis miss, also check tenant.status via `GET /public/tenants/:slug` (Cached 1 min in FE).
 - **Banner (sticky top):**
   ```
-  ⚠ Cửa hàng tạm dừng nhận đơn mới.
-  Bạn có thể xem đơn hiện tại và thanh toán. Liên hệ nhân viên nếu cần.
+  ⚠ The store temporarily stops accepting new orders.
+  You can view current orders and payments. Contact staff if needed.
   ```
-- **Disabled actions:** "Thêm vào giỏ", "Đặt món" buttons disabled with tooltip.
+- **Disabled actions:** "Add to cart", "Order" buttons disabled with tooltip.
 - **Allowed actions:** View menu, view cart (read-only), view order status, request payment for existing bills, complete payment.
 - **WS event handler:** Listen for `tenant.suspended` → display banner; for `tenant.activated` → remove banner + reload menu (in case stock/prices changed).
 
@@ -2028,7 +2049,7 @@ const NAV_ITEMS = {
     ...existing,
     { label: 'Subscription', href: '/dashboard/subscription', icon: 'CreditCard', permission: 'subscription.read_own' },
     {
-      label: 'Cài đặt thanh toán',
+      label: 'Payment settings',
       href: '/dashboard/payment-settings',
       icon: 'Landmark',
       permission: 'payment_settings.read_own',
@@ -2038,7 +2059,7 @@ const NAV_ITEMS = {
     ...existing,
     { label: 'Subscription', href: '/dashboard/subscription', icon: 'CreditCard', permission: 'subscription.read_own' },
     {
-      label: 'Cài đặt thanh toán',
+      label: 'Payment settings',
       href: '/dashboard/payment-settings',
       icon: 'Landmark',
       permission: 'payment_settings.read_own',
@@ -2099,9 +2120,9 @@ CREATE INDEX ix_tenants_owner_id ON tenants(owner_id) WHERE owner_id IS NOT NULL
 -- Seed default plans
 INSERT INTO pricing_plans (code, name, price_vnd, max_tables, max_staff, max_orders_per_day, features, display_order)
 VALUES
-  ('FREE', 'Miễn phí', 0, 10, 5, 100, '["basic_pos"]', 1),
-  ('BASIC', 'Cơ bản', 299000, 50, 20, 1000, '["basic_pos","analytics_basic"]', 2),
-  ('PREMIUM', 'Cao cấp', 999000, 500, 100, 10000, '["basic_pos","analytics_basic","analytics_advanced","priority_support"]', 3);
+('FREE', 'Free', 0, 10, 5, 100, '["basic_pos"]', 1),
+('BASIC', 'Basic', 299000, 50, 20, 1000, '["basic_pos","analytics_basic"]', 2),
+('PREMIUM', 'Premium', 999000, 500, 100, 10000, '["basic_pos","analytics_basic","analytics_advanced","priority_support"]', 3);
 
 -- Backfill: every existing tenant gets FREE subscription
 INSERT INTO subscriptions (tenant_id, pricing_plan_id, plan_code_snapshot, price_vnd_snapshot, status, starts_at, expires_at, source)
@@ -2151,15 +2172,16 @@ db.users.createIndex({ tenantId: 1, isActive: 1 });
 ### 14.2 Code Release Sequence
 
 1. **Release 1: Backend foundation** (no FE changes)
-   - SaaS Service mở rộng (Tenant entity, Plan, Subscription, Outbox).
-   - Payment Service: `tenant_payment_settings` entity + SePay OAuth client (basic, no UI).
-   - Authorizer ext.
-   - User-Access ext (tenantId field).
-   - Catalog ext (count + Kafka consumer for tenant.created).
-   - Order ext (Redis counter).
-   - BFF guards (TenantStatusGuard, TenantPlanGuard).
-   - Permission matrix update.
-   - Run all migrations 001-006.
+
+- SaaS service extended (tenant entity, Plan, Subscription, Outbox).
+  - Payment service: `tenant_payment_settings` entity + SePay OAuth client (basic, no UI).
+  - Authorizer ext.
+  - User-Access ext (tenantId field).
+  - Catalog ext (count + Kafka consumer for tenant.created).
+  - Order ext (Redis counter).
+  - BFF guards (TenantStatusGuard, TenantPlanGuard).
+  - Permission matrix update.
+  - Run all migrations 001-006.
 
 2. **Release 2: Admin UI** (FE only, backend ready)
    - `/admin` overview.
@@ -2193,7 +2215,7 @@ db.users.createIndex({ tenantId: 1, isActive: 1 });
 
 ---
 
-## 15. Coordination với Phase 4A và Phase 4C
+## 15. Coordination with Phase 4A and Phase 4C
 
 ### 15.1 Phase 4A (Saga + Hardening)
 
@@ -2229,7 +2251,7 @@ db.users.createIndex({ tenantId: 1, isActive: 1 });
 
 ### 16.1 Backend
 
-- [ ] Slug generation: `"Phở Hà Nội"` → `"pho-ha-noi"`, `"admin"` → 400 `SAAS_SLUG_RESERVED`.
+- [ ] Slug generation: `"Pho Hanoi"` → `"pho-ha-noi"`, `"admin"` → 400 `SAAS_SLUG_RESERVED`.
 - [ ] Onboarding API: `POST /admin/tenants/onboard` with valid input → tenant + subscription + KC user + empty payment_settings created atomically. Owner can log in immediately with provided password.
 - [ ] Onboarding compensation: mock Authorizer fail mid-saga → no orphan tenant row; KC user disabled.
 - [ ] Plan limit: tenant FREE, attempt to create 11th table → HTTP 402 `TENANT_PLAN_LIMIT_EXCEEDED` with details `{ limitType: 'max_tables', limit: 10, current: 10, upgradeUrl: '/dashboard/subscription' }`.
@@ -2241,12 +2263,12 @@ db.users.createIndex({ tenantId: 1, isActive: 1 });
 - [ ] Cron multi-instance safety: distributed lock prevents double execution.
 - [ ] Tier 1 OAuth flow: Owner connects → bank list shown → selects → webhook auto-created in SePay → status `CONNECTED`.
 - [ ] Tier 1 webhook: customer pays → tenant-scoped webhook URL hit → bill PAID → money in tenant's bank (verified manually).
-- [ ] Tier 2 checkout: Owner clicks "Thanh toán PREMIUM" → invoice + QR returned → polling status.
+- [ ] Tier 2 checkout: Owner clicks "Pay for PREMIUM" → invoice + QR returned → polling status.
 - [ ] Tier 2 webhook: Owner transfers correct amount → invoice PAID → subscription auto-created → tenant `SUSPENDED → ACTIVE` (if was suspended).
 - [ ] Underpaid Tier 2: amount < invoice.amount_vnd → invoice remains PENDING + audit, subscription NOT activated.
 - [ ] Duplicate Tier 2 webhook (same SePay tx_id): idempotent, no double-activate.
 - [ ] `tenant.created` Kafka event published from outbox after onboarding commit.
-- [ ] Catalog consumer: receives `tenant.created` → seeds "Khu vực chung" area.
+- [ ] Catalog consumer: receives `tenant.created` → seeds "General area" area.
 - [ ] Token refresh: SePay token expires → auto-refresh on next call → API succeeds.
 - [ ] Disconnect: SePay webhook deleted from SePay side; settings reset to NOT_CONNECTED.
 
@@ -2258,8 +2280,8 @@ db.users.createIndex({ tenantId: 1, isActive: 1 });
 - [ ] `/admin/tenants`: SUPER_ADMIN sees list, can onboard new tenant via modal.
 - [ ] `/admin/tenants/:id`: 5 tabs work; Usage tab shows real-time numbers.
 - [ ] `/admin/plans`: CRUD works; delete with active subs → 409 message with action.
-- [ ] `/dashboard/subscription`: OWNER sees current plan + 3 plan cards + history.
-- [ ] `/dashboard/subscription`: click Premium "Chọn" → invoice + QR rendered.
+- [ ] `/dashboard/subscription`: Owner sees current plan + 3 plan cards + history.
+- [ ] `/dashboard/subscription`: click Premium "Select" → invoice + QR rendered.
 - [ ] `/dashboard/billing/:id`: QR displays, polling, status → PAID → toast + redirect.
 - [ ] `/dashboard/payment-settings`: full OAuth flow works end-to-end with real SePay credentials.
 - [ ] Customer PWA: when tenant suspended, banner displayed, submit blocked, payment allowed.
@@ -2304,18 +2326,18 @@ db.users.createIndex({ tenantId: 1, isActive: 1 });
 
 | Scenario                                                                                                                                                                                               | Roles involved                   |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
-| **1. Onboarding** SUPER_ADMIN logs in → /admin/tenants → onboard "Phở Hà Nội" → Owner receives credentials → Owner logs in → sees dashboard.                                                           | SUPER_ADMIN, OWNER               |
-| **2. Connect SePay** Owner → /dashboard/payment-settings → click Connect → OAuth flow → pick bank → status Connected.                                                                                  | OWNER, SePay sandbox             |
+| **1. Onboarding** SUPER_ADMIN logs in → /admin/tenants → onboard "Pho Hanoi" → Owner receives credentials → Owner logs in → sees dashboard.                                                            | SUPER_ADMIN, Owner               |
+| **2. Connect SePay** Owner → /dashboard/payment-settings → click Connect → OAuth flow → pick bank → status Connected.                                                                                  | Owner, SePay sandbox             |
 | **3. Customer pays restaurant** Customer scans QR at table → adds menu items → requests bill → scans payment QR → transfers via bank app → bill PAID.                                                  | CUSTOMER                         |
-| **4. Owner upgrades plan** Owner sees usage approaching limit → /dashboard/subscription → select PREMIUM → /dashboard/billing/[id] → scans QR → transfers → page auto-redirects → plan PREMIUM active. | OWNER                            |
-| **5. Subscription expires** (test via setting expires_at in past + manual cron trigger) → tenant SUSPENDED → Owner can't create order → renews plan → SUSPENDED → ACTIVE.                              | OWNER (impacts STAFF + CUSTOMER) |
-| **6. Manual confirm fallback** Owner transfers but webhook fails → SUPER_ADMIN sees invoice PENDING → clicks Manual Confirm → plan activated.                                                          | SUPER_ADMIN, OWNER               |
+| **4. Owner upgrades plan** Owner sees usage approaching limit → /dashboard/subscription → select PREMIUM → /dashboard/billing/[id] → scans QR → transfers → page auto-redirects → plan PREMIUM active. | Owner                            |
+| **5. Subscription expires** (test via setting expires_at in past + manual cron trigger) → tenant SUSPENDED → Owner can't create order → renews plan → SUSPENDED → ACTIVE.                              | Owner (impacts STAFF + CUSTOMER) |
+| **6. Manual confirm fallback** Owner transfers but webhook fails → SUPER_ADMIN sees invoice PENDING → clicks Manual Confirm → plan activated.                                                          | SUPER_ADMIN, Owner               |
 
 ---
 
 ## 18. Historical Implementation Scope
 
-Trong quá trình triển khai Phase 4B, spec này đã cung cấp phạm vi quyết định cho implementation plan:
+During Phase 4B implementation, this spec provided decision scope for the implementation plan:
 
 - **Domain model** (§5) — table-level schema, indexes, encryption notes.
 - **State machines** (§4) — explicit transitions, side-effects, invariants.
@@ -2327,18 +2349,18 @@ Trong quá trình triển khai Phase 4B, spec này đã cung cấp phạm vi quy
 - **Skill requirements** (§13.1) — `ui-ux-pro-max` mandatory for landing.
 - **Risks & mitigations** — refer to audit §9 + §16 + §23 (R1-R20).
 
-Implementation plan sau đó đã được tổ chức thành nhiều batch/release nhỏ và Phase 4B hiện đã đóng theo final phase record.
+The Implementation plan was then organized into several small batches/releases and Phase 4B is now closed according to the final phase record.
 
 ---
 
-## Hết Đặc Tả Phase 4B
+## End of Phase 4B Specification
 
-> **Total estimated effort:** ~2.5-3 tuần (3 dev-days × 5-6 releases). Critical path: backend foundation → Tier 1 OAuth → Tier 2 billing.
+> **Total estimated effort:** ~2.5-3 weeks (3 dev-days × 5-6 releases). Critical path: backend foundation → Tier 1 OAuth → Tier 2 billing.
 >
 > **Highest-risk items:**
 >
-> - SePay OAuth2 first-time integration (Q25=E — credentials đã có; rủi ro còn lại là real testing với Vercel redirect URI + SePay callback/webhook).
+> - SePay OAuth2 first-time integration (Q25=E — credentials already present; remaining risk is real testing with Vercel redirect URI + SePay callback/webhook).
 > - Migration MongoDB tenantId backfill (legacy data accuracy).
 > - Customer PWA suspend banner edge cases (existing WS connection state).
 >
-> **Current status:** Phase 4B đã triển khai xong; xem final phase record tại [`docs/phases/phase-4b-saas-onboarding.md`](../phases/phase-4b-saas-onboarding.md).
+> **Current status:** Phase 4B has already been implemented; see the final phase record at [Phase 4B record](../phases/phase-4b-saas-onboarding.md).

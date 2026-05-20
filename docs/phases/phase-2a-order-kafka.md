@@ -6,50 +6,50 @@
 
 ## Final Scope
 
-Phase 2A hoàn thành nền tảng đặt món qua QR cho QRTable: khách vào phiên bàn bằng QR, dùng shared cart, gửi order, staff xác nhận/hủy/phục vụ, bill được gom theo session, yêu cầu phục vụ được gửi tới POS, và Order Service publish Kafka `order.confirmed` cho các consumer hậu xử lý.
+Phase 2A completes the QR ordering platform for QRTable: customers enter the session using QR, use shared cart, submit order, staff confirm/cancel/serve, bill is collected by session, service request is sent to POS, and Order service publishes Kafka `order.confirmed` for post-processing consumers.
 
-Phạm vi cuối cùng gồm:
+The final scope includes:
 
-- QR customer session flow: validate QR/table qua Catalog, tạo hoặc join active session, persist session trong Order PostgreSQL và cache active session trong Redis.
-- Shared cart theo session: Redis cart, optimistic `cartVersion`, conflict khi client dùng version cũ, lock cart khi bill đang chờ thanh toán.
-- Order lifecycle: cart/UI `DRAFT`, DB order bắt đầu từ `PENDING`, staff confirm sang `PROCESSING`, kitchen có thể đưa order/item sang `READY`, staff phục vụ sang `SERVED`, cancel theo state, và `COMPLETED` thuộc payment completion ở phase sau.
-- Bill/session lifecycle: một bill hiện hành cho active session, tạo ở lần submit order đầu tiên, aggregate các order chưa bị cancel, `OPEN -> PENDING_PAYMENT` khi customer request bill.
-- Order Service ownership cho orders, order items, sessions, bills, service requests, cart/session Redis semantics, và simplified outbox cho Kafka.
-- BFF customer/admin REST routes, BFF Direct realtime events, Customer PWA order/cart/bill flows, và Management POS order/service/table surfaces.
+- QR customer session flow: validate QR/table via Catalog, create or join active session, persist session in Order PostgreSQL and cache active session in Redis.
+- Shared cart by session: Redis cart, optimistic `cartVersion`, conflict when client uses old version, lock cart when bill is waiting for payment.
+- Order lifecycle: cart/UI `DRAFT`, DB order starts from `PENDING`, staff confirm to `PROCESSING`, kitchen can send order/item to `READY`, service staff to `SERVED`, cancel according to state, and `COMPLETED` belongs to payment completion in the next phase.
+- Bill/session lifecycle: a current bill for the active session, created at the first order submission, aggregate orders that have not been canceled, `OPEN -> PENDING_PAYMENT` when the customer requests the bill.
+- Order service ownership for orders, order items, sessions, bills, service requests, cart/session Redis semantics, and simplified outbox for Kafka.
+- BFF customer/admin REST routes, BFF Direct realtime events, Customer PWA order/cart/bill flows, and Management POS order/service/table surfaces.
 
 ## Accepted Decisions
 
-- Order Service là source of truth cho session, cart snapshot, order, order item, bill và service request; Catalog là source of truth cho menu item, stock, table status, QR token và `MenuItem.station`.
-- Session là durable entity trong PostgreSQL. Redis key `session:{tenantId}:{sessionId}` là cache active với TTL 2 giờ; idle close sau 30 phút chỉ áp dụng khi `orderCount == 0`.
-- Cart nằm trong Redis key `cart:{tenantId}:{sessionId}` với `cartVersion`. REST snapshot là nguồn dữ liệu chuẩn sau reconnect; WebSocket/realtime event chỉ là hint để invalidate/refetch.
-- `DRAFT` không tạo DB order row. Submit cart tạo order `PENDING`, clear cart sau khi thành công, và dùng `idempotencyKey` để tránh submit lặp.
-- Submit chỉ validate snapshot availability. Stock deduct chỉ xảy ra khi staff confirm `PENDING -> PROCESSING` qua Catalog TCP transactional command (`STOCK_DEDUCT_FOR_ORDER`); cancel processing gọi release/restore qua Catalog policy (`STOCK_RELEASE_FOR_ORDER`).
-- Kafka chỉ được dùng cho domain event hậu xác nhận: Order Service ghi outbox `order.confirmed`, publisher gửi topic với partition key `tenantId` và payload có table/session/item/station snapshot.
-- UI realtime không đi qua Kafka trong Phase 2A. BFF phát direct events sau TCP success: `events.cartUpdated`, `events.orderCreated`, `events.orderStatusChanged`, `events.serviceRequested`, `events.billRequested`, `events.tableTransferred`.
-- Bill request là explicit command. `REQUEST_BILL` service request là side effect thông báo/audit, không thay thế command request bill.
-- Bill request yêu cầu cart rỗng và các order không bị cancel đã served; khi hợp lệ bill sang `PENDING_PAYMENT`, cart bị `LOCKED`, table sang `billing`.
-- Customer chỉ tự hủy order `PENDING` trong session của mình. Staff cancel tách quyền `order.cancel_pending` và `order.cancel_processing`; cancel processing yêu cầu reason.
-- Chuyển bàn dùng saga-style consistency với Redis locks, Order DB update, Catalog table status update và realtime `tableTransferred`; không yêu cầu ACID transaction xuyên mọi store.
+- Order service is the source of truth for session, cart snapshot, order, order item, bill and service request; Catalog is the source of truth for menu items, stock, table status, QR token and `MenuItem.station`.
+- Session is a durable entity in PostgreSQL. Redis key `session:{tenantId}:{sessionId}` is an active cache with a TTL of 2 hours; idle close after 30 minutes only applies when `orderCount == 0`.
+- Cart is in Redis key `cart:{tenantId}:{sessionId}` with `cartVersion`. REST snapshot is the standard data source after reconnection; WebSocket/realtime event is just a hint to invalidate/refetch.
+- `DRAFT` does not create DB order row. Submit cart creates order `PENDING`, clear cart after success, and use `idempotencyKey` to avoid repeated submissions.
+- Submit only validates snapshot availability. Stock deduction only occurs when staff confirm `PENDING -> PROCESSING` via Catalog TCP transactional command (`STOCK_DEDUCT_FOR_ORDER`); cancel processing calls release/restore via Catalog policy (`STOCK_RELEASE_FOR_ORDER`).
+- Kafka is only used for post-confirmation domain events: Order service records outbox `order.confirmed`, publisher sends topic with partition key `tenantId` and payload has table/session/item/station snapshot.
+- Realtime UI does not go through Kafka in Phase 2A. BFF broadcasts direct events after TCP success: `events.cartUpdated`, `events.orderCreated`, `events.orderStatusChanged`, `events.serviceRequested`, `events.billRequested`, `events.tableTransferred`.
+- Bill request is an explicit command. `REQUEST_BILL` service request is a notification/audit side effect, does not replace the command request bill.
+- Bill request requires an empty cart and orders that have not been canceled have been served; When valid, bill goes to `PENDING_PAYMENT`, cart goes to `LOCKED`, table goes to `billing`.
+- Customer only cancels order `PENDING` in his session. Staff cancel separates permissions `order.cancel_pending` and `order.cancel_processing`; cancel processing requires reason.
+- Switch tables using saga-style consistency with Redis locks, Order DB update, Catalog table status update and realtime `tableTransferred`; Does not require ACID transactions across all stores.
 
 ## Final Business Behavior
 
-Khách quét QR để join session bàn. Nếu bàn available, hệ thống tạo session mới, set bàn occupied qua Catalog và cache session cho PWA. Nếu bàn occupied có session hợp lệ, khách join lại session đó. Bàn đang billing hoặc cleaning không nhận session đặt món mới.
+Guests scan the QR to join the session. If the table is available, the system creates a new session, sets the table occupied via Catalog and caches the session for the PWA. If the occupied table has a valid session, the customer rejoins that session. Tables that are billing or cleaning do not accept new order sessions.
 
-Khách thêm/sửa/xóa món trong cart theo `expectedCartVersion`; server reject mutation cũ bằng conflict để client refetch snapshot. Cart line có thể gộp cùng món/cùng ghi chú trong cùng session trước submit; đây là hành vi cart, không phải KDS batching.
+Customers add/edit/delete items in cart according to `expectedCartVersion`; The server rejects the old mutation with a conflict so the client can refetch the snapshot. Cart line can combine the same items/notes in the same session before submitting; This is cart behavior, not KDS batching.
 
-Khi submit order, Order Service persist order `PENDING`, order items, bill hiện hành nếu chưa có, tăng `orderCount`, clear cart, và BFF emit `events.orderCreated` cùng `events.cartUpdated`. Staff POS đọc order qua BFF admin routes và nhận realtime hint để refetch.
+When submitting an order, Order service persist order `PENDING`, order items, current bill if not available, increase `orderCount`, clear cart, and BFF emit `events.orderCreated` and `events.cartUpdated`. POS staff reads orders via BFF admin routes and receives realtime hints for refetching.
 
-Khi staff confirm, Order Service lock order, deduct stock qua Catalog, chuyển order sang `PROCESSING`, tạo outbox `order.confirmed`, và BFF emit `events.orderStatusChanged`. Kitchen/KDS Phase 2B consume Kafka event này để tạo station tickets.
+When staff confirms, Order service locks the order, deducts stock via Catalog, transfers order to `PROCESSING`, creates outbox `order.confirmed`, and BFF emits `events.orderStatusChanged`. Kitchen/KDS Phase 2B consumes this Kafka event to create station tickets.
 
-Customer hoặc staff có thể hủy `PENDING`; Owner/Manager có thể hủy `PROCESSING` kèm reason, Order Service cập nhật bill totals và gọi Catalog release stock. Các order canceled không tham gia tổng bill.
+Customer or staff can cancel `PENDING`; Owner/Manager can cancel `PROCESSING` with reason, Order service updates bill totals and calls Catalog release stock. Canceled orders do not participate in the total bill.
 
-Customer request bill sau khi cart rỗng và món đã served. Bill chuyển `PENDING_PAYMENT`, cart bị lock, table chuyển billing, và staff nhận service/bill realtime hint. Thanh toán, refund, split bill và settlement đầy đủ thuộc các phase sau, dù code hiện tại đã có các điểm mở rộng cho Phase 3+.
+Customer requests bill after cart is empty and item is served. Bill transfers `PENDING_PAYMENT`, cart is locked, table transfers billing, and staff receives service/bill realtime hint. Full payment, refund, split bill and settlement belong to the following phases, although the current code has expansion points for Phase 3+.
 
-Service requests `CALL_STAFF`, `GENERAL_HELP`, `REQUEST_BILL` được lưu trong Order domain; staff acknowledge/resolve qua POS. Table transfer giữ nguyên session id, cập nhật table snapshot trong Order DB, Redis session metadata, Catalog table statuses và realtime hint.
+service requests `CALL_STAFF`, `GENERAL_HELP`, `REQUEST_BILL` are stored in the Order domain; staff acknowledge/resolve via POS. Table transfer preserves session id, updates table snapshot in Order DB, Redis session metadata, Catalog table statuses and realtime hint.
 
 ## Final Technical Behavior
 
-Service ownership sau Phase 2A:
+Service ownership after Phase 2A:
 
 - Order Service owns PostgreSQL entities `sessions`, `orders`, `order_items`, `bills`, `service_requests`, `outbox_events`; Redis cart/session semantics; order state transitions; bill request; table transfer; stock-deduct/release orchestration through Catalog; and Kafka `order.confirmed` outbox production.
 - Catalog Service owns QR token validation, table status transitions, menu item snapshots, stock and station metadata. Order stores denormalized table/menu/station snapshots for history and display only.

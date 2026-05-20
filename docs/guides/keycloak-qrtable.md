@@ -1,270 +1,315 @@
-# Hướng Dẫn Keycloak Trong QRTable
+# Keycloak Instructions In QRTable
 
-> **Vai trò:** Tài liệu hỗ trợ (supporting guide), không phải nguồn sự thật chính (canonical source).
-> Khi cần trạng thái kiến trúc hiện tại, ưu tiên [`../technical-architecture.md`](../technical-architecture.md), [`../architecture/permission-matrix.md`](../architecture/permission-matrix.md), [`../references/auth-system-reference.md`](../references/auth-system-reference.md), và code trên `main`.
+> **Role:** Supporting guide, not canonical source.
+> When you need the current architectural state, prioritize `[../technical-architecture.md](../technical-architecture.md)`, `[../architecture/permission-matrix.md](../architecture/permission-matrix.md)`, `[../references/auth-system-reference.md](../references/auth-system-reference.md)`, and code above `main`.
 >
-> **Mục tiêu:** Giải thích Keycloak vừa đủ để đọc code, gỡ lỗi đăng nhập (debug authentication), và mở rộng đúng phạm vi QRTable. Tài liệu này có lý thuyết nền tảng, nhưng không đi xa thành giáo trình Keycloak tổng quát.
+> **Goal:** Explain Keycloak just enough to read code, debug authentication, and properly scale the QRTable. This document has background theory, but does not go far into a general Keycloak curriculum.
 >
-> **Trạng thái code hiện tại (2026-05-14):** QRTable dùng Keycloak `25.0.0` để xác thực người dùng nội bộ như `SUPER_ADMIN`, `OWNER`, `MANAGER`, `WAITER`, `CHEF`, `BARISTA`. Management App đăng nhập qua NextAuth + Keycloak provider. Authorizer Service xác minh JWT bằng JWKS của Keycloak, sau đó nạp hồ sơ ứng dụng và quyền từ User-Access. Customer PWA / khách quét QR không đăng nhập bằng Keycloak.
+> **Current code status (2026-05-14):** QRTable uses Keycloak `25.0.0` to authenticate internal users such as `SUPER_ADMIN`, `Owner`, `MANAGER`, `WAITER`, `CHEF`, `BARISTA`. Management App logs in via NextAuth + Keycloak provider. The Authorizer service verifies the JWT using Keycloak's JWKS, then fetches the application profile and permissions from User-Access. Customer PWA/QR scanning client not logged in with Keycloak.
 
 ---
 
-## Mục Lục
+## Table of Contents
 
-1. [Đọc nhanh](#1-đọc-nhanh)
-2. [Keycloak đang dùng ở đâu](#2-keycloak-đang-dùng-ở-đâu)
-3. [Nguyên tắc lựa chọn Keycloak](#3-nguyên-tắc-lựa-chọn-keycloak)
-4. [Lý thuyết vừa đủ](#4-lý-thuyết-vừa-đủ)
-5. [Các kiểu xác thực và flow Keycloak](#5-các-kiểu-xác-thực-và-flow-keycloak)
-6. [Luồng xác thực hiện tại](#6-luồng-xác-thực-hiện-tại)
-7. [Cấp phát user và onboarding tenant](#7-cấp-phát-user-và-onboarding-tenant)
-8. [Role, permission và tenant isolation](#8-role-permission-và-tenant-isolation)
-9. [Keycloak không sở hữu những gì](#9-keycloak-không-sở-hữu-những-gì)
-10. [Hướng dẫn cấu hình và thao tác Keycloak](#10-hướng-dẫn-cấu-hình-và-thao-tác-keycloak)
-11. [Thiết lập local, triển khai và gỡ lỗi](#11-thiết-lập-local-triển-khai-và-gỡ-lỗi)
-12. [Đọc code ở đâu](#12-đọc-code-ở-đâu)
+1. [Quick read](#1-quick read)
+2. [Where is Keycloak being used](#2-where-keycloak-is-being-used)
+3. [Principles of choosing Keycloak](#3-principles-of-choosing-keycloak)
+4. [Just Enough Theory](#4-just-enough-theory)
+5. [Keycloak authentication and flow types](#5-keycloak-authentication-and-flow-types)
+6. [Current authentication flow](#6-current-authentication-flow)
+7. [Allocation of users and onboarding tenants](#7-allocation-users-and-onboarding-tenants)
+8. [Role, permission and tenant isolation](#8-role-permission-and-tenant-isolation)
+9. [What does Keycloak not own](#9-keycloak-does-not-own-what)
+10. [Instructions for configuring and operating Keycloak](#10-instructions-for-configuring-and-operating-keycloak)
+11. [Set up local, deploy and debug](#11-set-up-local-deploy-and-debug)
+12. [Where to read the code](#12-where-to-read-the-code)
 13. [Checklist](#13-checklist)
 
 ---
 
-## 1. Đọc nhanh
+## 1. Read quickly
 
-Keycloak trong QRTable là **identity provider (nhà cung cấp định danh)** cho nhóm người dùng nội bộ của nhà hàng và hệ thống quản trị. Keycloak trả lời các câu hỏi:
-
-```txt
-Người này là ai?
-Token này có hợp lệ không?
-Người này đang có role định danh nào trong realm?
-```
-
-Keycloak **không** là nguồn sự thật cho toàn bộ quyền nghiệp vụ của QRTable. Sau khi token hợp lệ, QRTable vẫn cần User-Access Service để trả lời:
+Keycloak in QRTable is the **identity provider** for the restaurant's internal user group and administration system. Keycloak answers the questions:
 
 ```txt
-User này đã được provision vào ứng dụng chưa?
-User thuộc tenant nào?
-User có những permission ứng dụng nào?
-User có được phép gọi API hiện tại không?
+Who is this person?
+Is this token valid?
+What identified role does this person have in the realm?
 ```
 
-Một câu dễ nhớ:
+Keycloak is **not** the source of truth for all QRTable business authority. After the token is valid, QRTable still needs the User-Access service to respond:
 
 ```txt
-Keycloak xác thực danh tính.
-User-Access xác định hồ sơ, role nội bộ và permission.
-BFF Guards áp dụng tenant và permission trên từng request.
+Has this user been provisioned into the application?
+Which tenant does the user belong to?
+What application permissions does the user have?
+Is the user allowed to call the current API?
 ```
 
-### Luồng tổng quát
+An easy sentence to remember:
+
+```txt
+Keycloak authenticates identities.
+User-Access defines profiles, internal roles, and permissions.
+BFF Guards apply tenant and permissions on each request.
+```
+
+### General flow
 
 ```txt
 Management App
-  -> chuyển người dùng sang Keycloak login
-  -> nhận access token (JWT)
-  -> gọi BFF /authorizer/me bằng Bearer token
-  -> BFF UserGuard gọi Authorizer nếu token chưa có cache
-  -> Authorizer verify JWT bằng JWKS của Keycloak
-  -> Authorizer nạp profile + permission từ User-Access
-  -> BFF TenantGuard / PermissionGuard quyết định cho phép hay từ chối request
+-> switch users to Keycloak login
+-> receives access token (JWT)
+-> call BFF /authorizer/me with Bearer token
+-> BFF UserGuard calls Authorizer if the token is not cached yet
+-> Authorizer verify JWT using Keycloak's JWKS
+-> Authorizer loads profile + permission from User-Access
+-> BFF TenantGuard / PermissionGuard decides to allow or deny the request
 ```
 
-### Thuật ngữ tối thiểu
+### Minimum term
 
-| Thuật ngữ                                                      | Nghĩa trong QRTable                                                                                      |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Keycloak                                                       | Identity server (máy chủ định danh), quản lý đăng nhập, user, role định danh và token.                   |
-| Realm (không gian định danh)                                   | Vùng cấu hình riêng của Keycloak. QRTable dùng realm `qrtable`.                                          |
-| Client (ứng dụng đăng ký)                                      | Ứng dụng được Keycloak cấp token, ví dụ Management App hoặc BFF client.                                  |
-| User (tài khoản định danh)                                     | Tài khoản đăng nhập trong Keycloak, thường tương ứng với staff/admin/owner.                              |
-| Realm role (vai trò cấp realm)                                 | Role nằm ở cấp realm, ví dụ `OWNER`, `MANAGER`, `WAITER`. QRTable dùng role này để map sang role nội bộ. |
-| Role (vai trò)                                                 | Nhóm trách nhiệm lớn của user, ví dụ `OWNER`, `CHEF`.                                                    |
-| Permission (quyền thao tác)                                    | Quyền chi tiết trên API/nghiệp vụ, ví dụ `ORDER_CREATE`.                                                 |
-| Tenant (đơn vị thuê / nhà hàng)                                | Không gian dữ liệu của một nhà hàng trong hệ thống SaaS.                                                 |
-| Guard (lớp chặn request)                                       | Lớp kiểm tra request trước khi cho vào controller, ví dụ `UserGuard`, `TenantGuard`, `PermissionGuard`.  |
-| Session (phiên làm việc)                                       | Trạng thái đăng nhập hoặc trạng thái phiên đang hoạt động của người dùng/khách.                          |
-| Cache (bộ nhớ đệm)                                             | Bản lưu nhanh có thể hết hạn hoặc dựng lại, thường nằm trong Redis.                                      |
-| Provision (cấp phát hồ sơ/tài khoản)                           | Tạo hoặc đồng bộ user từ lớp định danh sang hồ sơ ứng dụng.                                              |
-| Onboarding (quy trình khởi tạo)                                | Luồng khởi tạo tenant/user ban đầu để một nhà hàng bắt đầu dùng hệ thống.                                |
-| Frontend (ứng dụng phía trình duyệt)                           | Phần giao diện chạy cho người dùng, ví dụ Management App.                                                |
-| Backend (dịch vụ phía server)                                  | Các service xử lý logic, dữ liệu, xác thực và phân quyền.                                                |
-| OpenID Connect / OIDC (chuẩn đăng nhập mở rộng trên OAuth 2.0) | Chuẩn đăng nhập mà Management App dùng để chuyển hướng sang Keycloak và nhận token.                      |
-| Access token (token truy cập)                                  | JWT ngắn hạn được gửi đến BFF trong header `Authorization: Bearer ...`.                                  |
-| Refresh token (token làm mới)                                  | Token dùng để xin access token mới khi access token sắp hết hạn.                                         |
-| JWT / JSON Web Token (token JSON có chữ ký)                    | Định dạng token có payload và chữ ký số. Authorizer phải verify JWT trước khi tin nội dung.              |
-| JWKS / JSON Web Key Set (tập khóa công khai)                   | Endpoint của Keycloak chứa public key để Authorizer kiểm tra chữ ký JWT.                                 |
-| Protocol mapper (bộ ánh xạ claim)                              | Cấu hình Keycloak để đưa user attribute/role vào token claim, ví dụ `tenant_id`.                         |
-| Client credentials (thông tin định danh của client)            | Cơ chế để service lấy admin token bằng `client_id` và `client_secret`.                                   |
-| Service account (tài khoản dịch vụ)                            | Tài khoản đại diện cho một client backend khi client đó gọi API quản trị.                                |
-| Admin REST API (API quản trị)                                  | API của Keycloak để tạo user, gán role, vô hiệu hóa user. Authorizer đang gọi API này.                   |
-| Required action (hành động bắt buộc)                           | Yêu cầu user làm một việc sau login, ví dụ `UPDATE_PASSWORD`.                                            |
-| Scope (phạm vi quyền yêu cầu)                                  | Danh sách quyền/nhóm thông tin mà client xin khi đăng nhập OIDC.                                         |
-| Source of truth (nguồn sự thật)                                | Nơi dữ liệu được xem là bản đúng nhất khi có mâu thuẫn.                                                  |
-| Security boundary (ranh giới bảo mật)                          | Lớp kiểm tra không được bỏ qua khi bảo vệ dữ liệu/API.                                                   |
-| Callback URL (URL quay lại)                                    | URL Keycloak chuyển người dùng về sau khi đăng nhập xong.                                                |
-
----
-
-## 2. Keycloak đang dùng ở đâu
-
-| Thành phần          | Vai trò của Keycloak                                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Docker provider     | Chạy Keycloak local ở `http://localhost:8180`, image `quay.io/keycloak/keycloak:25.0.0`.                                             |
-| Realm `qrtable`     | Không gian định danh cho dự án QRTable.                                                                                              |
-| Management App      | Dùng NextAuth Keycloak provider để login, refresh token và nạp session.                                                              |
-| Authorizer Service  | Verify JWT bằng JWKS, gọi Keycloak Admin REST API để tạo user, gán role và disable user.                                             |
-| BFF Guards          | Không nói chuyện trực tiếp với Keycloak; UserGuard gọi Authorizer và cache kết quả verify token trong Redis.                         |
-| User-Access Service | Lưu hồ sơ ứng dụng, role nội bộ và permission; đây mới là nguồn quyền ứng dụng.                                                      |
-| SaaS onboarding     | Tạo owner trong Keycloak khi tạo tenant mới, gán role `OWNER`, rollback bằng cách disable user nếu bước sau thất bại.                |
-| Keycloak Theme      | Custom theme trong `apps/keycloak-theme`, được mount vào container Keycloak.                                                         |
-| Bootstrap scripts   | `tools/keycloak-bootstrap.sh` tạo realm/client, user attributes, protocol mappers, realm roles và user mẫu cho môi trường local/dev. |
-
-Keycloak không dùng cho luồng khách hàng quét QR. Customer PWA dùng session/QR token và guard riêng, vì khách không cần tài khoản staff trong realm `qrtable`.
+| Terminology                                                  | Meaning in QRTable                                                                                                             |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Keycloak                                                     | Identity server (name server), manages logins, users, identity roles and tokens.                                               |
+| Realm (identity space)                                       | Keycloak's own configuration area. QRTable uses realm `qrtable`.                                                               |
+| Client (registration application)                            | Applications are given tokens by Keycloak, for example Management App or BFF client.                                           |
+| User (account identifier) ​​                                 | Login account in Keycloak, usually corresponding to staff/admin/Owner.                                                         |
+| Realm role (realm level role)                                | Roles are at the realm level, for example `Owner`, `MANAGER`, `WAITER`. QRTable uses this role to map to an internal role.     |
+| Role (role)                                                  | Large group of user responsibilities, for example `Owner`, `CHEF`.                                                             |
+| Permission (permission to operate)                           | API/business granular permissions, e.g. `ORDER_CREATE`.                                                                        |
+| tenant (rental unit / restaurant)                            | Data space of a restaurant in a SaaS system.                                                                                   |
+| Guard (request blocking class)                               | The class checks the request before putting it into the controller, for example `UserGuard`, `TenantGuard`, `PermissionGuard`. |
+| Session (session)                                            | The logged in state or active session state of the user/guest.                                                                 |
+| Cache (caching memory)                                       | Flashbacks can expire or be rebuilt, usually residing in Redis.                                                                |
+| Provision (allocation of records/accounts)                   | Create or synchronize users from the identity layer to the application profile.                                                |
+| Onboarding (initialization process)                          | Initial tenant/user initialization flow for a restaurant to start using the system.                                            |
+| Frontend (browser side application)                          | The interface that runs for the user, for example Management App.                                                              |
+| Backend (server-side service)                                | Services handle logic, data, authentication, and authorization.                                                                |
+| OpenID Connect / OIDC (extended login standard on OAuth 2.0) | Login standard that Management App uses to redirect to Keycloak and receive tokens.                                            |
+| Access token (access token)                                  | The short-term JWT is sent to the BFF in the `Authorization: Bearer ...` header.                                               |
+| Refresh token (refresh token)                                | Token is used to apply for a new access token when the access token is about to expire.                                        |
+| JWT / JSON Web Token (signed JSON token)                     | Token format with payload and digital signature. The Authorizer must verify the JWT before trusting the content.               |
+| JWKS / JSON Web Key Set (public key set)                     | Keycloak's endpoint contains the public key for the Authorizer to check the JWT signature.                                     |
+| Protocol mapper (claim mapper)                               | Configure Keycloak to include user attribute/role in token claim, for example `tenant_id`.                                     |
+| Client credentials (client identification information)       | The mechanism for the service to get the admin token is `client_id` and `client_secret`.                                       |
+| service account (service account)                            | The account represents a backend client when that client calls the administrative API.                                         |
+| Admin REST API (Admin API)                                   | Keycloak's API to create users, assign roles, and disable users. Authorizer is calling this API.                               |
+| Required action                                              | Ask the user to do something after login, for example `UPDATE_PASSWORD`.                                                       |
+| Scope (scope of request permission)                          | List of permissions/groups of information that the client requests when logging in to OIDC.                                    |
+| Source of truth (source of truth)                            | Where data is considered the most correct version when there are conflicts.                                                    |
+| Security boundary (security boundary)                        | The auditing layer should not be overlooked when protecting data/APIs.                                                         |
+| Callback URL (return URL)                                    | The Keycloak URL redirects the user back after logging in.                                                                     |
 
 ---
 
-## 3. Nguyên tắc lựa chọn Keycloak
+## 2. Where is Keycloak being used?
 
-Keycloak nên được chọn khi bài toán là **human authentication (xác thực người dùng con người)**, quản lý login, token, role định danh, hoặc vòng đời tài khoản trong hệ thống định danh.
+| Ingredients         | Keycloak's role                                                                                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Docker providers    | Run Keycloak locally at `http://localhost:8180`, image `quay.io/keycloak/keycloak:25.0.0`.                                                         |
+| Realm `qrtable`     | Identifier space for the QRTable project.                                                                                                          |
+| Management App      | Use NextAuth Keycloak provider to login, refresh token and load session.                                                                           |
+| Authorizer service  | verify JWT using JWKS, call Keycloak Admin REST API to create users, assign roles and disable users.                                               |
+| BFF Guards          | Do not talk directly to Keycloak; UserGuard calls Authorizer and caches token verification results in Redis.                                       |
+| User-Access service | Save application profiles, internal roles and permissions; This is the source of application permissions.                                          |
+| SaaS onboarding     | Create an Owner in Keycloak when creating a new tenant, assign the role `Owner`, rollback by disabling the user if the next step fails.            |
+| Keycloak Theme      | Custom theme in `apps/keycloak-theme`, mounted into Keycloak container.                                                                            |
+| Bootstrap scripts   | `tools/keycloak-bootstrap.sh` creates realm/client, user attributes, protocol mappers, realm roles and sample users for the local/dev environment. |
 
-Không nên dùng Keycloak như một database nghiệp vụ tổng quát. Nếu dữ liệu cần transaction nghiệp vụ, audit, query theo tenant, hoặc là source of truth của domain QRTable, hãy để service sở hữu domain đó quản lý.
-
-### 3.1 Khi nên dùng Keycloak
-
-Dùng Keycloak khi cần:
-
-- Đăng nhập nhân viên nhà hàng, owner, manager, admin hoặc super admin.
-- Phát hành access token (JWT) để frontend gọi BFF.
-- Xác minh token theo chuẩn OIDC/JWKS thay vì tự viết cơ chế token riêng.
-- Quản lý mật khẩu, required action, enabled/disabled user.
-- Tạo user từ backend thông qua Admin REST API trong luồng onboarding.
-- Gán role định danh có tính tổng quát, ví dụ `OWNER`, `MANAGER`, `WAITER`.
-- Tích hợp giao diện đăng nhập tập trung cho Management App.
-
-### 3.2 Khi không nên dùng Keycloak
-
-Không dùng Keycloak cho:
-
-- Session của khách hàng quét QR. Đây là luồng vô danh theo bàn/mã QR, không phải staff login.
-- Quyền nghiệp vụ chi tiết như `ORDER_CREATE`, `MENU_UPDATE`, `PLAN_MANAGE`. Các permission này thuộc User-Access và permission matrix.
-- Trạng thái tenant, gói dịch vụ (subscription), invoice, quota, payment settings.
-- OAuth của nhà cung cấp thanh toán, ví dụ SePay OAuth state.
-- Cache token, cart, KDS runtime hay các trạng thái tạm thời; các phần này dùng Redis.
-- Event liên service; các phần này dùng TCP/gRPC/Kafka theo đúng ngữ cảnh.
-
-### 3.3 Câu hỏi quyết định nhanh
-
-| Câu hỏi                                                  | Lựa chọn phù hợp                                                |
-| -------------------------------------------------------- | --------------------------------------------------------------- |
-| Đây có phải người dùng nội bộ cần đăng nhập không?       | Keycloak.                                                       |
-| Đây có phải khách hàng quét QR không có tài khoản không? | Customer session/QR token, không dùng Keycloak.                 |
-| Cần biết token có hợp lệ và user là ai?                  | Authorizer verify Keycloak JWT.                                 |
-| Cần biết user có permission nào trong QRTable?           | User-Access + PermissionGuard.                                  |
-| Cần biết user thuộc tenant nào?                          | JWT claim/user profile + TenantGuard.                           |
-| Cần tạo owner khi onboarding tenant mới?                 | SaaS Service gọi Authorizer, Authorizer gọi Keycloak Admin API. |
-| Cần vô hiệu hóa owner nếu onboarding fail?               | Authorizer gọi Keycloak Admin API disable user.                 |
-| Cần lưu dữ liệu nghiệp vụ lâu dài?                       | PostgreSQL trong service sở hữu domain.                         |
-
-### 3.4 So sánh các lớp liên quan
-
-| Lớp               | Trả lời câu hỏi                                       | QRTable đang dùng như thế nào                                       |
-| ----------------- | ----------------------------------------------------- | ------------------------------------------------------------------- |
-| Keycloak          | "Người này là ai, token có hợp lệ không?"             | Login, JWT, realm role, admin user lifecycle.                       |
-| NextAuth          | "Frontend giữ session login ra sao?"                  | Management App lưu token/session, refresh token và hydrate profile. |
-| Authorizer        | "Token Keycloak có hợp lệ trong QRTable không?"       | Verify JWT, nạp user profile, trả permissions cho BFF.              |
-| User-Access       | "User này có profile/role/permission nào?"            | Source of truth cho user ứng dụng và permission.                    |
-| BFF Guards        | "Request này có được phép đi tiếp không?"             | UserGuard, TenantGuard, PermissionGuard.                            |
-| Redis token cache | "Kết quả verify token gần đây có thể dùng lại không?" | Cache kết quả Authorizer để giảm verify lặp lại.                    |
+Keycloak is not used for QR scanning customer flows. Customer PWA uses its own session/QR token and guard, because the customer does not need a staff account in the `qrtable` realm.
 
 ---
 
-## 4. Lý thuyết vừa đủ
+## 3. Keycloak selection principles
+
+Keycloak should be chosen when the problem is **human authentication (human user authentication)**, managing logins, tokens, identity roles, or account lifecycle in the identity system.
+
+Keycloak should not be used as a general business database. If the data needs business transactions, audits, queries by tenant, or is the source of truth of the QRTable domain, let the service that owns that domain manage it.
+
+### Why does QRTable need Keycloak?
+
+The root problem of QRTable is that Management App has many internal user groups: super admin, Owner, manager, waiter, chef, barista. These people need to log in securely, receive standard tokens, have an account lifecycle, can be disabled, reset passwords, assign identifying roles and integrate with the backend via JWT. If you write all the authentication yourself from scratch, the project will have to handle many sensitive parts yourself: saving passwords, hashes, refresh tokens, token signing, JWKS, password policy, session security, user lifecycle and admin tooling.
+
+Keycloak resolves the identity class:
+
+```txt
+Who is logging in?
+Is this token valid?
+What identifying realm role does this user have?
+Is this user still enabled?
+```
+
+QRTable still separates the business permission layer into User-Access:
+
+```txt
+Which tenant does this user belong to in the application?
+Which QRTable permission does the user have?
+Is the current request allowed to continue?
+```
+
+Why Keycloak, not other options?
+
+| Options                            | Why is it not the main choice for this problem                                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Write your own auth                | High security risk, time consuming, easy to make mistakes in token refresh, password policy, signing key, user lifecycle.               |
+| Only use NextAuth                  | NextAuth manages the frontend session well, but is not a full identity server for realm, Admin API, JWKS, roles.                        |
+| Use User-Access                    | only User-Access owns application permissions, but should not issue/verify the OIDC token and password management standards themselves. |
+| Firebase/Auth0/SaaS identity       | Can be powerful, but depends on vendor/cloud; Keycloak is open-source, self-hosted, compatible with local/dev/thesis and Admin API.     |
+| Customer QR session using Keycloak | Customers scanning QR is an anonymous session by table, no need for an identification account in realm staff.                           |
+
+A good interview answer:
+
+> The project uses Keycloak as an identity provider for staff/admin because it needs standard OIDC login, JWT, JWKS verification, identity role, user lifecycle and Admin API for onboarding tenants. But Keycloak does not own detailed business permissions; After the token is valid, Authorizer/User-Access will load the profile, tenant and application permissions. This separation helps not to write sensitive auth yourself, while still keeping business authorization in the domain of QRTable.
+
+Interviewers often ask:
+
+| Question                                             | Questions to answer in QRTable                                                                                    |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| How is Keycloak different from User-Access?          | Keycloak authenticates identities; User-Access is the source of truth for application profile/permission.         |
+| Why don't QR customers use Keycloak?                 | Customer is an anonymous table/session flow, does not need a staff account and should not be a heavy login.       |
+| Is JWT claim enough to decentralize authority?       | Are not. Claim helps identify/tenant context; PermissionGuard still relies on application permissions.            |
+| If Keycloak is down, what will happen to the system? | Login/refresh/user provisioning is affected; Requests with valid tokens/cache may still run within design limits. |
+| Why do we need protocol mapper?                      | Put a claim like `tenant_id` in the token so that BFF/Authorizer can deduce the tenant context when needed.       |
+
+### 3.1 When to use Keycloak
+
+Use Keycloak when needed:
+
+- Log in as restaurant staff, Owner, manager, admin or super admin.
+- Issue an access token (JWT) for the frontend to call BFF.
+- verify tokens according to OIDC/JWKS standards instead of writing your own token mechanism.
+- Password management, required action, enabled/disabled user.
+- Create users from the backend via Admin REST API in the onboarding flow.
+- Assign generic role identifiers, for example `Owner`, `MANAGER`, `WAITER`.
+- Integrate centralized login interface for Management App.
+
+### 3.2 When you should not use Keycloak
+
+Do not use Keycloak for:
+
+- Customer session scans QR. This is an anonymous stream based on desk/QR code, not staff login.
+- Detailed business rights such as `ORDER_CREATE`, `MENU_UPDATE`, `PLAN_MANAGE`. These permissions belong to User-Access and permission matrix.
+- tenant status, service package (subscription), invoice, quota, payment settings.
+- Payment provider's OAuth, for example SePay OAuth state.
+- Cache tokens, carts, KDS runtime or temporary states; These parts use Redis.
+- Inter-service event; These sections use TCP/gRPC/Kafka in context.
+
+### 3.3 Quick decision question
+
+| Question                                                | Suitable choice                                                     |
+| ------------------------------------------------------- | ------------------------------------------------------------------- |
+| Is this an internal user that needs to log in?          | Keycloak.                                                           |
+| Is this a QR scanning customer without an account?      | Customer session/QR token, do not use Keycloak.                     |
+| Need to know if the token is valid and who is the user? | Authorizer verify Keycloak JWT.                                     |
+| Need to know what permissions a user has in QRTable?    | User-Access + PermissionGuard.                                      |
+| Need to know which tenant the user belongs to?          | JWT claim/user profile + TenantGuard.                               |
+| Need to create an Owner when onboarding a new tenant?   | SaaS service calls Authorizer, Authorizer calls Keycloak Admin API. |
+| Need to disable Owner if onboarding fails?              | Authorizer calls Keycloak Admin API disable user.                   |
+| Need to save long-term business data?                   | PostgreSQL in the service owns the domain.                          |
+
+### 3.4 Compare related classes
+
+| Class             | Answer questions                                    | How is QRTable being used                                              |
+| ----------------- | --------------------------------------------------- | ---------------------------------------------------------------------- |
+| Keycloak          | "Who is this person, is the token valid?"           | Login, JWT, realm role, admin user lifecycle.                          |
+| NextAuth          | "How does Frontend keep session login?"             | Management App saves token/session, refresh token and hydrate profile. |
+| Authorizer        | "Are Keycloak tokens valid in QRTable?"             | verify JWT, load user profile, return permissions to BFF.              |
+| User-Access       | "What profile/role/permission does this user have?" | Source of truth for application users and permissions.                 |
+| BFF Guards        | "Is this request allowed to continue?"              | UserGuard, TenantGuard, PermissionGuard.                               |
+| Redis token cache | "Can recent token verification results be reused?"  | Cache Authorizer results to reduce repeated verification.              |
+
+---
+
+## 4. Sufficient theory
 
 ### 4.1 Realm
 
-Realm là không gian cấu hình độc lập trong Keycloak. Mỗi realm có user, role, client, cấu hình đăng nhập và khóa ký token riêng.
+Realm is an independent configuration space in Keycloak. Each realm has its own user, role, client, login configuration, and token signing key.
 
-Trong QRTable, realm hiện tại là:
+In QRTable, the current realm is:
 
 ```txt
 qrtable
 ```
 
-Nếu sau này tạo thêm realm cho từng môi trường, ví dụ `qrtable-dev`, `qrtable-staging`, `qrtable-prod`, cần đảm bảo frontend, Authorizer và Keycloak Admin API cùng trỏ đến đúng issuer/realm. Sai realm thường dẫn đến token verify thất bại vì issuer hoặc key không khớp.
+If you later create additional realms for each environment, for example `qrtable-dev`, `qrtable-staging`, `qrtable-prod`, make sure the frontend, Authorizer and Keycloak Admin API all point to the correct issuer/realm. Wrong realm often results in failed token verification because the issuer or key does not match.
 
 ### 4.2 Client
 
-Client là ứng dụng được đăng ký với Keycloak. Client quyết định cách ứng dụng đăng nhập và nhận token.
+Client is the application registered with Keycloak. The client decides how the application logs in and receives tokens.
 
-Trong QRTable hiện có các biến môi trường liên quan:
+In the QRTable there are now relevant environment variables:
 
 ```txt
 KEYCLOAK_CLIENT_ID=qrtable-bff
 AUTH_KEYCLOAK_ID=management-app
 ```
 
-Ý nghĩa thực tế:
+Actual meaning:
 
-- `management-app` phục vụ luồng đăng nhập frontend qua NextAuth.
-- `qrtable-bff` / client backend được Authorizer dùng khi cần trao đổi token hoặc gọi Keycloak với client secret.
+- `management-app` serves the frontend login flow via NextAuth.
+- `qrtable-bff` / client backend is used by the Authorizer when needing to exchange tokens or call Keycloak with the client secret.
 
-Client secret (bí mật client) chỉ được dùng ở backend. Không đưa client secret vào trình duyệt, bundle frontend, hoặc tài liệu public.
+The client secret is only used on the backend. Do not include client secrets in browsers, frontend bundles, or public documents.
 
 ### 4.3 OpenID Connect
 
-OpenID Connect (chuẩn đăng nhập mở rộng trên OAuth 2.0) thêm lớp nhận diện người dùng lên OAuth 2.0. Nói ngắn gọn:
+OpenID Connect (an extended login standard on OAuth 2.0) adds a user identification layer to OAuth 2.0. In short:
 
 ```txt
-OAuth 2.0 trả lời: ứng dụng được quyền truy cập gì?
-OpenID Connect trả lời thêm: người đang đăng nhập là ai?
+OAuth 2.0 answers: what access does an application have?
+OpenID Connect further answers: who is the person logging in?
 ```
 
-Trong Management App:
+In Management App:
 
 ```txt
-Người dùng bấm đăng nhập
-  -> Management App chuyển sang Keycloak login page
-  -> Keycloak xác thực user
-  -> Management App nhận access token / refresh token qua NextAuth
+User clicks log in
+-> Management App redirects to Keycloak login page
+-> Keycloak authenticates users
+-> Management App receives access token / refresh token qua NextAuth
 ```
 
-Sau đó Management App không tự tin mọi claim trong token một cách tuyệt đối. Nó gọi BFF `/authorizer/me` để QRTable xác nhận user đã có profile và permission trong User-Access.
+After that, Management App does not have absolute confidence in all claims in the token. It calls BFF `/authorizer/me` to let QRTable confirm that the user has a profile and permission in User-Access.
 
-### 4.4 JWT và chữ ký số
+### 4.4 JWT and digital signatures
 
-JWT gồm ba phần:
+JWT consists of three parts:
 
 ```txt
 header.payload.signature
 ```
 
-Payload có thể đọc được bằng base64 decode, nhưng **không được tin** nếu chưa verify chữ ký. Authorizer làm đúng thứ tự:
+The payload can be read using base64 decode, but **cannot be trusted** without verifying the signature. Authorizer does the correct order:
 
-1. Decode header để lấy `kid` (key id).
-2. Lấy public key từ JWKS endpoint của Keycloak.
-3. Verify chữ ký với RS256.
-4. Kiểm tra payload có `sub`.
-5. Nạp profile từ User-Access.
+1. Decode header to get `kid` (key id).
+2. Get the public key from Keycloak's JWKS endpoint.
+3. verify signature with RS256.
+4. Check the payload has `sub`.
+5. Load profile from User-Access.
 
-Điều này quan trọng vì frontend hoặc client có thể gửi token giả. Chỉ token có chữ ký hợp lệ theo public key của realm mới được tin.
+This is important because the frontend or client can send fake tokens. Only tokens with a valid signature according to realm's public key can be trusted.
 
 ### 4.5 JWKS
 
-JWKS là danh sách public key của Keycloak:
+JWKS is Keycloak's public key list:
 
 ```txt
 {KEYCLOAK_HOST}/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs
 ```
 
-Với local QRTable:
+With local QRTable:
 
 ```txt
 http://localhost:8180/realms/qrtable/protocol/openid-connect/certs
 ```
 
-Keycloak có thể rotate key (xoay khóa ký). Vì vậy Authorizer không hard-code public key trong code, mà lấy key theo `kid` từ JWKS. Thư viện `jwks-rsa` được cấu hình cache và rate limit để giảm tải.
+Keycloak can rotate the key (rotate the signing key). So Authorizer does not hard-code the public key in the code, but gets the key according to `kid` from JWKS. The `jwks-rsa` library is configured with cache and rate limit to reduce load.
 
-### 4.6 Role trong Keycloak và permission trong QRTable
+### 4.6 Role in Keycloak and permission in QRTable
 
-Keycloak realm role là vai trò định danh lớn:
+Keycloak realm role is a major identifier role:
 
 ```txt
 SUPER_ADMIN
@@ -275,7 +320,7 @@ CHEF
 BARISTA
 ```
 
-Permission trong QRTable chi tiết hơn và thuộc User-Access, ví dụ:
+Permissions in QRTable are more detailed and belong to User-Access, for example:
 
 ```txt
 ORDER_CREATE
@@ -284,18 +329,18 @@ PLAN_MANAGE
 PAYMENT_SETTINGS_UPDATE
 ```
 
-Nguyên tắc:
+Principle:
 
 ```txt
-Keycloak role giúp QRTable biết user thuộc nhóm nào.
-User-Access role/permission quyết định user được làm hành động nào.
+The Keycloak role helps QRTable know which group a user belongs to.
+User-Access role/permission determines what action the user can do.
 ```
 
-Nếu token có role Keycloak nhưng User-Access không có profile/role mapping tương ứng, request vẫn bị từ chối.
+If the token has the Keycloak role but the User-Access does not have the corresponding profile/role mapping, the request will still be rejected.
 
-### 4.7 Claim và protocol mapper
+### 4.7 Claim and protocol mapper
 
-Claim là trường nằm trong JWT payload. QRTable quan tâm đến các claim như:
+Claim is a field in the JWT payload. QRTable is interested in claims such as:
 
 ```json
 {
@@ -309,135 +354,135 @@ Claim là trường nằm trong JWT payload. QRTable quan tâm đến các claim
 }
 ```
 
-Protocol mapper (bộ ánh xạ claim) giúp đưa user attribute vào token claim. Ví dụ user có attribute `tenant_id`, mapper có thể đưa giá trị này vào access token để BFF/Authorizer đọc được.
+Protocol mapper (claim mapper) helps put user attributes into claim tokens. For example, a user has the attribute `tenant_id`, the mapper can put this value into the access token so that BFF/Authorizer can read it.
 
-Trong code hiện tại, Authorizer và guards có xử lý cả `tenant_id` và dạng camelCase `tenantId` để tránh lệch tên field khi đi qua proto-loader.
+In the current code, Authorizer and guards handle both `tenant_id` and camelCase `tenantId` to avoid field name errors when passing through the proto-loader.
 
 ### 4.8 Admin REST API
 
-Admin REST API là API quản trị của Keycloak. Authorizer dùng API này để:
+Admin REST API is Keycloak's admin API. Authorizer uses this API to:
 
-- Lấy admin token bằng client credentials.
-- Tạo user.
-- Gán realm role cho user.
-- Update user.
-- Disable user.
-- Đọc thông tin user theo id.
+- Get admin token using client credentials.
+- Create users.
+- Assign realm role to user.
+- Update users.
+- Disable users.
+- Read user information by id.
 
-Theo tài liệu Keycloak chính thức, Admin REST API nằm dưới mẫu đường dẫn:
+According to the official Keycloak documentation, the Admin REST API is under the path pattern:
 
 ```txt
 /admin/realms/{realm}/...
 ```
 
-QRTable không để frontend gọi Admin REST API trực tiếp. Mọi thao tác quản trị Keycloak phải đi qua backend có client secret và rollback phù hợp.
+QRTable does not let the frontend call the Admin REST API directly. All Keycloak administration operations must go through a backend with appropriate client secret and rollback.
 
 ### 4.9 Required action
 
-Required action là hành động Keycloak bắt user thực hiện sau khi login. QRTable dùng `UPDATE_PASSWORD` trong luồng tạo owner mới:
+Required action is an action Keycloak forces users to perform after logging in. QRTable uses `UPDATE_PASSWORD` in the new Owner creation flow:
 
 ```txt
-SaaS onboarding tạo owner
-  -> Keycloak user có temporary password
+SaaS onboarding creates Owner
+-> Keycloak user has a temporary password
   -> requiredActions: ["UPDATE_PASSWORD"]
-  -> owner phải đổi mật khẩu sau lần đăng nhập đầu tiên
+-> Owner must change password after first login
 ```
 
-Đây là cách tốt hơn so với việc để temporary password tồn tại lâu dài như mật khẩu chính.
+This is a better way than letting the temporary password last as long as the main password.
 
 ---
 
-## 5. Các kiểu xác thực và flow Keycloak
+## 5. Keycloak authentication types and flows
 
-Keycloak hỗ trợ nhiều kiểu xác thực (authentication flow) và cấp token (grant/flow). QRTable không dùng tất cả. Khi đọc tài liệu Keycloak, cần phân biệt flow nào là nền tảng lý thuyết, flow nào đang được triển khai, và flow nào nên tránh.
+Keycloak supports many types of authentication (authentication flow) and token issuance (grant/flow). QRTable is not used at all. When reading Keycloak documentation, it is important to distinguish which flows are theoretical, which flows are being implemented, and which flows should be avoided.
 
 ### 5.1 Authorization Code / Standard Flow
 
-Authorization Code Flow, trong Keycloak UI thường gọi là **Standard Flow**, là flow chính cho ứng dụng web có login qua trình duyệt.
+Authorization Code Flow, often called **Standard Flow** in Keycloak UI, is the main flow for web applications with login via browser.
 
-Luồng dễ hiểu:
+Easy-to-understand flow:
 
 ```txt
-User mở Management App
-  -> Management App chuyển sang Keycloak
-  -> User nhập mật khẩu trên Keycloak
-  -> Keycloak trả code về callback URL
-  -> NextAuth đổi code lấy access token / refresh token
+User opens Management App
+-> Management App switched to Keycloak
+-> User enters password on Keycloak
+-> Keycloak returns the code to the callback URL
+-> NextAuth exchange code for access token / refresh token
 ```
 
-QRTable dùng flow này cho Management App qua NextAuth + Keycloak provider. Đây là flow nên ưu tiên cho staff/admin login vì password chỉ nhập ở Keycloak, frontend không tự xử lý mật khẩu.
+QRTable uses this flow for Management App via NextAuth + Keycloak provider. This is a flow that should be prioritized for staff/admin login because the password is only entered in Keycloak, the frontend does not process the password itself.
 
 ### 5.2 Refresh Token
 
-Refresh token dùng để xin access token mới khi access token hết hạn hoặc sắp hết hạn. Management App đang xin scope `offline_access` để có refresh token.
+Refresh token is used to apply for a new access token when the access token expires or is about to expire. Management App is asking for scope `offline_access` to get a refresh token.
 
-Trong QRTable:
+In QRTable:
 
-- NextAuth giữ refresh token trong JWT session phía server/runtime của NextAuth.
-- Khi access token sắp hết hạn, Management App gọi token endpoint của Keycloak với `grant_type=refresh_token`.
-- BFF vẫn phải verify access token mới qua Authorizer; refresh token không được gửi trực tiếp cho BFF API nghiệp vụ.
+- NextAuth keeps the refresh token in NextAuth's server/runtime JWT session.
+- When the access token is about to expire, Management App calls Keycloak's token endpoint with `grant_type=refresh_token`.
+- BFF still has to verify the new access token via Authorizer; The refresh token is not sent directly to the business API BFF.
 
 ### 5.3 Client Credentials / Service Account
 
-Client Credentials Grant là flow cho backend/service tự xác thực với Keycloak, không đại diện cho một user đang bấm giao diện.
+Client Credentials Grant is a flow for the backend/service to authenticate itself with Keycloak, not representing a user clicking the interface.
 
-Luồng dễ hiểu:
+Easy-to-understand flow:
 
 ```txt
-Authorizer có client_id + client_secret
-  -> gọi token endpoint với grant_type=client_credentials
-  -> nhận admin/service token
-  -> gọi Keycloak Admin REST API
+Authorizer has client_id + client_secret
+-> call token endpoint with grant_type=client_credentials
+-> receive admin/service token
+-> call Keycloak Admin REST API
 ```
 
-QRTable dùng cơ chế này để Authorizer gọi Keycloak Admin REST API, ví dụ tạo user, gán realm role, disable user. Trong `tools/keycloak-bootstrap.sh`, client backend được bật `serviceAccountsEnabled: true` và service account được gán các role quản trị cần thiết như `manage-users`, `view-users`, `query-users`.
+QRTable uses this mechanism for the Authorizer to call the Keycloak Admin REST API, for example creating a user, assigning a realm role, disabling the user. In `tools/keycloak-bootstrap.sh`, the client backend is enabled `serviceAccountsEnabled: true` and the service account is assigned necessary administrative roles such as `manage-users`, `view-users`, `query-users`.
 
 ### 5.4 Direct Access Grants / Password Grant
 
-Direct Access Grants cho phép client gửi username/password trực tiếp đến token endpoint để lấy token. Đây là flow tiện cho script, test hoặc legacy endpoint, nhưng không nên là flow chính cho giao diện người dùng hiện đại.
+Direct Access Grants allow clients to send username/password directly to the token endpoint to obtain tokens. This is a convenient flow for scripting, testing, or legacy endpoints, but should not be the main flow for modern user interfaces.
 
-Trong code hiện tại, Authorizer có hàm `exchangeUserToken()` dùng `grant_type=password`. Vì vậy bootstrap/local hoặc một số luồng nội bộ có thể dựa vào nó, nhưng Management App login chính vẫn nên đi qua Standard Flow.
+In the current code, Authorizer has function `exchangeUserToken()` which uses `grant_type=password`. So bootstrap/local or some internal flow can rely on it, but the main Management App login should still go through Standard Flow.
 
-Nguyên tắc trong QRTable:
+Principles in QRTable:
 
-- Dùng Standard Flow cho người dùng thật đăng nhập qua UI.
-- Chỉ bật Direct Access Grants khi có use case rõ ràng.
-- Không để frontend tự thu password rồi gọi password grant nếu có thể dùng redirect login của Keycloak.
+- Use Standard Flow for real users to log in via UI.
+- Only enable Direct Access Grants when there is a clear use case.
+- Do not let the frontend automatically collect the password and then call the password grant if you can use Keycloak's login redirect.
 
 ### 5.5 Implicit Flow
 
-Implicit Flow từng được dùng cho SPA cũ, trong đó token được trả trực tiếp qua browser redirect. Với bối cảnh hiện tại, nên tránh flow này vì token dễ lộ trên trình duyệt/history/log hơn và không còn là lựa chọn tốt cho ứng dụng web hiện đại.
+Implicit Flow was used for old SPA, where tokens were paid directly via browser redirect. In the current context, this flow should be avoided because the token is more easily exposed in the browser/history/log and is no longer a good choice for modern web applications.
 
-QRTable không cần Implicit Flow. Management App dùng NextAuth và Standard Flow.
+QRTable does not need Implicit Flow. Management App uses NextAuth and Standard Flow.
 
-### 5.6 Device Authorization và các flow khác
+### 5.6 Device Authorization and other flows
 
-Keycloak còn hỗ trợ các flow như Device Authorization (đăng nhập cho thiết bị ít khả năng nhập liệu), Identity Brokering (đăng nhập qua Google/GitHub/IdP khác), hoặc các flow tùy biến.
+Keycloak also supports flows such as Device Authorization (login for devices with limited input capabilities), Identity Brokering (login via Google/GitHub/other IdP), or custom flows.
 
-QRTable hiện chưa triển khai các flow này. Nếu sau này cần, hãy xem chúng là scope riêng:
+QRTable does not currently implement these flows. If needed later, consider them as separate scopes:
 
-- Thiết bị POS/kiosk không tiện nhập mật khẩu: cân nhắc Device Authorization.
-- Đăng nhập bằng Google Workspace của nhà hàng: cân nhắc Identity Brokering.
-- MFA/OTP cho admin: cấu hình authentication flow trong Keycloak, nhưng vẫn phải giữ BFF PermissionGuard làm lớp bảo vệ API.
+- POS/kiosk devices are not convenient to enter passwords: consider Device Authorization.
+- Sign in with your restaurant's Google Workspace: consider Identity Brokering.
+- MFA/OTP for admin: configure authentication flow in Keycloak, but still keep BFF PermissionGuard as API protection layer.
 
-### 5.7 Mapping flow với QRTable
+### 5.7 Mapping flow with QRTable
 
-| Nhu cầu                                      | Flow phù hợp                          | Trạng thái trong QRTable                       |
-| -------------------------------------------- | ------------------------------------- | ---------------------------------------------- |
-| Staff/admin đăng nhập Management App         | Standard Flow / Authorization Code    | Đang dùng qua NextAuth.                        |
-| Management App làm mới access token          | Refresh Token                         | Đang dùng qua NextAuth callback.               |
-| Authorizer gọi Admin REST API                | Client Credentials / Service Account  | Đang dùng cho Keycloak admin ops.              |
-| Script/test lấy token bằng username/password | Direct Access Grants / Password Grant | Có hỗ trợ trong Authorizer, dùng có kiểm soát. |
-| SPA nhận token trực tiếp từ redirect         | Implicit Flow                         | Không dùng, nên tránh.                         |
-| Customer quét QR gọi món                     | Không dùng Keycloak                   | Dùng customer session/QR token.                |
+| Demand                                      | Proper flow                           | Status in QRTable                               |
+| ------------------------------------------- | ------------------------------------- | ----------------------------------------------- |
+| Staff/admin log in to Management App        | Standard Flow / Authorization Code    | Using NextAuth.                                 |
+| Management App refreshes access token       | Refresh Tokens                        | Using NextAuth callback.                        |
+| Authorizer calls Admin REST API             | Client Credentials / service Account  | Currently used for Keycloak admin ops.          |
+| Script/test gets token by username/password | Direct Access Grants / Password Grant | There is support in Authorizer, controlled use. |
+| SPA receives tokens directly from redirect  | Implicit Flow                         | Do not use, should avoid.                       |
+| Customer scans QR to order                  | Do not use Keycloak                   | Use customer session/QR token.                  |
 
 ---
 
-## 6. Luồng xác thực hiện tại
+## 6. Current authentication flow
 
 ### 6.1 Management App login
 
-Management App dùng NextAuth với Keycloak provider. Biến cấu hình chính:
+Management App uses NextAuth with Keycloak provider. Main configuration variables:
 
 ```txt
 AUTH_KEYCLOAK_ID=management-app
@@ -446,265 +491,265 @@ AUTH_KEYCLOAK_ISSUER=http://localhost:8180/realms/qrtable
 MANAGEMENT_BFF_BASE_URL=http://localhost:3300/api/v1
 ```
 
-Luồng đăng nhập:
+Login flow:
 
 ```txt
-User mở /login
-  -> Management App gọi signIn("keycloak")
-  -> Keycloak login thành công
-  -> NextAuth lưu access token, refresh token, expiresAt
-  -> Management App gọi BFF /authorizer/me
-  -> Session được hydrate thêm roles, permissions, tenantId, userId
+User opens /login
+-> Management App calls signIn("keycloak")
+-> Keycloak login successfully
+-> NextAuth stores access token, refresh token, expiresAt
+-> Management App calls BFF /authorizer/me
+-> Session is hydrated with roles, permissions, tenantId, userId
 ```
 
-Management App yêu cầu các scope OIDC cơ bản và `offline_access` để có refresh token. Refresh token chỉ phục vụ session phía frontend; nó không thay thế kiểm tra quyền ở BFF.
+Management App requires basic OIDC scopes and `offline_access` to get refresh token. Refresh token only serves the frontend session; it does not replace permission checks in BFF.
 
-NextAuth có trách nhiệm giữ session phía frontend và refresh token. Nó không thay thế authorization (ủy quyền/kiểm tra quyền) ở BFF. Mọi API quan trọng vẫn phải qua BFF guards.
+NextAuth is responsible for keeping the frontend session and refreshing the token. It does not replace authorization in BFF. All important APIs still have to pass through BFF guards.
 
 ### 6.2 BFF UserGuard
 
-Khi route có `@Authorization({ secured: true })`, UserGuard sẽ:
+When a route has `@Authorization({ secured: true })`, UserGuard will:
 
-1. Đọc bearer token từ request.
-2. Tạo cache key Redis `user-token:{sha256(token)}`.
-3. Nếu có cache, gắn user metadata vào request.
-4. Nếu không có cache, gọi Authorizer gRPC `verifyUserToken`.
-5. Cache kết quả verify trong Redis khoảng 30 phút.
+1. Read bearer token from request.
+2. Create Redis key cache `user-token:{sha256(token)}`.
+3. If there is a cache, attach user metadata to the request.
+4. If there is no cache, call Authorizer gRPC `verifyUserToken`.
+5. Cache verification results in Redis for about 30 minutes.
 
-UserGuard không tự verify JWT. Điều này giúp logic verify tập trung ở Authorizer Service.
+UserGuard does not verify JWT itself. This keeps the verification logic centralized in the Authorizer service.
 
 ### 6.3 Authorizer verify token
 
 Authorizer Service:
 
-1. Decode JWT header để lấy `kid`.
-2. Lấy signing key từ JWKS.
-3. Verify JWT bằng RS256.
-4. Kiểm tra `sub`.
-5. Gọi User-Access để tìm user profile theo Keycloak user id.
-6. Kiểm tra role mapping giữa realm role trong token và role nội bộ.
-7. Gom permissions từ User-Access.
-8. Trả về metadata cho BFF.
+1. Decode JWT header to get `kid`.
+2. Get the signing key from JWKS.
+3. verify JWT using RS256.
+4. Check `sub`.
+5. Call User-Access to find the user profile by Keycloak user id.
+6. Check the role mapping between the realm role in the token and the internal role.
+7. Collect permissions from User-Access.
+8. Returns metadata for BFF.
 
-Nếu profile chưa tồn tại, Authorizer có thể auto provision nếu env `AUTH_AUTO_PROVISION_ON_FIRST_LOGIN=true`. Nếu không, lỗi đúng mong đợi là `user_not_provisioned`.
+If the profile does not exist, Authorizer can auto provision if env `AUTH_AUTO_PROVISION_ON_FIRST_LOGIN=true`. Otherwise, the expected error is `user_not_provisioned`.
 
 ### 6.4 TenantGuard
 
-TenantGuard đảm bảo request không "nhảy tenant" sai trái. Guard đọc tenant từ:
+TenantGuard ensures requests do not "jump tenants" incorrectly. Guard reads tenant from:
 
 - JWT claim `tenant_id` / `tenantId`.
-- Header/request context phù hợp với route.
-- Session cache trong một số luồng customer/session.
+- Header/request context matches the route.
+- Session cache in some customer/session threads.
 
-`SUPER_ADMIN` có thể bypass yêu cầu tenant trong các route quản trị phù hợp. Các role nhà hàng như `OWNER`, `MANAGER`, `WAITER`, `CHEF`, `BARISTA` phải có tenant hợp lệ và không được mismatch với tenant request.
+`SUPER_ADMIN` can bypass tenant requests in appropriate administrative routes. Restaurant roles such as `Owner`, `MANAGER`, `WAITER`, `CHEF`, `BARISTA` must have a valid tenant and must not be mismatched with the tenant request.
 
 ### 6.5 PermissionGuard
 
-PermissionGuard đọc permission route yêu cầu, sau đó so với danh sách permission trong metadata của user. Danh sách này đến từ User-Access, không đến trực tiếp từ Keycloak.
+PermissionGuard reads the permission route request, then compares it to the permission list in the user's metadata. This list comes from User-Access, not directly from Keycloak.
 
-Ví dụ:
-
-```txt
-Route cần ORDER_UPDATE
-  -> JWT hợp lệ
-  -> user đã provision
-  -> TenantGuard hợp lệ
-  -> PermissionGuard thấy user có ORDER_UPDATE
-  -> request được đi tiếp
-```
-
-Nếu thiếu permission, kết quả đúng là 403 `permission_denied`, không phải lỗi Keycloak.
-
-### 6.6 WebSocket và realtime
-
-Với realtime cho Management/KDS, token vẫn cần được xác minh trước khi socket được gắn vào room tenant/role. Nguyên tắc giống HTTP:
+For example:
 
 ```txt
-Token hợp lệ chưa đủ
-  -> cần user profile
-  -> cần tenant hợp lệ
-  -> mới join room realtime đúng phạm vi
+Route needs ORDER_UPDATE
+-> Valid JWT
+-> user has provisioned
+-> TenantGuard is valid
+-> PermissionGuard sees the user has ORDER_UPDATE
+-> request continues
 ```
 
-WebSocket chỉ là kênh đẩy tín hiệu runtime. Nó không nên bỏ qua Authorizer/User-Access nếu luồng đó cần staff identity.
+If permission is missing, the correct result is 403 `permission_denied`, not a Keycloak error.
+
+### 6.6 WebSocket and realtime
+
+With realtime for Management/KDS, the token still needs to be verified before the socket is attached to the room tenant/role. Same principle as HTTP:
+
+```txt
+A valid token is not enough
+-> need user profile
+-> need valid tenant
+-> just join room realtime in correct range
+```
+
+WebSocket is just a runtime signal push channel. It should not bypass Authorizer/User-Access if that thread needs staff identity.
 
 ---
 
-## 7. Cấp phát user và onboarding tenant
+## 7. Allocating users and onboarding tenants
 
-### 7.1 Tạo user nội bộ thông thường
+### 7.1 Create regular internal users
 
-User-Access Service có luồng tạo user ứng dụng:
-
-```txt
-Request tạo staff/admin
-  -> User-Access kiểm tra email
-  -> User-Access gọi Authorizer TCP KEYCLOAK.CREATE_USER
-  -> Authorizer tạo Keycloak user
-  -> User-Access tạo profile nội bộ
-```
-
-Lý do không chỉ tạo trong Keycloak:
-
-- Keycloak chỉ biết identity và realm role.
-- QRTable cần profile, tenant relation, internal role và permission.
-- QRTable cần kiểm soát lỗi duplicate email, rollback và mapping theo domain.
-
-### 7.2 Onboarding tenant owner trong Phase 4B
-
-Phase 4B thêm luồng onboarding tenant mới:
+User-Access service has an application user creation flow:
 
 ```txt
-SaaS Service nhận request onboarding
-  -> tạo tenant
-  -> gọi Authorizer KEYCLOAK.CREATE_TENANT_OWNER
-  -> Authorizer tạo Keycloak user owner
-  -> gán realm role OWNER
-  -> thêm attribute tenant_id / tenant_slug
-  -> set temporary password và required action UPDATE_PASSWORD nếu có
-  -> SaaS gọi User-Access upsert owner profile
-  -> tạo subscription/payment settings/outbox tenant.created
+Request creates staff/admin
+-> User-Access check email
+-> User-Access calls Authorizer TCP KEYCLOAK.CREATE_USER
+-> Authorizer creates a Keycloak user
+-> User-Access creates internal profile
 ```
 
-Nếu bước sau khi tạo Keycloak owner thất bại, SaaS gọi Authorizer `KEYCLOAK.DISABLE_USER` để vô hiệu hóa user vừa tạo. Đây là compensating action (hành động bù trừ), vì Keycloak và database SaaS/User-Access không nằm chung một transaction.
+Reasons not to just create in Keycloak:
 
-### 7.3 Vì sao rollback bằng disable
+- Keycloak only knows identity and realm role.
+- QRTable needs profile, tenant relations, internal roles and permissions.
+- QRTable needs to control duplicate email errors, rollback and mapping by domain.
 
-Trong hệ thống microservice, không có một transaction SQL duy nhất bao quanh Keycloak, SaaS DB và User-Access DB. Nếu Keycloak tạo owner thành công nhưng User-Access fail, user đó có thể đăng nhập nhưng chưa có profile ứng dụng.
+### 7.2 Onboarding tenant Owner in Phase 4B
 
-Disable user giúp:
+Phase 4B adds new tenant onboarding flow:
 
-- Chặn tài khoản nửa vời.
-- Giữ dấu vết để debug.
-- Tránh xóa vật lý user quá sớm khi cần audit luồng onboarding.
+```txt
+SaaS service receives an onboarding request
+-> create tenant
+-> calls Authorizer KEYCLOAK.CREATE_TENANT_OWNER
+-> Authorizer creates a Keycloak user Owner
+-> assigns realm role Owner
+-> adds attributes tenant_id / tenant_slug
+-> set temporary password and required action UPDATE_PASSWORD if available
+-> SaaS calls User-Access upsert Owner profile
+-> creates subscription/payment settings/tenant.created outbox
+```
 
-### 7.4 Auto provision khi đăng nhập lần đầu
+If the step after creating the Keycloak Owner fails, SaaS calls Authorizer `KEYCLOAK.DISABLE_USER` to disable the newly created user. This is a compensating action, because Keycloak and the SaaS/User-Access database are not in the same transaction.
 
-Authorizer có cơ chế auto provision nếu:
+### 7.3 Why rollback with disable
+
+In a microservice system, there is no single SQL transaction surrounding Keycloak, SaaS DB, and User-Access DB. If Keycloak successfully creates an Owner but User-Access fails, that user can log in but does not have an application profile.
+
+Disable user helps:
+
+- Half-hearted account blocking.
+- Keep traces for debugging.
+- Avoid physically deleting users too early when you need to audit the onboarding flow.
+
+### 7.4 Auto provision when logging in for the first time
+
+Authorizer has an auto provision mechanism if:
 
 ```txt
 AUTH_AUTO_PROVISION_ON_FIRST_LOGIN=true
 ```
 
-Cơ chế này chỉ nên dùng khi đã rõ nguồn claim và role mapping. Nếu không cẩn thận, nó có thể tạo profile từ token thiếu thông tin tenant/role. Trong các luồng quan trọng như onboarding owner, nên chủ động tạo profile qua service thay vì trông chờ auto provision.
+This mechanism should only be used when the claim source and role mapping are clear. If not careful, it can create profiles from tokens that lack tenant/role information. In important flows such as onboarding owners, they should proactively create profiles via services instead of waiting for auto provisioning.
 
 ---
 
-## 8. Role, permission và tenant isolation
+## 8. Role, permission and tenant isolation
 
-### 8.1 Mô hình hai lớp
+### 8.1 Two-layer model
 
-QRTable dùng mô hình hai lớp:
+QRTable uses a two-layer model:
 
 ```txt
-Lớp identity:
+identity class:
   Keycloak user, realm role, JWT, tenant claim
 
-Lớp application profile:
+Application profile layer:
   User-Access user, tenant relation, internal role, permissions
 ```
 
-Token Keycloak hợp lệ là điều kiện cần. Profile User-Access hợp lệ mới là điều kiện đủ để request vào domain QRTable.
+A valid Keycloak token is a necessary condition. A valid User-Access profile is a sufficient condition to request to domain QRTable.
 
 ### 8.2 Realm role
 
-Realm role trong Keycloak phân loại user theo vai trò lớn:
+Realm roles in Keycloak classify users according to major roles:
 
-| Realm role    | Ý nghĩa                              |
-| ------------- | ------------------------------------ |
-| `SUPER_ADMIN` | Quản trị hệ thống/SaaS cấp nền tảng. |
-| `OWNER`       | Chủ tenant/nhà hàng.                 |
-| `MANAGER`     | Quản lý nhà hàng.                    |
-| `WAITER`      | Nhân viên phục vụ.                   |
-| `CHEF`        | Nhân viên bếp.                       |
-| `BARISTA`     | Nhân viên bar/đồ uống.               |
+| Realm roles   | Meaning                                    |
+| ------------- | ------------------------------------------ |
+| `SUPER_ADMIN` | Platform-level System Administration/SaaS. |
+| `Owner`       | tenant/restaurant Owner.                   |
+| `MANAGER`     | Restaurant management.                     |
+| `WAITER`      | service staff.                             |
+| `CHEF`        | Kitchen staff.                             |
+| `BARISTA`     | Bar/beverage staff.                        |
 
-Role trong token giúp Authorizer đối chiếu role mapping. Tuy nhiên, permission cụ thể vẫn phải lấy từ User-Access.
+The role in the token helps the Authorizer compare role mapping. However, the specific permission must still be obtained from User-Access.
 
-### 8.3 Permission ứng dụng
+### 8.3 Application Permission
 
-Permission là quyền thao tác chi tiết của QRTable. Canonical permission matrix hiện nằm ở:
+Permission is the detailed manipulation permission of the QRTable. Canonical permission matrix is currently located at:
 
 ```txt
 docs/architecture/permission-matrix.md
 ```
 
-Và code/seed liên quan nằm ở:
+And the related code/seed is located at:
 
 ```txt
 libs/constants/src/lib/enum/role.enum.ts
 apps/user-access/src/seeder/role.json
 ```
 
-Khi thêm permission mới, không chỉ sửa Keycloak. Cần cập nhật enum, seed, permission matrix, guard usage và test liên quan.
+When adding new permissions, don't just edit Keycloak. Need to update enum, seed, permission matrix, guard usage and related testing.
 
 ### 8.4 Tenant claim
 
-Tenant claim giúp BFF biết identity hiện tại thuộc tenant nào. QRTable đang dùng `tenant_id` và có xử lý alias `tenantId` trong metadata nội bộ.
+tenant claim helps BFF know which tenant the current identity belongs to. QRTable is using `tenant_id` and has `tenantId` alias handling in its internal metadata.
 
-Nguyên tắc:
+Principle:
 
-- Staff nhà hàng phải gắn với tenant.
-- Request có tenant không được mismatch với tenant của user.
-- `SUPER_ADMIN` có các luồng quản trị có thể không cần tenant nhà hàng cụ thể.
-- Không tin tenant id do frontend tự gửi nếu nó mâu thuẫn với claim/profile.
+- Restaurant staff must be attached to the tenant.
+- The request has a tenant that cannot match the user's tenant.
+- `SUPER_ADMIN` has admin flows that may not require a specific restaurant tenant.
+- Do not trust the tenant id sent by the frontend if it conflicts with claim/profile.
 
-### 8.5 Role-based routing trên Management App
+### 8.5 Role-based routing on Management App
 
-Management App có route middleware dựa trên role để điều hướng UX:
+Management App has a role-based route middleware to navigate the UX:
 
 ```txt
-OWNER vào dashboard owner
-CHEF vào kitchen
-WAITER vào vùng phục vụ
+Owner into dashboard Owner
+CHEF enters the kitchen
+WAITER enters the service area
 ```
 
-Đây chỉ là lớp trải nghiệm người dùng. Nó không phải cơ chế bảo mật cuối cùng. Nếu frontend route middleware bị bypass, BFF PermissionGuard vẫn phải chặn request không đủ quyền.
+This is just the user experience layer. It is not the ultimate security mechanism. If the frontend route middleware is bypassed, BFF PermissionGuard must still block requests with insufficient permissions.
 
 ---
 
-## 9. Keycloak không sở hữu những gì
+## 9. Keycloak does not own anything
 
-Keycloak nên được xem là identity provider, không phải service nghiệp vụ của QRTable.
+Keycloak should be considered an identity provider, not a QRTable business service.
 
-| Phạm vi                               | Nguồn đúng                                        |
-| ------------------------------------- | ------------------------------------------------- |
-| Menu, catalog, product                | Catalog/Product service + PostgreSQL.             |
-| Order, bill, payment                  | Order/Payment service + PostgreSQL.               |
-| Tenant lifecycle, subscription, plan  | SaaS service.                                     |
-| Payment settings và SePay OAuth state | Payment service + Redis/PostgreSQL theo ngữ cảnh. |
-| Customer QR session                   | BFF/Order session + Redis.                        |
-| Staff permissions chi tiết            | User-Access + permission matrix.                  |
-| KDS runtime state                     | Kitchen + Redis/PostgreSQL theo loại state.       |
-| Realtime hints                        | BFF/Kitchen + WebSocket/Redis/Kafka tùy luồng.    |
+| Scope                                  | True source                                                |
+| -------------------------------------- | ---------------------------------------------------------- |
+| Menus, catalogs, products              | Catalog/Product service + PostgreSQL.                      |
+| Order, bill, payment                   | Order/Payment service + PostgreSQL.                        |
+| tenant lifecycle, subscription, plan   | SaaS services.                                             |
+| Payment settings and SePay OAuth state | Payment service + contextual Redis/PostgreSQL.             |
+| Customer QR session                    | BFF/Order session + Redis.                                 |
+| Staff permissions details              | User-Access + permission matrix.                           |
+| KDS runtime state                      | Kitchen + Redis/PostgreSQL by state type.                  |
+| Realtime hints                         | BFF/Kitchen + WebSocket/Redis/Kafka depending on the flow. |
 
-Nếu một yêu cầu nghe giống "người này được đăng nhập không", nghĩ đến Keycloak. Nếu nó nghe giống "nghiệp vụ QRTable sẽ thay đổi dữ liệu nào", nghĩ đến service sở hữu domain.
+If a request sounds like "can this person log in", think Keycloak. If it sounds like "what data will the QRTable operation change", think of the service that owns the domain.
 
 ---
 
-## 10. Hướng dẫn cấu hình và thao tác Keycloak
+## 10. Instructions for configuring and operating Keycloak
 
-Phần này trả lời câu hỏi: nếu mở Keycloak Admin Console thì cần cấu hình gì, ý nghĩa của từng thông số là gì, và cấu hình đó ánh xạ với script/code QRTable ra sao.
+This section answers the question: if you open Keycloak Admin Console, what configuration is needed, what is the meaning of each parameter, and how does that configuration map to the QRTable script/code.
 
-Trong QRTable, nên ưu tiên dùng script `tools/keycloak-bootstrap.sh` để tạo cấu hình lặp lại được. Admin Console phù hợp để kiểm tra, debug, hoặc hiểu cấu hình đang có.
+In QRTable, script `tools/keycloak-bootstrap.sh` should be preferred to create repeatable configuration. Admin Console is suitable for testing, debugging, or understanding existing configuration.
 
-### 10.1 Thứ tự thao tác khuyến nghị
+### 10.1 Recommended order of operations
 
-Khi cấu hình một môi trường Keycloak mới cho QRTable, đi theo thứ tự:
+When configuring a new Keycloak environment for QRTable, go in this order:
 
-1. Tạo hoặc chọn realm `qrtable`.
-2. Tạo OIDC clients `qrtable-bff` và `management-app`.
-3. Bật/tắt flow phù hợp cho từng client.
-4. Tạo realm roles `SUPER_ADMIN`, `OWNER`, `MANAGER`, `WAITER`, `CHEF`, `BARISTA`.
-5. Tạo user attributes `tenant_id` và `sub_role`.
-6. Tạo protocol mappers để đưa `tenant_id` và `sub_role` vào token.
-7. Gán service account roles cho backend client để gọi Admin REST API.
-8. Tạo user mẫu hoặc user thật, set password, gán realm role và tenant attributes.
-9. Đăng nhập thử Management App, gọi `/authorizer/me`, kiểm tra roles/permissions/tenant.
+1. Create or select realm `qrtable`.
+2. Create OIDC clients `qrtable-bff` and `management-app`.
+3. Turn on/off appropriate flow for each client.
+4. Create realm roles `SUPER_ADMIN`, `Owner`, `MANAGER`, `WAITER`, `CHEF`, `BARISTA`.
+5. Create user attributes `tenant_id` and `sub_role`.
+6. Create protocol mappers to include `tenant_id` and `sub_role` in the token.
+7. Assign service account roles to the backend client to call the Admin REST API.
+8. Create a sample user or real user, set a password, assign realm role and tenant attributes.
+9. Try logging in to Management App, call `/authorizer/me`, check roles/permissions/tenant.
 
 ### 10.2 Realm `qrtable`
 
-Realm là lớp bao ngoài. Trong Admin Console:
+Realm is the outer layer. In Admin Console:
 
 ```txt
 Admin Console
@@ -713,22 +758,22 @@ Admin Console
   -> Realm name: qrtable
 ```
 
-Các thông số quan trọng:
+Important parameters:
 
-| Thông số     | Ý nghĩa                    | QRTable local/dev                                                          |
-| ------------ | -------------------------- | -------------------------------------------------------------------------- |
-| Realm name   | Tên không gian định danh.  | `qrtable`                                                                  |
-| Enabled      | Realm có hoạt động không.  | Bật.                                                                       |
-| SSL Required | Chính sách bắt buộc HTTPS. | Local có thể `none`; production phải đi qua HTTPS/reverse proxy đúng cách. |
-| Login theme  | Theme login của Keycloak.  | `keycloak-theme` nếu đã build/mount `apps/keycloak-theme`.                 |
+| Parameters   | Meaning                 | QRTable local/dev                                                             |
+| ------------ | ----------------------- | ----------------------------------------------------------------------------- |
+| Realm name   | Identifier space name.  | `qrtable`                                                                     |
+| Enabled      | Does Realm work?        | Turn on.                                                                      |
+| SSL Required | Mandatory HTTPS policy. | Local can be `none`; production must go through HTTPS/reverse proxy properly. |
+| Login themes | Keycloak login theme.   | `keycloak-theme` if built/mounted `apps/keycloak-theme`.                      |
 
-Không nên đổi realm name tùy tiện sau khi đã cấu hình app, vì `AUTH_KEYCLOAK_ISSUER`, `KEYCLOAK_REALM`, JWKS endpoint và token issuer đều phụ thuộc vào realm.
+You should not change the realm name arbitrarily after configuring the app, because `AUTH_KEYCLOAK_ISSUER`, `KEYCLOAK_REALM`, JWKS endpoint and token issuer all depend on realm.
 
 ### 10.3 Client `management-app`
 
-`management-app` là client phục vụ login qua trình duyệt cho Management App.
+`management-app` is a client serving login via browser for Management App.
 
-Trong Admin Console:
+In Admin Console:
 
 ```txt
 Clients
@@ -737,19 +782,19 @@ Clients
   -> Client ID: management-app
 ```
 
-Thông số nên hiểu:
+Parameters you should understand:
 
-| Thông số              | Ý nghĩa                                                                          | QRTable                                                            |
-| --------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Client authentication | Bật nghĩa là confidential client (client có secret). Tắt nghĩa là public client. | Đang dùng secret qua NextAuth, nên bật.                            |
-| Standard flow         | Bật Authorization Code Flow cho browser login.                                   | Bật.                                                               |
-| Direct access grants  | Cho phép password grant.                                                         | Không cần cho login chính; chỉ bật nếu có use case/script rõ ràng. |
-| Service accounts      | Cho phép client credentials.                                                     | Không bắt buộc cho Management App.                                 |
-| Valid redirect URIs   | URL Keycloak được phép redirect về sau login.                                    | Local: `http://localhost:3000/*`.                                  |
-| Web origins           | Origin frontend được phép theo CORS/OIDC browser flow.                           | Local: `http://localhost:3000`.                                    |
-| Client secret         | Bí mật client dùng ở server-side NextAuth.                                       | Đặt vào `AUTH_KEYCLOAK_SECRET`, không đưa ra browser.              |
+| Parameters            | Meaning                                                                    | QRTable                                                                  |
+| --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Client authentication | On means confidential client (client has secret). Off means public client. | Using secrets via NextAuth, should be enabled.                           |
+| Standard flow         | Turn on Authorization Code Flow for browser login.                         | Turn on.                                                                 |
+| Direct access grants  | Allow password grants.                                                     | No need for main login; Only enable if there is a clear use case/script. |
+| service accounts      | Allow client credentials.                                                  | Not required for Management App.                                         |
+| Valid redirect URIs   | Keycloak URLs are allowed to redirect after login.                         | Local: `http://localhost:3000/*`.                                        |
+| Web origins           | Origin frontend is allowed according to CORS/OIDC browser flow.            | Local: `http://localhost:3000`.                                          |
+| Client secret         | The client secret is used on the server-side NextAuth.                     | Put in `AUTH_KEYCLOAK_SECRET`, do not output to browser.                 |
 
-Management App cần env:
+Management App needs env:
 
 ```txt
 AUTH_KEYCLOAK_ID=management-app
@@ -759,19 +804,19 @@ AUTH_KEYCLOAK_ISSUER=http://localhost:8180/realms/qrtable
 
 ### 10.4 Client `qrtable-bff`
 
-Tên `qrtable-bff` trong code hiện là backend/confidential client mà Authorizer dùng để trao đổi token và gọi Keycloak Admin REST API.
+The name `qrtable-bff` in the code is currently the backend/confidential client that the Authorizer uses to exchange tokens and call the Keycloak Admin REST API.
 
-Thông số chính:
+Main parameters:
 
-| Thông số              | Ý nghĩa                                     | QRTable                                                                                                 |
-| --------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Client authentication | Cho phép dùng client secret.                | Bật.                                                                                                    |
-| Service accounts      | Cho phép client credentials grant.          | Bật, để Authorizer lấy admin/service token.                                                             |
-| Direct access grants  | Cho phép password grant.                    | Đang bật trong bootstrap vì code có `exchangeUserToken()`.                                              |
-| Standard flow         | Cho phép authorization code flow.           | Đang bật trong bootstrap để giữ client linh hoạt, nhưng login chính của frontend dùng `management-app`. |
-| Client secret         | Secret backend dùng khi gọi token endpoint. | Đặt vào `KEYCLOAK_CLIENT_SECRET`.                                                                       |
+| Parameters            | Meaning                                          | QRTable                                                                                              |
+| --------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Client authentication | Allows use of client secrets.                    | Turn on.                                                                                             |
+| service accounts      | Allow client credentials grant.                  | Turn on, let Authorizer get admin/service token.                                                     |
+| Direct access grants  | Allow password grants.                           | Enabled in bootstrap because the code has `exchangeUserToken()`.                                     |
+| Standard flow         | Enable authorization code flow.                  | Enabled in bootstrap to keep the client flexible, but the main frontend login uses `management-app`. |
+| Client secret         | Secret backend used when calling token endpoint. | Put in `KEYCLOAK_CLIENT_SECRET`.                                                                     |
 
-Backend env tương ứng:
+Corresponding backend env:
 
 ```txt
 KEYCLOAK_HOST=http://localhost:8180
@@ -782,7 +827,7 @@ KEYCLOAK_CLIENT_SECRET=...
 
 ### 10.5 Realm roles
 
-Trong Admin Console:
+In Admin Console:
 
 ```txt
 Realm roles
@@ -790,37 +835,37 @@ Realm roles
   -> SUPER_ADMIN / OWNER / MANAGER / WAITER / CHEF / BARISTA
 ```
 
-Các role này là role định danh cấp cao. Đừng nhồi permission chi tiết của QRTable vào Keycloak role nếu permission đó đã thuộc User-Access.
+These roles are high-level identification roles. Don't stuff QRTable permission details into the Keycloak role if that permission already belongs to User-Access.
 
-Khi tạo user:
+When creating users:
 
 ```txt
 Users
-  -> chọn user
+-> select user
   -> Role mapping
   -> Assign realm role
 ```
 
-Sau login, role xuất hiện trong token ở `realm_access.roles`, rồi Authorizer đối chiếu với role nội bộ.
+After login, the role appears in the token in `realm_access.roles`, then the Authorizer compares it with the internal role.
 
-### 10.6 User attributes và protocol mappers
+### 10.6 User attributes and protocol mappers
 
-QRTable cần claim `tenant_id` và `sub_role` trong token. Có hai bước:
+QRTable needs to claim `tenant_id` and `sub_role` in the token. There are two steps:
 
-1. Tạo user attributes.
-2. Tạo protocol mappers để đưa attributes đó vào access token.
+1. Create user attributes.
+2. Create protocol mappers to include those attributes in the access token.
 
-Trong Admin Console, với user:
+In the Admin Console, for users:
 
 ```txt
 Users
-  -> chọn user
+-> select user
   -> Attributes
   -> tenant_id = <tenant-id>
   -> sub_role = OWNER / MANAGER / ...
 ```
 
-Trong client `management-app` và `qrtable-bff`, tạo mapper:
+In client `management-app` and `qrtable-bff`, create mapper:
 
 ```txt
 Client
@@ -829,16 +874,16 @@ Client
   -> user.attribute: tenant_id
   -> claim.name: tenant_id
   -> Add to access token: ON
-  -> Add to ID token / userinfo: ON nếu frontend/backend cần đọc
+-> Add to ID token / userinfo: ON if frontend/backend needs to read
 ```
 
-Lặp lại cho `sub_role`. Nếu thiếu mapper, user vẫn login được nhưng BFF/Authorizer có thể không thấy tenant claim, dẫn đến lỗi tenant hoặc profile mapping.
+Repeat for `sub_role`. If the mapper is missing, the user can still log in but the BFF/Authorizer may not see the tenant claim, leading to tenant or profile mapping errors.
 
-### 10.7 Service account roles cho Admin REST API
+### 10.7 service account roles for Admin REST API
 
-Để Authorizer tạo/disable user qua Admin REST API, service account của client backend phải có quyền quản trị user.
+For Authorizer to create/disable users via Admin REST API, the backend client's service account must have user admin rights.
 
-Trong Admin Console:
+In Admin Console:
 
 ```txt
 Clients
@@ -850,51 +895,51 @@ Clients
   -> manage-users, view-users, query-users
 ```
 
-Ý nghĩa:
+Meaning:
 
-| Role           | Dùng để làm gì                          |
-| -------------- | --------------------------------------- |
-| `manage-users` | Tạo, cập nhật, disable user.            |
-| `view-users`   | Đọc user theo id/email.                 |
-| `query-users`  | Tìm kiếm user khi cần kiểm tra tồn tại. |
+| Role           | What to use                                       |
+| -------------- | ------------------------------------------------- |
+| `manage-users` | Create, update, disable users.                    |
+| `view-users`   | Read user by id/email.                            |
+| `query-users`  | Search for users when needing to check existence. |
 
-Không gán quyền quản trị rộng hơn nếu chưa cần. Service account càng nhiều quyền, rủi ro khi lộ client secret càng lớn.
+Do not assign broader administrative rights if not needed. The more rights a service account has, the greater the risk of revealing client secrets.
 
-### 10.8 Tạo user thủ công để test
+### 10.8 Create manual users for testing
 
-Khi cần tạo user test bằng Admin Console:
+When you need to create user tests using Admin Console:
 
-1. Vào `Users -> Add user`.
-2. Điền `username`, `email`, `firstName`, `lastName`.
-3. Bật `Email verified` nếu muốn bỏ qua xác minh email local.
-4. Thêm attributes `tenant_id` và `sub_role`.
-5. Vào `Credentials`, set password.
-6. Bỏ temporary nếu là user dev cố định; bật temporary nếu muốn user đổi mật khẩu lần đầu.
-7. Vào `Role mapping`, gán realm role phù hợp.
-8. Đảm bảo User-Access cũng có profile tương ứng, nếu không token hợp lệ vẫn bị `user_not_provisioned`.
+1. Go to `Users -> Add user`.
+2. Fill in `username`, `email`, `firstName`, `lastName`.
+3. Turn on `Email verified` if you want to skip local email verification.
+4. Add attributes `tenant_id` and `sub_role`.
+5. Go to `Credentials`, set password.
+6. Remove temporary if you are a permanent dev user; Turn on temporary if you want the user to change their password for the first time.
+7. Go to `Role mapping`, assign the appropriate realm role.
+8. Make sure User-Access also has the corresponding profile, otherwise the valid token will still be `user_not_provisioned`.
 
-Điểm cuối cùng rất quan trọng: tạo user trong Keycloak chưa đủ. QRTable cần profile User-Access để lấy permissions.
+The last point is very important: creating a user in Keycloak is not enough. QRTable needs a User-Access profile to get permissions.
 
-### 10.9 Kiểm tra token và claim
+### 10.9 Check token and claim
 
-Sau khi login, có thể kiểm tra access token theo thứ tự:
+After logging in, you can check the access token in this order:
 
-1. Token có issuer đúng không: `http://localhost:8180/realms/qrtable`.
-2. Token có `realm_access.roles` không.
-3. Token có `tenant_id` và `sub_role` không.
-4. Header có `kid` không.
-5. JWKS endpoint có public key tương ứng không.
-6. Gọi BFF `/authorizer/me` có trả về roles, permissions, tenantId không.
+1. Does the token have the correct issuer: `http://localhost:8180/realms/qrtable`.
+2. Is the token `realm_access.roles`?
+3. Does the token have `tenant_id` and `sub_role`?
+4. Is the header `kid`?
+5. Does the JWKS endpoint have a corresponding public key?
+6. Does calling BFF `/authorizer/me` return roles, permissions, tenantId?
 
-Không dùng việc decode payload bằng mắt như bằng chứng bảo mật. Payload chỉ đáng tin sau khi Authorizer verify chữ ký JWT bằng JWKS.
+Do not use visual decoding of payloads as security evidence. The payload is only trustworthy after the Authorizer verifies the JWT signature using JWKS.
 
 ---
 
-## 11. Thiết lập local, triển khai và gỡ lỗi
+## 11. Local setup, deployment and debugging
 
-### 11.1 Cấu hình local
+### 11.1 Local configuration
 
-Keycloak local được khai báo trong `docker-compose.provider.yaml`:
+Keycloak local is declared in `docker-compose.provider.yaml`:
 
 ```txt
 Image: quay.io/keycloak/keycloak:25.0.0
@@ -904,7 +949,7 @@ Admin password: admin
 Realm: qrtable
 ```
 
-Biến môi trường backend:
+Backend environment variables:
 
 ```txt
 KEYCLOAK_HOST=http://localhost:8180
@@ -913,7 +958,7 @@ KEYCLOAK_CLIENT_ID=qrtable-bff
 KEYCLOAK_CLIENT_SECRET=...
 ```
 
-Biến môi trường Management App:
+Management App environment variables:
 
 ```txt
 AUTH_KEYCLOAK_ID=management-app
@@ -921,202 +966,202 @@ AUTH_KEYCLOAK_SECRET=...
 AUTH_KEYCLOAK_ISSUER=http://localhost:8180/realms/qrtable
 ```
 
-Script `tools/keycloak-bootstrap.sh` dùng cho môi trường local/dev để:
+Script `tools/keycloak-bootstrap.sh` is used for local/dev environment to:
 
-- Tạo hoặc cập nhật realm `qrtable`.
-- Tạo OIDC clients `qrtable-bff` và `management-app`.
-- Tạo user profile attributes `tenant_id` và `sub_role`.
-- Tạo protocol mappers để đưa `tenant_id` và `sub_role` vào JWT.
-- Tạo realm roles `SUPER_ADMIN`, `OWNER`, `MANAGER`, `WAITER`, `CHEF`, `BARISTA`.
-- Seed user mẫu từ `tools/auth-bootstrap-users.json`.
+- Create or update realm `qrtable`.
+- Create OIDC clients `qrtable-bff` and `management-app`.
+- Create user profile attributes `tenant_id` and `sub_role`.
+- Create protocol mappers to include `tenant_id` and `sub_role` in JWT.
+- Create realm roles `SUPER_ADMIN`, `Owner`, `MANAGER`, `WAITER`, `CHEF`, `BARISTA`.
+- Seed user sample from `tools/auth-bootstrap-users.json`.
 
-### 11.2 Giải thích thông số cấu hình
+### 11.2 Explanation of configuration parameters
 
-Các thông số trong `docker-compose.provider.yaml` và env liên quan:
+Parameters in `docker-compose.provider.yaml` and related env:
 
-| Thông số                                     | Nghĩa                                                         | QRTable local/dev                                                |
-| -------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `quay.io/keycloak/keycloak:25.0.0`           | Image Keycloak đang chạy.                                     | Cố định để tránh lệch hành vi giữa môi trường.                   |
-| `8180:8080`                                  | Map port host `8180` vào port container `8080`.               | Truy cập Keycloak qua `http://localhost:8180`.                   |
-| `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` | Tài khoản admin ban đầu của Keycloak.                         | `admin/admin` chỉ dành cho local/dev.                            |
-| `KC_HEALTH_ENABLED=true`                     | Bật health endpoint nội bộ của Keycloak.                      | Dùng cho Docker healthcheck.                                     |
-| `KC_PROXY_HEADERS=xforwarded`                | Tin header proxy như `X-Forwarded-Host`, `X-Forwarded-Proto`. | Hữu ích khi đi qua ngrok/Cloudflare Tunnel/reverse proxy.        |
-| `KC_HOSTNAME_STRICT=false`                   | Không bắt hostname phải khớp cứng.                            | Tiện cho local/tunnel; production nên cấu hình hostname rõ ràng. |
-| `command: start-dev`                         | Chạy development mode.                                        | Phù hợp local, không phải cấu hình production.                   |
-| Volume `/opt/keycloak/data`                  | Lưu dữ liệu Keycloak local.                                   | Giữ realm/client/user sau khi restart container.                 |
-| Volume `/opt/keycloak/providers`             | Mount provider/theme JAR.                                     | Dùng custom Keycloak theme từ `apps/keycloak-theme`.             |
+| Parameters                                   | Meaning                                                                | QRTable local/dev                                                                 |
+| -------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `quay.io/keycloak/keycloak:25.0.0`           | Image Keycloak is running.                                             | Immobilization to avoid behavioral deviations between environments.               |
+| `8180:8080`                                  | Map host port `8180` to container port `8080`.                         | Access Keycloak via `http://localhost:8180`.                                      |
+| `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` | Keycloak's original admin account.                                     | `admin/admin` is for local/dev only.                                              |
+| `KC_HEALTH_ENABLED=true`                     | Enable Keycloak's internal health endpoint.                            | Used for Docker healthcheck.                                                      |
+| `KC_PROXY_HEADERS=xforwarded`                | Proxy header information like `X-Forwarded-Host`, `X-Forwarded-Proto`. | Useful when going through ngrok/Cloudflare Tunnel/reverse proxy.                  |
+| `KC_HOSTNAME_STRICT=false`                   | Do not force the hostname to match.                                    | Convenient for local/tunnel; production should configure the hostname explicitly. |
+| `command: start-dev`                         | Run development mode.                                                  | Suitable for local, not production configuration.                                 |
+| Volume `/opt/keycloak/data`                  | Save Keycloak data locally.                                            | Keep realm/client/user after restarting the container.                            |
+| Volume `/opt/keycloak/providers`             | Mount provider/theme JAR.                                              | Use custom Keycloak theme from `apps/keycloak-theme`.                             |
 
-Các biến env của app:
+App env variables:
 
-| Biến                                 | Ai dùng            | Ý nghĩa                                                                  |
-| ------------------------------------ | ------------------ | ------------------------------------------------------------------------ |
-| `KEYCLOAK_HOST`                      | Authorizer/backend | Base URL Keycloak, ví dụ `http://localhost:8180`.                        |
-| `KEYCLOAK_REALM`                     | Authorizer/backend | Realm cần verify token và gọi Admin API.                                 |
-| `KEYCLOAK_CLIENT_ID`                 | Authorizer/backend | Client backend dùng client secret/service account.                       |
-| `KEYCLOAK_CLIENT_SECRET`             | Authorizer/backend | Secret của client backend.                                               |
-| `AUTH_KEYCLOAK_ID`                   | Management App     | Client ID dùng cho NextAuth provider.                                    |
-| `AUTH_KEYCLOAK_SECRET`               | Management App     | Client secret của `management-app`.                                      |
-| `AUTH_KEYCLOAK_ISSUER`               | Management App     | Issuer OIDC, phải là `{KEYCLOAK_HOST}/realms/{realm}`.                   |
-| `AUTH_AUTO_PROVISION_ON_FIRST_LOGIN` | Authorizer         | Cho phép tạo profile User-Access khi token hợp lệ nhưng profile chưa có. |
+| Variable                             | Who uses           | Meaning                                                                                       |
+| ------------------------------------ | ------------------ | --------------------------------------------------------------------------------------------- |
+| `KEYCLOAK_HOST`                      | Authorizer/backend | Base Keycloak URL, for example `http://localhost:8180`.                                       |
+| `KEYCLOAK_REALM`                     | Authorizer/backend | Realm needs to verify token and call Admin API.                                               |
+| `KEYCLOAK_CLIENT_ID`                 | Authorizer/backend | Client backend uses client secret/service account.                                            |
+| `KEYCLOAK_CLIENT_SECRET`             | Authorizer/backend | Secret of the backend client.                                                                 |
+| `AUTH_KEYCLOAK_ID`                   | Management App     | Client ID used for NextAuth provider.                                                         |
+| `AUTH_KEYCLOAK_SECRET`               | Management App     | Client secret of `management-app`.                                                            |
+| `AUTH_KEYCLOAK_ISSUER`               | Management App     | Issuer OIDC, must be `{KEYCLOAK_HOST}/realms/{realm}`.                                        |
+| `AUTH_AUTO_PROVISION_ON_FIRST_LOGIN` | Authorizer         | Allows creating a User-Access profile when the token is valid but the profile does not exist. |
 
-### 11.3 Các kiểu triển khai Keycloak
+### 11.3 Keycloak deployment types
 
-Keycloak có hai kiểu chạy chính cần phân biệt:
+Keycloak has two main running types that need to be distinguished:
 
-| Kiểu chạy                      | Dùng khi nào        | Đặc điểm                                                                                                          |
-| ------------------------------ | ------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Development mode (`start-dev`) | Local/dev/demo.     | Tiện khởi động, chấp nhận HTTP, hostname linh hoạt, không phải cấu hình an toàn mặc định.                         |
-| Production mode (`start`)      | Staging/production. | Secure by default (an toàn mặc định), cần hostname rõ ràng, HTTPS/TLS hoặc reverse proxy đúng, database bền vững. |
+| Running style                  | When to use         | Features                                                                                       |
+| ------------------------------ | ------------------- | ---------------------------------------------------------------------------------------------- |
+| Development mode (`start-dev`) | Local/dev/demo.     | Easy to start, accepts HTTP, flexible hostname, no default security configuration.             |
+| Production mode (`start`)      | Staging/production. | Secure by default, needs clear hostname, correct HTTPS/TLS or reverse proxy, durable database. |
 
-Theo tài liệu Keycloak hiện tại, production mode yêu cầu cấu hình nghiêm túc hơn về hostname và TLS. Ví dụ tư duy triển khai:
+According to current Keycloak documentation, production mode requires more serious configuration of hostname and TLS. Implementation thinking example:
 
 ```txt
 Internet
   -> HTTPS reverse proxy / load balancer
   -> Keycloak production mode
-  -> Keycloak database riêng
+-> Keycloak private database
 ```
 
-Với production/staging, không bê nguyên local compose lên chạy công khai. Cần tối thiểu:
+With production/staging, do not put the entire local composition up and run it publicly. Minimum required:
 
-- Dùng `start`, không dùng `start-dev`.
-- Dùng database bền vững cho Keycloak, không phụ thuộc vào volume local tạm bợ.
-- Cấu hình hostname/issuer ổn định, ví dụ `https://auth.qrtable.vn`.
-- Bật HTTPS hoặc đặt sau reverse proxy xử lý TLS đúng cách.
-- Cấu hình proxy headers đúng nếu TLS terminate ở proxy.
-- Không dùng `admin/admin`.
-- Quản lý client secret bằng secret manager/env an toàn.
-- Tách realm/client theo môi trường nếu cần, không trộn dev và production user.
+- Use `start`, not `start-dev`.
+- Use a sustainable database for Keycloak, not dependent on temporary local volumes.
+- Stable hostname/issuer configuration, for example `https://auth.qrtable.vn`.
+- Enable HTTPS or set behind a reverse proxy that handles TLS properly.
+- Configure proxy headers correctly if TLS terminates at the proxy.
+- Do not use `admin/admin`.
+- Manage client secrets using a secure secret manager/env.
+- Separate realm/client by environment if necessary, do not mix dev and production users.
 
-### 11.4 Mô hình realm/client theo môi trường
+### 11.4 Realm/client model by environment
 
-Có hai cách phổ biến:
+There are two popular ways:
 
-| Cách                                                                                  | Ưu điểm                                           | Nhược điểm                                | Gợi ý cho QRTable             |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------- | ----------------------------- |
-| Một Keycloak instance, nhiều realm (`qrtable-dev`, `qrtable-staging`, `qrtable-prod`) | Dễ tách dữ liệu, issuer rõ ràng.                  | Một instance vẫn là điểm phụ thuộc chung. | Tốt cho demo/staging nhỏ.     |
-| Mỗi môi trường một Keycloak instance riêng                                            | Cách ly mạnh, production ít bị ảnh hưởng bởi dev. | Tốn vận hành hơn.                         | Nên dùng khi production thật. |
+| How                                                                                       | Advantages                                         | Disadvantages                             | Suggestions for QRTable            |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------- | ---------------------------------- |
+| One Keycloak instance, multiple realms (`qrtable-dev`, `qrtable-staging`, `qrtable-prod`) | Easy to separate data, clear issue.                | An instance is still a common dependency. | Good for small demo/staging.       |
+| Each environment has its own Keycloak instance                                            | Sin isolation, production is less affected by dev. | More expensive to operate.                | Should be used in real production. |
 
-Quan trọng nhất là issuer phải ổn định. Nếu `AUTH_KEYCLOAK_ISSUER` là `https://auth.example.com/realms/qrtable`, token được phát ra cũng phải có issuer đó; Authorizer/NextAuth không nên trỏ sang URL khác rồi hy vọng token vẫn khớp.
+Most importantly, the issuer must be stable. If `AUTH_KEYCLOAK_ISSUER` is `https://auth.example.com/realms/qrtable`, the token issued must also have that issuer; Authorizer/NextAuth should not point to another URL and hope the token still matches.
 
-### 11.5 Endpoint hữu ích
+### 11.5 Useful Endpoints
 
-| Mục đích        | Endpoint                                                             |
+| Purpose         | Endpoints                                                            |
 | --------------- | -------------------------------------------------------------------- |
 | Realm issuer    | `http://localhost:8180/realms/qrtable`                               |
 | JWKS            | `http://localhost:8180/realms/qrtable/protocol/openid-connect/certs` |
 | Token endpoint  | `http://localhost:8180/realms/qrtable/protocol/openid-connect/token` |
 | Admin REST base | `http://localhost:8180/admin/realms/qrtable`                         |
 
-### 11.6 Lỗi thường gặp
+### 11.6 Common errors
 
-| Dấu hiệu                          | Cách hiểu                                                                                             |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| 401 `invalid_token`               | Token hết hạn, sai realm/issuer, sai chữ ký, thiếu `kid`, hoặc JWKS không lấy được key.               |
-| 401 `user_not_provisioned`        | Keycloak user hợp lệ nhưng User-Access chưa có profile ứng dụng.                                      |
-| 401 role mapping mismatch         | Role trong Keycloak không map được sang role nội bộ của QRTable.                                      |
-| 403 `permission_denied`           | User hợp lệ nhưng thiếu permission route yêu cầu.                                                     |
-| Tenant mismatch                   | Tenant trong request không khớp tenant claim/profile.                                                 |
-| Login lặp lại liên tục            | NextAuth/Keycloak issuer, client secret, callback URL hoặc refresh token có vấn đề.                   |
-| Duplicate email khi onboarding    | Keycloak hoặc User-Access đã có user với email đó.                                                    |
-| Owner mới đăng nhập nhưng bị chặn | Có thể owner tạo được trong Keycloak nhưng profile User-Access/subscription/onboarding chưa hoàn tất. |
+| Signs                               | How to understand                                                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 401 `invalid_token`                 | Expired token, wrong realm/issuer, wrong signature, missing `kid`, or JWKS cannot get the key.                   |
+| 401 `user_not_provisioned`          | Keycloak user is valid but User-Access does not have an application profile.                                     |
+| 401 role mapping mismatch           | Keycloak roles cannot be mapped to QRTable's internal roles.                                                     |
+| 403 `permission_denied`             | The user is valid but lacks the required route permission.                                                       |
+| tenant mismatch                     | tenant in request does not match tenant claim/profile.                                                           |
+| Login repeats continuously          | NextAuth/Keycloak issuer, client secret, callback URL or refresh token have problems.                            |
+| Duplicate emails when onboarding    | Keycloak or User-Access already has a user with that email.                                                      |
+| New Owner logged in but was blocked | The Owner may have been created in Keycloak but the User-Access/subscription/onboarding profile is not complete. |
 
-### 11.7 Cách đọc lỗi đúng lớp
+### 11.7 How to read class errors correctly
 
-Khi gặp lỗi auth, nên tách lớp:
+When encountering auth errors, the class should be separated:
 
 ```txt
-1. Keycloak login có thành công không?
-2. Access token có đúng issuer/realm/client không?
-3. Authorizer verify JWT có thành công không?
-4. User-Access có profile theo sub không?
-5. Role mapping có khớp không?
-6. TenantGuard có thấy tenant hợp lệ không?
-7. PermissionGuard có thấy permission cần thiết không?
+1. Is Keycloak login successful?
+2. Is the access token the correct issuer/realm/client?
+3. Is Authorizer verify JWT successful?
+4. Does User-Access have sub-profiles?
+5. Does the Role mapping match?
+6. Does TenantGuard find a valid tenant?
+7. Does PermissionGuard find permission necessary?
 ```
 
-Cách tách này giúp tránh việc mọi lỗi 401/403 đều bị quy về Keycloak.
+This separation helps avoid all 401/403 errors being attributed to Keycloak.
 
 ---
 
-## 12. Đọc code ở đâu
+## 12. Where to read the code
 
-| Nội dung                            | File/thao tác nên đọc                                                          |
+| Content                             | File/operation should read                                                     |
 | ----------------------------------- | ------------------------------------------------------------------------------ |
-| Cấu hình Keycloak backend           | `libs/configuration/src/lib/keycloak.config.ts`                                |
+| Keycloak backend configuration      | `libs/configuration/src/lib/keycloak.config.ts`                                |
 | Docker Keycloak local               | `docker-compose.provider.yaml`                                                 |
 | Bootstrap realm/client/mapper/users | `tools/keycloak-bootstrap.sh`                                                  |
-| Danh sách user mẫu local/dev        | `tools/auth-bootstrap-users.json`                                              |
+| List of sample users local/dev      | `tools/auth-bootstrap-users.json`                                              |
 | NextAuth Keycloak provider          | `apps/management-app/src/auth.ts`                                              |
-| Trang login Management App          | `apps/management-app/src/app/(auth)/login/page.tsx`                            |
+| Management App login page           | `apps/management-app/src/app/(auth)/login/page.tsx`                            |
 | Route NextAuth                      | `apps/management-app/src/app/api/auth/[...nextauth]/route.ts`                  |
 | Hydrate session frontend            | `apps/management-app/src/components/auth/auth-session-hydrator.tsx`            |
-| Gọi BFF `/authorizer/me`            | `apps/management-app/src/lib/auth/bff-server.ts`                               |
+| Call BFF `/authorizer/me`           | `apps/management-app/src/lib/auth/bff-server.ts`                               |
 | Role-based routing frontend         | `apps/management-app/src/lib/auth/role-routing.ts`                             |
 | Authorizer verify JWT               | `apps/authorizer/src/app/authorizer/services/authorizer.service.ts`            |
-| Gọi Keycloak token/admin API        | `apps/authorizer/src/app/keycloak/services/keycloak-http.service.ts`           |
-| Tạo owner/disable user              | `apps/authorizer/src/app/keycloak/services/keycloak-admin.service.ts`          |
+| Call Keycloak token/admin API       | `apps/authorizer/src/app/keycloak/services/keycloak-http.service.ts`           |
+| Create Owner/disable user           | `apps/authorizer/src/app/keycloak/services/keycloak-admin.service.ts`          |
 | TCP handler Keycloak                | `apps/authorizer/src/app/keycloak/controllers/keycloak.controller.ts`          |
 | gRPC verify token                   | `apps/authorizer/src/app/authorizer/controllers/authorizer-grpc.controller.ts` |
 | BFF UserGuard                       | `libs/guards/src/lib/user.guard.ts`                                            |
 | BFF TenantGuard                     | `libs/guards/src/lib/tenant.guard.ts`                                          |
 | BFF PermissionGuard                 | `libs/guards/src/lib/permission.guard.ts`                                      |
-| SaaS onboarding owner               | `apps/saas/src/services/onboarding-saga.service.ts`                            |
+| SaaS onboarding Owner               | `apps/saas/src/services/onboarding-saga.service.ts`                            |
 | User profile/profile upsert         | `apps/user-access/src/app/modules/user/services/user.service.ts`               |
-| Tenant owner profile                | `apps/user-access/src/app/modules/user/services/tenant-user.service.ts`        |
+| tenant Owner profile                | `apps/user-access/src/app/modules/user/services/tenant-user.service.ts`        |
 | Permission enum                     | `libs/constants/src/lib/enum/role.enum.ts`                                     |
-| Role seed                           | `apps/user-access/src/seeder/role.json`                                        |
+| Role seeds                          | `apps/user-access/src/seeder/role.json`                                        |
 
 ---
 
 ## 13. Checklist
 
-### 13.1 Khi thêm route BFF cần bảo vệ
+### 13.1 When adding a BFF route that needs protection
 
-- Route có `@Authorization({ secured: true })` nếu cần staff/admin login.
-- Route có permission metadata nếu là thao tác cần quyền cụ thể.
-- Đã xác định route có cần tenant hay có cho `SUPER_ADMIN` bypass không.
-- Frontend route middleware nếu cần UX điều hướng, nhưng không xem đó là security boundary.
-- Test lỗi 401 token invalid, 401 user not provisioned, 403 thiếu permission và tenant mismatch nếu route có tenant.
+- Route has `@Authorization({ secured: true })` if staff/admin login is needed.
+- Route has permission metadata if the operation requires specific permissions.
+- Determined whether the route needs a tenant or allows `SUPER_ADMIN` bypass.
+- Frontend route middleware if you need UX navigation, but don't consider it a security boundary.
+- Test for errors 401 invalid token, 401 user not provisioned, 403 missing permission and tenant mismatch if the route has a tenant.
 
-### 13.2 Khi thêm role hoặc permission
+### 13.2 When adding roles or permissions
 
-- Cập nhật `libs/constants/src/lib/enum/role.enum.ts`.
-- Cập nhật `apps/user-access/src/seeder/role.json`.
-- Cập nhật `docs/architecture/permission-matrix.md`.
-- Đảm bảo Keycloak realm có realm role tương ứng nếu đây là role định danh mới.
-- Kiểm tra Authorizer role mapping.
-- Kiểm tra Management App route mapping nếu role ảnh hưởng đến navigation.
+- Update `libs/constants/src/lib/enum/role.enum.ts`.
+- Update `apps/user-access/src/seeder/role.json`.
+- Update `docs/architecture/permission-matrix.md`.
+- Make sure Keycloak realm has the corresponding realm role if this is a new identified role.
+- Check Authorizer role mapping.
+- Check Management App route mapping if the role affects navigation.
 
-### 13.3 Khi thêm claim Keycloak mới
+### 13.3 When adding a new Keycloak claim
 
-- Thêm user attribute/protocol mapper trong Keycloak realm.
-- Cập nhật interface payload nếu backend cần đọc claim.
-- Cập nhật Authorizer transform payload nếu claim đi qua gRPC/proto.
-- Cập nhật guard/service đọc claim.
-- Viết rõ claim đó là identity claim hay application/domain state.
-- Cập nhật tài liệu liên quan nếu claim ảnh hưởng tenant/permission.
+- Add user attribute/protocol mapper in Keycloak realm.
+- Update the payload interface if the backend needs to read claims.
+- Update Authorizer transform payload if claim goes through gRPC/proto.
+- Update guard/service to read claims.
+- Clearly write whether the claim is identity claim or application/domain state.
+- Update relevant documents if claim affects tenant/permission.
 
-### 13.4 Khi thêm luồng tạo user mới
+### 13.4 When adding a new user creation flow
 
-- Không để frontend gọi Keycloak Admin REST API.
-- Backend phải tạo Keycloak user và User-Access profile theo thứ tự có rollback.
-- Nếu bước sau fail, có compensating action như disable user.
-- Nếu dùng temporary password, bật required action `UPDATE_PASSWORD`.
-- Kiểm tra duplicate email ở cả Keycloak và User-Access.
-- Không log client secret, access token, refresh token hoặc password.
+- Do not let the frontend call the Keycloak Admin REST API.
+- The backend must create the Keycloak user and User-Access profile in order with rollback.
+- If the following step fails, there is compensating action such as disable user.
+- If using temporary password, enable required action `UPDATE_PASSWORD`.
+- Check for duplicate emails in both Keycloak and User-Access.
+- Do not log client secret, access token, refresh token or password.
 
-### 13.5 Khi debug production/staging
+### 13.5 When debugging production/staging
 
-- Kiểm tra `AUTH_KEYCLOAK_ISSUER` và `KEYCLOAK_HOST/REALM` có trỏ đúng môi trường không.
-- Kiểm tra HTTPS/hostname/proxy headers của Keycloak.
-- Kiểm tra callback URL của Management App trong Keycloak client.
-- Kiểm tra JWKS endpoint truy cập được từ Authorizer.
-- Kiểm tra Redis token cache nếu user vừa đổi role/permission mà request vẫn dùng metadata cũ.
-- Kiểm tra User-Access profile trước khi nghĩ Keycloak sai.
+- Check if `AUTH_KEYCLOAK_ISSUER` and `KEYCLOAK_HOST/REALM` point to the correct environment.
+- Check Keycloak's HTTPS/hostname/proxy headers.
+- Check Management App callback URL in Keycloak client.
+- Check JWKS endpoint is accessible from Authorizer.
+- Check Redis token cache if the user has just changed role/permission but the request still uses the old metadata.
+- Check User-Access profile before thinking Keycloak is wrong.
 
 ---
 
-## Ghi chú nguồn tham khảo
+## Note the reference source
 
-Tài liệu này được viết bằng cách đối chiếu code QRTable trên `main` với tài liệu Keycloak chính thức qua Context7, đặc biệt các phần về Admin REST API, OpenID Connect client, service account/client credentials, realm role, protocol mapper và user management. Khi phát sinh khác biệt giữa tài liệu này và code hiện tại, ưu tiên code + canonical architecture docs, rồi cập nhật guide này.
+This document was written by comparing the QRTable code on `main` with the official Keycloak documentation via Context7, especially the sections on Admin REST API, OpenID Connect client, service account/client credentials, realm role, protocol mapper and user management. When differences arise between this document and existing code, prioritize the code + canonical architecture docs, then update this guide.

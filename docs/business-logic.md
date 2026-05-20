@@ -1,111 +1,111 @@
-# TÀI LIỆU NGHIỆP VỤ HỆ THỐNG QUẢN LÝ NHÀ HÀNG
+# PROFESSIONAL DOCUMENTS OF RESTAURANT MANAGEMENT SYSTEM
 
-> **PHÂN TÍCH DỰA TRÊN QRTABLE.IO LÀM TÔN CHỈ**
+> **ANALYSIS BASED ON QRTABLE.IO AS A PRINCIPAL**
 > **Current Status:** Living business overview, last aligned with implemented Phase 4B on 2026-05-13.
 
-Tài liệu này mô tả chi tiết các luồng nghiệp vụ cốt lõi, từ thiết lập ban đầu đến vận hành nhà hàng hàng ngày, tập trung vào mô hình đặt món tại bàn sử dụng mã QR (QR-based table ordering).
+This document describes in detail the core business flows, from initial setup to daily restaurant operations, focusing on the QR-based table ordering (QR-based table ordering) model.
 
-Khi có mâu thuẫn, ưu tiên theo thứ tự: code/tests hiện tại, accepted specs trong `docs/specs/`, phase records trong `docs/phases/`, rồi tài liệu overview này. Ma trận RBAC chi tiết nằm ở `docs/architecture/permission-matrix.md`.
-
----
-
-## 1. LUỒNG KHỞI TẠO VÀ THIẾT LẬP NHÀ HÀNG (ONBOARDING & MULTI-TENANCY)
-
-> **LƯU Ý:** Hệ thống là một **SaaS Platform** với mô hình Multi-Tenant. Quy trình này do **Super Admin** quản lý ở tầng Platform.
-
-Đây là quá trình tạo một tenant nhà hàng trên nền tảng, gắn Owner, subscription, cấu hình thanh toán ban đầu và trạng thái vận hành độc lập. Trạng thái hiện tại sau Phase 4B là **admin-assisted onboarding**; self-service registration wizard được để lại cho phase sau.
-
-### A. Các bước thiết lập
-
-1.  **Onboard tenant bởi Super Admin:**
-    - `SUPER_ADMIN` tạo tenant qua platform admin, khai báo tên quán, loại hình, địa chỉ, thông tin owner và gói ban đầu.
-    - Hệ thống tạo tenant, Owner user, subscription mặc định và payment settings row ban đầu trong cùng quy trình onboarding.
-    - Onboarding Phase 4B là một mini-saga trong SaaS Service: nếu bước tạo user/profile/payment settings thất bại, hệ thống rollback dữ liệu đã tạo trong DB và có cleanup path cho orphan Keycloak users.
-    - Phase 4B dùng cơ chế `SUPER_ADMIN` nhập password thủ công cho Owner; gửi email reset/required action được chuyển sang Phase 4C sau khi có SMTP/Notification.
-
-2.  **Khởi tạo Định danh Nhà hàng (Tenant Identity):**
-    - **Logic Cốt lõi:** Hệ thống tự động sinh ra một Slug/Subdomain duy nhất (ví dụ: `the-coffee-house.qrtable.io`) làm định danh thương hiệu trên Internet.
-    - Slug phải normalize tiếng Việt, unique toàn platform và chặn reserved words như `admin`, `api`, `www`, `app` để không xung đột route hoặc brand nội bộ.
-
-3.  **Lựa chọn Gói Dịch vụ (Subscription):**
-    - Super Admin quản lý pricing plans; Owner có thể xem gói và tạo checkout subscription cho tenant của mình; Manager chỉ có quyền xem subscription/plan.
-    - **Quy tắc:** Gói cước giới hạn tính năng và quy mô (ví dụ: Gói Miễn phí chỉ cho phép tối đa 10 bàn, không có báo cáo nâng cao). Ghi nhận ngày bắt đầu và kết thúc gói.
-    - Mỗi tenant chỉ có một subscription `ACTIVE` tại một thời điểm. Subscription mới có thể supersede subscription cũ và phải invalidate cache/guard liên quan.
-    - Auto-suspend subscription hết hạn chạy theo giờ Việt Nam: daily `02:00 Asia/Ho_Chi_Minh`, grace period 24h (`expires_at + 1 day < now()`).
-    - Counter `max_orders_per_day` dùng timezone `Asia/Ho_Chi_Minh` cho thị trường Việt Nam.
-    - Tenant thanh toán platform bằng subscription invoice `QRSUB*`; `SUPER_ADMIN` có manual confirm fallback khi webhook lỗi nhưng đã đối soát được tiền.
-
-4.  **Thiết lập Thanh toán Tenant:**
-    - Owner kết nối SePay OAuth2 trong `/dashboard/payment-settings` để tiền bill khách hàng về tài khoản ngân hàng của tenant.
-    - Payment Service sở hữu `tenant_payment_settings`; SaaS Service chỉ sở hữu tenant/subscription/invoice platform billing.
-    - Thanh toán hai tầng dùng prefix tách biệt: `QRTBL*` cho customer bill payment vào tài khoản tenant, `QRSUB*` cho subscription invoice tenant trả platform.
-    - Phase 4B hỗ trợ một SePay account / một active bank account cho mỗi tenant; multi-bank active, proration và partial subscription refund được defer.
-
-5.  **Thiết lập Cấu hình Vận hành:**
-    - **Mặc định Việt Nam:** Hệ thống tự động cấu hình đơn vị tiền tệ VND, ngôn ngữ Tiếng Việt.
-    - **Chế độ hoạt động:** Khách hàng có thể vừa đặt món trực tiếp (Instant Order) vừa xem Menu điện tử (Digital Menu).
-
-### B. Quy tắc Nghiệp vụ Chủ yếu (Business Rules)
-
-- **Cô lập Dữ liệu (Tenant Isolation):** Đảm bảo dữ liệu (đơn hàng, doanh thu, khách hàng) của cửa hàng này hoàn toàn tách biệt và không hiển thị cho cửa hàng khác.
-- **Trạng thái Hoạt động:** Cửa hàng có các trạng thái `ACTIVE`, `SUSPENDED`, `CLOSED`. `SUSPENDED` chuyển tenant sang read-only cho các thao tác vận hành mới, nhưng vẫn cho phép thanh toán bill đang chờ.
-  - **Actor:** Super Admin có quyền suspend/activate/close tenant khi vi phạm chính sách hoặc hết hạn subscription.
-  - `isActive` chỉ là field tương thích DTO cũ; hành vi vận hành lấy từ `status`.
-  - Khi tenant bị `SUSPENDED`, SePay webhook cho bill đã tạo vẫn được xử lý idempotent; order đang `PROCESSING` vẫn được kitchen hoàn tất tới served; UI hiển thị banner cảnh báo thay vì force-disconnect.
-  - `CLOSED` là trạng thái kết thúc hợp đồng trong Phase 4B, soft-flag tenant và disable owner khi cần. Hard-delete/retention/data erasure policy được defer.
-- **Phân quyền Ban đầu:** Tenant được onboard với **Restaurant Owner** trong phạm vi tenant; Owner quản lý nhân sự, Manager vận hành nhưng không có quyền xóa user, checkout subscription, hoặc cập nhật payment settings.
-- **Migration tenant cũ:** Legacy tenants được backfill plan `FREE` không hết hạn; `isActive=false` map sang `SUSPENDED`; currency/locale mặc định là `VND` / `vi-VN`.
+When there are conflicts, prioritize in this order: current code/tests, accepted specs in `docs/specs/`, phase records in `docs/phases/`, then this overview document. The detailed RBAC matrix is ​​located at `docs/architecture/permission-matrix.md`.
 
 ---
 
-## 2. LUỒNG QUẢN LÝ THỰC ĐƠN (CATALOG & MENU MANAGEMENT)
+## 1. RESTAURANT INITIALIZATION AND SETUP FLOW (ONBOARDING & MULTI-TENANCY)
 
-Mô tả quá trình số hóa thực đơn giấy của nhà hàng thành Menu điện tử trên hệ thống.
+> **NOTE:** The system is a **SaaS Platform** with Multi-tenant model. This process is managed by **Super Admin** at the Platform layer.
 
-### A. Cấu trúc Phân cấp Menu
+This is the process of creating a restaurant tenant on the platform, attaching Owner, subscription, initial payment configuration and independent operating status. The current status after Phase 4B is **admin-assisted onboarding**; The self-service registration wizard is left for the next phase.
 
-Hệ thống tuân thủ cấu trúc 2 tầng đơn giản:
+### A. Setup steps
 
-1.  **Danh mục (Category):**
-    - Dùng để nhóm các món ăn/đồ uống (Ví dụ: Khai vị, Món chính, Đồ uống, Tráng miệng).
-    - **Logic hiển thị:** Có thể cài đặt khung giờ hiển thị cho danh mục (Ví dụ: "Điểm tâm" chỉ hiển thị 6h - 10h sáng).
-    - **Trạng thái:** `Active` (Hiển thị) hoặc `Inactive` (Ẩn).
+1. **Onboard tenant by Super Admin:**
+   - `SUPER_ADMIN` creates tenant through platform admin, declares shop name, type, address, Owner information and initial package.
+   - The system creates tenant, Owner user, default subscription and initial payment settings row in the same onboarding process.
+   - Onboarding Phase 4B is a mini-saga in SaaS service: if the step of creating user/profile/payment settings fails, the system rolls back the created data in the DB and has a cleanup path for orphan Keycloak users.
+   - Phase 4B uses the `SUPER_ADMIN` mechanism to manually enter the password for the Owner; sending email reset/required action is moved to Phase 4C after having SMTP/Notification.
 
-2.  **Món ăn/Đồ uống (Menu Item):**
-    - **Thông tin cơ bản:** Tên món, Hình ảnh, Mô tả ngắn, Giá bán cố định.
-    - **Trạng thái:** `Available` (Còn hàng) hoặc `Out of Stock` (Hết hàng). Khi hết hàng, nút "Đặt món" trên giao diện khách hàng sẽ bị vô hiệu hóa ngay lập tức.
-    - **Giá đơn giản:** Mỗi món có một mức giá cố định, không có biến thể (size, topping).
+2. **Initialize Restaurant Identity (tenant Identity):**
+   - **Core Logic:** The system automatically generates a unique Slug/Subdomain (for example: `the-coffee-house.qrtable.io`) as a brand identifier on the Internet.
+   - Slug must normalize Vietnamese, unique throughout the platform and block reserved words such as `admin`, `api`, `www`, `app` to not conflict with internal routes or brands.
 
-### B. Quy tắc Nghiệp vụ Chủ yếu
+3. **Select service Package (Subscription):**
+   - Super Admin manages pricing plans; Owners can view plans and create checkout subscriptions for their tenants; Manager only has permission to view subscription/plan.
+   - **Rules:** Plans limit features and size (e.g. Free Plan only allows up to 10 tables, no advanced reporting). Record the start and end dates of the package.
+   - Each tenant can only have one `ACTIVE` subscription at a time. New subscriptions may supersede old subscriptions and must invalidate the associated cache/guard.
+   - Auto-suspend subscription expires according to Vietnamese time: daily `02:00 Asia/Ho_Chi_Minh`, grace period 24h (`expires_at + 1 day < now()`).
+   - Counter `max_orders_per_day` uses timezone `Asia/Ho_Chi_Minh` for the Vietnamese market.
+   - tenant pays the platform using subscription invoice `QRSUB*`; `SUPER_ADMIN` has a manual confirm fallback when the webhook fails but the money has been checked.
 
-- **Tính giá đơn giản:** Giá cuối cùng = Giá món × Số lượng. Không có phụ phí, thuế, hay giảm giá.
-- **Hiển thị:** Chỉ hiển thị món ăn thuộc danh mục `Active` và có trạng thái `Available`.
-- **Sắp xếp tùy chỉnh:** Chủ quán có quyền sắp xếp thứ tự hiển thị của Danh mục và Món ăn (drag & drop).
-- **Đồng bộ menu hiện tại:** Menu mutation invalidate cache/query hiện có; hệ thống hiện không có Kafka/WS `menu.updated`. Customer/POS hội tụ bằng refetch theo vòng đời query hoặc explicit invalidation sau mutation.
-- **Ràng buộc xóa:** Không được xóa món ăn đang có trong đơn hàng `Pending` hoặc `Processing`.
+4. **Set up tenant Payments:**
+   - Owner connects SePay OAuth2 in `/dashboard/payment-settings` to send customer bill money to tenant's bank account.
+   - Payment service owns `tenant_payment_settings`; SaaS service only owns the tenant/subscription/invoice billing platform.
+   - Two-tier payment uses separate prefix: `QRTBL*` for customer bill payment to tenant account, `QRSUB*` for subscription invoice tenant to pay platform.
+   - Phase 4B supports one SePay account / one active bank account per tenant; multi-bank active, provision and partial subscription refund are defer.
+
+5. **Set Up Operational Configuration:**
+   - **Default Vietnam:** The system automatically configures currency unit VND and language Vietnamese.
+   - **Operating mode:** Customers can both order directly (Instant Order) and view the electronic Menu (Digital Menu).
+
+### B. Business Rules
+
+- **Data Isolation (tenant Isolation):** Make sure the data (orders, revenue, customers) of this store is completely separate and not visible to other stores.
+- **Active Status:** Store has statuses `ACTIVE`, `SUSPENDED`, `CLOSED`. `SUSPENDED` converts the tenant to read-only for new operations, but still allows pending bill payments.
+  - **Actor:** Super Admin has the right to suspend/activate/close tenant when violating policy or subscription expires.
+  - `isActive` is just an old DTO compatible field; Operational behavior taken from `status`.
+  - When the tenant is `SUSPENDED`, the SePay webhook for the created bill is still processed idempotent; order is `PROCESSING` being processed by the kitchen until served; UI shows warning banner instead of force-disconnect.
+  - `CLOSED` is the contract end state in Phase 4B, soft-flag tenant and disable Owner when needed. Hard-delete/retention/data erasure policy is deferred.
+- **Initial Decentralization:** tenant is onboarded with **Restaurant Owner** within the tenant scope; Owner manages personnel, Manager operates but does not have the right to delete users, checkout subscription, or update payment settings.
+- **Migration of old tenants:** Legacy tenants have backfill plan `FREE` that does not expire; `isActive=false` map to `SUSPENDED`; The default currency/locale is `VND` / `vi-VN`.
 
 ---
 
-## 3. LUỒNG QUẢN LÝ SƠ ĐỒ BÀN & MÃ QR (TABLE & QR LOGIC)
+## 2. MENU MANAGEMENT FLOW (CATALOG & MENU MANAGEMENT)
 
-Chịu trách nhiệm số hóa mặt bằng nhà hàng và tạo ra các "cổng vào" (Entry Points) cho khách hàng.
+Describe the process of digitizing a restaurant's paper menu into an electronic menu on the system.
 
-### A. Cấu trúc Tổ chức Không gian
+### A. Menu Hierarchy
 
-- **Khu vực (Areas/Zones):**
-  - Chia quán thành các khu vực quản lý (Tầng trệt, Sân thượng, Phòng VIP).
-  - **Nghiệp vụ:** Giúp phân công phục vụ dễ dàng và báo cáo doanh thu theo khu vực.
-- **Bàn (Tables):**
-  - Mỗi bàn thuộc một Khu vực. Thông tin cơ bản: Tên/Số bàn, Sức chứa.
-  - **Định danh:** Mỗi bàn có một ID duy nhất trong phạm vi cửa hàng.
+The system adheres to a simple 2-tier structure:
 
-### B. Logic Định danh và Sinh mã QR
+1. **Category:**
+   - Used to group dishes/drinks (For example: Appetizers, Main dishes, Drinks, Desserts).
+   - **Display logic:** Can set display time frame for categories (For example: "Breakfast" only displays 6am - 10am).
+   - **Status:** `Active` (Visible) or `Inactive` (Hidden).
 
-- **Cơ chế Ánh xạ (Mapping):**
-  - Mỗi bàn được tạo ra sẽ gắn với một Token định danh duy nhất.
-  - Mã QR là một URL chứa tham số: `https://ten-quan.qrtable.io?table_id=xyz&token=abc`.
+2. **Food/Drinks (Menu Item):**
+   - **Basic information:** Item name, Image, Short description, Fixed price.
+   - **Status:** `Available` (In stock) or `Out of Stock` (Out of stock). When out of stock, the "Order" button on the customer interface will be disabled immediately.
+   - **Simple price:** Each item has a fixed price, no variations (size, topping).
 
-- **Bảo mật QR (Security Rules):**
+### B. Key Business Rules
+
+- **Simple price calculation:** Final price = Item price × Quantity. There are no surcharges, taxes, or discounts.
+- **Display:** Only shows dishes belonging to category `Active` and with status `Available`.
+- **Custom arrangement:** The Owner has the right to arrange the display order of Categories and Dishes (drag & drop).
+- **Synchronize current menu:** Mutation menu invalidate existing cache/query; the system currently does not have Kafka/WS `menu.updated`. Customer/POS convergence by refetching according to the query lifecycle or explicit invalidation after mutation.
+- **Deletion constraint:** Do not delete existing dishes in order `Pending` or `Processing`.
+
+---
+
+## 3. TABLE & QR CODE MANAGEMENT FLOW (TABLE & QR LOGIC)
+
+Responsible for digitizing the restaurant premises and creating "Entry Points" for customers.
+
+### A. Spatial Organization Structure
+
+- **Areas/Zones:**
+  - Divide the shop into management areas (Ground Floor, Terrace, VIP Room).
+  - **Professions:** Helps assign services easily and report revenue by region.
+- **Tables:**
+  - Each table belongs to an Area. Basic information: Name/Table number, Capacity.
+  - **Identifier:** Each table has a unique ID within the store.
+
+### B. Identification Logic and QR Code Generation
+
+- **Mapping Mechanism:**
+  - Each created table will be associated with a unique identification Token.
+  - A QR code is a URL containing parameters: `https://ten-quan.qrtable.io?table_id=xyz&token=abc`.
+
+- **QR Security (Security Rules):**
 
   ```
   Token Generation:
@@ -114,74 +114,78 @@ Chịu trách nhiệm số hóa mặt bằng nhà hàng và tạo ra các "cổn
   Token Validation:
     IF HMAC_verify(table_id, token, secret_key) == false
     THEN return 403 "Invalid QR code"
+  ```
 
-  Rate Limiting (Chống spam):
-    max_scans_per_table = 10 scans per 5 minutes
-    max_orders_per_session = 20 items
+Rate Limiting (Anti-spam):
+max_scans_per_table = 10 scans per 5 minutes
+max_orders_per_session = 20 items
 
     IF rate_limit_exceeded
     THEN return 429 "Too many requests, please wait"
 
-  Session Timeout:
-    IF last_activity > 30 minutes AND order_count == 0
-    THEN auto_close_session()
-  ```
-
-- **Xuất bản QR:** Cho phép xuất file ảnh/PDF các bộ mã QR theo template để in ấn đồng bộ.
-
-### C. Logic Quản lý Trạng thái Bàn (Table State Management)
-
-**State Machine - Vòng đời trạng thái bàn:**
+Session Timeout:
+IF last_activity > 30 minutes AND order_count == 0
+THEN auto_close_session()
 
 ```
+
+- **QR Publishing:** Allows exporting image/PDF files of QR codes according to templates for synchronous printing.
+
+### C. Table State Management Logic
+
+**State Machine - Table state lifecycle:**
+
+```
+
 ┌─────────────┐
-│  Available  │ (Sẵn sàng đón khách)
+│ Available │ (Ready to welcome guests)
 └──────┬──────┘
-       │ QR Scan → Create Session
-       ▼
+│ QR Scan → Create Session
+▼
 ┌─────────────┐
-│  Occupied   │ (Đang có khách)
+│ Occupied │ (There are guests)
 └──────┬──────┘
-       │ Customer request payment → Lock ordering
-       ▼
+│ Customer request payment → Lock ordering
+▼
 ┌─────────────┐
-│   Billing   │ (Chờ thanh toán)
+│ Billing │ (Waiting for payment)
 └──────┬──────┘
-       │ Payment completed
-       ▼
+│ Payment completed
+▼
 ┌─────────────┐
-│  Cleaning   │ (Cần dọn dẹp)
+│ Cleaning │ (Needs cleaning)
 └──────┬──────┘
-       │ Staff mark as clean
-       ▼
+│ Staff mark as clean
+▼
 ┌─────────────┐
-│  Available  │ (Quay lại trạng thái ban đầu)
+│ Available │ (Return to original state)
 └─────────────┘
-```
 
-**Business Rules cho State Transitions:**
+````
+
+**Business Rules for State Transitions:**
 
 ```yaml
 Available → Occupied:
-  Trigger: Khách quét QR lần đầu
+Trigger: Customer scans QR for the first time
   Condition: table_status == "Available"
   Action:
-    - Tạo Session mới
+- Create new Session
     - Set table_status = "Occupied"
     - Set session_started_at = current_timestamp
 
 Occupied → Billing:
-  Trigger: Khách nhấn "Yêu cầu thanh toán"
+Trigger: Customer clicks "Request payment"
   Condition:
     - table_status == "Occupied"
     - EXISTS (order_items WHERE status == "Ready")
   Action:
     - Set table_status = "Billing"
-    - Disable QR ordering (return "Bàn đang thanh toán")
+- Disable QR ordering (return "Table currently paying")
     - Notify staff
 
 Billing → Occupied (Rollback):
-  Trigger: Khách hủy yêu cầu thanh toán
+Trigger: Customer cancels payment request
   Condition:
     - table_status == "Billing"
     - payment_status != "Paid"
@@ -190,7 +194,7 @@ Billing → Occupied (Rollback):
     - Re-enable QR ordering
 
 Billing → Cleaning:
-  Trigger: Thanh toán hoàn tất
+Trigger: Payment completed
   Condition:
     - table_status == "Billing"
     - payment_status == "Paid"
@@ -200,289 +204,301 @@ Billing → Cleaning:
     - Archive order data
 
 Cleaning → Available:
-  Trigger: Nhân viên đánh dấu "Đã dọn xong"
+Trigger: Staff marks "Completed cleaning"
   Action:
     - Set table_status = "Available"
     - Clear session_id
     - Ready for next customer
-```
+````
 
-### D. Quy tắc Nghiệp vụ Chủ yếu
+### D. Key Business Rules
 
-- **Duy nhất:** Mỗi cửa hàng không có hai bàn trùng tên hoặc ID.
-- **Ràng buộc Xóa:** Không được xóa bàn nếu bàn đang có đơn hàng `Pending`/`Active`.
-- **Chuyển bàn (Merge/Switch):** Cho phép nhân viên chuyển toàn bộ giỏ hàng/đơn hàng từ bàn cũ sang bàn mới và giải phóng bàn cũ.
+- **Unique:** Each store cannot have two tables with the same name or ID.
+- **Delete Constraint:** Do not delete a table if it has orders `Pending`/`Active`.
+- **Move table (Merge/Switch):** Allows staff to transfer the entire shopping cart/order from the old table to the new table and release the old table.
 
   ```
   Transfer Table Logic:
-    Validate: destination table Available (Catalog); active session có orders/bill (Order).
-
-    Luồng Step 2.4 (saga + transfer lock — không một transaction ACID xuyên Order PG + Catalog PG + Redis):
-      - Khóa transfer + cập nhật orders/session trong Order DB
-      - Catalog TCP: cập nhật `tables.status` và binding bàn
-      - Redis: session/cart metadata (`table_id` / hiển thị)
-      - Compensation nếu bước giữa fail; realtime qua BFF Direct (không topic Kafka rename bàn)
+  Validate: destination table Available (Catalog); active session has orders/bill (Order).
   ```
 
-- **Giới hạn Gói cước:** Số lượng bàn tối đa được tạo bị giới hạn theo gói dịch vụ đã mua.
+Step 2.4 flow (saga + transfer lock — no ACID transaction across Order PG + Catalog PG + Redis):
+
+- Transfer key + update orders/session in Order DB
+- TCP Catalog: updated `tables.status` and binding table
+- Redis: session/cart metadata (`table_id`/display)
+- Compensation if the middle step fails; realtime via BFF Direct (no Kafka topic rename table)
+
+  ```
+
+  ```
+
+- **Package Limits:** The maximum number of tables created is limited according to the purchased service package.
 
 ---
 
-## 4. LUỒNG ĐẶT MÓN TẠI BÀN (CUSTOMER ORDERING FLOW)
+## 4. CUSTOMER ORDERING FLOW
 
-Quy trình từ lúc khách quét QR đến khi đơn hàng được gửi đến bếp.
+The process from the moment the customer scans the QR until the order is sent to the kitchen.
 
-### A. Quy trình Nghiệp vụ Chi tiết
+### A. Detailed Business Processes
 
-1.  **Khởi tạo Phiên (Session Initiation):**
-    - Khách quét mã QR, giao diện Menu mở ra (Progressive Web App).
-    - Hệ thống nhận diện `Store_ID`, `Table_ID`, và xác thực `Token`.
-    - **Logic Phiên (Session Management):**
+1.  **Session Initiation:** - Customers scan the QR code, the Menu interface opens (Progressive Web App). - The system identifies `Store_ID`, `Table_ID`, and authenticates `Token`. - **Session Management:**
 
-      ```
-      IF table_status == "Available" OR last_session_closed > 15 phút
-      THEN tạo Session mới với Session_ID duy nhất
+          ```
 
-      IF table_status == "Occupied" AND billing_status != "Billing"
-      THEN join Session hiện tại (Shared Cart - cùng giỏ hàng)
+    IF table_status == "Available" OR last_session_closed > 15 minutes
+    THEN create a new Session with a unique Session_ID
 
-      IF table_status == "Billing"
-      THEN chặn QR scan, hiển thị "Bàn đang thanh toán, vui lòng chờ"
-      ```
+          IF table_status == "Occupied" AND billing_status != "Billing"
 
-    - **Shared Cart Logic:** Tất cả khách quét QR vào cùng một bàn (trong cùng Session) sẽ thấy chung một giỏ hàng và có thể cùng thêm món.
+    THEN join current Session (Shared Cart - same cart)
 
-2.  **Lựa chọn Món (Item Selection):**
-    - Duyệt Menu theo danh mục, kiểm tra trạng thái `Available`/`Out of Stock` Real-time.
-    - Nhấn vào món → Hiển thị chi tiết (Hình ảnh lớn, Mô tả, Giá).
-    - Chọn số lượng → Nhấn "Thêm vào giỏ".
+          IF table_status == "Billing"
 
-3.  **Quản lý Giỏ hàng (Cart Management):**
-    - Xem danh sách món đã chọn, hiển thị: Tên món, Số lượng, Giá, Tổng cộng.
-    - **Chỉnh sửa:** Tăng/giảm số lượng, xóa món, thêm Ghi chú món (Ví dụ: "Không cay", "Ít muối").
-    - **Tính tổng tiền:** Tổng tiền = Σ(Giá món × Số lượng).
+    THEN block QR scan, display "Table is paying, please wait"
+    ```
 
-4.  **Gửi Đơn hàng (Order Submission):**
-    - Khách nhấn "Đặt món". Đơn hàng chuyển trạng thái `Pending` (Chờ xác nhận).
-    - Hệ thống gửi Thông báo Tức thời (âm thanh/rung) đến thiết bị của nhân viên tại quầy/POS.
+- **Shared Cart Logic:** All guests who scan QR at the same table (in the same Session) will see the same shopping cart and can add items together.
 
-5.  **Xác nhận và Điều phối (Confirmation & Routing):**
-    - Nhân viên kiểm tra và nhấn "Xác nhận".
-    - Đơn hàng chuyển sang `Processing` (Đang xử lý).
-    - **Điều phối Bếp:** Hệ thống tự động tách đơn: Món ăn -> Màn hình Bếp; Đồ uống -> Màn hình Bar.
-    - Tự động in Kitchen Order Ticket (KOT) nếu có máy in.
+2. **Item Selection:**
+   - Browse Menu by category, check `Available`/`Out of Stock` Real-time status.
+   - Click on the item → Show details (Large image, Description, Price).
+   - Select quantity → Click "Add to cart".
 
-6.  **Theo dõi Tiến độ (Order Tracking):**
-    - Giao diện khách hàng cập nhật trạng thái: "Đã gửi đơn" -> "Đang chế biến" -> "Đã lên món".
-    - Khách có thể đặt thêm món mới (Order bổ sung) mà không ảnh hưởng đến đơn cũ.
+3. **Cart Management:**
+   - View the list of selected items, displaying: Item name, Quantity, Price, Total.
+   - **Edit:** Increase/decrease quantity, delete dishes, add dish notes (Example: "Not spicy", "Low salt").
+   - **Calculate total amount:** Total amount = Σ(Price × Quantity).
 
-### B. Quy tắc Nghiệp vụ Chủ yếu
+4. **Order Submission:**
+   - Customer clicks "Order". Order status changes to `Pending` (Waiting for confirmation).
+   - The system sends Instant Notifications (sound/vibration) to the employee's device at the counter/POS.
 
-- **Khóa Đặt món (Ordering Lock):**
+5. **Confirmation & Routing:**
+   - Staff checks and clicks "Confirm".
+   - Order moved to `Processing` (Processing).
+   - **Kitchen Coordination:** Automatic ordering system: Dishes -> Kitchen screen; Drinks -> Bar Screen.
+   - Automatically print Kitchen Order Ticket (KOT) if there is a printer.
+
+6. **Order Tracking:**
+   - Customer interface status updates: "Order sent" -> "Processing" -> "Delivery ready".
+   - Customers can order new items (Additional Order) without affecting the old order.
+
+### B. Key Business Rules
+
+- **Ordering Lock:**
 
   ```
   IF table_status == "Billing"
-  THEN disable "Thêm món" button
-  AND show message "Bàn đang thanh toán, không thể đặt thêm món"
+  THEN disable "Add item" button
+  AND show message "Table is paying, cannot order more dishes"
   ```
 
-- **Xử lý Tồn kho Concurrent (Race Condition):**
+- **Concurrent Inventory Handling (Race Condition):**
 
   ```
-  Submit (customer): chỉ kiểm tra snapshot availability — KHÔNG trừ tồn kho.
+  Submit (customer): only checks snapshot availability — DOES NOT deduct inventory.
 
   Confirm (staff, PENDING → PROCESSING):
-    Catalog Service (sở hữu menu_items): pessimistic lock + deduct trong transaction Catalog
-      (qua lệnh TCP transactional — Order Service không UPDATE trực tiếp DB Catalog)
-    Order Service: cập nhật order status + phát Kafka order.confirmed sau commit (+ simplified outbox)
-
-    Nếu không đủ tồn → lỗi có cấu trúc cho nhân viên (khách đã submit trước đó chỉ là pending)
-
-  Stock/menu visibility: Catalog/BFF invalidate cache/query theo write path; không claim menu realtime WS.
+  Catalog service (owns menu_items): pessimistic lock + deduct in transaction Catalog
+  (via TCP transactional command — Order service does not directly UPDATE DB Catalog)
+  Order service: update order status + broadcast Kafka order.confirmed after commit (+ simplified outbox)
   ```
 
-  **Timestamp:** Sử dụng `server_timestamp` (UTC), KHÔNG dùng `client_timestamp`.
+If not enough inventory → structured error for staff (previously submitted customer is only pending)
 
-- **Cộng dồn Đơn:** Các đơn đặt bổ sung trong cùng Session sẽ merge vào một Bill duy nhất khi thanh toán.
+Stock/menu visibility: Catalog/BFF invalidate cache/query theo write path; not claim menu realtime WS.
 
-- **Bắt buộc Xác nhận:** Mọi đơn hàng phải qua trạng thái `Pending` → Nhân viên xác nhận → `Processing`, nhằm chống spam/đơn ảo.
-
-- **Hủy đơn bởi khách:**
-
-  ```
-  IF order_status == "Pending" AND confirmed == false
-  THEN allow customer to cancel (Soft delete, keep log)
-
-  IF order_status IN ["Processing", "Ready"]
-  THEN disable cancel button for customer
-  AND require staff/manager approval to cancel
-  ```
-
----
-
-## 5. LUỒNG XỬ LÝ ĐƠN HÀNG & NHÀ BẾP (KITCHEN/KDS FLOW)
-
-Bắt đầu khi nhân viên xác nhận đơn và kết thúc khi món ăn sẵn sàng.
-
-### A. Quy trình Nghiệp vụ Chi tiết
-
-1.  **Tiếp nhận và Phân loại (Ticket Routing):**
-    - Tách đơn tự động: Phân chia món ăn và đồ uống về Màn hình Bếp và Màn hình Bar riêng biệt.
-    - Mỗi đơn xuất hiện dưới dạng một "Ticket" điện tử, hiển thị: số bàn, tên món, ghi chú và thời gian chờ.
-
-2.  **Tiếp nhận Chế biến (Acknowledging):**
-    - **Trạng thái Chờ (Pending):** Thẻ mới có màu nổi bật (Đỏ/Vàng).
-    - **Bắt đầu làm (Processing):** Đầu bếp nhấn vào thẻ để xác nhận "Đang làm món này", giúp tránh làm trùng.
-
-3.  **Xử lý theo Yêu cầu:**
-    - Đầu bếp xem chính xác yêu cầu Modifiers và Ghi chú của khách.
-    - **Không batching/gộp món:** KDS hiển thị ticket/item theo snapshot backend; không có batch queue, tổng cùng món xuyên bàn, hay API/UI contract cho gộp món. Cart trước submit vẫn có thể gộp cùng món/cùng ghi chú trong cùng session.
-
-4.  **Hoàn thành Chế biến (Ready to Serve):**
-    - Đầu bếp nhấn "Hoàn thành" (Done/Ready). Thẻ biến mất khỏi màn hình bếp.
-    - **Kích hoạt Thông báo (Ping):** Hệ thống gửi thông báo ngay lập tức đến nhân viên phục vụ: "Bàn 05 - Món Phở bò đã xong".
-
-5.  **Thu hồi/Sửa lỗi (Recall Logic):**
-    - Cho phép đầu bếp thu hồi lại thẻ đã lỡ tay nhấn "Hoàn thành" để quay lại trạng thái đang chế biến.
-
-### B. Quy tắc Nghiệp vụ Chủ yếu
-
-- **FIFO (First In - First Out):** Đơn hàng vào trước phải hiển thị trước.
-- **Cảnh báo Trễ (SLA Warning):** Thẻ món quá X phút chưa hoàn thành phải đổi màu/nhấp nháy để cảnh báo quá tải/quên đơn.
-- **Đồng bộ Trạng thái:** WebSocket là hint realtime; KDS/PWA/POS phải refetch REST snapshot sau mutation, reconnect hoặc missed event. Order Service vẫn là source of truth cho trạng thái customer-visible.
-- **Ưu tiên Món (Priority):** Cho phép đánh dấu bàn/món "Ưu tiên" để đưa lên đầu danh sách KDS.
-
----
-
-## 6. LUỒNG THANH TOÁN & ĐỐI SOÁT (PAYMENT & RECONCILIATION)
-
-Đảm bảo mọi dịch vụ được chuyển đổi thành doanh thu chính xác và được ghi nhận.
-
-### A. Quy trình Nghiệp vụ Chi tiết
-
-1.  **Yêu cầu Thanh toán (Payment Request):**
-    - Khách nhấn nút "Thanh toán" trên Web-app -> Hệ thống gửi Alert đến POS/Tablet của nhân viên.
-    - **Khóa Đơn hàng (Order Locking):** Bàn chuyển sang trạng thái `Billing`, khách không thể đặt thêm món.
-
-2.  **Kiểm tra & Tổng hợp Hóa đơn (Final Review):**
-    - Nhân viên kiểm tra danh sách món, số lượng, tổng tiền.
-    - **Công thức tính tiền đơn giản:**
-      ```
-      Subtotal = Σ(Giá món × Số lượng)
-      Total = Subtotal
-      ```
-    - **Ràng buộc trạng thái:** Chỉ cho phép chuyển sang Billing khi tất cả món đã `Ready` (Hoàn thành chế biến).
-
-3.  **Thực hiện Thanh toán (Payment Execution):**
-    - **Thanh toán Tiền mặt (Cash):**
-      ```
-      Staff nhập số tiền khách đưa
-      Hệ thống tính tiền thừa = Tiền nhận - Total
-      Staff xác nhận "Đã thu tiền"
-      → payment_status = "Paid", payment_method = "Cash"
-      ```
-    - **Thanh toán Chuyển khoản (Bank Transfer — SePay / VietQR):**
-
-      ```
-      Hệ thống sinh QR VietQR (SePay) với:
-        - Tham số amount = bill.roundedTotal (VND đã làm tròn theo policy làm tròn nghìn)
-        - Nội dung chuyển khoản (des / CK content) chứa billReference cố định:
-          "QRTBL" + 8 ký tự đầu tiên của billId sau khi bỏ dấu gạch (UUID)
-
-      Khách quét QR và chuyển khoản
-
-      Webhook SePay → BFF → Payment khớp billReference (code hoặc regex trên content)
-        - Nếu số tiền < roundedTotal: giữ payment PENDING, ghi audit SEPAY_WEBHOOK_UNDERPAID
-        - Nếu số tiền >= roundedTotal: payment_status = "Paid"; lưu paidAmount = số tiền thực nhận
-          (chấp nhận overpaid; hoàn tiền full dùng paidAmount ?? roundedTotal)
-      ```
-
-      > **Lưu ý kiến trúc (2026-05):** Thanh toán chuyển khoản được xử lý thông qua **SePay + VietQR động** — QR code nhúng inline trong POS/PWA (không redirect). Route webhook trực tiếp Phase 3 hiện verify HMAC raw-body; route tenant/platform Phase 4B dùng `x-secret-key` path riêng và cần hardening value verification trước production. Xem `technical-architecture.md` §6.2.7 và phase record `docs/phases/phase-3-payment.md`.
-
-4.  **In Hóa đơn & Giải phóng Bàn (Closing):**
-    - In hóa đơn giấy.
-    - **Sau thanh toán thành công:** Theo state machine bàn, bàn chuyển `Billing` → `Cleaning`; nhân viên sau đó đánh dấu `Cleaning` → `Available` khi dọn xong. Không mô tả “nhảy thẳng Available” ngay khi thanh toán.
-
-5.  **Đối soát Tài chính (Reconciliation):**
-    - Cuối ngày/tháng, hệ thống tổng hợp nguồn thu theo phương thức (Tiền mặt, Chuyển khoản...).
-    - Chủ quán khớp dữ liệu số dư ngân hàng/két tiền với báo cáo trên QRTable.
-
-### B. Quy tắc Nghiệp vụ Chủ yếu
-
-- **Bất biến (Immutability):**
-
-  ```
-  IF bill_status == "Completed" AND payment_status == "Paid"
-  THEN disable all edit operations
-  AND require Refund flow for any adjustment
-  ```
-
-- **Làm tròn tiền:** Làm tròn đến hàng nghìn (VND). Ví dụ: 127.500đ → 128.000đ.
-
-- **Audit Log bắt buộc:**
-
-  ```
-  IF bill_status changed to "Canceled" AND any_item.status IN ["Processing", "Ready"]
-  THEN require:
-    - canceled_by (user_id)
-    - cancel_reason (text)
-    - canceled_at (timestamp)
-  AND log to audit_trail table
-  ```
-
-- **Chặn thanh toán khi món chưa xong:**
-  ```
-  IF EXISTS (order_item WHERE status IN ["Pending", "Processing"])
-  THEN disable "Yêu cầu thanh toán" button
-  AND show tooltip "Còn món chưa hoàn thành"
-  ```
-
----
-
-## 7. XỬ LÝ OFFLINE & NETWORK RESILIENCE
-
-Hệ thống phải hoạt động ổn định trong điều kiện mạng không ổn định.
-
-### A. Kịch bản Offline - Phía Khách hàng
-
-```yaml
-Scenario 1: Khách quét QR khi offline
-  Detection: navigator.onLine == false
-  Behavior:
-    - Show toast "Không có kết nối mạng"
-    - Load cached menu (nếu đã từng truy cập)
-    - Disable "Thêm vào giỏ" button
-    - Show "Chỉ xem, không thể đặt món khi offline"
-
-Scenario 2: Mất mạng giữa chừng khi đang duyệt menu
-  Detection: WebSocket disconnect event
-  Behavior:
-    - Show warning banner "Mất kết nối, đang thử kết nối lại..."
-    - Retry connection với exponential backoff (2s, 4s, 8s...)
-    - Giữ giỏ hàng trong localStorage
-    - Disable submit order button
-
-Scenario 3: Mất mạng khi đang submit order
-  Detection: HTTP request timeout hoặc network error
-  Behavior:
-    - Show error "Không thể gửi đơn hàng, vui lòng kiểm tra kết nối"
-    - Queue order trong IndexedDB
-    - Khi có mạng trở lại → Auto retry submit
-    - Show sync indicator: "Đang đồng bộ đơn hàng..."
 ```
 
-### B. Kịch bản Offline - Phía Nhân viên (POS/KDS)
+**Timestamp:** Use `server_timestamp` (UTC), NOT `client_timestamp`.
+
+- **Cumulative Orders:** Additional orders in the same Session will be merged into a single Bill when paying.
+
+- **Required Confirmation:** All orders must go through status `Pending` → Confirmation staff → `Processing`, to prevent spam/virtual orders.
+
+- **Cancellation by customer:**
+
+```
+
+IF order_status == "Pending" AND confirmed == false
+THEN allow customer to cancel (Soft delete, keep log)
+
+IF order_status IN ["Processing", "Ready"]
+THEN disable cancel button for customer
+AND require staff/manager approval to cancel
+
+````
+
+---
+
+## 5. ORDER PROCESSING FLOW & KITCHEN (KITCHEN/KDS FLOW)
+
+Starts when the staff confirms the order and ends when the food is ready.
+
+### A. Detailed Business Processes
+
+1. **Receiving and Sorting (Ticket Routing):**
+  - Automatic order separation: Divide dishes and drinks to separate Kitchen Screen and Bar Screen.
+  - Each order appears as an electronic "Ticket", displaying: table number, dish name, notes and waiting time.
+
+2. **Acknowledging:**
+  - **Pending Status:** New card has a prominent color (Red/Yellow).
+  - **Processing:** The chef clicks on the card to confirm "Processing this dish", helping to avoid duplicates.
+
+3. **Request Processing:**
+  - Chefs view exact Modifiers and Guest Notes requests.
+  - **No batching/merging of items:** KDS displays tickets/items according to the backend snapshot; There is no batch queue, cross-table totals, or API/UI contract for combining orders. Cart before submitting can still combine the same item/note in the same session.
+
+4. **Completed Processing (Ready to Serve):**
+  - The chef presses "Done/Ready". The card disappears from the kitchen screen.
+  - **Activate Notification (Ping):** The system sends an immediate notification to the waiter: "Table 05 - Beef Pho is finished".
+
+5. **Recall/Error Correction (Recall Logic):**
+  - Allows chefs to recall cards that accidentally click "Done" to return to the processing state.
+
+### B. Key Business Rules
+
+- **FIFO (First In - First Out):** Orders that come in first must be displayed first.
+- **Late Warning (SLA Warning):** Order cards that have not been completed for more than X minutes must change color/flashing to warn of overload/forgotten orders.
+- **Synchronize State:** WebSocket is realtime hint; KDS/PWA/POS must refetch REST snapshot after mutation, reconnect or missed event. Order service is still the source of truth for customer-visible status.
+- **Priority:** Allows you to mark tables/dishes as "Priority" to put them at the top of the KDS list.
+
+---
+
+## 6. PAYMENT FLOW & CONTROL (PAYMENT & RECONCILIATION)
+
+Ensure every service is converted into revenue accurately and recorded.
+
+### A. Detailed Business Processes
+
+1. **Payment Request:**
+  - The customer presses the "Pay" button on the Web-app -> The system sends an Alert to the employee's POS/Tablet.
+  - **Order Locking:** The table changes to `Billing` status, customers cannot order more dishes.
+
+2. **Check & Summarize Invoices (Final Review):**
+  - Staff checks the list of items, quantity, and total amount.
+  - **Simple payment formula:**
+    ```
+Subtotal = Σ(Item price × Quantity)
+    Total = Subtotal
+    ```
+- **Status constraints:** Only allow switching to Billing when all dishes have `Ready` (Completed processing).
+
+3. **Payment Execution:**
+  - **Cash Payment:**
+    ```
+Staff enters the amount of money given by the customer
+The system calculates excess money = Money received - Total
+Staff confirmed "Money collected"
+    → payment_status = "Paid", payment_method = "Cash"
+    ```
+- **Bank Transfer — SePay / VietQR):**
+
+    ```
+VietQR QR generation system (SePay) with:
+- Parameter amount = bill.roundedTotal (VND rounded according to the thousand rounding policy)
+- Transfer content (des / CK content) contains fixed billReference:
+"QRTBL" + first 8 characters of billId after removing the hyphen (UUID)
+
+Customers scan QR and transfer money
+
+Webhook SePay → BFF → Payment matches billReference (code or regex on content)
+- If amount < roundedTotal: keep payment PENDING, record audit SEPAY_WEBHOOK_UNDERPAID
+- If amount >= roundedTotal: payment_status = "Paid"; saved paidAmount = actual amount received
+(overpaid accepted; full refund using paidAmount ?? roundedTotal)
+    ```
+
+> **Architecture note (2026-05):** Transfer payments are processed via **SePay + Dynamic VietQR** — QR code embedded inline in POS/PWA (no redirect). The Phase 3 direct webhook route now verifies HMAC raw-body; The Phase 4B tenant/platform route uses its own `x-secret-key` path and needs hardening value verification before production. See `technical-architecture.md` §6.2.7 and phase record `docs/phases/phase-3-payment.md`.
+
+4. **Print Invoice & Clear Desk (Closing):**
+  - Print paper invoices.
+  - **After successful payment:** According to the table state machine, the table moves `Billing` → `Cleaning`; The employee then marks `Cleaning` → `Available` when finished cleaning. Do not describe “jump straight Available” immediately upon checkout.
+
+5. **Financial Reconciliation:**
+  - At the end of the day/month, the system summarizes revenue by method (Cash, Transfer...).
+  - The shop Owner matches the bank balance/cash box data with the report on QRTable.
+
+### B. Key Business Rules
+
+- **Immutability:**
+
+````
+
+IF bill_status == "Completed" AND payment_status == "Paid"
+THEN disable all edit operations
+AND require Refund flow for any adjustment
+
+```
+
+- **Round money:** Round to thousands (VND). For example: 127,500 VND → 128,000 VND.
+
+- **Audit Log required:**
+
+```
+
+IF bill_status changed to "Canceled" AND any_item.status IN ["Processing", "Ready"]
+THEN require: - canceled_by (user_id) - cancel_reason (text) - canceled_at (timestamp)
+AND log to audit_trail table
+
+```
+
+- **Block payment when the order is not completed:**
+```
+
+IF EXISTS (order_item WHERE status IN ["Pending", "Processing"])
+THEN disable "Request payment" button
+AND show tooltip "Unfinished items"
+
+````
+
+---
+
+## 7. OFFLINE HANDLING & NETWORK RESILIENCE
+
+The system must operate stably in unstable network conditions.
+
+### A. Offline Scenario - Client Side
 
 ```yaml
-Scenario 1: POS mất kết nối khi xác nhận đơn
+Scenario 1: Customers scan QR when offline
+Detection: navigator.onLine == false
+Behavior:
+- Show toast "No network connection"
+- Load cached menu (if ever accessed)
+- Disable "Add to cart" button
+- Show "Watch only, can't order offline"
+
+Scenario 2: Lost your life midway while browsing the menu
+Detection: WebSocket disconnect event
+Behavior:
+- Show warning banner "Connection lost, trying to reconnect..."
+- Retry connection with exponential backoff (2s, 4s, 8s...)
+- Keep cart in localStorage
+  - Disable submit order button
+
+Scenario 3: Loss of life while submitting order
+Detection: HTTP request timeout or network error
+Behavior:
+- Show error "Unable to send order, please check connection"
+- Queue order in IndexedDB
+- When the network comes back → Auto retry submit
+- Show sync indicator: "Synchronizing orders..."
+````
+
+### B. Offline Scenario - Employee Side (POS/KDS)
+
+```yaml
+Scenario 1: POS loses connection when confirming order
   Behavior:
     - Queue confirmation action
-    - Show "Offline - Thao tác sẽ được đồng bộ khi có mạng"
+- Show "Offline - Operations will be synchronized when the network is available"
     - Save to local queue with timestamp
-    - Auto sync khi reconnect
+- Auto sync when reconnect
     - Prevent duplicate submission (use idempotency key)
 
-Scenario 2: KDS mất kết nối
+Scenario 2: KDS lost connection
   Behavior:
     - Continue showing existing orders from cache
     - Queue status updates (mark as Processing/Ready)
@@ -495,7 +511,7 @@ Scenario 3: Payment terminal offline
     - Allow cash payment only
     - Disable bank transfer QR generation
     - Queue payment record
-    - Manual reconciliation khi có mạng
+- Manual reconciliation when online
 ```
 
 ### C. Sync Strategy
@@ -505,7 +521,7 @@ Conflict Resolution Rules:
   IF local_timestamp < server_timestamp THEN
     server_state_wins()
     discard_local_changes()
-    notify_user("Dữ liệu đã được cập nhật từ server")
+notify_user("Data has been updated from the server")
 
   IF action == "order_submission" THEN
     use_idempotency_key(order_id + session_id)
@@ -516,52 +532,52 @@ Retry Policy:
   backoff = exponential (2^n seconds)
 
   IF retry_count > max_retries THEN
-    show_error("Không thể đồng bộ, vui lòng liên hệ quản lý")
+show_error("Unable to synchronize, please contact administrator")
     log_to_error_tracking()
 ```
 
 ---
 
-## 8. STATE MACHINE - VÒNG ĐỜI ĐƠN HÀNG
+## 8. STATE MACHINE - ORDER LIFE CYCLE
 
-Quản lý trạng thái đơn hàng từ lúc tạo đến hoàn thành.
+Manage order status from creation to completion.
 
-> **Đặc tả Step 2.4 (canonical Q1–Q12):** [`business-logic-step-2.4-spec.vi.md`](specs/business-logic-step-2.4-spec.vi.md) — bổ sung ownership service, bill request explicit, transfer saga, RBAC cancel tách quyền. Mục §8 giữ vai trò tổng quan; khi lệch, ưu tiên đặc tả Step 2.4.
+> **Step 2.4 specification (canonical Q1–Q12):** [Step 2.4 business specification](specs/business-logic-step-2.4-spec.md) — additional ownership service, bill request explicit, transfer saga, RBAC cancel permission separation. Section §8 serves as an overview; When deviating, prioritize Step 2.4 specification.
 
-> **Enum casing convention:** Diagram + rules dưới đây dùng **Title Case** (`Draft`, `Pending`, `Processing`, `Ready`, `Served`, `Completed`, `Canceled`) cho readability. Enum values canonical là **UPPERCASE** (`DRAFT`, `PENDING`, ...) — xem `libs/shared/types/src/lib/order.types.ts` và `docs/phases/phase-2a-order-kafka.md` Step 2.3. Ánh xạ 1-1 (`Draft` ↔ `DRAFT`, v.v.).
+> **Enum casing convention:** The diagram + rules below use **Title Case** (`Draft`, `Pending`, `Processing`, `Ready`, `Served`, `Completed`, `Canceled`) for readability. Enum values ​​canonical are **UPPERCASE** (`DRAFT`, `PENDING`, ...) — see `libs/shared/types/src/lib/order.types.ts` and `docs/phases/phase-2a-order-kafka.md` Step 2.3. One-to-one mapping (`Draft` ↔ `DRAFT`, etc.).
 
 ### A. Order State Diagram
 
 ```
 ┌──────────┐
-│  Draft   │ (Khách đang thêm món vào giỏ, chưa submit)
+│ Draft │ (Customers are adding items to cart, not submitted yet)
 └────┬─────┘
      │ Submit Order
      ▼
 ┌──────────┐
-│ Pending  │ (Chờ nhân viên xác nhận)
+│ Pending │ (Waiting for staff confirmation)
 └────┬─────┘
      │ Staff confirm
      ├─────────────── Cancel (if not confirmed) → Canceled
      ▼
 ┌────────────┐
-│ Processing │ (Đã vào bếp, đang chế biến)
+│ Processing │ (Already in the kitchen, processing)
 └─────┬──────┘
       │ Kitchen mark as done
       ├────────────── Cancel (require manager approval) → Canceled
       ▼
 ┌──────────┐
-│  Ready   │ (Món đã xong, chờ lên bàn)
+│ Ready │ (The dish is ready, waiting for the table)
 └────┬─────┘
      │ Serve to table
      ▼
 ┌──────────┐
-│ Served   │ (Đã lên bàn)
+│ Served │ (Already on the table)
 └────┬─────┘
      │ Payment completed
      ▼
 ┌────────────┐
-│ Completed  │ (Hoàn tất, không thể sửa)
+│ Completed │ (Completed, cannot be edited)
 └────────────┘
 ```
 
@@ -569,36 +585,36 @@ Quản lý trạng thái đơn hàng từ lúc tạo đến hoàn thành.
 
 ```yaml
 Draft → Pending:
-  Trigger: Khách nhấn "Đặt món"
+Trigger: Customer clicks "Order"
   Validation:
     - cart_items.length > 0
     - all_items.status == "Available"
   Action:
-    - Create order record (persist từ PENDING — Draft không có DB row)
-    - Lần submit đầu tiên trong session: tạo bill OPEN nếu chưa có (Step 2.4)
+- Create order record (persist from PENDING — Draft without DB row)
+- First submission in session: create OPEN bill if there is no one (Step 2.4)
     - Notify staff (sound + push notification)
-    - Clear cart sau submit thành công
+- Clear cart after successful submission
 
 Draft → Canceled:
-  Trigger: Customer đóng trình duyệt / bỏ cart / explicit clear
+Trigger: Customer closes browser / removes cart / explicit clear
   Actor: Customer (self, implicit)
   Condition:
-    - cart chưa submit (order chưa tồn tại như record)
+- cart has not been submitted (order does not exist as record)
   Action:
-    - Release Redis cart key (TTL expiry hoặc explicit DEL)
-    - KHÔNG tạo order record (nothing to cancel formally)
-  Note: Transition này KHÔNG persist vì Draft chưa tạo DB row; code-level check trong ALLOWED_ORDER_TRANSITIONS cho FE disable "Submit" + cho BE reject replay nếu cart đã clear.
+- Release Redis cart key (TTL expiry or explicit DEL)
+- DO NOT create order record (nothing to cancel formally)
+Note: This transition will NOT persist because Draft has not created a DB row; code-level check in ALLOWED_ORDER_TRANSITIONS for FE disable "Submit" + for BE reject replay if cart is clear.
 
 Pending → Processing:
-  Trigger: Staff nhấn "Xác nhận"
-  Actor: Staff, Manager (RBAC chi tiết: permission-matrix §6 / §6.1)
+Trigger: Staff clicks "Confirm"
+Actor: Staff, Manager (RBAC details: permission-matrix §6 / §6.1)
   Validation:
     - order_status == "Pending"
-    - Catalog TCP: đủ tồn kho tại thời điểm confirm
+- TCP Catalog: enough inventory at the time of confirmation
   Action:
-    - Catalog deduct stock (trong DB Catalog)
+- Catalog deduct stock (in DB Catalog)
     - Update order_status = "Processing"
-    - Route to KDS (Kafka order.confirmed + station từ `MenuItem.station`)
+- Route to KDS (Kafka order.confirmed + station from `MenuItem.station`)
     - Print KOT if printer connected
 
 Pending → Canceled:
@@ -610,7 +626,7 @@ Pending → Canceled:
   Action:
     - Soft delete (set deleted_at, keep audit)
     - Log cancellation reason
-    - Không restore stock (chưa deduct khi pending — đặc tả Step 2.4 Q2)
+- Do not restore stock (not deducted when pending — specification Step 2.4 Q2)
     - Notify customer
 
 Processing → Canceled:
@@ -623,7 +639,7 @@ Processing → Canceled:
     - Update order_status = "Canceled"
     - Log audit trail (who, when, why)
     - Notify kitchen to stop
-    - Restore/adjust stock qua Catalog (đã deduct lúc confirm)
+- Restore/adjust stock through Catalog (already deducted during confirmation)
     - Flag for revenue report exclusion
 
 Processing → Ready:
@@ -646,7 +662,7 @@ Served → Completed:
   Trigger: Payment completed (Phase 3)
   Condition:
     - payment_status == "Paid"
-    - bill canonical: `BillStatus` **PAID** (văn prose "Closed/Completed" = đã kết thúc thanh toán)
+- bill canonical: `BillStatus` **PAID** (prose "Closed/Completed" = payment ended)
   Action:
     - Update order_status = "Completed"
     - Archive to read-only storage
@@ -655,133 +671,133 @@ Served → Completed:
 
 ---
 
-## 9. PHÂN QUYỀN & ACTOR PERMISSIONS
+## 9. DEGREE OF AUTHORITY & ACTOR PERMISSIONS
 
-Định nghĩa rõ ràng quyền hạn của từng vai trò trong hệ thống SaaS Multi-Tenant.
+Clearly define the authority of each role in the SaaS Multi-tenant system.
 
-> **Kiến trúc Actor:** Mô tả theo **nhóm vai (business language)**; ma trận RBAC thực tế (6 roles × 66 permissions) là canonical tại [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md) §6.
+> **Actor Architecture:** Described by **role group (business language)**; The actual RBAC matrix (6 roles × 66 permissions) is canonical at [permission matrix](architecture/permission-matrix.md) §6.
 
-> **Điều hướng ứng dụng quản trị:** `management-app` (Phase 2.x) dùng **role → tab/route** cho UX; **BFF** vẫn enforce **permission** từng endpoint. Xem [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md) §9 (nguyên tắc đồng bộ + tech debt).
+> **Admin app navigation:** `management-app` (Phase 2.x) uses **role → tab/route** for UX; **BFF** still enforces **permission** for each endpoint. See [permission matrix](architecture/permission-matrix.md) §9 (synchronization principle + tech debt).
 
 ### A. Actor Hierarchy & Roles
 
 #### **1. Super Admin (Platform Administrator)**
 
-**Phạm vi:** Toàn bộ nền tảng QRTable (Cross-Tenant)
+**Scope:** Entire QRTable platform (Cross-tenant)
 
-- **Vai trò:** Quản trị viên hệ thống SaaS
-- **Quyền hạn chính:**
-  - Quản lý Tenants: Phê duyệt/Tạm khóa/Xóa nhà hàng
-  - Quản lý Subscription Plans: Tạo/Sửa gói cước (Lite, Pro, Enterprise)
-  - Theo dõi Revenue Platform: Doanh thu từ subscription fees
-  - Cấu hình hệ thống: Payment gateways, System settings
-  - Xem tất cả dữ liệu (cho mục đích support/debug)
+- **Role:** SaaS system administrator
+- **Main powers:**
+  - Tenants management: Approve/Temporarily lock/Delete restaurants
+  - Manage Subscription Plans: Create/Edit plans (Lite, Pro, Enterprise)
+  - Monitor Revenue Platform: Revenue from subscription fees
+  - System configuration: Payment gateways, System settings
+  - View all data (for support/debug purposes)
 
-**Microservice tương ứng:** Authorizer Service, User-Access Service, SaaS Service
+**Microservice mapping:** Authorizer service, User-Access service, SaaS service
 
 ---
 
 #### **2. Restaurant Owner (Merchant Admin)**
 
-**Phạm vi:** Tenant mà họ sở hữu
+**Scope:** Tenants they own
 
-- **Vai trò:** Chủ nhà hàng — toàn quyền vận hành + HR (bao gồm xóa nhân viên)
-- **Keycloak role:** `OWNER`
-- **Permissions:** full operational (CRUD menu, tables, orders, payment, KDS), HR delete (`user.delete`), own-tenant SaaS visibility/checkout (`subscription.checkout`) và update payment settings (`payment_settings.update_own`).
+- **Role:** Restaurant Owner — full operational authority + HR (including deleting employees)
+- **Keycloak role:** `Owner`
+- **Permissions:** full operational (CRUD menu, tables, orders, payment, KDS), HR delete (`user.delete`), own-tenant SaaS visibility/checkout (`subscription.checkout`) and update payment settings (`payment_settings.update_own`).
 
-**Microservice tương ứng:** User-Access Service, Catalog Service, Order Service, Payment Service, SaaS Service
+**Microservice mapping:** User-Access service, Catalog service, Order service, Payment service, SaaS service
 
 ---
 
 #### **3. Manager (Operational Lead)**
 
-**Phạm vi:** Tenant mà họ được phân công
+**Scope:** tenant to which they are assigned
 
-- **Vai trò:** Quản lý vận hành ca làm việc — gần giống OWNER ở nghiệp vụ vận hành nhưng không có quyền tài chính/HR nhạy cảm.
+- **Role:** Shift operations manager — similar to Owner in operations but without the sensitive financial/HR rights.
 - **Keycloak role:** `MANAGER`
-- **Khác với OWNER:** không được xóa user, tạo/cancel subscription checkout, hoặc cập nhật SePay/payment settings; được xem tenant/subscription/plan/payment settings phục vụ vận hành.
+- **Different from Owner:** cannot delete users, create/cancel subscription checkout, or update SePay/payment settings; See tenant/subscription/plan/payment settings for operations.
 
-**Microservice tương ứng:** Same as OWNER cho vận hành, cộng quyền xem SaaS/Payment settings trong phạm vi tenant
+**Corresponding microservice:** Same as Owner for operations, plus permission to view SaaS/Payment settings within the tenant
 
 ---
 
 #### **4. Staff (Restaurant Employees)**
 
-**Phạm vi:** Tenant mà họ được thuê
+**Scope:** tenant for whom they are hired
 
-- **Vai trò:** Nhân viên nhà hàng
+- **Role:** Restaurant staff
 - **Sub-roles:**
-  - **Waiter/Server (Phục vụ)**: Xác nhận đơn, xử lý thanh toán, chuyển bàn
-  - **Chef (Bếp trưởng)**: Xem & cập nhật KDS món ăn
-  - **Barista/Bartender (Pha chế)**: Xem & cập nhật KDS đồ uống
+  - **Waiter/Server**: Confirm orders, process payments, transfer tables
+  - **Chef**: View & update dish KDS
+  - **Barista/Bartender**: View & update beverage KDS
 
-- **Quyền hạn chính:**
-  - Xác nhận đơn hàng từ Customer
-  - Cập nhật trạng thái món (Pending → Processing → Ready)
-  - Xử lý thanh toán (Cash/Bank Transfer)
-  - Chuyển bàn (Table transfer)
-  - Đánh dấu bàn sạch (Cleaning → Available)
-  - Hủy đơn chưa xác nhận (Pending only)
-  - **KHÔNG có quyền:** Quản lý menu, xem báo cáo doanh thu, quản lý nhân viên
+- **Main powers:**
+  - Order confirmation from Customer
+  - Update dish status (Pending → Processing → Ready)
+  - Payment processing (Cash/Bank Transfer)
+  - Table transfer
+  - Mark clean table (Cleaning → Available)
+  - Cancel unconfirmed orders (Pending only)
+  - **NO permissions:** Manage menus, view sales reports, manage staff
 
-**Microservice tương ứng:** Order Service, Kitchen Service, Payment Service
+**Microservice mapping:** Order service, Kitchen service, Payment service
 
 ---
 
 #### **5. Customer (End User - Diner)**
 
-**Phạm vi:** Chỉ Session/Table của chính họ
+**Scope:** Only their own Session/Table
 
-- **Vai trò:** Khách hàng đến nhà hàng
-- **Đặc điểm:** Thường KHÔNG cần đăng nhập (Guest checkout để tối ưu UX)
+- **Role:** Customers come to the restaurant
+- **Features:** Usually NO login required (Guest checkout to optimize UX)
 
-- **Quyền hạn chính:**
-  - Quét QR code để vào Menu
-  - Xem menu điện tử (Digital Menu)
-  - Đặt món qua QR (Add to cart, Submit order)
-  - Xem trạng thái đơn hàng real-time
-  - Thêm ghi chú món ("Không cay", "Ít muối")
-  - Yêu cầu thanh toán (Request bill)
-  - Hủy đơn chưa xác nhận (self-cancel)
-  - **KHÔNG có quyền:** Xem đơn của bàn khác, xem giá nhập, xem báo cáo
+- **Main powers:**
+  - Scan the QR code to enter the Menu
+  - View electronic menu (Digital Menu)
+  - Order via QR (Add to cart, Submit order)
+  - View real-time order status
+  - Add dish notes ("Not spicy", "Low salt")
+  - Request payment (Request bill)
+  - Cancel unconfirmed orders (self-cancel)
+  - **NO rights:** View orders from other tables, view input prices, view reports
 
-**Microservice tương ứng:** Order Service, Menu Service
+**Corresponding microservices:** Order service, Menu service
 
 ---
 
 ### B. Permission Matrix (Business-Language Summary)
 
-> **Canonical source:** Chi tiết đầy đủ 6 roles × 66 permissions xem [`docs/architecture/permission-matrix.md`](architecture/permission-matrix.md#6-canonical-permission-matrix-6-roles--66-permissions). Bảng dưới đây là **tóm lược business-language** cho 5 nhóm actor, KHÔNG phải source of truth cho RBAC guard check.
+> **Canonical source:** Full details of 6 roles × 66 permissions see [permission matrix](architecture/permission-matrix.md#6-canonical-permission-matrix-6-roles--66-permissions). The table below is the **business-language summary** for the 5 actor groups, NOT the source of truth for the RBAC guard check.
 
-| Tính năng                       | Super Admin | Restaurant Owner | Staff (Waiter) | Staff (Chef/Bar) | Customer |
-| ------------------------------- | ----------- | ---------------- | -------------- | ---------------- | -------- |
-| **Platform Management**         |             |                  |                |                  |          |
-| Quản lý Tenants (Approve/Lock)  | ✅          | ❌               | ❌             | ❌               | ❌       |
-| Tạo Subscription Plans          | ✅          | ❌               | ❌             | ❌               | ❌       |
-| Xem tất cả Tenants              | ✅          | ❌               | ❌             | ❌               | ❌       |
-| Cấu hình Payment Gateway        | ✅          | ❌               | ❌             | ❌               | ❌       |
-| Checkout subscription tenant    | ❌          | ✅ (Owner only)  | ❌             | ❌               | ❌       |
-| Xem gói/subscription tenant     | ✅          | ✅               | ❌             | ❌               | ❌       |
-| Cập nhật SePay tenant           | ❌          | ✅ (Owner only)  | ❌             | ❌               | ❌       |
-| **Restaurant Management**       |             |                  |                |                  |          |
-| Quản lý Menu (CRUD)             | ✅ (Debug)  | ✅               | ❌             | ❌               | ❌       |
-| Quản lý Tables & QR             | ❌          | ✅               | ⚠️ (View only) | ❌               | ❌       |
-| Quản lý Staff                   | ❌          | ✅               | ❌             | ❌               | ❌       |
-| Xem Analytics/Revenue           | ✅ (All)    | ✅ (Own only)    | ❌             | ❌               | ❌       |
-| Cấu hình Restaurant Settings    | ❌          | ✅               | ❌             | ❌               | ❌       |
-| **Order Operations**            |             |                  |                |                  |          |
-| Quét QR & Xem Menu              | ❌          | ✅               | ✅             | ❌               | ✅       |
-| Đặt món qua QR                  | ❌          | ❌               | ❌             | ❌               | ✅       |
-| Xác nhận đơn (Pending → Proc.)  | ❌          | ✅               | ✅             | ❌               | ❌       |
-| Hủy đơn chưa xác nhận           | ❌          | ✅               | ✅             | ❌               | ✅ (Own) |
-| Hủy đơn đã vào bếp              | ❌          | ✅ (Manager)     | ❌             | ❌               | ❌       |
-| Cập nhật KDS (Ready/Processing) | ❌          | ✅               | ❌             | ✅               | ❌       |
-| Xem trạng thái đơn hàng         | ✅ (Debug)  | ✅ (All orders)  | ✅ (All)       | ✅ (KDS only)    | ✅ (Own) |
-| **Table & Payment**             |             |                  |                |                  |          |
-| Chuyển bàn (Table Transfer)     | ❌          | ✅               | ✅             | ❌               | ❌       |
-| Xử lý thanh toán                | ❌          | ✅               | ✅             | ❌               | ❌       |
-| Yêu cầu thanh toán              | ❌          | ❌               | ❌             | ❌               | ✅       |
-| Đánh dấu bàn sạch               | ❌          | ✅               | ✅             | ❌               | ❌       |
+| Features                             | Super Admin | Restaurant Owner | Staff (Waiter) | Staff (Chef/Bar) | Customers |
+| ------------------------------------ | ----------- | ---------------- | -------------- | ---------------- | --------- |
+| **Platform Management**              |             |                  |                |                  |           |
+| Tenants Management (Approve/Lock)    | ✅          | ❌               | ❌             | ❌               | ❌        |
+| Create Subscription Plans            | ✅          | ❌               | ❌             | ❌               | ❌        |
+| View all Tenants                     | ✅          | ❌               | ❌             | ❌               | ❌        |
+| Configure Payment Gateway            | ✅          | ❌               | ❌             | ❌               | ❌        |
+| Checkout subscription tenant         | ❌          | ✅ (Owner only)  | ❌             | ❌               | ❌        |
+| View tenant packages/subscriptions   | ✅          | ✅               | ❌             | ❌               | ❌        |
+| Update SePay tenant                  | ❌          | ✅ (Owner only)  | ❌             | ❌               | ❌        |
+| **Restaurant Management**            |             |                  |                |                  |           |
+| Menu Management (CRUD)               | ✅ (Debug)  | ✅               | ❌             | ❌               | ❌        |
+| Manage Tables & QR                   | ❌          | ✅               | ⚠️ (View only) | ❌               | ❌        |
+| Staff Management                     | ❌          | ✅               | ❌             | ❌               | ❌        |
+| See Analytics/Revenue                | ✅ (All)    | ✅ (Own only)    | ❌             | ❌               | ❌        |
+| Configure Restaurant Settings        | ❌          | ✅               | ❌             | ❌               | ❌        |
+| **Order Operations**                 |             |                  |                |                  |           |
+| Scan QR & View Menu                  | ❌          | ✅               | ✅             | ❌               | ✅        |
+| Order via QR                         | ❌          | ❌               | ❌             | ❌               | ✅        |
+| Order confirmation (Pending → Proc.) | ❌          | ✅               | ✅             | ❌               | ❌        |
+| Cancel unconfirmed order             | ❌          | ✅               | ✅             | ❌               | ✅ (Own)  |
+| Cancel order already in the kitchen  | ❌          | ✅ (Manager)     | ❌             | ❌               | ❌        |
+| KDS Update (Ready/Processing)        | ❌          | ✅               | ❌             | ✅               | ❌        |
+| View order status                    | ✅ (Debug)  | ✅ (All orders)  | ✅ (All)       | ✅ (KDS only)    | ✅ (Own)  |
+| **Table & Payment**                  |             |                  |                |                  |           |
+| Table Transfer                       | ❌          | ✅               | ✅             | ❌               | ❌        |
+| Payment Processing                   | ❌          | ✅               | ✅             | ❌               | ❌        |
+| Request payment                      | ❌          | ❌               | ❌             | ❌               | ✅        |
+| Mark clean desk                      | ❌          | ✅               | ✅             | ❌               | ❌        |
 
 ---
 
@@ -806,7 +822,7 @@ Multi-Tenant Authorization Middleware:
 
       user = decode_jwt(token)
     ELSE
-      # Customer có thể anonymous hoặc có session_id
+# Customer can be anonymous or have session_id
       session = request.cookies.session_id OR generate_guest_session()
 
   STEP 3: Check Actor Permissions
@@ -831,12 +847,12 @@ Multi-Tenant Authorization Middleware:
         RETURN 403 Forbidden
 
     IF required_actor == "Customer" THEN
-      # Customer chỉ thấy dữ liệu của session/table của mình
+# Customer only sees his/her session/table data
       IF session.table_id != requested_resource.table_id THEN
         RETURN 403 Forbidden "Cannot view other table's orders"
 
   STEP 4: Action-Level Authorization
-    # Ví dụ: Hủy đơn đã vào bếp
+# Example: Cancel order already in the kitchen
     IF action == "cancel_order" AND order.status == "Processing" THEN
       IF user.role NOT IN ["OWNER", "MANAGER"] THEN
         RETURN 403 Forbidden "Only Manager can cancel processing orders"
@@ -861,42 +877,42 @@ Multi-Tenant Authorization Middleware:
 
 ```yaml
 Database Level Isolation:
-  # Mọi query phải filter theo tenant_id
+# All queries must filter by tenant_id
   SELECT * FROM orders WHERE tenant_id = :current_tenant_id
 
-  # Global Index phải bao gồm tenant_id
+# Global Index must include tenant_id
   CREATE INDEX idx_orders_tenant ON orders(tenant_id, created_at)
 
-  # Foreign Keys phải trong cùng tenant
+# Foreign Keys must be in the same tenant
   CONSTRAINT fk_order_table
     FOREIGN KEY (table_id)
     REFERENCES tables(id)
     WHERE tables.tenant_id = orders.tenant_id
 
 API Level Isolation:
-  # Middleware tự động inject tenant_id
+# Middleware automatically injects tenant_id
   IF user.role == "SUPER_ADMIN" THEN
-    # Super Admin có thể query cross-tenant bằng query param
+# Super Admin can query cross-tenant using query param
     tenant_id = request.query.tenant_id OR NULL
   ELSE
-    # Tất cả actors khác chỉ thấy tenant của mình
+# All other actors only see their tenant
     tenant_id = user.tenant_id
 
-  # Override mọi filter từ client
+# Override all filters from the client
   query.where('tenant_id', tenant_id)
 
 Session/Cache Isolation:
-  # Cache key phải bao gồm tenant_id
+# Cache key must include tenant_id
   cache_key = "menu:#{tenant_id}:#{category_id}"
 
-  # Session storage phải isolated
+# Session storage must isolated
   redis.setex("session:#{tenant_id}:#{session_id}", data)
 
 File Storage Isolation:
-  # Upload files vào folder riêng theo tenant
+# Upload files to separate folders by tenant
   file_path = "uploads/#{tenant_id}/menu_images/#{file_name}"
 
-  # Presigned URL phải verify tenant ownership
+# Presigned URL must verify tenant ownership
   IF file.tenant_id != user.tenant_id THEN
     RETURN 403 Forbidden
 ```
@@ -908,12 +924,12 @@ File Storage Isolation:
 #### **Case 1: Manager Override Staff Actions**
 
 ```yaml
-Scenario: Manager muốn hủy đơn mà Staff đã xác nhận
+Scenario: Manager wants to cancel the order that Staff has confirmed
 
   IF user.role == "MANAGER" AND action == "override_staff_action" THEN
     original_action = audit_log.find(action_id)
 
-    # Manager chỉ override được trong cùng tenant
+# Manager can only override within the same tenant
     IF original_action.tenant_id != user.tenant_id THEN
       RETURN 403 Forbidden
 
@@ -925,14 +941,14 @@ Scenario: Manager muốn hủy đơn mà Staff đã xác nhận
       reason: request.body.reason
     })
 
-    # Thực hiện action mới
+# Perform new action
     PROCEED with requested change
 ```
 
 #### **Case 2: Super Admin Debug Mode**
 
 ```yaml
-Scenario: Super Admin cần xem dữ liệu của một tenant để support
+Scenario: Super Admin needs to see a tenant's data for support
 
   IF user.role == "SUPER_ADMIN" AND request.query.debug_mode == true THEN
     tenant_id = request.query.tenant_id
@@ -956,7 +972,7 @@ Scenario: Super Admin cần xem dữ liệu của một tenant để support
 #### **Case 3: Customer Self-Service Cancellation**
 
 ```yaml
-Scenario: Khách hủy đơn mình vừa đặt
+Scenario: Customer cancels the order he just placed
 
   IF user.actor_type == "Customer" AND action == "cancel_order" THEN
     order = Order.find(order_id)
@@ -965,7 +981,7 @@ Scenario: Khách hủy đơn mình vừa đặt
     IF order.session_id != customer.session_id THEN
       RETURN 403 Forbidden "Not your order"
 
-    # Chỉ được hủy khi chưa xác nhận
+# Can only be canceled without confirmation
     IF order.status != "Pending" OR order.confirmed == true THEN
       RETURN 400 Bad Request "Cannot cancel confirmed order. Please ask staff for help."
 
@@ -987,9 +1003,9 @@ Scenario: Khách hủy đơn mình vừa đặt
 
 ---
 
-## III. CÁC QUY TRÌNH PHỤ VÀ MỞ RỘNG (EXTENDED FEATURES)
+##III. EXTENDED FEATURES
 
-- **Quản lý Nhân sự:** Thiết lập hệ thống phân quyền chi tiết (Admin, Quản lý, Phục vụ, Bếp).
-- **Quản lý yêu cầu phục vụ** Khách có thể gửi yêu cầu thêm (Gọi thêm món, Gọi tính tiền) hoặc yêu cầu hỗ trợ từ nhân viên phục vụ qua Web-app.
-- **Báo cáo Doanh thu (Analytics):** Thống kê chi tiết theo thời gian, món bán chạy, giờ cao điểm.
-- **Quản lý Kho Đơn giản (Inventory):** Thiết lập định lượng nguyên liệu cho món ăn (Ví dụ: 1 bát phở hết 200g thịt), tự động trừ kho khi phát sinh đơn hàng.
+- **Human Resources Management:** Set up a detailed decentralization system (Admin, Management, service, Kitchen).
+- **Manage service requests** Customers can send additional requests (Order additional dishes, Call for payment) or request assistance from service staff via Web-app.
+- **Revenue Report (Analytics):** Detailed statistics by time, best-selling items, peak hours.
+- **Simple Inventory Management (Inventory):** Set the quantity of ingredients for the dish (For example: 1 bowl of pho contains 200g of meat), automatically deduct inventory when an order is generated.

@@ -6,58 +6,58 @@
 
 ## Final Scope
 
-Phase 4B hoàn thành nền tảng SaaS thực tế cho QRTable: tenant lifecycle, admin-assisted onboarding, pricing plans, subscriptions, subscription_invoices, feature gating, tenant payment settings và kiến trúc thanh toán two-tier.
+Phase 4B completes the actual SaaS foundation for QRTable: tenant lifecycle, admin-assisted onboarding, pricing plans, subscriptions, subscription_invoices, feature gating, tenant payment settings and two-tier payment architecture.
 
-Phạm vi cuối cùng gồm:
+The final scope includes:
 
-- SaaS tenant lifecycle `ACTIVE` / `SUSPENDED` / `CLOSED`, slug an toàn, thông tin tenant mở rộng, và onboarding do `SUPER_ADMIN` thực hiện qua `/admin/tenants/onboard`.
-- Pricing plans `FREE` / `BASIC` / `PREMIUM`, subscription hiện hành mỗi tenant, subscription history, và `subscription_invoices` cho Tier 2 tenant -> platform billing.
+- SaaS tenant lifecycle `ACTIVE` / `SUSPENDED` / `CLOSED`, security slug, extended tenant information, and onboarding performed by `SUPER_ADMIN` via `/admin/tenants/onboard`.
+- Pricing plans `FREE` / `BASIC` / `PREMIUM`, current subscription per tenant, subscription history, and `subscription_invoices` for Tier 2 tenant -> billing platform.
 - Two-tier payment architecture:
-  - Tier 1 customer -> tenant: bill payment dùng prefix `QRTBL`, tenant payment settings, và SePay OAuth2 Connect để tenant nhận tiền vào tài khoản của mình.
-  - Tier 2 tenant -> platform: subscription checkout dùng VietQR / SePay webhook với prefix `QRSUB`, kèm manual confirm fallback cho `SUPER_ADMIN`.
-- UI surfaces: public landing, `/admin/tenants`, `/admin/plans`, `/admin/billing`, `/dashboard/subscription`, `/dashboard/payment-settings`, OAuth callback page, và Customer PWA suspend/read-only/payment exception.
+  - Tier 1 customer -> tenant: bill payment uses prefix `QRTBL`, tenant payment settings, and SePay OAuth2 Connect for the tenant to receive money into their account.
+  - Tier 2 tenant -> platform: subscription checkout using VietQR / SePay webhook with prefix `QRSUB`, with manual confirm fallback for `SUPER_ADMIN`.
+- UI surfaces: public landing, `/admin/tenants`, `/admin/plans`, `/admin/billing`, `/dashboard/subscription`, `/dashboard/payment-settings`, OAuth callback page, and Customer PWA suspend/read-only/payment exception.
 
 ## Accepted Decisions
 
-- Onboarding Phase 4B là admin-assisted, không phải self-service registration wizard. `SUPER_ADMIN` tạo tenant, Owner, subscription mặc định và payment settings ban đầu.
-- Onboarding chạy như mini-saga trong SaaS Service; failure giữa chừng phải rollback DB-side effects và cleanup orphan Keycloak users. Phase 4B dùng password nhập thủ công cho Owner, còn reset link/Required Action thuộc Phase 4C.
-- `TenantStatus` là trạng thái vận hành chính: `ACTIVE` cho phép thao tác, `SUSPENDED` chuyển sang read-only có ngoại lệ thanh toán bill đang chờ, `CLOSED` là trạng thái đóng tenant và không activate lại trong Phase 4B.
-- `isActive` chỉ còn ý nghĩa tương thích DTO cũ; hành vi mới derive từ `status`.
-- Slug tenant phải normalize tiếng Việt, unique toàn platform và chặn reserved words ở shared constants.
-- Auto-suspend chạy daily `02:00 Asia/Ho_Chi_Minh` với grace period 24h; `max_orders_per_day` cũng tính theo timezone Việt Nam.
-- Legacy tenant migration backfill `FREE` plan không hết hạn, map `isActive=false` thành `SUSPENDED`, và set default `VND` / `vi-VN`.
-- Permission mới được tách theo domain `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`; nhóm `saas.*` là legacy/backward compatibility.
-- Feature gating dùng mô hình hybrid: BFF/guard chặn sớm cho UX, service sở hữu resource vẫn có backup check/counter để giữ correctness.
-- Payment Service sở hữu `tenant_payment_settings`; SaaS Service không lưu OAuth token hay thông tin ngân hàng tenant.
-- BFF là HTTP edge và webhook router: endpoint tenant-scoped cho Tier 1, platform endpoint cho Tier 2, route theo billing reference prefix `QRTBL` / `QRSUB`.
-- Suspend phải có hiệu lực nhanh qua Redis key `tenant:{tenantId}:suspended`; subscription hiện hành được cache bằng `subscription:{tenantId}` để guard đọc nhanh.
-- Suspended tenant vẫn được xử lý SePay webhook cho bill đã tạo, order đang `PROCESSING` vẫn được kitchen hoàn tất, và client nhận banner cảnh báo thay vì force-disconnect.
-- `/admin/*` thuộc `management-app`; Phase 4B không tách app platform admin riêng. Landing page là static pricing/contact/login page đọc public plans.
-- Phase 4B không thêm notification/email suspend; phần đó thuộc Phase 4C.
+- Onboarding Phase 4B is admin-assisted, not self-service registration wizard. `SUPER_ADMIN` creates tenant, Owner, default subscription and initial payment settings.
+- Onboarding runs like a mini-saga in SaaS service; mid-failure must rollback DB-side effects and cleanup orphan Keycloak users. Phase 4B uses a manually entered password for the Owner, while reset link/Required Action belongs to Phase 4C.
+- `TenantStatus` is the main operating state: `ACTIVE` allows operations, `SUSPENDED` switches to read-only with pending bill payment exception, `CLOSED` is the state of closing the tenant and not reactivating in Phase 4B.
+- `isActive` only has the old DTO compatibility meaning; New behavior derived from `status`.
+- Slug tenant must normalize Vietnamese, unique across the platform and block reserved words in shared constants.
+- Auto-suspend runs daily `02:00 Asia/Ho_Chi_Minh` with a grace period of 24h; `max_orders_per_day` is also calculated according to Vietnam timezone.
+- Legacy tenant migration backfill `FREE` plan does not expire, maps `isActive=false` to `SUSPENDED`, and sets default `VND` / `vi-VN`.
+- New permissions are separated by domains `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`; `saas.*` group is legacy/backward compatibility.
+- Feature gating uses a hybrid model: BFF/guard blocks early for UX, the service that owns the resource still has backup check/counter to maintain correctness.
+- Payment service owns `tenant_payment_settings`; SaaS service does not store OAuth tokens or tenant banking information.
+- BFF is HTTP edge and webhook router: tenant-scoped endpoint for Tier 1, platform endpoint for Tier 2, route according to billing reference prefix `QRTBL` / `QRSUB`.
+- Suspend must take effect quickly via Redis key `tenant:{tenantId}:suspended`; The current subscription is cached with `subscription:{tenantId}` for the guard to read quickly.
+- Suspended tenant can still process the SePay webhook for the created bill, order `PROCESSING` is still completed by the kitchen, and the client receives a warning banner instead of force-disconnect.
+- `/admin/*` belongs to `management-app`; Phase 4B does not separate the app admin platform separately. Landing page is static pricing/contact/login page reading public plans.
+- Phase 4B does not add notification/email suspension; That part belongs to Phase 4C.
 
 ## Final Business Behavior
 
-Tenant được onboard với slug hợp lệ, Owner, plan mặc định, subscription ban đầu và row `tenant_payment_settings` ở trạng thái chưa kết nối. `ACTIVE` tenant có thể vận hành nhà hàng theo giới hạn gói. `SUSPENDED` tenant bị chặn các thao tác tạo mới/ghi mới cần vận hành như đặt món, tạo order, tạo bàn hoặc vượt quota; người dùng vẫn có thể đọc thông tin cần thiết và customer vẫn được thanh toán bill `PENDING_PAYMENT` đã phát sinh. `CLOSED` tenant bị đóng, bị chặn truy cập vận hành và là trạng thái kết thúc hợp đồng trong phase này.
+The tenant is onboarded with a valid slug, Owner, default plan, initial subscription, and row `tenant_payment_settings` in an unconnected state. `ACTIVE` tenant can operate restaurants according to plan limits. `SUSPENDED` tenant is blocked from creating/recording new operations such as placing orders, creating orders, creating tables or exceeding quota; The user can still read the necessary information and the customer can still get paid the bill `PENDING_PAYMENT` that has arisen. `CLOSED` tenant is closed, is blocked from operational access and is the contract end state in this phase.
 
-Pricing plan quy định giới hạn `max_tables`, `max_staff`, `max_orders_per_day` và danh sách feature. Mỗi tenant chỉ có một subscription `ACTIVE` tại một thời điểm; subscription mới có thể supersede subscription cũ. Subscription invoice là hóa đơn Tier 2 cho tenant trả tiền platform, khác với bill nhà hàng của customer. Invoice pending có QR thanh toán, được chuyển sang paid khi webhook khớp số tiền/reference hoặc khi `SUPER_ADMIN` manual confirm sau đối soát.
+Pricing plan specifies limits `max_tables`, `max_staff`, `max_orders_per_day` and feature list. Each tenant can only have one `ACTIVE` subscription at a time; New subscriptions can supersede old subscriptions. Subscription invoice is a Tier 2 invoice for the tenant paying the platform, different from the customer's restaurant bill. Pending invoices have a payment QR, which is converted to paid when the webhook matches the amount/reference or when `SUPER_ADMIN` manual confirms after checking.
 
-Thanh toán hai tầng được tách rõ:
+Two-tier payments are clearly separated:
 
-- Tier 1 customer -> tenant: customer thanh toán bill nhà hàng bằng cash/VietQR theo cấu hình tenant. QR/reference dùng `QRTBL`; Payment Service xử lý settlement và đọc bank settings từ `tenant_payment_settings`.
-- Tier 2 tenant -> platform: Owner tạo/cancel checkout subscription, Owner/Manager xem gói và subscription hiện hành, thanh toán platform VietQR với reference `QRSUB`; SaaS Service xử lý invoice và kích hoạt/renew subscription khi webhook hợp lệ.
+- Tier 1 customer -> tenant: customer pays restaurant bill with cash/VietQR according to tenant configuration. QR/reference uses `QRTBL`; Payment service processes settlement and reads bank settings from `tenant_payment_settings`.
+- Tier 2 tenant -> platform: Owner creates/cancel checkout subscription, Owner/Manager views current package and subscription, pays VietQR platform with reference `QRSUB`; SaaS service processes invoices and activates/renew subscriptions when the webhook is valid.
 
-Tenant tự kết nối SePay trên `/dashboard/payment-settings`: BFF tạo authorize URL, Payment Service trao đổi OAuth2 code, lưu token đã mã hóa, đọc danh sách bank accounts, tenant chọn tài khoản nhận tiền, và Payment Service cấu hình/lưu webhook settings cần thiết. Trình duyệt không nhận client secret, access token, refresh token.
+tenant automatically connects to SePay on `/dashboard/payment-settings`: BFF creates authorization URL, Payment service exchanges OAuth2 code, saves encrypted token, reads list of bank accounts, tenant selects account to receive money, and Payment service configures/saves necessary webhook settings. The browser does not receive client secret, access token, refresh token.
 
-Subscription/plan behavior trong Phase 4B dùng một active subscription tại một thời điểm. Checkout subscription tạo invoice `QRSUB*`; webhook hợp lệ hoặc manual confirm của `SUPER_ADMIN` kích hoạt/renew gói. Multi-bank active, proration, partial subscription refund, promotion/discount và transfer ownership nằm ngoài phạm vi phase.
+Subscription/plan behavior in Phase 4B uses one active subscription at a time. Checkout subscription creates invoice `QRSUB*`; Valid webhook or manual confirmation of `SUPER_ADMIN` activate/renew package. Multi-bank active, provision, partial subscription refund, promotion/discount and transfer ownership are outside the scope of phase.
 
 ## Final Technical Behavior
 
-Service ownership sau Phase 4B:
+Service ownership after Phase 4B:
 
-- SaaS Service owns `tenants`, `pricing_plans`, `subscriptions`, `subscription_invoices`, outbox SaaS events, tenant lifecycle, subscription activation/expiry, invoice matching, và Redis suspend/current-subscription cache writes.
-- Payment Service owns `tenant_payment_settings`, SePay OAuth2 client/token storage, tenant bank account selection, Tier 1 bill payment settlement, và tenant payment setting TCP patterns.
-- BFF owns HTTP routes, auth/permission guards, `TenantPlanGuard`/tenant lifecycle guards, public plan/landing APIs, SePay webhook routing, OAuth callback routing, và realtime tenant lifecycle emits.
-- User-Access owns user profile/tenant-side staff counts; Authorizer owns Keycloak user/role/disable operations; Catalog owns table counts và default tenant seed side effects; Order owns order counters và backup order quota checks.
+- SaaS service owns `tenants`, `pricing_plans`, `subscriptions`, `subscription_invoices`, outbox SaaS events, tenant lifecycle, subscription activation/expiry, invoice matching, and Redis suspend/current-subscription cache writes.
+- Payment service owns `tenant_payment_settings`, SePay OAuth2 client/token storage, tenant bank account selection, Tier 1 bill payment settlement, and tenant payment setting TCP patterns.
+- BFF owns HTTP routes, auth/permission guards, `TenantPlanGuard`/tenant lifecycle guards, public plan/landing APIs, SePay webhook routing, OAuth callback routing, and realtime tenant lifecycle emits.
+- User-Access owns user profile/tenant-side staff counts; Authorizer owns Keycloak user/role/disable operations; Catalog owns table counts and default tenant seed side effects; Order owns order counters and backup order quota checks.
 
 Redis keys introduced/used by the phase include `tenant:{tenantId}:suspended` for fast blocking and `subscription:{tenantId}` for current subscription cache. Customer PWA lifecycle state is exposed through session/tenant metadata, socket lifecycle events, and client-side banner/disabled controls.
 

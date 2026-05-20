@@ -1,16 +1,16 @@
 // QRTable ERD - Step 0.3 (orientation model)
 // NOTE: This schema is a planning baseline and will evolve iteratively in later phases.
 //
-// DATABASE-PER-SERVICE ARCHITECTURE:
+// DATABASE-PER-service ARCHITECTURE:
 //   DB "qrtable_saas"     → tenants, pricing_plans, subscriptions
 //   DB "qrtable_catalog"  → categories, menu_items, areas, tables
 //   DB "qrtable_order"    → orders, order_items, sessions, service_requests (Phase 2)
 //   DB "qrtable_payment"  → bills, payments, refunds (Phase 3)
-//   MongoDB "qrtable_auth" → users, roles (User-Access Service)
+//   MongoDB "qrtable_auth" → users, roles (User-Access service)
 //
-// MULTI-TENANCY: Discriminator Column (tenant_id) trên mọi tenant-scoped entity.
-// Cross-service references (VD: order.table_id → tables.id) là logical FK,
-// KHÔNG enforce bằng DB foreign key constraint (vì khác database).
+// MULTI-TENANCY: Discriminator Column (tenant_id) on every tenant-scoped entity.
+// Cross-service references (VD: order.table_id → tables.id) is logical FK,
+// DO NOT enforce using DB foreign key constraint (because it is different from database).
 
 Project qrtable_step_0_3 {
   database_type: "PostgreSQL"

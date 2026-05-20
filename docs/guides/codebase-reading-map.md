@@ -1,40 +1,40 @@
-# Bản Đồ Đọc Codebase QRTable
+# Codebase QRTable Reading Map
 
-> Hướng dẫn đọc codebase QRTable theo kiến trúc Nx monorepo, NestJS microservices và hai frontend app.
+> Instructions for reading QRTable codebase according to Nx monorepo architecture, NestJS microservices and two frontend apps.
 >
-> **Canonical Role:** Supporting guide. Khi có mâu thuẫn, ưu tiên `docs/README.md`, phase records, specs đã accepted, code/tests hiện tại.
+> **Canonical Role:** Supporting guide. When there is a conflict, prioritize `docs/README.md`, phase records, accepted specs, current code/tests.
 >
-> Cập nhật theo tài liệu và mã nguồn hiện tại: 2026-05-14.
+> Updated according to current documentation and source code: 2026-05-14.
 
-## Mục Tiêu
+## Target
 
-Tài liệu này giúp bạn đọc codebase QRTable một cách có hệ thống, đúng thứ tự và không bị ngợp bởi số lượng service, thư viện, tài liệu và bề mặt frontend.
+This document helps you read the QRTable codebase systematically, in the right order, and without being overwhelmed by the number of services, libraries, documentation, and frontend surfaces.
 
-Sau khi đọc theo tài liệu này, bạn nên đạt được các mục tiêu sau:
+After reading this document, you should achieve the following goals:
 
-- Nắm được kiến trúc tổng thể của Nx monorepo.
-- Biết service nào sở hữu nghiệp vụ nào.
-- Lần được flow từ UI đến BFF, microservice, DB, Redis, Kafka và realtime.
-- Biết file nào nên đọc trước, file nào đọc sau, file nào có thể bỏ qua ở vòng đầu.
-- Biết cách dùng tài liệu hiện có mà không bị nhầm giữa “mục tiêu kiến trúc” và “trạng thái code hiện tại”.
+- Understand the overall architecture of Nx monorepo.
+- Know which service owns which operation.
+- Trace the flow from UI to BFF, microservices, DB, Redis, Kafka and realtime.
+- Know which files to read first, which files to read later, and which files can be skipped in the first round.
+- Know how to use existing documentation without getting confused between “architectural goals” and “current code state”.
 
-## Nguyên Tắc Đọc Codebase Này
+## Guidelines for Reading This Codebase
 
-Không nên đọc theo kiểu mở từng thư mục từ trên xuống. Repo này lớn, nhiều tầng và nhiều phase, nên cách đọc đó rất dễ làm mất ngữ cảnh.
+You should not read by opening each folder from top to bottom. This repo is large, multi-layered and multi-phased, so that way of reading it can easily lose context.
 
-Hãy đọc theo 5 trục:
+Read along 5 axes:
 
 1. **Domain flow**: QR/session, cart/order, KDS, payment, SaaS.
-2. **Ownership**: service nào là nguồn sự thật của state nào.
-3. **Boundary**: HTTP/WebSocket ở BFF, TCP giữa services, Kafka cho domain events.
+2. **Ownership**: which service is the source of truth for which state.
+3. **Boundary**: HTTP/WebSocket in BFF, TCP between services, Kafka for domain events.
 4. **State machine**: table, order, bill, payment, tenant lifecycle.
 5. **Contract**: shared types, DTO, TCP message constants, realtime event payloads.
 
-Câu hỏi nên lặp lại khi đọc mỗi file:
+Questions to repeat when reading each file:
 
-> File này đang nằm ở layer nào: điều phối request, xử lý nghiệp vụ, lưu state, phát event, hay chỉ render UI?
+> Which layer is this file located in: request coordination, business processing, saving state, broadcasting events, or just rendering UI?
 
-## Bản Đồ Kiến Trúc Tổng Thể
+## Overall Architectural Map
 
 ```mermaid
 flowchart TB
@@ -101,52 +101,52 @@ BFF -- "Socket.IO /orders" --> Customer
 BFF -- "Socket.IO /orders" --> Staff
 ```
 
-## Vai Trò Từng App
+## Each App's Role
 
-| App                   | Vai trò                                                                 | Nên đọc khi nào                       |
-| --------------------- | ----------------------------------------------------------------------- | ------------------------------------- |
-| `apps/bff`            | API gateway, auth guard, HTTP controller, WebSocket gateway, TCP client | Đọc đầu tiên trong backend            |
-| `apps/catalog`        | Menu, category, area, table, QR token, stock                            | Đọc trước Order                       |
-| `apps/order`          | Session, cart, order, bill, service request, table transfer, outbox     | Đọc sau Catalog, đây là lõi nghiệp vụ |
-| `apps/kitchen`        | KDS Redis queue, consume `order.confirmed`, SLA warning                 | Đọc sau Order confirm                 |
-| `apps/payment`        | Cash, VietQR, SePay webhook, refund, payment outbox                     | Đọc sau Bill flow                     |
-| `apps/saas`           | Tenant onboarding, plan, subscription, invoice, tenant lifecycle        | Đọc sau khi nắm Order/Payment         |
-| `apps/authorizer`     | Token verify, Keycloak integration                                      | Đọc khi nghiên cứu auth/RBAC          |
-| `apps/user-access`    | User, role, permission seed, Mongo auth data                            | Đọc cùng Authorizer                   |
-| `apps/product`        | Legacy/template service                                                 | Bỏ qua ở vòng đầu                     |
-| `apps/customer-pwa`   | App khách hàng quét QR                                                  | Đọc sau khi nắm customer flow backend |
-| `apps/management-app` | Admin, dashboard, POS, KDS, SaaS surfaces                               | Đọc sau khi nắm BFF/admin endpoints   |
+| App                   | Role                                                                    | When should you read                                  |
+| --------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- |
+| `apps/bff`            | API gateway, auth guard, HTTP controller, WebSocket gateway, TCP client | Read first in backend                                 |
+| `apps/catalog`        | Menu, category, area, table, QR token, stock                            | Read first Order                                      |
+| `apps/order`          | Session, cart, order, bill, service request, table transfer, outbox     | Read the following Catalog, this is the business core |
+| `apps/kitchen`        | KDS Redis queue, consume `order.confirmed`, SLA warning                 | Read later Order confirmation                         |
+| `apps/payment`        | Cash, VietQR, SePay webhook, refund, payment outbox                     | Read later Bill flow                                  |
+| `apps/saas`           | tenant onboarding, plan, subscription, invoice, tenant lifecycle        | Read after grasping Order/Payment                     |
+| `apps/authorizer`     | Token verification, Keycloak integration                                | Read when researching auth/RBAC                       |
+| `apps/user-access`    | User, role, permission seed, Mongo auth data                            | Read with Authorizer                                  |
+| `apps/product`        | Legacy/template service                                                 | Skip in the first round                               |
+| `apps/customer-pwa`   | QR scanning customer app                                                | Read after understanding the customer flow backend    |
+| `apps/management-app` | Admin, dashboard, POS, KDS, SaaS surfaces                               | Read after understanding BFF/admin endpoints          |
 
-## Source Of Truth Khi Docs Bị Trùng Lặp
+## Source Of Truth When Docs Are Duplicate
 
-Đọc theo thứ tự ưu tiên này:
+Read in this order of priority:
 
-1. Code và test hiện tại.
-2. Specs/docs mới nhất đã được accepted.
-3. Phase records trong `docs/phases`.
-4. Docs cũ, references, architecture diagrams cũ.
-5. README boilerplate hoặc generated docs.
+1. Current code and testing.
+2. Latest specs/docs have been accepted.
+3. Phase records in `docs/phases`.
+4. Old Docs, references, old architecture diagrams.
+5. README boilerplate or generated docs.
 
-Điểm rất quan trọng: `AGENTS.md` nói rõ nhiều phần là **tiêu chuẩn mục tiêu**, không phải tất cả đều phản ánh 100% trạng thái code hiện tại. Vì vậy hãy dùng docs để lấy bản đồ, nhưng luôn verify bằng code.
+Very important point: `AGENTS.md` clearly states that many parts are **target standards**, not all of which 100% reflect the current state of the code. So use docs to get the map, but always verify with code.
 
-## Thứ Tự Đọc Tài Liệu
+## Document Reading Order
 
-### Vòng 0: Lấy Bản Đồ Docs
+### Round 0: Get Map Docs
 
-Đọc các file này trước khi chạm vào code:
+Read these files before touching the code:
 
 1. `docs/README.md`
-   - Mục đích: biết docs nào là canonical, docs nào chỉ là tham khảo.
+   - Purpose: knowing which docs are canonical and which docs are just reference.
 2. `docs/implementation_plan.md`
-   - Mục đích: biết phase nào đã xong, phase nào deferred, phase nào chưa làm.
+   - Purpose: know which phase has been completed, which phase is deferred, and which phase has not been completed.
 3. `docs/technical-architecture.md`
-   - Mục đích: nắm tổng thể microservices, DB per service, Kafka topics, Redis, WebSocket rooms.
+   - Purpose: overall understanding of microservices, DB per service, Kafka topics, Redis, WebSocket rooms.
 4. `docs/business-logic.md`
-   - Mục đích: nắm state machine và business rules.
+   - Purpose: grasp the state machine and business rules.
 5. `docs/architecture/permission-matrix.md`
-   - Mục đích: nắm role/permission trước khi đọc admin, POS, KDS.
+   - Purpose: grasp role/permission before reading admin, POS, KDS.
 
-Sau đó đọc phase records theo thứ tự:
+Then read the phase records in order:
 
 1. `docs/phases/phase-1-catalog.md`
 2. `docs/phases/phase-2a-order-kafka.md`
@@ -154,17 +154,17 @@ Sau đó đọc phase records theo thứ tự:
 4. `docs/phases/phase-3-payment.md`
 5. `docs/phases/phase-4b-saas-onboarding.md`
 
-Chỉ đọc specs chi tiết khi cần đào sâu:
+Only read the detailed specs when you need to dig deeper:
 
-- `docs/specs/business-logic-step-2.4-spec.vi.md`
-- `docs/specs/business-logic-step-2.6-spec.vi.md`
-- `docs/specs/business-logic-step-2.7-spec.vi.md`
-- `docs/specs/business-logic-phase-3-spec.vi.md`
+- `docs/specs/business-logic-step-2.4-spec.md`
+- `docs/specs/business-logic-step-2.6-spec.md`
+- `docs/specs/business-logic-step-2.7-spec.md`
+- `docs/specs/business-logic-phase-3-spec.md`
 - `docs/specs/business-logic-phase-4b-spec.md`
 
-## Vòng 1: Hiểu Nx Monorepo
+## Round 1: Understanding Nx Monorepo
 
-Đọc:
+Read:
 
 - `package.json`
 - `nx.json`
@@ -172,47 +172,47 @@ Chỉ đọc specs chi tiết khi cần đào sâu:
 - `apps/*/project.json`
 - `libs/*/project.json`
 
-Lệnh nên dùng:
+Recommended command:
 
 ```bash
 npx nx show projects
 npx nx graph
 ```
 
-Cần rút ra:
+Need to draw:
 
-- App nào là deployable app.
-- Lib nào là shared contract.
-- Alias nào map tới thư mục nào.
-- Script dev nào chạy tập service nào.
+- Which app is a deployable app?
+- Which lib is a shared contract?
+- Which alias maps to which folder?
+- Which dev script runs which set of services?
 
-Trong `package.json`, các script như `dev:bff-order`, `dev:bff-payment`, `dev:bff-auth` cho biết cách chạy và đọc theo từng slice domain.
+In `package.json`, scripts like `dev:bff-order`, `dev:bff-payment`, `dev:bff-auth` show how to run and read each domain slice.
 
-## Vòng 2: Đọc Backend Boundary Trước
+## Round 2: Read Backend Boundary First
 
-Đừng bắt đầu từ service internals ngay. Hãy đọc BFF và guard chain trước, vì đây là cửa ngõ của toàn bộ hệ thống.
+Don't start from service internals right away. Read the BFF and guard chain first, as this is the gateway to the entire system.
 
 ### BFF Entry Points
 
-Đọc:
+Read:
 
 - `apps/bff/src/main.ts`
 - `apps/bff/src/app/app.module.ts`
 - `apps/bff/src/app/modules/*/controllers/*.ts`
 - `apps/bff/src/app/modules/realtime/*`
 
-Cần nắm:
+Need to know:
 
 - Global prefix API.
 - Validation pipe.
 - CORS.
 - Redis Socket.IO adapter.
-- Thứ tự middleware, guard, interceptor.
-- HTTP route nào map sang TCP message nào.
+- Order of middleware, guard, interceptor.
+- Which HTTP route maps to which TCP message?
 
-### Auth, Tenant Và Permission
+### Auth, tenant And Permission
 
-Đọc:
+Read:
 
 - `libs/middlewares/src/lib/tenant.middleware.ts`
 - `libs/guards/src/lib/user.guard.ts`
@@ -221,21 +221,21 @@ Cần nắm:
 - `libs/guards/src/lib/permission.guard.ts`
 - `apps/bff/src/app/modules/saas/guards/customer-tenant-lifecycle.guard.ts`
 
-Cần nắm:
+Need to know:
 
-- Staff dùng JWT/Keycloak.
-- Customer dùng Redis session với `x-session-id`.
-- Tenant lấy từ `x-tenant-id` hoặc subdomain.
-- Permission enforcement nằm ở BFF guard, frontend navigation chỉ là UX.
-- Tenant suspended/closed ảnh hưởng customer write actions.
+- Staff uses JWT/Keycloak.
+- Customer uses Redis session with `x-session-id`.
+- tenant taken from `x-tenant-id` or subdomain.
+- Permission enforcement is in the BFF guard, frontend navigation is just UX.
+- tenant suspended/closed affects customer write actions.
 
-## Vòng 3: Đọc Backend Theo Domain Flow
+## Round 3: Read Backend According to Domain Flow
 
 ### Flow 1: QR, Table, Session, Menu
 
-Mục tiêu: hiểu khách quét QR và vào bàn như thế nào.
+Goal: understand how customers scan the QR and enter the table.
 
-Đọc theo thứ tự:
+Read in order:
 
 1. `apps/customer-pwa/src/pages/landing-page.tsx`
 2. `apps/customer-pwa/src/features/landing/services/session.service.ts`
@@ -245,7 +245,7 @@ Mục tiêu: hiểu khách quét QR và vào bàn như thế nào.
 6. `apps/catalog/src/app/modules/table/services/table.service.ts`
 7. `apps/catalog/src/app/modules/menu/services/menu.service.ts`
 
-Flow cần nắm:
+Flow you need to know:
 
 ```mermaid
 sequenceDiagram
@@ -267,18 +267,18 @@ sequenceDiagram
   BFF-->>PWA: sessionId + tenantId
 ```
 
-State cần nhớ:
+State to remember:
 
 - Table status: `AVAILABLE -> OCCUPIED -> BILLING -> CLEANING -> AVAILABLE`.
-- Session nằm ở Order service, cache trong Redis.
-- QR token do Catalog/Table quản lý.
-- Menu public chỉ trả item/category active và available.
+- Session is located in Order service, cache in Redis.
+- QR token is managed by Catalog/Table.
+- The public menu only returns active and available items/categories.
 
-### Flow 2: Cart Và Submit Order
+### Flow 2: Cart And Submit Order
 
-Mục tiêu: hiểu khách thêm món, submit order và shared cart state.
+Goal: understand customers add items, submit orders and share cart state.
 
-Đọc theo thứ tự:
+Read in order:
 
 1. `apps/customer-pwa/src/features/order/services/order.service.ts`
 2. `apps/customer-pwa/src/features/order/hooks/use-order-query.ts`
@@ -287,7 +287,7 @@ Mục tiêu: hiểu khách thêm món, submit order và shared cart state.
 5. `apps/order/src/app/modules/order/services/order.service.ts`
 6. `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts`
 
-Flow cần nắm:
+Flow you need to know:
 
 ```mermaid
 sequenceDiagram
@@ -311,19 +311,19 @@ sequenceDiagram
   Order-->>BFF: order + bill + cart + realtime events
 ```
 
-Điểm quan trọng:
+Important points:
 
-- Cart source of truth là Redis.
-- Cart dùng optimistic version để tránh conflict.
-- Submit order chỉ validate availability.
-- Stock deduction không xảy ra lúc submit, mà xảy ra lúc staff confirm.
-- BFF emit `events.orderCreated` và `events.cartUpdated` trực tiếp qua WebSocket.
+- Cart source of truth is Redis.
+- Cart uses optimistic version to avoid conflicts.
+- Submit order only validates availability.
+- Stock deduction does not occur at submission, but occurs at staff confirmation.
+- BFF emit `events.orderCreated` and `events.cartUpdated` directly via WebSocket.
 
 ### Flow 3: Staff Confirm, Stock Deduct, KDS
 
-Mục tiêu: hiểu từ lúc staff confirm đến lúc bếp thấy ticket.
+Goal: understand from the time the staff confirms until the kitchen sees the ticket.
 
-Đọc theo thứ tự:
+Read in order:
 
 1. `apps/management-app/src/features/order/services/order.service.ts`
 2. `apps/management-app/src/features/order/hooks/use-order-query.ts`
@@ -334,7 +334,7 @@ Mục tiêu: hiểu từ lúc staff confirm đến lúc bếp thấy ticket.
 7. `apps/kitchen/src/app/modules/kitchen/services/order-confirmed.consumer.ts`
 8. `apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts`
 
-Flow cần nắm:
+Flow you need to know:
 
 ```mermaid
 sequenceDiagram
@@ -359,18 +359,18 @@ sequenceDiagram
   Kitchen-->>BFF: kds.queue_changed via realtime path
 ```
 
-Điểm quan trọng:
+Important points:
 
-- `order.confirmed` chỉ publish sau staff confirm.
-- Kitchen không có DB riêng, source of truth là Redis.
-- Ticket có thể chia theo station: `KITCHEN`, `BAR`.
-- KDS frontend không tin socket payload là data chính. Socket chỉ invalidate query, REST snapshot vẫn là source of truth.
+- `order.confirmed` only publishes after staff confirm.
+- Kitchen does not have its own DB, the source of truth is Redis.
+- Tickets can be divided by station: `KITCHEN`, `BAR`.
+- KDS frontend does not believe the socket payload is the main data. The socket only invalidates the query, the REST snapshot is still the source of truth.
 
 ### Flow 4: KDS Start, Done, Ready, Served
 
-Mục tiêu: hiểu staff bếp thao tác ticket và đồng bộ về Order.
+Objective: understand how kitchen staff manipulate tickets and synchronize orders.
 
-Đọc theo thứ tự:
+Read in order:
 
 1. `apps/management-app/src/features/kds/services/kds.service.ts`
 2. `apps/management-app/src/features/kds/hooks/use-kds-queue.ts`
@@ -379,7 +379,7 @@ Mục tiêu: hiểu staff bếp thao tác ticket và đồng bộ về Order.
 5. `apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts`
 6. `apps/order/src/app/modules/order/services/order.service.ts`
 
-Flow cần nắm:
+Flow you need to know:
 
 ```mermaid
 sequenceDiagram
@@ -401,17 +401,17 @@ sequenceDiagram
   BFF->>WS: events.kitchenItemReady + events.orderStatusChanged
 ```
 
-Điểm quan trọng:
+Important points:
 
-- BFF orchestration giữa Kitchen và Order khi `done`.
-- Nếu sync sang Order fail, BFF có logic compensate recall ticket.
-- CHEF chỉ vào station `KITCHEN`, BARISTA chỉ vào `BAR`; OWNER/MANAGER vào cả hai.
+- BFF orchestration between Kitchen and Order when `done`.
+- If sync to Order fails, BFF has logic compensation recall ticket.
+- CHEF points to station `KITCHEN`, BARISTA points to `BAR`; Owner/MANAGER on both.
 
-### Flow 5: Bill Request Và Payment
+### Flow 5: Bill Request And Payment
 
-Mục tiêu: hiểu từ lúc khách yêu cầu thanh toán đến lúc bill paid.
+Goal: understand from the moment the customer requests payment to the moment the bill is paid.
 
-Đọc theo thứ tự:
+Read in order:
 
 1. `apps/customer-pwa/src/pages/request-payment-page.tsx`
 2. `apps/customer-pwa/src/features/payment/services/payment.service.ts`
@@ -423,7 +423,7 @@ Mục tiêu: hiểu từ lúc khách yêu cầu thanh toán đến lúc bill pai
 8. `apps/payment/src/app/modules/payment/repositories/payment-outbox.repository.ts`
 9. `apps/order/src/app/modules/order/services/payment-events-consumer.service.ts`
 
-Flow cần nắm:
+Flow you need to know:
 
 ```mermaid
 sequenceDiagram
@@ -452,21 +452,21 @@ sequenceDiagram
   BFF->>WS: events.paymentCompleted
 ```
 
-Điểm quan trọng:
+Important points:
 
 - Bill owned by Order.
 - Payment owned by Payment.
-- Cash và VietQR đều tạo payment record trong Payment service.
-- Payment completed có fast path gọi Order và có outbox Kafka để eventual consistency.
+- Cash and VietQR both create payment records in Payment service.
+- Payment completed has a fast path to call Order and has a Kafka outbox for eventual consistency.
 - Rounding VND: `ceil(amount / 1000) * 1000`.
-- `QRTBL` là reference cho customer payment.
-- Direct Phase 3 SePay route hiện verify HMAC raw-body; tenant/platform routes Phase 4B dùng `x-secret-key` path riêng.
+- `QRTBL` is the reference for customer payment.
+- Direct Phase 3 SePay route now verifies HMAC raw-body; tenant/platform routes Phase 4B uses its own `x-secret-key` path.
 
 ### Flow 6: SaaS Onboarding, Subscription, Tenant Lifecycle
 
-Mục tiêu: hiểu control plane của multi-tenant SaaS.
+Goal: understand the control plane of multi-tenant SaaS.
 
-Đọc theo thứ tự:
+Read in order:
 
 1. `apps/management-app/src/features/saas/api.ts`
 2. `apps/management-app/src/app/(admin)/admin/tenants/page.tsx`
@@ -477,7 +477,7 @@ Mục tiêu: hiểu control plane của multi-tenant SaaS.
 7. `apps/saas/src/services/tenant-lifecycle.service.ts`
 8. `apps/bff/src/app/modules/saas/guards/customer-tenant-lifecycle.guard.ts`
 
-Flow cần nắm:
+Flow you need to know:
 
 ```mermaid
 sequenceDiagram
@@ -501,42 +501,42 @@ sequenceDiagram
   Kafka->>Catalog: create default area
 ```
 
-Điểm quan trọng:
+Important points:
 
-- `QRSUB` là reference cho tenant subscription payment.
-- Payment Service sở hữu `tenant_payment_settings`; SaaS Service sở hữu tenant/subscription/invoice.
-- SaaS lifecycle ảnh hưởng customer writes qua Redis key `tenant:{tenantId}:suspended`.
-- Owner dashboard có payment settings OAuth SePay.
-- Super Admin quản lý tenants, plans, billing.
+- `QRSUB` is the reference for tenant subscription payment.
+- Payment service owns `tenant_payment_settings`; SaaS service owns tenant/subscription/invoice.
+- SaaS lifecycle affects customer writes via Redis key `tenant:{tenantId}:suspended`.
+- Owner dashboard has payment settings OAuth SePay.
+- Super Admin manages tenants, plans, billing.
 
-## Vòng 4: Đọc Shared Libraries
+## Round 4: Read Shared Libraries
 
-Sau khi đã nắm flow, hãy đọc shared libs để hiểu contract.
+Once you understand the flow, read the shared libs to understand the contract.
 
 ### Backend Shared
 
-| Lib                           | Nội dung cần đọc                                 |
+| Lib                           | Content to read                                  |
 | ----------------------------- | ------------------------------------------------ |
 | `libs/constants`              | Enum, TCP request messages, permission constants |
 | `libs/interfaces`             | Request/response wrappers, TCP payload contracts |
-| `libs/entities`               | TypeORM entities dùng chung                      |
+| `libs/entities`               | TypeORM entities uses chung                      |
 | `libs/guards`                 | Auth, tenant, permission, session guards         |
-| `libs/middlewares`            | Tenant resolution                                |
+| `libs/middlewares`            | tenant resolution                                |
 | `libs/interceptors`           | Response/error shape                             |
 | `libs/configuration`          | Env/config schema                                |
 | `libs/providers/redis-client` | Redis client provider                            |
 
 ### Frontend Shared
 
-| Lib                     | Nội dung cần đọc                                              |
+| Lib                     | Content to read                                               |
 | ----------------------- | ------------------------------------------------------------- |
-| `libs/shared/types`     | Domain types dùng cho FE/BE, event payload, state transitions |
+| `libs/shared/types`     | Domain types uses for FE/BE, event payload, state transitions |
 | `libs/shared/constants` | Status labels, roles, query config                            |
 | `libs/frontend/utils`   | API client, error handling, upload client                     |
 | `libs/frontend/ui`      | Shared UI primitives                                          |
 | `libs/frontend/hooks`   | Shared React hooks                                            |
 
-Nên đọc trước:
+Should read first:
 
 - `libs/shared/types/src/lib/order.types.ts`
 - `libs/shared/types/src/lib/session.types.ts`
@@ -545,7 +545,7 @@ Nên đọc trước:
 - `libs/shared/types/src/lib/kds.types.ts`
 - `libs/shared/types/src/lib/realtime-events.types.ts`
 
-## Vòng 5: Đọc Frontend Theo Surface
+## Round 5: Read Frontend According to Surface
 
 ### Customer PWA
 
@@ -556,21 +556,21 @@ Entry:
 - `apps/customer-pwa/src/lib/api-client.ts`
 - `apps/customer-pwa/src/features/session/context/session-provider.tsx`
 
-Đọc routes theo business order:
+Read routes according to business order:
 
 1. `landing-page.tsx`: resolve tenant, verify QR, join session.
 2. `menu-page.tsx`: public menu, cart drawer.
-3. `features/order/hooks/use-order-query.ts`: cart/order/bill query và mutations.
+3. `features/order/hooks/use-order-query.ts`: cart/order/bill query and mutations.
 4. `features/order/hooks/use-customer-order-realtime.ts`: socket invalidation.
 5. `order-tracking-page.tsx`: order status tracking.
 6. `request-payment-page.tsx`: bill request, VietQR creation, polling.
 
-Nguyên tắc frontend PWA:
+PWA frontend principles:
 
-- Session persist trong localStorage.
-- API client gắn `x-tenant-id` và `x-session-id`.
+- Session persist in localStorage.
+- API client attaches `x-tenant-id` and `x-session-id`.
 - Khi session closed, client clear local session.
-- WebSocket chỉ invalidate React Query cache.
+- WebSocket only invalidates React Query cache.
 
 ### Management App
 
@@ -582,7 +582,7 @@ Entry:
 - `apps/management-app/src/lib/api/authenticated-client.ts`
 - `apps/management-app/src/components/layout/data/sidebar-data.ts`
 
-Đọc theo route group:
+Read by route group:
 
 1. `(auth)`: login, callback, NextAuth/Keycloak.
 2. `(dashboard)`: owner/manager menu, tables, staff, orders, subscription, payment settings.
@@ -590,17 +590,17 @@ Entry:
 4. `(kds)`: kitchen/bar board.
 5. `(admin)`: super admin tenants, plans, billing, analytics.
 
-Nguyên tắc frontend management:
+Frontend management principles:
 
 - Middleware gate route theo role.
-- Sidebar filter theo role và permission.
-- API client gắn Bearer token và `x-tenant-id`.
-- React Query là cache layer.
+- Sidebar filter theo role and permission.
+- API client attaches Bearer token and `x-tenant-id`.
+- React Query is cache layer.
 - Realtime hook invalidate list/detail queries.
 
 ## Command Cheat Sheet
 
-### Tìm Project Và Alias
+### Find Projects And Alias
 
 ```bash
 npx nx show projects
@@ -608,7 +608,7 @@ rg -n "\"@einvoice|\"@common" tsconfig.base.json
 find apps libs -name project.json | sort
 ```
 
-### Trace Một HTTP Endpoint Từ BFF Vào Service
+### Trace An HTTP Endpoint From BFF Into service
 
 ```bash
 rg -n "@Controller|@Get|@Post|@Patch|@Delete" apps/bff/src/app/modules/order
@@ -640,57 +640,57 @@ rg -n "@Authorization|@Permissions|PERMISSION\\.|phase4bPermissions|hasPermissio
 rg -n "authApiClient|customerApi|useQuery|useMutation|io\\(" apps/customer-pwa apps/management-app
 ```
 
-### Đọc State Machines
+### Read State Machines
 
 ```bash
 rg -n "OrderStatus|BillStatus|PaymentStatus|SessionStatus|TABLE_STATUS|TableStatus" apps libs docs
 ```
 
-## Mẫu Ghi Chú Khi Đọc Một Flow
+## Sample Notes When Reading a Flow
 
-Hãy tạo một bảng cho mỗi flow:
+Let's create a table for each flow:
 
-| Cột            | Câu hỏi                                             |
+| Column         | Question                                            |
 | -------------- | --------------------------------------------------- |
-| UI surface     | Page/hook/component nào kích hoạt action?           |
-| API endpoint   | BFF route nào nhận request?                         |
-| Auth rule      | Route dùng staff JWT, customer session, hay public? |
-| TCP message    | BFF gọi message nào sang service?                   |
-| Service method | Method nào xử lý business rule chính?               |
-| Persistence    | State lưu ở DB, Redis hay Kafka outbox?             |
-| Realtime       | Event nào emit, room nào nhận?                      |
-| Tests          | Test nào mô tả behavior này?                        |
-| Doc reference  | Phase/spec nào liên quan?                           |
+| UI surfaces    | Which page/hook/component triggers the action?      |
+| API endpoints  | Which BFF route receives the request?               |
+| Auth rule      | Route uses staff JWT, customer session, hay public? |
+| TCP messages   | Which message does BFF call to the service?         |
+| service method | Which method handles the main business rule?        |
+| Persistence    | State stored in DB, Redis or Kafka outbox?          |
+| Realtime       | Which event to send, which room to receive?         |
+| Tests          | Which test describes this behavior?                 |
+| Doc reference  | Which phase/spec is involved?                       |
 
-Ví dụ cho confirm order:
+Example for confirm order:
 
-| Cột            | Giá trị                                                  |
+| Column         | Value                                                    |
 | -------------- | -------------------------------------------------------- |
-| UI surface     | `management-app` POS live orders                         |
-| API endpoint   | `POST /admin/orders/:id/confirm`                         |
+| UI surfaces    | `management-app` POS live orders                         |
+| API endpoints  | `POST /admin/orders/:id/confirm`                         |
 | Auth rule      | Staff JWT + permission                                   |
-| TCP message    | `ORDER.CONFIRM`                                          |
-| Service method | `OrderService.confirmOrder`                              |
+| TCP messages   | `ORDER.CONFIRM`                                          |
+| service method | `OrderService.confirmOrder`                              |
 | Persistence    | Order DB update, Catalog stock transaction, Order outbox |
 | Realtime       | `events.orderStatusChanged`                              |
 | Kafka          | `order.confirmed`                                        |
 | Consumer       | Kitchen service                                          |
 
-## Những Điểm Dễ Nhầm
+## Common Mistakes
 
-### Docs Là Target, Code Là Thực Tế
+### Docs Are Target, Code Is Reality
 
-Một số docs mô tả kiến trúc mục tiêu. Khi thấy docs và code lệch nhau, dùng code và test hiện tại để kết luận, sau đó ghi lại gap.
+Some docs describe the target architecture. When you see the docs and code are different, use the current code and tests to draw conclusions, then record the gap.
 
-Ví dụ cần cảnh giác:
+Examples to be wary of:
 
-- Docs có thể nói QR HMAC, nhưng code Table service đang dùng opaque random token.
-- Docs/diagram cũ có thể nói payments DB sở hữu bills, nhưng flow hiện tại là Order owns bills.
-- `product` service có dấu hiệu legacy/template, không nên đọc sớm.
+- Docs may say QR HMAC, but the Table service code is using opaque random token.
+- Old Docs/diagrams may say payments DB owns bills, but the current flow is Order owns bills.
+- `product` service shows signs of legacy/template, should not be read early.
 
-### Kafka Không Dùng Để Proxy UI
+### Kafka Not Used to Proxy UI
 
-Kafka chỉ dùng cho domain events cross-service:
+Kafka is only used for domain cross-service events:
 
 - `order.confirmed`
 - `payment.completed`
@@ -698,19 +698,19 @@ Kafka chỉ dùng cho domain events cross-service:
 - `kitchen.sla_warning`
 - `tenant.created`
 
-Những event UI như cart/order/status/bill/table thường được BFF emit trực tiếp sau TCP success.
+UI events like cart/order/status/bill/table are often emitted by BFF directly after TCP success.
 
-### WebSocket Không Phải Source Of Truth
+### WebSocket Is Not Source Of Truth
 
-Frontend dùng Socket.IO như invalidation hint:
+Frontend uses Socket.IO as invalidation hint:
 
-1. Socket event đến.
+1. Socket event arrives.
 2. React Query invalidate.
 3. UI refetch REST snapshot.
 
-Vì vậy khi đọc bug realtime, hãy xem cả REST query và socket hook.
+So when reading realtime bugs, look at both REST queries and socket hooks.
 
-### Table, Session, Bill, Payment Khác Owner
+### Table, Session, Bill, Payment Other Owner
 
 | State                                       | Owner                    |
 | ------------------------------------------- | ------------------------ |
@@ -721,13 +721,13 @@ Vì vậy khi đọc bug realtime, hãy xem cả REST query và socket hook.
 | Tenant, plan, subscription invoice          | SaaS                     |
 | Role/permission/user mapping                | User Access + Authorizer |
 
-### Customer Và Staff Auth Khác Nhau
+### Customer And Staff Auth Are Different
 
-| Actor       | Auth style                                              |
-| ----------- | ------------------------------------------------------- |
-| Customer    | Redis session, `x-session-id`, anonymous                |
-| Staff/Admin | Keycloak JWT, `Authorization: Bearer`, `x-tenant-id`    |
-| Super Admin | JWT role, có thể bypass tenant scope trong một số guard |
+| Actor       | Auth style                                           |
+| ----------- | ---------------------------------------------------- |
+| Customers   | Redis session, `x-session-id`, anonymous             |
+| Staff/Admin | Keycloak JWT, `Authorization: Bearer`, `x-tenant-id` |
+| Super Admin | JWT role, can bypass tenant scope in some guards     |
 
 ## File Landmarks
 
@@ -810,132 +810,132 @@ Vì vậy khi đọc bug realtime, hãy xem cả REST query và socket hook.
 - `apps/management-app/src/features/kds/hooks/use-kds-realtime.ts`
 - `apps/management-app/src/features/saas/api.ts`
 
-## Lộ Trình Học Đề Xuất
+## Recommended Course of Study
 
-### Ngày 1: Docs Và Nx Skeleton
+### Day 1: Docs And Nx Skeleton
 
-Mục tiêu:
+Objective:
 
-- Biết repo có những app/lib nào.
-- Biết docs nào cần tin.
-- Vẽ được architecture diagram tổng thể.
-
-Checklist:
-
-- Đọc `docs/README.md`.
-- Đọc `technical-architecture.md`.
-- Đọc `business-logic.md`.
-- Chạy `npx nx show projects`.
-- Mở `tsconfig.base.json` để hiểu alias.
-
-### Ngày 2: BFF, Auth, Tenant, Permission
-
-Mục tiêu:
-
-- Hiểu mọi request đi qua BFF như thế nào.
-- Hiểu staff vs customer auth.
+- Know what apps/libs the repo has.
+- Know which docs to trust.
+- Draw the overall architecture diagram.
 
 Checklist:
 
-- Đọc BFF `main.ts` và `app.module.ts`.
-- Đọc guards trong `libs/guards`.
-- Đọc `permission-matrix.md`.
-- Trace một route admin và một route customer.
+- Read `docs/README.md`.
+- Read `technical-architecture.md`.
+- Read `business-logic.md`.
+- Run `npx nx show projects`.
+- Open `tsconfig.base.json` to understand alias.
 
-### Ngày 3: Catalog Và Order
+### Day 2: BFF, Auth, tenant, Permission
 
-Mục tiêu:
+Objective:
 
-- Hiểu QR/session/cart/order/bill.
-- Nắm state machine chính.
+- Understand how every request goes through BFF.
+- Understand staff vs customer auth.
 
 Checklist:
 
-- Đọc Catalog table/menu-item services.
-- Đọc Order controller và Order service.
-- Đọc Cart service, Bill service, Session service.
-- Trace `submitOrder` và `confirmOrder`.
+- Read BFF `main.ts` and `app.module.ts`.
+- Read guards in `libs/guards`.
+- Read `permission-matrix.md`.
+- Trace an admin route and a customer route.
 
-### Ngày 4: Kitchen Và Payment
+### Day 3: Catalog And Order
 
-Mục tiêu:
+Objective:
 
-- Hiểu Kafka, outbox, KDS Redis, payment settlement.
+- Understand QR/session/cart/order/bill.
+- Grasp the main state machine.
+
+Checklist:
+
+- Read Catalog table/menu-item services.
+- Read Order controller and Order service.
+- Read Cart service, Bill service, Session service.
+- Trace `submitOrder` and `confirmOrder`.
+
+### Day 4: Kitchen And Payment
+
+Objective:
+
+- Understand Kafka, outbox, KDS Redis, payment settlement.
 
 Checklist:
 
 - Trace `order.confirmed`.
-- Đọc KDS Redis repository.
+- Read KDS Redis repository.
 - Trace `payment.completed`.
-- Đọc Payment settlement và SePay webhook.
+- Read Payment settlement and SePay webhooks.
 
-### Ngày 5: SaaS Và Frontend
+### Day 5: SaaS And Frontend
 
-Mục tiêu:
+Objective:
 
-- Hiểu tenant onboarding, subscription, lifecycle.
-- Nối được frontend pages với backend endpoints.
+- Understand tenant onboarding, subscription, lifecycle.
+- Connect frontend pages to backend endpoints.
 
 Checklist:
 
-- Đọc SaaS onboarding saga.
-- Đọc tenant lifecycle guard.
-- Đọc Customer PWA routes/hooks.
-- Đọc Management App middleware/auth/sidebar/features.
+- Read SaaS onboarding saga.
+- Read tenant lifecycle guard.
+- Read Customer PWA routes/hooks.
+- Read Management App middleware/auth/sidebar/features.
 
-## Cách Kiểm Tra Bạn Đã Hiểu
+## How to Check You Understand
 
-Bạn nên tự trả lời được các câu hỏi sau:
+You should be able to answer the following questions:
 
-1. Khi khách quét QR, service nào validate token?
-2. Khi customer submit order, stock đã trừ hay chưa?
-3. Khi staff confirm order, Kafka event nào được publish?
-4. Kitchen ticket lưu ở DB hay Redis?
-5. Khi KDS bấm done, service nào update Order item status?
-6. Khi khách yêu cầu bill, điều kiện nào phải đúng?
-7. Payment service có sở hữu bill không?
-8. `payment.completed` ảnh hưởng Order service như thế nào?
-9. Tenant suspended thì customer còn được làm gì?
-10. Frontend realtime dùng payload socket để render trực tiếp hay invalidate/refetch?
+1. When a customer scans a QR, which service validates the token?
+2. When the customer submits the order, has the stock been deducted or not?
+3. When staff confirms an order, which Kafka events are published?
+4. Kitchen tickets are stored in DB or Redis?
+5. When KDS clicks done, which service updates Order item status?
+6. When a customer requests a bill, what conditions must be true?
+7. Does payment service own the bill?
+8. How does `payment.completed` affect Order service?
+9. tenant suspended, what else can the customer do?
+10. Frontend realtime uses payload socket to render directly or invalidate/refetch?
 
-Nếu trả lời được 10 câu này, bạn đã nắm phần xương sống của QRTable.
+If you can answer these 10 questions, you have grasped the backbone of QRTable.
 
-## Cách Đọc Khi Gặp Bug Hoặc Feature Mới
+## How to Read When Encountering a Bug or New Feature
 
-Dùng quy trình này:
+Use this procedure:
 
-1. Xác định actor: customer, waiter, chef, barista, manager, owner, super admin.
-2. Xác định UI surface: PWA, POS, KDS, dashboard, admin.
-3. Tìm endpoint trong BFF.
-4. Tìm TCP message BFF gọi sang service.
-5. Tìm service method xử lý business rule.
-6. Tìm persistence owner: DB, Redis, Kafka outbox.
-7. Tìm realtime event nếu UI cần cập nhật live.
-8. Tìm tests gần domain đó.
-9. Đối chiếu docs/phase/spec.
-10. Ghi lại gap giữa docs và code nếu có.
+1. Identify actors: customer, waiter, chef, barista, manager, Owner, super admin.
+2. Determine UI surface: PWA, POS, KDS, dashboard, admin.
+3. Find the endpoint in BFF.
+4. Find the TCP message BFF to call the service.
+5. Find the service method that handles the business rule.
+6. Find persistence Owner: DB, Redis, Kafka outbox.
+7. Find realtime events if the UI needs live updates.
+8. Find tests near that domain.
+9. Compare docs/phase/spec.
+10. Record gaps between docs and code if any.
 
-## Thứ Tự Không Nên Đọc
+## Order Should Not Be Read
 
-Không nên bắt đầu bằng:
+Do not start with:
 
 - `node_modules`
 - `.nx`
 - `dist`
 - `.next`
 - Generated lockfiles
-- UI components nhỏ lẻ trong `components/ui`
+- Small UI components in `components/ui`
 - CSS/theme files
 - `apps/product` legacy/template
-- Architecture images cũ trước khi đọc docs canonical
+- Old architecture images before reading canonical docs
 
-Những file này có thể cần sau, nhưng không giúp nắm flow ở vòng đầu.
+These files may be needed later, but do not help grasp the flow in the first round.
 
-## Kết Luận
+## Conclusion
 
-Codebase QRTable lớn, nhưng không phải hỗn loạn nếu đọc đúng trục.
+Codebase QRTable is large, but not chaotic if read on the correct axis.
 
-Thứ tự tốt nhất là:
+The best order is:
 
 1. Docs canonical.
 2. Nx project map.
@@ -950,6 +950,6 @@ Thứ tự tốt nhất là:
 11. Shared types/constants.
 12. Tests.
 
-Triết lý đọc quan trọng nhất:
+Most important reading philosophy:
 
-> Đừng đọc file. Hãy đọc flow. Sau đó dùng file để chứng minh flow đó.
+> Don't read the file. Read flow. Then use the file to demonstrate that flow.

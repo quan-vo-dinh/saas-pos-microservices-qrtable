@@ -9,7 +9,7 @@
 ## Status definitions
 
 - **`covered`** — Existing tests protect the target layer for this rule.
-- **`partial`** — Existing tests cover part of the rule; a stronger layer, fixture, live stack proof, or edge case is still needed.
+- **`partial`** — Existing tests cover part of the rule; a siner layer, fixture, live stack proof, or edge case is still needed.
 - **`missing`** — Behavior appears implemented or is the current contract, but no adequate test was found.
 - **`implementation-gap`** — Canonical docs describe a rule that is not clearly implemented; do not add tests until behavior is built or the spec changes.
 - **`security-gap`** — Security hardening is insufficient for production or demo-public exposure; current tests may only cover route shape or presence.
@@ -166,7 +166,7 @@
 
 **Target layer:** integration. **Stack:** Redis; BFF or PWA optional.
 
-**Notes:** Unit and hook coverage is strong. Step 5.3 DB/Redis integration now proves concurrent mutations with the same expected `cartVersion` produce one success, one `CART_VERSION_CONFLICT`, and a stable final server snapshot. Redis cart writes use compare-and-set via `WATCH`/`MULTI`. Run with `RUN_PHASE5_ORDER_SUBMIT_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-submit-cart.integration.spec.ts --runInBand` after PostgreSQL and Redis are ready.
+**Notes:** Unit and hook coverage is sin. Step 5.3 DB/Redis integration now proves concurrent mutations with the same expected `cartVersion` produce one success, one `CART_VERSION_CONFLICT`, and a stable final server snapshot. Redis cart writes use compare-and-set via `WATCH`/`MULTI`. Run with `RUN_PHASE5_ORDER_SUBMIT_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-submit-cart.integration.spec.ts --runInBand` after PostgreSQL and Redis are ready.
 
 ---
 

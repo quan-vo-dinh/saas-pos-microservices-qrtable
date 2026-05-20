@@ -32,6 +32,12 @@ If current code and an accepted spec disagree, verify the behavior in code first
 | `testing/`       | Testing execution plans, traceability matrices, and handoff notes derived from canonical phase/testing strategy.                                                   |
 | `presentations/` | Thesis and presentation assets; not an engineering source of truth.                                                                                                |
 
+## English Writing Standard
+
+All long-lived documentation in this repository should be written in clear English. Prefer short sentences, direct verbs, and stable technical terms such as tenant, guard, outbox, idempotency, permission, subscription, and WebSocket room. When a concept is useful for Vietnamese developers learning English, explain it in simple English instead of adding Vietnamese translations.
+
+Use Vietnamese business examples only when the example itself needs local context, such as a restaurant name, bank transfer content, or VietQR-specific scenario. Explanations, headings, tables, diagrams, UI copy, and code comments in documentation should stay English-first.
+
 ## Execution Artifacts Policy
 
 `docs/superpowers/` is not a canonical documentation store. If temporary execution artifacts are generated there during future work, they must not become the place readers use to understand current product behavior, architecture, or roadmap.

@@ -1,47 +1,47 @@
 # Phase 4A — Saga + Hardening (Order / Payment)
 
-> **Mục tiêu:** Chuẩn hóa giao dịch đa bước cho xác nhận đơn và hoàn tất thanh toán — có bù trừ (compensation) rõ ràng, giới hạn và idempotency chống double-submit, ràng buộc xóa dữ liệu và audit hủy đơn; đưa transactional outbox đơn giản vào Order/Payment để Kafka không mất sự kiện khi commit DB thành công.
-> **Ước lượng:** ~1 tuần
-> **Trạng thái:** ⏸ Deferred — chưa triển khai/đóng như một phase riêng sau Phase 3; một số hardening cục bộ đã xuất hiện trong Phase 3/4B nhưng không tính là hoàn thành Phase 4A.
+> **Goal:** Standardize multi-step transactions for order confirmation and payment completion — with clear compensation, limits and idempotency against double-submission, data deletion constraints, and order cancellation audits; put a simple transactional outbox in Order/Payment so that Kafka doesn't lose events when the DB commit is successful.
+> **Estimated:** ~1 week
+> **Status:** ⏸ Deferred — not yet implemented/closed as a separate phase after Phase 3; Some local hardening occurred in Phase 3/4B but does not count as completing Phase 4A.
 
 ## Prerequisites
 
-- Phase 3 hoàn thành — [phase-3-payment.md](phase-3-payment.md) (luồng thanh toán, billing/session đã ổn định làm nền cho saga thanh toán và validation)
-- Phase 2A/2B: Order, Kafka, KDS/realtime đã có — saga xác nhận đơn bám vào khóa tồn, tạo đơn, thông báo bếp
-- Phase 4B đã hoàn thành một onboarding mini-saga trong SaaS Service — nếu Phase 4A được mở lại, phần hardening phải xem đó là luồng hiện hữu để chuẩn hóa/retry/observe, không thiết kế lại từ con số không.
+- Phase 3 completed — [phase-3-payment.md](phase-3-payment.md) (payment flow, billing/session is stable as the foundation for payment and validation saga)
+- Phase 2A/2B: Order, Kafka, KDS/realtime available — order confirmation saga based on inventory key, order creation, kitchen notification
+- Phase 4B has completed an onboarding mini-saga in SaaS service — if Phase 4A is reopened, the hardening must consider it as an existing flow to standardize/retry/observe, not redesign from scratch.
 
-## Tham Chiếu
+## Reference
 
-| Tài liệu                  | Section liên quan                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------- |
-| technical-architecture.md | §12 Distributed Transactions (xử lý giao dịch phân tán / saga & đảm bảo nhất quán) |
-| business-logic.md         | §4.B Ordering rules (điều kiện đặt/xác nhận đơn, trạng thái line-item)             |
-| business-logic.md         | §6.B Payment rules (điều kiện thanh toán, đóng phiên, hóa đơn)                     |
+| Documents                 | Related Sections                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| technical-architecture.md | §12 Distributed Transactions (distributed transaction processing / saga & consistency assurance) |
+| business-logic.md         | §4.B Ordering rules (order order/confirmation conditions, line-item status)                      |
+| business-logic.md         | §6.B Payment rules (payment conditions, session closure, invoice)                                |
 
-## Tổng Quan
+## Overview
 
-Phase 4A nâng độ tin cậy của luồng lõi POS: mọi "chuỗi hành động" có nhiều bước (tồn kho → đơn → thông báo; kiểm tra billing → đóng phiên → cập nhật bàn → lưu trữ bill) được mô hình hóa như saga có compensation — để khi một bước thất bại, hệ thống không để lại trạng thái nửa vời mà có đường lui có kiểm soát. Sau Phase 4B, phase này cũng phải nhận diện onboarding tenant/Owner/payment settings là một mini-saga hiện hữu trong SaaS Service: phạm vi 4A là harden retry/observability/compensation nếu cần, không đổi ownership nghiệp vụ đã chốt. Đồng thời phase cố định các policy vận hành (giới hạn đơn theo phiên, idempotency, delete constraints, audit hủy) và một lớp outbox tối giản để đồng bộ "đã ghi DB" với "đã publish Kafka", tránh mất sự kiện. Full CDC (Debezium) được ghi nhận là hướng sau luận án — không nằm trong phạm vi phase này.
+Phase 4A increases the reliability of the POS core flow: every multi-step "action chain" (inventory → order → notification; check billing → close session → update table → store bill) is modeled as a saga with compensation — so that when a step fails, the system is not left in a half-baked state but has a controlled retreat. After Phase 4B, this phase must also identify onboarding tenant/Owner/payment settings as a mini-saga existing in the SaaS service: scope 4A is harden retry/observability/compensation if necessary, without changing the closed business ownership. At the same time, the phase fixed operational policies (session limit, idempotency, delete constraints, audit cancellation) and a minimalist outbox layer to synchronize "DB recorded" with "Kafka published", avoiding event loss. Full CDC (Debezium) is recognized as a post-thesis direction — not within the scope of this phase.
 
 ## Steps
 
-### Step 4.1 — Học Saga (3–4 ngày)
+### Step 4.1 — Study Saga (3–4 days)
 
-**Mục tiêu:** Có nền lý thuyết và từ vựng chung (orchestration/choreography, compensation, idempotency) trước khi gắn vào Order/Payment — giảm thiết kế sai ngay từ đầu.
+**Goal:** Have a general foundation of theory and vocabulary (orchestration/choreography, compensation, idempotency) before plugging in Order/Payment — reducing design mistakes from the start.
 
-**Yêu cầu chính (WHAT + WHY):**
+**Main requirements (WHAT + WHY):**
 
-- Hoàn thành bài **124–129** trong lộ trình khóa học (saga, giao dịch phân tán, failure modes).
-- **Why:** Các luồng confirm order và complete payment là đa bước và cross-cutting; không có khung saga thì dễ lệ thuộc "happy path" và khó reasoning khi timeout/retry.
+- Complete lessons **124–129** in the course roadmap (saga, distributed transactions, failure modes).
+- **Why:** The confirm order and complete payment flows are multi-step and cross-cutting; Without the saga framework, it is easy to depend on the "happy path" and difficult to reason about timeout/retry.
 
-**Verify:** Có thể mô tả bằng lời: điểm commit, điểm có thể retry, điểm bắt buộc compensation, và vì sao idempotency không thể thiếu ở biên HTTP.
+**verify:** Can be described in words: commit point, retry point, required compensation point, and why idempotency is indispensable at the HTTP edge.
 
-### Step 4.2 — Triển khai & hardening (4–5 ngày)
+### Step 4.2 — Deployment & hardening (4–5 days)
 
-**Mục tiêu:** Saga và policy vận hành được phản ánh trong hành vi hệ thống (không chỉ tài liệu), đồng bộ với quy tắc nghiệp vụ ordering/payment.
+**Goal:** Saga and operational policy are reflected in system behavior (not just documents), in sync with ordering/payment business rules.
 
 #### Order Confirm Saga
 
-**WHAT:** Chuỗi nghiệp vụ: khóa/giữ tồn kho phù hợp → tạo/ghi nhận đơn → thông báo KDS (hoặc kênh bếp tương đương).
+**WHAT:** Business chain: lock/hold appropriate inventory → create/record order → KDS notification (or equivalent kitchen channel).
 
 **Saga Steps (Order Confirm):**
 
@@ -51,15 +51,15 @@ Phase 4A nâng độ tin cậy của luồng lõi POS: mọi "chuỗi hành đ�
 | 2    | Update Order → Processing                | Order   | Mark order failed / rollback |
 | 3    | Route to KDS via Kafka `order.confirmed` | Kitchen | Notify customer of failure   |
 
-Compensation thực hiện theo thứ tự ngược: Step 3 → Step 2 → Step 1.
+Compensation is performed in reverse order: Step 3 → Step 2 → Step 1.
 
-**WHY:** Đảm bảo không có đơn "đã tạo" khi tồn không còn đủ, và không để tồn bị giữ vĩnh viễn nếu bước sau thất bại.
+**WHY:** Make sure there are no "created" orders when inventory runs out, and don't let inventory be held permanently if the next step fails.
 
-**Compensation (ý định):** Hoàn tác phần tồn đã lock; đánh dấu đơn/thao tác thất bại theo rule nghiệp vụ; thông báo khách (hoặc kênh phù hợp) khi luồng không hoàn tất — để staff/khách không kỳ vọng đơn đã vào bếp.
+**Compensation (intent):** Undo the locked portion; Mark failed orders/operations according to business rules; Notify the guest (or appropriate channel) when the stream is not complete — so staff/guests don't expect the order to have entered the kitchen.
 
 #### Payment Complete Saga
 
-**WHAT:** Chuỗi nghiệp vụ: **validate billing** — toàn bộ line-item phải ở trạng thái cho phép thanh toán theo rule (ví dụ Ready/Served như §6.B) → đóng session → cập nhật trạng thái bàn → archive bill (lưu trữ hóa đơn/phiên theo policy).
+**WHAT:** Business chain: **validate billing** — the entire line-item must be in a state that allows payment according to the rule (eg Ready/Served as §6.B) → close session → update table status → archive bill (store invoice/session according to policy).
 
 **Saga Steps (Payment Complete):**
 
@@ -70,54 +70,54 @@ Compensation thực hiện theo thứ tự ngược: Step 3 → Step 2 → Step 
 | 3    | Update Table → Cleaning                  | Catalog | Revert table status                      |
 | 4    | Archive Bill                             | Order   | Unarchive bill, revert to previous state |
 
-Compensation thực hiện theo thứ tự ngược: Step 4 → Step 3 → Step 2 → Step 1.
+Compensation is performed in reverse order: Step 4 → Step 3 → Step 2 → Step 1.
 
-**WHY:** Thanh toán chỉ được phép khi nghiệp vụ "đã phục vụ đủ điều kiện"; tránh đóng tiền trên đơn chưa sẵn sàng và tránh bàn/phiên lệch với thực tế thanh toán.
+**WHY:** Payment is only allowed when the operation is "qualifiedly served"; Avoid paying on applications that are not ready and avoid discussions/sessions that differ from actual payment.
 
-**Compensation (ý định):** Mở lại session nếu đã đóng nhưng bước sau lỗi; revert cập nhật bàn về trạng thái nhất quán trước bước lỗi — để không khóa bàn vĩnh viễn hoặc ghi nhận sai occupancy.
+**Compensation (intent):** Reopen session if closed but the following step fails; revert updates the table to a consistent state before the error step — so as not to permanently lock the table or record incorrect occupancy.
 
 #### Hardening chung
 
-| Chủ đề                   | WHAT                                                                                                                        | WHY                                                             |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `max_orders_per_session` | Giới hạn số đơn tối đa mỗi phiên (mặc định 20), **cấu hình theo tenant plan** — chống spam/đơn ảo                           | Chống abuse/spam đặt hàng và giữ vận hành POS ổn định           |
-| Idempotency              | Redis SET NX cho order creation — cùng idempotency key chỉ thắng lần đầu, prevent double-submit                             | Double-submit (double tap, retry client) không tạo trùng đơn    |
-| Delete constraints       | Không xóa **Category** còn **MenuItem**; không xóa **MenuItem** còn **OrderItem** đang active (status IN PROCESSING, READY) | Bảo toàn tham chiếu và lịch sử đơn; tránh orphan và sai báo cáo |
-| Audit cancel             | **BẮT BUỘC** ghi log khi Cancel order — **actor** (who), **reason** (why), **timestamp** (when)                             | Phục vụ điều tra, đối soát và trách nhiệm vận hành              |
+| Topics                   | WHAT                                                                                                                                | WHY                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `max_orders_per_session` | Limit the maximum number of orders per session (default 20), **configurable according to tenant plan** — anti-spam/virtual orders   | Prevent ordering abuse/spam and keep POS operations stable                |
+| Idempotency              | Redis SET NX for order creation — same idempotency key for first win only, prevent double-submit                                    | Double-submit (double tap, retry client) does not create duplicate orders |
+| Delete constraints       | Do not delete **Category** and **MenuItem**; do not delete **MenuItem** while **OrderItem** is active (status IN PROCESSING, READY) | Preserves single reference and history; Avoid orphans and false reports   |
+| Audit cancel             | **REQUIRED** log when Cancel order — **actor** (who), **reason** (why), **timestamp** (when)                                        | Serving investigation, control and operational responsibility             |
 
-#### SaaS Onboarding Mini-Saga (đã có từ Phase 4B)
+#### SaaS Onboarding Mini-Saga (available from Phase 4B)
 
-**WHAT:** Chuỗi onboarding tenant hiện hữu gồm tạo tenant/subscription mặc định, tạo Owner qua Authorizer/User-Access, khởi tạo `tenant_payment_settings`, ghi outbox `tenant.created`, và rollback/cleanup khi bước giữa chừng thất bại.
+**WHAT:** The existing tenant onboarding sequence includes creating the default tenant/subscription, creating the Owner via Authorizer/User-Access, initializing `tenant_payment_settings`, outboxing `tenant.created`, and rollback/cleanup when the mid-step fails.
 
-**WHY:** Đây là business flow đa service phát sinh sau spec Phase 4B. Nếu Phase 4A được triển khai sau Phase 4B, nó phải harden flow này cùng với Order/Payment: idempotency key cho onboarding request, compensation có audit rõ, retry/cleanup orphan Keycloak user có metric/log, và không làm mất outbox event sau DB commit.
+**WHY:** This is a multi-service business flow arising after spec Phase 4B. If Phase 4A is deployed after Phase 4B, it must harden this flow with Order/Payment: idempotency key for onboarding requests, compensation with clear audit, retry/cleanup orphan Keycloak user with metrics/log, and not lose outbox events after DB commit.
 
-**Ranh giới:** Không biến onboarding thành self-service registration wizard; quyết định đó vẫn deferred/post-thesis theo Phase 4B.
+**Boundary:** Do not turn onboarding into a self-service registration wizard; That decision remains deferred/post-thesis under Phase 4B.
 
 #### Simplified Transactional Outbox
 
-**WHAT:** Bảng `outbox_events` (hoặc tên tương đương) trong **Order** và **Payment**; ghi event **cùng transaction** với thay đổi nghiệp vụ; job/cron nền poll → publish Kafka → đánh dấu đã gửi.
+**WHAT:** Table `outbox_events` (or equivalent) in **Order** and **Payment**; record event **with transaction** with business change; poll background job/cron → publish Kafka → mark sent.
 
-**Data flow:** Khi state change xảy ra → ghi event vào bảng outbox **cùng DB transaction** với update nghiệp vụ → background cron poll outbox định kỳ → publish event lên Kafka → mark outbox record là "sent". Đảm bảo event không mất khi service crash giữa chừng (giữa commit DB và publish Kafka).
+**Data flow:** When state change occurs → record event to outbox table **with DB transaction** with business update → background cron poll outbox periodically → publish event to Kafka → mark outbox record as "sent". Make sure the event is not lost when the service crashes midway (between committing DB and publishing Kafka).
 
-**WHY:** Nếu chỉ publish Kafka sau khi commit, crash giữa chừng có thể làm mất sự kiện; outbox gắn "đã xảy ra" với "đã persist" trước khi broker nhận.
+**WHY:** If you only publish Kafka after committing, a crash in the middle may cause the event to be lost; outbox attaches "occurred" to "persisted" before the broker received it.
 
-**Phạm vi ngoài phase:** **Full CDC với Debezium** — ghi chú là **post-thesis** (độ phức tạp vận hành/infra cao hơn; phase này chấp nhận outbox poll đơn giản).
+**Scope beyond phase:** **Full CDC with Debezium** — noted as **post-thesis** (higher operational/infra complexity; this phase accepts simple outbox poll).
 
-**Verify (gợi ý tổng thể):** Scenario failure được diễn tả trong Acceptance Criteria; outbox không để lệch "DB đã commit nhưng không có bản ghi outbox" cho các sự kiện đã cam kết.
+**verify (overall suggestion):** Scenario failure is described in the Acceptance Criteria; outbox does not leave the error "DB committed but no outbox record" for committed events.
 
 ## Acceptance Criteria
 
-- **Saga compensation (order):** Khi khóa/giữ tồn thất bại → **không** tạo đơn hợp lệ; tồn và trạng thái hệ thống không ở trạng thái "có đơn nhưng không có đủ hàng".
-- **Billing validation (payment):** Thanh toán **bị chặn** khi còn line-item chưa đạt điều kiện Ready/Served (theo rule §6.B / cấu hình nghiệp vụ đã thống nhất).
-- **Idempotency:** Gửi trùng cùng idempotency key (double-submit) → **một** đơn/hành động tương ứng, không nhân đôi side-effect.
-- **Delete constraints:** Không xóa được Category còn MenuItem; không xóa được MenuItem còn OrderItem active — API/DB phản hồi lỗi rõ ràng.
-- **Audit cancel:** Mọi thao tác hủy đơn có bản ghi audit với **actor, reason, timestamp** đủ để tra cứu sau.
-- **Onboarding mini-saga hardening:** Nếu Phase 4A mở lại sau Phase 4B, onboarding tenant có idempotency/compensation/audit/observability rõ và không làm thay đổi quyết định admin-assisted onboarding.
+- **Saga compensation (order):** When locking/preserving fails → **does not** create a valid order; inventory and the system status is not in the state of "there are orders but not enough goods".
+- **Billing validation (payment):** Billing is **blocked** when there are still line-items that have not met the Ready/Served condition (according to rule §6.B / agreed business configuration).
+- **Idempotency:** Submit the same idempotency key (double-submit) → **one** corresponding action/action, do not duplicate the side-effect.
+- **Delete constraints:** Cannot delete Category but MenuItem; MenuItem cannot be deleted but OrderItem is active — API/DB returns clear error.
+- **Audit cancel:** All cancellation operations have an audit record with **actor, reason, timestamp** enough for later lookup.
+- **Onboarding mini-saga hardening:** If Phase 4A reopens after Phase 4B, onboarding the tenant has clear idempotency/compensation/audit/observability and does not change the admin-assisted onboarding decision.
 
 ## Outputs
 
-- Luồng **Order Confirm Saga** và **Payment Complete Saga** được mô tả bằng hành vi có compensation, khớp technical-architecture §12 và business-logic §4.B / §6.B.
-- Policy `**max_orders_per_session`\*\* (mặc định 20, configurable theo tenant) áp dụng nhất quán trên luồng đặt/xác nhận.
-- Idempotency và delete constraints là **bất biến** trong integration/API tests hoặc checklist QA tương đương.
-- Outbox đơn giản trên Order + Payment: event ghi cùng transaction, worker/cron đẩy Kafka và đánh dấu sent.
-- Roadmap ghi rõ: **Debezium / full CDC** — sau luận án.
+- The **Order Confirm Saga** and **Payment Complete Saga** flows are described by behavior with compensation, matching technical-architecture §12 and business-logic §4.B / §6.B.
+- Policy `**max_orders_per_session`\*\* (default 20, configurable by tenant) applies consistently across the order/confirm flow.
+- Idempotency and delete constraints are **invariant** in integration/API tests or equivalent QA checklists.
+- Simple outbox on Order + Payment: event recorded with transaction, worker/cron pushes Kafka and marked sent.
+- Roadmap clearly states: **Debezium / full CDC** — after thesis.

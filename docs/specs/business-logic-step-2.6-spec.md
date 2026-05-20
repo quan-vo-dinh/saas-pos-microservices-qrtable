@@ -1,54 +1,54 @@
-# Bước 2.6 — Đặc tả Nghiệp vụ & Kiến trúc Chính thức
+# Step 2.6 — Formal Architecture & Business Specification
 
-> **Giai đoạn:** 2B — Kitchen Service + WebSocket Gateway  
-> **Bước:** 2.6 — KDS Redis-only, SLA Worker, WebSocket Gateway hardening  
-> **Date:** 2026-05-07  
-> **Trạng thái:** Chốt sau audit Step 2.6
-> **Mục đích:** Tài liệu này lưu đặc tả kỹ thuật/nghiệp vụ đã chốt cho Step 2.6. Đây **không** phải implementation plan; trạng thái triển khai cuối cùng xem [`docs/phases/phase-2b-kitchen-websocket.md`](../phases/phase-2b-kitchen-websocket.md).
-
----
-
-## 0. Biên bản quyết định
-
-| Câu hỏi | Quyết định                            | Nội dung chốt                                                                                                                                                                                                                       |
-| ------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1      | Theo khuyến nghị audit — **Option B** | Kitchen Service consume `order.confirmed`, ghi Redis xong rồi phát internal Redis Pub/Sub event để BFF WebSocket Gateway emit `events.kdsQueueChanged`. BFF không emit KDS queue hint trực tiếp từ `order.confirmed` để tránh race. |
-| Q2      | Theo khuyến nghị audit — **Option A** | SLA dùng Redis Sorted Set `kds:sla:due` + worker nội bộ Kitchen Service. Không dùng request-driven check, không dùng Redis keyspace notification.                                                                                   |
-| Q3      | **Bỏ hoàn toàn batching**             | Không có tính năng gộp đơn/gộp món trong hệ thống. Không tạo Redis batch keys, không có batch projection, không có UI/API batch contract. Các acceptance cũ về batching trong phase doc bị thay thế bởi FIFO/priority theo ticket.  |
-| Q4      | Theo khuyến nghị audit — **Option A** | Redis-only KDS phải có recovery: rebuild từ Order Service active orders khi Kitchen khởi động hoặc khi phát hiện Redis mất state. Kafka replay là hardening tương lai.                                                              |
-| Q5      | Theo khuyến nghị audit — **Option A** | Thêm permission mới `KITCHEN_SET_PRIORITY` cho Owner/Manager-only priority flagging. Không dùng chung `KITCHEN_UPDATE_TICKET` cho thao tác priority.                                                                                |
-
-### 0.1 Tài liệu này override các điểm cũ nào?
-
-1. `docs/phases/phase-2b-kitchen-websocket.md` có yêu cầu "Batching: gom cùng món từ các order khác nhau". Yêu cầu này **bị loại bỏ hoàn toàn** theo quyết định Q3.
-2. BFF Kafka bridge trong phase doc nói `order.confirmed → room KDS/staff`. Với quyết định Q1, BFF **không** dùng `order.confirmed` để emit KDS queue trực tiếp. KDS queue event chỉ được emit sau khi Kitchen đã ghi Redis.
-3. Tên topic canonical là `kitchen.sla_warning`. Mọi biến thể `kitchen.sla_warn` chỉ là drift tài liệu cũ và không được dùng.
+> **Phase:** 2B — Kitchen service + WebSocket Gateway
+> **Step:** 2.6 — KDS Redis-only, SLA Worker, WebSocket Gateway hardening
+> **Date:** 2026-05-07
+> **Status:** Finalized after audit Step 2.6
+> **Purpose:** This document stores the finalized technical/business specification for Step 2.6. This is **not** an implementation plan; Final deployment status see [Phase 2B record](../phases/phase-2b-kitchen-websocket.md).
 
 ---
 
-## 1. Phạm vi và ngoài phạm vi
+## 0. Minutes of decision
 
-### 1.1 Trong phạm vi Step 2.6
+| Question | Decision                                          | Closing content                                                                                                                                                                                                                                |
+| -------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1       | According to audit recommendations — **Option B** | Kitchen service consumes `order.confirmed`, writes Redis, then broadcasts internal Redis Pub/Sub event to BFF WebSocket Gateway emit `events.kdsQueueChanged`. BFF does not emit KDS queue hint directly from `order.confirmed` to avoid race. |
+| Q2       | According to audit recommendations — **Option A** | SLA uses Redis Sorted Set `kds:sla:due` + internal worker Kitchen service. Do not use request-driven check, do not use Redis keyspace notification.                                                                                            |
+| Q3       | **Completely eliminate batching**                 | There is no function to combine orders/orders in the system. No creation of Redis batch keys, no batch projection, no UI/API batch contract. The old batching acceptances in the doc phase are replaced by FIFO/priority by ticket.            |
+| Q4       | According to audit recommendations — **Option A** | Redis-only KDS must have recovery: rebuild from Order service active orders when Kitchen starts or when Redis is detected losing state. Kafka replay is the hardening of the future.                                                           |
+| Q5       | According to audit recommendations — **Option A** | Add new permission `KITCHEN_SET_PRIORITY` for Owner/Manager-only priority flagging. Do not use `KITCHEN_UPDATE_TICKET` for priority operations.                                                                                                |
+
+### 0.1 Which old points does this document override?
+
+1. `docs/phases/phase-2b-kitchen-websocket.md` has the request "Batching: collecting the same item from different orders". This requirement is **completely eliminated** by decision Q3.
+2. BFF Kafka bridge in phase doc says `order.confirmed → room KDS/staff`. With decision Q1, BFF **does not** use `order.confirmed` to emit the KDS queue directly. KDS queue events are only emitted after Kitchen has written to Redis.
+3. The canonical topic name is `kitchen.sla_warning`. Any `kitchen.sla_warn` variant is just old document drift and should not be used.
+
+---
+
+## 1. Scope and out of scope
+
+### 1.1 Within Step 2.6
 
 1. **Kitchen Service Redis-only**
 
-- Tạo service `kitchen` riêng, sở hữu KDS ticket/queue state trong Redis.
+- Create a separate `kitchen` service, owning the KDS ticket/queue state in Redis.
 - Consume Kafka topic `order.confirmed`.
-- Tách ticket theo `station` từ item snapshot: `KITCHEN` hoặc `BAR`.
-- Tạo tối đa một ticket cho mỗi `(tenantId, orderId, station)`.
-- Duy trì FIFO/priority queue bằng Redis Sorted Set.
-- Hỗ trợ ticket lifecycle: `PENDING → PROCESSING → READY`, recall `READY → PROCESSING`, void/archive.
-- Chạy SLA worker nội bộ và produce Kafka `kitchen.sla_warning`.
-- Expose TCP commands để BFF gọi qua REST guarded endpoints.
-- Không có PostgreSQL/MongoDB riêng cho Kitchen.
+- Separate ticket by `station` from item snapshot: `KITCHEN` or `BAR`.
+- Create a maximum of one ticket for each `(tenantId, orderId, station)`.
+- Maintain FIFO/priority queue using Redis Sorted Set.
+- Ticket lifecycle support: `PENDING → PROCESSING → READY`, recall `READY → PROCESSING`, void/archive.
+- Run the internal SLA worker and produce Kafka `kitchen.sla_warning`.
+- Expose TCP commands for BFF to call via REST guarded endpoints.
+- No separate PostgreSQL/MongoDB for Kitchen.
 
 2. **WebSocket Gateway hardening**
 
-- Socket.IO Gateway trong BFF xác thực handshake thay vì tin client tự join room.
-- Gắn Socket.IO Redis Adapter để scale nhiều BFF instances.
-- Assign room theo role/session từ server-side auth context.
-- Emit realtime hints từ BFF Direct, Kafka bridge, và Kitchen internal events.
-- Reconnect policy: client luôn refetch snapshot sau reconnect.
+- Socket.IO Gateway in BFF authenticates handshake instead of trusting the client to join the room.
+- Attach Socket.IO Redis Adapter to scale multiple BFF instances.
+- Assign room according to role/session from server-side auth context.
+- Emit realtime hints from BFF Direct, Kafka bridge, and Kitchen internal events.
+- Reconnect policy: client always refetch snapshot after reconnecting.
 
 3. **KDS REST/BFF endpoints**
 
@@ -58,72 +58,72 @@
 - Recall ticket.
 - Set/unset priority.
 
-4. **Integration với Order Service**
+4. **Integration with Order service**
 
-- Kitchen ticket creation bắt nguồn từ `order.confirmed`.
-- Khi ticket done/ready, customer-visible state vẫn phải được đồng bộ về Order Service.
-- Transfer table sau khi có KDS ticket phải patch table snapshot trong active KDS tickets.
-- Redis recovery rebuild active KDS state từ Order Service active orders.
+- Kitchen ticket creation originates from `order.confirmed`.
+- When the ticket is done/ready, the customer-visible state must still be synchronized to Order service.
+- Transfer table after having KDS ticket must patch table snapshot in active KDS ticket.
+- Redis recovery rebuild active KDS state from Order service active orders.
 
 5. **RBAC**
 
-- Dùng các permission hiện có:
+- Use existing permissions:
   - `KITCHEN_GET_QUEUE`
   - `KITCHEN_UPDATE_TICKET`
   - `KITCHEN_RECALL`
-- Thêm permission mới:
+- Add new permission:
   - `KITCHEN_SET_PRIORITY`
-- CHEF chỉ được thao tác station `KITCHEN`.
-- BARISTA chỉ được thao tác station `BAR`.
-- OWNER/MANAGER được xem/thao tác cả hai station và priority.
+- CHEF can only operate station `KITCHEN`.
+- BARISTA can only operate station `BAR`.
+- Owner/MANAGER can view/manipulate both stations and priorities.
 
-### 1.2 Ngoài phạm vi Step 2.6
+### 1.2 Outside the scope of Step 2.6
 
-1. Không triển khai batching/gộp món/gộp đơn dưới bất kỳ dạng nào.
-2. Không thêm Kafka topic mới như `kitchen.ticket_changed`.
-3. Không làm Redis Stream replay cho WebSocket packet.
-4. Không làm full CDC/Debezium outbox.
-5. Không triển khai Payment Service đầy đủ, refund, hoặc receipt.
-6. Không thay thế Order Service làm source of truth cho customer-visible order state.
-7. Không cho client mutate KDS trực tiếp qua WebSocket.
+1. Do not deploy batching/combining orders/combining orders in any form.
+2. Do not add new Kafka topic like `kitchen.ticket_changed`.
+3. Do not do Redis Stream replay for WebSocket packets.
+4. Do not complete CDC/Debezium outbox.
+5. Not implementing full Payment service, refund, or receipt.
+6. Do not replace Order service as the source of truth for customer-visible order state.
+7. Do not allow clients to mutate KDS directly via WebSocket.
 
 ---
 
 ## 2. Bounded Context & Source of Truth
 
-| Context                  | Sở hữu                                                                          | Storage                               | Giao tiếp                                                                                                 |
-| ------------------------ | ------------------------------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| **Order Service**        | Order, order item, session, bill, service request, customer-visible order state | PostgreSQL + Redis session/cart cache | TCP từ BFF; Kafka producer `order.confirmed`; BFF Direct events                                           |
-| **Catalog Service**      | Menu item, station config, stock, table status                                  | PostgreSQL                            | TCP từ BFF/Order                                                                                          |
-| **Kitchen Service**      | KDS ticket, station queue, prep state, priority, recall window, SLA state       | Redis-only                            | Kafka consumer `order.confirmed`; Kafka producer `kitchen.sla_warning`; TCP từ BFF; Redis Pub/Sub tới BFF |
-| **BFF Realtime Gateway** | HTTP guard boundary, WebSocket handshake, room assignment, WS delivery          | Stateless + Socket.IO Redis Adapter   | REST/TCP orchestration, Redis Pub/Sub, Kafka bridge                                                       |
-| **Auth/User-Access**     | Staff identity, tenant claim, roles, permissions                                | Keycloak + MongoDB roles              | gRPC/TCP via existing guard/auth flow                                                                     |
+| Context                  | Own                                                                             | Storage                               | Communication                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Order service**        | Order, order item, session, bill, service request, customer-visible order state | PostgreSQL + Redis session/cart cache | TCP from BFF; Kafka producer `order.confirmed`; BFF Direct events                                          |
+| **service Catalog**      | Menu items, station config, stock, table status                                 | PostgreSQL                            | TCP from BFF/Order                                                                                         |
+| **Kitchen service**      | KDS ticket, station queue, prep state, priority, recall window, SLA state       | Redis-only                            | Kafka consumer `order.confirmed`; Kafka producer `kitchen.sla_warning`; TCP from BFF; Redis Pub/Sub to BFF |
+| **BFF Realtime Gateway** | HTTP guard boundary, WebSocket handshake, room assignment, WS delivery          | Stateless + Socket.IO Redis Adapter   | REST/TCP orchestration, Redis Pub/Sub, Kafka bridge                                                        |
+| **Auth/User-Access**     | Staff identity, tenant claim, roles, permissions                                | Keycloak + MongoDB roles              | gRPC/TCP via existing guard/auth flow                                                                      |
 
-### 2.1 Nguyên tắc source of truth
+### 2.1 Source of truth principle
 
-1. Order Service là source of truth cho khách hàng thấy order đang ở trạng thái nào.
-2. Kitchen Redis là source of truth cho màn KDS thấy ticket đang ở trạng thái prep nào.
-3. Catalog là source of truth cho `MenuItem.station` hiện tại, nhưng `order.confirmed` mang station snapshot bất biến cho KDS.
-4. WebSocket event chỉ là realtime hint. Snapshot REST/TCP mới là dữ liệu để render chính xác sau reconnect.
-5. Mọi key, event, command, query đều phải có `tenantId`.
+1. Order service is the source of truth that shows customers what status their order is in.
+2. Kitchen Redis is the source of truth that shows the KDS screen what prep status the ticket is in.
+3. Catalog is the source of truth for `MenuItem.station` currently, but `order.confirmed` carries an immutable station snapshot for KDS.
+4. WebSocket events are just realtime hints. The new REST/TCP snapshot is the data to render accurately after reconnecting.
+5. Every key, event, command, query must have `tenantId`.
 
 ---
 
-## 3. Kafka Topic Registry cho Step 2.6
+## 3. Kafka Topic Registry for Step 2.6
 
 ### 3.1 Topic `order.confirmed`
 
-| Thuộc tính         | Giá trị                                     |
-| ------------------ | ------------------------------------------- |
-| Producer           | Order Service outbox publisher              |
-| Consumer chính     | Kitchen Service                             |
-| Consumer group     | `kitchen-service-group`                     |
-| Partition key      | `tenantId`                                  |
-| Delivery semantics | At-least-once                               |
-| Idempotency        | `eventId` + `(tenantId, orderId, station)`  |
-| BFF direct bridge? | Không emit KDS queue trực tiếp từ topic này |
+| Attributes         | Value                                          |
+| ------------------ | ---------------------------------------------- |
+| Producer           | Order service outbox publisher                 |
+| Main consumer      | Kitchen service                                |
+| Consumer group     | `kitchen-service-group`                        |
+| Partition key      | `tenantId`                                     |
+| Delivery semantics | At-least-once                                  |
+| Idempotency        | `eventId` + `(tenantId, orderId, station)`     |
+| BFF direct bridge? | Do not emit KDS queue directly from this topic |
 
-Payload canonical hiện tại:
+Current payload canonical:
 
 ```ts
 type OrderConfirmedEvent = {
@@ -158,26 +158,26 @@ type OrderConfirmedEvent = {
 
 Validation rules:
 
-1. `schemaVersion` phải là `1`.
-2. `tenantId`, `orderId`, `sessionId`, `tableId`, `tableName`, `eventId` bắt buộc có.
-3. Mỗi item phải có `station`.
-4. Item thiếu `station` bị đưa vào Redis dead-letter key, không tự fallback category trong Step 2.6.
-5. Một order có thể tạo:
-   - 0 ticket nếu mọi item invalid/canceled.
-   - 1 ticket nếu chỉ có một station.
-   - 2 ticket nếu có cả `KITCHEN` và `BAR`.
+1. `schemaVersion` must be `1`.
+2. `tenantId`, `orderId`, `sessionId`, `tableId`, `tableName`, `eventId` are required.
+3. Each item must have `station`.
+4. Items missing `station` are included in the Redis dead-letter key, not falling back to the category in Step 2.6.
+5. An order can be created:
+   - 0 tickets if all items are invalid/canceled.
+   - 1 ticket if there is only one station.
+   - 2 tickets if there are both `KITCHEN` and `BAR`.
 
 ### 3.2 Topic `kitchen.sla_warning`
 
-| Thuộc tính             | Giá trị                                           |
-| ---------------------- | ------------------------------------------------- |
-| Producer               | Kitchen Service SLA Worker                        |
-| Consumer chính         | BFF Kafka bridge                                  |
-| Consumer tương lai     | Notification/Analytics                            |
-| Consumer group của BFF | `bff-kafka-bridge`                                |
-| Partition key          | `tenantId`                                        |
-| Delivery semantics     | At-least-once                                     |
-| Idempotency            | `eventId` + `(tenantId, ticketId, level, bucket)` |
+| Attributes            | Value                                             |
+| --------------------- | ------------------------------------------------- |
+| Producer              | Kitchen service SLA Worker                        |
+| Main consumer         | BFF Kafka bridge                                  |
+| Future Consumer       | Notifications/Analytics                           |
+| Consumer group of BFF | `bff-kafka-bridge`                                |
+| Partition key         | `tenantId`                                        |
+| Delivery semantics    | At-least-once                                     |
+| Idempotency           | `eventId` + `(tenantId, ticketId, level, bucket)` |
 
 Payload canonical:
 
@@ -206,21 +206,21 @@ WS mapping:
 - `kitchen.sla_warning` → `events.kitchenSlaWarning`
 - Rooms:
   - `tenant:{tenantId}:management`
-  - `tenant:{tenantId}:kds:kitchen` nếu station là `KITCHEN`
-  - `tenant:{tenantId}:kds:bar` nếu station là `BAR`
+  - `tenant:{tenantId}:kds:kitchen` if station is `KITCHEN`
+  - `tenant:{tenantId}:kds:bar` if station is `BAR`
 
 ### 3.3 Topic `payment.completed`
 
-Step 2.6 chỉ chuẩn bị bridge contract vì topic này thuộc Phase 3.
+Step 2.6 only prepares the bridge contract because this topic belongs to Phase 3.
 
-| Thuộc tính             | Giá trị                               |
-| ---------------------- | ------------------------------------- |
-| Producer               | Payment Service                       |
-| Consumer chính         | Order/Catalog/Notification/BFF bridge |
-| Consumer group của BFF | `bff-kafka-bridge`                    |
-| Partition key          | `tenantId`                            |
+| Attributes            | Value                                 |
+| --------------------- | ------------------------------------- |
+| Producer              | Payment service                       |
+| Main consumer         | Order/Catalog/Notification/BFF bridge |
+| Consumer group of BFF | `bff-kafka-bridge`                    |
+| Partition key         | `tenantId`                            |
 
-Payload tối thiểu cho BFF bridge:
+Minimum payload for BFF bridge:
 
 ```ts
 type PaymentCompletedEvent = {
@@ -247,9 +247,9 @@ WS mapping:
   - `session:{sessionId}:customer`
   - `tenant:{tenantId}:staff`
 
-### 3.4 Internal Redis Pub/Sub event từ Kitchen sang BFF
+### 3.4 Internal Redis Pub/Sub event from Kitchen to BFF
 
-Không thêm Kafka topic cho KDS queue change. Kitchen publish Redis Pub/Sub sau khi Redis write thành công.
+Do not add Kafka topic for KDS queue change. Kitchen publishes Redis Pub/Sub after Redis writes successfully.
 
 Channel:
 
@@ -290,7 +290,7 @@ type KdsQueueChangedInternalEvent = {
 };
 ```
 
-Redis Pub/Sub event là hint không durable. Nếu BFF hoặc client miss event, reconnect/refetch snapshot vẫn phải đúng.
+Redis Pub/Sub event is a non-durable hint. If BFF or client misses event, reconnect/refetch snapshot must still be correct.
 
 ---
 
@@ -305,7 +305,7 @@ KITCHEN
 BAR
 ```
 
-Station slug dùng cho required phase keys:
+Station slug used for required phase keys:
 
 ```txt
 KITCHEN -> kitchen
@@ -314,54 +314,54 @@ BAR     -> bar
 
 ### 4.2 Ticket identity
 
-Một ticket đại diện cho một order ở một station.
+A ticket represents an order at a station.
 
 ```txt
 ticketId = {orderId}:{station}
 ```
 
-Ví dụ:
+For example:
 
 ```txt
 0a1b...-order-id:KITCHEN
 0a1b...-order-id:BAR
 ```
 
-`ticketId` là deterministic để chống duplicate khi Kafka retry.
+`ticketId` is deterministic to prevent duplicates when Kafka retry.
 
 ### 4.3 Ticket item identity
 
-Một `orderItemId` map trực tiếp thành một KDS ticket item.
+A `orderItemId` maps directly to a KDS ticket item.
 
 ```txt
 ticketItemId = {orderItemId}
 ```
 
-Không tạo ID riêng nếu không cần, vì `orderItemId` đã là identity bền vững từ Order Service.
+Do not create your own ID if you do not need it, because `orderItemId` is already a persistent identity from Order service.
 
 ### 4.4 Core keys
 
-| Key                                                | Type             | TTL / retention                                  | Owner   | Mục đích                                                                 |
-| -------------------------------------------------- | ---------------- | ------------------------------------------------ | ------- | ------------------------------------------------------------------------ |
-| `kds:{tid}:ticket:{ticketId}`                      | Hash             | Không TTL khi active; set TTL 24-48h sau archive | Kitchen | Aggregate root của KDS ticket.                                           |
-| `kds:{tid}:ticket:{ticketId}:items`                | Set              | Cùng retention với ticket                        | Kitchen | Danh sách `ticketItemId`.                                                |
-| `kds:{tid}:ticket-item:{ticketItemId}`             | Hash             | Cùng retention với ticket                        | Kitchen | State từng item trong ticket.                                            |
-| `kds:{tid}:order:{orderId}:tickets`                | Set              | Cùng retention với ticket                        | Kitchen | Lookup ticket theo order để cancel/transfer/patch.                       |
-| `kds:{tid}:kitchen`                                | Sorted Set       | Không TTL                                        | Kitchen | Active queue của station KITCHEN: chứa ticket `PENDING` và `PROCESSING`. |
-| `kds:{tid}:bar`                                    | Sorted Set       | Không TTL                                        | Kitchen | Active queue của station BAR: chứa ticket `PENDING` và `PROCESSING`.     |
-| `kds:{tid}:station:{station}:READY`                | Sorted Set       | Recall/pickup window                             | Kitchen | Ticket READY còn có thể recall hoặc cần staff visibility.                |
-| `kds:{tid}:revision`                               | String counter   | Không TTL                                        | Kitchen | Tenant-level revision.                                                   |
-| `kds:{tid}:station:{station}:revision`             | String counter   | Không TTL                                        | Kitchen | Station-level revision.                                                  |
-| `kds:{tid}:dedupe:event:{eventId}`                 | String           | 14 ngày                                          | Kitchen | Idempotency theo Kafka event.                                            |
-| `kds:{tid}:dedupe:order:{orderId}:{station}`       | String           | 14 ngày                                          | Kitchen | Chống duplicate ticket theo order/station.                               |
-| `kds:{tid}:source-event:{eventId}:tickets`         | Set              | 14 ngày                                          | Kitchen | Debug mapping event → ticket IDs.                                        |
-| `kds:sla:due`                                      | Sorted Set       | Không TTL                                        | Kitchen | Global due index cho SLA worker.                                         |
-| `kds:{tid}:ticket:{ticketId}:sla`                  | Hash             | Cùng retention với ticket                        | Kitchen | SLA state của ticket.                                                    |
-| `kds:{tid}:dedupe:sla:{ticketId}:{level}:{bucket}` | String           | 24h                                              | Kitchen | Chống cảnh báo SLA lặp.                                                  |
-| `kds:cleanup:due`                                  | Sorted Set       | Không TTL                                        | Kitchen | Ticket đến hạn archive/delete.                                           |
-| `kds:{tid}:dead-letter:order-confirmed`            | List hoặc Stream | Cap 1000 records, TTL 7 ngày                     | Kitchen | Lưu payload invalid để debug.                                            |
-| `lock:kds:{tid}:ticket:{ticketId}`                 | String           | PX 5-10s                                         | Kitchen | Optional lock cho command phức tạp.                                      |
-| `lock:kds:rebuild:{tid}`                           | String           | PX theo timeout rebuild                          | Kitchen | Chống nhiều rebuild cùng tenant.                                         |
+| Key                                                | Type           | TTL / retention                                  | Owner   | Purpose                                                                       |
+| -------------------------------------------------- | -------------- | ------------------------------------------------ | ------- | ----------------------------------------------------------------------------- |
+| `kds:{tid}:ticket:{ticketId}`                      | Hash           | No TTL when active; set TTL 24-48h later archive | Kitchen | Aggregate root of KDS ticket.                                                 |
+| `kds:{tid}:ticket:{ticketId}:items`                | Set            | Same retention with tickets                      | Kitchen | List `ticketItemId`.                                                          |
+| `kds:{tid}:ticket-item:{ticketItemId}`             | Hash           | Same retention with tickets                      | Kitchen | State each item in the ticket.                                                |
+| `kds:{tid}:order:{orderId}:tickets`                | Set            | Same retention with tickets                      | Kitchen | Lookup tickets according to order to cancel/transfer/patch.                   |
+| `kds:{tid}:kitchen`                                | Sorted Set     | No TTL                                           | Kitchen | Active queue of station KITCHEN: contains tickets `PENDING` and `PROCESSING`. |
+| `kds:{tid}:bar`                                    | Sorted Set     | No TTL                                           | Kitchen | Active queue of station BAR: contains tickets `PENDING` and `PROCESSING`.     |
+| `kds:{tid}:station:{station}:READY`                | Sorted Set     | Recall/pickup window                             | Kitchen | Ticket READY can also be recalled or requires staff visibility.               |
+| `kds:{tid}:revision`                               | String counter | No TTL                                           | Kitchen | tenant-level revision.                                                        |
+| `kds:{tid}:station:{station}:revision`             | String counter | No TTL                                           | Kitchen | Station-level revision.                                                       |
+| `kds:{tid}:dedupe:event:{eventId}`                 | String         | 14 days                                          | Kitchen | Idempotency according to Kafka events.                                        |
+| `kds:{tid}:dedupe:order:{orderId}:{station}`       | String         | 14 days                                          | Kitchen | Prevent duplicate tickets by order/station.                                   |
+| `kds:{tid}:source-event:{eventId}:tickets`         | Set            | 14 days                                          | Kitchen | Debug mapping event → ticket IDs.                                             |
+| `kds:sla:due`                                      | Sorted Set     | No TTL                                           | Kitchen | Global due index for worker SLA.                                              |
+| `kds:{tid}:ticket:{ticketId}:sla`                  | Hash           | Same retention with tickets                      | Kitchen | SLA state of the ticket.                                                      |
+| `kds:{tid}:dedupe:sla:{ticketId}:{level}:{bucket}` | String         | 24h                                              | Kitchen | Prevent repeated SLA warnings.                                                |
+| `kds:cleanup:due`                                  | Sorted Set     | No TTL                                           | Kitchen | Expired tickets archive/delete.                                               |
+| `kds:{tid}:dead-letter:order-confirmed`            | List or Stream | Cap 1000 records, TTL 7 days                     | Kitchen | Save invalid payload for debugging.                                           |
+| `lock:kds:{tid}:ticket:{ticketId}`                 | String         | PX 5-10s                                         | Kitchen | Optional lock for complex commands.                                           |
+| `lock:kds:rebuild:{tid}`                           | String         | PX according to rebuild timeout                  | Kitchen | Prevent multiple rebuilds within the same tenant.                             |
 
 ### 4.5 Ticket hash fields
 
@@ -421,20 +421,20 @@ Redis Sorted Set score:
 
 ```txt
 PRIORITY_BUCKET_FACTOR = 10_000_000_000_000
-priorityRank = 0 nếu priority = true
-priorityRank = 1 nếu priority = false
+priorityRank = 0 if priority = true
+priorityRank = 1 if priority = false
 queueScore = priorityRank * PRIORITY_BUCKET_FACTOR + confirmedAtEpochMs
 ```
 
-Ý nghĩa:
+Meaning:
 
-- Priority ticket luôn đứng trước normal ticket trong cùng station.
-- FIFO vẫn giữ bên trong mỗi priority bucket.
-- Khi bật/tắt priority, cập nhật lại `queueScore` trong active queue tương ứng.
+- Priority tickets always come before normal tickets in the same station.
+- FIFO remains inside each priority bucket.
+- When turning priority on/off, update `queueScore` in the corresponding active queue.
 
-### 4.8 Không có batching keys
+### 4.8 No batching keys
 
-Các key sau **không được tạo** trong Step 2.6:
+The following keys are **not created** in Step 2.6:
 
 ```txt
 kds:{tid}:station:{station}:batches
@@ -443,9 +443,9 @@ kds:{tid}:batch:{...}:items
 kds:{tid}:ticket-item:{ticketItemId}:batch
 ```
 
-Không có `prepSignature`, không có `activeQuantity`, không có group total xuyên order.
+There is no `prepSignature`, no `activeQuantity`, no group total across orders.
 
-KDS UI có thể hiển thị nhiều ticket cùng món, nhưng không được gom chúng thành một batch backend contract.
+KDS UI can display multiple tickets for the same item, but cannot combine them into a batch backend contract.
 
 ---
 
@@ -467,7 +467,7 @@ Kafka order.confirmed
         v
       READY
         |
-        | recall trong recall window
+| recall in recall window
         v
    PROCESSING
 
@@ -477,14 +477,14 @@ READY / VOIDED -- cleanup retention --> ARCHIVED
 
 ### 5.2 Transition rules
 
-| From                           | To           | Trigger                   | Actor                      | Permission              | Ghi chú                                                            |
-| ------------------------------ | ------------ | ------------------------- | -------------------------- | ----------------------- | ------------------------------------------------------------------ |
-| none                           | `PENDING`    | Kafka `order.confirmed`   | Kitchen consumer           | Service principal       | Idempotent create.                                                 |
-| `PENDING`                      | `PROCESSING` | Start ticket              | CHEF/BARISTA/OWNER/MANAGER | `KITCHEN_UPDATE_TICKET` | Station restriction bắt buộc.                                      |
-| `PROCESSING`                   | `READY`      | Done ticket               | CHEF/BARISTA/OWNER/MANAGER | `KITCHEN_UPDATE_TICKET` | Phải sync Order Service trước khi emit customer/staff ready event. |
-| `READY`                        | `PROCESSING` | Recall                    | CHEF/BARISTA/OWNER/MANAGER | `KITCHEN_RECALL`        | Chỉ trong recall window.                                           |
-| `PENDING`/`PROCESSING`/`READY` | `VOIDED`     | Order cancel/compensation | Order/BFF-driven command   | Theo command gốc        | Remove khỏi active/ready queue.                                    |
-| `READY`/`VOIDED`               | `ARCHIVED`   | Cleanup worker            | Kitchen internal           | Service principal       | Xóa khỏi queue, set TTL hoặc delete.                               |
+| From                           | Big          | Triggers                  | Actor                      | Permission                        | Notes                                                               |
+| ------------------------------ | ------------ | ------------------------- | -------------------------- | --------------------------------- | ------------------------------------------------------------------- |
+| none                           | `PENDING`    | Kafka `order.confirmed`   | Kitchen consumers          | service principal                 | Idempotent create.                                                  |
+| `PENDING`                      | `PROCESSING` | Start ticket              | CHEF/BARISTA/Owner/MANAGER | `KITCHEN_UPDATE_TICKET`           | Station restriction required.                                       |
+| `PROCESSING`                   | `READY`      | Done ticket               | CHEF/BARISTA/Owner/MANAGER | `KITCHEN_UPDATE_TICKET`           | Must sync Order service before emitting customer/staff ready event. |
+| `READY`                        | `PROCESSING` | Recall                    | CHEF/BARISTA/Owner/MANAGER | `KITCHEN_RECALL`                  | Only in recall window.                                              |
+| `PENDING`/`PROCESSING`/`READY` | `VOIDED`     | Order cancel/compensation | Order/BFF-driven command   | According to the original command | Remove from active/ready queue.                                     |
+| `READY`/`VOIDED`               | `ARCHIVED`   | Cleanup worker            | Kitchen interior           | service principal                 | Delete from queue, set TTL or delete.                               |
 
 ### 5.3 Start ticket
 
@@ -640,18 +640,18 @@ KDS_ARCHIVED_TTL_SECONDS = 86400
 Default policy:
 
 ```txt
-KDS_DEFAULT_SLA_SECONDS = 900          # 15 phút
-KDS_BREACH_GRACE_SECONDS = 300         # thêm 5 phút sau WARNING
+KDS_DEFAULT_SLA_SECONDS = 900          # 15 minutes
+KDS_BREACH_GRACE_SECONDS = 300 # add 5 minutes after WARNING
 KDS_SLA_WORKER_INTERVAL_MS = 5000
 ```
 
-Per-tenant/per-station config có thể được cache ở:
+Per-tenant/per-station config can be cached at:
 
 ```txt
 kds:{tid}:settings
 ```
 
-Nếu chưa có tenant settings service, Step 2.6 dùng default config từ env.
+If there is no tenant settings service, Step 2.6 uses default config from env.
 
 ### 6.2 Due index
 
@@ -676,15 +676,15 @@ BREACH score  = confirmedAtEpochMs + (slaSeconds + breachGraceSeconds) * 1000
 
 ### 6.3 Worker algorithm
 
-1. Mỗi `KDS_SLA_WORKER_INTERVAL_MS`, scan:
+1. Every `KDS_SLA_WORKER_INTERVAL_MS`, scan:
 
 ```txt
 ZRANGEBYSCORE kds:sla:due -inf now LIMIT 0 N
 ```
 
-2. Claim due member bằng Lua hoặc lock ngắn.
+2. Claim due member using Lua or short lock.
 3. Re-read ticket hash.
-4. Skip nếu ticket status là `READY`, `VOIDED`, hoặc `ARCHIVED`.
+4. Skip if ticket status is `READY`, `VOIDED`, or `ARCHIVED`.
 5. Check dedupe:
 
 ```txt
@@ -697,10 +697,10 @@ kds:{tid}:dedupe:sla:{ticketId}:{level}:{bucket}
 
 ### 6.4 SLA warning levels
 
-| Level     | Điều kiện                                              | UI expectation       | Kafka                         |
-| --------- | ------------------------------------------------------ | -------------------- | ----------------------------- |
-| `WARNING` | `now >= confirmedAt + slaSeconds`                      | Ticket cảnh báo vàng | Produce `kitchen.sla_warning` |
-| `BREACH`  | `now >= confirmedAt + slaSeconds + breachGraceSeconds` | Ticket cảnh báo đỏ   | Produce `kitchen.sla_warning` |
+| Level     | Conditions                                             | UI expectations       | Kafka                         |
+| --------- | ------------------------------------------------------ | --------------------- | ----------------------------- |
+| `WARNING` | `now >= confirmedAt + slaSeconds`                      | Yellow warning ticket | Produce `kitchen.sla_warning` |
+| `BREACH`  | `now >= confirmedAt + slaSeconds + breachGraceSeconds` | Red warning ticket    | Produce `kitchen.sla_warning` |
 
 ---
 
@@ -708,60 +708,60 @@ kds:{tid}:dedupe:sla:{ticketId}:{level}:{bucket}
 
 ### 7.1 Namespace
 
-Giữ namespace hiện có:
+Keep the existing namespace:
 
 ```txt
 /orders
 ```
 
-Không bắt buộc tạo `/kds` trong Step 2.6. Nếu sau này tách namespace, contract room/event vẫn giữ nguyên.
+Creating `/kds` is not required in Step 2.6. If the namespace is later separated, the contract room/event will remain the same.
 
 ### 7.2 Socket.IO Redis Adapter
 
-BFF phải dùng custom `IoAdapter` với Socket.IO Redis Adapter để broadcast qua nhiều instance.
+BFF must use custom `IoAdapter` with Socket.IO Redis Adapter to broadcast across multiple instances.
 
-Yêu cầu vận hành:
+Operating requirements:
 
-- Dùng Redis pub/sub client riêng cho Socket.IO adapter.
-- Register adapter trước khi app listen/gateway hoạt động.
-- Nếu bật long-polling, load balancer phải sticky-session; hoặc cấu hình client `transports: ['websocket']`.
-- Adapter không cung cấp replay. Reconnect vẫn phải REST snapshot.
+- Use separate Redis pub/sub client for Socket.IO adapter.
+- Register adapter before app listen/gateway operates.
+- If long-polling is enabled, the load balancer must be sticky-session; or configure client `transports: ['websocket']`.
+- Adapter does not provide replays. Reconnect still requires a REST snapshot.
 
 ### 7.3 Handshake auth — Staff
 
-Client gửi JWT trong một trong các vị trí được hỗ trợ:
+Client sends JWT in one of the supported locations:
 
 ```txt
 Authorization: Bearer <jwt>
 auth.token
 ```
 
-Gateway phải:
+Gateway must:
 
-1. Verify JWT qua Authorizer hoặc shared auth verification service tương đương `UserGuard`.
-2. Resolve `tenantId` từ claim `tenant_id`.
-3. Resolve roles/permissions từ AuthorizeResponse.
-4. Reject socket nếu:
+1. verify JWT via Authorizer or shared auth verification service equivalent to `UserGuard`.
+2. Resolve `tenantId` from claim `tenant_id`.
+3. Resolve roles/permissions from AuthorizeResponse.
+4. Reject socket if:
    - token invalid;
    - user not provisioned;
    - tenant missing/mismatch;
-   - role không có room nào hợp lệ.
+   - role does not have any valid rooms.
 
 ### 7.4 Handshake auth — Customer
 
-Client gửi:
+Client sent:
 
 ```txt
 x-session-id
-x-tenant-id hoặc tenant context tương đương QR/session flow
+x-tenant-id or tenant context equivalent QR/session flow
 ```
 
-Gateway phải:
+Gateway must:
 
-1. Validate session ID tồn tại và thuộc tenant.
-2. Không tạo session mới trong WebSocket handshake.
-3. Join room `session:{sessionId}:customer` sau khi validation thành công.
-4. Nếu session expired/closed, reject socket hoặc emit auth error rồi disconnect.
+1. Validate session ID exists and belongs to the tenant.
+2. Do not create new sessions in the WebSocket handshake.
+3. Join room `session:{sessionId}:customer` after successful validation.
+4. If session expires/closed, reject socket or emit auth error then disconnect.
 
 ### 7.5 Room assignment
 
@@ -859,14 +859,14 @@ type KitchenItemReadyEvent = {
 
 Emit condition:
 
-- Chỉ emit sau khi Kitchen ticket/item ready và Order Service readiness update đều thành công.
+- Only emit after Kitchen ticket/item ready and Order service readiness update are both successful.
 
 #### `events.kitchenSlaWarning`
 
 Rooms:
 
 - `tenant:{tid}:management`
-- Station KDS room tương ứng.
+- Station KDS room respectively.
 
 Payload:
 
@@ -876,7 +876,7 @@ type KitchenSlaWarningWsEvent = KitchenSlaWarningEvent;
 
 #### Existing direct events
 
-Các event Step 2.4 vẫn giữ:
+Step 2.4 events remain:
 
 - `events.cartUpdated`
 - `events.orderCreated`
@@ -887,15 +887,15 @@ Các event Step 2.4 vẫn giữ:
 
 ---
 
-## 8. BFF REST Contract cho KDS
+## 8. BFF REST Contract for KDS
 
-Tất cả endpoint staff dùng:
+All endpoint staff use:
 
 ```txt
 UserGuard -> TenantGuard -> PermissionGuard
 ```
 
-Global runtime vẫn có `SessionGuard`, nhưng route secured phải bypass session theo pattern hiện tại.
+The global runtime still has `SessionGuard`, but the secured route must bypass the session according to the current pattern.
 
 ### 8.1 Get KDS queue
 
@@ -1177,7 +1177,7 @@ sourceEventId = "rebuild:{tenantId}:{orderId}:{station}"
 
 Redis rebuild from Order cannot perfectly restore whether a chef had already pressed Start before Redis loss. This is acceptable for Step 2.6 because Order is the durable source and KDS is an operational view.
 
-If stronger prep-state recovery is required later, use Kafka replay plus durable KDS audit in a future hardening phase.
+If siner prep-state recovery is required later, use Kafka replay plus durable KDS audit in a future hardening phase.
 
 ---
 
@@ -1471,7 +1471,7 @@ These are scenario requirements, not implementation tasks.
 
 ## 18. Historical Implementation Boundaries
 
-Khi đối chiếu implementation hoặc viết plan hardening sau này, vẫn phải giữ các boundary đã chốt:
+When comparing implementations or writing hardening plans later, you must still keep the locked boundaries:
 
 1. Do not reintroduce batching as "small helper" or UI convenience.
 2. Add `KITCHEN_SET_PRIORITY` before exposing priority endpoint.

@@ -1,37 +1,37 @@
-# Phase 3 — Đặc Tả Nghiệp Vụ & Kiến Trúc Payment Service Chính Thức
+# Phase 3 — Final Payment service Architecture & Business Specification
 
-> **Giai đoạn:** Phase 3 — Payment Service (SePay/VietQR + Cash)  
-> **Ngày:** 2026-05-08  
-> **Trạng thái:** Chốt sau audit Phase 3 và quyết định Q1-Q6 của project owner.
-> **Mục đích:** Tài liệu này là tiêu chuẩn nghiệp vụ/kỹ thuật cho Phase 3. Đây không phải implementation plan và không phân rã task code.
-> **Implementation note (2026-05-14):** Spec gốc Phase 3 chốt theo cơ chế `X-Secret-Key`. Code hiện tại cho route trực tiếp `POST /api/v1/payment/sepay/webhook` đã harden sang HMAC raw-body (`X-SePay-Signature` + `X-SePay-Timestamp`). Các route tenant/platform thêm ở Phase 4B vẫn dùng `x-secret-key` path riêng. Khi lệch, ưu tiên phase record hiện tại và code/tests.
-
----
-
-## 0. Biên Bản Quyết Định
-
-| Câu hỏi | Quyết định  | Nội dung chốt                                                                                                                                        |
-| ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1      | Phương án A | Nếu khách chuyển thiếu tiền qua VietQR, giữ payment `PENDING`, ghi audit `SEPAY_WEBHOOK_UNDERPAID`, trả webhook HTTP 200 và để staff xử lý thủ công. |
-| Q2      | Phương án A | Nếu khách chuyển dư tiền qua VietQR, chấp nhận `PAID`, lưu `paidAmount = transferAmount`, không tự tạo refund cho phần chênh.                        |
-| Q3      | Phương án A | Phase 3 chỉ hỗ trợ **full refund**, tối đa một refund active/confirmed cho mỗi payment.                                                              |
-| Q4      | Phương án A | WAITER được quyền `payment.create` để tạo QR VietQR trên POS.                                                                                        |
-| Q5      | Phương án A | Webhook không khớp bill/payment chỉ ghi application log và trả HTTP 200; không persist vào `audit_payments`.                                         |
-| Q6      | Phương án A | `billReference = "QRTBL" + first 8 chars of billId`, nếu đụng unique thì regenerate bằng suffix đơn giản.                                            |
-
-### 0.1 Tài Liệu Này Override Điểm Nào?
-
-1. Phase 3 không dùng Stripe, không redirect sang hosted checkout. Spec gốc không yêu cầu raw-body signature, nhưng implementation hiện tại đã đổi route trực tiếp sang HMAC raw-body để harden webhook.
-2. Payment online của Phase 3 là **SePay + VietQR inline**: hệ thống build QR URL và chờ webhook xác nhận.
-3. `PaymentMethod` Phase 3 chỉ mở rộng thêm `VIETQR`. Không thêm `CARD`, `MOMO`, `ZALOPAY`, `BANK_TRANSFER` trong scope này.
-4. Refund Phase 3 là **manual full refund**: staff/owner chuyển khoản tay ngoài hệ thống rồi xác nhận trong Dashboard.
-5. Không thiết kế distributed lock, Redis lock, saga riêng, hoặc replay queue riêng cho webhook. PostgreSQL transaction + constraint là baseline.
+> **Phase:** Phase 3 — Payment service (SePay/VietQR + Cash)
+> **Date:** 2026-05-08
+> **Status:** Finalized after Phase 3 audit and project Owner's Q1-Q6 decision.
+> **Purpose:** This document is a business/technical standard for Phase 3. This is not an implementation plan and does not disassemble task code.
+> **Implementation note (2026-05-14):** Original Spec Phase 3 latches according to `X-Secret-Key` mechanism. The current code for the direct route `POST /api/v1/payment/sepay/webhook` has been hardened to HMAC raw-body (`X-SePay-Signature` + `X-SePay-Timestamp`). tenant/platform routes added in Phase 4B still use their own `x-secret-key` path. When deviating, prioritize the current phase record and code/tests.
 
 ---
 
-## 1. Cơ Sở Tài Liệu và Context7
+## 0. Minutes of Decision
 
-### 1.1 Cơ Sở Trong Repo
+| Question | Decision | Closing content                                                                                                                                                                 |
+| -------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1       | Option A | If the customer transfers insufficient money via VietQR, keep payment `PENDING`, record audit `SEPAY_WEBHOOK_UNDERPAID`, pay webhook HTTP 200 and let staff handle it manually. |
+| Q2       | Option A | If the customer transfers excess money via VietQR, accept `PAID`, save `paidAmount = transferAmount`, do not create a refund for the difference.                                |
+| Q3       | Option A | Phase 3 only supports **full refund**, maximum one active/confirmed refund per payment.                                                                                         |
+| Q4       | Option A | WAITER is authorized `payment.create` to create QR VietQR on POS.                                                                                                               |
+| Q5       | Option A | Webhook that does not match bill/payment only records application log and returns HTTP 200; Do not persist to `audit_payments`.                                                 |
+| Q6       | Option A | `billReference = "QRTBL" + first 8 chars of billId`, if unique, regenerate with simple suffix.                                                                                  |
+
+### 0.1 What Points Does This Document Override?
+
+1. Phase 3 does not use Stripe, does not redirect to hosted checkout. The original spec did not require a raw-body signature, but the current implementation has changed the route directly to HMAC raw-body to harden the webhook.
+2. Phase 3's online payment is **SePay + VietQR inline**: the system builds QR URL and waits for webhook to confirm.
+3. `PaymentMethod` Phase 3 only expands `VIETQR`. Do not add `CARD`, `MOMO`, `ZALOPAY`, `BANK_TRANSFER` in this scope.
+4. Refund Phase 3 is **manual full refund**: staff/Owner transfers money manually outside the system and then confirms in Dashboard.
+5. Do not design separate distributed lock, Redis lock, separate saga, or separate replay queue for webhooks. PostgreSQL transaction + constraint is baseline.
+
+---
+
+## 1. Document Base and Context7
+
+### 1.1 Facility in Repo
 
 - `docs/phases/phase-3-payment.md`
 - `docs/phases/phase-3-payment.md`
@@ -40,87 +40,87 @@
 - `docs/implementation_plan.md`
 - `docs/architecture/permission-matrix.md`
 - `docs/references/auth-system-reference.md`
-- `docs/specs/business-logic-step-2.4-spec.vi.md`
-- Code hiện tại: `Bill`, `BillStatus`, `PaymentMethod`, `OutboxEvent`, Order outbox publisher.
+- `docs/specs/business-logic-step-2.4-spec.md`
+- Current code: `Bill`, `BillStatus`, `PaymentMethod`, `OutboxEvent`, Order outbox publisher.
 
-### 1.2 Kết Quả Context7 Dùng Cho Spec
+### 1.2 Context7 Results Used for Spec
 
-Tài liệu SePay từ Context7 (`/websites/developer_sepay_vn`) xác nhận:
+SePay documentation from Context7 (`/websites/developer_sepay_vn`) confirms:
 
-- VietQR image URL có format:
+- VietQR image URL has the format:
 
 ```text
 https://qr.sepay.vn/img?acc=SO_TAI_KHOAN&bank=NGAN_HANG&amount=SO_TIEN&des=NOI_DUNG
 ```
 
-- SePay webhook gửi JSON body thông thường.
-- Spec Phase 3 gốc chọn SECRET_KEY mode nên webhook có header:
+- SePay webhook sends regular JSON body.
+- Original Spec Phase 3 chose SECRET_KEY mode so the webhook has the header:
 
 ```http
 X-Secret-Key: <secret_key>
 Content-Type: application/json
 ```
 
-- Implementation hiện tại của direct Phase 3 route đã harden sang HMAC raw-body (`X-SePay-Signature` / `X-SePay-Timestamp`). Các route tenant/platform Phase 4B vẫn theo `x-secret-key` path riêng.
+- Current implementation of direct Phase 3 route has been hardened to HMAC raw-body (`X-SePay-Signature` / `X-SePay-Timestamp`). Phase 4B tenant/platform routes still follow their own `x-secret-key` path.
 
-- Payload webhook có các field chính: `id`, `gateway`, `transactionDate`, `accountNumber`, `code`, `content`, `transferType`, `transferAmount`, `accumulated`, `subAccount`, `referenceCode`, `description`.
-- `code` có thể `null`; hệ thống phải fallback parse từ `content`.
+- Payload webhook has main fields: `id`, `gateway`, `transactionDate`, `accountNumber`, `code`, `content`, `transferType`, `transferAmount`, `accumulated`, `subAccount`, `referenceCode`, `description`.
+- `code` can `null`; The system must fallback parse from `content`.
 
 ---
 
-## 2. Phạm Vi và Ngoài Phạm Vi
+## 2. Scope and Out of Scope
 
-### 2.1 Trong Phạm Vi Phase 3
+### 2.1 Within Phase 3
 
-1. Tạo Payment Service mới (`apps/payment`) với PostgreSQL riêng `qrtable_payment`.
-2. Tạo và hiển thị VietQR cho bill ở trạng thái `PENDING_PAYMENT`.
-3. Nhận webhook SePay qua BFF endpoint public. Spec gốc dùng `X-Secret-Key`; code hiện tại của route trực tiếp dùng HMAC headers `X-SePay-Signature` / `X-SePay-Timestamp`.
-4. Xác nhận thanh toán tiền mặt trên POS.
-5. Chống duplicate webhook bằng DB unique constraint.
-6. Chống race Cash vs VietQR bằng transaction + row lock trên payment.
+1. Create a new Payment service (`apps/payment`) with private PostgreSQL `qrtable_payment`.
+2. Create and display VietQR for the bill in status `PENDING_PAYMENT`.
+3. Receive SePay webhook via BFF public endpoint. Original spec uses `X-Secret-Key`; The current code of the direct route uses HMAC headers `X-SePay-Signature` / `X-SePay-Timestamp`.
+4. Confirm cash payment on POS.
+5. Prevent duplicate webhooks with DB unique constraint.
+6. Prevent Cash vs VietQR race by transaction + row lock on payment.
 7. Emit Kafka:
    - `payment.completed`
    - `payment.refunded`
-8. Manual full refund có audit.
-9. Payment history cơ bản cho POS/Dashboard.
-10. Cập nhật shared type, permission, config cần thiết.
+8. Manual full refund with audit.
+9. Basic payment history for POS/Dashboard.
+10. Update necessary shared types, permissions, and config.
 
-### 2.2 Ngoài Phạm Vi Phase 3
+### 2.2 Out of Range Phase 3
 
-1. Không split bill.
-2. Không partial refund.
-3. Không auto payout/auto bank transfer refund.
-4. Không đối soát ngân hàng tự động cuối ngày.
-5. Không hỗ trợ nhiều gateway song song.
-6. Không tạo webhook replay dashboard.
-7. Không tạo Redis lock hoặc distributed lock.
-8. Không đảm bảo chính xác tuyệt đối cho trường hợp khách chuyển khoản sai nội dung và staff tự đối soát thủ công. Trường hợp này chỉ application log trong Phase 3.
+1. Do not split the bill.
+2. No partial refund.
+3. No auto payout/auto bank transfer refund.
+4. No automatic bank reconciliation at the end of the day.
+5. Does not support multiple parallel gateways.
+6. Do not create dashboard replay webhooks.
+7. Do not create Redis lock or distributed lock.
+8. Absolute accuracy is not guaranteed in cases where customers transfer money with incorrect content and staff manually check. In this case, only application log is in Phase 3.
 
 ---
 
-## 3. Service Boundary và Ownership
+## 3. service Boundary and Ownership
 
 ### 3.1 Ownership
 
-| Domain object   | Owner                    | Storage                          | Ghi chú                                                                                                                   |
-| --------------- | ------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Bill            | Order Service            | `qrtable_order.bills`            | Payment Service chỉ nhận `billId`, không sở hữu lifecycle bill.                                                           |
-| Payment         | Payment Service          | `qrtable_payment.payments`       | Source of truth cho method, paid amount, SePay transaction.                                                               |
-| Refund          | Payment Service          | `qrtable_payment.refunds`        | Manual full refund, audit bắt buộc.                                                                                       |
-| Payment audit   | Payment Service          | `qrtable_payment.audit_payments` | Truy vết payment/refund.                                                                                                  |
-| Table status    | Catalog Service          | `qrtable_catalog.tables`         | Order `BillService.markPaid` gọi Catalog TCP `TABLE.UPDATE_STATUS` sau fast path hoặc Kafka `payment.completed` consumer. |
-| User/permission | User-Access + Authorizer | MongoDB + Keycloak               | BFF enforce permission với staff routes.                                                                                  |
+| Domain object   | Owner                    | Storage                          | Notes                                                                                                                       |
+| --------------- | ------------------------ | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Bill            | Order service            | `qrtable_order.bills`            | Payment service only receives `billId`, does not own the lifecycle bill.                                                    |
+| Payment         | Payment service          | `qrtable_payment.payments`       | Source of truth for method, paid amount, SePay transaction.                                                                 |
+| Refund          | Payment service          | `qrtable_payment.refunds`        | Manual full refund, mandatory audit.                                                                                        |
+| Payment audit   | Payment service          | `qrtable_payment.audit_payments` | Track payments/refunds.                                                                                                     |
+| Table status    | service Catalog          | `qrtable_catalog.tables`         | Order `BillService.markPaid` calls TCP Catalog `TABLE.UPDATE_STATUS` after fast path or Kafka `payment.completed` consumer. |
+| User/permission | User-Access + Authorizer | MongoDB + Keycloak               | BFF enforce permission with staff routes.                                                                                   |
 
 ### 3.2 Communication
 
-| Flow                                        | Protocol                      | Lý do                                                  |
+| Flow                                        | Protocols                     | Reason                                                 |
 | ------------------------------------------- | ----------------------------- | ------------------------------------------------------ |
-| Client -> BFF payment endpoints             | HTTP REST                     | BFF là API gateway duy nhất.                           |
-| BFF -> Payment Service                      | TCP                           | Theo pattern service hiện tại.                         |
-| Payment Service -> Order Service query bill | TCP                           | Payment cần snapshot bill để tạo payment/QR.           |
-| Payment Service -> Kafka                    | Kafka via local outbox        | Domain events `payment.completed`, `payment.refunded`. |
-| SePay -> BFF webhook                        | HTTP POST                     | External callback.                                     |
-| BFF -> clients realtime                     | WebSocket bridge / BFF Direct | UI status update, không thay source of truth.          |
+| Client -> BFF payment endpoints             | HTTP REST                     | BFF is the only API gateway.                           |
+| BFF -> Payment service                      | TCP                           | According to the current service pattern.              |
+| Payment service -> Order service query bill | TCP                           | Payment needs a snapshot bill to create payment/QR.    |
+| Payment service -> Kafka                    | Kafka via local outbox        | Domain events `payment.completed`, `payment.refunded`. |
+| SePay -> BFF webhook                        | HTTP POST                     | External callbacks.                                    |
+| BFF -> realtime clients                     | WebSocket bridge / BFF Direct | UI status updated, source of truth not changed.        |
 
 ---
 
@@ -128,20 +128,20 @@ Content-Type: application/json
 
 ### 4.1 Bill State
 
-Bill state vẫn thuộc Order Service:
+Bill state still belongs to Order service:
 
 ```text
 OPEN -> PENDING_PAYMENT -> PAID
 ```
 
-Phase 3 chỉ được hoàn tất bill khi nhận `payment.completed`.
+Phase 3 can only complete the bill when receiving `payment.completed`.
 
 Rules:
 
-- Chỉ tạo payment khi bill đang `PENDING_PAYMENT`.
-- Bill `PAID` là immutable.
-- Nếu payment underpaid, bill vẫn `PENDING_PAYMENT`.
-- Refund không reopen bill; bill vẫn `PAID`.
+- Only create payment when bill is `PENDING_PAYMENT`.
+- Bill `PAID` is immutable.
+- If payment is underpaid, bill is still `PENDING_PAYMENT`.
+- Refund does not reopen bill; bill is still `PAID`.
 
 ### 4.2 Payment State
 
@@ -153,11 +153,11 @@ PENDING -> PAID -> REFUND_PENDING -> REFUNDED
 
 Rules:
 
-- `PENDING`: đã tạo payment row/QR hoặc chuẩn bị cash confirm.
-- `PAID`: cash hoặc SePay đã xác nhận đủ tiền.
-- `REFUND_PENDING`: Owner/Manager đã tạo refund request, chờ chuyển khoản tay.
-- `REFUNDED`: staff/owner xác nhận đã hoàn tiền tay.
-- `FAILED`: chỉ dùng cho lỗi nghiệp vụ có chủ đích sau này. Underpaid không chuyển `FAILED` trong Phase 3.
+- `PENDING`: created payment row/QR or prepared cash confirmation.
+- `PAID`: cash or SePay has confirmed sufficient funds.
+- `REFUND_PENDING`: Owner/Manager has created a refund request, waiting for manual transfer.
+- `REFUNDED`: staff/Owner confirms refund has been received.
+- `FAILED`: only used for future intentional business errors. Underpaid does not transfer `FAILED` in Phase 3.
 
 ### 4.3 Refund State
 
@@ -169,16 +169,16 @@ PENDING_STAFF_ACTION -> CONFIRMED
 
 Rules:
 
-- Phase 3 chỉ full refund.
-- Mỗi payment có tối đa một refund active/confirmed.
-- `CONFIRMED` nghĩa là người dùng nội bộ đã xác nhận đã chuyển khoản ngoài hệ thống.
-- Hệ thống không gọi API ngân hàng để chuyển tiền refund.
+- Phase 3 only full refund.
+- Each payment has a maximum of one active/confirmed refund.
+- `CONFIRMED` means the internal user has confirmed the transfer outside the system.
+- The system does not call the banking API to transfer refund money.
 
 ---
 
-## 5. Data Schema Chính Thức
+## 5. Official Data Schema
 
-### 5.1 Bảng `payments`
+### 5.1 Table `payments`
 
 ```sql
 CREATE TABLE payments (
@@ -240,21 +240,21 @@ CREATE INDEX idx_payments_tenant_status_created
 
 Field semantics:
 
-| Field                  | Ý nghĩa                                                       |
-| ---------------------- | ------------------------------------------------------------- |
-| `tenant_id`            | Tenant scope bắt buộc.                                        |
-| `bill_id`              | Bill thuộc Order Service.                                     |
-| `bill_reference`       | Mã đưa vào nội dung VietQR, format `QRTBL` + 8 chars.         |
-| `method`               | `CASH` hoặc `VIETQR`; có thể null khi payment mới pending.    |
-| `raw_total`            | Tổng gốc từ bill/order snapshot.                              |
-| `rounded_total`        | Số tiền phải thu sau rounding.                                |
-| `rounding_delta`       | `rounded_total - raw_total`.                                  |
-| `paid_amount`          | Số tiền thực thu; VietQR overpaid lưu số tiền chuyển thực tế. |
-| `amount_received`      | Tiền mặt khách đưa, chỉ dùng cho `CASH`.                      |
-| `change_amount`        | Tiền thừa, chỉ dùng cho `CASH`.                               |
-| `sepay_transaction_id` | `payload.id` từ SePay, dùng chống webhook duplicate.          |
+| Field                  | Meaning                                                                    |
+| ---------------------- | -------------------------------------------------------------------------- |
+| `tenant_id`            | tenant scope required.                                                     |
+| `bill_id`              | Bill belongs to Order service.                                             |
+| `bill_reference`       | Code included in VietQR content, format `QRTBL` + 8 chars.                 |
+| `method`               | `CASH` or `VIETQR`; Can be null when payment is pending.                   |
+| `raw_total`            | Original total from bill/order snapshot.                                   |
+| `rounded_total`        | Amount receivable after rounding.                                          |
+| `rounding_delta`       | `rounded_total - raw_total`.                                               |
+| `paid_amount`          | Actual amount collected; VietQR overpaid saves the actual transfer amount. |
+| `amount_received`      | Cash given by customers can only be used for `CASH`.                       |
+| `change_amount`        | Excess money, only used for `CASH`.                                        |
+| `sepay_transaction_id` | `payload.id` from SePay, used to prevent duplicate webhooks.               |
 
-### 5.2 Bảng `refunds`
+### 5.2 Table `refunds`
 
 ```sql
 CREATE TABLE refunds (
@@ -299,12 +299,12 @@ CREATE INDEX idx_refunds_tenant_status_created
 
 Rules:
 
-- `amount` phải bằng `payment.rounded_total` trong Phase 3 full refund.
-- `requested_by_user_id` là Owner/Manager tạo yêu cầu.
-- `confirmed_by_user_id` là người bấm xác nhận đã hoàn tiền tay.
-- `customer_bank_account` nên bắt buộc ở UI nếu refund qua chuyển khoản.
+- `amount` must be equal to `payment.rounded_total` in Phase 3 full refund.
+- `requested_by_user_id` is the Owner/Manager who created the request.
+- `confirmed_by_user_id` is the person who clicked to confirm the refund.
+- `customer_bank_account` should be required in UI if refund is via bank transfer.
 
-### 5.3 Bảng `audit_payments`
+### 5.3 Table `audit_payments`
 
 ```sql
 CREATE TABLE audit_payments (
@@ -347,14 +347,14 @@ CREATE INDEX idx_audit_payments_tenant_created
 
 Rules:
 
-- Unmatched webhook không persist vào `audit_payments`; chỉ application log.
-- Matched underpaid webhook phải ghi audit để staff thấy lý do payment vẫn pending.
-- `actor_type = 'SEPAY'` cho webhook.
-- `actor_type = 'USER'` cho cash/refund actions.
+- Unmatched webhook does not persist to `audit_payments`; application log only.
+- Matched underpaid webhook must record an audit so staff can see why the payment is still pending.
+- `actor_type = 'SEPAY'` for webhooks.
+- `actor_type = 'USER'` for cash/refund actions.
 
-### 5.4 Bảng `outbox_events`
+### 5.4 Table `outbox_events`
 
-Payment Service dùng cùng schema tối giản như Order Service:
+Payment service uses the same minimalist schema as Order service:
 
 ```sql
 CREATE TABLE outbox_events (
@@ -383,14 +383,14 @@ CREATE INDEX idx_payment_outbox_status_created
 
 ### 6.1 BFF HTTP Endpoints
 
-| Endpoint                                | Actor                | Guard/Permission                                                | Mục đích                                    |
-| --------------------------------------- | -------------------- | --------------------------------------------------------------- | ------------------------------------------- |
-| `POST /api/v1/payment/vietqr/create-qr` | OWNER/MANAGER/WAITER | `UserGuard -> TenantGuard -> PermissionGuard`, `payment.create` | Tạo/reuse payment pending và trả QR URL.    |
-| `POST /api/v1/payment/cash/confirm`     | OWNER/MANAGER/WAITER | `payment.confirm_cash`                                          | Xác nhận thu tiền mặt.                      |
-| `POST /api/v1/payment/sepay/webhook`    | SePay                | Public endpoint + HMAC raw-body verification                    | Nhận webhook SePay. Không dùng JWT guards.  |
-| `POST /api/v1/payment/refund/request`   | OWNER/MANAGER        | `payment.refund`                                                | Tạo yêu cầu full refund.                    |
-| `POST /api/v1/payment/refund/confirm`   | OWNER/MANAGER        | `payment.refund`                                                | Xác nhận đã hoàn tiền tay.                  |
-| `GET /api/v1/payment/history`           | OWNER/MANAGER/WAITER | `payment.get_history`                                           | Xem lịch sử payment theo tenant/bill/table. |
+| Endpoints                               | Actor                | Guard/Permission                                                | Purpose                                      |
+| --------------------------------------- | -------------------- | --------------------------------------------------------------- | -------------------------------------------- |
+| `POST /api/v1/payment/vietqr/create-qr` | Owner/MANAGER/WAITER | `UserGuard -> TenantGuard -> PermissionGuard`, `payment.create` | Create/reuse pending payment and pay QR URL. |
+| `POST /api/v1/payment/cash/confirm`     | Owner/MANAGER/WAITER | `payment.confirm_cash`                                          | Confirmation of cash collection.             |
+| `POST /api/v1/payment/sepay/webhook`    | SePay                | Public endpoint + HMAC raw-body verification                    | Get SePay webhook. Do not use JWT guards.    |
+| `POST /api/v1/payment/refund/request`   | Owner/MANAGER        | `payment.refund`                                                | Create a full refund request.                |
+| `POST /api/v1/payment/refund/confirm`   | Owner/MANAGER        | `payment.refund`                                                | Confirmed refund received.                   |
+| `GET /api/v1/payment/history`           | Owner/MANAGER/WAITER | `payment.get_history`                                           | View payment history by tenant/bill/table.   |
 
 ### 6.2 Request/Response: Create VietQR
 
@@ -419,9 +419,9 @@ Response:
 
 Rules:
 
-- Nếu payment pending đã tồn tại cho bill, return existing QR.
-- Nếu payment đã `PAID`, trả conflict hoặc current paid state để UI hiển thị đã thanh toán.
-- Nếu bill không ở `PENDING_PAYMENT`, reject `409`.
+- If pending payment already exists for the bill, return existing QR.
+- If payment is already `PAID`, pay in conflict or current paid state so that the UI displays payment.
+- If bill is not in `PENDING_PAYMENT`, reject `409`.
 
 ### 6.3 Request/Response: Confirm Cash
 
@@ -505,7 +505,7 @@ Request:
 ```json
 {
   "paymentId": "uuid",
-  "reason": "Khách yêu cầu hoàn tiền vì nhập nhầm hóa đơn",
+  "reason": "Customer requested a refund because he entered the wrong invoice",
   "customerBankAccount": "0123456789",
   "customerBankName": "Vietcombank",
   "customerAccountName": "NGUYEN VAN A"
@@ -577,7 +577,7 @@ All amounts are integer VND.
 
 ### 7.2 Bill Reference Generation
 
-Chốt theo Q6-A:
+Closing according to Q6-A:
 
 ```ts
 function createBillReference(billId: string): string {
@@ -614,8 +614,8 @@ function extractBillReference(payload: SepayWebhookPayload): string | null {
 Priority:
 
 1. Parse `payload.code`.
-2. Fallback regex trên `payload.content`.
-3. Nếu không tìm được, application log và HTTP 200.
+2. Fallback regex on `payload.content`.
+3. If not found, application log and HTTP 200.
 
 ### 7.4 Verify SePay Webhook
 
@@ -717,7 +717,7 @@ If SePay wins:
 
 ### 8.1 Topic `payment.completed`
 
-Producer: Payment Service  
+Producer: Payment Service
 Current consumers in code: Order Service and BFF realtime bridge. Catalog table status is updated by Order through TCP inside `BillService.markPaid`; Notification is Phase 4C+.
 
 ```json
@@ -746,7 +746,7 @@ Rules:
 
 ### 8.2 Topic `payment.refunded`
 
-Producer: Payment Service  
+Producer: Payment Service
 Current consumers in code: none. The event is emitted by Payment outbox for audit/future integration; Notification and BFF dashboard handling are Phase 4C+ extensions.
 
 ```json
@@ -853,13 +853,13 @@ Rules:
 POS shows:
 
 - Bill summary.
-- Rounding line.
+- Rounding lines.
 - `roundedTotal`.
-- QR image.
+- QR images.
 - `billReference`.
-- Status pill:
-  - `PENDING`: Đang chờ chuyển khoản.
-  - `PAID`: Đã thanh toán.
+- Status pills:
+  - `PENDING`: Waiting for transfer.
+  - `PAID`: Paid.
   - underpaid note if latest audit has `SEPAY_WEBHOOK_UNDERPAID`.
 
 Polling fallback:
@@ -919,7 +919,7 @@ Dashboard refund UI:
 
 ---
 
-## 14. Test Matrix Tối Thiểu
+## 14. Minimum Test Matrix
 
 ### Unit Tests
 
@@ -952,7 +952,7 @@ Dashboard refund UI:
 
 ## 15. Historical Implementation Scope
 
-Implementation plan Phase 3 đã dùng tài liệu này để tổ chức các nhóm việc:
+Implementation plan Phase 3 used this document to organize work groups:
 
 1. Scaffold `apps/payment` + PostgreSQL connection.
 2. Add Payment entities and migrations.

@@ -95,5 +95,5 @@ Implementation and stabilization evidence for Phase 3 includes:
 - Live SePay provider validation still requires public BFF URLs, registered webhook settings, real/sandbox banking credentials, and a final decision on whether production Tier 1 webhooks use the direct HMAC route or the tenant-scoped `x-secret-key` route.
 - Email receipt delivery, durable customer/staff notifications, and notification-service integration are deferred to Phase 4C.
 - Split bill, partial refund, automated refund payout, daily bank reconciliation, webhook replay dashboard, and multi-gateway routing are out of Phase 3 scope.
-- Stronger saga/compensation for rare cases where Payment is `PAID` but Order finalization repeatedly fails belongs to later hardening. The implemented baseline is Payment outbox plus Order consumer/idempotent `BILL_MARK_PAID`.
+- Siner saga/compensation for rare cases where Payment is `PAID` but Order finalization repeatedly fails belongs to later hardening. The implemented baseline is Payment outbox plus Order consumer/idempotent `BILL_MARK_PAID`.
 - Tenant payment settings, SePay OAuth Connect, and two-tier platform subscription payment behavior are recorded in the Phase 4B SaaS onboarding record, not this Phase 3 record.
