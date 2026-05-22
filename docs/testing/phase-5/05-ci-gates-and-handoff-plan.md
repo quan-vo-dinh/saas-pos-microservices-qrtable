@@ -29,6 +29,7 @@ Document and wire the commands that make Phase 5 repeatable: quick PR checks, fu
 - [ ] Update CI only for deterministic gates first. Do not add Playwright to PR CI until stack and credentials are deterministic.
 - [ ] Document stack-dependent commands in a Phase 5 testing guide or this folder.
 - [ ] Keep real SePay checks out of default PR/local gates; document them as opt-in live smoke guarded by `RUN_LIVE_SEPAY=1`.
+- [ ] Document runtime-gated frontend-utils integration tests: default `pnpm nx test frontend-utils` skips live BFF/Keycloak suites; opt in with `RUN_FRONTEND_UTILS_INTEGRATION=1`, `BFF_URL`, and `KEYCLOAK_URL`.
 - [ ] Ensure skipped tests print actionable reasons, such as missing BFF health, missing Keycloak credentials, or missing seeded suspended tenant.
 - [ ] Produce a final Phase 5 handoff checklist summarizing covered, partial, missing, security-gap, and deferred rows.
 - [ ] Run final verification commands and record results.
@@ -51,6 +52,16 @@ pnpm exec playwright test tests/e2e
 ```
 
 Stack-dependent commands must be documented with prerequisites instead of silently treated as universal PR requirements.
+
+Frontend-utils integration tests:
+
+```bash
+# Default deterministic gate: runtime-dependent integration suites stay skipped.
+pnpm nx test frontend-utils
+
+# Manual/pre-demo stack gate: requires BFF and Keycloak to be running and seeded.
+RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils
+```
 
 ## Next Session Notes
 

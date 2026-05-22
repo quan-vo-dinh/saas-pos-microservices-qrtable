@@ -3,7 +3,7 @@
 > **Document philosophy:** Understand the _why_ before the _how_. Every concept is anchored in context
 > QRTable's specifics so you don't learn abstract theory but learn to apply it immediately.
 >
-> **Current code status (2026-05-14):** This document is a supporting guide. Redis implemented for: cache JWT verification, anonymous customer session, public menu, rate limiting, Socket.io Redis Adapter, KDS runtime store, transfer/rebuild locks, daily order quota counter, tenant suspend flag, subscription cache and SePay OAuth state. Order cart/session uses Redis Hash `cart:{tenantId}:{sessionId}` / `session:{tenantId}:{sessionId}` with `cartVersion` check in the code. Lua script is a hardening option for cart, not the current implementation. The persistent source of truth (PostgreSQL) is still the place to store tenants, menus, orders, bills, payments and all data that needs auditing.
+> **Current code status (2026-05-22):** This document is a supporting guide. Redis implemented for: cache JWT verification, anonymous customer session, public menu, rate limiting, Socket.io Redis Adapter, KDS runtime store, transfer/rebuild locks, daily order quota counter, tenant suspend flag, subscription cache and SePay OAuth state. Order cart/session uses Redis Hash `cart:{tenantId}:{sessionId}` / `session:{tenantId}:{sessionId}` with `cartVersion` check in the code. KDS Redis access is split behind a `KdsRedisRepository` façade with ticket, SLA and recovery stores. Lua script is a hardening option for cart, not the current implementation. The persistent source of truth (PostgreSQL) is still the place to store tenants, menus, orders, bills, payments and all data that needs auditing.
 
 ---
 
@@ -706,6 +706,8 @@ graph LR
 ```
 
 **Important point:** The Kafka consumer must be idempotent — check `kds:{tenantId}:dedupe:{eventId}` before creating a ticket. Kafka at-least-once can deliver duplicate events when rebalancing. Dedupe key in Redis is the first layer of protection.
+
+**Repository ownership after refactor:** `KdsRedisRepository` is the public façade used by Kitchen services and controllers. Internally, `KdsTicketStoreRepository` owns ticket snapshots, station queues, priority, recall and item readiness; `KdsSlaStoreRepository` owns SLA due/claim/dedupe state; `KdsRecoveryStoreRepository` owns rebuild and recovery indexes. Keep Redis key construction in the KDS key utility and keep the façade thin so service code does not depend on low-level Redis primitives.
 
 ### 9.4 tenant Suspend and Subscription Cache
 

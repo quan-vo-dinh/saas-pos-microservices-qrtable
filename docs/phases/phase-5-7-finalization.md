@@ -80,7 +80,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 | Kitchen + realtime      | KDS queue scoring, station access, SLA worker, gateway room derivation                                       | Kafka `order.confirmed` -> Kitchen Redis ticket -> BFF `kds.queue_changed` hint                        | KDS station flow, reconnect/refetch snapshot, waiter sees ready/served                                        |
 | Payment + refund        | VND rounding, payment reference, cash/VIETQR policy, webhook duplicate/underpaid/after-paid, refund state    | Payment transaction + Order `BILL_MARK_PAID`; outbox `payment.completed`; payment history tenant scope | POS cash/VietQR panels, Customer payment screen, paid bill immutability/refund visibility                     |
 | SaaS Phase 4B           | Slug, onboarding saga, tenant lifecycle, subscription invoice, payment settings, OAuth state, feature gating | SaaS onboarding cross-service compensation; Redis suspend/subscription cache; `QRSUB` invoice matching | Public landing, SUPER_ADMIN tenant/plan/billing, Owner subscription/payment settings, suspended Customer PWA  |
-| Architecture invariants | Kafka topic registry, Redis access policy, no `menu.updated`, BFF route constants, TCP pattern exposure      | Allowed Redis/Kafka access checks; topic/env defaults match canonical 5-topic registry                 | Browser checks observe final UI snapshots and refetch behavior, not hidden event internals                    |
+| Architecture invariants | Kafka topic registry, Redis access policy, no `menu.updated`, BFF route constants, TCP pattern exposure      | Allowed Redis/Kafka access checks; topic/env defaults match canonical 6-topic registry                 | Browser checks observe final UI snapshots and refetch behavior, not hidden event internals                    |
 
 ### Steps
 
@@ -116,7 +116,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 - Phase 2B: KDS Redis queue, duplicate `order.confirmed`, station access, snapshot-refetch after realtime hint.
 - Phase 3: VND rounding, `QRTBL`, cash/VietQR settlement, webhook duplicate/underpaid/after-paid, refund full-only, payment completion -> Order finalization.
 - Phase 4B: tenant lifecycle, subscription/plan, `QRSUB`, OAuth state, payment settings, feature gating, suspended/closed customer behavior.
-- Architecture: Kafka 5-topic registry, Redis access policy, no `menu.updated`, BFF Direct vs Kafka boundaries, permission matrix counts.
+- Architecture: Kafka 6-topic registry, Redis access policy, no `menu.updated`, BFF Direct vs Kafka boundaries, permission matrix counts.
 
 **verify:** You can look at the table and answer "which test is this rule protected by" or "why hasn't it been tested in Phase 5?"
 
@@ -215,6 +215,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 
 - If you keep the current CI, Phase 5 must clearly state that Playwright/integration is a pre-demo or nightly/manual gate, not a PR gate.
 - If you include Playwright in CI, you must add a service stack or use a preview/dev stack with stable seeds; Do not enable E2E in CI when credentials/Keycloak is not deterministic.
+- Runtime-dependent frontend-utils integration suites are skipped by default. Enable them only with `RUN_FRONTEND_UTILS_INTEGRATION=1` plus `BFF_URL` and `KEYCLOAK_URL` pointing at a ready local/test stack.
 - Add explicit package scripts for new E2Es, for example `e2e:phase3`, `e2e:phase4b`, or a `e2e:demo` script that runs selected flows in order.
 - Coverage report is a secondary artifact; The new traceability matrix is ​​the main acceptance.
 

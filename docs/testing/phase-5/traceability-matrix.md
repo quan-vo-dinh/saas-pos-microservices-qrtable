@@ -40,7 +40,7 @@
 
 **Target layer:** integration. **Stack:** BFF, Catalog, auth seed.
 
-**Notes:** Unit or service coverage exists and a stack-dependent integration file exists; Phase 5 should make readiness and seed policy explicit before treating this as a reliable gate.
+**Notes:** Unit or service coverage exists and stack-dependent frontend-utils integration files exist. They are skipped by default and require `RUN_FRONTEND_UTILS_INTEGRATION=1`, `BFF_URL`, and `KEYCLOAK_URL` before this becomes a reliable live-stack gate.
 
 ---
 
@@ -636,9 +636,9 @@
 
 ---
 
-### `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `covered` (P1, architecture)
+### `P1-ARCH-KAFKA-6-TOPIC-REGISTRY` — `covered` (P1, architecture)
 
-**Requirement:** Kafka topic registry is exactly the current domain topics: `order.confirmed`, `payment.completed`, `payment.refunded`, `kitchen.sla_warning`, `tenant.created`; no UI-only Kafka topics.
+**Requirement:** Kafka topic registry is exactly the current domain topics: `order.confirmed`, `order.status_changed`, `payment.completed`, `payment.refunded`, `kitchen.sla_warning`, `tenant.created`; no UI-only Kafka topics.
 
 **Sources:** `technical-architecture` (7.2, 7.4); `phase-5-7-finalization` architecture anchors.
 
@@ -646,7 +646,7 @@
 
 **Target layer:** unit-contract. **Stack:** none.
 
-**Notes:** Static configuration test locks the exact five-topic registry and default environment topic names.
+**Notes:** Static configuration test locks the exact six-topic registry and default environment topic names, including `KAFKA_ORDER_STATUS_CHANGED_TOPIC` defaulting to `order.status_changed`.
 
 ---
 

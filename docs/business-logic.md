@@ -243,21 +243,21 @@ The process from the moment the customer scans the QR until the order is sent to
 
 ### A. Detailed Business Processes
 
-1.  **Session Initiation:** - Customers scan the QR code, the Menu interface opens (Progressive Web App). - The system identifies `Store_ID`, `Table_ID`, and authenticates `Token`. - **Session Management:**
+1. **Session Initiation:**
+   - Customers scan the QR code, the Menu interface opens (Progressive Web App).
+   - The system identifies `Store_ID`, `Table_ID`, and authenticates `Token`.
+   - **Session Management:**
 
-          ```
+     ```txt
+     IF table_status == "Available" OR last_session_closed > 15 minutes
+     THEN create a new Session with a unique Session_ID
 
-    IF table_status == "Available" OR last_session_closed > 15 minutes
-    THEN create a new Session with a unique Session_ID
+     IF table_status == "Occupied" AND billing_status != "Billing"
+     THEN join current Session (Shared Cart - same cart)
 
-          IF table_status == "Occupied" AND billing_status != "Billing"
-
-    THEN join current Session (Shared Cart - same cart)
-
-          IF table_status == "Billing"
-
-    THEN block QR scan, display "Table is paying, please wait"
-    ```
+     IF table_status == "Billing"
+     THEN block QR scan, display "Table is paying, please wait"
+     ```
 
 - **Shared Cart Logic:** All guests who scan QR at the same table (in the same Session) will see the same shopping cart and can add items together.
 
@@ -303,7 +303,7 @@ The process from the moment the customer scans the QR until the order is sent to
   Confirm (staff, PENDING → PROCESSING):
   Catalog service (owns menu_items): pessimistic lock + deduct in transaction Catalog
   (via TCP transactional command — Order service does not directly UPDATE DB Catalog)
-  Order service: update order status + broadcast Kafka order.confirmed after commit (+ simplified outbox)
+  Order service: update order status + write simplified outbox `order.confirmed` for Kafka publishing after commit
   ```
 
 If not enough inventory → structured error for staff (previously submitted customer is only pending)
@@ -640,6 +640,7 @@ Processing → Canceled:
     - Log audit trail (who, when, why)
     - Notify kitchen to stop
 - Restore/adjust stock through Catalog (already deducted during confirmation)
+    - Write simplified outbox `order.status_changed` for durable status projection/audit
     - Flag for revenue report exclusion
 
 Processing → Ready:

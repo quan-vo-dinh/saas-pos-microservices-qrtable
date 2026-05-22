@@ -4,7 +4,7 @@
 
 > **Topic (English):** Design and Implementation of a SaaS-Based POS Platform with Integrated QR Code Ordering Using a Microservices Architecture
 
-> **Version:** 1.0  |  **Update:** 2026-02-10
+> **Version:** 1.0  |  **Update:** 2026-05-22
 
 ---
 
@@ -725,6 +725,7 @@ Redis (active cache — synchronized with durable session):
 
 Events emitted (Kafka):
   - order.confirmed → Kitchen Service (P1+P2); publish qua simplified outbox — implementation_plan §4
+  - order.status_changed → durable Order status-change stream via outbox (P4); immediate UI still uses BFF Direct
   - order.completed → analytics pipeline (future)
 
 BFF Direct Side-Effects (AP1 — without Kafka, see §7.3):
@@ -759,6 +760,7 @@ Responsibility:
   - Status update: Pending → Processing → Ready
 - Recall: rollback Ready → Processing (manual mistake)
 - Priority flagging: push tickets to the top of the queue
+- Redis data access is exposed through `KdsRedisRepository` as the façade; ticket, SLA and recovery responsibilities live in `KdsTicketStoreRepository`, `KdsSlaStoreRepository` and `KdsRecoveryStoreRepository`.
 
 Data Store (Redis — no need for separate PostgreSQL):
   - kds:{tenant_id}:kitchen → Sorted Set { ticket_id: timestamp }
@@ -903,17 +905,18 @@ Communicate:
 
 ### 7.2 Kafka Topic Registry
 
-**Selection principle:** The system applies the 4P+2AP rule set (see §7.4) to decide which events use Kafka vs BFF Direct. Only 5 topics pass the filter:
+**Selection principle:** The system applies the 4P+2AP rule set (see §7.4) to decide which events use Kafka vs BFF Direct. Six topics pass the current code/test contract:
 
-| Topic                 | Producer          | Consumer(s)                                                             | Principle  | Main payload                       |
-| --------------------- | ----------------- | ----------------------------------------------------------------------- | ---------- | ---------------------------------- |
-| `order.confirmed`     | Order service     | Kitchen service                                                         | P1, P2     | `{ tenantId, orderId, items[] }`   |
-| `payment.completed`   | Payment service   | Order service, BFF realtime bridge                                      | P1, P2, P3 | `{ tenantId, billId, method }`     |
-| `payment.refunded`    | Payment service   | No current runtime consumer; Phase 4C+ notification/dashboard extension | P1, P3     | `{ tenantId, paymentId, amount }`  |
-| `kitchen.sla_warning` | Kitchen service   | BFF realtime bridge                                                     | P2         | `{ tenantId, ticketId, waitTime }` |
-| `tenant.created`      | SaaS Mgmt service | Catalog service; Notification is Phase 4C contract                      | P1, P3     | `{ tenantId, ownerEmail, slug }`   |
+| Topic                  | Producer          | Consumer(s)                                                             | Principle  | Main payload                       |
+| ---------------------- | ----------------- | ----------------------------------------------------------------------- | ---------- | ---------------------------------- |
+| `order.confirmed`      | Order service     | Kitchen service                                                         | P1, P2     | `{ tenantId, orderId, items[] }`   |
+| `order.status_changed` | Order service     | No current runtime consumer; durable status projection/audit extension  | P4         | `{ tenantId, orderId, toStatus }`  |
+| `payment.completed`    | Payment service   | Order service, BFF realtime bridge                                      | P1, P2, P3 | `{ tenantId, billId, method }`     |
+| `payment.refunded`     | Payment service   | No current runtime consumer; Phase 4C+ notification/dashboard extension | P1, P3     | `{ tenantId, paymentId, amount }`  |
+| `kitchen.sla_warning`  | Kitchen service   | BFF realtime bridge                                                     | P2         | `{ tenantId, ticketId, waitTime }` |
+| `tenant.created`       | SaaS Mgmt service | Catalog service; Notification is Phase 4C contract                      | P1, P3     | `{ tenantId, ownerEmail, slug }`   |
 
-> UI-layer/lifecycle events like `order.created`, `order.status_changed`, `cart.updated`, `bill.requested`, `table.transferred`, `service.requested`, `kds.queue_changed`, `tenant.suspended/activated/closed` DO NOT use Kafka as the source of truth — instead use BFF Direct, Redis internal hints, or socket emit after the source service has been committed (see §7.3).
+> UI-layer events like `order.created`, `cart.updated`, `bill.requested`, `table.transferred`, `service.requested`, `kds.queue_changed`, `tenant.suspended/activated/closed` DO NOT use Kafka as the source of truth — instead use BFF Direct, Redis internal hints, or socket emit after the source service has been committed (see §7.3). `order.status_changed` is the exception: it is an approved durable Order outbox topic, while immediate WebSocket feedback still comes from BFF Direct after the TCP response.
 
 ### 7.3 BFF Direct Side-Effects Pattern
 
@@ -964,7 +967,7 @@ Use Kafka when the same event needs to trigger a business response in **multiple
 **P4 — Atomicity Safeguard (Transactional Outbox):**
 When a domain event is the result of a DB write, the event **MUST** be written with the database transaction (Outbox Pattern) to avoid the Dual-Write Problem. Background process poll outbox → publish Kafka.
 
-> **Step 2.4:** `order.confirmed` uses **simplified outbox** (table `outbox_events` + cron poll) as `implementation_plan.md` §4 — match P4 for confirm stream. Full CDC / transactional outbox hardening → Phase 4A (Saga + Hardening).
+> **Current implementation:** `order.confirmed` and `order.status_changed` use the Order `outbox_events` table before publishing to Kafka. Full CDC / transactional outbox hardening remains Phase 4A+ operational hardening.
 
 #### Exclusion Anti-patterns (When NOT to use Kafka)
 
@@ -1150,11 +1153,9 @@ Configure via Keycloak **Protocol Mapper** (type: User Attribute → Token Claim
 │  │    Customer → session:{sid}:customer     │    │
 │  └──────────────────────────────────────────┘    │
 │           │                                      │
-│           ├─ Kafka Consumer Bridge (3 topics):   │
+│           ├─ Kafka Consumer Bridge (2 topics):   │
 │           │                                      │
 │  ┌──────────────────────────────────────────┐    │
-│  │  order.confirmed → session:{sid}:cust    │    │
-│  │    (customer tracking only; non-KDS)     │    │
 │  │  kitchen.sla_warning → tenant:{tid}:mgmt│    │
 │  │  payment.completed → session:{sid}:cust (bridge follow-up; baseline polling) │    │
 │  └──────────────────────────────────────────┘    │

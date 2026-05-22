@@ -4,7 +4,7 @@
 >
 > **Canonical Role:** Supporting guide. When there is a conflict, prioritize `docs/README.md`, phase records, accepted specs, current code/tests.
 >
-> Updated according to current documentation and source code: 2026-05-14.
+> Updated according to current documentation and source code: 2026-05-22.
 
 ## Target
 
@@ -87,6 +87,7 @@ SaaS --> Payment
 
 %% -------- Async Events (Kafka) --------
 Order -- "order.confirmed" --> Kafka
+Order -- "order.status_changed" --> Kafka
 Payment -- "payment.completed" --> Kafka
 SaaS -- "tenant.created" --> Kafka
 
@@ -664,17 +665,17 @@ Let's create a table for each flow:
 
 Example for confirm order:
 
-| Column         | Value                                                    |
-| -------------- | -------------------------------------------------------- |
-| UI surfaces    | `management-app` POS live orders                         |
-| API endpoints  | `POST /admin/orders/:id/confirm`                         |
-| Auth rule      | Staff JWT + permission                                   |
-| TCP messages   | `ORDER.CONFIRM`                                          |
-| service method | `OrderService.confirmOrder`                              |
-| Persistence    | Order DB update, Catalog stock transaction, Order outbox |
-| Realtime       | `events.orderStatusChanged`                              |
-| Kafka          | `order.confirmed`                                        |
-| Consumer       | Kitchen service                                          |
+| Column         | Value                                                                               |
+| -------------- | ----------------------------------------------------------------------------------- |
+| UI surfaces    | `management-app` POS live orders                                                    |
+| API endpoints  | `POST /admin/orders/:id/confirm`                                                    |
+| Auth rule      | Staff JWT + permission                                                              |
+| TCP messages   | `ORDER.CONFIRM`                                                                     |
+| service method | `OrderService.confirmOrder` delegates to `OrderStateTransitionService.confirmOrder` |
+| Persistence    | Order DB update, Catalog stock transaction, Order outbox                            |
+| Realtime       | `events.orderStatusChanged`                                                         |
+| Kafka          | `order.confirmed`                                                                   |
+| Consumer       | Kitchen service                                                                     |
 
 ## Common Mistakes
 
@@ -852,7 +853,8 @@ Objective:
 Checklist:
 
 - Read Catalog table/menu-item services.
-- Read Order controller and Order service.
+- Read Order controller and Order service façade.
+- Read `OrderSubmitService`, `OrderStateTransitionService` and `OrderKdsEventService` for the focused business logic.
 - Read Cart service, Bill service, Session service.
 - Trace `submitOrder` and `confirmOrder`.
 
@@ -865,7 +867,7 @@ Objective:
 Checklist:
 
 - Trace `order.confirmed`.
-- Read KDS Redis repository.
+- Read KDS Redis repository façade and ticket/SLA/recovery stores.
 - Trace `payment.completed`.
 - Read Payment settlement and SePay webhooks.
 

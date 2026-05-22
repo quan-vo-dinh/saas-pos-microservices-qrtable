@@ -3,7 +3,7 @@
 > **Document philosophy:** Understand the _why_ before the _how_. Every concept is anchored in context
 > QRTable's specifics so you don't learn abstract theory but learn to apply it immediately.
 >
-> **Current code status (2026-05-13):** This document is a supporting guide. Kafka consumers already included in the code include `order.confirmed → Kitchen`, `payment.completed → Order + BFF realtime bridge`, `kitchen.sla_warning → BFF realtime bridge`, and `tenant.created → Catalog`. Notification service does not exist in `apps/`\*; The Notification examples below are Phase 4C+/future extensions, not the current runtime state.
+> **Current code status (2026-05-22):** This document is a supporting guide. The approved Kafka topic registry is `order.confirmed`, `order.status_changed`, `payment.completed`, `payment.refunded`, `kitchen.sla_warning`, and `tenant.created`. Runtime consumers already included in the code include `order.confirmed → Kitchen`, `payment.completed → Order + BFF realtime bridge`, `kitchen.sla_warning → BFF realtime bridge`, and `tenant.created → Catalog`. `order.status_changed` is currently an Order outbox topic for durable status projection/audit; immediate order WebSocket feedback still uses BFF Direct after the TCP response. Notification service does not exist in `apps/`\*; The Notification examples below are Phase 4C+/future extensions, not the current runtime state.
 
 ---
 
@@ -1026,7 +1026,7 @@ This is the lowest level, suitable for "throwaway" data such as monitoring metri
 
 **At-least-once (at least once):** Message is processed at least once, possibly more (duplicate). Achieved by committing the offset _after_ successful processing. If there is a crash after processing but before commit → the message is fetched and processed again.
 
-**This is QRTable's selection for all 5 topics.** Mandatory consequence: every consumer processing a message must be **idempotent** — that is, processing the same message twice must produce identical results as processing it once.
+**This is QRTable's selection for all approved Kafka topics.** Mandatory consequence: every consumer processing a message must be **idempotent** — that is, processing the same message twice must produce identical results as processing it once.
 
 **Exactly-once (exactly once):** Message is processed exactly once. Kafka supports this through Kafka Transactions — combining idempotent producers, transactional APIs, and `read_committed` isolation on consumers. Significantly more complex, has performance overhead, and requires both producer and consumer to be in the Kafka ecosystem (not applicable when consumers write to PostgreSQL or Redis).
 
@@ -1225,11 +1225,11 @@ Do not use TCP/gRPC for tasks where the producer does not need a response, espec
 
 #### Diagram: Event Map — All Topics In QRTable
 
-> Panoramic map of 5 Kafka topics and typical BFF Direct events in QRTable. Each topic is labeled with the corresponding 4P+2AP principle. Looking from above, you can clearly see which producer publishes which event, and which consumer that event goes to.
+> Panoramic map of 6 Kafka topics and typical BFF Direct events in QRTable. Each topic is labeled with the corresponding 4P+2AP principle. Looking from above, you can clearly see which producer publishes which event, and which consumer that event goes to.
 
 ```mermaid
 graph TB
-    subgraph KAFKA_EVENTS["📋 Kafka Topics — 5 Events"]
+    subgraph KAFKA_EVENTS["📋 Kafka Topics — 6 Events"]
         subgraph T1["order.confirmed (P1+P2)"]
             T1_PROD["🛒 Order Service"]
             T1_CONS1["🍳 Kitchen Service"]
@@ -1253,11 +1253,15 @@ graph TB
             T5_PROD["💳 Payment Service"]
             T5_CONS1["📧 Notification<br/>Phase 4C+"]
         end
+        subgraph T6["order.status_changed (P4)"]
+            T6_PROD["🛒 Order Service"]
+            T6_CONS1["📊 Projection/Audit<br/>future"]
+        end
     end
 
     subgraph BFF_EVENTS["🌐 BFF Direct / Socket Events"]
         BE1["order.created"]
-        BE2["order.status_changed"]
+        BE2["events.orderStatusChanged"]
         BE3["service.requested"]
         BE4["cart.updated"]
         BE5["bill.requested"]
@@ -1274,6 +1278,10 @@ graph TB
 P1: Kitchen service has independent business logic (routing by dish type, creating FIFO tickets, priorities and SLA). Order service shouldn't know that.
 
 P2: Order service must not wait for Kitchen to finish creating the ticket. Kitchen can process multiple orders simultaneously, taking a few seconds. Customer must receive the "Order confirmed" response immediately.
+
+`**order.status_changed` → Kafka (P4, durable stream)\*\*
+
+P4: Order status transitions are database-backed domain state. The Kafka topic exists for durable status projection/audit or future downstream consumers. It is not used as the immediate UI push path; BFF still emits `events.orderStatusChanged` directly from successful TCP responses.
 
 `**payment.completed` → Kafka (P1 + P2 + P3)\*\*
 
@@ -1604,6 +1612,7 @@ graph LR
         T3["kitchen.sla_warning"]
         T4["tenant.created"]
         T5["payment.refunded"]
+        T6["order.status_changed"]
     end
 
     subgraph GROUPS["🏷️ Consumer Groups"]
@@ -1623,12 +1632,14 @@ graph LR
     T4 --> G5
 
     T5 -.-> G2
+    T6 -.-> G2
 
     style T1 fill:#339af0,stroke:#333,color:#fff
     style T2 fill:#339af0,stroke:#333,color:#fff
     style T3 fill:#339af0,stroke:#333,color:#fff
     style T4 fill:#339af0,stroke:#333,color:#fff
     style T5 fill:#339af0,stroke:#333,color:#fff
+    style T6 fill:#339af0,stroke:#333,color:#fff
     style G1 fill:#ffd93d,stroke:#333,color:#333
     style G2 fill:#ff922b,stroke:#333,color:#fff
     style G3 fill:#51cf66,stroke:#333,color:#fff
@@ -1638,7 +1649,7 @@ graph LR
 
 `**kitchen-service-group`:\*\* Consume `order.confirmed` to create KDS ticket. Kitchen service is the only consumer in this group. If scaled to multiple instances, the instances share the partition in the group.
 
-`**notification-service-group` (Phase 4C+):\*_ When Notification service is added, this group can consume `payment.completed`, `payment.refunded`, `tenant.created` to send email and record audit log. Currently `apps/`_ does not have this service.
+`**notification-service-group` (Phase 4C+):\*_ When Notification service is added, this group can consume `payment.completed`, `payment.refunded`, `tenant.created` and possibly `order.status_changed` to send email and record audit log. Currently `apps/`_ does not have this service.
 
 `**order-payment-consumer-group`:\*\* Order service consumes `payment.completed` to close the session/bill and call Catalog TCP to update the table. This group name clearly shows: Order service is syncing status from Payment domain.
 
@@ -1785,7 +1796,7 @@ Consumer must Idempotent
       Manual Commit
 Architecture
       4P+2AP Framework
-      5 Kafka Topics
+      6 Kafka Topics
       BFF Direct Events
 Outbox Pattern for Atomicity
     Multi-Tenant
@@ -1812,12 +1823,13 @@ After reading the entire document, here is a brief mental model to remember:
 
 #### Diagram: Cheat Sheet — Quick Decisions
 
-> Quick summary of 5 Kafka topics with producer, consumer, partition key, acks level, and delivery semantics. Used as a "quick reference" when implementing.
+> Quick summary of 6 Kafka topics with producer, consumer, partition key, acks level, and delivery semantics. Used as a "quick reference" when implementing.
 
-| Topic                 | Producer        | Consumer Groups                                       | Key      | acks | Delivery      | Principles   |
-| --------------------- | --------------- | ----------------------------------------------------- | -------- | ---- | ------------- | ------------ |
-| `order.confirmed`     | Order service   | kitchen-service-group                                 | tenantId | all  | at-least-once | P1 + P2      |
-| `payment.completed`   | Payment service | order-payment-consumer-group, bff-kafka-bridge        | tenantId | all  | at-least-once | P1 + P2 + P3 |
-| `kitchen.sla_warning` | Kitchen service | bff-kafka-bridge                                      | tenantId | 1    | at-least-once | P2           |
-| `tenant.created`      | SaaS Mgmt       | catalog-tenant-created-consumer-group                 | tenantId | all  | at-least-once | P1 + P3      |
-| `payment.refunded`    | Payment service | none current; notification-service-group is Phase 4C+ | tenantId | all  | at-least-once | P1           |
+| Topic                  | Producer        | Consumer Groups                                       | Key      | acks | Delivery      | Principles   |
+| ---------------------- | --------------- | ----------------------------------------------------- | -------- | ---- | ------------- | ------------ |
+| `order.confirmed`      | Order service   | kitchen-service-group                                 | tenantId | all  | at-least-once | P1 + P2      |
+| `order.status_changed` | Order service   | none current; projection/audit consumer is future     | tenantId | all  | at-least-once | P4           |
+| `payment.completed`    | Payment service | order-payment-consumer-group, bff-kafka-bridge        | tenantId | all  | at-least-once | P1 + P2 + P3 |
+| `kitchen.sla_warning`  | Kitchen service | bff-kafka-bridge                                      | tenantId | 1    | at-least-once | P2           |
+| `tenant.created`       | SaaS Mgmt       | catalog-tenant-created-consumer-group                 | tenantId | all  | at-least-once | P1 + P3      |
+| `payment.refunded`     | Payment service | none current; notification-service-group is Phase 4C+ | tenantId | all  | at-least-once | P1           |

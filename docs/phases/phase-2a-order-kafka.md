@@ -61,6 +61,7 @@ Service ownership after Phase 2A:
 Kafka/event behavior:
 
 - `order.confirmed` payload includes `eventId`, `schemaVersion`, `tenantId`, `orderId`, `sessionId`, `tableId`, `tableName`, items with station snapshots, totals, confirmation metadata and correlation id.
+- `order.status_changed` is the durable Order outbox topic for status projection/audit. BFF Direct remains the immediate WebSocket path for `events.orderStatusChanged` after successful TCP responses.
 - Outbox publisher sends pending rows to Kafka and marks success/failure; at-least-once delivery is handled by downstream idempotency.
 - BFF Direct events are not replay logs. Clients treat them as realtime hints and refetch REST snapshots.
 
@@ -68,7 +69,7 @@ Kafka/event behavior:
 
 Implementation evidence present in the repo on 2026-05-13:
 
-- Order domain services, repositories and tests cover session join/cache, cart version conflicts, submit/confirm/cancel/serve, bill request/reopen/payment hooks, service requests, transfer table and Kafka payload construction.
+- Order domain services, repositories and tests cover session join/cache, cart version conflicts, submit/confirm/cancel/serve, bill request/reopen/payment hooks, service requests, transfer table and Kafka payload construction. `OrderService` remains the TCP-facing façade while submit flow, state transitions and KDS event mapping are delegated to focused services.
 - BFF customer/admin controllers expose cart, orders, bill, service request, staff order actions and transfer endpoints with tenant/session context and permission guards.
 - BFF realtime gateway/service emits cart/order/status/service/bill/transfer hints to session and tenant staff rooms.
 - Customer PWA order hooks/services use live BFF APIs for cart, orders, current bill, bill request, idempotency and session-scoped realtime invalidation.

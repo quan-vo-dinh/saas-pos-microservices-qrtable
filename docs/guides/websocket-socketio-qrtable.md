@@ -309,7 +309,7 @@ subgraph "Flow 1: BFF Direct (sau TCP success)"
         FE1 -->|"POST /orders"| BFF1
         BFF1 -->|"TCP gRPC"| SVC1
         SVC1 -->|"success response"| BFF1
-        BFF1 -->|"events.orderCreated"| WS1
+        BFF1 -->|"events.orderCreated / events.orderStatusChanged"| WS1
     end
 
 subgraph "Flow 2: Kafka Bridge (domain events)"
@@ -1016,10 +1016,10 @@ After reading the entire document, here is a brief mental model to remember:
 
 > Quick summary table of source, receiving room and frontend action for each event group. Use as a "quick reference" when adding features or debugging.
 
-| Event Group                          | Source              | Receiving Room                                 | Frontend                          |
-| ------------------------------------ | ------------------- | ---------------------------------------------- | --------------------------------- |
-| `events.orderCreated`, `cartUpdated` | BFF Direct (TCP)    | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate order/cart/bill        |
-| `events.paymentCompleted`            | Kafka bridge        | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate payment/bill/order     |
-| `events.kdsQueueChanged`             | Redis Pub/Sub → BFF | `tenant:{tid}:kds:kitchen/bar`, `management`   | Filter station → invalidate queue |
-| `events.kitchenSlaWarning`           | Kafka bridge        | Station room, `management`                     | Filter station → invalidate queue |
-| `tenant.suspended/activated/closed`  | BFF Direct (admin)  | `tenant:{tid}:customers`                       | Patch tenant lifecycle context    |
+| Event Group                                                       | Source              | Receiving Room                                 | Frontend                          |
+| ----------------------------------------------------------------- | ------------------- | ---------------------------------------------- | --------------------------------- |
+| `events.orderCreated`, `events.orderStatusChanged`, `cartUpdated` | BFF Direct (TCP)    | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate order/cart/bill        |
+| `events.paymentCompleted`                                         | Kafka bridge        | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate payment/bill/order     |
+| `events.kdsQueueChanged`                                          | Redis Pub/Sub → BFF | `tenant:{tid}:kds:kitchen/bar`, `management`   | Filter station → invalidate queue |
+| `events.kitchenSlaWarning`                                        | Kafka bridge        | Station room, `management`                     | Filter station → invalidate queue |
+| `tenant.suspended/activated/closed`                               | BFF Direct (admin)  | `tenant:{tid}:customers`                       | Patch tenant lifecycle context    |

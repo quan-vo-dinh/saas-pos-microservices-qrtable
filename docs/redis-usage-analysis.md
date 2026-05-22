@@ -617,7 +617,7 @@ Current operations/mechanism:
 Code status:
 
 - Yes `apps/kitchen`.
-- `KdsRedisRepository` write/read `kds:*`, SLA, dedupe, dead-letter and rebuild lock keys.
+- `KdsRedisRepository` remains the public façade; `KdsTicketStoreRepository`, `KdsSlaStoreRepository` and `KdsRecoveryStoreRepository` own ticket/queue, SLA and recovery Redis operations.
 - `KitchenEventsPublisher` publish `realtime:kds:{tenantId}` using Redis Pub/Sub.
 - KDS UI/realtime depends on BFF subscriber + current Socket.io path.
 

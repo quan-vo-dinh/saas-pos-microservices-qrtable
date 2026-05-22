@@ -51,6 +51,7 @@ Table transfer patches active KDS tickets for the session so KDS reflects the ne
 Service ownership after Phase 2B:
 
 - Kitchen Service owns Redis KDS keys: ticket hashes, ticket item hashes, `kds:{tenantId}:kitchen`, `kds:{tenantId}:bar`, ready queues, revision keys, dedupe keys, dead-letter keys, session/order ticket indexes, `kds:sla:due`, SLA claim/dedupe keys and rebuild locks.
+- `KdsRedisRepository` is the Kitchen Redis façade. Ticket/queue behavior lives in `KdsTicketStoreRepository`, SLA scheduling/dedupe in `KdsSlaStoreRepository`, and rebuild/recovery behavior in `KdsRecoveryStoreRepository`.
 - Kitchen Kafka consumer reads `order.confirmed` with at-least-once semantics and idempotency by `eventId` plus `(tenantId, orderId, station)`.
 - Kitchen SLA worker produces `kitchen.sla_warning`; BFF Kafka bridge consumes that topic and emits `events.kitchenSlaWarning`.
 - Kitchen internal events use Redis Pub/Sub channel `realtime:kds:{tenantId}` for `kds.queue_changed`; BFF subscriber maps them to station/management WebSocket rooms.
@@ -65,7 +66,7 @@ Service ownership after Phase 2B:
 
 Implementation evidence present in the repo on 2026-05-13:
 
-- `apps/kitchen` contains the Kafka consumer, Redis repository, ticket service, SLA worker, recovery service, Kafka producer and internal Redis publisher for KDS.
+- `apps/kitchen` contains the Kafka consumer, Redis repository façade, ticket/SLA/recovery Redis stores, ticket service, SLA worker, recovery service, Kafka producer and internal Redis publisher for KDS.
 - `libs/shared/types/src/lib/kds.types.ts` defines KDS ticket, queue snapshot, queue changed, kitchen item ready, SLA warning and active-order snapshot contracts.
 - BFF realtime module includes Socket.IO gateway, auth service, Redis adapter, KDS internal subscriber, Kafka bridge and event fan-out service.
 - BFF Kitchen controller and station-access service enforce queue/action permissions, station boundaries and Order sync for ready events.
