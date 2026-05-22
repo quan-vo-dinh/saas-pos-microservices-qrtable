@@ -1,11 +1,14 @@
 import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 import { DatabaseType } from 'typeorm';
-import { TypeOrmModule, TypeOrmModuleAsyncOptions } from '@nestjs/typeorm';
+import { DynamicModule } from '@nestjs/common';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 type PgTypes = {
   setTypeParser: (oid: number, parser: (value: string) => Date) => void;
 };
+
+export type TypeOrmEntityTarget = Extract<NonNullable<TypeOrmModuleOptions['entities']>, readonly unknown[]>[number];
 
 const POSTGRES_TIMESTAMP_OID = 1114;
 let pgTimestampParserConfigured = false;
@@ -55,20 +58,39 @@ export class TypeOrmConfiguration {
   }
 }
 
-export const TypeOrmProvider = TypeOrmModule.forRootAsync({
-  imports: [ConfigModule],
-  inject: [ConfigService],
-  useFactory: async (configService: ConfigService) => {
-    return {
-      type: configService.get<string>('TYPEORM_CONFIG.TYPE') as DatabaseType,
-      host: configService.get<string>('TYPEORM_CONFIG.HOST'),
-      port: configService.get<number>('TYPEORM_CONFIG.PORT'),
-      username: configService.get<string>('TYPEORM_CONFIG.USERNAME'),
-      password: configService.get<string>('TYPEORM_CONFIG.PASSWORD'),
-      database: configService.get<string>('TYPEORM_CONFIG.DATABASE'),
-      entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-      synchronize: true,
-      autoLoadEntities: true,
-    } as TypeOrmModuleAsyncOptions;
-  },
-});
+function shouldSynchronizeSchema(configService: ConfigService): boolean {
+  const nodeEnv = configService.get<string>('NODE_ENV') ?? '';
+  const configured = configService.get<boolean | string>('TYPEORM_SYNCHRONIZE');
+  const isSynchronizationEnabled = configured === true || configured === 'true';
+
+  return isSynchronizationEnabled && ['development', 'test'].includes(nodeEnv);
+}
+
+function getPostgresDatabaseType(configService: ConfigService): 'postgres' {
+  const databaseType = configService.get<DatabaseType>('TYPEORM_CONFIG.TYPE');
+  if (databaseType !== 'postgres') {
+    throw new Error(`Unsupported TypeORM database type: ${databaseType}`);
+  }
+
+  return databaseType;
+}
+
+export function createTypeOrmProvider(entities: TypeOrmEntityTarget[]): DynamicModule {
+  return TypeOrmModule.forRootAsync({
+    imports: [ConfigModule],
+    inject: [ConfigService],
+    useFactory: async (configService: ConfigService): Promise<TypeOrmModuleOptions> => {
+      return {
+        type: getPostgresDatabaseType(configService),
+        host: configService.get<string>('TYPEORM_CONFIG.HOST'),
+        port: configService.get<number>('TYPEORM_CONFIG.PORT'),
+        username: configService.get<string>('TYPEORM_CONFIG.USERNAME'),
+        password: configService.get<string>('TYPEORM_CONFIG.PASSWORD'),
+        database: configService.get<string>('TYPEORM_CONFIG.DATABASE'),
+        entities,
+        synchronize: shouldSynchronizeSchema(configService),
+        autoLoadEntities: false,
+      };
+    },
+  });
+}

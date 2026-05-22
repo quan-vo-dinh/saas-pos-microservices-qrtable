@@ -51,6 +51,8 @@ const QUICK: { id: string; label: string; value: string }[] = [
 ];
 
 export function LiveOrdersTable() {
+  'use no memo';
+
   const posViewFilter = useOrderUiState((s) => s.viewFilter);
   const setPosViewFilter = useOrderUiState((s) => s.setViewFilter);
   const selectRow = useOrderUiState((s) => s.selectOrder);
@@ -78,8 +80,6 @@ export function LiveOrdersTable() {
     }
   }, [posViewFilter]);
   const ordersQuery = useOrdersQuery(orderQueryParams);
-  const liveOrders = ordersQuery.data ?? [];
-  const tables = tablesQuery.data ?? [];
   const confirmingOrderId = confirmOrderMutation.isPending ? confirmOrderMutation.variables : null;
   const servingOrderId = markServedMutation.isPending ? markServedMutation.variables : null;
 
@@ -94,6 +94,8 @@ export function LiveOrdersTable() {
   }, [posViewFilter]);
 
   const rows = useMemo(() => {
+    const liveOrders = ordersQuery.data ?? [];
+    const tables = tablesQuery.data ?? [];
     const base = liveOrders.filter(
       (o) => o.status !== OrderStatus.COMPLETED && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.DRAFT,
     );
@@ -119,7 +121,7 @@ export function LiveOrdersTable() {
           return true;
       }
     });
-  }, [liveOrders, tables, posViewFilter, nowMs]);
+  }, [ordersQuery.data, tablesQuery.data, posViewFilter, nowMs]);
 
   const columns: ColumnDef<Order>[] = useMemo(
     () => [
@@ -290,6 +292,7 @@ export function LiveOrdersTable() {
     [confirmOrderMutation, confirmingOrderId, markServedMutation, selectRow, servingOrderId, nowMs],
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table is isolated in this "use no memo" component.
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
 
   const scrollParentRef = useRef<HTMLDivElement>(null);

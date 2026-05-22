@@ -1,5 +1,6 @@
 "use client";
 import React, { useRef, useState } from "react";
+import Image from "next/image";
 import { MotionValue, motion, useScroll, useTransform } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
@@ -182,9 +183,11 @@ export const Lid = ({
             title={screenImageClickLabel}
             className="group absolute inset-0 z-[1] cursor-zoom-in rounded-lg border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#010101]"
           >
-            <img
+            <Image
               src={src as string}
               alt={imageAlt ?? "Product screenshot"}
+              fill
+              sizes="(max-width: 768px) 80vw, 512px"
               className="pointer-events-none h-full w-full rounded-lg object-cover object-left-top transition-opacity duration-150 group-hover:opacity-95 group-active:opacity-90"
             />
             <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/55 px-2 py-1 font-mono text-[10px] font-medium uppercase tracking-wide text-zinc-200 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
@@ -192,9 +195,11 @@ export const Lid = ({
             </span>
           </button>
         ) : (
-          <img
+          <Image
             src={src as string}
             alt={imageAlt ?? "Product screenshot"}
+            fill
+            sizes="(max-width: 768px) 80vw, 512px"
             className="absolute inset-0 h-full w-full rounded-lg object-cover object-left-top"
           />
         )}

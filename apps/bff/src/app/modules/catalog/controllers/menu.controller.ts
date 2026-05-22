@@ -2,6 +2,7 @@ import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { MetadataKey } from '@common/constants/common.constant';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
+import { RedisKey } from '@common/constants/redis-key.constants';
 import { ProcessId } from '@common/decorators/processId.decorator';
 import { PublicMenuResponseDto, ValidateQrTokenRequestDto, TableResponseDto } from '@common/interfaces/gateway/catalog';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
@@ -31,7 +32,7 @@ export class MenuPublicController {
   @ApiOperation({ summary: 'Get public menu' })
   async getMenu(@ProcessId() processId: string, @Req() req: Request): Promise<ResponseDto<PublicMenuTcpResponse>> {
     const tenantId = req[MetadataKey.TENANT_ID] as string;
-    const cacheKey = `menu:${tenantId}`;
+    const cacheKey = RedisKey.menu.public(tenantId);
 
     const cached = await this.cacheManager.get<PublicMenuTcpResponse>(cacheKey);
     if (cached) {

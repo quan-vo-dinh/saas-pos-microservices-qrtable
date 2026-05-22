@@ -1,5 +1,6 @@
 import * as React from "react"
 import type { HTMLAttributes } from "react"
+import Image from "next/image"
 
 import { cn } from "@/lib/utils"
 
@@ -92,9 +93,11 @@ export function Iphone({
             borderRadius: `${RADIUS_H}% / ${RADIUS_V}%`,
           }}
         >
-          <img
+          <Image
             src={src}
             alt={imageAlt}
+            fill
+            sizes="(max-width: 640px) 90vw, 390px"
             className={cn(
               "block size-full",
               imageFit === "contain"

@@ -310,7 +310,7 @@ describe('PaymentService settlement behavior', () => {
     roundingDelta: 500,
   };
 
-  it('handleSepayWebhook: underpaid transfer records UNDERPAID audit and does not complete payment', async () => {
+  it('handleSepayWebhook: rejects transfer amount below roundedTotal and records UNDERPAID audit', async () => {
     const payment = makePayment({
       billReference: 'QRTBL11111111',
       status: 'PENDING',
@@ -340,7 +340,7 @@ describe('PaymentService settlement behavior', () => {
     });
 
     await service.handleSepayWebhook({
-      payload: baseSepayPayload({ transferAmount: 100_000 }),
+      payload: baseSepayPayload({ transferAmount: 127_500 }),
       tenantSlug: 'tenant-a',
       secret: 'tenant-secret',
     });
@@ -355,7 +355,7 @@ describe('PaymentService settlement behavior', () => {
       null,
       expect.objectContaining({
         expectedAmount: payment.roundedTotal,
-        actualAmount: 100_000,
+        actualAmount: 127_500,
       }),
       expect.anything(),
     );
@@ -740,6 +740,77 @@ describe('PaymentService settlement behavior', () => {
       expect.anything(),
       expect.objectContaining({ status: 'PAID' }),
       expect.any(String),
+    );
+    expect(orderClient.send).toHaveBeenCalledWith(TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID, expect.anything());
+  });
+
+  it('confirmCash: accepts exact rounded total for a rounded Order bill snapshot', async () => {
+    const payment = makePayment({ status: 'PENDING', method: null, paidAmount: null });
+    const manager = { save: jest.fn().mockImplementation(async (_: unknown, e: unknown) => e) };
+    const dataSource = {
+      transaction: jest.fn(async (fn: (m: EntityManager) => Promise<void>) => fn(manager as unknown as EntityManager)),
+    };
+    const paymentRepo = {
+      findByBillReferenceForUpdate: jest.fn(),
+      findByTenantBillForUpdate: jest.fn().mockResolvedValue(payment),
+      findByTenantAndBill: jest.fn().mockResolvedValue({
+        ...payment,
+        status: 'PAID',
+        method: PaymentMethod.CASH,
+        paidAmount: 128_000,
+        amountReceived: 128_000,
+        changeAmount: 0,
+        paidAt: new Date('2026-05-08T12:00:00.000Z'),
+      }),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
+    const auditRepo = { createPaymentAudit: jest.fn().mockResolvedValue(undefined) };
+    const outboxRepo = { createCompleted: jest.fn().mockResolvedValue(undefined) };
+    const orderClient = {
+      send: jest.fn().mockImplementation((pattern: string) => {
+        if (pattern === TCP_REQUEST_MESSAGE.ORDER.BILL_GET_PAYMENT_SNAPSHOT) {
+          return of({ data: snapshot });
+        }
+        if (pattern === TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID) {
+          return of({ data: { ok: true } });
+        }
+        return throwError(() => new Error(`unexpected pattern ${pattern}`));
+      }),
+    };
+
+    const service = buildPaymentServiceForTest({
+      dataSource: dataSource as unknown as DataSource,
+      orderClient,
+      paymentRepo,
+      auditRepo,
+      outboxRepo,
+    });
+
+    const result = await service.confirmCash({
+      tenantId: 'tenant-1',
+      billId: payment.billId,
+      userId: 'user-1',
+      amountReceived: 128_000,
+      processId: 'p1',
+    });
+
+    expect(result.status).toBe('PAID');
+    expect(result.paidAmount).toBe(128_000);
+    expect(result.amountReceived).toBe(128_000);
+    expect(result.changeAmount).toBe(0);
+    expect(manager.save).toHaveBeenCalledWith(
+      PaymentEntity,
+      expect.objectContaining({
+        paidAmount: 128_000,
+        amountReceived: 128_000,
+        changeAmount: 0,
+      }),
+    );
+    expect(outboxRepo.createCompleted).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ roundedTotal: 128_000, status: 'PAID' }),
+      'p1',
     );
     expect(orderClient.send).toHaveBeenCalledWith(TCP_REQUEST_MESSAGE.ORDER.BILL_MARK_PAID, expect.anything());
   });

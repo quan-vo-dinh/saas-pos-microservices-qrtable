@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { MacbookScroll } from '@/components/ui/macbook-scroll';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { QrCode } from 'lucide-react';
@@ -58,9 +59,11 @@ export function DashboardMacbookSection(): React.ReactElement {
           <DialogDescription className="sr-only">
             Đóng bằng nút đóng hoặc phím Escape để quay lại trang.
           </DialogDescription>
-          <img
+          <Image
             src={DASHBOARD_SCREENSHOT}
             alt="QRTable — màn hình quản lý đơn và bàn (xem phóng to)"
+            width={3600}
+            height={2338}
             className="mx-auto max-h-[min(85vh,820px)] w-auto max-w-full rounded-md object-contain"
           />
           <p className="text-center font-mono text-[11px] text-zinc-500">Đóng bằng nút X hoặc phím Escape.</p>

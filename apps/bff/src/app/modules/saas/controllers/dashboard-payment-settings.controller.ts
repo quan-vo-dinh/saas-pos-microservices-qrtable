@@ -11,6 +11,7 @@ import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import { buildTcpRequestContext } from '@common/utils/request.util';
 import { Body, Controller, ForbiddenException, Get, Inject, Post, Query, Req } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { map } from 'rxjs';
@@ -21,7 +22,10 @@ import { SAAS_BFF_ROUTES } from '../saas-bff-routes';
 @Controller()
 @Authorization({ secured: true })
 export class DashboardPaymentSettingsController {
-  constructor(@Inject(TCP_SERVICES.PAYMENT_SERVICE) private readonly paymentClient: TcpClient) {}
+  constructor(
+    @Inject(TCP_SERVICES.PAYMENT_SERVICE) private readonly paymentClient: TcpClient,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get(SAAS_BFF_ROUTES.dashboardPaymentSettings)
   @Permissions([PERMISSION.PAYMENT_SETTINGS_READ_OWN])
@@ -107,7 +111,7 @@ export class DashboardPaymentSettingsController {
   }
 
   private tenantWebhookUrl(tenantSlug: string): string {
-    const baseUrl = process.env.PUBLIC_API_BASE_URL?.replace(/\/+$/, '') ?? '';
+    const baseUrl = this.configService.get<string>('BFF_PAYMENT_CONFIG.PUBLIC_API_BASE_URL')?.replace(/\/+$/, '') ?? '';
     const path = `/api/v1/payment/sepay/webhook/${tenantSlug}`;
     return baseUrl ? `${baseUrl}${path}` : path;
   }

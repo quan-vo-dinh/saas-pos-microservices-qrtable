@@ -14,6 +14,10 @@ export class KafkaConfiguration {
 
   @IsString()
   @IsNotEmpty()
+  ORDER_STATUS_CHANGED_TOPIC: string;
+
+  @IsString()
+  @IsNotEmpty()
   KITCHEN_SLA_WARNING_TOPIC: string;
 
   @IsString()
@@ -57,6 +61,8 @@ export class KafkaConfiguration {
     this.CLIENT_ID = data?.CLIENT_ID || process.env['KAFKA_CLIENT_ID'] || 'qrtable-order-service';
     this.ORDER_CONFIRMED_TOPIC =
       data?.ORDER_CONFIRMED_TOPIC || process.env['KAFKA_ORDER_CONFIRMED_TOPIC'] || 'order.confirmed';
+    this.ORDER_STATUS_CHANGED_TOPIC =
+      data?.ORDER_STATUS_CHANGED_TOPIC || process.env['KAFKA_ORDER_STATUS_CHANGED_TOPIC'] || 'order.status_changed';
     this.KITCHEN_SLA_WARNING_TOPIC =
       data?.KITCHEN_SLA_WARNING_TOPIC || process.env['KAFKA_KITCHEN_SLA_WARNING_TOPIC'] || 'kitchen.sla_warning';
     this.KITCHEN_CLIENT_ID =

@@ -5,7 +5,9 @@ import { RedisConfiguration } from '@common/configuration/redis.config';
 import { TcpConfiguration } from '@common/configuration/tcp.config';
 import { TypeOrmConfiguration } from '@common/configuration/type-orm.config';
 import { Type } from 'class-transformer';
-import { ValidateNested } from 'class-validator';
+import { IsString, ValidateNested } from 'class-validator';
+
+const DEFAULT_ORDER_PAYMENT_CONSUMER_GROUP = 'order-payment-consumer-group';
 
 class OrderAppConfiguration extends AppConfiguration {
   constructor() {
@@ -19,6 +21,15 @@ class OrderTypeOrmConfiguration extends TypeOrmConfiguration {
     super({
       DATABASE: process.env['ORDER_TYPEORM_DATABASE'] || process.env['TYPEORM_DATABASE'] || 'qrtable',
     });
+  }
+}
+
+class OrderPaymentConsumerConfiguration {
+  @IsString()
+  GROUP_ID: string;
+
+  constructor() {
+    this.GROUP_ID = process.env['KAFKA_ORDER_PAYMENT_CONSUMER_GROUP'] || DEFAULT_ORDER_PAYMENT_CONSUMER_GROUP;
   }
 }
 
@@ -42,6 +53,10 @@ class Configuration extends BaseConfiguration {
   @ValidateNested()
   @Type(() => KafkaConfiguration)
   KAFKA_CONFIG = new KafkaConfiguration();
+
+  @ValidateNested()
+  @Type(() => OrderPaymentConsumerConfiguration)
+  ORDER_PAYMENT_CONSUMER_CONFIG = new OrderPaymentConsumerConfiguration();
 }
 
 export const CONFIGURATION = new Configuration();

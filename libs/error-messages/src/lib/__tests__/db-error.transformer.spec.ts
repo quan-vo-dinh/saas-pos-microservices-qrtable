@@ -9,32 +9,37 @@ function createQueryFailedError(pgCode: string): QueryFailedError {
   return error;
 }
 
+function expectBusinessException(result: BusinessException | null): BusinessException {
+  expect(result).toBeInstanceOf(BusinessException);
+  if (!result) {
+    throw new Error('Expected transformDbError to return BusinessException');
+  }
+  return result;
+}
+
 describe('transformDbError', () => {
   it('should transform unique violation (23505) to COMMON_DB_UNIQUE_VIOLATION', () => {
     const dbError = createQueryFailedError('23505');
-    const result = transformDbError(dbError);
+    const result = expectBusinessException(transformDbError(dbError));
 
-    expect(result).toBeInstanceOf(BusinessException);
-    expect(result!.errorCode).toBe(ErrorCode.COMMON_DB_UNIQUE_VIOLATION);
-    expect(result!.getStatus()).toBe(409);
+    expect(result.errorCode).toBe(ErrorCode.COMMON_DB_UNIQUE_VIOLATION);
+    expect(result.getStatus()).toBe(409);
   });
 
   it('should transform FK violation (23503) to COMMON_DB_FK_VIOLATION', () => {
     const dbError = createQueryFailedError('23503');
-    const result = transformDbError(dbError);
+    const result = expectBusinessException(transformDbError(dbError));
 
-    expect(result).toBeInstanceOf(BusinessException);
-    expect(result!.errorCode).toBe(ErrorCode.COMMON_DB_FK_VIOLATION);
-    expect(result!.getStatus()).toBe(400);
+    expect(result.errorCode).toBe(ErrorCode.COMMON_DB_FK_VIOLATION);
+    expect(result.getStatus()).toBe(400);
   });
 
   it('should transform not-null violation (23502) to COMMON_DB_NOT_NULL_VIOLATION', () => {
     const dbError = createQueryFailedError('23502');
-    const result = transformDbError(dbError);
+    const result = expectBusinessException(transformDbError(dbError));
 
-    expect(result).toBeInstanceOf(BusinessException);
-    expect(result!.errorCode).toBe(ErrorCode.COMMON_DB_NOT_NULL_VIOLATION);
-    expect(result!.getStatus()).toBe(400);
+    expect(result.errorCode).toBe(ErrorCode.COMMON_DB_NOT_NULL_VIOLATION);
+    expect(result.getStatus()).toBe(400);
   });
 
   it('should return null for unknown PG error code', () => {

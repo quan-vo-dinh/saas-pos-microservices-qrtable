@@ -23,6 +23,7 @@ export const menuItemsColumns: ColumnDef<MenuItem>[] = [
       return (
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-muted overflow-hidden border border-border">
           {imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Menu image URLs are tenant-uploaded assets from the API.
             <img src={imageUrl} alt={row.original.name} className="h-full w-full object-cover" />
           ) : (
             <ImageIcon className="h-4 w-4 text-muted-foreground/60" />

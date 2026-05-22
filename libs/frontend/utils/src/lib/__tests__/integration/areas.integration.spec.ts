@@ -1,4 +1,5 @@
 import { apiFetch } from './helpers';
+import { describeFrontendUtilsIntegration } from './integration-gate';
 
 interface Area {
   id: string;
@@ -7,7 +8,7 @@ interface Area {
   sortOrder: number;
 }
 
-describe('[Integration] Areas CRUD', () => {
+describeFrontendUtilsIntegration('[Integration] Areas CRUD', () => {
   const uid = Date.now();
   let createdId: string;
 

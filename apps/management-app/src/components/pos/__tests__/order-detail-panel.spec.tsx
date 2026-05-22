@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react';
+import { createElement, type ComponentProps, type ReactNode } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { OrderItemStatus, OrderStatus, type Order } from '@einvoice/types';
 
@@ -8,9 +8,10 @@ const mockUseMarkOrderServedMutation = jest.fn();
 
 jest.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, layout: _layout, ...props }: ComponentProps<'div'> & { layout?: boolean }) => (
-      <div {...props}>{children}</div>
-    ),
+    div: ({ children, layout, ...props }: ComponentProps<'div'> & { layout?: boolean }) => {
+      void layout;
+      return <div {...props}>{children}</div>;
+    },
   },
   AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
@@ -22,7 +23,7 @@ jest.mock('@/components/pos/cancel-order-dialog', () => ({
 jest.mock('@einvoice/frontend-ui', () => ({
   Avatar: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AvatarFallback: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  AvatarImage: (props: ComponentProps<'img'>) => <img {...props} />,
+  AvatarImage: (props: ComponentProps<'img'>) => createElement('img', { alt: '', ...props }),
 }));
 
 jest.mock('@/features/order/hooks/use-order-query', () => ({

@@ -2,6 +2,7 @@ import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { MetadataKey } from '@common/constants/common.constant';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
+import { RedisKey } from '@common/constants/redis-key.constants';
 import { ProcessId } from '@common/decorators/processId.decorator';
 import { Authorization } from '@common/decorators/authorizer.decorator';
 import { Permissions } from '@common/decorators/permission.decorator';
@@ -344,7 +345,7 @@ export class MenuItemAdminController {
   private async invalidateMenuCache(req: Request): Promise<void> {
     const tenantId = req[MetadataKey.TENANT_ID] as string;
     if (tenantId) {
-      await this.cacheManager.del(`menu:${tenantId}`);
+      await this.cacheManager.del(RedisKey.menu.public(tenantId));
     }
   }
 }

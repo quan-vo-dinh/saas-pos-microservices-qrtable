@@ -2,6 +2,7 @@ import { RedisClientService } from '@common/providers/redis-client/redis-client.
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { RedisKey } from '@common/constants/redis-key.constants';
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { Request } from '@common/interfaces/tcp/common/request.interface';
 import type { ResponseType } from '@common/interfaces/tcp/common/response.interface';
@@ -26,7 +27,7 @@ export class CartService {
   ) {}
 
   cartKey(tenantId: string, sessionId: string): string {
-    return `cart:${tenantId}:${sessionId}`;
+    return RedisKey.cart.data(tenantId, sessionId);
   }
 
   async getSnapshot(tenantId: string, sessionId: string): Promise<CartSnapshot> {

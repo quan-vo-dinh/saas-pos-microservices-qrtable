@@ -1,11 +1,12 @@
 import { apiFetch, BFF_URL } from './helpers';
+import { describeFrontendUtilsIntegration } from './integration-gate';
 
 interface Category {
   id: string;
   tenantId: string;
 }
 
-describe('[Integration] Multi-Tenant Isolation', () => {
+describeFrontendUtilsIntegration('[Integration] Multi-Tenant Isolation', () => {
   it('should reject request without tenant header', async () => {
     const res = await fetch(`${BFF_URL}/menu`);
     expect([400, 403].includes(res.status)).toBe(true);

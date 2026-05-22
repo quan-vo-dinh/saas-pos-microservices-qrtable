@@ -5,6 +5,7 @@ jest.mock('uuid', () => ({
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { firstValueFrom, of } from 'rxjs';
 import { PublicSaasController } from './public-saas.controller';
@@ -17,7 +18,17 @@ describe('PublicSaasController', () => {
     saasClient = { send: jest.fn().mockReturnValue(of(Response.success([{ code: 'FREE' }]))) };
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PublicSaasController],
-      providers: [{ provide: TCP_SERVICES.SAAS_SERVICE, useValue: saasClient }],
+      providers: [
+        { provide: TCP_SERVICES.SAAS_SERVICE, useValue: saasClient },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) =>
+              key === 'BFF_PLATFORM_CONFIG.PLATFORM_CONTACT_EMAIL' ? 'support@qrtable.local' : undefined,
+            ),
+          },
+        },
+      ],
     }).compile();
     controller = module.get(PublicSaasController);
   });

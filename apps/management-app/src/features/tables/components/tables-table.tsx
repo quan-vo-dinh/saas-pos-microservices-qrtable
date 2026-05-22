@@ -34,11 +34,14 @@ type TablesTableProps = {
 };
 
 export function TablesTable({ data, areas }: TablesTableProps) {
+  'use no memo';
+
   const { selectedTableId, setSelectedTableId } = useTables();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table is isolated in this "use no memo" component.
   const table = useReactTable({
     data,
     columns,

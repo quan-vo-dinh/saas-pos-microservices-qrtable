@@ -9,6 +9,7 @@ import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message'
 import { Permissions } from '@common/decorators/permission.decorator';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
 import { Reflector } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Request } from 'express';
 import { firstValueFrom, of } from 'rxjs';
@@ -29,7 +30,17 @@ describe('DashboardPaymentSettingsController', () => {
     paymentClient = { send: jest.fn().mockReturnValue(of(Response.success({ ok: true }))) };
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DashboardPaymentSettingsController],
-      providers: [{ provide: TCP_SERVICES.PAYMENT_SERVICE, useValue: paymentClient }],
+      providers: [
+        { provide: TCP_SERVICES.PAYMENT_SERVICE, useValue: paymentClient },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) =>
+              key === 'BFF_PAYMENT_CONFIG.PUBLIC_API_BASE_URL' ? 'https://api.qrtable.local' : undefined,
+            ),
+          },
+        },
+      ],
     }).compile();
     controller = module.get(DashboardPaymentSettingsController);
   });

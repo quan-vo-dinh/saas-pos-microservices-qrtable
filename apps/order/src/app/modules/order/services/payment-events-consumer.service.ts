@@ -1,5 +1,6 @@
 import type { BillMarkPaidTcpRequest } from '@common/interfaces/tcp/order/order-request.interface';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Consumer, Kafka } from 'kafkajs';
 import { CONFIGURATION } from '../../../../configuration';
 import { BillService } from './bill.service';
@@ -76,7 +77,10 @@ export class PaymentEventsConsumerService implements OnModuleInit, OnModuleDestr
   private readonly logger = new Logger(PaymentEventsConsumerService.name);
   private consumer: Consumer | null = null;
 
-  constructor(private readonly billService: BillService) {}
+  constructor(
+    private readonly billService: BillService,
+    @Optional() private readonly configService?: ConfigService,
+  ) {}
 
   /**
    * Parses a Kafka message body and runs Order finalization. Returns whether a valid
@@ -97,7 +101,9 @@ export class PaymentEventsConsumerService implements OnModuleInit, OnModuleDestr
       this.logger.warn('Kafka brokers empty; payment consumer will not run');
       return;
     }
-    const groupId = process.env['KAFKA_ORDER_PAYMENT_CONSUMER_GROUP'] ?? 'order-payment-consumer-group';
+    const groupId =
+      this.configService?.get<string>('ORDER_PAYMENT_CONSUMER_CONFIG.GROUP_ID') ??
+      CONFIGURATION.ORDER_PAYMENT_CONSUMER_CONFIG.GROUP_ID;
     const kafka = new Kafka({ clientId: `${CLIENT_ID}-payment-consumer`, brokers: BROKERS });
     this.consumer = kafka.consumer({ groupId });
 

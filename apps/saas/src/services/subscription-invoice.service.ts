@@ -9,7 +9,9 @@ import {
   Optional,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomBytes, timingSafeEqual } from 'crypto';
+import { CONFIGURATION } from '../configuration';
 import { PricingPlanRepository } from '../repositories/pricing-plan.repository';
 import { SubscriptionInvoiceRepository } from '../repositories/subscription-invoice.repository';
 import { SubscriptionService } from './subscription.service';
@@ -50,6 +52,7 @@ export class SubscriptionInvoiceService {
     },
     private readonly subscriptionService: SubscriptionService,
     @Optional() private readonly planRepository?: PricingPlanRepository,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
 
   async checkout(input: {
@@ -229,8 +232,8 @@ export class SubscriptionInvoiceService {
   }
 
   private buildQrUrl(invoice: SubscriptionInvoice): string | null {
-    const account = process.env.SEPAY_PLATFORM_QR_ACCOUNT || process.env.PAYMENT_SEPAY_QR_ACCOUNT;
-    const bank = process.env.SEPAY_PLATFORM_QR_BANK || process.env.PAYMENT_SEPAY_QR_BANK;
+    const account = this.platformPaymentConfig('QR_ACCOUNT');
+    const bank = this.platformPaymentConfig('QR_BANK');
     if (!account || !bank) {
       return null;
     }
@@ -245,11 +248,18 @@ export class SubscriptionInvoiceService {
   }
 
   private verifyPlatformWebhookSecret(secret?: string): void {
-    const expectedSecret = process.env.SEPAY_PLATFORM_WEBHOOK_SECRET?.trim();
+    const expectedSecret = this.platformPaymentConfig('WEBHOOK_SECRET')?.trim();
     const providedSecret = secret?.trim();
     if (!expectedSecret || !providedSecret || !constantTimeEquals(expectedSecret, providedSecret)) {
       throw new UnauthorizedException('SEPAY_PLATFORM_WEBHOOK_SECRET_INVALID');
     }
+  }
+
+  private platformPaymentConfig(key: 'QR_ACCOUNT' | 'QR_BANK' | 'WEBHOOK_SECRET'): string | undefined {
+    return (
+      this.configService?.get<string>(`SAAS_PLATFORM_PAYMENT_CONFIG.${key}`) ??
+      CONFIGURATION.SAAS_PLATFORM_PAYMENT_CONFIG[key]
+    );
   }
 
   private toInvoiceResponse(invoice: SubscriptionInvoice): Record<string, unknown> {

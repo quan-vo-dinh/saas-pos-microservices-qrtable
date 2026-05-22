@@ -1,4 +1,5 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 
 export type OAuthConfig = {
@@ -52,12 +53,15 @@ export class SepayOAuthClientService {
     'profile',
   ];
 
-  constructor(@Optional() @Inject(SEPAY_OAUTH_CLIENT_CONFIG) config?: Partial<OAuthConfig>) {
+  constructor(
+    @Optional() @Inject(SEPAY_OAUTH_CLIENT_CONFIG) config?: Partial<OAuthConfig>,
+    @Optional() private readonly configService?: ConfigService,
+  ) {
     this.config = {
-      baseUrl: process.env.SEPAY_OAUTH_BASE_URL ?? 'https://my.sepay.vn',
-      clientId: process.env.SEPAY_OAUTH_CLIENT_ID ?? '',
-      clientSecret: process.env.SEPAY_OAUTH_CLIENT_SECRET ?? '',
-      redirectUri: process.env.SEPAY_OAUTH_REDIRECT_URI ?? '',
+      baseUrl: this.configService?.get<string>('SEPAY_OAUTH_CONFIG.BASE_URL') ?? 'https://my.sepay.vn',
+      clientId: this.configService?.get<string>('SEPAY_OAUTH_CONFIG.CLIENT_ID') ?? '',
+      clientSecret: this.configService?.get<string>('SEPAY_OAUTH_CONFIG.CLIENT_SECRET') ?? '',
+      redirectUri: this.configService?.get<string>('SEPAY_OAUTH_CONFIG.REDIRECT_URI') ?? '',
       ...config,
     };
     this.http = axios.create({ baseURL: this.config.baseUrl, timeout: 5000 });

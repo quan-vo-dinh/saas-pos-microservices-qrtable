@@ -29,7 +29,6 @@ export function successMessage(templateKey: keyof typeof SUCCESS_TEMPLATES, enti
 
 export function getErrorDisplayMessage(error: Error): string {
   const err = error as Error & Record<string, unknown>;
-  console.log('error:', error);
   if ('serverMessage' in err && typeof err['serverMessage'] === 'string') {
     return err['serverMessage'];
   }

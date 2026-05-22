@@ -1,4 +1,5 @@
 import { apiFetch } from './helpers';
+import { describeFrontendUtilsIntegration } from './integration-gate';
 
 interface Category {
   id: string;
@@ -18,7 +19,7 @@ interface MenuItem {
   deletedAt: string | null;
 }
 
-describe('[Integration] Menu Items CRUD', () => {
+describeFrontendUtilsIntegration('[Integration] Menu Items CRUD', () => {
   const uid = Date.now();
   const catName = `MI-Test-Cat-${uid}`;
   let categoryId: string;

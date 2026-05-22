@@ -1,4 +1,5 @@
 import { ROLE } from '@common/constants/enum/role.enum';
+import { WsRoom } from '@common/constants/ws-room.constants';
 import { Logger } from '@nestjs/common';
 import {
   ConnectedSocket,
@@ -69,7 +70,7 @@ export class OrderEventsGateway implements OnGatewayConnection {
       return;
     }
 
-    const room = body.station === 'KITCHEN' ? `tenant:${tenantId}:kds:kitchen` : `tenant:${tenantId}:kds:bar`;
+    const room = WsRoom.kds(tenantId, body.station);
     void socket.join(room);
   }
 }

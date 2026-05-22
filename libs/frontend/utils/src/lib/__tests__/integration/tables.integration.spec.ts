@@ -1,4 +1,5 @@
 import { apiFetch } from './helpers';
+import { describeFrontendUtilsIntegration } from './integration-gate';
 
 interface Area {
   id: string;
@@ -15,7 +16,7 @@ interface Table {
   tenantId: string;
 }
 
-describe('[Integration] Tables CRUD', () => {
+describeFrontendUtilsIntegration('[Integration] Tables CRUD', () => {
   const uid = Date.now();
   const areaName = `TBL-Test-Area-${uid}`;
   let areaId: string;

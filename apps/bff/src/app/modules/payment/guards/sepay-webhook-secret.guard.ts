@@ -13,7 +13,7 @@ export class SepayWebhookSecretGuard implements CanActivate {
     const signature = this.header(request, 'x-sepay-signature');
     const timestamp = this.header(request, 'x-sepay-timestamp');
     const rawBody = request.rawBody ?? Buffer.alloc(0);
-    const secret = this.configService.get<string>('SEPAY_WEBHOOK_SECRET') || process.env['SEPAY_WEBHOOK_SECRET'] || '';
+    const secret = this.configService.get<string>('BFF_PAYMENT_CONFIG.SEPAY_WEBHOOK_SECRET') ?? '';
 
     assertSepayHmacSignature(signature, timestamp, rawBody, secret);
     return true;

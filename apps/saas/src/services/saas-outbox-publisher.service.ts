@@ -1,5 +1,6 @@
 import { CONFIGURATION } from '../configuration';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Kafka } from 'kafkajs';
 import { SaasOutboxRepository } from '../repositories/saas-outbox.repository';
 
@@ -14,7 +15,10 @@ export class SaasOutboxPublisherService implements OnModuleInit, OnModuleDestroy
   private publishing = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly outbox: SaasOutboxRepository) {}
+  constructor(
+    private readonly outbox: SaasOutboxRepository,
+    @Optional() private readonly configService?: ConfigService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     await this.initializeProducerAndPolling();
@@ -55,7 +59,9 @@ export class SaasOutboxPublisherService implements OnModuleInit, OnModuleDestroy
       return;
     }
     const kafka = new Kafka({
-      clientId: process.env['KAFKA_SAAS_CLIENT_ID'] || 'qrtable-saas-service',
+      clientId:
+        this.configService?.get<string>('SAAS_KAFKA_CLIENT_CONFIG.CLIENT_ID') ??
+        CONFIGURATION.SAAS_KAFKA_CLIENT_CONFIG.CLIENT_ID,
       brokers,
     });
     this.producer = kafka.producer();

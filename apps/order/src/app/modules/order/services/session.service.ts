@@ -2,6 +2,7 @@ import { RedisClientService } from '@common/providers/redis-client/redis-client.
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Session } from '@common/entities/session.entity';
+import { RedisKey } from '@common/constants/redis-key.constants';
 import { SessionStatus } from '@einvoice/types';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import type Redis from 'ioredis';
@@ -28,7 +29,7 @@ export class SessionService {
   ) {}
 
   sessionKey(tenantId: string, sessionId: string): string {
-    return `session:${tenantId}:${sessionId}`;
+    return RedisKey.session.data(tenantId, sessionId);
   }
 
   /**
@@ -75,7 +76,7 @@ export class SessionService {
     await this.sessionRepository.markClosed(sessionId, tenantId, closedAt);
     const redis = this.redisClient.getClient();
     await redis.del(this.sessionKey(tenantId, sessionId));
-    await redis.del(`cart:${tenantId}:${sessionId}`);
+    await redis.del(RedisKey.cart.data(tenantId, sessionId));
   }
 
   async getSessionForReadOnlyBill(tenantId: string, sessionId: string): Promise<Session> {
@@ -240,7 +241,7 @@ export class SessionService {
     const closedAt = new Date();
     await this.sessionRepository.markClosed(fields.sessionId, fields.tenantId, closedAt);
     await redis.del(redisKey);
-    await redis.del(`cart:${fields.tenantId}:${fields.sessionId}`);
+    await redis.del(RedisKey.cart.data(fields.tenantId, fields.sessionId));
     return true;
   }
 }

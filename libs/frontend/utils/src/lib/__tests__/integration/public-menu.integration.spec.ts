@@ -1,4 +1,5 @@
 import { apiPublicFetch } from './helpers';
+import { describeFrontendUtilsIntegration } from './integration-gate';
 
 interface PublicMenuItem {
   id: string;
@@ -18,7 +19,7 @@ interface PublicMenuResponse {
   categories: PublicMenuCategory[];
 }
 
-describe('[Integration] Public Menu', () => {
+describeFrontendUtilsIntegration('[Integration] Public Menu', () => {
   it('should return public menu without authentication', async () => {
     const { status, data } = await apiPublicFetch<PublicMenuResponse>('/menu');
 

@@ -2,9 +2,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "../../dist/out-tsc",
-    "module": "commonjs",
-    "moduleResolution": "node10",
-    "types": ["jest", "node", "react", "react-dom"],
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["jest", "node", "react", "react-dom", "vite/client"],
+    "skipLibCheck": true,
     "allowUmdGlobalAccess": true,
     "jsx": "react-jsx"
   },

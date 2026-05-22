@@ -20,13 +20,13 @@ import { cn } from '@/lib/utils';
 export function KpiTiles() {
   const liveOrdersQuery = useOrdersQuery();
   const tablesQuery = useTablesQuery();
-  const liveOrders = liveOrdersQuery.data ?? [];
-  const tables = tablesQuery.data ?? [];
   const posViewFilter = useOrderUiState((s) => s.viewFilter);
   const setPosViewFilter = useOrderUiState((s) => s.setViewFilter);
   const nowMs = useNowMs();
 
   const { pending, avgMin, overdue, occPct } = useMemo(() => {
+    const liveOrders = liveOrdersQuery.data ?? [];
+    const tables = tablesQuery.data ?? [];
     const active = liveOrders.filter(
       (o) => o.status !== OrderStatus.COMPLETED && o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.DRAFT,
     );
@@ -39,7 +39,7 @@ export function KpiTiles() {
     const occ = tables.filter((t) => t.status === 'occupied' || t.status === 'billing').length;
     const pct = tot ? Math.round((occ / tot) * 100) : 0;
     return { pending: pend.length, avgMin: avg, overdue: ovd, occPct: pct };
-  }, [liveOrders, tables, nowMs]);
+  }, [liveOrdersQuery.data, tablesQuery.data, nowMs]);
   const hasDataError = liveOrdersQuery.isError || tablesQuery.isError;
   const pendingValue = hasDataError ? '—' : String(pending);
   const avgValue = hasDataError ? '—' : Number.isFinite(avgMin) ? formatMinutes(avgMin) : '—';

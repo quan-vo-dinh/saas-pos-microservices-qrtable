@@ -67,7 +67,7 @@ export function TodayMiniCharts() {
         <div className="flex min-w-0 flex-col gap-2">
           <div className="h-24 w-full min-w-0 min-h-24">
             <p className="mb-0.5 text-[0.6rem] text-muted-foreground">Doanh thu 6h–22h</p>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={80}>
               <LineChart data={lineData} margin={{ top: 2, right: 2, left: -18, bottom: 0 }}>
                 <XAxis dataKey="t" tick={{ fontSize: 9 }} />
                 <YAxis hide />
@@ -78,7 +78,7 @@ export function TodayMiniCharts() {
           </div>
           <div className="h-24 w-full min-w-0 min-h-24">
             <p className="mb-0.5 text-[0.6rem] text-muted-foreground">Top 5 món (từ mock)</p>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={80}>
               <BarChart data={barData} layout="vertical" margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
                 <XAxis type="number" hide />
                 <YAxis type="category" dataKey="name" width={56} tick={{ fontSize: 9 }} />
@@ -89,7 +89,7 @@ export function TodayMiniCharts() {
           </div>
           <div className="h-28 w-full min-w-0 min-h-28">
             <p className="mb-0.5 text-[0.6rem] text-muted-foreground">Trạng thái bàn</p>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height={96}>
               <PieChart>
                 <Tooltip />
                 <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={22} outerRadius={40} paddingAngle={2}>

@@ -38,6 +38,8 @@ function sessionMinutes(sessionId: string) {
 }
 
 export function ServiceRequestTable() {
+  'use no memo';
+
   const [tab, setTab] = useState<'PENDING' | 'ACKNOWLEDGED' | 'RESOLVED'>('PENDING');
   const selectedServiceRequestId = useMockStore((s) => s.selectedServiceRequestId);
   const selectServiceRequest = useMockStore((s) => s.selectServiceRequest);
@@ -157,6 +159,7 @@ export function ServiceRequestTable() {
     [acknowledgeMutation, resolveMutation, tableName],
   );
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table is isolated in this "use no memo" component.
   const t = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
 
   return (

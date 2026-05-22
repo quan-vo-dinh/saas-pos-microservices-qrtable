@@ -1,5 +1,6 @@
 import { CONFIGURATION } from '../../../configuration';
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Consumer, Kafka } from 'kafkajs';
 import { AreaService } from '../area/services/area.service';
 
@@ -20,7 +21,10 @@ export class TenantCreatedConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TenantCreatedConsumer.name);
   private consumer: Consumer | null = null;
 
-  constructor(private readonly areaService: AreaService) {}
+  constructor(
+    private readonly areaService: AreaService,
+    @Optional() private readonly configService?: ConfigService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     const brokers = CONFIGURATION.KAFKA_CONFIG.BROKERS;
@@ -29,11 +33,15 @@ export class TenantCreatedConsumer implements OnModuleInit, OnModuleDestroy {
       return;
     }
     const kafka = new Kafka({
-      clientId: process.env['KAFKA_CATALOG_CLIENT_ID'] || 'qrtable-catalog-service',
+      clientId:
+        this.configService?.get<string>('CATALOG_TENANT_EVENTS_CONFIG.CLIENT_ID') ??
+        CONFIGURATION.CATALOG_TENANT_EVENTS_CONFIG.CLIENT_ID,
       brokers,
     });
     this.consumer = kafka.consumer({
-      groupId: process.env['KAFKA_CATALOG_TENANT_CONSUMER_GROUP'] || 'catalog-tenant-created-consumer-group',
+      groupId:
+        this.configService?.get<string>('CATALOG_TENANT_EVENTS_CONFIG.TENANT_CONSUMER_GROUP_ID') ??
+        CONFIGURATION.CATALOG_TENANT_EVENTS_CONFIG.TENANT_CONSUMER_GROUP_ID,
     });
     await this.consumer.connect();
     await this.consumer.subscribe({ topic: CONFIGURATION.KAFKA_CONFIG.TENANT_CREATED_TOPIC, fromBeginning: false });

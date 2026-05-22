@@ -102,8 +102,8 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
 
       <div className="flex flex-col gap-1">
         <p className="text-[0.65rem] font-medium uppercase text-muted-foreground">Mật độ yêu cầu</p>
-        <div className="h-24 w-full min-w-0 rounded-md border border-border/40 bg-background/40">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-24 min-h-24 w-full min-w-0 rounded-md border border-border/40 bg-background/40">
+          <ResponsiveContainer width="100%" height={96}>
             <AreaChart data={spark} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">

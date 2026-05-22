@@ -1,4 +1,8 @@
-import { TypeOrmProvider } from '@common/configuration/type-orm.config';
+import { createTypeOrmProvider } from '@common/configuration/type-orm.config';
+import { Area } from '@common/entities/area.entity';
+import { Category } from '@common/entities/category.entity';
+import { MenuItem } from '@common/entities/menu-item.entity';
+import { Table } from '@common/entities/table.entity';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { CONFIGURATION, TConfiguration } from '../configuration';
@@ -12,7 +16,7 @@ import { TenantEventsModule } from './modules/tenant-events/tenant-events.module
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [() => CONFIGURATION] }),
-    TypeOrmProvider,
+    createTypeOrmProvider([Area, Category, MenuItem, Table]),
     CategoryModule,
     AreaModule,
     MenuItemModule,

@@ -21,8 +21,14 @@ jest.mock('next-auth/react', () => ({
 
 jest.mock('framer-motion', () => ({
   motion: {
-    tr: ({ children, layout: _layout, ...props }: ComponentProps<'tr'> & { layout?: boolean }) => <tr {...props}>{children}</tr>,
-    div: ({ children, layout: _layout, ...props }: ComponentProps<'div'> & { layout?: boolean }) => <div {...props}>{children}</div>,
+    tr: ({ children, layout, ...props }: ComponentProps<'tr'> & { layout?: boolean }) => {
+      void layout;
+      return <tr {...props}>{children}</tr>;
+    },
+    div: ({ children, layout, ...props }: ComponentProps<'div'> & { layout?: boolean }) => {
+      void layout;
+      return <div {...props}>{children}</div>;
+    },
   },
   AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));

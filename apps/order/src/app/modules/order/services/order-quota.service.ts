@@ -1,4 +1,5 @@
 import { RedisClientService } from '@common/providers/redis-client/redis-client.service';
+import { RedisKey } from '@common/constants/redis-key.constants';
 import { Inject, Injectable } from '@nestjs/common';
 
 type RedisLike = {
@@ -22,7 +23,7 @@ export class OrderQuotaService {
       month: '2-digit',
       day: '2-digit',
     }).format(now);
-    return `quota:${tenantId}:orders:${date}`;
+    return RedisKey.quota.dailyOrders(tenantId, date);
   }
 
   async incrementDailyOrders(tenantId: string, now = new Date()): Promise<number> {

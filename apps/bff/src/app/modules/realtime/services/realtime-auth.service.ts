@@ -1,5 +1,6 @@
 import { GRPC_SERVICES } from '@common/configuration/grpc.config';
 import { ROLE } from '@common/constants/enum/role.enum';
+import { WsRoom } from '@common/constants/ws-room.constants';
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { AuthorizerService } from '@common/interfaces/grpc/authorizer';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -115,15 +116,15 @@ export class RealtimeAuthService implements OnModuleInit {
 
     const roles = extractJwtRealmRoles(jwt);
     const rooms = new Set<string>();
-    rooms.add(`tenant:${tenantId}:staff`);
+    rooms.add(WsRoom.staff(tenantId));
     if (roles.includes(ROLE.CHEF)) {
-      rooms.add(`tenant:${tenantId}:kds:kitchen`);
+      rooms.add(WsRoom.kds(tenantId, 'KITCHEN'));
     }
     if (roles.includes(ROLE.BARISTA)) {
-      rooms.add(`tenant:${tenantId}:kds:bar`);
+      rooms.add(WsRoom.kds(tenantId, 'BAR'));
     }
     if (roles.includes(ROLE.SUPER_ADMIN) || roles.includes(ROLE.OWNER) || roles.includes(ROLE.MANAGER)) {
-      rooms.add(`tenant:${tenantId}:management`);
+      rooms.add(WsRoom.management(tenantId));
     }
 
     socket.data.staffRoles = roles;
@@ -147,10 +148,10 @@ export class RealtimeAuthService implements OnModuleInit {
     }
     const tid = tenantId.trim();
     const sid = sessionId.trim();
-    const rooms: string[] = [`session:${sid}:customer`, `tenant:${tid}:customers`];
+    const rooms: string[] = [WsRoom.customer(sid), WsRoom.customers(tid)];
     const slug = getHandshakeAuthString(socket.handshake.auth as Record<string, unknown> | undefined, 'tenantSlug');
     if (slug?.trim()) {
-      rooms.push(`tenant-slug:${slug.trim()}:customers`);
+      rooms.push(WsRoom.tenantSlugCustomers(slug.trim()));
     }
     return rooms;
   }

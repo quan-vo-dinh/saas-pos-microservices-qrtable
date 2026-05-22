@@ -1,9 +1,9 @@
 import { SubscriptionInvoiceStatus } from '@common/constants/saas.constants';
 import { UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { SubscriptionInvoiceService } from './subscription-invoice.service';
 
 describe('SubscriptionInvoiceService', () => {
-  const originalPlatformSecret = process.env.SEPAY_PLATFORM_WEBHOOK_SECRET;
   const invoiceRepo = {
     findByBillingReferenceForUpdate: jest.fn(),
     markPaid: jest.fn(),
@@ -13,15 +13,6 @@ describe('SubscriptionInvoiceService', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    process.env.SEPAY_PLATFORM_WEBHOOK_SECRET = 'platform-secret';
-  });
-
-  afterAll(() => {
-    if (originalPlatformSecret === undefined) {
-      delete process.env.SEPAY_PLATFORM_WEBHOOK_SECRET;
-      return;
-    }
-    process.env.SEPAY_PLATFORM_WEBHOOK_SECRET = originalPlatformSecret;
   });
 
   it('does not activate subscription when transfer is underpaid', async () => {
@@ -40,7 +31,7 @@ describe('SubscriptionInvoiceService', () => {
       planCodeSnapshot: 'PREMIUM',
       periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
     });
-    const service = new SubscriptionInvoiceService(invoiceRepo as never, subscriptionService as never);
+    const service = createService();
 
     await service.handleWebhook({
       code: 'QRSUB123',
@@ -72,7 +63,7 @@ describe('SubscriptionInvoiceService', () => {
       planCodeSnapshot: 'PREMIUM',
       periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
     });
-    const service = new SubscriptionInvoiceService(invoiceRepo as never, subscriptionService as never);
+    const service = createService();
 
     await service.handleWebhook({
       code: 'QRSUB123',
@@ -105,7 +96,7 @@ describe('SubscriptionInvoiceService', () => {
       periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
     });
     invoiceRepo.markPaid.mockResolvedValue(null);
-    const service = new SubscriptionInvoiceService(invoiceRepo as never, subscriptionService as never);
+    const service = createService();
 
     await service.handleWebhook({
       code: 'QRSUB123',
@@ -133,7 +124,7 @@ describe('SubscriptionInvoiceService', () => {
       planCodeSnapshot: 'PREMIUM',
       periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
     });
-    const service = new SubscriptionInvoiceService(invoiceRepo as never, subscriptionService as never);
+    const service = createService();
 
     await expect(
       service.handleWebhook({
@@ -150,8 +141,7 @@ describe('SubscriptionInvoiceService', () => {
   });
 
   it('rejects unconfigured platform webhook secret without mutating invoice or subscription', async () => {
-    delete process.env.SEPAY_PLATFORM_WEBHOOK_SECRET;
-    const service = new SubscriptionInvoiceService(invoiceRepo as never, subscriptionService as never);
+    const service = createService({ WEBHOOK_SECRET: undefined });
 
     await expect(
       service.handleWebhook({
@@ -168,7 +158,7 @@ describe('SubscriptionInvoiceService', () => {
   });
 
   it('ignores QRTBL payloads on the platform route without mutating invoice state', async () => {
-    const service = new SubscriptionInvoiceService(invoiceRepo as never, subscriptionService as never);
+    const service = createService();
 
     await service.handleWebhook({
       code: 'QRTBL11111111',
@@ -181,4 +171,23 @@ describe('SubscriptionInvoiceService', () => {
     expect(invoiceRepo.markPaid).not.toHaveBeenCalled();
     expect(subscriptionService.assignPlan).not.toHaveBeenCalled();
   });
+
+  function createService(config: { WEBHOOK_SECRET?: string } = { WEBHOOK_SECRET: 'platform-secret' }) {
+    const configService = {
+      get: jest.fn((key: string) => {
+        if (key === 'SAAS_PLATFORM_PAYMENT_CONFIG.WEBHOOK_SECRET') {
+          return config.WEBHOOK_SECRET;
+        }
+
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+
+    return new SubscriptionInvoiceService(
+      invoiceRepo as never,
+      subscriptionService as never,
+      undefined,
+      configService as never,
+    );
+  }
 });

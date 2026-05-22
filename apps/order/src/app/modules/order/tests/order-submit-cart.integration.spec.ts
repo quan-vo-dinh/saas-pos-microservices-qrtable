@@ -16,8 +16,11 @@ import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { SessionRepository } from '../repositories/session.repository';
 import { CartService } from '../services/cart.service';
+import { OrderKdsEventService } from '../services/order-kds-event.service';
 import { OrderQuotaService } from '../services/order-quota.service';
 import { OrderService } from '../services/order.service';
+import { OrderStateTransitionService } from '../services/order-state-transition.service';
+import { OrderSubmitService } from '../services/order-submit.service';
 import { SessionService } from '../services/session.service';
 
 const RUN_INTEGRATION = process.env['RUN_PHASE5_ORDER_SUBMIT_INTEGRATION'] === '1';
@@ -247,17 +250,38 @@ async function createHarness(): Promise<Harness> {
   } as unknown as TcpClient;
   const cartService = new CartService(redisClient, catalogClient, sessionService);
   const orderQuotaService = new OrderQuotaService(redisClient);
-  const orderService = new OrderService(
+  const orderRepository = new OrderRepository(dataSource.getRepository(Order));
+  const orderItemRepository = new OrderItemRepository(dataSource.getRepository(OrderItem));
+  const billRepository = new BillRepository(dataSource.getRepository(Bill));
+  const orderKdsEventService = new OrderKdsEventService();
+  const orderSubmitService = new OrderSubmitService(
     dataSource,
-    new OrderRepository(dataSource.getRepository(Order)),
-    new OrderItemRepository(dataSource.getRepository(OrderItem)),
-    new BillRepository(dataSource.getRepository(Bill)),
+    orderRepository,
+    orderItemRepository,
+    billRepository,
     sessionRepository,
     cartService,
     sessionService,
     orderQuotaService,
-    catalogClient,
     saasClient,
+  );
+  const orderStateTransitionService = new OrderStateTransitionService(
+    dataSource,
+    orderRepository,
+    orderItemRepository,
+    billRepository,
+    orderKdsEventService,
+    catalogClient,
+  );
+  const orderService = new OrderService(
+    orderRepository,
+    orderItemRepository,
+    sessionRepository,
+    sessionService,
+    catalogClient,
+    orderSubmitService,
+    orderKdsEventService,
+    orderStateTransitionService,
   );
 
   return { dataSource, redis, cartService, orderService };

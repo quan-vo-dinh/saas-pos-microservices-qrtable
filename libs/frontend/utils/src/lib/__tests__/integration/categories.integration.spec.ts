@@ -1,4 +1,5 @@
 import { apiFetch } from './helpers';
+import { describeFrontendUtilsIntegration } from './integration-gate';
 
 interface Category {
   id: string;
@@ -10,7 +11,7 @@ interface Category {
   updatedAt: string;
 }
 
-describe('[Integration] Categories CRUD', () => {
+describeFrontendUtilsIntegration('[Integration] Categories CRUD', () => {
   const uid = Date.now();
   let createdId: string;
 

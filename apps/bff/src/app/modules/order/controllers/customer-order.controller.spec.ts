@@ -8,6 +8,7 @@ import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message'
 import { Response } from '@common/interfaces/tcp/common/response.interface';
 import { BillStatus } from '@einvoice/types';
 import { ConflictException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Request } from 'express';
 import { of } from 'rxjs';
@@ -45,6 +46,12 @@ describe('CustomerOrderController', () => {
             emitOrderStatusChanged: jest.fn(),
             emitServiceRequested: jest.fn(),
             emitBillRequested: jest.fn(),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => (key === 'BFF_PAYMENT_CONFIG.PAYMENT_TCP_TIMEOUT_MS' ? 5000 : undefined)),
           },
         },
       ],

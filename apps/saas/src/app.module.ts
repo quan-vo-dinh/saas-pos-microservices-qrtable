@@ -1,4 +1,4 @@
-import { TypeOrmProvider } from '@common/configuration/type-orm.config';
+import { createTypeOrmProvider } from '@common/configuration/type-orm.config';
 import { TCP_SERVICES, TcpProvider } from '@common/configuration/tcp.config';
 import { PricingPlan } from '@common/entities/pricing-plan.entity';
 import { SaasOutboxEvent } from '@common/entities/saas-outbox-event.entity';
@@ -36,7 +36,7 @@ import { TenantSuspendCronService } from './services/tenant-suspend-cron.service
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [() => CONFIGURATION] }),
-    TypeOrmProvider,
+    createTypeOrmProvider([Tenant, PricingPlan, Subscription, SubscriptionInvoice, SaasOutboxEvent]),
     RedisClientModule,
     ScheduleModule.forRoot(),
     ClientsModule.registerAsync([

@@ -3,7 +3,10 @@ import { TcpProvider, TCP_SERVICES } from '@common/configuration/tcp.config';
 import { Module } from '@nestjs/common';
 import { RedisClientModule } from '@common/providers/redis-client/redis-client.module';
 import { KitchenController } from './controllers/kitchen.controller';
+import { KdsRecoveryStoreRepository } from './repositories/kds-recovery-store.repository';
 import { KdsRedisRepository } from './repositories/kds-redis.repository';
+import { KdsSlaStoreRepository } from './repositories/kds-sla-store.repository';
+import { KdsTicketStoreRepository } from './repositories/kds-ticket-store.repository';
 import { KdsTicketService } from './services/kds-ticket.service';
 import { KitchenEventsPublisher } from './services/kitchen-events.publisher';
 import { KitchenKafkaProducer } from './services/kitchen-kafka.producer';
@@ -15,6 +18,9 @@ import { OrderConfirmedConsumer } from './services/order-confirmed.consumer';
   imports: [RedisClientModule, ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.ORDER_SERVICE)])],
   controllers: [KitchenController],
   providers: [
+    KdsTicketStoreRepository,
+    KdsSlaStoreRepository,
+    KdsRecoveryStoreRepository,
     KdsRedisRepository,
     KitchenEventsPublisher,
     KdsTicketService,

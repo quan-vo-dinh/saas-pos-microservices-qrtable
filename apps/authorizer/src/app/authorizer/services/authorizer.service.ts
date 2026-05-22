@@ -199,7 +199,7 @@ export class AuthorizerService {
   }
 
   private isAutoProvisionOnFirstLoginEnabled(): boolean {
-    return process.env['AUTH_AUTO_PROVISION_ON_FIRST_LOGIN'] === 'true';
+    return this.configService.get<boolean>('AUTHORIZER_AUTH_CONFIG.AUTO_PROVISION_ON_FIRST_LOGIN') === true;
   }
 
   /**

@@ -5,6 +5,7 @@ import { ProcessId } from '@common/decorators/processId.decorator';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import { Controller, Get, Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { map } from 'rxjs';
 import { SAAS_BFF_ROUTES } from '../saas-bff-routes';
@@ -12,7 +13,10 @@ import { SAAS_BFF_ROUTES } from '../saas-bff-routes';
 @ApiTags('SaaS Public')
 @Controller()
 export class PublicSaasController {
-  constructor(@Inject(TCP_SERVICES.SAAS_SERVICE) private readonly saasClient: TcpClient) {}
+  constructor(
+    @Inject(TCP_SERVICES.SAAS_SERVICE) private readonly saasClient: TcpClient,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get(SAAS_BFF_ROUTES.publicPlans)
   @ApiOkResponse({ type: ResponseDto })
@@ -39,7 +43,7 @@ export class PublicSaasController {
       data: {
         productName: 'QRTable',
         market: 'Vietnamese F&B SaaS POS',
-        contactEmail: process.env.PLATFORM_CONTACT_EMAIL ?? 'support@qrtable.local',
+        contactEmail: this.configService.get<string>('BFF_PLATFORM_CONFIG.PLATFORM_CONTACT_EMAIL'),
       },
       processID: processId,
     });

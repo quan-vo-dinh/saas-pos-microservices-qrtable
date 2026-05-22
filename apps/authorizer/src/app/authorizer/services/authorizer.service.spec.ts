@@ -21,14 +21,11 @@ jest.mock('jwks-rsa', () => ({
 }));
 
 describe('AuthorizerService', () => {
-  const originalEnv = process.env;
-
   afterEach(() => {
-    process.env = { ...originalEnv };
     jest.resetAllMocks();
   });
 
-  const createService = () => {
+  const createService = (autoProvisionOnFirstLogin = false) => {
     const mockUserAccessService = {
       getByUserId: jest.fn(),
       upsertByIdentity: jest.fn(),
@@ -44,6 +41,10 @@ describe('AuthorizerService', () => {
 
           if (key === 'KEYCLOAK_CONFIG.REALM') {
             return 'qrtable';
+          }
+
+          if (key === 'AUTHORIZER_AUTH_CONFIG.AUTO_PROVISION_ON_FIRST_LOGIN') {
+            return autoProvisionOnFirstLogin;
           }
 
           return undefined;
@@ -69,11 +70,6 @@ describe('AuthorizerService', () => {
   };
 
   it('returns user_not_provisioned when user is missing and auto-provision is disabled', async () => {
-    process.env = {
-      ...originalEnv,
-      AUTH_AUTO_PROVISION_ON_FIRST_LOGIN: 'false',
-    };
-
     const { service, mockUserAccessService } = createService();
 
     (jwt.decode as jest.Mock).mockReturnValue({
@@ -97,12 +93,7 @@ describe('AuthorizerService', () => {
   });
 
   it('auto-provisions user on first login when enabled', async () => {
-    process.env = {
-      ...originalEnv,
-      AUTH_AUTO_PROVISION_ON_FIRST_LOGIN: 'true',
-    };
-
-    const { service, mockUserAccessService } = createService();
+    const { service, mockUserAccessService } = createService(true);
 
     (jwt.decode as jest.Mock).mockReturnValue({
       header: { kid: 'kid-1' },

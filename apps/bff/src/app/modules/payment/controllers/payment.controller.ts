@@ -58,10 +58,7 @@ export class PaymentController {
   }
 
   private paymentTcpTimeoutMs(): number {
-    const configured =
-      this.configService.get<number | string>('BFF_PAYMENT_TCP_TIMEOUT_MS') ??
-      process.env['BFF_PAYMENT_TCP_TIMEOUT_MS'];
-    const parsed = Number(configured ?? 5000);
+    const parsed = Number(this.configService.get<number>('BFF_PAYMENT_CONFIG.PAYMENT_TCP_TIMEOUT_MS') ?? 5000);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 5000;
   }
 

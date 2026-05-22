@@ -18,7 +18,10 @@ import { ServiceRequestRepository } from './repositories/service-request.reposit
 import { SessionRepository } from './repositories/session.repository';
 import { BillService } from './services/bill.service';
 import { CartService } from './services/cart.service';
+import { OrderKdsEventService } from './services/order-kds-event.service';
+import { OrderStateTransitionService } from './services/order-state-transition.service';
 import { OrderService } from './services/order.service';
+import { OrderSubmitService } from './services/order-submit.service';
 import { OutboxPublisherService } from './services/outbox-publisher.service';
 import { OrderQuotaService } from './services/order-quota.service';
 import { PaymentEventsConsumerService } from './services/payment-events-consumer.service';
@@ -35,6 +38,9 @@ import { TransferService } from './services/transfer.service';
   controllers: [OrderController],
   providers: [
     OrderService,
+    OrderSubmitService,
+    OrderStateTransitionService,
+    OrderKdsEventService,
     OrderQuotaService,
     BillService,
     ServiceRequestService,

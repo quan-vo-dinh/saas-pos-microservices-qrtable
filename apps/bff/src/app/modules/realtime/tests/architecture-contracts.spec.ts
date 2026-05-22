@@ -70,7 +70,7 @@ function read(relOrAbs: string): string {
 }
 
 describe('Phase 5 architecture contracts', () => {
-  it('keeps the canonical Kafka topic registry to the five domain topics only', () => {
+  it('keeps the canonical Kafka topic registry to approved domain topics only', () => {
     const config = new KafkaConfiguration({ BROKERS: ['localhost:29092'] });
     const topicEntries = Object.entries(config)
       .filter(([key]) => key.endsWith('_TOPIC'))
@@ -78,7 +78,14 @@ describe('Phase 5 architecture contracts', () => {
       .sort();
 
     expect(topicEntries).toEqual(
-      ['kitchen.sla_warning', 'order.confirmed', 'payment.completed', 'payment.refunded', 'tenant.created'].sort(),
+      [
+        'kitchen.sla_warning',
+        'order.confirmed',
+        'order.status_changed',
+        'payment.completed',
+        'payment.refunded',
+        'tenant.created',
+      ].sort(),
     );
 
     const kafkaConfigSource = read(join(WORKSPACE_ROOT, 'libs/configuration/src/lib/kafka.config.ts'));

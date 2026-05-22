@@ -116,8 +116,8 @@ describe('PaymentController TCP behavior', () => {
     const send = jest.fn(() => NEVER);
     const configService = {
       get: jest.fn((key: string) => {
-        if (key === 'SEPAY_WEBHOOK_SECRET') return 'secret';
-        if (key === 'BFF_PAYMENT_TCP_TIMEOUT_MS') return '1';
+        if (key === 'BFF_PAYMENT_CONFIG.SEPAY_WEBHOOK_SECRET') return 'secret';
+        if (key === 'BFF_PAYMENT_CONFIG.PAYMENT_TCP_TIMEOUT_MS') return '1';
         return undefined;
       }),
     };
@@ -132,7 +132,7 @@ describe('PaymentController TCP behavior', () => {
   it('returns the exact success body SePay requires after the Payment TCP call succeeds', async () => {
     const send = jest.fn(() => of({ data: { status: 'success' }, statusCode: 200, code: HTTP_MESSAGE.OK }));
     const configService = {
-      get: jest.fn((key: string) => (key === 'SEPAY_WEBHOOK_SECRET' ? 'secret' : undefined)),
+      get: jest.fn((key: string) => (key === 'BFF_PAYMENT_CONFIG.SEPAY_WEBHOOK_SECRET' ? 'secret' : undefined)),
     };
     const controller = new PaymentController({ send } as never, configService as never);
 

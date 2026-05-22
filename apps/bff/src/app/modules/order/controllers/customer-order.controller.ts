@@ -49,6 +49,7 @@ import {
   Req,
   SetMetadata,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { firstValueFrom, map, timeout } from 'rxjs';
@@ -62,10 +63,11 @@ export class CustomerOrderController {
     @Inject(TCP_SERVICES.ORDER_SERVICE) private readonly orderClient: TcpClient,
     @Inject(TCP_SERVICES.PAYMENT_SERVICE) private readonly paymentClient: TcpClient,
     private readonly realtimeEvents: RealtimeEventsService,
+    private readonly configService: ConfigService,
   ) {}
 
   private paymentTcpTimeoutMs(): number {
-    const parsed = Number(process.env['BFF_PAYMENT_TCP_TIMEOUT_MS'] ?? 5000);
+    const parsed = Number(this.configService.get<number>('BFF_PAYMENT_CONFIG.PAYMENT_TCP_TIMEOUT_MS') ?? 5000);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 5000;
   }
 

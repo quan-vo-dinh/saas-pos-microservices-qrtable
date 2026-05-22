@@ -255,6 +255,7 @@ export function MenuItemMutateDrawer() {
                     onClick={() => fileInputRef.current?.click()}
                     className="group relative block h-32 w-full overflow-hidden rounded-md border p-0 text-left ring-offset-background transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Preview may be a blob URL before upload. */}
                     <img
                       src={derivedImagePreview}
                       alt="Preview"
