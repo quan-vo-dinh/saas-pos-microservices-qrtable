@@ -4,6 +4,8 @@
 
 Document and wire the commands that make Phase 5 repeatable: quick PR checks, full unit/contract checks, stack-dependent integration, browser E2E, and pre-demo dry run.
 
+Current execution scope for Task 1 is limited to root gate scripts and the Phase 5 handoff document. Product behavior, CI workflow wiring, and new Playwright coverage are intentionally out of scope for this slice.
+
 ## Inputs
 
 - `docs/testing/phase-5/traceability-matrix.md`
@@ -23,16 +25,18 @@ Document and wire the commands that make Phase 5 repeatable: quick PR checks, fu
 | Browser E2E smoke  | Pre-demo/manual, later CI        | Full app stack + seed                                          | Demo journey or frontend/backend integration regressed  |
 | Provider checks    | Manual opt-in before public demo | `RUN_LIVE_SEPAY=1` + public app/API URL + provider credentials | Real SePay/OAuth/live webhook assumptions not certified |
 
+Playwright remains a manual or pre-demo gate. Do not add it to PR CI until the full app stack, Keycloak seed, service databases, and browser fixtures are deterministic enough to run without local readiness skips.
+
 ## Tasks
 
-- [ ] Add package scripts only after the underlying commands are proven locally.
+- [x] Add package scripts for currently proven browser surfaces: `e2e:phase3`, `e2e:phase4b`, and `e2e:demo`.
 - [ ] Update CI only for deterministic gates first. Do not add Playwright to PR CI until stack and credentials are deterministic.
-- [ ] Document stack-dependent commands in a Phase 5 testing guide or this folder.
+- [x] Document stack-dependent commands in `docs/testing/phase-5/phase-5-handoff.md`.
 - [ ] Keep real SePay checks out of default PR/local gates; document them as opt-in live smoke guarded by `RUN_LIVE_SEPAY=1`.
 - [ ] Document runtime-gated frontend-utils integration tests: default `pnpm nx test frontend-utils` skips live BFF/Keycloak suites; opt in with `RUN_FRONTEND_UTILS_INTEGRATION=1`, `BFF_URL`, and `KEYCLOAK_URL`.
 - [ ] Ensure skipped tests print actionable reasons, such as missing BFF health, missing Keycloak credentials, or missing seeded suspended tenant.
-- [ ] Produce a final Phase 5 handoff checklist summarizing covered, partial, missing, security-gap, and deferred rows.
-- [ ] Run final verification commands and record results.
+- [x] Produce a Phase 5 handoff checklist summarizing current covered, partial, implementation-gap, and deferred rows.
+- [x] Run final verification commands and record results.
 
 ## Output
 
@@ -63,6 +67,16 @@ pnpm nx test frontend-utils
 RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils
 ```
 
+SaaS live Payment integration:
+
+```bash
+# Default deterministic gate: opt-in live Payment spec stays skipped.
+pnpm nx test saas --testPathPatterns=onboarding-saga-live-payment.integration.spec.ts --runInBand
+
+# Manual/pre-demo stack gate: requires Postgres plus Payment TCP.
+NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm nx test saas --testPathPatterns=onboarding-saga-live-payment.integration.spec.ts --runInBand
+```
+
 ## Next Session Notes
 
 - Keep PR CI boring and deterministic. Full-stack confidence can be pre-demo/nightly until infra is stable.
@@ -70,3 +84,4 @@ RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_U
 - Do not mark Phase 5 complete if any P0 row is untriaged.
 - A skipped test is acceptable only when the matrix says why and the command prints why.
 - Final handoff should list exact commands run, exact commands skipped, and the reason for every skip.
+- Disable Nx cache when collecting opt-in evidence for a spec that is skipped by default; otherwise the skipped default run can be reused.

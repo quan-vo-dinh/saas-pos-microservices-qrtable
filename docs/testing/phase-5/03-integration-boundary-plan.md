@@ -38,6 +38,88 @@ Prove behavior that mocks cannot prove: tenant isolation, real persistence filte
 - [ ] Update the traceability matrix with exact integration spec paths and skip conditions.
 - [ ] Record any `security-gap`, especially `x-secret-key` value verification if still not implemented.
 
+## P0 Integration Readiness Backlog
+
+These commands are opt-in only. They require a seeded local stack or a dedicated integration harness and do not make any `partial` P0 row covered until the command passes and the traceability matrix is updated with evidence.
+
+### `P0-CAT-TENANT-ISOLATION`
+
+Prerequisites:
+
+- BFF reachable through `BFF_URL`
+- Keycloak reachable through `KEYCLOAK_URL`
+- Catalog service and database running with tenant A/B menu fixtures
+- Auth seed loaded with representative tenant-scoped users
+- `RUN_FRONTEND_UTILS_INTEGRATION=1`
+
+```bash
+RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils
+```
+
+### `P0-RBAC-TENANT-ISOLATION-API`
+
+Prerequisites:
+
+- BFF reachable through `BFF_URL`
+- Keycloak, Authorizer, User-Access, and service databases running
+- Auth bootstrap users loaded from `tools/auth-bootstrap-users.json`
+- Representative OWNER, MANAGER, WAITER, CHEF, BARISTA, and SUPER_ADMIN credentials seeded
+- `RUN_FRONTEND_UTILS_INTEGRATION=1`
+
+```bash
+RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils
+```
+
+```bash
+BFF_URL=http://localhost:3300/api/v1 AUTH_BOOTSTRAP_USERS_FILE=tools/auth-bootstrap-users.json bash tools/verify-permission-matrix.sh
+```
+
+### `P0-KDS-ORDER-CONFIRMED-DEDUPE`
+
+Prerequisites:
+
+- Redis running and isolated for the test database/index
+- Kitchen app test harness can deliver the same `order.confirmed` payload twice through the direct consumer or Kafka test consumer path
+- Seeded order payload includes one tenant, one order id, and station-specific items
+- `RUN_PHASE5_KDS_DEDUPE_INTEGRATION=1`
+
+Opt-in command, passed on 2026-05-23 against local Redis from `docker-compose.provider.yaml`:
+
+```bash
+RUN_PHASE5_KDS_DEDUPE_INTEGRATION=1 pnpm nx test kitchen --testPathPatterns=order-confirmed-dedupe.integration.spec.ts --runInBand
+```
+
+### `P0-SAAS-ONBOARDING-SAGA`
+
+Prerequisites:
+
+- PostgreSQL ready for the SaaS database
+- For the existing DB harness, Authorizer, User-Access, and Payment remain contract doubles
+- For the live Payment slice, PostgreSQL must include both SaaS tables and Payment `tenant_payment_settings`; Payment TCP must be running
+- For full live multi-service readiness, Keycloak, Authorizer, User-Access, Payment TCP, and Kafka or outbox verification must be running and seeded
+- `RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1`
+- `RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1`
+
+```bash
+NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm nx test saas --testPathPatterns=onboarding-saga-db.integration.spec.ts --runInBand
+```
+
+Live Payment TCP slice, passed on 2026-05-23 against local Postgres and Payment TCP:
+
+```bash
+NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm nx test saas --testPathPatterns=onboarding-saga-live-payment.integration.spec.ts --runInBand
+```
+
+This proves SaaS onboarding calls the real Payment TCP boundary and creates exactly one Payment-owned `tenant_payment_settings` row, including replay/idempotency of `PAYMENT_SETTINGS.CREATE_EMPTY`. It does not prove live Authorizer/Keycloak or live User-Access yet, so the matrix row remains `partial`.
+
+## Next Code-Test Task After KDS
+
+The first KDS slice has landed as `apps/kitchen/src/app/modules/kitchen/tests/order-confirmed-dedupe.integration.spec.ts`. It uses a real Redis direct-consumer harness to deliver duplicate and reissued `order.confirmed` payloads and assert one ticket per `(tenantId, orderId, station)`.
+
+The next SaaS slice has landed as `apps/saas/src/services/onboarding-saga-live-payment.integration.spec.ts`. It uses real SaaS PostgreSQL plus live Payment TCP/Payment DB while keeping Authorizer and User-Access as contract doubles.
+
+Next integration work should either finish `P0-SAAS-ONBOARDING-SAGA` live Authorizer/Keycloak + User-Access proof, or fix the frontend-utils Keycloak client mismatch before trying to promote `P0-CAT-TENANT-ISOLATION` / `P0-RBAC-TENANT-ISOLATION-API`.
+
 ## Output
 
 - Integration specs or a documented integration suite command.

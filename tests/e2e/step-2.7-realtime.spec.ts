@@ -4,8 +4,10 @@
  * BFF default here is port 3300 + `GLOBAL_PREFIX=api/v1` (see repo `.env.example`); override via `STEPP27_BFF_HEALTH_URL`.
  * Skip entirely: `SKIP_STEPP27_E2E=1`, or when BFF health is unreachable.
  */
-import { createHash } from 'node:crypto';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { loginWithKeycloak } from './helpers/auth';
+import { devQrTokenHex } from './helpers/qr';
+import { reachable } from './helpers/readiness';
 
 /** Matches `tools/dev-seed/constants.js` + `tools/dev-seed/postgres/data.js` */
 const DEV_TENANT_ID = '023772bb-391b-401c-936a-ed7034b69cec';
@@ -21,22 +23,6 @@ const WAITER_PASSWORD = process.env.STEPP27_WAITER_PASSWORD ?? 'waiter123';
 const CHEF_EMAIL = process.env.STEPP27_CHEF_EMAIL ?? 'chef.1700000005@gmail.com';
 const CHEF_PASSWORD = process.env.STEPP27_CHEF_PASSWORD ?? 'chef123';
 
-function devQrTokenHex(tableKey: string): string {
-  return createHash('sha256').update(`${DEV_TENANT_ID}:${tableKey}:qrtable-dev-qr`).digest('hex');
-}
-
-async function staffLogin(page: Page, nextPath: string, email: string, password: string): Promise<void> {
-  await page.goto(`${MGMT_BASE}/login?next=${encodeURIComponent(nextPath)}`);
-  await page.getByRole('button', { name: /Continue with Keycloak/i }).click();
-  await page.waitForURL(/8180|keycloak|openid-connect/i, { timeout: 120_000 });
-  await page.locator('input[name="username"], #username').first().fill(email);
-  await page.locator('input[name="password"], #password').first().fill(password);
-  const submit = page.locator('#kc-login, input[name="login"], button[type="submit"]').first();
-  await submit.click();
-  const escaped = nextPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '\\/');
-  await expect(page).toHaveURL(new RegExp(`${escaped}(\\?|$)`), { timeout: 120_000 });
-}
-
 test.describe('Step 2.7 realtime (dev stack)', () => {
   test.describe.configure({ mode: 'serial' });
 
@@ -46,13 +32,12 @@ test.describe('Step 2.7 realtime (dev stack)', () => {
   }) => {
     test.skip(process.env.SKIP_STEPP27_E2E === '1', 'Step 2.7 E2E skipped: set SKIP_STEPP27_E2E=1');
 
-    const health = await request.get(BFF_HEALTH_URL, { timeout: 10_000 }).catch(() => null);
     test.skip(
-      !health?.ok(),
+      !(await reachable(request, BFF_HEALTH_URL)),
       `BFF not reachable at ${BFF_HEALTH_URL} (start pnpm dev:bff-order after pnpm dev:reseed -- --yes)`,
     );
 
-    const qrToken = devQrTokenHex('A01');
+    const qrToken = devQrTokenHex(DEV_TENANT_ID, 'A01');
     const landingUrl = `${PWA_BASE}/landing?tenant=${encodeURIComponent(TENANT_SLUG)}&table=${encodeURIComponent(TABLE_A01_ID)}&token=${encodeURIComponent(qrToken)}`;
 
     const pwaContext = await browser.newContext();
@@ -76,7 +61,7 @@ test.describe('Step 2.7 realtime (dev stack)', () => {
       const waiterContext = await browser.newContext();
       const waiter = await waiterContext.newPage();
       try {
-        await staffLogin(waiter, '/pos', WAITER_EMAIL, WAITER_PASSWORD);
+        await loginWithKeycloak(waiter, MGMT_BASE, '/pos', WAITER_EMAIL, WAITER_PASSWORD);
         const liveOrders = waiter.locator('[data-slot="pos-live-orders"]');
         await expect(liveOrders).toBeVisible();
         await liveOrders.getByRole('button', { name: 'Nhận', exact: true }).first().click();
@@ -88,7 +73,7 @@ test.describe('Step 2.7 realtime (dev stack)', () => {
       const chefContext = await browser.newContext();
       const chef = await chefContext.newPage();
       try {
-        await staffLogin(chef, '/kds/kitchen', CHEF_EMAIL, CHEF_PASSWORD);
+        await loginWithKeycloak(chef, MGMT_BASE, '/kds/kitchen', CHEF_EMAIL, CHEF_PASSWORD);
         await expect(chef.getByRole('button', { name: 'Bắt đầu', exact: true }).first()).toBeVisible({
           timeout: 180_000,
         });
@@ -101,7 +86,7 @@ test.describe('Step 2.7 realtime (dev stack)', () => {
         const serveContext = await browser.newContext();
         const servePage = await serveContext.newPage();
         try {
-          await staffLogin(servePage, '/pos', WAITER_EMAIL, WAITER_PASSWORD);
+          await loginWithKeycloak(servePage, MGMT_BASE, '/pos', WAITER_EMAIL, WAITER_PASSWORD);
           const liveOrders = servePage.locator('[data-slot="pos-live-orders"]');
           await expect(liveOrders).toBeVisible();
           await expect(liveOrders.getByRole('button', { name: 'Đã phục vụ', exact: true }).first()).toBeVisible({
