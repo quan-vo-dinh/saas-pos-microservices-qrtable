@@ -40,7 +40,7 @@
 
 **Target layer:** integration. **Stack:** BFF, Catalog, auth seed.
 
-**Notes:** Unit or service coverage exists and stack-dependent frontend-utils integration files exist. They are skipped by default and require `RUN_FRONTEND_UTILS_INTEGRATION=1`, `BFF_URL`, and `KEYCLOAK_URL` before this becomes a reliable live-stack gate.
+**Notes:** Unit or service coverage exists and stack-dependent frontend-utils integration files exist. Default `pnpm nx test frontend-utils` intentionally skips the live BFF/Keycloak integration suites. Opt-in prerequisites are BFF at `BFF_URL`, Keycloak at `KEYCLOAK_URL`, Catalog service and database with tenant A/B menu fixtures, seeded tenant-scoped users, and `RUN_FRONTEND_UTILS_INTEGRATION=1`. Run `RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils` against that seeded stack before treating this as a reliable live-stack gate.
 
 ---
 
@@ -266,17 +266,17 @@
 
 ## Kitchen (KDS) and realtime
 
-### `P0-KDS-ORDER-CONFIRMED-DEDUPE` — `partial` (P0, realtime)
+### `P0-KDS-ORDER-CONFIRMED-DEDUPE` — `covered` (P0, realtime)
 
 **Requirement:** `order.confirmed` creates at most one Redis ticket per `(tenantId, orderId, station)` and deduplicates duplicate Kafka events.
 
 **Sources:** `business-logic` (5); `technical-architecture` (7.2); `phase-2b-kitchen-websocket` accepted decisions.
 
-**Tests:** Kitchen order-confirmed consumer spec; KDS ticket service spec.
+**Tests:** Kitchen order-confirmed consumer spec; KDS ticket service spec; opt-in Redis integration spec `apps/kitchen/src/app/modules/kitchen/tests/order-confirmed-dedupe.integration.spec.ts`.
 
 **Target layer:** integration. **Stack:** Kafka or direct consumer harness, Redis.
 
-**Notes:** Unit consumer tests cover dedupe and dead-letter; add real Redis or Kafka duplicate-delivery coverage for at-least-once behavior.
+**Notes:** Unit consumer tests cover dedupe and dead-letter. The opt-in Redis integration harness delivers duplicate and reissued `order.confirmed` payloads directly through `OrderConfirmedConsumer` and asserts at most one ticket per `(tenantId, orderId, station)` for KITCHEN and BAR. Passed on 2026-05-23 against local Redis started from `docker-compose.provider.yaml` with `RUN_PHASE5_KDS_DEDUPE_INTEGRATION=1 pnpm nx test kitchen --testPathPatterns=order-confirmed-dedupe.integration.spec.ts --runInBand`.
 
 ---
 
@@ -468,11 +468,11 @@
 
 **Sources:** `business-logic` (1.A); `phase-4b-saas-onboarding` accepted decisions.
 
-**Tests:** SaaS onboarding saga unit and mocked integration specs; opt-in SaaS PostgreSQL integration `apps/saas/src/services/onboarding-saga-db.integration.spec.ts`; Authorizer Keycloak admin service spec; User-Access tenant user service spec.
+**Tests:** SaaS onboarding saga unit and mocked integration specs; opt-in SaaS PostgreSQL integration `apps/saas/src/services/onboarding-saga-db.integration.spec.ts`; opt-in live Payment TCP integration `apps/saas/src/services/onboarding-saga-live-payment.integration.spec.ts`; Authorizer Keycloak admin service spec; User-Access tenant user service spec.
 
 **Target layer:** integration. **Stack:** SaaS database, Authorizer and Keycloak, User-Access, Payment TCP, Kafka or outbox.
 
-**Notes:** Step 5.3 SaaS PostgreSQL integration now proves successful tenant, initial subscription, payment-settings TCP contract, and `tenant.created` outbox persistence, plus compensation before and after subscription assignment. The service now deletes `INITIAL_ONBOARDING` subscriptions during rollback to avoid orphan rows. This remains `partial` because Authorizer + real Keycloak, User-Access, and Payment services are still represented by TCP contract doubles rather than a live multi-service harness. Run with `NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm nx test saas --testPathPatterns=onboarding-saga-db.integration.spec.ts --runInBand` after PostgreSQL is ready.
+**Notes:** Step 5.3 SaaS PostgreSQL integration now proves successful tenant, initial subscription, payment-settings TCP contract, and `tenant.created` outbox persistence, plus compensation before and after subscription assignment. The service now deletes `INITIAL_ONBOARDING` subscriptions during rollback to avoid orphan rows. The live Payment slice passed on 2026-05-23 with `NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm nx test saas --testPathPatterns=onboarding-saga-live-payment.integration.spec.ts --runInBand`, proving real Payment TCP creates exactly one Payment-owned `tenant_payment_settings` row and that replaying `PAYMENT_SETTINGS.CREATE_EMPTY` remains idempotent. This remains `partial` because Authorizer + real Keycloak and live User-Access are still represented by TCP contract doubles rather than a full live multi-service harness. Opt-in prerequisites are PostgreSQL for SaaS/Payment tables, Payment TCP for the live Payment slice, and, before full live multi-service readiness, Keycloak, Authorizer, User-Access, Payment TCP, and Kafka or outbox verification running and seeded.
 
 ---
 
@@ -632,7 +632,7 @@
 
 **Target layer:** integration. **Stack:** BFF, auth seed, service databases.
 
-**Notes:** Guard and client tests exist; stack integration needs readiness and seed policy and broader representative endpoints.
+**Notes:** Guard and client tests exist. Default `pnpm nx test frontend-utils` intentionally skips the live BFF/Keycloak integration suites; tenant-isolation API coverage still needs the opt-in seeded stack command plus broader representative endpoints before this row can move beyond `partial`. Opt-in prerequisites are BFF at `BFF_URL`, Keycloak, Authorizer, User-Access, service databases, auth bootstrap users from `tools/auth-bootstrap-users.json`, representative OWNER, MANAGER, WAITER, CHEF, BARISTA, and SUPER_ADMIN credentials, and `RUN_FRONTEND_UTILS_INTEGRATION=1`. Run `RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils` and `BFF_URL=http://localhost:3300/api/v1 AUTH_BOOTSTRAP_USERS_FILE=tools/auth-bootstrap-users.json bash tools/verify-permission-matrix.sh` against that seeded stack before promoting this row.
 
 ---
 
@@ -740,17 +740,16 @@
 
 Ordered by urgency; each line is **priority**, **rule id**, **status**, and **next action**.
 
-1. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Extend the browser smoke with a seeded pending-bill payment exception path after Flow B/B+D data is stable.
-2. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Add a live multi-service harness for Authorizer + Keycloak, User-Access, and Payment; DB success and compensation are now covered.
-3. **P0** — `P0-CAT-TENANT-ISOLATION` — `partial` — Make readiness and seed policy explicit for the existing stack-dependent tenant isolation integration before treating it as a reliable gate.
-4. **P0** — `P0-KDS-ORDER-CONFIRMED-DEDUPE` — `partial` — Add Redis or Kafka duplicate-delivery coverage for at-least-once behavior.
-5. **P0** — `P0-RBAC-TENANT-ISOLATION-API` — `partial` — Add representative live-stack API checks once BFF/auth/service seed policy is stable.
+1. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Add live Authorizer + Keycloak and User-Access proof; DB success/compensation and live Payment TCP are now covered.
+2. **P0** — `P0-CAT-TENANT-ISOLATION` — `partial` — Run the opt-in seeded BFF/Keycloak/Catalog gate and record evidence before treating it as a reliable live-stack gate.
+3. **P0** — `P0-RBAC-TENANT-ISOLATION-API` — `partial` — Add representative live-stack API checks once BFF/auth/service seed policy is stable.
+4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Extend the browser smoke with a seeded pending-bill payment exception path after Flow B/B+D data is stable.
 
 ---
 
 ## First P0 batch candidates
 
-1. **Integration:** `P0-SAAS-ONBOARDING-SAGA` live external services, `P0-CAT-TENANT-ISOLATION`, `P0-KDS-ORDER-CONFIRMED-DEDUPE`, `P0-RBAC-TENANT-ISOLATION-API`.
+1. **Integration:** Finish `P0-SAAS-ONBOARDING-SAGA` live Authorizer/Keycloak + User-Access, or fix the frontend-utils Keycloak client mismatch before promoting `P0-CAT-TENANT-ISOLATION` / `P0-RBAC-TENANT-ISOLATION-API`.
 2. **Browser E2E:** Extend `P0-SAAS-SUSPENDED-CUSTOMER-PWA` with pending-bill payment, then payment close-session coverage from `P1-PAY-BROWSER-CLOSE-SESSION` if promoted for demo risk.
 3. **Optional fast feedback:** BFF quota edge checks for `P0-SAAS-FEATURE-GATING-QUOTAS` if the UI needs pre-forward upgrade prompts.
 

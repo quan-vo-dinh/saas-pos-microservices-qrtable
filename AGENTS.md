@@ -6,22 +6,61 @@
 ## NOTE: Technical English Collaboration
 
 English support is secondary. The main priority is still solving software engineering tasks correctly.
-Because I am a Vietnamese developer, my English questions or technical descriptions may sometimes be incomplete, unnatural, ambiguous, or not precise enough.
 
-When discussing with me:
+Because I am a Vietnamese developer, my English questions, task descriptions, or discussion messages may sometimes be incomplete, unnatural, ambiguous, or not precise enough.
 
-- By default, the system will use and apply "Technical English Collaboration" dynamically. This means that when I proactively ask you a question or participate in a discussion in English, the system will automatically detect the language I am using. If it's Vietnamese, it won't apply; if I'm communicating in English, it will.
-- Keep important technical terms in English, such as service boundary, DTO, guard, interceptor, idempotency, tenant isolation, event-driven, cache invalidation, and eventual consistency... etc, ...
-- If I write a technical question in English, briefly correct important grammar or wording issues first, then answer the technical question.
-- Do not overcorrect every small English mistake. Only correct mistakes that affect clarity, professionalism, or technical meaning.
-- If the technical concept is difficult, explain it in Vietnamese after the English explanation.
-- If the English answer may be hard to understand, add a short Vietnamese summary.
-- If my meaning is clear, briefly correct important grammar or wording issues first, then answer the technical question.
-- If my wording is understood but unnatural, rewrite it into clearer technical English before answering.
-- If my wording may cause technical misunderstanding, point out the ambiguity and ask a clarification question before making code changes.
+Use this section only when I communicate in English or when the output itself is expected to be written in English. If I communicate in Vietnamese, respond mainly in Vietnamese and keep important technical terms in English.
+
+### General Rules
+
+- Do not act as a strict English tutor during normal engineering work.
+- Do not interrupt coding tasks just to teach English.
+- Focus on understanding my intended technical meaning first.
+- Keep important technical terms in English, such as service boundary, DTO, guard, interceptor, idempotency, tenant isolation, event-driven, cache invalidation, eventual consistency, API contract, state machine, and service boundary.
+- Only explain English corrections when they are useful for clarity, professionalism, technical accuracy, documentation, interview answers, or workplace communication.
+
+### When I Write in English
+
+If my meaning is clear:
+
+- Rewrite my sentence into more natural, practical English before answering.
+- You may fully rewrite/refactor the sentence, not just fix small grammar issues.
+- Preserve the original meaning.
+- Prefer wording that sounds natural in real technical discussions, workplace communication, documentation, or interviews.
+- After the rewritten sentence, answer the technical question.
+
+If my sentence is understandable but unnatural:
+
+- Provide a better version that a developer would actually use.
+- Keep it concise and realistic.
+- Do not over-explain small grammar details unless they affect clarity.
+
+If my sentence may cause technical misunderstanding:
+
+- Point out the ambiguity.
+- Ask a clarification question before making code changes.
 - If there are multiple possible interpretations, list the likely interpretations and ask me to confirm the intended one.
-- Do not guess silently when ambiguity affects architecture, data model, API contract, authentication, authorization, tenant isolation, payment, Kafka events, Redis behavior, or database changes.
-- If the ambiguity is minor and does not affect implementation correctness, make a reasonable assumption and state it briefly.
+
+Do not guess silently when ambiguity affects:
+
+- architecture
+- data model
+- API contract
+- authentication
+- authorization
+- tenant isolation
+- payment flow
+- Kafka events
+- Redis behavior
+- database changes
+- state transitions
+- external integrations
+
+If the ambiguity is minor and does not affect implementation correctness:
+
+- Make a reasonable assumption.
+- State the assumption briefly.
+- Continue with the technical answer or implementation.
 
 ---
 
@@ -253,7 +292,7 @@ const key = `order:submit:${sessionId}:${hashOrderItems(items)}`;
 
 - Lấy từ DB → `find`
 - Gọi HTTP → `fetch`_ hoặc `get`_
-- Tạo entity → `create*`
+- Tạo entity → `create`\*
 - Không trộn `get/fetch/load/retrieve` cho cùng một loại thao tác.
 
 ### Single Responsibility
