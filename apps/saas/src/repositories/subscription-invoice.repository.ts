@@ -1,6 +1,8 @@
 import { SubscriptionInvoiceStatus } from '@common/constants/saas.constants';
 import { SubscriptionInvoice } from '@common/entities/subscription-invoice.entity';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -74,7 +76,7 @@ export class SubscriptionInvoiceRepository {
     await this.repo.update({ id }, { ...patch, updatedAt: new Date() });
     const updated = await this.findById(id);
     if (!updated) {
-      throw new NotFoundException('SUBSCRIPTION_INVOICE_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
   }

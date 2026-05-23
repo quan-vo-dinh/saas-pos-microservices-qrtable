@@ -6,7 +6,9 @@ import type {
 } from '@common/interfaces/tcp/payment';
 import type { BillPaymentSnapshotTcpResponse } from '@common/interfaces/tcp/order';
 import { assertValidVndRoundingSnapshot } from '@common/utils/vnd-rounding.util';
-import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { BillStatus, PaymentMethod } from '@einvoice/types';
 import { DataSource, EntityManager, QueryFailedError } from 'typeorm';
 import { CONFIGURATION } from '../../../../configuration';
@@ -48,7 +50,7 @@ export class PaymentSettlementService {
   async createVietQr(dto: CreateVietQrTcpRequest): Promise<CreateVietQrTcpResponse> {
     const snapshot = await this.orderGateway.getBillPaymentSnapshot(dto.tenantId, dto.billId, dto.processId);
     if (snapshot.status !== BillStatus.PENDING_PAYMENT) {
-      throw new ConflictException('Bill is not pending payment');
+      throw new BusinessException(ErrorCode.PAYMENT_BILL_NOT_PENDING_PAYMENT, HttpStatus.CONFLICT);
     }
     this.assertValidOrderBillSnapshot(snapshot);
 
@@ -57,7 +59,7 @@ export class PaymentSettlementService {
       if (existing.status === 'PENDING') {
         return { ...this.mapper.toPaymentResponse(existing), ...(await this.vietQrPresentation(existing)) };
       }
-      throw new ConflictException('Bill already paid');
+      throw new BusinessException(ErrorCode.PAYMENT_BILL_ALREADY_PAID, HttpStatus.CONFLICT);
     }
 
     const payment = this.paymentRepo.create({
@@ -84,7 +86,7 @@ export class PaymentSettlementService {
   async confirmCash(dto: ConfirmCashTcpRequest): Promise<PaymentTcpResponse> {
     const snapshot = await this.orderGateway.getBillPaymentSnapshot(dto.tenantId, dto.billId, dto.processId);
     if (snapshot.status !== BillStatus.PENDING_PAYMENT) {
-      throw new ConflictException('Bill is not pending payment');
+      throw new BusinessException(ErrorCode.PAYMENT_BILL_NOT_PENDING_PAYMENT, HttpStatus.CONFLICT);
     }
     this.assertValidOrderBillSnapshot(snapshot);
 
@@ -115,11 +117,11 @@ export class PaymentSettlementService {
       }
 
       if (payment.status !== 'PENDING') {
-        throw new ConflictException('Bill already paid');
+        throw new BusinessException(ErrorCode.PAYMENT_BILL_ALREADY_PAID, HttpStatus.CONFLICT);
       }
 
       if (dto.amountReceived < payment.roundedTotal) {
-        throw new BadRequestException('Insufficient amount received');
+        throw new BusinessException(ErrorCode.PAYMENT_AMOUNT_INSUFFICIENT, HttpStatus.BAD_REQUEST);
       }
 
       const paidAt = new Date();
@@ -164,7 +166,7 @@ export class PaymentSettlementService {
 
     const fresh = await this.paymentRepo.findByTenantAndBill(dto.tenantId, dto.billId);
     if (!fresh) {
-      throw new ConflictException('Payment state is inconsistent');
+      throw new BusinessException(ErrorCode.PAYMENT_STATE_INCONSISTENT, HttpStatus.CONFLICT);
     }
     return this.mapper.toPaymentResponse(fresh);
   }
@@ -176,7 +178,7 @@ export class PaymentSettlementService {
     const account = settings?.vietqrAccountNumber || CONFIGURATION.SEPAY_CONFIG.QR_ACCOUNT;
     const bank = settings?.vietqrBankName || CONFIGURATION.SEPAY_CONFIG.QR_BANK;
     if (!account || !bank) {
-      throw new ServiceUnavailableException('Tenant VietQR account and bank are not configured');
+      throw new BusinessException(ErrorCode.TENANT_VIETQR_ACCOUNT_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     return {
@@ -232,7 +234,7 @@ export class PaymentSettlementService {
       });
     } catch (error) {
       if (error instanceof RangeError) {
-        throw new BadRequestException('Order bill snapshot has inconsistent VND rounding totals');
+        throw new BusinessException(ErrorCode.PAYMENT_BILL_SNAPSHOT_INVALID, HttpStatus.BAD_REQUEST);
       }
       throw error;
     }

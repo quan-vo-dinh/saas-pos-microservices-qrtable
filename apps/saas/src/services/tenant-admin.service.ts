@@ -1,7 +1,9 @@
 import { TenantStatus } from '@common/constants/saas.constants';
 import { Subscription } from '@common/entities/subscription.entity';
 import { Tenant } from '@common/entities/tenant.entity';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { PricingPlanRepository } from '../repositories/pricing-plan.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { TenantRepository } from '../repositories/tenant.repository';
@@ -98,7 +100,7 @@ export class TenantAdminService {
   private async findTenant(id: string): Promise<Tenant> {
     const tenant = await this.tenantRepository.findById(id);
     if (!tenant) {
-      throw new NotFoundException('TENANT_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_TENANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return tenant;
   }

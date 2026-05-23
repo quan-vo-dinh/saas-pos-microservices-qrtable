@@ -11,13 +11,9 @@ import type {
   TenantPaymentSettingsTcpResponse,
 } from '@common/interfaces/tcp/payment';
 import { RedisClientService } from '@common/providers/redis-client/redis-client.service';
-import {
-  Injectable,
-  NotFoundException,
-  Optional,
-  ServiceUnavailableException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable, Optional } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { TenantPaymentSettingsEntity } from '../entities/tenant-payment-settings.entity';
 import { TenantPaymentSettingsRepository } from '../repositories/tenant-payment-settings.repository';
@@ -103,7 +99,7 @@ export class TenantPaymentSettingsService {
     const sepay = this.requireSepayClient();
     const settings = await this.findRequired(params.tenantId);
     if (!settings.sepayAccessTokenEncrypted) {
-      throw new ServiceUnavailableException('SEPAY_ACCESS_TOKEN_NOT_CONFIGURED');
+      throw new BusinessException(ErrorCode.SEPAY_ACCESS_TOKEN_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     const accessToken = secrets.decrypt(settings.sepayAccessTokenEncrypted);
@@ -162,7 +158,7 @@ export class TenantPaymentSettingsService {
   private async findRequired(tenantId: string): Promise<TenantPaymentSettingsEntity> {
     const settings = await this.repository.findByTenantId(tenantId);
     if (!settings) {
-      throw new NotFoundException('TENANT_PAYMENT_SETTINGS_NOT_FOUND');
+      throw new BusinessException(ErrorCode.TENANT_PAYMENT_SETTINGS_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return settings;
   }
@@ -183,14 +179,14 @@ export class TenantPaymentSettingsService {
 
   private requireSecrets(): PaymentSecretsService {
     if (!this.secrets) {
-      throw new ServiceUnavailableException('PAYMENT_SECRETS_SERVICE_NOT_CONFIGURED');
+      throw new BusinessException(ErrorCode.PAYMENT_SECRETS_SERVICE_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
     }
     return this.secrets;
   }
 
   private requireSepayClient(): SepayOAuthClientService {
     if (!this.sepay) {
-      throw new ServiceUnavailableException('SEPAY_OAUTH_CLIENT_NOT_CONFIGURED');
+      throw new BusinessException(ErrorCode.SEPAY_OAUTH_CLIENT_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
     }
     return this.sepay;
   }
@@ -220,11 +216,11 @@ export class TenantPaymentSettingsService {
       this.stateFallback.delete(state);
     }
     if (!raw) {
-      throw new UnauthorizedException('INVALID_SEPAY_OAUTH_STATE');
+      throw new BusinessException(ErrorCode.INVALID_SEPAY_OAUTH_STATE, HttpStatus.UNAUTHORIZED);
     }
     const parsed = JSON.parse(raw) as { tenantId: string; ownerUserId: string; expiresAt: number } | null;
     if (!parsed || parsed.expiresAt < Date.now()) {
-      throw new UnauthorizedException('INVALID_SEPAY_OAUTH_STATE');
+      throw new BusinessException(ErrorCode.INVALID_SEPAY_OAUTH_STATE, HttpStatus.UNAUTHORIZED);
     }
     return parsed;
   }

@@ -1,3 +1,5 @@
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { SlugService } from './slug.service';
 
 describe('SlugService', () => {
@@ -17,7 +19,13 @@ describe('SlugService', () => {
   });
 
   it('rejects reserved slugs', () => {
-    expect(() => service.assertAllowed('admin')).toThrow('SAAS_SLUG_RESERVED');
+    expect(() => service.assertAllowed('admin')).toThrow(BusinessException);
+
+    try {
+      service.assertAllowed('admin');
+    } catch (error) {
+      expect((error as BusinessException).errorCode).toBe(ErrorCode.SAAS_SLUG_RESERVED);
+    }
   });
 
   it('adds suffix when collision resolver says slug exists', async () => {

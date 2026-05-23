@@ -6,6 +6,8 @@ import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message'
 import { Authorization } from '@common/decorators/authorizer.decorator';
 import { Permissions } from '@common/decorators/permission.decorator';
 import { ProcessId } from '@common/decorators/processId.decorator';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
@@ -13,7 +15,7 @@ import { buildTcpRequestContext } from '@common/utils/request.util';
 import { SAAS_EVENTS, TenantStatus } from '@common/constants/saas.constants';
 import type { GetTenantByIdTcpRequest } from '@common/interfaces/tcp/saas';
 import type { TenantTcpResponse } from '@common/interfaces/tcp/saas';
-import { Body, Controller, ForbiddenException, Get, Inject, Param, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Inject, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { firstValueFrom, from, map, mergeMap } from 'rxjs';
@@ -233,7 +235,7 @@ export class AdminTenantsController {
     const userData = req[MetadataKey.USER_DATA] as AuthorizeResponse | undefined;
     const userId = userData?.metadata?.userId;
     if (!userId) {
-      throw new ForbiddenException('USER_ID_REQUIRED');
+      throw new BusinessException(ErrorCode.USER_ID_REQUIRED, HttpStatus.FORBIDDEN);
     }
     return userId;
   }
@@ -248,7 +250,7 @@ export class AdminTenantsController {
     const permissions = userData?.metadata?.permissions ?? [];
 
     if (!permissions.includes(requiredPermissionByAction[action])) {
-      throw new ForbiddenException('AUTH_PERMISSION_DENIED');
+      throw new BusinessException(ErrorCode.AUTH_PERMISSION_DENIED, HttpStatus.FORBIDDEN);
     }
   }
 }

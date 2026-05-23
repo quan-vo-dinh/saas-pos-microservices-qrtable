@@ -1,14 +1,8 @@
 import { BILL_REF_PREFIXES, SubscriptionInvoiceStatus } from '@common/constants/saas.constants';
 import { SubscriptionInvoice } from '@common/entities/subscription-invoice.entity';
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  Optional,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { CONFIGURATION } from '../configuration';
@@ -63,7 +57,7 @@ export class SubscriptionInvoiceService {
   }): Promise<Record<string, unknown>> {
     const plan = await this.planRepository?.findActiveByCode(input.planCode);
     if (!plan) {
-      throw new NotFoundException('PLAN_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_PLAN_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
     const now = new Date();
@@ -103,7 +97,7 @@ export class SubscriptionInvoiceService {
   }): Promise<Record<string, unknown>> {
     const invoice = await this.invoiceRepository.findById(input.invoiceId);
     if (!invoice || (input.tenantId && invoice.tenantId !== input.tenantId)) {
-      throw new NotFoundException('SUBSCRIPTION_INVOICE_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     const response = this.toInvoiceResponse(invoice);
     return input.statusOnly ? { id: response.id, status: response.status } : response;
@@ -116,10 +110,10 @@ export class SubscriptionInvoiceService {
   }): Promise<Record<string, unknown>> {
     const invoice = await this.invoiceRepository.findById(input.invoiceId);
     if (!invoice || (input.tenantId && invoice.tenantId !== input.tenantId)) {
-      throw new NotFoundException('SUBSCRIPTION_INVOICE_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     if (invoice.status !== SubscriptionInvoiceStatus.PENDING) {
-      throw new BadRequestException('ONLY_PENDING_INVOICE_CAN_BE_CANCELED');
+      throw new BusinessException(ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CANCELED, HttpStatus.BAD_REQUEST);
     }
     return this.toInvoiceResponse(
       await this.invoiceRepository.updateById(invoice.id, {
@@ -137,10 +131,10 @@ export class SubscriptionInvoiceService {
   }): Promise<Record<string, unknown>> {
     const invoice = await this.invoiceRepository.findById(input.invoiceId);
     if (!invoice) {
-      throw new NotFoundException('SUBSCRIPTION_INVOICE_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     if (invoice.status !== SubscriptionInvoiceStatus.PENDING) {
-      throw new BadRequestException('ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED');
+      throw new BusinessException(ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED, HttpStatus.BAD_REQUEST);
     }
 
     const paid = await this.invoiceRepository.markPaid(invoice.id, {
@@ -152,7 +146,7 @@ export class SubscriptionInvoiceService {
       sepayTransferContent: input.note ?? invoice.sepayTransferContent ?? null,
     });
     if (!paid) {
-      throw new BadRequestException('ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED');
+      throw new BusinessException(ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED, HttpStatus.BAD_REQUEST);
     }
 
     await this.subscriptionService.assignPlan({
@@ -251,7 +245,7 @@ export class SubscriptionInvoiceService {
     const expectedSecret = this.platformPaymentConfig('WEBHOOK_SECRET')?.trim();
     const providedSecret = secret?.trim();
     if (!expectedSecret || !providedSecret || !constantTimeEquals(expectedSecret, providedSecret)) {
-      throw new UnauthorizedException('SEPAY_PLATFORM_WEBHOOK_SECRET_INVALID');
+      throw new BusinessException(ErrorCode.SEPAY_PLATFORM_WEBHOOK_SECRET_INVALID, HttpStatus.UNAUTHORIZED);
     }
   }
 

@@ -6,11 +6,13 @@ import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message'
 import { Authorization } from '@common/decorators/authorizer.decorator';
 import { Permissions } from '@common/decorators/permission.decorator';
 import { ProcessId } from '@common/decorators/processId.decorator';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import { buildTcpRequestContext } from '@common/utils/request.util';
-import { Body, Controller, ForbiddenException, Get, Inject, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Inject, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { map } from 'rxjs';
@@ -66,7 +68,7 @@ export class AdminBillingController {
     const userData = req[MetadataKey.USER_DATA] as AuthorizeResponse | undefined;
     const userId = userData?.metadata?.userId;
     if (!userId) {
-      throw new ForbiddenException('USER_ID_REQUIRED');
+      throw new BusinessException(ErrorCode.USER_ID_REQUIRED, HttpStatus.FORBIDDEN);
     }
     return userId;
   }

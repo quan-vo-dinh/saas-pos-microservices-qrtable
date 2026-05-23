@@ -1,6 +1,8 @@
 import { SubscriptionStatus, normalizePlanCode } from '@common/constants/saas.constants';
 import { Subscription } from '@common/entities/subscription.entity';
-import { Injectable } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, Repository } from 'typeorm';
 import type { AssignPlanParams } from '../services/subscription.service';
@@ -90,7 +92,7 @@ export class SubscriptionRepository {
     );
     const updated = await this.findById(subscriptionId);
     if (!updated) {
-      throw new Error('SUBSCRIPTION_NOT_FOUND_AFTER_CANCEL');
+      throw new BusinessException(ErrorCode.SAAS_SUBSCRIPTION_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return updated;
   }

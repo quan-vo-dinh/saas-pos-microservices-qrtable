@@ -1,4 +1,6 @@
-import { BadRequestException, ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { ConflictException } from '@nestjs/common';
 import type { SepayWebhookPayload } from '@common/interfaces/tcp/payment';
 import { BillStatus, PaymentMethod } from '@einvoice/types';
 import { of, throwError } from 'rxjs';
@@ -43,6 +45,18 @@ function makePayment(overrides: Partial<PaymentEntity> = {}): PaymentEntity {
 
 function uniqueViolation(): QueryFailedError {
   return new QueryFailedError('INSERT INTO payments', [], { code: '23505' } as Error & { code: string });
+}
+
+async function expectBusinessError(promise: Promise<unknown>, errorCode: ErrorCode): Promise<void> {
+  let caught: unknown;
+  try {
+    await promise;
+  } catch (error) {
+    caught = error;
+  }
+
+  expect(caught).toBeInstanceOf(BusinessException);
+  expect((caught as BusinessException).errorCode).toBe(errorCode);
 }
 
 function buildPaymentServiceForTest(opts: {
@@ -285,13 +299,14 @@ describe('PaymentService policy checks', () => {
       outboxRepo: {} as never,
     });
 
-    await expect(
+    await expectBusinessError(
       service.createVietQr({
         tenantId: 'tenant-1',
         billId: 'bill-1',
         userId: 'user-1',
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+      ErrorCode.PAYMENT_BILL_SNAPSHOT_INVALID,
+    );
 
     expect(paymentRepo.create).not.toHaveBeenCalled();
     expect(paymentRepo.save).not.toHaveBeenCalled();
@@ -535,13 +550,14 @@ describe('PaymentService settlement behavior', () => {
       outboxRepo,
     });
 
-    await expect(
+    await expectBusinessError(
       service.handleSepayWebhook({
         payload: baseSepayPayload({ transferAmount: 200_000 }),
         tenantSlug: 'tenant-a',
         secret: 'wrong-secret',
       }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+      ErrorCode.SEPAY_WEBHOOK_SECRET_INVALID,
+    );
 
     expect(payment.status).toBe('PENDING');
     expect(dataSource.transaction).not.toHaveBeenCalled();
@@ -581,13 +597,14 @@ describe('PaymentService settlement behavior', () => {
       tenantPaymentSettingsRepository,
     });
 
-    await expect(
+    await expectBusinessError(
       service.handleSepayWebhook({
         payload: baseSepayPayload({ transferAmount: 200_000 }),
         tenantSlug: 'tenant-a',
         secret: 'tenant-secret',
       }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+      ErrorCode.SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED,
+    );
 
     expect(dataSource.transaction).not.toHaveBeenCalled();
     expect(paymentRepo.findByBillReferenceForUpdate).not.toHaveBeenCalled();
@@ -628,13 +645,14 @@ describe('PaymentService settlement behavior', () => {
       outboxRepo,
     });
 
-    await expect(
+    await expectBusinessError(
       service.handleSepayWebhook({
         payload: baseSepayPayload({ transferAmount: 200_000 }),
         tenantSlug: 'tenant-a',
         secret: 'tenant-secret',
       }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      ErrorCode.SEPAY_TENANT_MISMATCH,
+    );
 
     expect(payment.status).toBe('PENDING');
     expect(manager.save).not.toHaveBeenCalled();
@@ -842,7 +860,7 @@ describe('PaymentService settlement behavior', () => {
       outboxRepo,
     });
 
-    await expect(
+    await expectBusinessError(
       service.confirmCash({
         tenantId: 'tenant-1',
         billId: payment.billId,
@@ -850,7 +868,8 @@ describe('PaymentService settlement behavior', () => {
         amountReceived: 127_500,
         processId: 'p1',
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+      ErrorCode.PAYMENT_AMOUNT_INSUFFICIENT,
+    );
 
     expect(outboxRepo.createCompleted).not.toHaveBeenCalled();
   });
@@ -905,14 +924,15 @@ describe('PaymentService settlement behavior', () => {
       outboxRepo,
     });
 
-    await expect(
+    await expectBusinessError(
       service.confirmCash({
         tenantId: 'tenant-1',
         billId: snapshot.billId,
         userId: 'user-1',
         amountReceived: 127_500,
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+      ErrorCode.PAYMENT_BILL_SNAPSHOT_INVALID,
+    );
 
     expect(paymentRepo.create).not.toHaveBeenCalled();
     expect(manager.save).not.toHaveBeenCalled();

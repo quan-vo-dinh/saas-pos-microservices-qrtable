@@ -5,15 +5,28 @@ jest.mock('uuid', () => ({
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { MetadataKey } from '@common/constants/common.constant';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
 import { BillStatus } from '@einvoice/types';
-import { ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Request } from 'express';
 import { of } from 'rxjs';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 import { CustomerOrderController } from './customer-order.controller';
+
+async function expectBusinessError(promise: Promise<unknown>, errorCode: ErrorCode): Promise<void> {
+  let caught: unknown;
+  try {
+    await promise;
+  } catch (error) {
+    caught = error;
+  }
+
+  expect(caught).toBeInstanceOf(BusinessException);
+  expect((caught as BusinessException).errorCode).toBe(errorCode);
+}
 
 describe('CustomerOrderController', () => {
   let controller: CustomerOrderController;
@@ -141,7 +154,10 @@ describe('CustomerOrderController', () => {
         data: { bill: { id: 'bill-1', status: BillStatus.OPEN, sessionId: 'sess-1' }, cart: null },
       }),
     );
-    await expect(controller.createCustomerVietQr('proc-1', req)).rejects.toBeInstanceOf(ConflictException);
+    await expectBusinessError(
+      controller.createCustomerVietQr('proc-1', req),
+      ErrorCode.PAYMENT_BILL_NOT_PENDING_PAYMENT,
+    );
     expect(paymentClient.send).not.toHaveBeenCalled();
   });
 
@@ -155,7 +171,7 @@ describe('CustomerOrderController', () => {
         },
       }),
     );
-    await expect(controller.createCustomerVietQr('proc-1', req)).rejects.toBeInstanceOf(ConflictException);
+    await expectBusinessError(controller.createCustomerVietQr('proc-1', req), ErrorCode.BILL_SESSION_MISMATCH);
     expect(paymentClient.send).not.toHaveBeenCalled();
   });
 });

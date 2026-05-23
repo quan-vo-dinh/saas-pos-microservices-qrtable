@@ -1,4 +1,26 @@
-import type { ApiResponse } from '@einvoice/types';
+import type { ApiErrorResponse, ApiResponse } from '@einvoice/types';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+function normalizeServerMessage(value: unknown): string | undefined {
+  const message = normalizeString(value);
+  if (message) {
+    return message;
+  }
+
+  if (Array.isArray(value)) {
+    const messages = value.map(normalizeString).filter((item): item is string => Boolean(item));
+    return messages.length > 0 ? messages.join('; ') : undefined;
+  }
+
+  return undefined;
+}
 
 export class ApiError extends Error {
   readonly status: number;
@@ -11,9 +33,12 @@ export class ApiError extends Error {
     let serverMessage = body;
 
     try {
-      const parsed = JSON.parse(body) as Record<string, unknown>;
-      errorCode = parsed['errorCode'] as string | undefined;
-      serverMessage = (parsed['message'] as string) ?? body;
+      const parsed: unknown = JSON.parse(body);
+      if (isRecord(parsed)) {
+        const response = parsed as ApiErrorResponse;
+        errorCode = normalizeString(response.errorCode);
+        serverMessage = normalizeServerMessage(response.message) ?? body;
+      }
     } catch {
       // body is not JSON — use raw text
     }

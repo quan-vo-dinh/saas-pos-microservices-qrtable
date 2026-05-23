@@ -1,4 +1,6 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 
 type TenantWithStatus = {
   status?: 'ACTIVE' | 'SUSPENDED' | 'CLOSED' | string;
@@ -11,11 +13,11 @@ export class TenantStatusGuard implements CanActivate {
     const tenant = request.tenant as TenantWithStatus | undefined;
 
     if (!tenant) {
-      throw new ForbiddenException('TENANT_REQUIRED');
+      throw new BusinessException(ErrorCode.TENANT_REQUIRED, HttpStatus.FORBIDDEN);
     }
 
     if (tenant.status === 'CLOSED') {
-      throw new ForbiddenException('TENANT_CLOSED');
+      throw new BusinessException(ErrorCode.TENANT_CLOSED, HttpStatus.FORBIDDEN);
     }
 
     if (tenant.status === 'SUSPENDED') {
@@ -28,7 +30,7 @@ export class TenantStatusGuard implements CanActivate {
           routePath.includes('/dashboard/payment-settings'));
 
       if (!allowedWhileSuspended) {
-        throw new ForbiddenException('TENANT_SUSPENDED');
+        throw new BusinessException(ErrorCode.TENANT_SUSPENDED, HttpStatus.FORBIDDEN);
       }
     }
 

@@ -1,5 +1,7 @@
 import { TenantStatus } from '@common/constants/saas.constants';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { TenantRepository } from '../repositories/tenant.repository';
 import { TenantStatusCacheService } from './tenant-status-cache.service';
 
@@ -46,7 +48,7 @@ export class TenantLifecycleService {
   private async assertTenant(tenantId: string): Promise<void> {
     const tenant = await this.tenantRepository.findById(tenantId);
     if (!tenant) {
-      throw new NotFoundException('TENANT_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_TENANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
   }
 }

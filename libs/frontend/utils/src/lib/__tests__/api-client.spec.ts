@@ -169,6 +169,51 @@ describe('apiClient', () => {
     await expect(apiClient('/fail')).rejects.toThrow('Internal Server Error');
   });
 
+  it('uses typed server message and error code from BFF error responses', async () => {
+    expect.assertions(4);
+    fetchSpy.mockResolvedValue(
+      mockResponse(
+        { statusCode: 409, message: 'Hóa đơn đã được thanh toán', errorCode: 'PAYMENT_BILL_ALREADY_PAID' },
+        {
+          ok: false,
+          status: 409,
+        },
+      ),
+    );
+
+    try {
+      await apiClient('/payment');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError);
+      const apiErr = err as ApiError;
+      expect(apiErr.message).toBe('Hóa đơn đã được thanh toán');
+      expect(apiErr.serverMessage).toBe('Hóa đơn đã được thanh toán');
+      expect(apiErr.errorCode).toBe('PAYMENT_BILL_ALREADY_PAID');
+    }
+  });
+
+  it('normalizes validation message arrays and ignores non-string error codes', async () => {
+    expect.assertions(3);
+    fetchSpy.mockResolvedValue(
+      mockResponse(
+        { statusCode: 400, message: ['Name is required', { nested: true }, 'Price is invalid'], errorCode: 42 },
+        {
+          ok: false,
+          status: 400,
+        },
+      ),
+    );
+
+    try {
+      await apiClient('/invalid');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ApiError);
+      const apiErr = err as ApiError;
+      expect(apiErr.serverMessage).toBe('Name is required; Price is invalid');
+      expect(apiErr.errorCode).toBeUndefined();
+    }
+  });
+
   // -----------------------------------------------------------------------
   // 7. HTTP method and body forwarding
   // -----------------------------------------------------------------------

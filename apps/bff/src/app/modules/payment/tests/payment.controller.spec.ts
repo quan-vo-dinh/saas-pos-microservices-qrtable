@@ -5,11 +5,12 @@ jest.mock('uuid', () => ({
 import { createHmac } from 'node:crypto';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { MetadataKey } from '@common/constants/common.constant';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { SepayWebhookRequestDto } from '@common/interfaces/gateway/payment';
 import type { SepayWebhookPayload } from '@common/interfaces/tcp/payment';
 import { NEVER, of } from 'rxjs';
@@ -21,6 +22,16 @@ import { assertSepayHmacSignature } from '../verify-sepay-webhook-secret';
 function makeSignature(secret: string, timestamp: string, body: string): string {
   const hex = createHmac('sha256', secret).update(`${timestamp}.${body}`, 'utf8').digest('hex');
   return `sha256=${hex}`;
+}
+
+function expectBusinessThrow(fn: () => void, errorCode: ErrorCode): void {
+  expect(fn).toThrow(BusinessException);
+
+  try {
+    fn();
+  } catch (error) {
+    expect((error as BusinessException).errorCode).toBe(errorCode);
+  }
 }
 
 function makeSepayPayload(overrides: Partial<SepayWebhookPayload> = {}): SepayWebhookPayload {
@@ -75,23 +86,38 @@ describe('assertSepayHmacSignature', () => {
   const VALID_SIG = makeSignature(SECRET, TIMESTAMP, BODY);
 
   it('throws when secret is empty', () => {
-    expect(() => assertSepayHmacSignature(VALID_SIG, TIMESTAMP, BODY, '')).toThrow(UnauthorizedException);
+    expectBusinessThrow(
+      () => assertSepayHmacSignature(VALID_SIG, TIMESTAMP, BODY, ''),
+      ErrorCode.SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED,
+    );
   });
 
   it('throws when signature header is missing', () => {
-    expect(() => assertSepayHmacSignature(undefined, TIMESTAMP, BODY, SECRET)).toThrow(UnauthorizedException);
+    expectBusinessThrow(
+      () => assertSepayHmacSignature(undefined, TIMESTAMP, BODY, SECRET),
+      ErrorCode.SEPAY_WEBHOOK_SIGNATURE_MISSING,
+    );
   });
 
   it('throws when timestamp header is missing', () => {
-    expect(() => assertSepayHmacSignature(VALID_SIG, undefined, BODY, SECRET)).toThrow(UnauthorizedException);
+    expectBusinessThrow(
+      () => assertSepayHmacSignature(VALID_SIG, undefined, BODY, SECRET),
+      ErrorCode.SEPAY_WEBHOOK_SIGNATURE_MISSING,
+    );
   });
 
   it('throws when signature does not match', () => {
-    expect(() => assertSepayHmacSignature('sha256=deadbeef', TIMESTAMP, BODY, SECRET)).toThrow(UnauthorizedException);
+    expectBusinessThrow(
+      () => assertSepayHmacSignature('sha256=deadbeef', TIMESTAMP, BODY, SECRET),
+      ErrorCode.SEPAY_WEBHOOK_SIGNATURE_INVALID,
+    );
   });
 
   it('throws when timestamp is tampered', () => {
-    expect(() => assertSepayHmacSignature(VALID_SIG, '9999999999', BODY, SECRET)).toThrow(UnauthorizedException);
+    expectBusinessThrow(
+      () => assertSepayHmacSignature(VALID_SIG, '9999999999', BODY, SECRET),
+      ErrorCode.SEPAY_WEBHOOK_SIGNATURE_INVALID,
+    );
   });
 
   it('accepts a valid HMAC-SHA256 signature', () => {

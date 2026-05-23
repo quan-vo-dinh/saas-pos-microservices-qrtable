@@ -1,5 +1,7 @@
 import { RESERVED_TENANT_SLUGS } from '@common/constants/saas.constants';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable } from '@nestjs/common';
 
 @Injectable()
 export class SlugService {
@@ -20,7 +22,7 @@ export class SlugService {
 
   assertAllowed(slug: string): void {
     if (!slug || RESERVED_TENANT_SLUGS.includes(slug as (typeof RESERVED_TENANT_SLUGS)[number])) {
-      throw new BadRequestException('SAAS_SLUG_RESERVED');
+      throw new BusinessException(ErrorCode.SAAS_SLUG_RESERVED, HttpStatus.BAD_REQUEST);
     }
   }
 

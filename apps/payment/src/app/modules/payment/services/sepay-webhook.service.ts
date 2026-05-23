@@ -1,5 +1,7 @@
 import type { HandleSepayWebhookTcpRequest, SepayWebhookTcpResponse } from '@common/interfaces/tcp/payment';
-import { ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { PaymentMethod } from '@einvoice/types';
 import { timingSafeEqual } from 'crypto';
 import { DataSource } from 'typeorm';
@@ -60,7 +62,7 @@ export class SepayWebhookService {
         return;
       }
       if (routeTenantId && payment.tenantId !== routeTenantId) {
-        throw new ForbiddenException('SEPAY_TENANT_MISMATCH');
+        throw new BusinessException(ErrorCode.SEPAY_TENANT_MISMATCH, HttpStatus.FORBIDDEN);
       }
 
       await this.auditRepo.createPaymentAudit(
@@ -177,18 +179,18 @@ export class SepayWebhookService {
     const tenantSlug = dto.tenantSlug?.trim();
     const providedSecret = dto.secret?.trim();
     if (!tenantSlug || !providedSecret) {
-      throw new UnauthorizedException('SEPAY_WEBHOOK_SECRET_REQUIRED');
+      throw new BusinessException(ErrorCode.SEPAY_WEBHOOK_SECRET_REQUIRED, HttpStatus.UNAUTHORIZED);
     }
 
     const tenant = await this.tenantGateway.resolveBySlug(tenantSlug, dto.processId);
     const settings = await this.tenantPaymentSettingsRepo.findByTenantId(tenant.id);
     if (!settings?.webhookSecretEncrypted) {
-      throw new UnauthorizedException('SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED');
+      throw new BusinessException(ErrorCode.SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED, HttpStatus.UNAUTHORIZED);
     }
 
     const expectedSecret = this.decryptWebhookSecret(settings.webhookSecretEncrypted);
     if (!constantTimeEquals(expectedSecret, providedSecret)) {
-      throw new UnauthorizedException('SEPAY_WEBHOOK_SECRET_INVALID');
+      throw new BusinessException(ErrorCode.SEPAY_WEBHOOK_SECRET_INVALID, HttpStatus.UNAUTHORIZED);
     }
 
     return tenant.id;
@@ -202,7 +204,7 @@ export class SepayWebhookService {
       }
       return secret;
     } catch {
-      throw new UnauthorizedException('SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED');
+      throw new BusinessException(ErrorCode.SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED, HttpStatus.UNAUTHORIZED);
     }
   }
 }

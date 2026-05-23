@@ -3,6 +3,8 @@ import { MetadataKey } from '@common/constants/common.constant';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { ProcessId } from '@common/decorators/processId.decorator';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import {
   CartMutateRequestDto,
   CreateCustomerServiceRequestDto,
@@ -36,10 +38,10 @@ import { buildTcpRequestContext } from '@common/utils/request.util';
 import { BillStatus, type ServiceRequestType } from '@einvoice/types';
 import {
   Body,
-  ConflictException,
   Controller,
   Delete,
   Get,
+  HttpStatus,
   Inject,
   Param,
   ParseIntPipe,
@@ -424,10 +426,10 @@ export class CustomerOrderController {
     );
     const bill = currentBill.data?.bill;
     if (!bill || bill.status !== BillStatus.PENDING_PAYMENT) {
-      throw new ConflictException('Current bill is not pending payment');
+      throw new BusinessException(ErrorCode.PAYMENT_BILL_NOT_PENDING_PAYMENT, HttpStatus.CONFLICT);
     }
     if (bill.sessionId !== sessionId) {
-      throw new ConflictException('Bill does not belong to this session');
+      throw new BusinessException(ErrorCode.BILL_SESSION_MISMATCH, HttpStatus.CONFLICT);
     }
 
     const payload: CreateVietQrTcpRequest = {

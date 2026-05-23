@@ -4,7 +4,9 @@ import type {
   PaymentHistoryTcpResponse,
   PaymentTcpResponse,
 } from '@common/interfaces/tcp/payment';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { PaymentRepository } from '../repositories/payment.repository';
 import { PaymentMapper } from './payment.mapper';
 
@@ -28,7 +30,7 @@ export class PaymentQueryService {
   async getStatus(dto: PaymentByIdTcpRequest): Promise<PaymentTcpResponse> {
     const payment = await this.paymentRepo.findByTenantAndId(dto.tenantId, dto.paymentId);
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      throw new BusinessException(ErrorCode.PAYMENT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return this.mapper.toPaymentResponse(payment);
   }

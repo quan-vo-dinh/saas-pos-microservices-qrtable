@@ -1,7 +1,9 @@
 import { PricingPlan } from '@common/entities/pricing-plan.entity';
 import { Subscription } from '@common/entities/subscription.entity';
 import { Tenant } from '@common/entities/tenant.entity';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { PricingPlanRepository } from '../repositories/pricing-plan.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { TenantRepository } from '../repositories/tenant.repository';
@@ -73,10 +75,10 @@ export class SubscriptionDashboardService {
   async cancelSubscription(input: { tenantId: string; reason?: string | null }): Promise<Record<string, unknown>> {
     const current = await this.subscriptionRepository.findActiveByTenantId(input.tenantId);
     if (!current) {
-      throw new NotFoundException('ACTIVE_SUBSCRIPTION_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_ACTIVE_SUBSCRIPTION_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     if (!input.reason?.trim()) {
-      throw new BadRequestException('CANCEL_REASON_REQUIRED');
+      throw new BusinessException(ErrorCode.SAAS_CANCEL_REASON_REQUIRED, HttpStatus.BAD_REQUEST);
     }
     return this.toSubscriptionHistory(
       await this.subscriptionRepository.cancelActive(input.tenantId, current.id, input.reason.trim()),
@@ -119,7 +121,7 @@ export class SubscriptionDashboardService {
   private async findTenant(id: string): Promise<Tenant> {
     const tenant = await this.tenantRepository.findById(id);
     if (!tenant) {
-      throw new NotFoundException('TENANT_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_TENANT_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
     return tenant;
   }

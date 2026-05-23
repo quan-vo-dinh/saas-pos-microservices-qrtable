@@ -10,7 +10,9 @@ import type {
   BillMarkedPaidTcpResponse,
   BillPaymentSnapshotTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
-import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom, map, timeout } from 'rxjs';
 import { CONFIGURATION } from '../../../../configuration';
 
@@ -42,7 +44,7 @@ export class PaymentOrderGateway {
         ),
     );
     if (!wrapped?.data) {
-      throw new ConflictException('Unable to load bill snapshot');
+      throw new BusinessException(ErrorCode.PAYMENT_BILL_SNAPSHOT_UNAVAILABLE, HttpStatus.BAD_GATEWAY);
     }
     return wrapped.data;
   }

@@ -1,9 +1,22 @@
-import { ConflictException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 import { PaymentEntity } from '../entities/payment.entity';
 import { RefundEntity } from '../entities/refund.entity';
 import { RefundService } from '../services/refund.service';
+
+async function expectBusinessError(promise: Promise<unknown>, errorCode: ErrorCode): Promise<void> {
+  let caught: unknown;
+  try {
+    await promise;
+  } catch (error) {
+    caught = error;
+  }
+
+  expect(caught).toBeInstanceOf(BusinessException);
+  expect((caught as BusinessException).errorCode).toBe(errorCode);
+}
 
 function makePayment(overrides: Partial<PaymentEntity> = {}): PaymentEntity {
   return Object.assign(new PaymentEntity(), {
@@ -124,14 +137,15 @@ describe('RefundService', () => {
     const blocking = { id: 'refund-block', paymentId: payment.id } as RefundEntity;
     const { service } = buildService({ payment, blockingRefund: blocking });
 
-    await expect(
+    await expectBusinessError(
       service.requestRefund({
         tenantId: 'tenant-1',
         paymentId: 'payment-1',
         userId: 'staff-1',
         reason: 'dup',
       }),
-    ).rejects.toBeInstanceOf(ConflictException);
+      ErrorCode.PAYMENT_REFUND_ALREADY_EXISTS,
+    );
   });
 
   it('confirmRefund marks refund CONFIRMED and payment REFUNDED, emits outbox', async () => {

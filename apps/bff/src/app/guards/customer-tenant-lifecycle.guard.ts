@@ -2,19 +2,14 @@ import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { MetadataKey } from '@common/constants/common.constant';
 import { buildTenantSuspendedRedisKey, TenantStatus } from '@common/constants/saas.constants';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { buildTcpRequestContext } from '@common/utils/request.util';
 import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import type { GetTenantByIdTcpRequest } from '@common/interfaces/tcp/saas';
 import type { TenantTcpResponse } from '@common/interfaces/tcp/saas';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { randomUUID } from 'crypto';
 import { firstValueFrom } from 'rxjs';
@@ -78,19 +73,19 @@ export class CustomerTenantLifecycleGuard implements CanActivate {
         if (redisSuspended) {
           return true;
         }
-        throw new ServiceUnavailableException('TENANT_STATUS_UNAVAILABLE');
+        throw new BusinessException(ErrorCode.TENANT_STATUS_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE);
       }
       if (path.includes('/customer/')) {
         if (redisSuspended) {
-          throw new ForbiddenException('TENANT_SUSPENDED');
+          throw new BusinessException(ErrorCode.TENANT_SUSPENDED, HttpStatus.FORBIDDEN);
         }
-        throw new ServiceUnavailableException('TENANT_STATUS_UNAVAILABLE');
+        throw new BusinessException(ErrorCode.TENANT_STATUS_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE);
       }
       return true;
     }
 
     if (status === TenantStatus.CLOSED) {
-      throw new ForbiddenException('TENANT_CLOSED');
+      throw new BusinessException(ErrorCode.TENANT_CLOSED, HttpStatus.FORBIDDEN);
     }
 
     if (status === TenantStatus.SUSPENDED) {
@@ -103,7 +98,7 @@ export class CustomerTenantLifecycleGuard implements CanActivate {
       if (isPostCustomerVietQr(path, method)) {
         return true;
       }
-      throw new ForbiddenException('TENANT_SUSPENDED');
+      throw new BusinessException(ErrorCode.TENANT_SUSPENDED, HttpStatus.FORBIDDEN);
     }
 
     return true;

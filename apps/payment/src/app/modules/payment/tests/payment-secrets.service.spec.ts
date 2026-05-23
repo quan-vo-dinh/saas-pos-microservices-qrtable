@@ -1,4 +1,6 @@
 import { Test } from '@nestjs/testing';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { PAYMENT_SECRETS_ENCRYPTION_KEY, PaymentSecretsService } from '../services/payment-secrets.service';
 
 describe('PaymentSecretsService', () => {
@@ -12,7 +14,13 @@ describe('PaymentSecretsService', () => {
   });
 
   it('rejects invalid key length', () => {
-    expect(() => new PaymentSecretsService('short')).toThrow('PAYMENT_SECRETS_ENCRYPTION_KEY');
+    expect(() => new PaymentSecretsService('short')).toThrow(BusinessException);
+
+    try {
+      new PaymentSecretsService('short');
+    } catch (error) {
+      expect((error as BusinessException).errorCode).toBe(ErrorCode.PAYMENT_SECRETS_SERVICE_NOT_CONFIGURED);
+    }
   });
 
   it('resolves through Nest DI with an explicit encryption-key provider', async () => {
@@ -42,6 +50,12 @@ describe('PaymentSecretsService', () => {
     }).compile();
 
     const service = moduleRef.get(PaymentSecretsService);
-    expect(() => service.encrypt('missing-key')).toThrow('PAYMENT_SECRETS_ENCRYPTION_KEY');
+    expect(() => service.encrypt('missing-key')).toThrow(BusinessException);
+
+    try {
+      service.encrypt('missing-key');
+    } catch (error) {
+      expect((error as BusinessException).errorCode).toBe(ErrorCode.PAYMENT_SECRETS_SERVICE_NOT_CONFIGURED);
+    }
   });
 });

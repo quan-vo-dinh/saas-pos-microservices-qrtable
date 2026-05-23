@@ -7,8 +7,9 @@ import { MetadataKey } from '@common/constants/common.constant';
 import { PERMISSION } from '@common/constants/enum/role.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { Permissions } from '@common/decorators/permission.decorator';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
-import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Request } from 'express';
@@ -127,7 +128,18 @@ describe('AdminTenantsController', () => {
         'pid-1',
         req([PERMISSION.TENANT_SUSPEND]),
       ),
-    ).toThrow(ForbiddenException);
+    ).toThrow(BusinessException);
+
+    try {
+      controller.updateStatus(
+        'tenant-1',
+        { action: TenantStatusActionDtoValue.CLOSE },
+        'pid-1',
+        req([PERMISSION.TENANT_SUSPEND]),
+      );
+    } catch (error) {
+      expect((error as BusinessException).errorCode).toBe(ErrorCode.AUTH_PERMISSION_DENIED);
+    }
   });
 
   it('attaches expected permission metadata on admin routes', () => {

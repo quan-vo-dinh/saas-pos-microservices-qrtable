@@ -1,4 +1,6 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
@@ -10,7 +12,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
  *
  * Signing payload: `{timestamp}.{rawBody}`
  *
- * @throws UnauthorizedException when signature is invalid or any input is missing.
+ * @throws BusinessException when signature is invalid or any input is missing.
  */
 export function assertSepayHmacSignature(
   signature: string | undefined,
@@ -19,10 +21,10 @@ export function assertSepayHmacSignature(
   secret: string,
 ): void {
   if (!secret) {
-    throw new UnauthorizedException('Webhook secret not configured');
+    throw new BusinessException(ErrorCode.SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED, HttpStatus.UNAUTHORIZED);
   }
   if (!signature || !timestamp) {
-    throw new UnauthorizedException('Missing SePay signature headers');
+    throw new BusinessException(ErrorCode.SEPAY_WEBHOOK_SIGNATURE_MISSING, HttpStatus.UNAUTHORIZED);
   }
 
   const bodyStr = rawBody instanceof Buffer ? rawBody.toString('utf8') : rawBody;
@@ -34,6 +36,6 @@ export function assertSepayHmacSignature(
   const b = Buffer.from(expected, 'utf8');
 
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    throw new UnauthorizedException('Invalid webhook signature');
+    throw new BusinessException(ErrorCode.SEPAY_WEBHOOK_SIGNATURE_INVALID, HttpStatus.UNAUTHORIZED);
   }
 }

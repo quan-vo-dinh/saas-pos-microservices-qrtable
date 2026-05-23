@@ -1,7 +1,8 @@
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
-import { UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { firstValueFrom, of } from 'rxjs';
 import { SepayWebhookController } from './sepay-webhook.controller';
@@ -50,8 +51,14 @@ describe('SepayWebhookController', () => {
     expect(saasClient.send).not.toHaveBeenCalled();
   });
 
-  it('missing secret returns UnauthorizedException', () => {
-    expect(() => controller.handlePlatformWebhook('', {})).toThrow(UnauthorizedException);
-    expect(() => controller.handleTenantWebhook('tenant-a', '', {})).toThrow(UnauthorizedException);
+  it('missing secret returns typed BusinessException', () => {
+    expect(() => controller.handlePlatformWebhook('', {})).toThrow(BusinessException);
+    expect(() => controller.handleTenantWebhook('tenant-a', '', {})).toThrow(BusinessException);
+
+    try {
+      controller.handlePlatformWebhook('', {});
+    } catch (error) {
+      expect((error as BusinessException).errorCode).toBe(ErrorCode.SEPAY_SECRET_REQUIRED);
+    }
   });
 });

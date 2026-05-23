@@ -37,7 +37,7 @@ export function useAcknowledgeServiceRequestMutation() {
     mutationFn: (requestId: string) => serviceRequestService.acknowledgeServiceRequest(requestId),
     onSuccess: async () => {
       await invalidateServiceRequestQueries(queryClient);
-      toast.success(successMessage('updated', 'service request'));
+      toast.success(successMessage('updated', 'serviceRequest'));
     },
     onError: (error: Error) => {
       toast.error(getErrorDisplayMessage(error));
@@ -52,7 +52,7 @@ export function useResolveServiceRequestMutation() {
     mutationFn: (requestId: string) => serviceRequestService.resolveServiceRequest(requestId),
     onSuccess: async () => {
       await invalidateServiceRequestQueries(queryClient);
-      toast.success(successMessage('updated', 'service request'));
+      toast.success(successMessage('updated', 'serviceRequest'));
     },
     onError: (error: Error) => {
       toast.error(getErrorDisplayMessage(error));

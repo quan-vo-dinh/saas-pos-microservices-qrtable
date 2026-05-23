@@ -7,6 +7,8 @@ import { Authorization } from '@common/decorators/authorizer.decorator';
 import { Permissions } from '@common/decorators/permission.decorator';
 import { ProcessId } from '@common/decorators/processId.decorator';
 import { RawResponse } from '@common/decorators/raw-response.decorator';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import {
   ConfirmCashRequestDto,
   CreateVietQrRequestDto,
@@ -35,7 +37,7 @@ import type {
   SepayWebhookTcpResponse,
 } from '@common/interfaces/tcp/payment';
 import { buildTcpRequestContext } from '@common/utils/request.util';
-import { Body, Controller, Get, Inject, Post, Query, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Inject, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -53,7 +55,9 @@ export class PaymentController {
   private userId(req: Request): string {
     const u = req[MetadataKey.USER_DATA] as AuthorizeResponse | undefined;
     const id = u?.metadata?.userId;
-    if (!id) throw new UnauthorizedException();
+    if (!id) {
+      throw new BusinessException(ErrorCode.USER_ID_REQUIRED, HttpStatus.UNAUTHORIZED);
+    }
     return id;
   }
 

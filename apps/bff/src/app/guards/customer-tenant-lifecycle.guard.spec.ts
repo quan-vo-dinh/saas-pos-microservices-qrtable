@@ -5,7 +5,8 @@ jest.mock('uuid', () => ({
 import { MetadataKey } from '@common/constants/common.constant';
 import { TenantStatus } from '@common/constants/saas.constants';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
-import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import type { ExecutionContext } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { CustomerTenantLifecycleGuard } from './customer-tenant-lifecycle.guard';
@@ -20,6 +21,18 @@ describe('CustomerTenantLifecycleGuard', () => {
     ({
       switchToHttp: () => ({ getRequest: () => request }),
     }) as ExecutionContext;
+
+  async function expectBusinessError(promise: Promise<unknown>, errorCode: ErrorCode): Promise<void> {
+    let caught: unknown;
+    try {
+      await promise;
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(BusinessException);
+    expect((caught as BusinessException).errorCode).toBe(errorCode);
+  }
 
   function mockTenantStatus(status: TenantStatus | null): void {
     if (status === null) {
@@ -60,7 +73,7 @@ describe('CustomerTenantLifecycleGuard', () => {
   it('blocks customer order mutations for suspended tenants', async () => {
     mockTenantStatus(TenantStatus.SUSPENDED);
 
-    await expect(
+    await expectBusinessError(
       guard().canActivate(
         ctx({
           method: 'POST',
@@ -68,13 +81,14 @@ describe('CustomerTenantLifecycleGuard', () => {
           [MetadataKey.TENANT_ID]: 'tenant-1',
         }),
       ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      ErrorCode.TENANT_SUSPENDED,
+    );
   });
 
   it('blocks closed tenants for customer routes', async () => {
     mockTenantStatus(TenantStatus.CLOSED);
 
-    await expect(
+    await expectBusinessError(
       guard().canActivate(
         ctx({
           method: 'GET',
@@ -82,14 +96,15 @@ describe('CustomerTenantLifecycleGuard', () => {
           [MetadataKey.TENANT_ID]: 'tenant-1',
         }),
       ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      ErrorCode.TENANT_CLOSED,
+    );
   });
 
   it('uses Redis suspended flag when SaaS status is unavailable for mutations', async () => {
     cache.get.mockResolvedValue('1');
     mockTenantStatus(null);
 
-    await expect(
+    await expectBusinessError(
       guard().canActivate(
         ctx({
           method: 'POST',
@@ -97,13 +112,14 @@ describe('CustomerTenantLifecycleGuard', () => {
           [MetadataKey.TENANT_ID]: 'tenant-1',
         }),
       ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      ErrorCode.TENANT_SUSPENDED,
+    );
   });
 
   it('fails closed for mutations when both Redis and SaaS status are unavailable', async () => {
     mockTenantStatus(null);
 
-    await expect(
+    await expectBusinessError(
       guard().canActivate(
         ctx({
           method: 'POST',
@@ -111,7 +127,8 @@ describe('CustomerTenantLifecycleGuard', () => {
           [MetadataKey.TENANT_ID]: 'tenant-1',
         }),
       ),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      ErrorCode.TENANT_STATUS_UNAVAILABLE,
+    );
   });
 
   it('keeps pending customer VietQR route available for suspended tenants', async () => {

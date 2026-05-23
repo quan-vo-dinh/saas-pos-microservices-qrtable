@@ -1,4 +1,6 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type {
   RefundConfirmTcpRequest,
@@ -26,12 +28,12 @@ export class RefundService {
     return this.dataSource.transaction(async (manager) => {
       const payment = await this.paymentRepo.findByTenantAndIdForUpdate(manager, dto.tenantId, dto.paymentId);
       if (!payment || payment.status !== 'PAID') {
-        throw new ConflictException('Payment is not paid');
+        throw new BusinessException(ErrorCode.PAYMENT_NOT_PAID, HttpStatus.CONFLICT);
       }
 
       const blocking = await this.refundRepo.findBlockingRefundForPayment(manager, payment.id);
       if (blocking) {
-        throw new ConflictException('Refund already exists for this payment');
+        throw new BusinessException(ErrorCode.PAYMENT_REFUND_ALREADY_EXISTS, HttpStatus.CONFLICT);
       }
 
       payment.status = 'REFUND_PENDING';
@@ -58,12 +60,12 @@ export class RefundService {
     return this.dataSource.transaction(async (manager) => {
       const refund = await this.refundRepo.findByTenantAndIdForUpdate(manager, dto.tenantId, dto.refundId);
       if (!refund || refund.status !== 'PENDING_STAFF_ACTION') {
-        throw new ConflictException('Refund is not pending staff action');
+        throw new BusinessException(ErrorCode.PAYMENT_REFUND_NOT_PENDING_STAFF_ACTION, HttpStatus.CONFLICT);
       }
 
       const payment = await this.paymentRepo.findByTenantAndIdForUpdate(manager, dto.tenantId, refund.paymentId);
       if (!payment || payment.status !== 'REFUND_PENDING') {
-        throw new ConflictException('Payment is not waiting for refund confirmation');
+        throw new BusinessException(ErrorCode.PAYMENT_NOT_WAITING_REFUND_CONFIRMATION, HttpStatus.CONFLICT);
       }
 
       refund.status = 'CONFIRMED';

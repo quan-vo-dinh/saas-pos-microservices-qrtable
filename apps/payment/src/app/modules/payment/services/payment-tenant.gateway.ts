@@ -3,7 +3,9 @@ import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message'
 import type { RequestType } from '@common/interfaces/tcp/common/request.interface';
 import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
 import type { GetTenantBySlugTcpRequest, TenantTcpResponse } from '@common/interfaces/tcp/saas';
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { firstValueFrom, timeout } from 'rxjs';
 import { CONFIGURATION } from '../../../../configuration';
 
@@ -22,7 +24,7 @@ export class PaymentTenantGateway {
         .pipe(timeout({ first: CONFIGURATION.PAYMENT_INTEGRATION_CONFIG.ORDER_TCP_TIMEOUT_MS })),
     );
     if (!wrapped?.data?.id) {
-      throw new UnauthorizedException('SEPAY_TENANT_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SEPAY_TENANT_NOT_FOUND, HttpStatus.UNAUTHORIZED);
     }
     return { id: wrapped.data.id, slug: wrapped.data.slug ?? slug };
   }

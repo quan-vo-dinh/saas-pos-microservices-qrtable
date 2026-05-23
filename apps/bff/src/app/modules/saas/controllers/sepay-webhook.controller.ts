@@ -1,9 +1,11 @@
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
 import { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
-import { Body, Controller, Headers, Inject, Param, Post, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Headers, HttpStatus, Inject, Param, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
 import { map } from 'rxjs';
@@ -83,7 +85,7 @@ export class SepayWebhookController {
 
   private assertSecret(secret?: string): void {
     if (!secret?.trim()) {
-      throw new UnauthorizedException('SEPAY_SECRET_REQUIRED');
+      throw new BusinessException(ErrorCode.SEPAY_SECRET_REQUIRED, HttpStatus.UNAUTHORIZED);
     }
   }
 }

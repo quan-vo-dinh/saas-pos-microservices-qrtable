@@ -1,7 +1,20 @@
 import { SubscriptionInvoiceStatus } from '@common/constants/saas.constants';
-import { UnauthorizedException } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { ConfigService } from '@nestjs/config';
 import { SubscriptionInvoiceService } from './subscription-invoice.service';
+
+async function expectBusinessError(promise: Promise<unknown>, errorCode: ErrorCode): Promise<void> {
+  let caught: unknown;
+  try {
+    await promise;
+  } catch (error) {
+    caught = error;
+  }
+
+  expect(caught).toBeInstanceOf(BusinessException);
+  expect((caught as BusinessException).errorCode).toBe(errorCode);
+}
 
 describe('SubscriptionInvoiceService', () => {
   const invoiceRepo = {
@@ -126,14 +139,15 @@ describe('SubscriptionInvoiceService', () => {
     });
     const service = createService();
 
-    await expect(
+    await expectBusinessError(
       service.handleWebhook({
         code: 'QRSUB123',
         transferAmount: 999000,
         sepayTransactionId: 'tx-1',
         secret: 'wrong-secret',
       }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+      ErrorCode.SEPAY_PLATFORM_WEBHOOK_SECRET_INVALID,
+    );
 
     expect(invoiceRepo.findByBillingReferenceForUpdate).not.toHaveBeenCalled();
     expect(invoiceRepo.markPaid).not.toHaveBeenCalled();
@@ -143,14 +157,15 @@ describe('SubscriptionInvoiceService', () => {
   it('rejects unconfigured platform webhook secret without mutating invoice or subscription', async () => {
     const service = createService({ WEBHOOK_SECRET: undefined });
 
-    await expect(
+    await expectBusinessError(
       service.handleWebhook({
         code: 'QRSUB123',
         transferAmount: 999000,
         sepayTransactionId: 'tx-1',
         secret: 'platform-secret',
       }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+      ErrorCode.SEPAY_PLATFORM_WEBHOOK_SECRET_INVALID,
+    );
 
     expect(invoiceRepo.findByBillingReferenceForUpdate).not.toHaveBeenCalled();
     expect(invoiceRepo.markPaid).not.toHaveBeenCalled();

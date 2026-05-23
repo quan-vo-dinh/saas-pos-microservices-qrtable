@@ -1,5 +1,7 @@
 import { normalizePlanCode } from '@common/constants/saas.constants';
-import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Inject, Injectable, Optional } from '@nestjs/common';
 import { PricingPlanRepository } from '../repositories/pricing-plan.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { SubscriptionCacheService } from './subscription-cache.service';
@@ -45,7 +47,7 @@ export class SubscriptionService {
     const planCode = normalizePlanCode(params.planCode);
     const plan = await this.planRepository.findActiveByCode(planCode);
     if (!plan) {
-      throw new NotFoundException('PLAN_NOT_FOUND');
+      throw new BusinessException(ErrorCode.SAAS_PLAN_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
 
     const existing = await this.subscriptionRepository.findActiveByTenantId(params.tenantId);

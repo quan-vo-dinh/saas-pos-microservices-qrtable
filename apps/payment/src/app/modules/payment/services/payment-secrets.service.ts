@@ -1,4 +1,6 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Inject, Injectable, Optional } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
 export const PAYMENT_SECRETS_ENCRYPTION_KEY = Symbol('PAYMENT_SECRETS_ENCRYPTION_KEY');
@@ -10,7 +12,7 @@ export class PaymentSecretsService {
   constructor(@Optional() @Inject(PAYMENT_SECRETS_ENCRYPTION_KEY) rawKey?: string) {
     const normalizedKey = rawKey?.trim();
     if (normalizedKey && !/^[a-f0-9]{64}$/i.test(normalizedKey)) {
-      throw new Error('PAYMENT_SECRETS_ENCRYPTION_KEY must be a 64-character hex string');
+      throw new BusinessException(ErrorCode.PAYMENT_SECRETS_SERVICE_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
     }
     this.key = normalizedKey ? Buffer.from(normalizedKey, 'hex') : undefined;
   }
@@ -35,7 +37,7 @@ export class PaymentSecretsService {
 
   private requireKey(): Buffer {
     if (!this.key) {
-      throw new Error('PAYMENT_SECRETS_ENCRYPTION_KEY must be a 64-character hex string');
+      throw new BusinessException(ErrorCode.PAYMENT_SECRETS_SERVICE_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
     }
     return this.key;
   }
