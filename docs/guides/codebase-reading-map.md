@@ -282,6 +282,61 @@ Guard chain là nơi xử lý cross-cutting concerns: authentication, session, t
 
 Flow thực tế:
 
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Customer
+  participant PWA as Customer PWA
+  participant BFF as BFF
+  participant SaaS as SaaS service
+  participant Catalog as Catalog service
+  participant CatalogDB as Catalog DB
+  participant Order as Order service
+  participant OrderDB as Order DB
+
+  Customer->>PWA: Mở QR/tenant landing
+  PWA->>BFF: Resolve tenant metadata
+  BFF->>SaaS: TCP SAAS.GET_BY_SLUG hoặc SAAS.GET_BY_ID
+  SaaS-->>BFF: Tenant snapshot
+  BFF-->>PWA: Tenant public metadata
+
+  PWA->>BFF: POST /menu/validate-qr
+  BFF->>Catalog: TCP TABLE.VALIDATE_QR_TOKEN
+  Catalog->>CatalogDB: Check QR token, tenantId, table status
+  CatalogDB-->>Catalog: Table snapshot
+  Catalog-->>BFF: Valid table snapshot
+  BFF-->>PWA: QR/table validation result
+
+  PWA->>BFF: POST /customer/sessions/join
+  BFF->>Order: TCP ORDER.SESSION_JOIN
+  Order->>Catalog: TCP TABLE.VALIDATE_QR_TOKEN
+  Catalog->>CatalogDB: Re-check QR/table ownership
+  Catalog-->>Order: Table snapshot
+
+  alt Table is BILLING or CLEANING
+    Order-->>BFF: Reject with business error
+    BFF-->>PWA: 409 conflict
+  else Table is OCCUPIED
+    Order->>OrderDB: Find active session by table.sessionId
+    Order->>OrderDB: Touch session activity
+    Order-->>BFF: Existing SessionTcpResponse
+    BFF-->>PWA: Reuse session
+  else Table is available
+    Order->>OrderDB: Create Session ACTIVE
+    Order->>Catalog: TCP TABLE.UPDATE_STATUS OCCUPIED with sessionId
+    Catalog->>CatalogDB: Update table status and sessionId
+    Catalog-->>Order: Updated table
+    Order-->>BFF: New SessionTcpResponse
+    BFF-->>PWA: New session
+  end
+
+  PWA->>BFF: GET /menu
+  BFF->>Catalog: TCP MENU.GET_PUBLIC_MENU
+  Catalog->>CatalogDB: Load categories and menu items
+  Catalog-->>BFF: Public menu
+  BFF-->>PWA: Menu response
+```
+
 1. Customer mở QR/tenant landing trong PWA.
 2. PWA resolve tenant và validate QR qua BFF.
 3. BFF `POST /customer/sessions/join` gửi `TCP_REQUEST_MESSAGE.ORDER.SESSION_JOIN`.
@@ -323,6 +378,59 @@ Flow thực tế:
 
 Flow thực tế:
 
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Customer
+  participant PWA as Customer PWA
+  participant BFF as BFF
+  participant Order as Order service
+  participant Redis as Redis cart/quota
+  participant Catalog as Catalog service
+  participant SaaS as SaaS service
+  participant OrderDB as Order DB
+  participant Realtime as BFF realtime
+
+  Customer->>PWA: Add/update/remove item
+  PWA->>BFF: PATCH /customer/cart with expectedCartVersion
+  BFF->>Order: TCP ORDER.CART_MUTATE
+  Order->>OrderDB: Validate active session
+  Order->>Redis: Load cart snapshot
+  Order->>Catalog: TCP MENU_ITEM.VALIDATE_ORDERABLE
+  Catalog-->>Order: Orderable item snapshot
+  Order->>Redis: WATCH cart key, write next cartVersion
+  Order-->>BFF: CartTcpResponse
+  BFF->>Realtime: emit events.cartUpdated
+  BFF-->>PWA: Updated cart snapshot
+
+  Customer->>PWA: Submit order
+  PWA->>BFF: POST /customer/orders with idempotencyKey and expectedCartVersion
+  BFF->>Order: TCP ORDER.SUBMIT
+  Order->>OrderDB: Check active session
+  Order->>OrderDB: Find order by idempotencyKey
+
+  alt Existing idempotent order
+    Order->>Redis: Load current cart snapshot
+    Order->>OrderDB: Load order items and bill
+    Order-->>BFF: Replay SubmitOrderTcpResponse
+  else New order
+    Order->>Redis: Load cart snapshot and compare cartVersion
+    Order->>SaaS: TCP SUBSCRIPTION.GET_CURRENT
+    SaaS-->>Order: Plan and maxOrdersPerDay
+    Order->>Redis: INCR daily order quota
+    Order->>OrderDB: Transaction lock Session
+    Order->>OrderDB: Create PENDING Order, Bill, OrderItems
+    Order->>OrderDB: Recalculate bill totals
+    Order->>OrderDB: Increment session.orderCount
+    Order->>Redis: Clear cart with expectedCartVersion
+    Order-->>BFF: SubmitOrderTcpResponse with cartUpdated and orderCreated
+  end
+
+  BFF->>Realtime: emit events.cartUpdated
+  BFF->>Realtime: emit events.orderCreated
+  BFF-->>PWA: Order, bill and cart snapshot
+```
+
 1. Customer mutate cart qua `GET/PATCH/DELETE /customer/cart`.
 2. Cart service lưu snapshot theo tenant/session và cart version.
 3. Submit order qua `POST /customer/orders` kèm `idempotencyKey` và `expectedCartVersion`.
@@ -363,6 +471,46 @@ Flow thực tế:
 | Tests         | `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts` |
 
 Flow thực tế:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Staff
+  participant Mgmt as Management App POS
+  participant BFF as BFF
+  participant Order as Order service
+  participant OrderDB as Order DB
+  participant Catalog as Catalog service
+  participant CatalogDB as Catalog DB
+  participant Kafka as Kafka
+  participant Kitchen as Kitchen service
+  participant Realtime as BFF realtime
+
+  Staff->>Mgmt: Click confirm pending order
+  Mgmt->>BFF: POST /admin/orders/:id/confirm
+  BFF->>BFF: UserGuard, TenantGuard, PermissionGuard
+  BFF->>Order: TCP ORDER.CONFIRM
+  Order->>OrderDB: Transaction lock Order
+  Order->>OrderDB: Load OrderItems and open Bill
+
+  alt Order is not PENDING
+    Order-->>BFF: ORDER_INVALID_STATE
+    BFF-->>Mgmt: 409 conflict
+  else Order is PENDING
+    Order->>Catalog: TCP MENU_ITEM.STOCK_DEDUCT_FOR_ORDER
+    Catalog->>CatalogDB: Lock menu items and deduct stock
+    Catalog-->>Order: Stock mutation result
+    Order->>OrderDB: Set order PROCESSING
+    Order->>OrderDB: Save OutboxEvent order.confirmed
+    Order-->>BFF: OrderActionTcpResponse with orderStatusChanged
+    BFF->>Realtime: emit events.orderStatusChanged
+    BFF-->>Mgmt: Confirmed order
+  end
+
+  Order->>Kafka: OutboxPublisher publishes order.confirmed
+  Kafka-->>Kitchen: order.confirmed event
+  Kitchen->>Kitchen: Deduplicate event and create KDS tickets
+```
 
 1. Staff xem pending/live orders trong POS.
 2. Staff confirm order qua `POST /admin/orders/:id/confirm`.
@@ -412,6 +560,83 @@ Flow thực tế:
 
 Flow thực tế:
 
+Sequence tạo KDS ticket từ `order.confirmed`:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Kafka as Kafka
+  participant Consumer as Kitchen OrderConfirmedConsumer
+  participant Repo as KdsRedisRepository
+  participant TicketStore as KdsTicketStore
+  participant SlaStore as KdsSlaStore
+  participant Redis as Redis
+  participant Pub as KitchenEventsPublisher
+  participant BFFSub as BFF KDS subscriber
+  participant Realtime as BFF realtime
+  participant KDSUI as Management KDS UI
+
+  Kafka-->>Consumer: order.confirmed
+  Consumer->>Consumer: Parse and validate schemaVersion/eventType
+  Consumer->>Repo: createTicketsFromConfirmedOrder(event)
+  Repo->>Redis: Check dedupe/recovery keys
+  Repo->>TicketStore: Create station tickets
+  TicketStore->>Redis: Save ticket data and queue sorted set
+  Repo->>SlaStore: Register SLA markers
+  SlaStore->>Redis: Save SLA tracking keys
+  Repo-->>Consumer: kds.queue_changed events
+  Consumer->>Pub: publishMany(events)
+  Pub->>Redis: PUBLISH realtime:kds tenant channel
+  Redis-->>BFFSub: Pub/sub message
+  BFFSub->>Realtime: emitKdsQueueChanged
+  Realtime-->>KDSUI: events.kdsQueueChanged
+```
+
+Sequence staff thao tác ticket:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Staff
+  participant KDSUI as Management KDS UI
+  participant BFF as BFF KitchenController
+  participant Kitchen as Kitchen service
+  participant Redis as Redis KDS state
+  participant Order as Order service
+  participant OrderDB as Order DB
+  participant Realtime as BFF realtime
+
+  Staff->>KDSUI: Click start ticket
+  KDSUI->>BFF: POST /admin/kds/tickets/:ticketId/start
+  BFF->>BFF: Permission and station access check
+  BFF->>Kitchen: TCP KITCHEN.START_TICKET
+  Kitchen->>Redis: Mark ticket PROCESSING and publish queue_changed
+  Kitchen-->>BFF: KdsMutationTcpResponse
+  BFF-->>KDSUI: Ticket started
+
+  Staff->>KDSUI: Click done
+  KDSUI->>BFF: POST /admin/kds/tickets/:ticketId/done
+  BFF->>Kitchen: TCP KITCHEN.MARK_READY
+  Kitchen->>Redis: Mark ticket READY and publish queue_changed
+  Kitchen-->>BFF: Ready ticket with orderItemIds
+  BFF->>Order: TCP ORDER.MARK_ITEMS_READY
+  Order->>OrderDB: Mark order items READY and maybe order READY
+
+  alt Order update succeeds
+    Order-->>BFF: kitchenItemReady and optional orderStatusChanged
+    BFF->>Realtime: emit events.kitchenItemReady
+    opt Order status changed
+      BFF->>Realtime: emit events.orderStatusChanged
+    end
+    BFF-->>KDSUI: Done accepted
+  else Order update fails
+    BFF->>Kitchen: TCP KITCHEN.RECALL_TICKET with compensation requestId
+    Kitchen->>Redis: Recall ticket back to queue
+    Kitchen-->>BFF: Compensation result
+    BFF-->>KDSUI: Error from Order path
+  end
+```
+
 1. Kitchen consume Kafka `order.confirmed`.
 2. `order-confirmed.consumer.ts` dedupe event và tạo ticket theo station.
 3. `KdsTicketService` thao tác queue/ticket qua Redis repository facade.
@@ -460,6 +685,43 @@ Flow thực tế:
 
 Flow cash:
 
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Staff
+  participant Mgmt as Management App POS
+  participant BFF as BFF PaymentController
+  participant Payment as Payment service
+  participant PaymentDB as Payment DB
+  participant Order as Order service
+  participant OrderDB as Order DB
+  participant Kafka as Kafka
+  participant BFFBridge as BFF Kafka bridge
+  participant Realtime as BFF realtime
+
+  Staff->>Mgmt: Confirm cash payment
+  Mgmt->>BFF: POST /payment/cash/confirm
+  BFF->>Payment: TCP PAYMENT.CONFIRM_CASH
+  Payment->>Order: TCP ORDER.BILL_GET_PAYMENT_SNAPSHOT
+  Order->>OrderDB: Load bill/session totals
+  Order-->>Payment: Bill payment snapshot
+  Payment->>Payment: Validate VND rounding and amountReceived
+  Payment->>PaymentDB: Transaction lock/create Payment
+  Payment->>PaymentDB: Save audit rows and payment.completed outbox
+  Payment-->>BFF: PaymentTcpResponse
+  BFF-->>Mgmt: Cash confirmed
+
+  Payment->>Order: TCP ORDER.BILL_MARK_PAID
+  Order->>OrderDB: Mark bill/session/table flow paid/closed
+  Payment->>Kafka: PaymentOutboxPublisher publishes payment.completed
+  Kafka-->>Order: payment.completed consumer retry-safety path
+  Order->>OrderDB: markPaid idempotently if needed
+  Kafka-->>BFFBridge: payment.completed
+  BFFBridge->>Order: TCP ORDER.BILL_GET_PAYMENT_SNAPSHOT
+  Order-->>BFFBridge: sessionId for bill
+  BFFBridge->>Realtime: emit events.paymentCompleted
+```
+
 1. Staff/customer yêu cầu bill, Order chuyển bill sang `PENDING_PAYMENT`.
 2. Staff confirm cash qua BFF `POST /payment/cash/confirm`.
 3. Payment lấy bill payment snapshot từ Order.
@@ -469,6 +731,59 @@ Flow cash:
 7. Order vẫn có `PaymentEventsConsumerService` consume `payment.completed` như async finalization/retry-safety path, nên `markPaid` phải đọc theo hướng idempotent.
 
 Flow VietQR/SePay:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Customer
+  participant PWA as Customer PWA
+  participant BFF as BFF
+  participant Payment as Payment service
+  participant PaymentDB as Payment DB
+  participant Order as Order service
+  participant OrderDB as Order DB
+  participant SePay as SePay webhook
+  participant Kafka as Kafka
+  participant BFFBridge as BFF Kafka bridge
+  participant Realtime as BFF realtime
+
+  Customer->>PWA: Request VietQR payment
+  PWA->>BFF: POST /customer/payment/vietqr/create-qr
+  BFF->>Order: TCP ORDER.BILL_GET_CURRENT
+  Order->>OrderDB: Verify current bill belongs to session
+  Order-->>BFF: Current bill PENDING_PAYMENT
+  BFF->>Payment: TCP PAYMENT.CREATE_VIETQR
+  Payment->>Order: TCP ORDER.BILL_GET_PAYMENT_SNAPSHOT
+  Order-->>Payment: Bill totals and status
+  Payment->>PaymentDB: Create or reuse PENDING payment
+  Payment->>Payment: Build billReference and QR URL
+  Payment-->>BFF: QR presentation
+  BFF-->>PWA: QR URL and payment info
+
+  SePay->>BFF: POST /payment/sepay/webhook
+  BFF->>BFF: SepayWebhookSecretGuard
+  BFF->>Payment: TCP PAYMENT.HANDLE_SEPAY_WEBHOOK
+  Payment->>Payment: Extract billReference and verify tenant secret if tenant route
+  Payment->>PaymentDB: Lock payment by billReference
+
+  alt Duplicate, after-paid, unmatched or underpaid
+    Payment->>PaymentDB: Write audit only when payment matched
+    Payment-->>BFF: success without mark paid
+  else Valid incoming transfer
+    Payment->>PaymentDB: Mark payment PAID and audit
+    Payment->>PaymentDB: Save payment.completed outbox
+    Payment->>Order: TCP ORDER.BILL_MARK_PAID
+    Order->>OrderDB: Mark bill paid idempotently
+    Payment-->>BFF: success
+  end
+
+  Payment->>Kafka: PaymentOutboxPublisher publishes payment.completed
+  Kafka-->>Order: payment.completed consumer retry-safety path
+  Kafka-->>BFFBridge: payment.completed
+  BFFBridge->>Order: TCP ORDER.BILL_GET_PAYMENT_SNAPSHOT
+  Order-->>BFFBridge: sessionId for bill
+  BFFBridge->>Realtime: emit events.paymentCompleted
+```
 
 1. UI gọi `POST /payment/vietqr/create-qr` hoặc customer route từ BFF.
 2. Payment tạo pending payment, generate bill reference và QR presentation.
@@ -522,12 +837,93 @@ Lưu ý path: `apps/saas` hiện đang đặt file trực tiếp dưới `src/co
 
 Flow onboarding:
 
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Admin
+  participant Mgmt as Management App Admin
+  participant BFF as BFF SaaS controllers
+  participant SaaS as SaaS service
+  participant SaaSDB as SaaS DB
+  participant Authorizer as Authorizer/Keycloak
+  participant UserAccess as User Access
+  participant Payment as Payment service
+  participant Kafka as Kafka
+  participant Catalog as Catalog service
+
+  Admin->>Mgmt: Submit onboard tenant form
+  Mgmt->>BFF: Admin tenant onboarding request
+  BFF->>BFF: User, Tenant, Permission guards
+  BFF->>SaaS: TCP TENANT.ONBOARD
+  SaaS->>SaaS: SlugService.generateUnique
+  SaaS->>SaaSDB: Create Tenant ACTIVE
+  SaaS->>Authorizer: TCP KEYCLOAK.CREATE_TENANT_OWNER
+  Authorizer-->>SaaS: ownerUserId
+  SaaS->>UserAccess: TCP USER.UPSERT_WITH_TENANT
+  UserAccess-->>SaaS: Owner profile upserted
+  SaaS->>SaaSDB: Assign initial subscription plan snapshot
+  SaaS->>Payment: TCP PAYMENT_SETTINGS.CREATE_EMPTY
+  Payment-->>SaaS: Empty payment settings created
+  SaaS->>SaaSDB: Create saas outbox tenant.created
+  SaaS-->>BFF: Tenant and ownerUserId
+  BFF-->>Mgmt: Onboarding success
+
+  SaaS->>Kafka: SaasOutboxPublisher publishes tenant.created
+  Kafka-->>Catalog: TenantCreatedConsumer
+  Catalog->>Catalog: Seed default area for tenant
+
+  alt Keycloak/UserAccess/Payment/subscription step fails
+    SaaS->>Authorizer: TCP KEYCLOAK.DISABLE_USER if owner was created
+    SaaS->>SaaSDB: Compensate initial subscription if assigned
+    SaaS->>SaaSDB: Delete tenant
+    SaaS-->>BFF: TENANT_ONBOARDING_FAILED
+  end
+```
+
 1. Admin onboard tenant từ Management App.
 2. BFF SaaS controller gửi `TCP_REQUEST_MESSAGE.TENANT.ONBOARD`.
 3. `OnboardingSagaService` tạo tenant, tạo owner qua Authorizer/Keycloak, upsert owner profile qua User Access, tạo empty payment settings qua Payment, assign plan/subscription, ghi tenant created outbox.
 4. Nếu một bước quan trọng fail, saga compensate tenant/subscription đã tạo.
 
 Flow lifecycle:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor AdminOrCron as Admin or Suspend Cron
+  participant BFF as BFF SaaS controllers
+  participant SaaS as SaaS service
+  participant SaaSDB as SaaS DB
+  participant Redis as Redis tenant status cache
+  participant Customer as Customer PWA
+  participant Guard as CustomerTenantLifecycleGuard
+
+  AdminOrCron->>BFF: Suspend, activate or close tenant
+  BFF->>SaaS: TCP TENANT.SUSPEND / ACTIVATE / CLOSE
+  SaaS->>SaaSDB: Assert tenant exists
+  SaaS->>SaaSDB: Update tenant status fields
+
+  alt SUSPEND or CLOSE
+    SaaS->>Redis: SET tenant suspended flag
+  else ACTIVATE
+    SaaS->>Redis: DEL tenant suspended flag
+  end
+
+  SaaS-->>BFF: Lifecycle mutation success
+
+  Customer->>BFF: Customer/menu request
+  BFF->>Guard: Run lifecycle guard for /customer or /menu path
+  Guard->>Redis: Read suspended flag
+  Guard->>SaaS: TCP SAAS.GET_BY_ID for current status
+
+  alt Tenant CLOSED
+    Guard-->>Customer: 403 TENANT_CLOSED
+  else Tenant SUSPENDED and write request
+    Guard-->>Customer: 403 TENANT_SUSPENDED
+  else Tenant ACTIVE or allowed read/join/payment path
+    Guard-->>BFF: Allow request to continue
+  end
+```
 
 1. Tenant có status active/suspended/closed.
 2. `TenantLifecycleService` suspend/activate/close tenant.
@@ -569,6 +965,45 @@ Flow lifecycle:
 
 Flow thực tế:
 
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Staff
+  participant Mgmt as Management App
+  participant Keycloak as Keycloak
+  participant BFF as BFF
+  participant UserGuard as UserGuard
+  participant Authorizer as Authorizer service
+  participant UserAccess as User Access
+  participant TenantGuard as TenantGuard
+  participant PermissionGuard as PermissionGuard
+  participant Domain as Domain service
+
+  Staff->>Mgmt: Login
+  Mgmt->>Keycloak: OIDC/NextAuth login flow
+  Keycloak-->>Mgmt: Access token/session
+  Mgmt->>BFF: API request with Bearer token and tenant context
+  BFF->>UserGuard: Global guard step 1
+  UserGuard->>Authorizer: gRPC/TCP verify user token
+  Authorizer->>Keycloak: Verify token/JWKS or admin lookup
+  Authorizer->>UserAccess: Load app profile/roles if needed
+  Authorizer-->>UserGuard: User metadata and roles
+  UserGuard-->>BFF: Attach USER_DATA
+  BFF->>TenantGuard: Global guard step 2
+  TenantGuard->>TenantGuard: Resolve tenant from header/claims/session
+  TenantGuard-->>BFF: Attach TENANT_ID
+  BFF->>PermissionGuard: Global guard step 3
+  PermissionGuard->>PermissionGuard: Match @Permissions metadata
+
+  alt Missing permission or invalid tenant
+    PermissionGuard-->>Mgmt: 403 forbidden
+  else Authorized
+    BFF->>Domain: TCP request with tenantId/userId/processId
+    Domain-->>BFF: Domain response
+    BFF-->>Mgmt: HTTP response
+  end
+```
+
 1. Staff/owner/admin login qua Keycloak/NextAuth integration.
 2. Management App gọi BFF với bearer token.
 3. `UserGuard` verify token qua Authorizer, cache result.
@@ -605,6 +1040,46 @@ Flow thực tế:
 | Tests       | `apps/bff/src/app/modules/realtime/tests/architecture-contracts.spec.ts`      |
 
 Flow thực tế:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Client as Customer or Staff UI
+  participant Gateway as OrderEventsGateway
+  participant Auth as RealtimeAuthService
+  participant Rooms as WsRoom builders
+  participant Domain as Domain controllers/events
+  participant Kafka as Kafka
+  participant RedisPubSub as Redis pub/sub
+  participant Bridge as Realtime bridges/subscribers
+  participant Realtime as RealtimeEventsService
+
+  Client->>Gateway: Connect Socket.IO namespace /orders
+  Gateway->>Auth: resolveConnectionRooms(socket)
+  Auth->>Auth: Read handshake auth, token/session/tenant/station
+  Auth->>Rooms: Build customer/staff/management/kds rooms
+  Rooms-->>Auth: Room names
+  Auth-->>Gateway: Allowed rooms
+  Gateway->>Gateway: socket.join(room)
+  Gateway-->>Client: Connected
+
+  alt Client sends legacy join.session or join.staff
+    Client->>Gateway: join.session / join.staff
+    Gateway-->>Client: events.authError, room assignment is server-managed
+  end
+
+  Domain->>Realtime: emitCartUpdated/orderCreated/orderStatusChanged/etc.
+  Realtime->>Rooms: Resolve target rooms
+  Realtime-->>Client: Socket event as invalidation hint
+
+  Kafka-->>Bridge: kitchen.sla_warning or payment.completed
+  Bridge->>Realtime: emitKitchenSlaWarning or emitPaymentCompleted
+  Realtime-->>Client: Socket event
+
+  RedisPubSub-->>Bridge: realtime:kds:* kds.queue_changed
+  Bridge->>Realtime: emitKdsQueueChanged
+  Realtime-->>Client: events.kdsQueueChanged
+```
 
 1. Client connect Socket.IO namespace `/orders`.
 2. `RealtimeAuthService` resolve rooms từ token/session/tenant/station.
