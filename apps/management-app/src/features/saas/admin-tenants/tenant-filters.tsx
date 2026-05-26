@@ -9,7 +9,6 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { TenantStatus } from '@/features/saas/types';
 
 const PAGE_SIZES = [10, 20, 50] as const;
-const DEFAULT_PLANS = ['FREE', 'BASIC', 'PREMIUM'] as const;
 
 type TenantFiltersProps = {
   extraPlanCodes: string[];
@@ -31,8 +30,8 @@ export function TenantFilters({ extraPlanCodes }: TenantFiltersProps) {
   const limit = Number(searchParams.get('limit') ?? '20') || 20;
 
   const planOptions = useMemo(
-    () => Array.from(new Set([...DEFAULT_PLANS, ...extraPlanCodes])).sort(),
-    [extraPlanCodes],
+    () => Array.from(new Set([...extraPlanCodes, planCode].filter(Boolean))).sort(),
+    [extraPlanCodes, planCode],
   );
 
   useEffect(() => {

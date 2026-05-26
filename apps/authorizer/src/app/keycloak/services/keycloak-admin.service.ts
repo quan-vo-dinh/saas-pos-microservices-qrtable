@@ -53,17 +53,18 @@ export class KeycloakAdminService {
       const location = headers.location;
       userId = Array.isArray(location) ? location[0]?.split('/').pop() : location?.split('/').pop();
     } catch (error) {
-      if (this.keycloakHttp.isDuplicateUserError(error)) {
-        throw new BusinessException(ErrorCode.OWNER_EMAIL_ALREADY_EXISTS, HttpStatus.CONFLICT);
-      }
-      throw error;
+      this.throwMappedKeycloakAdminError(error);
     }
 
     if (!userId) {
       throw new BusinessException(ErrorCode.KEYCLOAK_USER_CREATION_FAILED, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    await this.assignRealmRoles({ userId, roleNames: request.roleNames, processId: request.processId });
+    try {
+      await this.assignRealmRoles({ userId, roleNames: request.roleNames, processId: request.processId });
+    } catch (error) {
+      this.throwMappedKeycloakAdminError(error);
+    }
     return { userId, email: request.email, enabled: true, requiredActions };
   }
 
@@ -104,5 +105,17 @@ export class KeycloakAdminService {
       enabled: typeof user.enabled === 'boolean' ? user.enabled : undefined,
       attributes: user.attributes as Record<string, string[]> | undefined,
     };
+  }
+
+  private throwMappedKeycloakAdminError(error: unknown): never {
+    if (this.keycloakHttp.isDuplicateUserError(error)) {
+      throw new BusinessException(ErrorCode.OWNER_EMAIL_ALREADY_EXISTS, HttpStatus.CONFLICT);
+    }
+
+    if (this.keycloakHttp.isForbiddenError(error)) {
+      throw new BusinessException(ErrorCode.KEYCLOAK_ADMIN_PERMISSION_DENIED, HttpStatus.FORBIDDEN);
+    }
+
+    throw error;
   }
 }

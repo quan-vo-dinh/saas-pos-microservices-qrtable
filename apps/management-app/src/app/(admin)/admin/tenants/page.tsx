@@ -51,10 +51,7 @@ function AdminTenantsClient() {
     enabled: authReady,
   });
 
-  const extraPlanCodes = useMemo(
-    () => (plansQuery.data ?? []).map((p) => p.code).filter(Boolean),
-    [plansQuery.data],
-  );
+  const extraPlanCodes = useMemo(() => (plansQuery.data ?? []).map((p) => p.code).filter(Boolean), [plansQuery.data]);
 
   const totalPages = useMemo(() => {
     const { total, limit } = tenantsQuery.data ?? { total: 0, limit: query.limit };
@@ -99,6 +96,8 @@ function AdminTenantsClient() {
       <OnboardTenantDialog
         open={onboardOpen}
         onOpenChange={setOnboardOpen}
+        plans={plansQuery.data ?? []}
+        plansLoading={plansQuery.isLoading}
         onCreated={() => void tenantsQuery.refetch()}
       />
     </div>

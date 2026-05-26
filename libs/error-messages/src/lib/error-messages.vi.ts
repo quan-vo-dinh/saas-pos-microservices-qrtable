@@ -109,5 +109,6 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.COMMON_VALIDATION_FAILED]: 'Dữ liệu không hợp lệ',
   [ErrorCode.COMMON_INTERNAL_ERROR]: 'Lỗi hệ thống, vui lòng thử lại sau',
   [ErrorCode.KEYCLOAK_USER_CREATION_FAILED]: 'Không thể tạo tài khoản trên hệ thống xác thực',
+  [ErrorCode.KEYCLOAK_ADMIN_PERMISSION_DENIED]: 'Keycloak service account chưa có quyền quản trị người dùng',
   [ErrorCode.OWNER_EMAIL_ALREADY_EXISTS]: 'Email chủ cửa hàng đã tồn tại',
 };

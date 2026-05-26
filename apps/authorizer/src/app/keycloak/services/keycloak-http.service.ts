@@ -149,4 +149,9 @@ export class KeycloakHttpService {
     const axiosError = error as AxiosError;
     return axios.isAxiosError(error) && axiosError.response?.status === HttpStatus.CONFLICT;
   }
+
+  isForbiddenError(error: unknown): boolean {
+    const axiosError = error as AxiosError;
+    return axios.isAxiosError(error) && axiosError.response?.status === HttpStatus.FORBIDDEN;
+  }
 }

@@ -109,5 +109,6 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.COMMON_VALIDATION_FAILED]: 'Validation failed',
   [ErrorCode.COMMON_INTERNAL_ERROR]: 'Internal server error, please try again later',
   [ErrorCode.KEYCLOAK_USER_CREATION_FAILED]: 'Failed to create user in authentication system',
+  [ErrorCode.KEYCLOAK_ADMIN_PERMISSION_DENIED]: 'Keycloak service account lacks user administration permissions',
   [ErrorCode.OWNER_EMAIL_ALREADY_EXISTS]: 'Owner email already exists',
 };

@@ -13,5 +13,6 @@
   "a-file-icon-vscode.arrowTheme": "material",
   "a-file-icon-vscode.folderColor": "#90a4ae",
   "a-file-icon-vscode.opacity": 1,
-  "a-file-icon-vscode.saturation": 1
+  "a-file-icon-vscode.saturation": 1,
+  "cSpell.words": ["Sepay"]
 }

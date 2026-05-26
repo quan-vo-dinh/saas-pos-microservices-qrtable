@@ -1,21 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { saasApi } from '@/features/saas/api';
-import type { OnboardTenantPayload } from '@/features/saas/types';
+import type { OnboardTenantPayload, PricingPlan } from '@/features/saas/types';
 import { ApiError } from '@einvoice/frontend-utils';
+import { toast } from 'sonner';
+import { getActivePlanOptions, getNextPlanCode } from './plan-options';
 
 const DEFAULT_MODES = ['INSTANT_ORDER', 'DIGITAL_MENU'] as const;
 
@@ -23,10 +19,19 @@ type OnboardTenantDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultPlanCode?: string;
+  plans?: PricingPlan[];
+  plansLoading?: boolean;
   onCreated: () => void;
 };
 
-export function OnboardTenantDialog({ open, onOpenChange, defaultPlanCode = 'FREE', onCreated }: OnboardTenantDialogProps) {
+export function OnboardTenantDialog({
+  open,
+  onOpenChange,
+  defaultPlanCode = '',
+  plans = [],
+  plansLoading = false,
+  onCreated,
+}: OnboardTenantDialogProps) {
   const [tenantName, setTenantName] = useState('');
   const [tenantType, setTenantType] = useState('RESTAURANT');
   const [address, setAddress] = useState('');
@@ -38,12 +43,17 @@ export function OnboardTenantDialog({ open, onOpenChange, defaultPlanCode = 'FRE
   const [digitalMenu, setDigitalMenu] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const activePlanOptions = useMemo(() => getActivePlanOptions(plans), [plans]);
+  const selectedPlanCode = getNextPlanCode({
+    plans,
+    currentPlanCode: planCode || defaultPlanCode,
+  });
 
   const reset = () => {
     setTenantName('');
     setTenantType('RESTAURANT');
     setAddress('');
-    setPlanCode(defaultPlanCode);
+    setPlanCode(getNextPlanCode({ plans, currentPlanCode: defaultPlanCode }));
     setOwnerFirstName('');
     setOwnerLastName('');
     setOwnerEmail('');
@@ -53,6 +63,9 @@ export function OnboardTenantDialog({ open, onOpenChange, defaultPlanCode = 'FRE
   };
 
   const handleSubmit = async () => {
+    if (!selectedPlanCode) {
+      return;
+    }
     setEmailError(null);
     const operatingModes: string[] = [];
     if (instant) {
@@ -69,7 +82,7 @@ export function OnboardTenantDialog({ open, onOpenChange, defaultPlanCode = 'FRE
       tenantName: tenantName.trim(),
       tenantType,
       address: address.trim() || undefined,
-      initialPlanCode: planCode,
+      initialPlanCode: selectedPlanCode,
       ownerEmail: ownerEmail.trim(),
       ownerFirstName: ownerFirstName.trim(),
       ownerLastName: ownerLastName.trim(),
@@ -87,7 +100,7 @@ export function OnboardTenantDialog({ open, onOpenChange, defaultPlanCode = 'FRE
         setEmailError(e.serverMessage);
         return;
       }
-      throw e;
+      toast.error(e instanceof ApiError ? e.serverMessage : 'Onboarding tenant thất bại');
     } finally {
       setSubmitting(false);
     }
@@ -122,18 +135,25 @@ export function OnboardTenantDialog({ open, onOpenChange, defaultPlanCode = 'FRE
           </div>
           <div className="grid gap-1.5">
             <Label>Gói ban đầu</Label>
-            <Select value={planCode} onValueChange={setPlanCode}>
+            <Select
+              value={selectedPlanCode}
+              onValueChange={setPlanCode}
+              disabled={plansLoading || activePlanOptions.length === 0}
+            >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder={plansLoading ? 'Đang tải gói...' : 'Chọn gói'} />
               </SelectTrigger>
               <SelectContent>
-                {['FREE', 'BASIC', 'PREMIUM'].map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
+                {activePlanOptions.map((plan) => (
+                  <SelectItem key={plan.id} value={plan.code}>
+                    {plan.code} · {plan.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {!plansLoading && activePlanOptions.length === 0 ? (
+              <p className="text-destructive text-sm">Chưa có gói đang bán để onboard tenant.</p>
+            ) : null}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="grid gap-1.5">
@@ -177,6 +197,7 @@ export function OnboardTenantDialog({ open, onOpenChange, defaultPlanCode = 'FRE
             disabled={
               submitting ||
               !tenantName.trim() ||
+              !selectedPlanCode ||
               !ownerEmail.trim() ||
               !ownerFirstName.trim() ||
               !ownerLastName.trim()

@@ -18,27 +18,38 @@ Use this section only when I communicate in English or when the output itself is
 - Focus on understanding my intended technical meaning first.
 - Keep important technical terms in English, such as service boundary, DTO, guard, interceptor, idempotency, tenant isolation, event-driven, cache invalidation, eventual consistency, API contract, state machine, and service boundary.
 - Only explain English corrections when they are useful for clarity, professionalism, technical accuracy, documentation, interview answers, or workplace communication.
+- Do not automatically rewrite every English sentence I write. First judge whether the sentence is already correct, natural, and technically clear. Only suggest a rewrite when it meaningfully improves clarity, correctness, professionalism, or technical precision.
 
 ### When I Write in English
 
-If my meaning is clear:
+When I write in English, evaluate my sentence or question first instead of automatically rewriting it.
 
-- Rewrite my sentence into more natural, practical English before answering.
-- You may fully rewrite/refactor the sentence, not just fix small grammar issues.
-- Preserve the original meaning.
-- Prefer wording that sounds natural in real technical discussions, workplace communication, documentation, or interviews.
-- After the rewritten sentence, answer the technical question.
+If my sentence is already grammatically correct, technically clear, and natural enough for real developer communication:
 
-If my sentence is understandable but unnatural:
+- Tell me that the sentence is already acceptable.
+- Do not rewrite it unnecessarily.
+- You may optionally suggest a slightly more polished version only if it adds clear value for professionalism, documentation, interviews, or workplace communication.
+- Do not change wording just for the sake of producing a “clearer version.”
+
+If my sentence is understandable but unnatural, awkward, or not idiomatic:
 
 - Provide a better version that a developer would actually use.
-- Keep it concise and realistic.
-- Do not over-explain small grammar details unless they affect clarity.
+- Keep the rewrite concise and realistic.
+- Preserve the original technical meaning.
+- Avoid over-explaining small grammar details unless they affect clarity, professionalism, or technical accuracy.
+- After the rewrite, continue answering the technical question.
+
+If my sentence is grammatically okay but could sound too casual, vague, or unprofessional in a work context:
+
+- Briefly say that the sentence is understandable.
+- Provide a more professional version only when useful.
+- Explain the difference only if it helps me choose the right tone.
 
 If my sentence may cause technical misunderstanding:
 
 - Point out the ambiguity.
-- Ask a clarification question before making code changes.
+- Do not silently rewrite it as if the meaning were certain.
+- Ask a clarification question before making code changes or giving implementation advice.
 - If there are multiple possible interpretations, list the likely interpretations and ask me to confirm the intended one.
 
 Do not guess silently when ambiguity affects:

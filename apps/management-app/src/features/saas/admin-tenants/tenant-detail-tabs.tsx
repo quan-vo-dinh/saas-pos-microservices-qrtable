@@ -1,19 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ApiError } from '@einvoice/frontend-utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,22 +18,19 @@ import { saasApi } from '@/features/saas/api';
 import { formatDateTime } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import type { TenantDetail, TenantStatus } from '@/features/saas/types';
+import { getActivePlanOptions, getNextPlanCode } from './plan-options';
 import { TenantStatusBadge } from './tenant-status-badge';
 
-export function TenantDetailHeader({
-  tenant,
-  permissions,
-}: {
-  tenant: TenantDetail;
-  permissions: string[];
-}) {
+export function TenantDetailHeader({ tenant, permissions }: { tenant: TenantDetail; permissions: string[] }) {
   const qc = useQueryClient();
   const [closeOpen, setCloseOpen] = useState(false);
   const [confirmName, setConfirmName] = useState('');
   const [closeReason, setCloseReason] = useState('');
 
   const invalidate = () =>
-    void qc.invalidateQueries({ queryKey: ['admin-tenant', tenant.id] }).then(() => qc.invalidateQueries({ queryKey: ['admin-tenants'] }));
+    void qc
+      .invalidateQueries({ queryKey: ['admin-tenant', tenant.id] })
+      .then(() => qc.invalidateQueries({ queryKey: ['admin-tenants'] }));
 
   const statusMutation = useMutation({
     mutationFn: async (input: { action: 'SUSPEND' | 'ACTIVATE' | 'CLOSE'; reason?: string }) => {
@@ -172,7 +163,7 @@ export function TenantSubscriptionsTab({
     queryFn: () => saasApi.listTenantSubscriptions(tenantId),
     enabled: authReady,
   });
-  const [planCode, setPlanCode] = useState('BASIC');
+  const [planCode, setPlanCode] = useState('');
   const [billingPeriod, setBillingPeriod] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
   const [effectiveAt] = useState(() => new Date().toISOString());
   const plans = useQuery({
@@ -180,9 +171,11 @@ export function TenantSubscriptionsTab({
     queryFn: () => saasApi.listPlansAdmin(),
     enabled: authReady,
   });
+  const activePlanOptions = useMemo(() => getActivePlanOptions(plans.data), [plans.data]);
+  const selectedPlanCode = getNextPlanCode({ plans: plans.data, currentPlanCode: planCode });
 
   const assign = useMutation({
-    mutationFn: () => saasApi.assignTenantSubscription(tenantId, { planCode, billingPeriod }),
+    mutationFn: () => saasApi.assignTenantSubscription(tenantId, { planCode: selectedPlanCode, billingPeriod }),
     onSuccess: async () => {
       toast.success('Đã gán gói');
       await qc.invalidateQueries({ queryKey: ['admin-tenant-subs', tenantId] });
@@ -200,24 +193,25 @@ export function TenantSubscriptionsTab({
           <div className="grid flex-1 gap-2 md:grid-cols-3">
             <div className="grid gap-1.5">
               <Label>Gói</Label>
-              <Select value={planCode} onValueChange={setPlanCode}>
+              <Select
+                value={selectedPlanCode}
+                onValueChange={setPlanCode}
+                disabled={plans.isLoading || activePlanOptions.length === 0}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn gói" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(plans.data ?? [])
-                    .filter((plan) => plan.isActive)
-                    .sort((a, b) => a.displayOrder - b.displayOrder)
-                    .map((plan) => (
-                      <SelectItem key={plan.id} value={plan.code}>
-                        {plan.code} · {plan.name}
-                      </SelectItem>
-                    ))}
-                  {!(plans.data ?? []).some((plan) => plan.code === planCode) ? (
-                    <SelectItem value={planCode}>{planCode}</SelectItem>
-                  ) : null}
+                  {activePlanOptions.map((plan) => (
+                    <SelectItem key={plan.id} value={plan.code}>
+                      {plan.code} · {plan.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {!plans.isLoading && activePlanOptions.length === 0 ? (
+                <p className="text-destructive text-xs">Chưa có gói đang bán để gán.</p>
+              ) : null}
             </div>
             <div className="grid gap-1.5">
               <Label>Chu kỳ</Label>
@@ -243,7 +237,11 @@ export function TenantSubscriptionsTab({
               <p>Kích hoạt gói mới sẽ mở lại tenant nếu đang tạm khóa.</p>
             )}
           </div>
-          <Button type="button" disabled={assign.isPending} onClick={() => assign.mutate()}>
+          <Button
+            type="button"
+            disabled={assign.isPending || plans.isLoading || activePlanOptions.length === 0 || !selectedPlanCode}
+            onClick={() => assign.mutate()}
+          >
             Gán gói
           </Button>
         </div>

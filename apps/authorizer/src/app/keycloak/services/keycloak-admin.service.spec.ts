@@ -11,6 +11,7 @@ describe('KeycloakAdminService', () => {
     updateUser: jest.fn(),
     getUserById: jest.fn(),
     isDuplicateUserError: jest.fn(),
+    isForbiddenError: jest.fn(),
   };
 
   beforeEach(() => {
@@ -86,5 +87,23 @@ describe('KeycloakAdminService', () => {
         roleNames: ['OWNER'],
       }),
     ).rejects.toMatchObject<Partial<BusinessException>>({ errorCode: ErrorCode.OWNER_EMAIL_ALREADY_EXISTS });
+  });
+
+  it('maps Keycloak admin 403 to a stable permission error', async () => {
+    keycloakHttp.createUserWithToken.mockRejectedValue(new Error('Request failed with status code 403'));
+    keycloakHttp.isDuplicateUserError.mockReturnValue(false);
+    keycloakHttp.isForbiddenError.mockReturnValue(true);
+
+    const service = new KeycloakAdminService(keycloakHttp as never);
+    await expect(
+      service.createTenantOwner({
+        email: 'owner@example.com',
+        firstName: 'Owner',
+        lastName: 'One',
+        tenantId: 'tenant-1',
+        tenantSlug: 'pho-ha-noi',
+        roleNames: ['OWNER'],
+      }),
+    ).rejects.toMatchObject<Partial<BusinessException>>({ errorCode: ErrorCode.KEYCLOAK_ADMIN_PERMISSION_DENIED });
   });
 });
