@@ -40,7 +40,7 @@ describe('SepayWebhookController', () => {
   });
 
   it('tenant webhook forwards to Payment with tenantSlug', async () => {
-    await firstValueFrom(controller.handleTenantWebhook('tenant-a', 'secret', { id: 1 }));
+    await firstValueFrom(controller.handleTenantWebhook('tenant-a', 'secret', '', '', '', { id: 1 }));
 
     expect(paymentClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.PAYMENT.HANDLE_SEPAY_WEBHOOK,
@@ -51,9 +51,31 @@ describe('SepayWebhookController', () => {
     expect(saasClient.send).not.toHaveBeenCalled();
   });
 
+  it('tenant webhook accepts OAuth2 API key style headers', async () => {
+    await firstValueFrom(controller.handleTenantWebhook('tenant-a', '', 'tenant-secret', '', '', { id: 1 }));
+
+    expect(paymentClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.PAYMENT.HANDLE_SEPAY_WEBHOOK,
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantSlug: 'tenant-a', secret: 'tenant-secret' }),
+      }),
+    );
+  });
+
+  it('tenant webhook accepts SePay Authorization Apikey header', async () => {
+    await firstValueFrom(controller.handleTenantWebhook('tenant-a', '', '', '', 'Apikey tenant-secret', { id: 1 }));
+
+    expect(paymentClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.PAYMENT.HANDLE_SEPAY_WEBHOOK,
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantSlug: 'tenant-a', secret: 'tenant-secret' }),
+      }),
+    );
+  });
+
   it('missing secret returns typed BusinessException', () => {
     expect(() => controller.handlePlatformWebhook('', {})).toThrow(BusinessException);
-    expect(() => controller.handleTenantWebhook('tenant-a', '', {})).toThrow(BusinessException);
+    expect(() => controller.handleTenantWebhook('tenant-a', '', '', '', '', {})).toThrow(BusinessException);
 
     try {
       controller.handlePlatformWebhook('', {});

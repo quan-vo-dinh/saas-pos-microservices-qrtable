@@ -182,7 +182,7 @@ export class SepayWebhookService {
       throw new BusinessException(ErrorCode.SEPAY_WEBHOOK_SECRET_REQUIRED, HttpStatus.UNAUTHORIZED);
     }
 
-    const tenant = await this.tenantGateway.resolveBySlug(tenantSlug, dto.processId);
+    const tenant = await this.tenantGateway.resolveByKey(tenantSlug, dto.processId);
     const settings = await this.tenantPaymentSettingsRepo.findByTenantId(tenant.id);
     if (!settings?.webhookSecretEncrypted) {
       throw new BusinessException(ErrorCode.SEPAY_WEBHOOK_SECRET_NOT_CONFIGURED, HttpStatus.UNAUTHORIZED);

@@ -24,6 +24,9 @@ describe('TcpLoggingInterceptor', () => {
           data: {
             secret: 'raw-secret',
             webhookSecret: 'nested-secret',
+            authorizationCode: 'oauth-code',
+            accessToken: 'access-token',
+            password: 'raw-password',
             payload: { code: 'QRSUB123' },
           },
         },
@@ -36,6 +39,9 @@ describe('TcpLoggingInterceptor', () => {
     const logOutput = JSON.stringify(logSpy.mock.calls);
     expect(logOutput).not.toContain('raw-secret');
     expect(logOutput).not.toContain('nested-secret');
+    expect(logOutput).not.toContain('oauth-code');
+    expect(logOutput).not.toContain('access-token');
+    expect(logOutput).not.toContain('raw-password');
     expect(logOutput).toContain('[REDACTED]');
     expect(logOutput).toContain('QRSUB123');
   });

@@ -35,6 +35,10 @@ export class PaymentSecretsService {
     return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
   }
 
+  assertConfigured(): void {
+    this.requireKey();
+  }
+
   private requireKey(): Buffer {
     if (!this.key) {
       throw new BusinessException(ErrorCode.PAYMENT_SECRETS_SERVICE_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);

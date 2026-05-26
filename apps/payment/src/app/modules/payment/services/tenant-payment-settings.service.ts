@@ -18,7 +18,7 @@ import { randomBytes } from 'crypto';
 import { TenantPaymentSettingsEntity } from '../entities/tenant-payment-settings.entity';
 import { TenantPaymentSettingsRepository } from '../repositories/tenant-payment-settings.repository';
 import { PaymentSecretsService } from './payment-secrets.service';
-import { SepayOAuthClientService } from './sepay-oauth-client.service';
+import { SepayBankAccount, SepayOAuthClientService } from './sepay-oauth-client.service';
 
 @Injectable()
 export class TenantPaymentSettingsService {
@@ -65,9 +65,10 @@ export class TenantPaymentSettingsService {
   ): Promise<HandlePaymentOAuthCallbackTcpResponse> {
     const secrets = this.requireSecrets();
     const sepay = this.requireSepayClient();
+    secrets.assertConfigured();
     const state = await this.consumeOAuthState(params.state);
     const settings = await this.findRequired(state.tenantId);
-    const token = await sepay.exchangeCode(params.code);
+    const token = await sepay.exchangeCode(params.authorizationCode);
     const expiresAt = new Date(Date.now() + token.expires_in * 1000);
     const scopes = token.scope?.split(/\s+/).filter(Boolean) ?? [];
 
@@ -103,14 +104,19 @@ export class TenantPaymentSettingsService {
     }
 
     const accessToken = secrets.decrypt(settings.sepayAccessTokenEncrypted);
-    const bank = await sepay.getBankAccountDetail(accessToken, params.sepayBankAccountUuid);
-    const webhookSecret = randomBytes(24).toString('hex');
+    const bank = await this.resolveBankAccount(sepay, accessToken, params);
+    const bankAccountId = requireSepayBankAccountId(bank);
+    const webhookSecret = randomBytes(16).toString('hex');
+    await this.repository.updateByTenantId(params.tenantId, {
+      webhookSecretEncrypted: secrets.encrypt(webhookSecret),
+      lastError: null,
+      lastErrorAt: null,
+    });
     const webhook = await sepay.upsertWebhook(accessToken, {
-      webhook_url: params.webhookUrl,
-      auth_type: 'SECRET_KEY',
-      secret_key: webhookSecret,
-      active: 1,
-      allow_events: ['*'],
+      bankAccountId,
+      name: `QRTable ${params.tenantId}`,
+      webhookUrl: params.webhookUrl,
+      apiKey: webhookSecret,
     });
 
     await this.repository.updateByTenantId(params.tenantId, {
@@ -133,6 +139,28 @@ export class TenantPaymentSettingsService {
       accountNumberMasked: maskAccountNumber(bank.account_number),
       accountHolder: bank.account_holder,
     };
+  }
+
+  private async resolveBankAccount(
+    sepay: SepayOAuthClientService,
+    accessToken: string,
+    params: SelectBankTcpRequest,
+  ): Promise<SepayBankAccount> {
+    if (params.sepayBankAccountUuid) {
+      return sepay.getBankAccountDetail(accessToken, params.sepayBankAccountUuid);
+    }
+
+    if (!params.accountNumber) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
+    }
+
+    const banks = await sepay.listBankAccounts(accessToken);
+    const bank = banks.find((candidate) => candidate.account_number === params.accountNumber);
+    if (!bank) {
+      throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
+    }
+
+    return bank;
   }
 
   async disconnect(params: PaymentSettingsByTenantTcpRequest): Promise<TenantPaymentSettingsTcpResponse> {
@@ -228,4 +256,12 @@ export class TenantPaymentSettingsService {
 
 function maskAccountNumber(value: string): string {
   return value.length <= 4 ? value : `•••• ${value.slice(-4)}`;
+}
+
+function requireSepayBankAccountId(bank: SepayBankAccount): number {
+  const parsed = typeof bank.id === 'number' ? bank.id : Number(String(bank.id ?? '').trim());
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
+  }
+  return parsed;
 }

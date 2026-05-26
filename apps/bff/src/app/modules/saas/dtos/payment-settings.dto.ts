@@ -1,17 +1,20 @@
 import { IsOptional, IsString } from 'class-validator';
 
 export class SelectSepayBankAccountDto {
+  @IsOptional()
   @IsString()
-  bankAccountUuid!: string;
+  bankAccountUuid?: string;
 
   @IsString()
   accountNumber!: string;
 
+  @IsOptional()
   @IsString()
-  accountHolder!: string;
+  accountHolder?: string;
 
+  @IsOptional()
   @IsString()
-  bankName!: string;
+  bankName?: string;
 
   @IsOptional()
   @IsString()

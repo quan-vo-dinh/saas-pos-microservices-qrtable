@@ -77,7 +77,7 @@ function sanitizeForLog(value: unknown): unknown {
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([key, child]) => [
       key,
-      /secret/i.test(key) ? '[REDACTED]' : sanitizeForLog(child),
+      /secret|token|authorization|password/i.test(key) ? '[REDACTED]' : sanitizeForLog(child),
     ]),
   );
 }

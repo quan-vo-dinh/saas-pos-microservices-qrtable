@@ -15,7 +15,7 @@ export type GeneratePaymentAuthorizeUrlTcpRequest = {
 };
 
 export type HandlePaymentOAuthCallbackTcpRequest = {
-  code: string;
+  authorizationCode: string;
   state: string;
   processId?: string;
 };
@@ -23,7 +23,8 @@ export type HandlePaymentOAuthCallbackTcpRequest = {
 export type SelectBankTcpRequest = {
   tenantId: string;
   ownerUserId: string;
-  sepayBankAccountUuid: string;
+  sepayBankAccountUuid?: string;
+  accountNumber?: string;
   webhookUrl: string;
   processId?: string;
 };

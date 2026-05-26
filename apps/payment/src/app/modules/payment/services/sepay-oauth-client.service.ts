@@ -1,4 +1,6 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import { BusinessException } from '@common/error-messages/business.exception';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { HttpStatus, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 
@@ -18,7 +20,8 @@ type SepayOAuthTokenResponse = {
   scope?: string;
 };
 
-type SepayBankAccount = {
+export type SepayBankAccount = {
+  id?: number | string;
   uuid: string;
   bank_short_name: string;
   account_number: string;
@@ -27,21 +30,25 @@ type SepayBankAccount = {
 };
 
 type SepayWebhookConfig = {
-  webhook_url: string;
-  auth_type: 'SECRET_KEY';
-  secret_key: string;
-  active: 1;
-  allow_events: string[];
+  bankAccountId: number | string;
+  webhookUrl: string;
+  apiKey: string;
+  name: string;
 };
 
 type SepayWebhookResponse = {
-  id?: string;
-  webhook_id?: string;
+  id?: string | number;
+  webhook_id?: string | number;
   secret_key?: string;
 };
 
+const SEPAY_WEBHOOK_EVENT_TYPE = 'In_only';
+const SEPAY_WEBHOOK_AUTH_TYPE = 'Api_Key';
+const SEPAY_WEBHOOK_REQUEST_CONTENT_TYPE = 'Json';
+
 @Injectable()
 export class SepayOAuthClientService {
+  private readonly logger = new Logger(SepayOAuthClientService.name);
   private readonly http: AxiosInstance;
   private readonly config: OAuthConfig;
   private readonly scopes = [
@@ -68,6 +75,7 @@ export class SepayOAuthClientService {
   }
 
   buildAuthorizeUrl(state: string): string {
+    this.assertConfigured();
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: this.config.clientId,
@@ -79,6 +87,7 @@ export class SepayOAuthClientService {
   }
 
   async exchangeCode(code: string): Promise<SepayOAuthTokenResponse> {
+    this.assertConfigured();
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       code,
@@ -107,14 +116,37 @@ export class SepayOAuthClientService {
   }
 
   async upsertWebhook(accessToken: string, body: SepayWebhookConfig): Promise<{ id: string; secret_key?: string }> {
-    const { data } = await this.http.post('/api/v1/webhooks', body, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+    const payload = toOAuthWebhookPayload(body);
+    try {
+      const { data } = await this.http.post('/api/v1/webhooks', payload, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const response = data as SepayWebhookResponse;
+      return {
+        id: String(response.id ?? response.webhook_id ?? ''),
+        secret_key: response.secret_key ?? body.apiKey,
+      };
+    } catch (error) {
+      this.throwSepayApiException('create_webhook', error);
+    }
+  }
+
+  private assertConfigured(): void {
+    if (!this.config.clientId || !this.config.clientSecret || !this.config.redirectUri) {
+      throw new BusinessException(ErrorCode.SEPAY_OAUTH_CLIENT_NOT_CONFIGURED, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+  }
+
+  private throwSepayApiException(action: string, error: unknown): never {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    const responseData = axios.isAxiosError(error) ? error.response?.data : undefined;
+    this.logger.warn(`SePay ${action} failed status=${status ?? 'unknown'} response=${JSON.stringify(responseData)}`);
+    throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY, undefined, undefined, {
+      provider: 'sepay',
+      action,
+      status,
+      response: responseData,
     });
-    const response = data as SepayWebhookResponse;
-    return {
-      id: response.id ?? response.webhook_id ?? '',
-      secret_key: response.secret_key,
-    };
   }
 }
 
@@ -131,5 +163,65 @@ function normalizeBankAccountResponse(data: unknown): SepayBankAccount {
     data && typeof data === 'object' && 'data' in data && (data as { data?: unknown }).data
       ? (data as { data: unknown }).data
       : data;
-  return source as SepayBankAccount;
+  const record = isRecord(source) ? source : {};
+  const bank = isRecord(record.bank) ? record.bank : {};
+  const id = readStringOrNumber(record.id ?? record.uuid ?? record.xid);
+  const accountNumber = readString(record.account_number ?? record.accountNumber);
+
+  return {
+    id,
+    uuid: String(id ?? accountNumber),
+    bank_short_name: readString(
+      record.bank_short_name ?? record.bank_name ?? record.brand_name ?? bank.short_name ?? bank.code,
+    ),
+    account_number: accountNumber,
+    account_holder: readString(record.account_holder ?? record.account_holder_name ?? record.accountHolder),
+    balance: readNumber(record.balance ?? record.accumulated),
+  };
+}
+
+function toOAuthWebhookPayload(body: SepayWebhookConfig): Record<string, unknown> {
+  return {
+    bank_account_id: parseBankAccountId(body.bankAccountId),
+    name: body.name,
+    event_type: SEPAY_WEBHOOK_EVENT_TYPE,
+    authen_type: SEPAY_WEBHOOK_AUTH_TYPE,
+    webhook_url: body.webhookUrl,
+    is_verify_payment: 1,
+    active: 1,
+    api_key: body.apiKey,
+    request_content_type: SEPAY_WEBHOOK_REQUEST_CONTENT_TYPE,
+  };
+}
+
+function parseBankAccountId(value: number | string): number {
+  const parsed = typeof value === 'number' ? value : Number(value.trim());
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST);
+  }
+  return parsed;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function readString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return '';
+}
+
+function readStringOrNumber(value: unknown): string | number | undefined {
+  if (typeof value === 'string' || typeof value === 'number') return value;
+  return undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }

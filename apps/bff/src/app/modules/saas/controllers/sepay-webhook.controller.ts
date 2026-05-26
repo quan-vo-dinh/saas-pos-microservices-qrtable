@@ -55,9 +55,13 @@ export class SepayWebhookController {
   handleTenantWebhook(
     @Param('tenantSlug') tenantSlug: string,
     @Headers('x-secret-key') secret: string,
+    @Headers('api-key') apiKey: string,
+    @Headers('x-api-key') xApiKey: string,
+    @Headers('authorization') authorization: string,
     @Body() payload: SepayWebhookPayloadDto,
   ) {
-    this.assertSecret(secret);
+    const resolvedSecret = this.resolveSecret(secret, apiKey, xApiKey, authorization);
+    this.assertSecret(resolvedSecret);
     const processId = randomUUID();
 
     return this.paymentClient
@@ -65,7 +69,7 @@ export class SepayWebhookController {
         processId,
         data: {
           tenantSlug,
-          secret,
+          secret: resolvedSecret,
           payload,
           processId,
         },
@@ -87,5 +91,20 @@ export class SepayWebhookController {
     if (!secret?.trim()) {
       throw new BusinessException(ErrorCode.SEPAY_SECRET_REQUIRED, HttpStatus.UNAUTHORIZED);
     }
+  }
+
+  private resolveSecret(
+    xSecretKey?: string,
+    apiKey?: string,
+    xApiKey?: string,
+    authorization?: string,
+  ): string | undefined {
+    const directSecret = xSecretKey?.trim() || apiKey?.trim() || xApiKey?.trim();
+    if (directSecret) return directSecret;
+
+    const rawAuthorization = authorization?.trim();
+    if (!rawAuthorization) return undefined;
+    const [, token] = rawAuthorization.match(/^(?:Bearer|Apikey|Api_Key|Api-Key)\s+(.+)$/i) ?? [];
+    return token?.trim() || rawAuthorization;
   }
 }

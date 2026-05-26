@@ -59,7 +59,7 @@ export class DashboardPaymentSettingsController {
     @Req() req: Request,
   ) {
     return this.forward(TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.HANDLE_OAUTH_CALLBACK, req, processId, {
-      code,
+      authorizationCode: code,
       state,
       requestIp: req.ip,
       userAgent: req.headers['user-agent'] ?? null,
@@ -73,9 +73,10 @@ export class DashboardPaymentSettingsController {
   selectBank(@Body() body: SelectSepayBankAccountDto, @ProcessId() processId: string, @Req() req: Request) {
     const tenantId = req[MetadataKey.TENANT_ID] as string;
     return this.forward(TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.SELECT_BANK, req, processId, {
-      ...body,
       ...this.tenantPayload(req),
       ownerUserId: this.userId(req),
+      sepayBankAccountUuid: body.bankAccountUuid,
+      accountNumber: body.accountNumber,
       webhookUrl: this.tenantWebhookUrl(tenantId),
     });
   }

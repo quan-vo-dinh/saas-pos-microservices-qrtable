@@ -61,11 +61,54 @@ describe('DashboardPaymentSettingsController', () => {
       TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.HANDLE_OAUTH_CALLBACK,
       expect.objectContaining({
         data: {
-          code: 'code-1',
+          authorizationCode: 'code-1',
           state: 'state-1',
           requestIp: '127.0.0.1',
           userAgent: 'jest',
         },
+      }),
+    );
+  });
+
+  it('maps bank account selection to the Payment TCP contract', async () => {
+    await firstValueFrom(
+      controller.selectBank(
+        {
+          bankAccountUuid: 'bank-1',
+          accountNumber: '0332770502',
+          accountHolder: 'VO DINH QUAN',
+          bankName: 'MBBank',
+        },
+        'pid-1',
+        req,
+      ),
+    );
+
+    expect(paymentClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.SELECT_BANK,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: 'tenant-a',
+          ownerUserId: 'owner-1',
+          sepayBankAccountUuid: 'bank-1',
+          accountNumber: '0332770502',
+          webhookUrl: 'https://api.qrtable.local/api/v1/payment/sepay/webhook/tenant-a',
+        }),
+      }),
+    );
+  });
+
+  it('allows bank account selection by account number for stale frontend bundles', async () => {
+    await firstValueFrom(controller.selectBank({ accountNumber: '0332770502' }, 'pid-1', req));
+
+    expect(paymentClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.SELECT_BANK,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          tenantId: 'tenant-a',
+          sepayBankAccountUuid: undefined,
+          accountNumber: '0332770502',
+        }),
       }),
     );
   });

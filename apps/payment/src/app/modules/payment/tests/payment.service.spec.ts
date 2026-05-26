@@ -81,7 +81,7 @@ function buildPaymentServiceForTest(opts: {
     decrypt: jest.fn().mockReturnValue('tenant-secret'),
   };
   const tenantGateway = opts.tenantGateway ?? {
-    resolveBySlug: jest.fn().mockResolvedValue({ id: 'tenant-1', slug: 'tenant-a' }),
+    resolveByKey: jest.fn().mockResolvedValue({ id: 'tenant-1', slug: 'tenant-a' }),
   };
   const gateway = new PaymentOrderGateway(opts.orderClient as never);
   const mapper = new PaymentMapper();
