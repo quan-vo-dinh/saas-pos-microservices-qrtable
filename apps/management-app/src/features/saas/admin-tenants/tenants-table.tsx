@@ -140,7 +140,12 @@ export function TenantsTable({
                     <TableCell>
                       <TenantStatusBadge status={row.status} />
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-sm">{row.ownerEmail ?? '—'}</TableCell>
+                    <TableCell className="max-w-[200px] truncate text-sm">
+                      {row.ownerName ?? row.ownerEmail ?? '—'}
+                      {row.ownerName && row.ownerEmail ? (
+                        <span className="text-muted-foreground block truncate text-xs">{row.ownerEmail}</span>
+                      ) : null}
+                    </TableCell>
                     <TableCell className="text-sm">{row.planCode ?? '—'}</TableCell>
                     <TableCell className="whitespace-nowrap text-sm">{formatDateTime(row.expiresAt)}</TableCell>
                     <TableCell className="whitespace-nowrap text-sm">{formatDateTime(row.createdAt)}</TableCell>

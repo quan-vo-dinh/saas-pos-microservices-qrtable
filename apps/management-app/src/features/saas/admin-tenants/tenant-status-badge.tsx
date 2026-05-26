@@ -1,3 +1,4 @@
+import { tenantStatusVi } from '@einvoice/shared-constants';
 import { Badge } from '@/components/ui/badge';
 import type { TenantStatus } from '@/features/saas/types';
 
@@ -7,12 +8,6 @@ const styles: Record<TenantStatus, string> = {
   CLOSED: 'bg-muted text-muted-foreground',
 };
 
-const labels: Record<TenantStatus, string> = {
-  ACTIVE: 'Hoạt động',
-  SUSPENDED: 'Tạm khóa',
-  CLOSED: 'Đã đóng',
-};
-
 export function TenantStatusBadge({ status }: { status: TenantStatus }) {
-  return <Badge className={styles[status] ?? ''}>{labels[status] ?? status}</Badge>;
+  return <Badge className={styles[status] ?? ''}>{tenantStatusVi(status)}</Badge>;
 }

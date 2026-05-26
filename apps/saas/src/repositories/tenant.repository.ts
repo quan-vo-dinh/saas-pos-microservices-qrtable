@@ -4,7 +4,7 @@ import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 @Injectable()
 export class TenantRepository {
@@ -17,6 +17,13 @@ export class TenantRepository {
 
   findById(id: string): Promise<Tenant | null> {
     return this.repo.findOne({ where: { id } });
+  }
+
+  findByIds(ids: string[]): Promise<Tenant[]> {
+    if (!ids.length) {
+      return Promise.resolve([]);
+    }
+    return this.repo.find({ where: { id: In(ids) } });
   }
 
   findBySlug(slug: string): Promise<Tenant | null> {

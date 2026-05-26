@@ -26,7 +26,9 @@ describe('SepayWebhookController', () => {
   });
 
   it('platform webhook forwards to SaaS without tenantSlug or returning the raw secret', async () => {
-    const response = await firstValueFrom(controller.handlePlatformWebhook('secret', { transferAmount: 299000 }));
+    const response = await firstValueFrom(
+      controller.handlePlatformWebhook('secret', '', '', '', { transferAmount: 299000 }),
+    );
 
     expect(saasClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.SUBSCRIPTION.HANDLE_WEBHOOK,
@@ -37,6 +39,22 @@ describe('SepayWebhookController', () => {
     expect(saasClient.send.mock.calls[0][1].data).not.toHaveProperty('tenantSlug');
     expect(paymentClient.send).not.toHaveBeenCalled();
     expect(JSON.stringify(response)).not.toContain('secret');
+  });
+
+  it('platform webhook accepts SePay Authorization Apikey header', async () => {
+    await firstValueFrom(
+      controller.handlePlatformWebhook('', '', '', 'Apikey platform-secret', {
+        transferAmount: 299000,
+        code: 'QRSUB1234567890',
+      }),
+    );
+
+    expect(saasClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.SUBSCRIPTION.HANDLE_WEBHOOK,
+      expect.objectContaining({
+        data: expect.objectContaining({ secret: 'platform-secret' }),
+      }),
+    );
   });
 
   it('tenant webhook forwards to Payment with tenantSlug', async () => {
@@ -74,11 +92,11 @@ describe('SepayWebhookController', () => {
   });
 
   it('missing secret returns typed BusinessException', () => {
-    expect(() => controller.handlePlatformWebhook('', {})).toThrow(BusinessException);
+    expect(() => controller.handlePlatformWebhook('', '', '', '', {})).toThrow(BusinessException);
     expect(() => controller.handleTenantWebhook('tenant-a', '', '', '', '', {})).toThrow(BusinessException);
 
     try {
-      controller.handlePlatformWebhook('', {});
+      controller.handlePlatformWebhook('', '', '', '', {});
     } catch (error) {
       expect((error as BusinessException).errorCode).toBe(ErrorCode.SEPAY_SECRET_REQUIRED);
     }

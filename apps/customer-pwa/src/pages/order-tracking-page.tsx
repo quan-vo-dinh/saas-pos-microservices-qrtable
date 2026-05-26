@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError, formatCurrency } from '@einvoice/frontend-utils';
+import { orderItemStatusVi, orderStatusVi } from '@einvoice/shared-constants';
 import { OrderStatus } from '@einvoice/types';
 import { Button } from '@einvoice/frontend-ui';
 import { toast } from 'sonner';
@@ -96,7 +97,7 @@ export function OrderTrackingPage(): React.ReactElement {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">#{row.id}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {row.items.length} dòng món · {row.status}
+                      {row.items.length} dòng món · {orderStatusVi(row.status)}
                     </p>
                   </div>
                   <span className="shrink-0 text-sm font-medium">{formatCurrency(row.totalAmount)}</span>
@@ -161,7 +162,7 @@ export function OrderTrackingPage(): React.ReactElement {
               <span className="min-w-0 truncate">
                 {it.menuItemName} ×{it.quantity}
               </span>
-              <span className="shrink-0 text-muted-foreground">{it.status}</span>
+              <span className="shrink-0 text-muted-foreground">{orderItemStatusVi(it.status)}</span>
             </li>
           ))}
         </ul>

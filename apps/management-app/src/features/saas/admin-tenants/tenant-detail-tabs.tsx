@@ -61,7 +61,12 @@ export function TenantDetailHeader({ tenant, permissions }: { tenant: TenantDeta
           {tenant.planCode ? <Badge variant="secondary">{tenant.planCode}</Badge> : null}
         </div>
         <p className="text-muted-foreground text-sm">{tenant.slug}</p>
-        <p className="text-sm">Chủ: {tenant.ownerEmail ?? '—'}</p>
+        <p className="text-sm">
+          Chủ: {tenant.ownerName ?? tenant.ownerEmail ?? '—'}
+          {tenant.ownerName && tenant.ownerEmail ? (
+            <span className="text-muted-foreground"> ({tenant.ownerEmail})</span>
+          ) : null}
+        </p>
       </div>
       <div className="flex flex-wrap gap-2">
         {canSuspend ? (

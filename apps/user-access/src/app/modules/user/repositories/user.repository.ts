@@ -49,9 +49,6 @@ export class UserRepository {
         { userId: params.userId },
         {
           $set: updatePayload,
-          $setOnInsert: {
-            userId: params.userId,
-          },
         },
         { upsert: true, new: true },
       )

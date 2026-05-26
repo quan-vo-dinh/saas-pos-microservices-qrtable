@@ -2,7 +2,7 @@ import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { OnboardingSagaService } from './onboarding-saga.service';
 
 describe('OnboardingSagaService', () => {
-  const tenantRepo = { create: jest.fn(), deleteById: jest.fn() };
+  const tenantRepo = { create: jest.fn(), deleteById: jest.fn(), updateProfile: jest.fn() };
   const subscriptionService = { assignPlan: jest.fn() };
   const paymentClient = { send: jest.fn() };
   const authorizerClient = { send: jest.fn() };
@@ -13,6 +13,7 @@ describe('OnboardingSagaService', () => {
 
   it('creates tenant, owner, selected subscription, empty payment settings, and outbox event', async () => {
     tenantRepo.create.mockResolvedValue({ id: 'tenant-1', slug: 'pho-ha-noi', name: 'Pho Ha Noi' });
+    tenantRepo.updateProfile.mockResolvedValue({ id: 'tenant-1', ownerId: 'kc-owner-1' });
     authorizerClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: { userId: 'kc-owner-1' } }) });
     userClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: { userId: 'kc-owner-1' } }) });
     paymentClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: { tenantId: 'tenant-1' } }) });
@@ -39,6 +40,7 @@ describe('OnboardingSagaService', () => {
     });
 
     expect(result.tenant.id).toBe('tenant-1');
+    expect(tenantRepo.updateProfile).toHaveBeenCalledWith('tenant-1', { ownerId: 'kc-owner-1' });
     expect(subscriptionService.assignPlan).toHaveBeenCalledWith(expect.objectContaining({ planCode: 'STARTER' }));
     expect(outbox.createTenantCreated).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-1' }));
   });

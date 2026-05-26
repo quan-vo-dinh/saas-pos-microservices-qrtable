@@ -140,6 +140,9 @@ export const saasApi = {
       post(payload),
     ),
 
+  cancelAdminInvoice: (id: string) =>
+    authApiClient<SubscriptionInvoice>(`/admin/billing/invoices/${encodeURIComponent(id)}/cancel`, post({})),
+
   listTenantSubscriptions: (tenantId: string) =>
     authApiClient<SubscriptionHistoryRow[]>(`/admin/tenants/${encodeURIComponent(tenantId)}/subscriptions`),
 

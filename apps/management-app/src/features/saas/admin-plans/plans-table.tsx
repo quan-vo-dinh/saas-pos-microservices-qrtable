@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { billingPeriodVi } from '@einvoice/shared-constants';
 import { saasApi } from '@/features/saas/api';
 import { formatQuota, formatVnd } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
@@ -78,12 +79,12 @@ export function PlansTable({ data, permissions, onEdit }: PlansTableProps) {
                 <TableCell className="font-mono text-xs">{row.code}</TableCell>
                 <TableCell>{row.name}</TableCell>
                 <TableCell>{formatVnd(row.priceVnd)}</TableCell>
-                <TableCell>{row.billingPeriod}</TableCell>
+                <TableCell>{billingPeriodVi(row.billingPeriod)}</TableCell>
                 <TableCell>{formatQuota(row.maxTables)}</TableCell>
                 <TableCell>{formatQuota(row.maxStaff)}</TableCell>
                 <TableCell>{formatQuota(row.maxOrdersPerDay)}</TableCell>
                 <TableCell>
-                  <Badge variant={row.isActive ? 'default' : 'secondary'}>{row.isActive ? 'On' : 'Off'}</Badge>
+                  <Badge variant={row.isActive ? 'default' : 'secondary'}>{row.isActive ? 'Đang bán' : 'Ngừng bán'}</Badge>
                 </TableCell>
                 <TableCell className="text-end">
                   <DropdownMenu>

@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { invoiceStatusVi } from '@einvoice/shared-constants';
 import { ApiError } from '@einvoice/frontend-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,8 @@ import { saasApi } from '@/features/saas/api';
 import { formatDateTime, formatVnd } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import type { InvoiceStatus, SubscriptionInvoice } from '@/features/saas/types';
+
+const INVOICE_STATUS_OPTIONS: InvoiceStatus[] = ['PENDING', 'PAID', 'UNDERPAID', 'EXPIRED', 'CANCELED'];
 import { InvoiceStatusBadge } from './invoice-status-badge';
 import { ManualConfirmDialog } from './manual-confirm-dialog';
 
@@ -69,6 +72,16 @@ export function AdminBillingClient() {
     enabled: authReady,
   });
 
+  const cancelInvoice = async (inv: SubscriptionInvoice) => {
+    try {
+      await saasApi.cancelAdminInvoice(inv.id);
+      toast.success('Đã huỷ hóa đơn');
+      await qc.invalidateQueries({ queryKey: ['admin-billing'] });
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.serverMessage : 'Huỷ hóa đơn thất bại');
+    }
+  };
+
   const confirm = async (note: string) => {
     if (!manual) {
       return;
@@ -110,16 +123,16 @@ export function AdminBillingClient() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Tất cả</SelectItem>
-              <SelectItem value="PENDING">PENDING</SelectItem>
-              <SelectItem value="PAID">PAID</SelectItem>
-              <SelectItem value="UNDERPAID">UNDERPAID</SelectItem>
-              <SelectItem value="EXPIRED">EXPIRED</SelectItem>
-              <SelectItem value="CANCELED">CANCELED</SelectItem>
+              {INVOICE_STATUS_OPTIONS.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {invoiceStatusVi(status)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div className="grid gap-1.5">
-          <Label>Tenant ID</Label>
+          <Label>Tenant (ID)</Label>
           <Input
             defaultValue={filters.tenantId}
             onBlur={(e) =>
@@ -210,7 +223,12 @@ export function AdminBillingClient() {
             {rows.map((inv) => (
               <TableRow key={inv.id}>
                 <TableCell className="font-mono text-xs">{inv.billingReference}</TableCell>
-                <TableCell className="max-w-[140px] truncate text-xs">{inv.tenantId}</TableCell>
+                <TableCell className="max-w-[180px]">
+                  <div className="flex flex-col">
+                    <span className="truncate text-sm font-medium">{inv.tenantName ?? '—'}</span>
+                    <span className="text-muted-foreground truncate text-xs">{inv.tenantSlug ?? inv.tenantId}</span>
+                  </div>
+                </TableCell>
                 <TableCell>{inv.planCodeSnapshot}</TableCell>
                 <TableCell className="whitespace-nowrap text-end text-sm">
                   <InvoiceAmount invoice={inv} />
@@ -227,6 +245,17 @@ export function AdminBillingClient() {
                       <a href={inv.qrUrl} target="_blank" rel="noreferrer">
                         QR
                       </a>
+                    </Button>
+                  ) : null}
+                  {inv.status === 'PENDING' &&
+                  hasPermission(permissions, phase4bPermissions.subscriptionAssign) ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="me-1"
+                      onClick={() => void cancelInvoice(inv)}
+                    >
+                      Huỷ
                     </Button>
                   ) : null}
                   {['PENDING', 'UNDERPAID'].includes(inv.status) &&

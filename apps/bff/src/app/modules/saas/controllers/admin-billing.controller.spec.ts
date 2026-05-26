@@ -24,6 +24,22 @@ describe('AdminBillingController', () => {
     controller = module.get(AdminBillingController);
   });
 
+  it('forwards cancel invoice without tenant scope', async () => {
+    const req = { [MetadataKey.USER_DATA]: { metadata: { userId: 'admin-user-1' } } } as unknown as Request;
+
+    await firstValueFrom(controller.cancelInvoice('invoice-2', 'pid-2', req));
+
+    expect(saasClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.SUBSCRIPTION.CANCEL_INVOICE,
+      expect.objectContaining({
+        data: {
+          invoiceId: 'invoice-2',
+          reason: 'Canceled by platform admin',
+        },
+      }),
+    );
+  });
+
   it('forwards confirmedByUserId for manual confirmations', async () => {
     const req = {
       [MetadataKey.USER_DATA]: { metadata: { userId: 'admin-user-1' } },

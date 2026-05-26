@@ -435,7 +435,7 @@ Authorizer has client_id + client_secret
 -> call Keycloak Admin REST API
 ```
 
-QRTable uses this mechanism for the Authorizer to call the Keycloak Admin REST API, for example creating a user, assigning a realm role, disabling the user. In `tools/keycloak-bootstrap.sh`, the client backend is enabled `serviceAccountsEnabled: true` and the service account is assigned necessary administrative roles such as `manage-users`, `view-users`, `query-users`.
+QRTable uses this mechanism for the Authorizer to call the Keycloak Admin REST API, for example creating a user, assigning a realm role, disabling the user. In `tools/keycloak-bootstrap.sh`, the client backend is enabled `serviceAccountsEnabled: true` and the service account is assigned necessary administrative roles such as `manage-users`, `view-users`, `query-users`, and `view-realm`.
 
 ### 5.4 Direct Access Grants / Password Grant
 
@@ -892,16 +892,17 @@ Clients
   -> Assign role
   -> Filter by clients
   -> realm-management
-  -> manage-users, view-users, query-users
+  -> manage-users, view-users, query-users, view-realm
 ```
 
 Meaning:
 
-| Role           | What to use                                       |
-| -------------- | ------------------------------------------------- |
-| `manage-users` | Create, update, disable users.                    |
-| `view-users`   | Read user by id/email.                            |
-| `query-users`  | Search for users when needing to check existence. |
+| Role           | What to use                                           |
+| -------------- | ----------------------------------------------------- |
+| `manage-users` | Create, update, disable users, assign realm roles.    |
+| `view-users`   | Read user by id/email.                                |
+| `query-users`  | Search for users when needing to check existence.     |
+| `view-realm`   | Read realm roles (required before assigning `OWNER`). |
 
 Do not assign broader administrative rights if not needed. The more rights a service account has, the greater the risk of revealing client secrets.
 

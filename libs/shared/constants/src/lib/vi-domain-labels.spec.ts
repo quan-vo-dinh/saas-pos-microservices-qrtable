@@ -27,6 +27,8 @@ import {
   serviceRequestTypeVi,
   sessionStatusVi,
   tableStatusVi,
+  billingPeriodVi,
+  invoiceStatusVi,
 } from './vi-domain-labels';
 
 describe('vi-domain-labels', () => {
@@ -80,5 +82,13 @@ describe('vi-domain-labels', () => {
 
   it('does not echo raw enum token for a representative order status', () => {
     expect(orderStatusVi(OrderStatus.PENDING)).not.toMatch(/^PENDING$/);
+  });
+});
+
+describe('vi-domain-labels — SaaS', () => {
+  it('maps billing period and invoice status to Vietnamese', () => {
+    expect(billingPeriodVi('MONTHLY')).toBe('Hàng tháng');
+    expect(invoiceStatusVi('PENDING')).toBe('Chờ thanh toán');
+    expect(invoiceStatusVi('PENDING')).not.toMatch(/^PENDING$/);
   });
 });

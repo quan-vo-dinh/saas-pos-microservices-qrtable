@@ -4,7 +4,7 @@ import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, LessThan, Repository } from 'typeorm';
 
 @Injectable()
 export class SubscriptionInvoiceRepository {
@@ -96,5 +96,19 @@ export class SubscriptionInvoiceRepository {
         sepayTransferContent: String(patch.content ?? ''),
       },
     );
+  }
+
+  async expirePendingPastQrExpiry(now: Date): Promise<number> {
+    const result = await this.repo.update(
+      {
+        status: SubscriptionInvoiceStatus.PENDING,
+        qrExpiresAt: LessThan(now),
+      },
+      {
+        status: SubscriptionInvoiceStatus.EXPIRED,
+        updatedAt: new Date(),
+      },
+    );
+    return result.affected ?? 0;
   }
 }

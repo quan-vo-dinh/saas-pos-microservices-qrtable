@@ -196,7 +196,7 @@ if [[ -z "${realm_management_client_id}" || -z "${service_account_user_id}" ]]; 
   exit 1
 fi
 
-required_realm_mgmt_roles=(manage-users view-users query-users)
+required_realm_mgmt_roles=(manage-users view-users query-users view-realm)
 for role in "${required_realm_mgmt_roles[@]}"; do
   role_payload="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${realm_management_client_id}/roles/${role}" "${auth_header[@]}")"
   has_role="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/users/${service_account_user_id}/role-mappings/clients/${realm_management_client_id}" "${auth_header[@]}" | jq -e ".[] | select(.name == \"${role}\")" >/dev/null 2>&1; echo $?)"

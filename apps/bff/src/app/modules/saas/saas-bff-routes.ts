@@ -13,6 +13,7 @@ export const SAAS_BFF_ROUTES = {
   adminPlanById: 'admin/plans/:id',
   adminBillingInvoices: 'admin/billing/invoices',
   adminBillingInvoiceManualConfirm: 'admin/billing/invoices/:id/manual-confirm',
+  adminBillingInvoiceCancel: 'admin/billing/invoices/:id/cancel',
   dashboardSubscription: 'dashboard/subscription',
   dashboardSubscriptionCheckout: 'dashboard/subscription/checkout',
   dashboardSubscriptionCancel: 'dashboard/subscription/cancel',

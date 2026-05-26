@@ -7,6 +7,7 @@ describe('OnboardingSaga integration', () => {
     create: jest.fn(),
     deleteById: jest.fn(),
     findBySlug: jest.fn(),
+    updateProfile: jest.fn(),
   };
   const subscriptionService = { assignPlan: jest.fn() };
   const paymentClient = { send: jest.fn() };
@@ -18,6 +19,7 @@ describe('OnboardingSaga integration', () => {
     jest.resetAllMocks();
     tenantRepo.findBySlug.mockResolvedValue(null);
     tenantRepo.create.mockResolvedValue({ id: 'tenant-1', slug: 'pho-ha-noi', name: 'Pho Ha Noi' });
+    tenantRepo.updateProfile.mockResolvedValue({ id: 'tenant-1', ownerId: 'owner-1' });
     subscriptionService.assignPlan.mockResolvedValue({ id: 'sub-1' });
     paymentClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: { tenantId: 'tenant-1' } }) });
   });
@@ -52,6 +54,7 @@ describe('OnboardingSaga integration', () => {
       TCP_REQUEST_MESSAGE.USER.UPSERT_WITH_TENANT,
       expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-1', userId: 'owner-1' }) }),
     );
+    expect(tenantRepo.updateProfile).toHaveBeenCalledWith('tenant-1', { ownerId: 'owner-1' });
     expect(subscriptionService.assignPlan).toHaveBeenCalledWith(expect.objectContaining({ planCode: 'STARTER' }));
     expect(paymentClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.CREATE_EMPTY,

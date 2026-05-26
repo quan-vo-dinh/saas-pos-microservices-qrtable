@@ -31,6 +31,7 @@ import { SubscriptionService } from './services/subscription.service';
 import { TenantAdminService } from './services/tenant-admin.service';
 import { TenantLifecycleService } from './services/tenant-lifecycle.service';
 import { TenantStatusCacheService } from './services/tenant-status-cache.service';
+import { SubscriptionInvoiceExpireCronService } from './services/subscription-invoice-expire-cron.service';
 import { TenantSuspendCronService } from './services/tenant-suspend-cron.service';
 
 @Module({
@@ -65,6 +66,7 @@ import { TenantSuspendCronService } from './services/tenant-suspend-cron.service
     SubscriptionInvoiceRepository,
     SubscriptionInvoiceService,
     TenantSuspendCronService,
+    SubscriptionInvoiceExpireCronService,
     SaasOutboxRepository,
     SaasOutboxPublisherService,
   ],

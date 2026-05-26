@@ -102,6 +102,37 @@ describe('SubscriptionInvoiceService', () => {
     );
   });
 
+  it('extracts QRSUB billing reference from transfer content when code is null', async () => {
+    invoiceRepo.findByBillingReferenceForUpdate.mockResolvedValue({
+      id: 'invoice-1',
+      billingReference: 'QRSUBDDD611CC97',
+      amountVnd: 5000,
+      status: SubscriptionInvoiceStatus.PENDING,
+      tenantId: 'tenant-1',
+      planCodeSnapshot: 'VIP-2',
+      periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
+    });
+    invoiceRepo.markPaid.mockResolvedValue({
+      id: 'invoice-1',
+      tenantId: 'tenant-1',
+      planCodeSnapshot: 'VIP-2',
+      periodEndsAt: new Date('2027-05-12T00:00:00.000Z'),
+    });
+    const service = createService();
+
+    await service.handleWebhook({
+      code: null,
+      transferAmount: 5000,
+      sepayTransactionId: '60608248',
+      secret: 'platform-secret',
+      content:
+        'MBVCB.14398446377.792251.QRSUBDDD611CC97.CT tu 9332770502 VO DINH MINH QUAN toi 0332770502 VO DINH MINH QUAN tai MB- Ma GD ACSP/ sf792251',
+    });
+
+    expect(invoiceRepo.findByBillingReferenceForUpdate).toHaveBeenCalledWith('QRSUBDDD611CC97');
+    expect(subscriptionService.assignPlan).toHaveBeenCalled();
+  });
+
   it('does not assign subscription when duplicate webhook loses pending update race', async () => {
     invoiceRepo.findByBillingReferenceForUpdate.mockResolvedValue({
       id: 'invoice-1',
@@ -275,6 +306,7 @@ describe('SubscriptionInvoiceService', () => {
     return new SubscriptionInvoiceService(
       invoiceRepo as never,
       subscriptionService as never,
+      undefined,
       undefined,
       configService as never,
     );

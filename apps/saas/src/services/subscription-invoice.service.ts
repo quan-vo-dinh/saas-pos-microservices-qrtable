@@ -9,16 +9,19 @@ import { randomBytes, timingSafeEqual } from 'crypto';
 import { CONFIGURATION } from '../configuration';
 import { PricingPlanRepository } from '../repositories/pricing-plan.repository';
 import { SubscriptionInvoiceRepository } from '../repositories/subscription-invoice.repository';
+import { TenantRepository } from '../repositories/tenant.repository';
 import { SubscriptionService } from './subscription.service';
 
 export type SubscriptionWebhookInput = {
-  code: string;
+  code?: string | null;
   transferAmount: number;
   sepayTransactionId: string;
   secret?: string;
   referenceCode?: string;
   content?: string;
 };
+
+const SUBSCRIPTION_BILLING_REFERENCE_REGEX = /QRSUB[A-Z0-9]{10}/i;
 
 @Injectable()
 export class SubscriptionInvoiceService {
@@ -48,8 +51,10 @@ export class SubscriptionInvoiceService {
       ): Promise<SubscriptionInvoice | null>;
       updateById(id: string, patch: Partial<SubscriptionInvoice>): Promise<SubscriptionInvoice>;
       auditUnderpaid(id: string, patch: Record<string, unknown>): Promise<void>;
+      expirePendingPastQrExpiry(now: Date): Promise<number>;
     },
     private readonly subscriptionService: SubscriptionService,
+    @Optional() private readonly tenantRepository?: TenantRepository,
     @Optional() private readonly planRepository?: PricingPlanRepository,
     @Optional() private readonly configService?: ConfigService,
   ) {}
@@ -89,9 +94,10 @@ export class SubscriptionInvoiceService {
 
   async list(query: Record<string, unknown>): Promise<Record<string, unknown>> {
     const result = await this.invoiceRepository.list(query);
+    const tenantById = await this.loadTenantsById(result.items.map((invoice) => invoice.tenantId));
     return {
       ...result,
-      items: result.items.map((invoice) => this.toInvoiceResponse(invoice)),
+      items: result.items.map((invoice) => this.toInvoiceResponse(invoice, tenantById.get(invoice.tenantId))),
     };
   }
 
@@ -100,11 +106,13 @@ export class SubscriptionInvoiceService {
     invoiceId: string;
     statusOnly?: boolean;
   }): Promise<Record<string, unknown>> {
-    const invoice = await this.invoiceRepository.findById(input.invoiceId);
+    let invoice = await this.invoiceRepository.findById(input.invoiceId);
     if (!invoice || (input.tenantId && invoice.tenantId !== input.tenantId)) {
       throw new BusinessException(ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
-    const response = this.toInvoiceResponse(invoice);
+    invoice = await this.expireIfPastQrExpiry(invoice);
+    const tenant = await this.tenantRepository?.findById(invoice.tenantId);
+    const response = this.toInvoiceResponse(invoice, tenant ?? undefined);
     return input.statusOnly ? { id: response.id, status: response.status } : response;
   }
 
@@ -183,12 +191,13 @@ export class SubscriptionInvoiceService {
   async handleWebhook(input: SubscriptionWebhookInput): Promise<void> {
     this.verifyPlatformWebhookSecret(input.secret);
 
-    if (!input.code.startsWith(BILL_REF_PREFIXES.SUBSCRIPTION)) {
-      this.logger.warn(`Ignoring non-subscription webhook code=${input.code}`);
+    const billingReference = this.resolveBillingReference(input);
+    if (!billingReference) {
+      this.logger.warn('Ignoring subscription webhook without QRSUB billing reference');
       return;
     }
 
-    const invoice = await this.invoiceRepository.findByBillingReferenceForUpdate(input.code);
+    const invoice = await this.invoiceRepository.findByBillingReferenceForUpdate(billingReference);
     if (!invoice || invoice.status !== SubscriptionInvoiceStatus.PENDING) {
       return;
     }
@@ -265,6 +274,31 @@ export class SubscriptionInvoiceService {
     return `https://qr.sepay.vn/img?${params.toString()}`;
   }
 
+  private resolveBillingReference(input: SubscriptionWebhookInput): string | null {
+    const code = input.code?.trim();
+    if (code) {
+      const match = code.toUpperCase().match(SUBSCRIPTION_BILLING_REFERENCE_REGEX);
+      if (match) {
+        return match[0].toUpperCase();
+      }
+      if (code.toUpperCase().startsWith(BILL_REF_PREFIXES.SUBSCRIPTION)) {
+        return code.toUpperCase();
+      }
+    }
+
+    for (const candidate of [input.content, input.referenceCode]) {
+      if (!candidate) {
+        continue;
+      }
+      const match = String(candidate).toUpperCase().match(SUBSCRIPTION_BILLING_REFERENCE_REGEX);
+      if (match) {
+        return match[0].toUpperCase();
+      }
+    }
+
+    return null;
+  }
+
   private verifyPlatformWebhookSecret(secret?: string): void {
     const expectedSecret = this.platformPaymentConfig('WEBHOOK_SECRET')?.trim();
     const providedSecret = secret?.trim();
@@ -280,10 +314,37 @@ export class SubscriptionInvoiceService {
     );
   }
 
-  private toInvoiceResponse(invoice: SubscriptionInvoice): Record<string, unknown> {
+  private async expireIfPastQrExpiry(invoice: SubscriptionInvoice): Promise<SubscriptionInvoice> {
+    if (
+      invoice.status !== SubscriptionInvoiceStatus.PENDING ||
+      !invoice.qrExpiresAt ||
+      invoice.qrExpiresAt.getTime() > Date.now()
+    ) {
+      return invoice;
+    }
+    return this.invoiceRepository.updateById(invoice.id, {
+      status: SubscriptionInvoiceStatus.EXPIRED,
+    });
+  }
+
+  private async loadTenantsById(tenantIds: string[]): Promise<Map<string, { name: string; slug: string }>> {
+    if (!this.tenantRepository) {
+      return new Map();
+    }
+    const uniqueIds = [...new Set(tenantIds.filter(Boolean))];
+    const tenants = await this.tenantRepository.findByIds(uniqueIds);
+    return new Map(tenants.map((tenant) => [tenant.id, { name: tenant.name, slug: tenant.slug }]));
+  }
+
+  private toInvoiceResponse(
+    invoice: SubscriptionInvoice,
+    tenant?: { name: string; slug: string },
+  ): Record<string, unknown> {
     return {
       id: invoice.id,
       tenantId: invoice.tenantId,
+      tenantName: tenant?.name ?? null,
+      tenantSlug: tenant?.slug ?? null,
       pricingPlanId: invoice.pricingPlanId,
       planCodeSnapshot: invoice.planCodeSnapshot,
       amountVnd: Number(invoice.amountVnd),

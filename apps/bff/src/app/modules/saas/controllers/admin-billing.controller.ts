@@ -50,6 +50,17 @@ export class AdminBillingController {
     });
   }
 
+  @Post(SAAS_BFF_ROUTES.adminBillingInvoiceCancel)
+  @Permissions([PERMISSION.SUBSCRIPTION_ASSIGN])
+  @ApiOkResponse({ type: ResponseDto })
+  @ApiOperation({ summary: 'Cancel pending subscription invoice (platform admin)' })
+  cancelInvoice(@Param('id') id: string, @ProcessId() processId: string, @Req() req: Request) {
+    return this.forward(TCP_REQUEST_MESSAGE.SUBSCRIPTION.CANCEL_INVOICE, req, processId, {
+      invoiceId: id,
+      reason: 'Canceled by platform admin',
+    });
+  }
+
   private forward(pattern: unknown, req: Request, processId: string, data?: unknown) {
     return this.saasClient.send(pattern, buildTcpRequestContext(req, processId, data)).pipe(
       map(

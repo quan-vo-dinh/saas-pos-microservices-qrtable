@@ -28,6 +28,7 @@ export interface TenantListItem {
   status: TenantStatus;
   type: string;
   ownerEmail: string | null;
+  ownerName: string | null;
   planCode: string | null;
   subscriptionStatus: SubscriptionStatus | null;
   expiresAt: string | null;
@@ -49,6 +50,8 @@ export interface TenantDetail extends TenantListItem {
 export interface SubscriptionInvoice {
   id: string;
   tenantId: string;
+  tenantName: string | null;
+  tenantSlug: string | null;
   planCodeSnapshot: string;
   amountVnd: number;
   paidAmountVnd: number | null;

@@ -23,15 +23,22 @@ export class SepayWebhookController {
   @Post(SAAS_BFF_ROUTES.tier2Webhook)
   @ApiOkResponse({ type: ResponseDto })
   @ApiOperation({ summary: 'Handle platform subscription SePay webhook' })
-  handlePlatformWebhook(@Headers('x-secret-key') secret: string, @Body() payload: SepayWebhookPayloadDto) {
-    this.assertSecret(secret);
+  handlePlatformWebhook(
+    @Headers('x-secret-key') secret: string,
+    @Headers('api-key') apiKey: string,
+    @Headers('x-api-key') xApiKey: string,
+    @Headers('authorization') authorization: string,
+    @Body() payload: SepayWebhookPayloadDto,
+  ) {
+    const resolvedSecret = this.resolveSecret(secret, apiKey, xApiKey, authorization);
+    this.assertSecret(resolvedSecret);
     const processId = randomUUID();
 
     return this.saasClient
       .send(TCP_REQUEST_MESSAGE.SUBSCRIPTION.HANDLE_WEBHOOK, {
         processId,
         data: {
-          secret,
+          secret: resolvedSecret,
           payload,
           processId,
         },

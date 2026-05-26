@@ -35,6 +35,7 @@ export class OnboardingSagaService {
     @Inject(TenantRepository)
     private readonly tenantRepository: {
       create(data: Record<string, unknown>): Promise<{ id: string; slug: string; name: string }>;
+      updateProfile(id: string, patch: Record<string, unknown>): Promise<unknown>;
       deleteById(id: string): Promise<void>;
       findBySlug?(slug: string): Promise<unknown | null>;
     },
@@ -103,6 +104,8 @@ export class OnboardingSagaService {
           processId: params.processId,
         }),
       );
+
+      await this.tenantRepository.updateProfile(tenant.id, { ownerId: ownerUserId });
 
       await this.subscriptionService.assignPlan({
         tenantId: tenant.id,
