@@ -72,6 +72,7 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND]: 'Subscription invoice not found',
   [ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CANCELED]: 'Only pending invoices can be canceled',
   [ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED]: 'Only pending invoices can be confirmed',
+  [ErrorCode.SAAS_MANUAL_CONFIRM_NOTE_REQUIRED]: 'Manual confirmation requires a reconciliation note',
   [ErrorCode.TENANT_ONBOARDING_FAILED]: 'Tenant onboarding failed',
   [ErrorCode.PAYMENT_NOT_FOUND]: 'Payment not found',
   [ErrorCode.PAYMENT_BILL_SNAPSHOT_UNAVAILABLE]: 'Unable to load bill snapshot for payment',

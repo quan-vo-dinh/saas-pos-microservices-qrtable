@@ -95,6 +95,7 @@ export const saasApi = {
         address: payload.address,
         initialPlanCode: payload.initialPlanCode,
         ownerEmail: payload.ownerEmail,
+        ownerPassword: payload.ownerPassword,
         ownerFirstName: payload.ownerFirstName,
         ownerLastName: payload.ownerLastName,
         operatingModes: payload.operatingModes,
@@ -114,7 +115,7 @@ export const saasApi = {
     authApiClient<PricingPlan>(`/admin/plans/${encodeURIComponent(id)}`, patch(payload)),
 
   deletePlan: (id: string) =>
-    authApiClient<void>(`/admin/plans/${encodeURIComponent(id)}`, {
+    authApiClient<PricingPlan>(`/admin/plans/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
 

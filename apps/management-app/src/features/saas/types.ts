@@ -2,7 +2,7 @@
 
 export type TenantStatus = 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
 export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'SUPERSEDED' | 'CANCELED';
-export type InvoiceStatus = 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELED';
+export type InvoiceStatus = 'PENDING' | 'PAID' | 'UNDERPAID' | 'EXPIRED' | 'CANCELED';
 export type BillingPeriod = 'MONTHLY' | 'YEARLY';
 export type PaymentConnectionStatus = 'NOT_CONNECTED' | 'CONNECTED' | 'TOKEN_EXPIRED' | 'REVOKED' | 'ERROR';
 
@@ -51,11 +51,12 @@ export interface SubscriptionInvoice {
   tenantId: string;
   planCodeSnapshot: string;
   amountVnd: number;
+  paidAmountVnd: number | null;
   billingPeriod: BillingPeriod;
   billingReference: string;
   status: InvoiceStatus;
   qrUrl: string | null;
-  qrExpiresAt: string;
+  qrExpiresAt: string | null;
   paidAt: string | null;
   createdAt: string;
 }
@@ -104,6 +105,7 @@ export type OnboardTenantPayload = {
   address?: string;
   initialPlanCode: string;
   ownerEmail: string;
+  ownerPassword: string;
   ownerFirstName: string;
   ownerLastName: string;
   operatingModes?: string[];
@@ -115,7 +117,7 @@ export type UpdateTenantStatusPayload = {
 };
 
 export type CreatePlanPayload = Omit<PricingPlan, 'id'> & { code: string };
-export type UpdatePlanPayload = Partial<Omit<PricingPlan, 'id'>>;
+export type UpdatePlanPayload = Partial<Omit<PricingPlan, 'id' | 'code'>>;
 
 export type CheckoutSubscriptionPayload = {
   planCode: string;
@@ -123,7 +125,7 @@ export type CheckoutSubscriptionPayload = {
 };
 
 export type ManualConfirmPayload = {
-  note?: string;
+  note: string;
 };
 
 export type SelectSepayBankPayload = {

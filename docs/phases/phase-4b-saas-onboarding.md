@@ -11,7 +11,7 @@ Phase 4B completes the actual SaaS foundation for QRTable: tenant lifecycle, adm
 The final scope includes:
 
 - SaaS tenant lifecycle `ACTIVE` / `SUSPENDED` / `CLOSED`, security slug, extended tenant information, and onboarding performed by `SUPER_ADMIN` via `/admin/tenants/onboard`.
-- Pricing plans `FREE` / `BASIC` / `PREMIUM`, current subscription per tenant, subscription history, and `subscription_invoices` for Tier 2 tenant -> billing platform.
+- Admin-managed pricing plans, current subscription per tenant, subscription history, and `subscription_invoices` for Tier 2 tenant -> billing platform. Seed plans may use examples such as `FREE`, `BASIC`, or `PREMIUM`, but runtime UI must read active plans from SaaS and must not synthesize fake plans.
 - Two-tier payment architecture:
   - Tier 1 customer -> tenant: bill payment uses prefix `QRTBL`, tenant payment settings, and SePay OAuth2 Connect for the tenant to receive money into their account.
   - Tier 2 tenant -> platform: subscription checkout using VietQR / SePay webhook with prefix `QRSUB`, with manual confirm fallback for `SUPER_ADMIN`.
@@ -19,8 +19,9 @@ The final scope includes:
 
 ## Accepted Decisions
 
-- Onboarding Phase 4B is admin-assisted, not self-service registration wizard. `SUPER_ADMIN` creates tenant, Owner, default subscription and initial payment settings.
+- Onboarding Phase 4B is admin-assisted, not self-service registration wizard. `SUPER_ADMIN` creates tenant, Owner, selected initial subscription and initial payment settings.
 - Onboarding runs like a mini-saga in SaaS service; mid-failure must rollback DB-side effects and cleanup orphan Keycloak users. Phase 4B uses a manually entered password for the Owner, while reset link/Required Action belongs to Phase 4C.
+- Onboarding must receive an explicit initial plan selected from active pricing plans. The backend must not silently fall back to a hardcoded plan code when the UI or caller omits the plan.
 - `TenantStatus` is the main operating state: `ACTIVE` allows operations, `SUSPENDED` switches to read-only with pending bill payment exception, `CLOSED` is the state of closing the tenant and not reactivating in Phase 4B.
 - `isActive` only has the old DTO compatibility meaning; New behavior derived from `status`.
 - Slug tenant must normalize Vietnamese, unique across the platform and block reserved words in shared constants.
@@ -37,7 +38,7 @@ The final scope includes:
 
 ## Final Business Behavior
 
-The tenant is onboarded with a valid slug, Owner, default plan, initial subscription, and row `tenant_payment_settings` in an unconnected state. `ACTIVE` tenant can operate restaurants according to plan limits. `SUSPENDED` tenant is blocked from creating/recording new operations such as placing orders, creating orders, creating tables or exceeding quota; The user can still read the necessary information and the customer can still get paid the bill `PENDING_PAYMENT` that has arisen. `CLOSED` tenant is closed, is blocked from operational access and is the contract end state in this phase.
+The tenant is onboarded with a valid slug, Owner, selected initial plan, initial subscription, and row `tenant_payment_settings` in an unconnected state. `ACTIVE` tenant can operate restaurants according to plan limits. `SUSPENDED` tenant is blocked from creating/recording new operations such as placing orders, creating orders, creating tables or exceeding quota; The user can still read the necessary information and the customer can still get paid the bill `PENDING_PAYMENT` that has arisen. `CLOSED` tenant is closed, is blocked from operational access and is the contract end state in this phase.
 
 Pricing plan specifies limits `max_tables`, `max_staff`, `max_orders_per_day` and feature list. Each tenant can only have one `ACTIVE` subscription at a time; New subscriptions can supersede old subscriptions. Subscription invoice is a Tier 2 invoice for the tenant paying the platform, different from the customer's restaurant bill. Pending invoices have a payment QR, which is converted to paid when the webhook matches the amount/reference or when `SUPER_ADMIN` manual confirms after checking.
 
@@ -48,7 +49,7 @@ Two-tier payments are clearly separated:
 
 tenant automatically connects to SePay on `/dashboard/payment-settings`: BFF creates authorization URL, Payment service exchanges OAuth2 code, saves encrypted token, reads list of bank accounts, tenant selects account to receive money, and Payment service configures/saves necessary webhook settings. The browser does not receive client secret, access token, refresh token.
 
-Subscription/plan behavior in Phase 4B uses one active subscription at a time. Checkout subscription creates invoice `QRSUB*`; Valid webhook or manual confirmation of `SUPER_ADMIN` activate/renew package. Multi-bank active, provision, partial subscription refund, promotion/discount and transfer ownership are outside the scope of phase.
+Subscription/plan behavior in Phase 4B uses one active subscription at a time. Checkout subscription creates invoice `QRSUB*`; Valid webhook or manual confirmation of `SUPER_ADMIN` activate/renew package. Pricing plan code is immutable after creation. Plan delete in Phase 4B means deactivate / stop selling, not hard-delete. Multi-bank active, provision, partial subscription refund, promotion/discount and transfer ownership are outside the scope of phase.
 
 ## Final Technical Behavior
 
@@ -77,6 +78,7 @@ Implementation and stabilization evidence on 2026-05-13 showed the phase is comp
 - Direct startup smoke for built SaaS and Payment services passed on temporary ports after sourcing environment configuration.
 - Browser verification covered SUPER_ADMIN admin routes, OWNER subscription/payment-settings routes, public landing, mobile responsive surfaces, OAuth invalid-state handling, and active Customer PWA QR flow. No blank pages, 401/500 dashboard screens, console crashes, or exposed SePay secrets were observed in those checks.
 - Suspended Customer PWA behavior is covered by automated tests and component/guard checks. Real browser verification for a suspended tenant was limited by missing suspended seed route/data in the available local UI.
+- Stabilization on 2026-05-26 tightened SUPER_ADMIN plan/onboarding/billing behavior: active plans are loaded from SaaS instead of fake UI defaults, onboarding forwards the Owner temporary password, plan code update is blocked, VND amounts are rounded through the shared utility, `UNDERPAID` subscription invoices can be manually confirmed after audit evidence, and manual confirm uses an app dialog instead of browser confirm.
 
 ## Handoff / Deferred Work
 
@@ -86,4 +88,5 @@ Implementation and stabilization evidence on 2026-05-13 showed the phase is comp
 - Suspended Customer PWA browser verification still needs a reliable suspended seed route or demo fixture so manual route-level smoke can match automated coverage.
 - Production SePay setup still requires public BFF/webhook URLs, platform webhook secret, OAuth redirect registration, and live provider-side validation.
 - Tenant/platform `x-secret-key` webhook value verification needs production hardening against stored platform/tenant secrets; current documented route shape is correct, but security verification must be rechecked before go-live.
+- Existing production databases created before the 2026-05-26 actor-id fix must alter SaaS actor columns from `uuid` to `varchar(64)` before deploying the fixed code: `subscriptions.created_by_user_id`, `subscription_invoices.requested_by_user_id`, and `subscription_invoices.manually_confirmed_by_user_id`.
 - Hard-delete, retention cleanup, tenant data erasure policy, transfer ownership, promotions/discounts, webhook replay dashboard, and partial subscription refund/proration are out of scope for Phase 4B.

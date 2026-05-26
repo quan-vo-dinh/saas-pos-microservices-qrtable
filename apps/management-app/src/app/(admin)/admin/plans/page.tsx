@@ -11,7 +11,7 @@ import { PlansTable } from '@/features/saas/admin-plans/plans-table';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { saasApi } from '@/features/saas/api';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
-import type { CreatePlanPayload, PricingPlan } from '@/features/saas/types';
+import type { CreatePlanPayload, PricingPlan, UpdatePlanPayload } from '@/features/saas/types';
 
 export default function AdminPlansPage() {
   const { data: session } = useSession();
@@ -33,7 +33,7 @@ export default function AdminPlansPage() {
         await saasApi.createPlan(values);
         toast.success('Đã tạo gói');
       } else if (editing) {
-        await saasApi.updatePlan(editing.id, values);
+        await saasApi.updatePlan(editing.id, toUpdatePlanPayload(values));
         toast.success('Đã cập nhật gói');
       }
       await plansQuery.refetch();
@@ -83,4 +83,19 @@ export default function AdminPlansPage() {
       />
     </div>
   );
+}
+
+function toUpdatePlanPayload(values: CreatePlanPayload): UpdatePlanPayload {
+  return {
+    name: values.name,
+    description: values.description,
+    priceVnd: values.priceVnd,
+    billingPeriod: values.billingPeriod,
+    maxTables: values.maxTables,
+    maxStaff: values.maxStaff,
+    maxOrdersPerDay: values.maxOrdersPerDay,
+    features: values.features,
+    isActive: values.isActive,
+    displayOrder: values.displayOrder,
+  };
 }

@@ -1,6 +1,7 @@
 import { normalizePlanCode } from '@common/constants/saas.constants';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { buildVndRoundingSnapshot } from '@common/utils/vnd-rounding.util';
 import { HttpStatus, Inject, Injectable, Optional } from '@nestjs/common';
 import { PricingPlanRepository } from '../repositories/pricing-plan.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
@@ -59,7 +60,7 @@ export class SubscriptionService {
       ...params,
       planCode,
       pricingPlanId: plan.id,
-      priceVndSnapshot: plan.priceVnd,
+      priceVndSnapshot: buildVndRoundingSnapshot(Number(plan.priceVnd)).roundedTotal,
     });
 
     await this.subscriptionCache?.setCurrent(params.tenantId, {

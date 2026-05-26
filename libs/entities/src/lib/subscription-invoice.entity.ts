@@ -67,13 +67,13 @@ export class SubscriptionInvoice extends BaseEntity {
   @Column({ name: 'sepay_transaction_date', type: 'timestamptz', nullable: true })
   sepayTransactionDate?: Date | null;
 
-  @Column({ name: 'manually_confirmed_by_user_id', type: 'uuid', nullable: true })
+  @Column({ name: 'manually_confirmed_by_user_id', type: 'varchar', length: 64, nullable: true })
   manuallyConfirmedByUserId?: string | null;
 
   @Column({ name: 'manually_confirmed_at', type: 'timestamptz', nullable: true })
   manuallyConfirmedAt?: Date | null;
 
-  @Column({ name: 'requested_by_user_id', type: 'uuid' })
+  @Column({ name: 'requested_by_user_id', type: 'varchar', length: 64 })
   requestedByUserId!: string;
 
   @Column({ name: 'expired_at', type: 'timestamptz', nullable: true })

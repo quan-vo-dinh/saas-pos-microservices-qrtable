@@ -2,6 +2,7 @@ import { BILL_REF_PREFIXES, SubscriptionInvoiceStatus } from '@common/constants/
 import { SubscriptionInvoice } from '@common/entities/subscription-invoice.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { buildVndRoundingSnapshot } from '@common/utils/vnd-rounding.util';
 import { HttpStatus, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes, timingSafeEqual } from 'crypto';
@@ -40,7 +41,11 @@ export class SubscriptionInvoiceService {
       list(
         query: Record<string, unknown>,
       ): Promise<{ items: SubscriptionInvoice[]; page: number; limit: number; total: number }>;
-      markPaid(id: string, patch: Partial<SubscriptionInvoice>): Promise<SubscriptionInvoice | null>;
+      markPaid(
+        id: string,
+        patch: Partial<SubscriptionInvoice>,
+        allowedStatuses?: SubscriptionInvoiceStatus[],
+      ): Promise<SubscriptionInvoice | null>;
       updateById(id: string, patch: Partial<SubscriptionInvoice>): Promise<SubscriptionInvoice>;
       auditUnderpaid(id: string, patch: Record<string, unknown>): Promise<void>;
     },
@@ -129,22 +134,35 @@ export class SubscriptionInvoiceService {
     confirmedByUserId: string;
     note?: string | null;
   }): Promise<Record<string, unknown>> {
+    const note = input.note?.trim();
+    if (!note) {
+      throw new BusinessException(ErrorCode.SAAS_MANUAL_CONFIRM_NOTE_REQUIRED, HttpStatus.BAD_REQUEST);
+    }
+
     const invoice = await this.invoiceRepository.findById(input.invoiceId);
     if (!invoice) {
       throw new BusinessException(ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND, HttpStatus.NOT_FOUND);
     }
-    if (invoice.status !== SubscriptionInvoiceStatus.PENDING) {
+    if (
+      ![SubscriptionInvoiceStatus.PENDING, SubscriptionInvoiceStatus.UNDERPAID].includes(
+        invoice.status as SubscriptionInvoiceStatus,
+      )
+    ) {
       throw new BusinessException(ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED, HttpStatus.BAD_REQUEST);
     }
 
-    const paid = await this.invoiceRepository.markPaid(invoice.id, {
-      status: SubscriptionInvoiceStatus.PAID,
-      paidAt: new Date(),
-      paidAmountVnd: invoice.amountVnd,
-      manuallyConfirmedByUserId: input.confirmedByUserId,
-      manuallyConfirmedAt: new Date(),
-      sepayTransferContent: input.note ?? invoice.sepayTransferContent ?? null,
-    });
+    const paid = await this.invoiceRepository.markPaid(
+      invoice.id,
+      {
+        status: SubscriptionInvoiceStatus.PAID,
+        paidAt: new Date(),
+        paidAmountVnd: invoice.amountVnd,
+        manuallyConfirmedByUserId: input.confirmedByUserId,
+        manuallyConfirmedAt: new Date(),
+        sepayTransferContent: note,
+      },
+      [SubscriptionInvoiceStatus.PENDING, SubscriptionInvoiceStatus.UNDERPAID],
+    );
     if (!paid) {
       throw new BusinessException(ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED, HttpStatus.BAD_REQUEST);
     }
@@ -216,9 +234,15 @@ export class SubscriptionInvoiceService {
     requestedBillingPeriod: 'MONTHLY' | 'YEARLY',
   ): number {
     if (planBillingPeriod === requestedBillingPeriod) {
-      return Number(planPriceVnd);
+      return this.roundAmount(Number(planPriceVnd));
     }
-    return requestedBillingPeriod === 'YEARLY' ? Number(planPriceVnd) * 12 : Math.ceil(Number(planPriceVnd) / 12);
+    const amount =
+      requestedBillingPeriod === 'YEARLY' ? Number(planPriceVnd) * 12 : Math.ceil(Number(planPriceVnd) / 12);
+    return this.roundAmount(amount);
+  }
+
+  private roundAmount(amountVnd: number): number {
+    return buildVndRoundingSnapshot(amountVnd).roundedTotal;
   }
 
   private createBillingReference(): string {
@@ -269,6 +293,7 @@ export class SubscriptionInvoiceService {
       qrUrl: invoice.qrUrl ?? null,
       qrExpiresAt: invoice.qrExpiresAt?.toISOString() ?? null,
       paidAt: invoice.paidAt?.toISOString() ?? null,
+      paidAmountVnd: invoice.paidAmountVnd == null ? null : Number(invoice.paidAmountVnd),
       createdAt: invoice.createdAt?.toISOString?.() ?? invoice.createdAt,
     };
   }

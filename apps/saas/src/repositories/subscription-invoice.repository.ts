@@ -4,7 +4,7 @@ import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 @Injectable()
 export class SubscriptionInvoiceRepository {
@@ -64,8 +64,12 @@ export class SubscriptionInvoiceRepository {
     return { items, page, limit, total };
   }
 
-  async markPaid(id: string, patch: Partial<SubscriptionInvoice>): Promise<SubscriptionInvoice | null> {
-    const result = await this.repo.update({ id, status: SubscriptionInvoiceStatus.PENDING }, patch);
+  async markPaid(
+    id: string,
+    patch: Partial<SubscriptionInvoice>,
+    allowedStatuses: SubscriptionInvoiceStatus[] = [SubscriptionInvoiceStatus.PENDING],
+  ): Promise<SubscriptionInvoice | null> {
+    const result = await this.repo.update({ id, status: In(allowedStatuses) }, patch);
     if (!result.affected) {
       return null;
     }
@@ -83,7 +87,7 @@ export class SubscriptionInvoiceRepository {
 
   async auditUnderpaid(id: string, patch: Record<string, unknown>): Promise<void> {
     await this.repo.update(
-      { id },
+      { id, status: SubscriptionInvoiceStatus.PENDING },
       {
         status: SubscriptionInvoiceStatus.UNDERPAID,
         paidAmountVnd: Number(patch.transferAmount ?? 0),

@@ -17,7 +17,7 @@ describe('SubscriptionService', () => {
   });
 
   it('assigns a new active subscription and supersedes the previous one', async () => {
-    planRepo.findActiveByCode.mockResolvedValue({ id: 'plan-premium', code: 'PREMIUM', priceVnd: 999000 });
+    planRepo.findActiveByCode.mockResolvedValue({ id: 'plan-premium', code: 'PREMIUM', priceVnd: 999001 });
     subRepo.findActiveByTenantId.mockResolvedValue({ id: 'sub-old', status: SubscriptionStatus.ACTIVE });
     subRepo.createActive.mockResolvedValue({ id: 'sub-new', planCodeSnapshot: 'PREMIUM' });
 
@@ -31,6 +31,7 @@ describe('SubscriptionService', () => {
     });
 
     expect(subRepo.supersedeActive).toHaveBeenCalledWith('tenant-1', 'sub-old');
+    expect(subRepo.createActive).toHaveBeenCalledWith(expect.objectContaining({ priceVndSnapshot: 1000000 }));
     expect(result.id).toBe('sub-new');
   });
 

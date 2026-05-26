@@ -1,6 +1,6 @@
 import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
-import { DEFAULT_PLAN_CODES, TenantStatus } from '@common/constants/saas.constants';
+import { TenantStatus } from '@common/constants/saas.constants';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
@@ -51,6 +51,11 @@ export class OnboardingSagaService {
     let tenant: { id: string; slug: string; name: string } | undefined;
     let ownerUserId: string | undefined;
     let initialSubscriptionAssigned = false;
+    const planCode = params.planCode?.trim();
+
+    if (!planCode) {
+      throw new BusinessException(ErrorCode.SAAS_PLAN_NOT_FOUND, HttpStatus.BAD_REQUEST);
+    }
 
     try {
       const slug = await this.slugService.generateUnique(params.slug ?? params.tenantName, async (candidate) => {
@@ -59,8 +64,6 @@ export class OnboardingSagaService {
         }
         return Boolean(await this.tenantRepository.findBySlug(candidate));
       });
-      const planCode = params.planCode ?? DEFAULT_PLAN_CODES.FREE;
-
       tenant = await this.tenantRepository.create({
         name: params.tenantName.trim(),
         slug,

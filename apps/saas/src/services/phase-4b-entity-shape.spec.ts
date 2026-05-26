@@ -3,6 +3,7 @@ import { PricingPlan } from '@common/entities/pricing-plan.entity';
 import { Subscription } from '@common/entities/subscription.entity';
 import { SubscriptionInvoice } from '@common/entities/subscription-invoice.entity';
 import { Tenant } from '@common/entities/tenant.entity';
+import { getMetadataArgsStorage } from 'typeorm';
 
 describe('Phase 4B entity shape', () => {
   it('tenant supports status-based active mapping inputs', () => {
@@ -33,4 +34,18 @@ describe('Phase 4B entity shape', () => {
     subscription.priceVndSnapshot = 0;
     expect(subscription.priceVndSnapshot).toBe(0);
   });
+
+  it('stores auth actor ids as strings instead of postgres UUIDs', () => {
+    expect(columnType(Subscription, 'createdByUserId')).toBe('varchar');
+    expect(columnType(SubscriptionInvoice, 'requestedByUserId')).toBe('varchar');
+    expect(columnType(SubscriptionInvoice, 'manuallyConfirmedByUserId')).toBe('varchar');
+  });
 });
+
+type EntityConstructor = typeof Subscription | typeof SubscriptionInvoice;
+
+function columnType(target: EntityConstructor, propertyName: string) {
+  return getMetadataArgsStorage().columns.find(
+    (column) => column.target === target && column.propertyName === propertyName,
+  )?.options.type;
+}

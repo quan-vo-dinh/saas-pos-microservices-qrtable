@@ -72,6 +72,7 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND]: 'Không tìm thấy hóa đơn đăng ký',
   [ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CANCELED]: 'Chỉ hóa đơn đang chờ mới có thể hủy',
   [ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CONFIRMED]: 'Chỉ hóa đơn đang chờ mới có thể xác nhận',
+  [ErrorCode.SAAS_MANUAL_CONFIRM_NOTE_REQUIRED]: 'Vui lòng nhập ghi chú đối soát trước khi xác nhận thủ công',
   [ErrorCode.TENANT_ONBOARDING_FAILED]: 'Onboarding cửa hàng thất bại',
   [ErrorCode.PAYMENT_NOT_FOUND]: 'Không tìm thấy thanh toán',
   [ErrorCode.PAYMENT_BILL_SNAPSHOT_UNAVAILABLE]: 'Không thể tải thông tin hóa đơn để thanh toán',

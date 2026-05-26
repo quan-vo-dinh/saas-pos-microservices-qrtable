@@ -61,12 +61,6 @@ export class UpdatePlanDto {
   @IsOptional()
   @IsString()
   @MinLength(2)
-  @MaxLength(40)
-  code?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(2)
   @MaxLength(80)
   name?: string;
 

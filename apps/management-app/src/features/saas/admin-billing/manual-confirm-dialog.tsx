@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -24,11 +25,16 @@ type ManualConfirmDialogProps = {
 
 export function ManualConfirmDialog({ invoice, open, onOpenChange, onConfirm }: ManualConfirmDialogProps) {
   const [note, setNote] = useState('');
+  const [referenceInput, setReferenceInput] = useState('');
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
+  const canConfirm = Boolean(
+    invoice && checked && note.trim().length >= 3 && referenceInput.trim() === invoice.billingReference && !busy,
+  );
 
   const reset = () => {
     setNote('');
+    setReferenceInput('');
     setChecked(false);
   };
 
@@ -57,8 +63,17 @@ export function ManualConfirmDialog({ invoice, open, onOpenChange, onConfirm }: 
               Thao tác này bỏ qua khớp tự động SePay. Chỉ dùng khi đã đối soát chuyển khoản thủ công.
             </p>
             <div className="grid gap-1.5">
-              <Label>Ghi chú</Label>
+              <Label>Ghi chú đối soát</Label>
               <Textarea value={note} onChange={(e) => setNote(e.target.value)} />
+              <p className="text-muted-foreground text-xs">Nhập mã giao dịch, thời gian chuyển khoản hoặc bằng chứng đối soát.</p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Nhập lại mã thanh toán</Label>
+              <Input
+                value={referenceInput}
+                onChange={(e) => setReferenceInput(e.target.value.trim().toUpperCase())}
+                placeholder={invoice.billingReference}
+              />
             </div>
             <label className="flex items-start gap-2 text-sm">
               <Checkbox checked={checked} onCheckedChange={(v) => setChecked(v === true)} className="mt-0.5" />
@@ -73,7 +88,7 @@ export function ManualConfirmDialog({ invoice, open, onOpenChange, onConfirm }: 
           <Button
             type="button"
             variant="destructive"
-            disabled={!invoice || !checked || busy}
+            disabled={!canConfirm}
             onClick={async () => {
               if (!invoice) {
                 return;

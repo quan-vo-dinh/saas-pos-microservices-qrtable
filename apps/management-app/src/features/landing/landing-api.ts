@@ -1,50 +1,5 @@
 import type { BillingPeriod, PricingPlan } from '@/features/saas/types';
 
-const FALLBACK_PLANS: PricingPlan[] = [
-  {
-    id: 'fallback-free',
-    code: 'FREE',
-    name: 'Free',
-    description: 'Khởi đầu cho quán nhỏ, giới hạn rõ ràng.',
-    priceVnd: 0,
-    billingPeriod: 'MONTHLY' as BillingPeriod,
-    maxTables: 10,
-    maxStaff: 3,
-    maxOrdersPerDay: 200,
-    features: ['QR đặt món tại bàn', 'Menu công khai trên điện thoại', 'Theo dõi bill'],
-    isActive: true,
-    displayOrder: 1,
-  },
-  {
-    id: 'fallback-basic',
-    code: 'BASIC',
-    name: 'Basic',
-    description: 'Gói cân bằng cho nhà hàng vận hành hằng ngày.',
-    priceVnd: 490_000,
-    billingPeriod: 'MONTHLY' as BillingPeriod,
-    maxTables: 40,
-    maxStaff: 15,
-    maxOrdersPerDay: 1_500,
-    features: ['Đầy đủ tính năng Free', 'VietQR cho bill khách', 'Thu phí gói tự động', 'Báo cáo doanh thu cơ bản'],
-    isActive: true,
-    displayOrder: 2,
-  },
-  {
-    id: 'fallback-premium',
-    code: 'PREMIUM',
-    name: 'Premium',
-    description: 'Giới hạn cao cho chuỗi cửa hàng và giờ cao điểm.',
-    priceVnd: 1_290_000,
-    billingPeriod: 'MONTHLY' as BillingPeriod,
-    maxTables: 200,
-    maxStaff: 80,
-    maxOrdersPerDay: 8_000,
-    features: ['Mọi tính năng Basic', 'Ưu tiên hỗ trợ mở quán', 'Hạn mức đơn cao hơn cho giờ đông'],
-    isActive: true,
-    displayOrder: 3,
-  },
-];
-
 function normalizePlan(raw: Record<string, unknown>): PricingPlan | null {
   const id = String(raw.id ?? '');
   const code = String(raw.code ?? '').toUpperCase();
@@ -68,26 +23,26 @@ function normalizePlan(raw: Record<string, unknown>): PricingPlan | null {
 export async function getPublicPlans(): Promise<PricingPlan[]> {
   const baseUrl = process.env.NEXT_PUBLIC_BFF_BASE_URL?.trim();
   if (!baseUrl) {
-    return FALLBACK_PLANS;
+    return [];
   }
   const url = `${baseUrl.replace(/\/+$/, '')}/public/plans`;
   try {
     const response = await fetch(url, { next: { revalidate: 300 } });
     if (!response.ok) {
-      return FALLBACK_PLANS;
+      return [];
     }
     const json = (await response.json()) as { data?: unknown };
     const rows = json?.data;
     if (!Array.isArray(rows) || rows.length === 0) {
-      return FALLBACK_PLANS;
+      return [];
     }
     const mapped = rows
       .map((r) => normalizePlan(r as Record<string, unknown>))
       .filter((p): p is PricingPlan => p !== null)
       .sort((a, b) => a.displayOrder - b.displayOrder);
-    return mapped.length > 0 ? mapped : FALLBACK_PLANS;
+    return mapped;
   } catch {
-    return FALLBACK_PLANS;
+    return [];
   }
 }
 

@@ -18,8 +18,12 @@ async function expectBusinessError(promise: Promise<unknown>, errorCode: ErrorCo
 
 describe('SubscriptionInvoiceService', () => {
   const invoiceRepo = {
+    createInvoice: jest.fn(),
+    findById: jest.fn(),
     findByBillingReferenceForUpdate: jest.fn(),
+    list: jest.fn(),
     markPaid: jest.fn(),
+    updateById: jest.fn(),
     auditUnderpaid: jest.fn(),
   };
   const subscriptionService = { assignPlan: jest.fn() };
@@ -119,6 +123,76 @@ describe('SubscriptionInvoiceService', () => {
     });
 
     expect(subscriptionService.assignPlan).not.toHaveBeenCalled();
+  });
+
+  it('rejects manual confirmation without an audit note', async () => {
+    const service = createService();
+
+    await expectBusinessError(
+      service.manualConfirm({
+        invoiceId: 'invoice-1',
+        confirmedByUserId: '6a09eb83438a79c4d6e70707',
+        note: '   ',
+      }),
+      ErrorCode.SAAS_MANUAL_CONFIRM_NOTE_REQUIRED,
+    );
+
+    expect(invoiceRepo.findById).not.toHaveBeenCalled();
+    expect(invoiceRepo.markPaid).not.toHaveBeenCalled();
+    expect(subscriptionService.assignPlan).not.toHaveBeenCalled();
+  });
+
+  it('manual confirms an underpaid invoice after audit evidence is provided', async () => {
+    const periodEndsAt = new Date('2026-06-26T00:00:00.000Z');
+    const invoice = {
+      id: 'invoice-1',
+      tenantId: 'tenant-1',
+      pricingPlanId: 'plan-basic',
+      planCodeSnapshot: 'BASIC',
+      amountVnd: 22000,
+      billingPeriod: 'MONTHLY',
+      billingReference: 'QRSUB123',
+      status: SubscriptionInvoiceStatus.UNDERPAID,
+      qrUrl: null,
+      qrExpiresAt: new Date('2026-05-26T00:15:00.000Z'),
+      paidAt: null,
+      paidAmountVnd: 12000,
+      periodEndsAt,
+      createdAt: new Date('2026-05-26T00:00:00.000Z'),
+    };
+    invoiceRepo.findById.mockResolvedValue(invoice);
+    invoiceRepo.markPaid.mockResolvedValue({
+      ...invoice,
+      status: SubscriptionInvoiceStatus.PAID,
+      paidAmountVnd: 22000,
+      paidAt: new Date('2026-05-26T00:20:00.000Z'),
+    });
+    const service = createService();
+
+    const result = await service.manualConfirm({
+      invoiceId: 'invoice-1',
+      confirmedByUserId: '6a09eb83438a79c4d6e70707',
+      note: '  Bank transfer TX  ',
+    });
+
+    expect(invoiceRepo.markPaid).toHaveBeenCalledWith(
+      'invoice-1',
+      expect.objectContaining({
+        paidAmountVnd: 22000,
+        sepayTransferContent: 'Bank transfer TX',
+        manuallyConfirmedByUserId: '6a09eb83438a79c4d6e70707',
+      }),
+      [SubscriptionInvoiceStatus.PENDING, SubscriptionInvoiceStatus.UNDERPAID],
+    );
+    expect(subscriptionService.assignPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'tenant-1',
+        planCode: 'BASIC',
+        expiresAt: periodEndsAt,
+        createdByUserId: '6a09eb83438a79c4d6e70707',
+      }),
+    );
+    expect(result).toEqual(expect.objectContaining({ status: SubscriptionInvoiceStatus.PAID, paidAmountVnd: 22000 }));
   });
 
   it('rejects invalid platform webhook secret before marking invoice paid or assigning subscription', async () => {

@@ -40,9 +40,9 @@ export function PlansTable({ data, permissions, onEdit }: PlansTableProps) {
   const [statusTarget, setStatusTarget] = useState<{ plan: PricingPlan; nextActive: boolean } | null>(null);
   const updateStatus = useMutation({
     mutationFn: ({ plan, nextActive }: { plan: PricingPlan; nextActive: boolean }) =>
-      saasApi.updatePlan(plan.id, { isActive: nextActive }),
-    onSuccess: async () => {
-      toast.success('Đã cập nhật trạng thái gói');
+      nextActive ? saasApi.updatePlan(plan.id, { isActive: true }) : saasApi.deletePlan(plan.id),
+    onSuccess: async (_data, variables) => {
+      toast.success(variables.nextActive ? 'Đã bán lại gói' : 'Đã ngừng bán gói');
       setStatusTarget(null);
       await qc.invalidateQueries({ queryKey: ['admin-plans'] });
     },
@@ -50,7 +50,8 @@ export function PlansTable({ data, permissions, onEdit }: PlansTableProps) {
   });
 
   const sorted = [...data].sort((a, b) => a.displayOrder - b.displayOrder);
-  const canToggleStatus = hasPermission(permissions, phase4bPermissions.planUpdate);
+  const canDeactivate = hasPermission(permissions, phase4bPermissions.planDelete);
+  const canReactivate = hasPermission(permissions, phase4bPermissions.planUpdate);
 
   return (
     <>
@@ -95,12 +96,12 @@ export function PlansTable({ data, permissions, onEdit }: PlansTableProps) {
                       {hasPermission(permissions, phase4bPermissions.planUpdate) ? (
                         <DropdownMenuItem onClick={() => onEdit(row)}>Sửa</DropdownMenuItem>
                       ) : null}
-                      {canToggleStatus ? (
+                      {(row.isActive ? canDeactivate : canReactivate) ? (
                         <DropdownMenuItem
                           className={row.isActive ? 'text-destructive' : undefined}
                           onClick={() => setStatusTarget({ plan: row, nextActive: !row.isActive })}
                         >
-                          {row.isActive ? 'Tắt gói' : 'Bật lại'}
+                          {row.isActive ? 'Ngừng bán' : 'Bán lại'}
                         </DropdownMenuItem>
                       ) : null}
                     </DropdownMenuContent>
@@ -115,7 +116,7 @@ export function PlansTable({ data, permissions, onEdit }: PlansTableProps) {
       <AlertDialog open={Boolean(statusTarget)} onOpenChange={(open) => !open && setStatusTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{statusTarget?.nextActive ? 'Bật lại gói' : 'Tắt gói'}</AlertDialogTitle>
+            <AlertDialogTitle>{statusTarget?.nextActive ? 'Bán lại gói' : 'Ngừng bán gói'}</AlertDialogTitle>
             <AlertDialogDescription>
               {statusTarget?.nextActive
                 ? `Gói ${statusTarget.plan.code} sẽ xuất hiện lại trong onboarding và gán subscription mới.`

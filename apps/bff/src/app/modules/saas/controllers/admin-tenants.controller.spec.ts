@@ -78,6 +78,7 @@ describe('AdminTenantsController', () => {
           tenantName: 'Tenant A',
           initialPlanCode: 'FREE',
           ownerEmail: 'owner@example.com',
+          ownerPassword: 'Password123!',
           ownerFirstName: 'A',
           ownerLastName: 'Owner',
         },
@@ -90,7 +91,7 @@ describe('AdminTenantsController', () => {
       TCP_REQUEST_MESSAGE.TENANT.ONBOARD,
       expect.objectContaining({
         processId: 'pid-1',
-        data: expect.objectContaining({ createdByUserId: 'admin-user-1' }),
+        data: expect.objectContaining({ createdByUserId: 'admin-user-1', ownerPassword: 'Password123!' }),
       }),
     );
   });

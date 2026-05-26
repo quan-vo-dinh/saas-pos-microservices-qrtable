@@ -45,6 +45,6 @@ export class Subscription extends BaseEntity {
   @Column({ name: 'source_invoice_id', type: 'uuid', nullable: true })
   sourceInvoiceId?: string | null;
 
-  @Column({ name: 'created_by_user_id', type: 'uuid', nullable: true })
+  @Column({ name: 'created_by_user_id', type: 'varchar', length: 64, nullable: true })
   createdByUserId?: string | null;
 }

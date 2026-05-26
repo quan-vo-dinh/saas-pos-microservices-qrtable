@@ -51,6 +51,11 @@ export class OnboardTenantDto {
   ownerEmail!: string;
 
   @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  ownerPassword!: string;
+
+  @IsString()
   @MinLength(1)
   @MaxLength(80)
   ownerFirstName!: string;

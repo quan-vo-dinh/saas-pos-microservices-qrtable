@@ -40,6 +40,7 @@ describe('OnboardingSaga integration', () => {
       ownerPassword: 'Password123!',
       ownerFirstName: 'Owner',
       ownerLastName: 'One',
+      planCode: 'STARTER',
       processId: 'p1',
     });
 
@@ -51,7 +52,7 @@ describe('OnboardingSaga integration', () => {
       TCP_REQUEST_MESSAGE.USER.UPSERT_WITH_TENANT,
       expect.objectContaining({ data: expect.objectContaining({ tenantId: 'tenant-1', userId: 'owner-1' }) }),
     );
-    expect(subscriptionService.assignPlan).toHaveBeenCalledWith(expect.objectContaining({ planCode: 'FREE' }));
+    expect(subscriptionService.assignPlan).toHaveBeenCalledWith(expect.objectContaining({ planCode: 'STARTER' }));
     expect(paymentClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.CREATE_EMPTY,
       expect.objectContaining({
@@ -84,6 +85,7 @@ describe('OnboardingSaga integration', () => {
         tenantName: 'Phở Hà Nội',
         ownerEmail: 'owner@example.com',
         ownerPassword: 'Password123!',
+        planCode: 'STARTER',
       }),
     ).rejects.toMatchObject({ errorCode: ErrorCode.TENANT_ONBOARDING_FAILED });
 

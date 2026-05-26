@@ -4,14 +4,17 @@ import type { SepayWebhookPayload } from '../payment';
 export type CreateTenantTcpRequest = CreateTenantRequestDto;
 
 export type OnboardTenantTcpRequest = {
-  name: string;
-  type: 'CAFE' | 'RESTAURANT' | 'PUB' | 'OTHER';
+  name?: string;
+  tenantName?: string;
+  type?: 'CAFE' | 'RESTAURANT' | 'PUB' | 'OTHER';
+  tenantType?: string;
   address?: string;
   ownerEmail: string;
   ownerPassword: string;
   ownerFirstName: string;
   ownerLastName: string;
   planCode?: string;
+  initialPlanCode?: string;
   createdByUserId: string;
   processId?: string;
 };

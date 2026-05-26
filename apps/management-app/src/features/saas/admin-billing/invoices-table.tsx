@@ -112,6 +112,7 @@ export function AdminBillingClient() {
               <SelectItem value="ALL">Tất cả</SelectItem>
               <SelectItem value="PENDING">PENDING</SelectItem>
               <SelectItem value="PAID">PAID</SelectItem>
+              <SelectItem value="UNDERPAID">UNDERPAID</SelectItem>
               <SelectItem value="EXPIRED">EXPIRED</SelectItem>
               <SelectItem value="CANCELED">CANCELED</SelectItem>
             </SelectContent>
@@ -138,7 +139,7 @@ export function AdminBillingClient() {
           <Label>Plan code</Label>
           <Input
             defaultValue={filters.planCode}
-            placeholder="BASIC"
+            placeholder="Nhập mã gói"
             onBlur={(e) =>
               pushParams((n) => {
                 const v = e.target.value.trim().toUpperCase();
@@ -211,7 +212,9 @@ export function AdminBillingClient() {
                 <TableCell className="font-mono text-xs">{inv.billingReference}</TableCell>
                 <TableCell className="max-w-[140px] truncate text-xs">{inv.tenantId}</TableCell>
                 <TableCell>{inv.planCodeSnapshot}</TableCell>
-                <TableCell className="whitespace-nowrap text-end text-sm">{formatVnd(inv.amountVnd)}</TableCell>
+                <TableCell className="whitespace-nowrap text-end text-sm">
+                  <InvoiceAmount invoice={inv} />
+                </TableCell>
                 <TableCell>
                   <InvoiceStatusBadge status={inv.status} />
                 </TableCell>
@@ -226,7 +229,8 @@ export function AdminBillingClient() {
                       </a>
                     </Button>
                   ) : null}
-                  {inv.status === 'PENDING' && hasPermission(permissions, phase4bPermissions.subscriptionAssign) ? (
+                  {['PENDING', 'UNDERPAID'].includes(inv.status) &&
+                  hasPermission(permissions, phase4bPermissions.subscriptionAssign) ? (
                     <Button size="sm" variant="destructive" onClick={() => setManual(inv)}>
                       Xác nhận tay
                     </Button>
@@ -278,6 +282,23 @@ export function AdminBillingClient() {
       </div>
 
       <ManualConfirmDialog invoice={manual} open={Boolean(manual)} onOpenChange={(o) => !o && setManual(null)} onConfirm={confirm} />
+    </div>
+  );
+}
+
+function InvoiceAmount({ invoice }: { invoice: SubscriptionInvoice }) {
+  if (invoice.status !== 'UNDERPAID') {
+    return <span>{formatVnd(invoice.amountVnd)}</span>;
+  }
+
+  const paidAmount = Math.max(0, invoice.paidAmountVnd ?? 0);
+  const shortfall = Math.max(0, invoice.amountVnd - paidAmount);
+
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span>{formatVnd(invoice.amountVnd)}</span>
+      <span className="text-muted-foreground text-xs">Đã nhận {formatVnd(paidAmount)}</span>
+      <span className="text-destructive text-xs">Thiếu {formatVnd(shortfall)}</span>
     </div>
   );
 }

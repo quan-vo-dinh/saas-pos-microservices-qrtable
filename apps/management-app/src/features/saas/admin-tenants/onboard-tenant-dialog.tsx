@@ -39,6 +39,7 @@ export function OnboardTenantDialog({
   const [ownerFirstName, setOwnerFirstName] = useState('');
   const [ownerLastName, setOwnerLastName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
   const [instant, setInstant] = useState(true);
   const [digitalMenu, setDigitalMenu] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -57,6 +58,7 @@ export function OnboardTenantDialog({
     setOwnerFirstName('');
     setOwnerLastName('');
     setOwnerEmail('');
+    setOwnerPassword('');
     setInstant(true);
     setDigitalMenu(true);
     setEmailError(null);
@@ -84,6 +86,7 @@ export function OnboardTenantDialog({
       address: address.trim() || undefined,
       initialPlanCode: selectedPlanCode,
       ownerEmail: ownerEmail.trim(),
+      ownerPassword,
       ownerFirstName: ownerFirstName.trim(),
       ownerLastName: ownerLastName.trim(),
       operatingModes,
@@ -176,6 +179,18 @@ export function OnboardTenantDialog({
             />
             {emailError ? <p className="text-destructive text-sm">{emailError}</p> : null}
           </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="ob-password">Mật khẩu tạm thời</Label>
+            <Input
+              id="ob-password"
+              type="password"
+              value={ownerPassword}
+              minLength={8}
+              maxLength={128}
+              onChange={(e) => setOwnerPassword(e.target.value)}
+            />
+            <p className="text-muted-foreground text-xs">Tối thiểu 8 ký tự. Owner sẽ dùng mật khẩu này để đăng nhập lần đầu.</p>
+          </div>
           <div className="grid gap-2">
             <Label>Chế độ vận hành</Label>
             <label className="flex items-center gap-2 text-sm">
@@ -199,6 +214,7 @@ export function OnboardTenantDialog({
               !tenantName.trim() ||
               !selectedPlanCode ||
               !ownerEmail.trim() ||
+              ownerPassword.length < 8 ||
               !ownerFirstName.trim() ||
               !ownerLastName.trim()
             }

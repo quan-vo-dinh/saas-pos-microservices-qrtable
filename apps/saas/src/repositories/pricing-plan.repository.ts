@@ -2,6 +2,7 @@ import { normalizePlanCode } from '@common/constants/saas.constants';
 import { PricingPlan } from '@common/entities/pricing-plan.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { buildVndRoundingSnapshot } from '@common/utils/vnd-rounding.util';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -42,6 +43,7 @@ export class PricingPlanRepository {
       this.repo.create({
         ...data,
         code: data.code ? normalizePlanCode(data.code) : data.code,
+        priceVnd: this.roundPriceVnd(data.priceVnd),
         isActive: data.isActive ?? true,
         features: data.features ?? [],
       }),
@@ -49,11 +51,14 @@ export class PricingPlanRepository {
   }
 
   async updatePlan(id: string, patch: Partial<PricingPlan>): Promise<PricingPlan> {
-    const update = {
+    const update: Partial<PricingPlan> = {
       ...patch,
-      code: patch.code ? normalizePlanCode(patch.code) : patch.code,
       updatedAt: new Date(),
     };
+    delete update.code;
+    if (patch.priceVnd !== undefined) {
+      update.priceVnd = this.roundPriceVnd(patch.priceVnd);
+    }
     await this.repo.update({ id }, update);
     const updated = await this.repo.findOne({ where: { id } });
     if (!updated) {
@@ -64,5 +69,9 @@ export class PricingPlanRepository {
 
   deactivate(id: string): Promise<PricingPlan> {
     return this.updatePlan(id, { isActive: false });
+  }
+
+  private roundPriceVnd(priceVnd: number | undefined): number | undefined {
+    return priceVnd === undefined ? undefined : buildVndRoundingSnapshot(Number(priceVnd)).roundedTotal;
   }
 }

@@ -1,3 +1,4 @@
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { OnboardingSagaService } from './onboarding-saga.service';
 
 describe('OnboardingSagaService', () => {
@@ -10,7 +11,7 @@ describe('OnboardingSagaService', () => {
 
   beforeEach(() => jest.resetAllMocks());
 
-  it('creates tenant, owner, free subscription, empty payment settings, and outbox event', async () => {
+  it('creates tenant, owner, selected subscription, empty payment settings, and outbox event', async () => {
     tenantRepo.create.mockResolvedValue({ id: 'tenant-1', slug: 'pho-ha-noi', name: 'Pho Ha Noi' });
     authorizerClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: { userId: 'kc-owner-1' } }) });
     userClient.send.mockReturnValue({ toPromise: () => Promise.resolve({ data: { userId: 'kc-owner-1' } }) });
@@ -33,11 +34,12 @@ describe('OnboardingSagaService', () => {
       ownerPassword: 'Password123!',
       ownerFirstName: 'Owner',
       ownerLastName: 'One',
+      planCode: 'STARTER',
       processId: 'p1',
     });
 
     expect(result.tenant.id).toBe('tenant-1');
-    expect(subscriptionService.assignPlan).toHaveBeenCalledWith(expect.objectContaining({ planCode: 'FREE' }));
+    expect(subscriptionService.assignPlan).toHaveBeenCalledWith(expect.objectContaining({ planCode: 'STARTER' }));
     expect(outbox.createTenantCreated).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-1' }));
   });
 
@@ -59,9 +61,33 @@ describe('OnboardingSagaService', () => {
         tenantName: 'Pho Ha Noi',
         ownerEmail: 'owner@example.com',
         ownerPassword: 'Password123!',
+        planCode: 'STARTER',
         processId: 'p1',
       }),
     ).rejects.toThrow('kc failed');
     expect(tenantRepo.deleteById).toHaveBeenCalledWith('tenant-1');
+  });
+
+  it('requires an explicit initial plan before creating tenant side effects', async () => {
+    const service = new OnboardingSagaService(
+      tenantRepo as never,
+      subscriptionService as never,
+      authorizerClient as never,
+      userClient as never,
+      paymentClient as never,
+      outbox as never,
+    );
+
+    await expect(
+      service.onboard({
+        tenantName: 'Pho Ha Noi',
+        ownerEmail: 'owner@example.com',
+        ownerPassword: 'Password123!',
+      }),
+    ).rejects.toMatchObject({ errorCode: ErrorCode.SAAS_PLAN_NOT_FOUND });
+
+    expect(tenantRepo.create).not.toHaveBeenCalled();
+    expect(authorizerClient.send).not.toHaveBeenCalled();
+    expect(subscriptionService.assignPlan).not.toHaveBeenCalled();
   });
 });

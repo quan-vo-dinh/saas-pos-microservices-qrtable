@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CheckoutSubscriptionDto {
   @IsString()
@@ -16,8 +16,8 @@ export class CancelSubscriptionDto {
 }
 
 export class ManualConfirmSubscriptionInvoiceDto {
-  @IsOptional()
   @IsString()
+  @MinLength(3)
   @MaxLength(500)
-  note?: string;
+  note!: string;
 }

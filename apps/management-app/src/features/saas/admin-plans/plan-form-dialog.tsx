@@ -130,7 +130,11 @@ export function PlanFormDialog({ open, onOpenChange, mode, initial, onSubmit }: 
           <div className="text-muted-foreground rounded-md border px-3 py-2 text-xs">{preview}</div>
           <div className="grid gap-1.5">
             <Label>Mã (in hoa)</Label>
-            <Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} disabled={mode === 'edit'} />
+            <Input
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              readOnly={mode === 'edit'}
+            />
             {codeError ? <p className="text-destructive text-xs">{codeError}</p> : null}
           </div>
           <div className="grid gap-1.5">
