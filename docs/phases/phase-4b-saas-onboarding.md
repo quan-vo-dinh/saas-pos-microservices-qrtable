@@ -2,7 +2,7 @@
 
 > **Status:** Done
 > **Canonical Role:** Final phase record after implementation and audit.
-> **Last Updated:** 2026-05-26
+> **Last Updated:** 2026-05-27
 
 ## Final Scope
 
@@ -29,6 +29,7 @@ The final scope includes:
 - Legacy tenant migration backfill `FREE` plan does not expire, maps `isActive=false` to `SUSPENDED`, and sets default `VND` / `vi-VN`.
 - New permissions are separated by domains `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`; `saas.*` group is legacy/backward compatibility.
 - Feature gating uses a hybrid model: BFF/guard blocks early for UX, the service that owns the resource still has backup check/counter to maintain correctness.
+- Current subscription usage is resolved from owning services, not frontend placeholders: Catalog counts tables, User-Access counts tenant staff, and Order counts today's orders using `Asia/Ho_Chi_Minh`.
 - Payment service owns `tenant_payment_settings`; SaaS service does not store OAuth tokens or tenant banking information.
 - BFF is HTTP edge and webhook router: tenant-scoped endpoint for Tier 1, platform endpoint for Tier 2, route according to billing reference prefix `QRTBL` / `QRSUB`.
 - Suspend must take effect quickly via Redis key `tenant:{tenantId}:suspended`; The current subscription is cached with `subscription:{tenantId}` for the guard to read quickly.
@@ -43,7 +44,7 @@ The final scope includes:
 
 The tenant is onboarded with a valid slug, Owner, selected initial plan, initial subscription, and row `tenant_payment_settings` in an unconnected state. `ACTIVE` tenant can operate restaurants according to plan limits. `SUSPENDED` tenant is blocked from creating/recording new operations such as placing orders, creating orders, creating tables or exceeding quota; The user can still read the necessary information and the customer can still get paid the bill `PENDING_PAYMENT` that has arisen. `CLOSED` tenant is closed, is blocked from operational access and is the contract end state in this phase.
 
-Pricing plan specifies limits `max_tables`, `max_staff`, `max_orders_per_day` and feature list. Each tenant can only have one `ACTIVE` subscription at a time; New subscriptions can supersede old subscriptions. Subscription invoice is a Tier 2 invoice for the tenant paying the platform, different from the customer's restaurant bill. Pending invoices have a payment QR, which is converted to paid when the webhook matches the amount/reference or when `SUPER_ADMIN` manual confirms after checking.
+Pricing plan specifies limits `max_tables`, `max_staff`, `max_orders_per_day` and feature list. The current-plan panel displays live usage for tables, staff and today's orders; plan feature codes are stored in DB/API but rendered through Vietnamese label helpers. Each tenant can only have one `ACTIVE` subscription at a time; New subscriptions can supersede old subscriptions. Subscription invoice is a Tier 2 invoice for the tenant paying the platform, different from the customer's restaurant bill. Pending invoices have a payment QR, which is converted to paid when the webhook matches the amount/reference or when `SUPER_ADMIN` manual confirms after checking.
 
 Two-tier payments are clearly separated:
 
@@ -61,7 +62,7 @@ Service ownership after Phase 4B:
 - SaaS service owns `tenants`, `pricing_plans`, `subscriptions`, `subscription_invoices`, outbox SaaS events, tenant lifecycle, subscription activation/expiry, invoice matching, and Redis suspend/current-subscription cache writes.
 - Payment service owns `tenant_payment_settings`, SePay OAuth2 client/token storage, tenant bank account selection, Tier 1 bill payment settlement, and tenant payment setting TCP patterns.
 - BFF owns HTTP routes, auth/permission guards, `TenantPlanGuard`/tenant lifecycle guards, public plan/landing APIs, SePay webhook routing, OAuth callback routing, and realtime tenant lifecycle emits.
-- User-Access owns user profile/tenant-side staff counts; Authorizer owns Keycloak user/role/disable operations; Catalog owns table counts and default tenant seed side effects; Order owns order counters and backup order quota checks.
+- User-Access owns user profile/tenant-side staff counts; Authorizer owns Keycloak user/role/disable operations; Catalog owns table counts and default tenant seed side effects; Order owns order counters, Ho Chi Minh daily usage windows and backup order quota checks.
 
 Redis keys introduced/used by the phase include `tenant:{tenantId}:suspended` for fast blocking and `subscription:{tenantId}` for current subscription cache. Customer PWA lifecycle state is exposed through session/tenant metadata, socket lifecycle events, and client-side banner/disabled controls.
 
@@ -83,6 +84,7 @@ Implementation and stabilization evidence on 2026-05-13 showed the phase is comp
 - Suspended Customer PWA behavior is covered by automated tests and component/guard checks. Real browser verification for a suspended tenant was limited by missing suspended seed route/data in the available local UI.
 - Stabilization on 2026-05-26 tightened SUPER_ADMIN plan/onboarding/billing behavior: active plans are loaded from SaaS instead of fake UI defaults, onboarding forwards the Owner temporary password, plan code update is blocked, VND amounts are rounded through the shared utility, `UNDERPAID` subscription invoices can be manually confirmed after audit evidence, and manual confirm uses an app dialog instead of browser confirm.
 - Further stabilization (2026-05-26): systematic frontend label mapping for SaaS/dashboard surfaces (subscription status, billing period, SePay connection status, invoice/tenant badges); SePay platform webhook accepts `Authorization: Apikey` as well as `x-secret-key`; `QRSUB` billing reference resolved from transfer content when `code` is null; invoice cancel flows for admin and owner; billing list enriches tenant name/slug.
+- Stabilization on 2026-05-27 completed live dashboard usage counters and display mapping: current-plan usage reads Catalog/User-Access/Order counters, plan comparison/current plan/admin plan picker render `features` via `planFeatureVi()`, tenant owner display uses `owner_id` plus User-Access lookup fallback, and customer/POS/SaaS surfaces avoid raw wire enum labels.
 
 ## Handoff / Deferred Work
 

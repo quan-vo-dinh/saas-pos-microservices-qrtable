@@ -5,7 +5,7 @@
 > **Status:** ✅ **Finalized** after Phase 4B audit rounds and Q1–Q25 decisions of the project Owner.
 > **Purpose:** This document is the **finalized architecture + business standard** for Phase 4B. Not implementation plan, not task code decomposition. Final deployment status see [Phase 4B record](../phases/phase-4b-saas-onboarding.md).
 
-> **Operational source of truth (2026-05-26):** For **current routes, env vars, and setup steps**, prefer [phase-4b-saas-onboarding.md](../phases/phase-4b-saas-onboarding.md), [sepay-configuration-guide-phase3.md](../guides/sepay-configuration-guide-phase3.md), and [frontend-domain-display.md](../guides/frontend-domain-display.md) over older sections in this spec if they disagree with code on `main`.
+> **Operational source of truth (2026-05-27):** For **current routes, env vars, setup steps, UI labels and usage counters**, prefer [phase-4b-saas-onboarding.md](../phases/phase-4b-saas-onboarding.md), [sepay-configuration-guide-phase3.md](../guides/sepay-configuration-guide-phase3.md), and [frontend-domain-display.md](../guides/frontend-domain-display.md) over older sections in this spec if they disagree with code on `main`.
 
 ---
 
@@ -1946,7 +1946,7 @@ Functional + data contracts:
 #### 13.3.1 `/dashboard` (Owner/Manager Home)
 
 - **Existing dashboard** + new "Plan & Quota" widget.
-- **Widget data:** `GET /api/v1/dashboard/subscription` → current plan; `GET /api/v1/admin/tenants/{me}/usage` (using own tenantId from JWT) for usage. Actually expose lighter `GET /api/v1/dashboard/usage` for own tenant.
+- **Widget data:** `GET /api/v1/dashboard/subscription` returns current plan plus usage resolved by SaaS from owning services: Catalog table count, User-Access staff count, and Order today's count using the Ho Chi Minh day boundary.
 - **UI:** Card with plan name, expiry, 3 progress bars (tables/staff/orders today).
 - **CTA:** "Manage packages" → /dashboard/subscription; "Upgrade" if not PREMIUM.
 

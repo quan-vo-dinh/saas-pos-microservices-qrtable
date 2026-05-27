@@ -4,7 +4,7 @@
 
 > **Topic (English):** Design and Implementation of a SaaS-Based POS Platform with Integrated QR Code Ordering Using a Microservices Architecture
 
-> **Version:** 1.0  |  **Update:** 2026-05-22
+> **Version:** 1.0  |  **Update:** 2026-05-27
 
 ---
 
@@ -319,7 +319,7 @@ Backend and JSON responses keep **English enum wire values** (`OrderStatus.PENDI
 | Locale formatting     | `@einvoice/frontend-utils` (`formatCurrency`), app `formatters.ts` (`formatVnd`, `formatDateTime`)                   | Money and timestamps            |
 | Badges (optional)     | App feature components (e.g. `management-app/.../features/saas/components/badges/`)                                  | Presentation only; call `*Vi()` |
 
-**Rules:** Do not render raw enum strings in UI. Do not duplicate label maps inside apps. Do not mix re-export barrels that bundle shared-constants with React components. Full playbook: [frontend-domain-display.md](guides/frontend-domain-display.md).
+**Rules:** Do not render raw enum strings or SaaS plan feature codes in UI. Plan feature lists/tables use `planFeatureVi()`, status badges call the matching `*Vi()` helper, and unknown values should degrade through `displayDomainLabel()` instead of showing raw `UPPER_SNAKE`. Do not duplicate label maps inside apps. Do not mix re-export barrels that bundle shared-constants with React components. Full playbook: [frontend-domain-display.md](guides/frontend-domain-display.md).
 
 ### 4.5 Details by application
 
@@ -634,6 +634,7 @@ Responsibility:
   - Subscription lifecycle: assign, checkout invoice, activate, cancel, expire, history
   - Subscription invoices (`subscription_invoices`): Tier 2 tenant → platform VietQR, status, manual confirm, SePay webhook handling
   - Feature gating support: current subscription cache + target-service backup checks for limits
+  - Subscription usage dashboard: resolve live table/staff/order counters through Catalog, User-Access and Order TCP; daily order usage uses `Asia/Ho_Chi_Minh`
   - Slug/Subdomain generation & uniqueness validation; reserved words are blocked in shared SaaS constants
   - Onboarding mini-saga: create tenant owner via Authorizer/User-Access and initialize Payment settings row; rollback/cleanup handles partial failure and orphan Keycloak users
   - Tenant suspend Redis flag: SaaS writes/clears `tenant:{tenantId}:suspended`; BFF guards read for edge enforcement
@@ -676,7 +677,7 @@ Responsibility:
   - Table State Machine: Available → Occupied → Billing → Cleaning
   - Sort ordering (drag & drop), time-based category visibility
 - **Stock mutations for orders:** endpoint/command TCP transactional (reserve/deduct/release) — Order service **does not** write directly to `menu_items` (Phase 2A Step 2.4)
-- Table status updates: receive orders from Order/BFF flow (bill request, transfer saga) in Catalog transactions
+- Table status updates: receive orders from Order/BFF flow (bill request, transfer saga, safe empty-session release) in Catalog transactions. Occupied/billing release must validate the matching `sessionId` before clearing `tables.session_id`.
   - Delete constraints:
 → Do not allow MenuItem to be deleted if order_item exists
 with status IN (Pending, Processing, Ready) links to that menu_item_id
@@ -705,6 +706,7 @@ Caching (Redis):
 ```
 Responsibility:
 - Session Management: durable session in PostgreSQL (Order DB); Redis is active cache/TTL for fast path
+- Empty session recovery: Order owns stale/closed empty-session release and the staff `release_empty_table_session` command; Catalog only updates the table after Order validates tenant/table/session ownership, `orderCount == 0`, no bill and no persisted orders
 - Shared Cart: multi-device cart through Redis Hash + global cart version (optimistic concurrency)
 - Order State Machine: persist from `PENDING` or higher; `DRAFT` refers to cart/UI — see docs/specs/business-logic-step-2.4-spec.md §3.1
 - Stock: Order service **does not** mutate `menu_items`; When confirming (`PENDING → PROCESSING`) calls Catalog service (TCP) to deduct the Catalog transaction
@@ -734,6 +736,7 @@ Redis (active cache — synchronized with durable session):
   - session:{tenant_id}:{session_id} → cache mirror + TTL/idle metadata
 → TTL: 2 hours (session lifetime)
 → Idle check: if last_activity > 30 minutes AND order_count == 0 → auto-close (session with orders will not close)
+→ Redis expiry is not the source of truth. If an empty session becomes stale or is manually released, Order closes the durable session when needed, releases the bound Catalog table by `sessionId`, and deletes `session:*` plus `cart:*`.
 - cart:{tenant_id}:{session_id} → Hash + cart-level version + line ids — see the Step 2.4 specification
     → TTL: bound to session TTL
 
@@ -749,6 +752,13 @@ BFF Direct Side-Effects (AP1 — without Kafka, see §7.3):
 - table.transferred → staff + session rooms (transfer completed)
 - order.ready → BFF emit WS to tenant:{tid}:staff + session:{sid}:customer (when Kitchen TCP/BFF bridge)
 - service.requested → BFF emit WS to tenant:{tid}:staff
+
+Empty Table Session Release:
+Trigger: Staff/Manager clicks the POS safe release action for an occupied table with no active orders.
+- BFF route: `POST /api/v1/admin/tables/:tableId/release-empty-session`
+- TCP command: `order.release_empty_table_session`
+- Permission: `TABLE_UPDATE_STATUS`
+- Order validates same tenant/table/session, `orderCount == 0`, no bill and no persisted orders, then closes the empty session if active, deletes Redis session/cart keys and asks Catalog to mark the matching table available.
 
 Table Transfer (saga-style — non-ACID across Order PG + Catalog PG + Redis):
 Trigger: Staff/Manager moves table
@@ -1305,18 +1315,18 @@ QR URL Format:
 
 ### 11.1 Cache Layers
 
-| Layer                    | Key Pattern                           | Data                               | TTL                | Invalidation                        |
-| ------------------------ | ------------------------------------- | ---------------------------------- | ------------------ | ----------------------------------- |
-| **Token Cache**          | `user-token:{sha256(jwt)}`            | User data + permissions            | 30 min             | Token expiry / logout               |
-| **Menu Cache**           | `menu:{tenant_id}`                    | Full menu JSON                     | 10 min             | Explicit invalidation on menu write |
-| **Table Status**         | `table:{tenant_id}:{table_id}:status` | Status enum                        | No expire          | Explicit update on change           |
-| **Session**              | `session:{tenant_id}:{session_id}`    | Session metadata + last_activity   | 2 hours (lifetime) | On session close / idle 30min       |
-| **Cart**                 | `cart:{tenant_id}:{session_id}`       | Hash of cart items                 | 2 hours            | Bound to session TTL                |
-| **Rate Limit**           | `rl:{endpoint}:{ip/token}`            | Request count                      | Window (s)         | Auto-expire                         |
-| **KDS Queue**            | `kds:{tenant_id}:{station}`           | Sorted Set of tickets              | No expire          | On ticket complete/remove           |
-| **Tenant Suspend**       | `tenant:{tenantId}:suspended`         | Suspend edge flag                  | No expire          | SaaS lifecycle activate/close       |
-| **Current Subscription** | `subscription:{tenantId}`             | Current plan/subscription snapshot | 5 min              | SaaS subscription changes           |
-| **Payment OAuth State**  | `oauth_state:{state}`                 | SePay OAuth CSRF/tenant binding    | 5 min              | Callback consumes key               |
+| Layer                    | Key Pattern                           | Data                               | TTL                | Invalidation                                                              |
+| ------------------------ | ------------------------------------- | ---------------------------------- | ------------------ | ------------------------------------------------------------------------- |
+| **Token Cache**          | `user-token:{sha256(jwt)}`            | User data + permissions            | 30 min             | Token expiry / logout                                                     |
+| **Menu Cache**           | `menu:{tenant_id}`                    | Full menu JSON                     | 10 min             | Explicit invalidation on menu write                                       |
+| **Table Status**         | `table:{tenant_id}:{table_id}:status` | Status enum                        | No expire          | Explicit update on change                                                 |
+| **Session**              | `session:{tenant_id}:{session_id}`    | Session metadata + last_activity   | 2 hours (lifetime) | On session close, idle empty-session close, or safe empty-session release |
+| **Cart**                 | `cart:{tenant_id}:{session_id}`       | Hash of cart items                 | 2 hours            | Bound to session TTL; delete on close/release                             |
+| **Rate Limit**           | `rl:{endpoint}:{ip/token}`            | Request count                      | Window (s)         | Auto-expire                                                               |
+| **KDS Queue**            | `kds:{tenant_id}:{station}`           | Sorted Set of tickets              | No expire          | On ticket complete/remove                                                 |
+| **Tenant Suspend**       | `tenant:{tenantId}:suspended`         | Suspend edge flag                  | No expire          | SaaS lifecycle activate/close                                             |
+| **Current Subscription** | `subscription:{tenantId}`             | Current plan/subscription snapshot | 5 min              | SaaS subscription changes                                                 |
+| **Payment OAuth State**  | `oauth_state:{state}`                 | SePay OAuth CSRF/tenant binding    | 5 min              | Callback consumes key                                                     |
 
 ### 11.2 Redis Access Policy
 

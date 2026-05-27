@@ -2,7 +2,7 @@
 
 > Hướng dẫn đọc codebase QRTable theo đúng kiến trúc hiện tại của dự án.
 >
-> **Last verified:** 2026-05-24, đối chiếu với source code hiện tại sau đợt refactor hỗ trợ Phase 5.
+> **Last verified:** 2026-05-27, đối chiếu với source code hiện tại sau session recovery và domain-label stabilization.
 >
 > **Canonical role:** Tài liệu này là bản đồ đọc code. Khi có xung đột, ưu tiên current code/tests, `docs/README.md`, phase records và accepted specs.
 
@@ -317,7 +317,14 @@ sequenceDiagram
   alt Table is BILLING or CLEANING
     Order-->>BFF: Reject with business error
     BFF-->>PWA: 409 conflict
-  else Table is OCCUPIED
+  else Table is OCCUPIED with stale/closed empty session
+    Order->>OrderDB: Validate empty session has no orders or bill
+    Order->>Catalog: TCP TABLE.UPDATE_STATUS AVAILABLE with matching sessionId
+    Order->>OrderDB: Create Session ACTIVE
+    Order->>Catalog: TCP TABLE.UPDATE_STATUS OCCUPIED with new sessionId
+    Order-->>BFF: New SessionTcpResponse
+    BFF-->>PWA: New session
+  else Table is OCCUPIED with active session
     Order->>OrderDB: Find active session by table.sessionId
     Order->>OrderDB: Touch session activity
     Order-->>BFF: Existing SessionTcpResponse
@@ -343,9 +350,10 @@ sequenceDiagram
 3. BFF `POST /customer/sessions/join` gửi `TCP_REQUEST_MESSAGE.ORDER.SESSION_JOIN`.
 4. Order gọi Catalog `TABLE.VALIDATE_QR_TOKEN` để xác thực table/QR.
 5. Nếu table đang `BILLING` hoặc `CLEANING`, Order reject join.
-6. Nếu table đang `OCCUPIED`, Order lấy session hiện có và touch activity.
-7. Nếu table available, Order tạo `Session`, sau đó gọi Catalog update table status thành `OCCUPIED`.
-8. PWA lưu session context, menu được fetch qua `GET /menu`.
+6. Nếu table đang `OCCUPIED` nhưng session rỗng đã stale/closed, Order release binding cũ theo `sessionId`, rồi tạo session mới.
+7. Nếu table đang `OCCUPIED` với active session hợp lệ, Order lấy session hiện có và touch activity.
+8. Nếu table available, Order tạo `Session`, sau đó gọi Catalog update table status thành `OCCUPIED`.
+9. PWA lưu session context, menu được fetch qua `GET /menu`.
 
 **Lý thuyết cần nắm:**
 
@@ -463,12 +471,14 @@ sequenceDiagram
 | Management UI | `apps/management-app/src/features/order/hooks/use-order-query.ts`                    |
 | BFF           | `apps/bff/src/app/modules/order/controllers/staff-order.controller.ts`               |
 | Order         | `apps/order/src/app/modules/order/services/order.service.ts` facade                  |
+| Order         | `apps/order/src/app/modules/order/services/session.service.ts`                       |
 | Order         | `apps/order/src/app/modules/order/services/order-state-transition.service.ts`        |
 | Order         | `apps/order/src/app/modules/order/services/order-kds-event.service.ts`               |
 | Order         | `apps/order/src/app/modules/order/services/outbox-publisher.service.ts`              |
 | Catalog       | `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts`               |
 | Catalog       | `apps/catalog/src/app/modules/menu-item/repositories/menu-item.repository.ts`        |
 | Tests         | `apps/order/src/app/modules/order/tests/order-state-transition.service.spec.ts`      |
+| Tests         | `apps/order/src/app/modules/order/tests/session.service.spec.ts`                     |
 | Tests         | `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts` |
 
 Flow thực tế:

@@ -231,11 +231,12 @@ available → occupied → billing → cleaning → available
 
 Step 2.4 use Catalog service commands to change table statuses:
 
-| Trigger                             | Switch table status                             | Owner                                                     |
-| ----------------------------------- | ----------------------------------------------- | --------------------------------------------------------- |
-| QR/session starts at desk available | `available → occupied`                          | Catalog command, initialized from BFF/Order session flow  |
-| Customer request bill               | `occupied → billing`                            | Catalog command, initialized from Order bill request flow |
-| Transfer tables                     | old table → `available`; new table → `occupied` | Catalog command with saga semantics                       |
+| Trigger                             | Switch table status                             | Owner                                                         |
+| ----------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
+| QR/session starts at desk available | `available → occupied`                          | Catalog command, initialized from BFF/Order session flow      |
+| Empty/stuck session recovery        | `occupied → available`                          | Order validates empty session, Catalog updates by `sessionId` |
+| Customer request bill               | `occupied → billing`                            | Catalog command, initialized from Order bill request flow     |
+| Transfer tables                     | old table → `available`; new table → `occupied` | Catalog command with saga semantics                           |
 
 Payment completion and `billing → cleaning` belong to Phase 3.
 
@@ -300,6 +301,7 @@ Idle rule: **30 minutes**.
 - Close session.
 - Delete cart key.
 - Mark a table as available if that table is only occupied by this empty session.
+- The same release path can be triggered manually by staff when the bound occupied table has no orders or bill.
 
 2. If `lastActivity > 30 minutes` and `orderCount > 0`:
 
@@ -325,6 +327,7 @@ When a customer scans QR or enters table flow:
 4. If table is `occupied`:
 
 - Join the current active session of the table if billing is not active.
+- If the bound session is stale empty or already closed empty, Order safely releases the old table binding, deletes Redis session/cart keys, and creates a fresh session.
 - Returns the same session ID or binds the client to an existing session according to the BFF/session cookie policy.
 
 5. If table is `billing`:
@@ -1399,18 +1402,19 @@ This section lists the business capabilities needed for Step 2.4. The exact path
 
 ### 16.2 Staff orders
 
-| Capacity                    | Guard/rights                                                                      | Compulsive behavior                                           |
-| --------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| List orders                 | `ORDER_GET_LIST`                                                                  | tenant-scoped POS list.                                       |
-| Get order detail            | `ORDER_GET_BY_ID`                                                                 | tenant-scoped.                                                |
-| Confirm order               | `ORDER_CONFIRM`                                                                   | Deduct stock qua Catalog; `PENDING → PROCESSING`; emit Kafka. |
-| Cancel pending order        | `ORDER_CANCEL_PENDING`                                                            | Staff reject pending.                                         |
-| Cancel processing order     | `ORDER_CANCEL_PROCESSING`                                                         | Manager/Owner + reason.                                       |
-| Acknowledge service request | `SERVICE_REQUEST_ACKNOWLEDGE`                                                     | `PENDING → ACKNOWLEDGED`.                                     |
-| Resolve service request     | `SERVICE_REQUEST_RESOLVE`                                                         | `ACKNOWLEDGED → RESOLVED`.                                    |
-| Transfer table              | `TABLE_TRANSFER`                                                                  | Saga transfer.                                                |
-| Reopen bill before payment  | `TABLE_UPDATE_STATUS` + bill ownership in the same tenant; Owner, MANAGER, WAITER | `PENDING_PAYMENT → OPEN`.                                     |
-| Get bill/list pending bills | Existing/future bill/payment read permission                                      | Needed for POS Bills view.                                    |
+| Capacity                    | Guard/rights                                                                      | Compulsive behavior                                                                           |
+| --------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| List orders                 | `ORDER_GET_LIST`                                                                  | tenant-scoped POS list.                                                                       |
+| Get order detail            | `ORDER_GET_BY_ID`                                                                 | tenant-scoped.                                                                                |
+| Confirm order               | `ORDER_CONFIRM`                                                                   | Deduct stock qua Catalog; `PENDING → PROCESSING`; emit Kafka.                                 |
+| Cancel pending order        | `ORDER_CANCEL_PENDING`                                                            | Staff reject pending.                                                                         |
+| Cancel processing order     | `ORDER_CANCEL_PROCESSING`                                                         | Manager/Owner + reason.                                                                       |
+| Acknowledge service request | `SERVICE_REQUEST_ACKNOWLEDGE`                                                     | `PENDING → ACKNOWLEDGED`.                                                                     |
+| Resolve service request     | `SERVICE_REQUEST_RESOLVE`                                                         | `ACKNOWLEDGED → RESOLVED`.                                                                    |
+| Transfer table              | `TABLE_TRANSFER`                                                                  | Saga transfer.                                                                                |
+| Release empty table session | `TABLE_UPDATE_STATUS`                                                             | Only same-tenant occupied table with matching empty session; no bill and no persisted orders. |
+| Reopen bill before payment  | `TABLE_UPDATE_STATUS` + bill ownership in the same tenant; Owner, MANAGER, WAITER | `PENDING_PAYMENT → OPEN`.                                                                     |
+| Get bill/list pending bills | Existing/future bill/payment read permission                                      | Needed for POS Bills view.                                                                    |
 
 ### 16.3 Permission update required
 

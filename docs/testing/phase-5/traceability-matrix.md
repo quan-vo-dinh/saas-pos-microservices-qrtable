@@ -144,7 +144,7 @@
 
 ### `P0-ORD-SESSION-JOIN` — `covered` (P0, state-machine)
 
-**Requirement:** Customer QR join creates a durable active session for an AVAILABLE table, rejoins an OCCUPIED active session, and rejects session starts for BILLING and CLEANING.
+**Requirement:** Customer QR join creates a durable active session for an AVAILABLE table, rejoins an OCCUPIED active session, safely recovers stale/closed empty occupied sessions, and rejects session starts for BILLING and CLEANING.
 
 **Sources:** `business-logic` (3.C, 4.A); `phase-2a-order-kafka` final scope.
 
@@ -152,7 +152,7 @@
 
 **Target layer:** integration. **Stack:** PostgreSQL, Redis, Catalog TCP, PWA or BFF for E2E.
 
-**Notes:** Step 5.3 external-stack integration now proves live Catalog QR/table-state validation plus Order PostgreSQL/Redis semantics: AVAILABLE creates and caches an active session and moves Catalog to OCCUPIED, OCCUPIED rejoins the active session and refreshes activity, and BILLING/CLEANING reject joins. Run with `NX_SKIP_NX_CACHE=true RUN_PHASE5_ORDER_SESSION_JOIN_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-session-join.integration.spec.ts --runInBand` after PostgreSQL, Redis, and Catalog TCP are ready.
+**Notes:** Step 5.3 external-stack integration now proves live Catalog QR/table-state validation plus Order PostgreSQL/Redis semantics: AVAILABLE creates and caches an active session and moves Catalog to OCCUPIED, OCCUPIED rejoins the active session and refreshes activity, stale/closed empty occupied sessions are released before a fresh session is created, and BILLING/CLEANING reject joins. Staff manual release is covered by Order service, BFF controller and POS table-detail tests. Run with `NX_SKIP_NX_CACHE=true RUN_PHASE5_ORDER_SESSION_JOIN_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-session-join.integration.spec.ts --runInBand` after PostgreSQL, Redis, and Catalog TCP are ready.
 
 ---
 
@@ -544,11 +544,11 @@
 
 **Sources:** `business-logic` (1.A); `technical-architecture` (15.1); `phase-4b-saas-onboarding` accepted decisions.
 
-**Tests:** Catalog table service spec; User-Access user and tenant-user service specs; Order service and order quota service specs; BusinessException and interceptor specs for quota error `details` propagation; SaaS Phase 4B entity shape spec.
+**Tests:** Catalog table service spec; User-Access user and tenant-user service specs; Order service and order quota service specs; SaaS tenant admin service spec for live usage aggregation; BusinessException and interceptor specs for quota error `details` propagation; SaaS Phase 4B entity shape spec.
 
 **Target layer:** unit-contract. **Stack:** mocked SaaS TCP and Redis-like quota counter.
 
-**Notes:** Owner-service enforcement now covers `max_tables`, `max_staff`, and `max_orders_per_day`; missing/inactive/unavailable quota source fails closed; `-1` is unlimited; disabled users do not count toward staff quota; order quota uses an atomic Redis reservation with release on rejected or failed creation and skips idempotency replay. BFF edge checks remain optional fast-feedback coverage.
+**Notes:** Owner-service enforcement now covers `max_tables`, `max_staff`, and `max_orders_per_day`; missing/inactive/unavailable quota source fails closed for enforcement. Dashboard usage display is resolved by SaaS from Catalog table count, User-Access staff count and Order today's count; unavailable display counters degrade to zero at the SaaS aggregation boundary. `-1` is unlimited; disabled users do not count toward staff quota; order quota uses an atomic Redis reservation with release on rejected or failed creation and skips idempotency replay. BFF edge checks remain optional fast-feedback coverage.
 
 ---
 
@@ -582,11 +582,11 @@
 
 ### `P1-SAAS-ADMIN-DASHBOARD-ROUTES` — `covered` (P1, demo)
 
-**Requirement:** Public landing, `/admin/tenants`, `/admin/plans`, `/admin/billing`, `/dashboard/subscription`, `/dashboard/payment-settings`, and OAuth invalid-state must not blank, 401, or 500 with seeded roles.
+**Requirement:** Public landing, `/admin/tenants`, `/admin/plans`, `/admin/billing`, `/dashboard/subscription`, `/dashboard/payment-settings`, and OAuth invalid-state must not blank, 401, or 500 with seeded roles; SaaS/dashboard UI must not render raw wire enum or plan feature codes.
 
 **Sources:** `phase-4b-saas-onboarding` UI surfaces; `phase-5-7-finalization` Step 5.4.
 
-**Tests:** BFF Phase 4B contract spec; SaaS controller specs; management-app dashboard query auth readiness spec; Playwright route smoke `tests/e2e/phase-5-admin-dashboard-routes.spec.ts`.
+**Tests:** BFF Phase 4B contract spec; SaaS controller specs; shared-constants label tests; management-app dashboard query auth readiness spec; Playwright route smoke `tests/e2e/phase-5-admin-dashboard-routes.spec.ts`.
 
 **Target layer:** browser-e2e. **Stack:** management-app, BFF, Keycloak, seeded SUPER_ADMIN, OWNER, and MANAGER.
 

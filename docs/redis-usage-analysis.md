@@ -1,6 +1,6 @@
 # Redis Usage Analysis — Current Implementation and Projected Design
 
-> Date: 2026-05-14
+> Date: 2026-05-27
 > Scope: `docs/business-logic.md`, `docs/technical-architecture.md`, `docs/implementation_plan.md`, `docs/phases/*`, Redis docs/spec, and current code in `apps/`, `libs/`, `tools/`.
 > Objective: clarify all Redis parts in the QRTable system in a way that is easy to read, easy to look up, and easy to verify for Vietnamese people.
 
@@ -371,6 +371,7 @@ Idle close:
 
 - If the session is idle for more than 30 minutes and `orderCount == 0`, Order service marks the PostgreSQL session as `CLOSED`, delete the Redis session key and delete the cart key.
 - If `orderCount > 0`, do not close the session just because it is idle.
+- Staff safe release uses the same empty-session invariant: the session must match tenant/table/session, have `orderCount == 0`, no bill, and no persisted orders. It closes the durable session if needed, asks Catalog to release the matching table by `sessionId`, then deletes both Redis keys.
 
 Read flow:
 
@@ -828,6 +829,8 @@ Customer scans QR
   -> Order Service SESSION_JOIN
       -> Catalog validates table + QR token
       -> if table available: create PostgreSQL session
+      -> if table occupied by stale/closed empty session: release old binding, then create PostgreSQL session
+      -> if table occupied by active session: rejoin current PostgreSQL session
       -> rehydrate Redis session:{tenantId}:{sessionId}
       -> Catalog marks table occupied
 ```

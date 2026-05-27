@@ -945,7 +945,7 @@ Customers do not need an account. The entry point is the table's QR code. QR URL
 
 After the QR is valid, the system resolves the tenant and table. There are many layers of validation here: does the tenant slug exist, does the table belong to that tenant, is the HMAC token correct, what state is the table in and has the request exceeded the rate limit.
 
-If the table is free or the old session is closed, Order creates a new session. If the table is occupied and not yet billed, the customer joins the current session to use the shared cart. If the table is billing, the system locks the order to avoid placing an order after payment has been requested. Then, every API customer must check session ownership so that this customer does not view or edit another table's data.
+If the table is free, Order creates a new session. If the table is occupied by an empty stale or closed session, Order safely releases the old binding and creates a fresh session. If the table is occupied by a valid active session, the customer joins the current shared cart. If the table is billing, the system locks ordering to avoid placing an order after payment has been requested. Then, every customer API must check session ownership so that this customer does not view or edit another table's data.
 
 ---
 

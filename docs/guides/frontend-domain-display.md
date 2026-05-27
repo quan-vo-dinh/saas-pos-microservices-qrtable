@@ -6,7 +6,7 @@
 
 ## Problem
 
-API and database keep **English wire values** (`ACTIVE`, `CONNECTED`, `PENDING_PAYMENT`). The UI must not render those strings directly. Dates and money must use locale formatters, not raw ISO strings or unrounded numbers.
+API and database keep **English wire values** (`ACTIVE`, `CONNECTED`, `PENDING_PAYMENT`) and feature codes (`basic_pos`, `priority_support`). The UI must not render those strings directly. Dates and money must use locale formatters, not raw ISO strings or unrounded numbers.
 
 ## Layered Model (Nx Monorepo)
 
@@ -27,7 +27,7 @@ Backend enum  →  JSON wire value  →  *Vi() in shared-constants  →  Badge/t
 
 ```typescript
 // Plain Vietnamese text
-import { billingPeriodVi, tenantStatusVi } from '@einvoice/shared-constants';
+import { billingPeriodVi, planFeatureVi, tenantStatusVi } from '@einvoice/shared-constants';
 
 // SaaS status badges (management-app only today)
 import { SubscriptionStatusBadge } from '@/features/saas/components/badges';
@@ -37,6 +37,12 @@ import { formatVnd, formatDateTime } from '@/features/saas/formatters';
 ```
 
 Do **not** create app barrels that re-export `@einvoice/shared-constants` together with React components (former `features/saas/display/` anti-pattern).
+
+## Plan Features And Usage
+
+SaaS plan `features` are persisted as backend/API codes. Subscription screens, plan comparison tables, and admin plan pickers must map every feature through `planFeatureVi(code)` before display. Unknown feature codes should fall back through `displayDomainLabel()` behavior, which produces readable title case instead of raw snake/upper case.
+
+The current-plan usage bars are not frontend defaults. They should display service-provided usage values: tables from Catalog, staff from User-Access, and today's orders from Order using the Ho Chi Minh day boundary. If a counter is unavailable, the SaaS backend owns the fallback policy; UI components should not invent usage numbers.
 
 ## SaaS Feature Layout (management-app)
 
@@ -55,7 +61,7 @@ Use `*Vi()` from `@einvoice/shared-constants` directly in components (order trac
 2. Add map + `*Vi()` in `vi-domain-labels.ts` and a unit test in `vi-domain-labels.spec.ts`.
 3. Update app view types if needed (`features/saas/types.ts` should stay aligned with `saas.constants`).
 4. Add or extend a badge in `components/badges/` when the status appears in tables or headers.
-5. Never render `{entity.status}` without mapping in user-facing UI.
+5. Never render `{entity.status}` or raw `plan.features` without mapping in user-facing UI.
 
 ## Related Docs
 

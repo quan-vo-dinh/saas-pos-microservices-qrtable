@@ -1,7 +1,7 @@
 # PROFESSIONAL DOCUMENTS OF RESTAURANT MANAGEMENT SYSTEM
 
 > **ANALYSIS BASED ON QRTABLE.IO AS A PRINCIPAL**
-> **Current Status:** Living business overview, last aligned with implemented Phase 4B on 2026-05-13.
+> **Current Status:** Living business overview, last aligned with implemented Phase 4B and May 27 session/SaaS stabilization on 2026-05-27.
 
 This document describes in detail the core business flows, from initial setup to daily restaurant operations, focusing on the QR-based table ordering (QR-based table ordering) model.
 
@@ -33,6 +33,7 @@ This is the process of creating a restaurant tenant on the platform, attaching O
    - Each tenant can only have one `ACTIVE` subscription at a time. New subscriptions may supersede old subscriptions and must invalidate the associated cache/guard.
    - Auto-suspend subscription expires according to Vietnamese time: daily `02:00 Asia/Ho_Chi_Minh`, grace period 24h (`expires_at + 1 day < now()`).
    - Counter `max_orders_per_day` uses timezone `Asia/Ho_Chi_Minh` for the Vietnamese market.
+   - Current-plan usage counters are live service counts: tables from Catalog, staff from User-Access, and today's orders from Order using the Ho Chi Minh day boundary.
    - tenant pays the platform using subscription invoice `QRSUB*`; `SUPER_ADMIN` has a manual confirm fallback when the webhook fails but the money has been checked.
 
 4. **Set up tenant Payments:**
@@ -174,6 +175,19 @@ Trigger: Customer scans QR for the first time
     - Set table_status = "Occupied"
     - Set session_started_at = current_timestamp
 
+Occupied → Available (Safe Empty Session Release):
+Trigger: Staff releases an empty/stuck table session, or Order recovers a stale empty session on join
+  Condition:
+    - table_status == "Occupied"
+    - session_id matches the Order session
+    - order_count == 0
+    - no bill and no persisted orders exist for that session
+  Action:
+    - Close the empty Order session if it is still active
+    - Delete Redis session/cart keys
+    - Set table_status = "Available"
+    - Clear session_id
+
 Occupied → Billing:
 Trigger: Customer clicks "Request payment"
   Condition:
@@ -216,6 +230,7 @@ Trigger: Staff marks "Completed cleaning"
 - **Unique:** Each store cannot have two tables with the same name or ID.
 - **Delete Constraint:** Do not delete a table if it has orders `Pending`/`Active`.
 - **Move table (Merge/Switch):** Allows staff to transfer the entire shopping cart/order from the old table to the new table and release the old table.
+- **Safe Empty Session Release:** Staff can release an occupied table only when Order proves the bound session is empty: same tenant/table/session, `orderCount == 0`, no bill and no persisted orders. This is not a generic force-unlock.
 
   ```
   Transfer Table Logic:
@@ -249,14 +264,17 @@ The process from the moment the customer scans the QR until the order is sent to
    - **Session Management:**
 
      ```txt
-     IF table_status == "Available" OR last_session_closed > 15 minutes
-     THEN create a new Session with a unique Session_ID
+     IF table_status == "Available"
+     THEN create a new Session, bind table.session_id, and mark the table Occupied
 
-     IF table_status == "Occupied" AND billing_status != "Billing"
+     IF table_status == "Occupied" AND active empty session is stale or already closed
+     THEN Order safely releases the empty session/table and creates a fresh Session
+
+     IF table_status == "Occupied" AND active session is valid
      THEN join current Session (Shared Cart - same cart)
 
-     IF table_status == "Billing"
-     THEN block QR scan, display "Table is paying, please wait"
+     IF table_status == "Billing" OR table_status == "Cleaning"
+     THEN block ordering and show the appropriate waiting message
      ```
 
 - **Shared Cart Logic:** All guests who scan QR at the same table (in the same Session) will see the same shopping cart and can add items together.

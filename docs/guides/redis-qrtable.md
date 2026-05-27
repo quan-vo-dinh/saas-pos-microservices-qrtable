@@ -3,7 +3,7 @@
 > **Document philosophy:** Understand the _why_ before the _how_. Every concept is anchored in context
 > QRTable's specifics so you don't learn abstract theory but learn to apply it immediately.
 >
-> **Current code status (2026-05-22):** This document is a supporting guide. Redis implemented for: cache JWT verification, anonymous customer session, public menu, rate limiting, Socket.io Redis Adapter, KDS runtime store, transfer/rebuild locks, daily order quota counter, tenant suspend flag, subscription cache and SePay OAuth state. Order cart/session uses Redis Hash `cart:{tenantId}:{sessionId}` / `session:{tenantId}:{sessionId}` with `cartVersion` check in the code. KDS Redis access is split behind a `KdsRedisRepository` façade with ticket, SLA and recovery stores. Lua script is a hardening option for cart, not the current implementation. The persistent source of truth (PostgreSQL) is still the place to store tenants, menus, orders, bills, payments and all data that needs auditing.
+> **Current code status (2026-05-27):** This document is a supporting guide. Redis implemented for: cache JWT verification, anonymous customer session, public menu, rate limiting, Socket.io Redis Adapter, KDS runtime store, transfer/rebuild locks, daily order quota counter, tenant suspend flag, subscription cache and SePay OAuth state. Order cart/session uses Redis Hash `cart:{tenantId}:{sessionId}` / `session:{tenantId}:{sessionId}` with `cartVersion` check in the code. Order can safely release stale or manually selected empty table sessions after PostgreSQL validation, then deletes the matching session/cart keys. KDS Redis access is split behind a `KdsRedisRepository` facade with ticket, SLA and recovery stores. Lua script is a hardening option for cart, not the current implementation. The persistent source of truth (PostgreSQL) is still the place to store tenants, menus, orders, bills, payments and all data that needs auditing.
 
 ---
 
@@ -282,7 +282,7 @@ TTL (Time To Live) is the time a key remains alive before Redis deletes itself. 
 
 Consider `oauth_state:{state}` with a 5 minute TTL: this is not "Redis cleans itself up every 5 minutes to save RAM". This is a security requirement — OAuth state is only valid for 5 minutes after creation. If the callback arrives after 5 minutes, the key no longer exists, the flow fails. This is correct behavior.
 
-Similar to `bff-session:{tenantId}:{sessionId}` TTL 2h: when the session expires, the customer must scan the QR again. This is a business rule enforced by TTL.
+Similar to `bff-session:{tenantId}:{sessionId}` TTL 2h: when the edge session expires, the customer may need to re-enter through the QR/PWA flow. For Order-domain sessions, PostgreSQL remains the source of truth; Redis expiry alone does not close a dining session.
 
 Important question when adding a new Redis key: **"How long is the TTL and why?"** — not "is the TTL necessary?". By default there should be TTL. Not having a TTL must be a deliberate decision for a clear reason.
 
@@ -642,15 +642,15 @@ Redis-->>Order: "3" ✓ match
 
     C->>BFF: submitOrder()
 Order->>PG: INSERT order (from cart state)
-    Order->>Redis: DEL cart:t1:sess-abc session:t1:sess-abc
-    Note over Redis: Cleanup after submit
+    Order->>Redis: Clear cart:t1:sess-abc and advance cartVersion
+    Note over Redis: Keep session cache active for tracking, bill and later orders
 ```
 
 **Points to remember:**
 
 - `cartVersion` is optimistic locking at the application layer, not a Redis feature.
 - Cart is draft state in Redis; order persistence is in PostgreSQL.
-- DEL cart/session after submission is proactive cleanup — do not let TTL clean up after 2 hours.
+- Cart cleanup after submission is proactive; session cleanup happens on payment close, idle empty-session close, or safe empty-session release, not immediately after every order.
 
 ### 9.2 Public Menu Cache
 

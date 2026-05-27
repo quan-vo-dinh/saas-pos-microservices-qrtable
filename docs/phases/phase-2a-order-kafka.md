@@ -2,7 +2,7 @@
 
 > **Status:** Done
 > **Canonical Role:** Final phase record after implementation/audit.
-> **Last Updated:** 2026-05-13
+> **Last Updated:** 2026-05-27
 
 ## Final Scope
 
@@ -11,6 +11,7 @@ Phase 2A completes the QR ordering platform for QRTable: customers enter the ses
 The final scope includes:
 
 - QR customer session flow: validate QR/table via Catalog, create or join active session, persist session in Order PostgreSQL and cache active session in Redis.
+- Empty/stuck table recovery: safely release an occupied table when its bound Order session is empty, stale or already closed.
 - Shared cart by session: Redis cart, optimistic `cartVersion`, conflict when client uses old version, lock cart when bill is waiting for payment.
 - Order lifecycle: cart/UI `DRAFT`, DB order starts from `PENDING`, staff confirm to `PROCESSING`, kitchen can send order/item to `READY`, service staff to `SERVED`, cancel according to state, and `COMPLETED` belongs to payment completion in the next phase.
 - Bill/session lifecycle: a current bill for the active session, created at the first order submission, aggregate orders that have not been canceled, `OPEN -> PENDING_PAYMENT` when the customer requests the bill.
@@ -21,6 +22,7 @@ The final scope includes:
 
 - Order service is the source of truth for session, cart snapshot, order, order item, bill and service request; Catalog is the source of truth for menu items, stock, table status, QR token and `MenuItem.station`.
 - Session is a durable entity in PostgreSQL. Redis key `session:{tenantId}:{sessionId}` is an active cache with a TTL of 2 hours; idle close after 30 minutes only applies when `orderCount == 0`.
+- Redis expiry is not a source of truth. Order may close and release an empty session only after validating same tenant/table/session, `orderCount == 0`, no bill and no persisted orders.
 - Cart is in Redis key `cart:{tenantId}:{sessionId}` with `cartVersion`. REST snapshot is the standard data source after reconnection; WebSocket/realtime event is just a hint to invalidate/refetch.
 - `DRAFT` does not create DB order row. Submit cart creates order `PENDING`, clear cart after success, and use `idempotencyKey` to avoid repeated submissions.
 - Submit only validates snapshot availability. Stock deduction only occurs when staff confirm `PENDING -> PROCESSING` via Catalog TCP transactional command (`STOCK_DEDUCT_FOR_ORDER`); cancel processing calls release/restore via Catalog policy (`STOCK_RELEASE_FOR_ORDER`).
@@ -30,10 +32,11 @@ The final scope includes:
 - Bill request requires an empty cart and orders that have not been canceled have been served; When valid, bill goes to `PENDING_PAYMENT`, cart goes to `LOCKED`, table goes to `billing`.
 - Customer only cancels order `PENDING` in his session. Staff cancel separates permissions `order.cancel_pending` and `order.cancel_processing`; cancel processing requires reason.
 - Switch tables using saga-style consistency with Redis locks, Order DB update, Catalog table status update and realtime `tableTransferred`; Does not require ACID transactions across all stores.
+- Staff safe-release for stuck empty tables is intentionally narrower than force unlock. It uses `TABLE_UPDATE_STATUS`, BFF route `POST /api/v1/admin/tables/:tableId/release-empty-session`, and TCP command `order.release_empty_table_session`.
 
 ## Final Business Behavior
 
-Guests scan the QR to join the session. If the table is available, the system creates a new session, sets the table occupied via Catalog and caches the session for the PWA. If the occupied table has a valid session, the customer rejoins that session. Tables that are billing or cleaning do not accept new order sessions.
+Guests scan the QR to join the session. If the table is available, the system creates a new session, sets the table occupied via Catalog and caches the session for the PWA. If the occupied table has a valid session, the customer rejoins that session. If the occupied table points to an empty stale or already closed session, Order safely releases the old session/table binding and creates a fresh session. Tables that are billing or cleaning do not accept new order sessions.
 
 Customers add/edit/delete items in cart according to `expectedCartVersion`; The server rejects the old mutation with a conflict so the client can refetch the snapshot. Cart line can combine the same items/notes in the same session before submitting; This is cart behavior, not KDS batching.
 
@@ -45,17 +48,17 @@ Customer or staff can cancel `PENDING`; Owner/Manager can cancel `PROCESSING` wi
 
 Customer requests bill after cart is empty and item is served. Bill transfers `PENDING_PAYMENT`, cart is locked, table transfers billing, and staff receives service/bill realtime hint. Full payment, refund, split bill and settlement belong to the following phases, although the current code has expansion points for Phase 3+.
 
-service requests `CALL_STAFF`, `GENERAL_HELP`, `REQUEST_BILL` are stored in the Order domain; staff acknowledge/resolve via POS. Table transfer preserves session id, updates table snapshot in Order DB, Redis session metadata, Catalog table statuses and realtime hint.
+service requests `CALL_STAFF`, `GENERAL_HELP`, `REQUEST_BILL` are stored in the Order domain; staff acknowledge/resolve via POS. Table transfer preserves session id, updates table snapshot in Order DB, Redis session metadata, Catalog table statuses and realtime hint. POS staff can also release an occupied empty table session after confirmation; Order rejects the command when any order or bill exists.
 
 ## Final Technical Behavior
 
 Service ownership after Phase 2A:
 
-- Order Service owns PostgreSQL entities `sessions`, `orders`, `order_items`, `bills`, `service_requests`, `outbox_events`; Redis cart/session semantics; order state transitions; bill request; table transfer; stock-deduct/release orchestration through Catalog; and Kafka `order.confirmed` outbox production.
+- Order Service owns PostgreSQL entities `sessions`, `orders`, `order_items`, `bills`, `service_requests`, `outbox_events`; Redis cart/session semantics; order state transitions; bill request; table transfer; safe empty-session release; stock-deduct/release orchestration through Catalog; and Kafka `order.confirmed` outbox production.
 - Catalog Service owns QR token validation, table status transitions, menu item snapshots, stock and station metadata. Order stores denormalized table/menu/station snapshots for history and display only.
 - BFF owns HTTP edge routes, staff permission guards, customer session/tenant context, TCP orchestration, and direct WebSocket emits after successful service responses.
 - Customer PWA owns QR session persistence, cart/order/bill API usage, idempotency key creation, optimistic cart UX with server reconciliation, and realtime invalidation/refetch for session-scoped data.
-- Management App POS owns staff order list/detail/actions, service-request handling, table transfer surfaces and hybrid polling/realtime invalidation.
+- Management App POS owns staff order list/detail/actions, service-request handling, table transfer surfaces, empty-table release surface and hybrid polling/realtime invalidation.
 - Shared types in `libs/shared/types` define `OrderStatus`, `OrderItemStatus`, `BillStatus`, `SessionStatus`, `ServiceRequestStatus`, transition matrices and event payload contracts shared by FE/BE.
 
 Kafka/event behavior:
@@ -67,7 +70,7 @@ Kafka/event behavior:
 
 ## Acceptance Evidence
 
-Implementation evidence present in the repo on 2026-05-13:
+Implementation evidence present in the repo on 2026-05-13, with May 27 session hardening:
 
 - Order domain services, repositories and tests cover session join/cache, cart version conflicts, submit/confirm/cancel/serve, bill request/reopen/payment hooks, service requests, transfer table and Kafka payload construction. `OrderService` remains the TCP-facing façade while submit flow, state transitions and KDS event mapping are delegated to focused services.
 - BFF customer/admin controllers expose cart, orders, bill, service request, staff order actions and transfer endpoints with tenant/session context and permission guards.
@@ -75,6 +78,7 @@ Implementation evidence present in the repo on 2026-05-13:
 - Customer PWA order hooks/services use live BFF APIs for cart, orders, current bill, bill request, idempotency and session-scoped realtime invalidation.
 - Management App order/service/table hooks and POS surfaces use live BFF/Catalog APIs with polling plus realtime invalidation.
 - Shared type tests cover transition matrices and enum completeness for the Order/Bill/Service Request contracts.
+- May 27 hardening adds unit/controller/UI tests for stale occupied joins and `release_empty_table_session`: `session.service.spec.ts`, `order.service.spec.ts`, `order-session-join.integration.spec.ts`, `staff-order.controller.spec.ts`, `order.service.spec.ts` in management-app, and `table-detail-panel.spec.tsx`.
 
 ## Handoff / Deferred Work
 
