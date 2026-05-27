@@ -16,6 +16,7 @@ enum USER {
   UPSERT_WITH_TENANT = 'user.upsert_with_tenant',
   UPSERT_TENANT_OWNER_PROFILE = 'user.upsert_tenant_owner_profile',
   COUNT_BY_TENANT = 'user.count_by_tenant',
+  FIND_OWNER_BY_TENANT = 'user.find_owner_by_tenant',
   DISABLE_TENANT_USERS = 'user.disable_tenant_users',
   DISABLE = 'user.disable',
 }
@@ -152,6 +153,7 @@ enum ORDER {
   GET_LIST = 'order.get_list',
   GET_SESSION_LIST = 'order.get_session_list',
   GET_BY_ID = 'order.get_by_id',
+  COUNT_TODAY_BY_TENANT = 'order.count_today_by_tenant',
   CONFIRM = 'order.confirm',
   CANCEL_PENDING = 'order.cancel_pending',
   CANCEL_PROCESSING = 'order.cancel_processing',
@@ -165,6 +167,7 @@ enum ORDER {
   BILL_REQUEST = 'order.bill_request',
   BILL_REOPEN = 'order.bill_reopen',
   TABLE_TRANSFER = 'order.table_transfer',
+  RELEASE_EMPTY_TABLE_SESSION = 'order.release_empty_table_session',
   KDS_ACTIVE_ORDERS_GET = 'order.kds_active_orders_get',
   MARK_ITEMS_READY = 'order.mark_items_ready',
   REVERT_ITEMS_PROCESSING = 'order.revert_items_processing',

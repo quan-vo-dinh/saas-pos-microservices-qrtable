@@ -59,4 +59,10 @@ export class UserController {
     const result = await this.tenantUserService.countTenantUsers(data);
     return Response.success(result);
   }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.FIND_OWNER_BY_TENANT)
+  async findOwnerByTenant(@RequestParams() data: { tenantId: string }) {
+    const user = await this.tenantUserService.findOwnerByTenantId(data.tenantId);
+    return Response.success(user);
+  }
 }

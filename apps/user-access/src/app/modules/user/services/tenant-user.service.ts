@@ -54,4 +54,8 @@ export class TenantUserService {
     });
     return { tenantId: request.tenantId, count };
   }
+
+  findOwnerByTenantId(tenantId: string) {
+    return this.userRepository.findOwnerByTenantId(tenantId);
+  }
 }

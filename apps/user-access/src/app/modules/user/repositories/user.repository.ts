@@ -102,6 +102,15 @@ export class UserRepository {
     return this.userModel.findOne({ email }).exec();
   }
 
+  async findOwnerByTenantId(tenantId: string): Promise<User | null> {
+    const ownerRole = await this.roleModel.findOne({ name: ROLE.OWNER }).exec();
+    if (!ownerRole?._id) {
+      return null;
+    }
+
+    return this.userModel.findOne({ tenantId, isActive: true, roles: ownerRole._id }).populate('roles').exec();
+  }
+
   async exists(email: string) {
     const result = await this.userModel.exists({ email }).exec();
 

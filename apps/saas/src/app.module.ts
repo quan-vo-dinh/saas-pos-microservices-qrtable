@@ -43,6 +43,8 @@ import { TenantSuspendCronService } from './services/tenant-suspend-cron.service
     ClientsModule.registerAsync([
       TcpProvider(TCP_SERVICES.AUTHORIZER_SERVICE),
       TcpProvider(TCP_SERVICES.USER_ACCESS_SERVICE),
+      TcpProvider(TCP_SERVICES.CATALOG_SERVICE),
+      TcpProvider(TCP_SERVICES.ORDER_SERVICE),
       TcpProvider(TCP_SERVICES.PAYMENT_SERVICE),
     ]),
     TypeOrmModule.forFeature([Tenant, PricingPlan, Subscription, SubscriptionInvoice, SaasOutboxEvent]),
