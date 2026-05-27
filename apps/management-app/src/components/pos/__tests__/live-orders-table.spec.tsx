@@ -127,6 +127,21 @@ describe('POS live order UI', () => {
     expect(screen.queryByRole('button', { name: 'Nhận' })).not.toBeNull();
   });
 
+  it('uses readable sizing for live order row labels and actions', () => {
+    mockUseOrdersQuery.mockReturnValue({
+      data: [baseOrder],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<LiveOrdersTable />);
+
+    expect(screen.getByText('Bàn 01').className).toContain('text-sm');
+    expect(screen.getByRole('button', { name: 'Nhận' }).className).toContain('h-8');
+    expect(screen.getByRole('button', { name: 'Nhận' }).className).toContain('text-xs');
+  });
+
   it('disables the confirm button while the matching confirm mutation is pending', () => {
     mockUseOrdersQuery.mockReturnValue({
       data: [baseOrder],

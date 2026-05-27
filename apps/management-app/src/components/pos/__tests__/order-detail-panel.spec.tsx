@@ -91,6 +91,20 @@ describe('OrderDetailPanel', () => {
     );
   });
 
+  it('uses readable sizing for order detail item content', () => {
+    mockUseOrderDetailQuery.mockReturnValue({
+      data: orderWithCatalogImage,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<OrderDetailPanel orderId="order-1" />);
+
+    expect(screen.getByText('Phở bò').className).toContain('text-sm');
+    expect(screen.getByText('1').className).toContain('text-sm');
+  });
+
   it('shows a serve action for READY orders', () => {
     const mutate = jest.fn();
     mockUseMarkOrderServedMutation.mockReturnValue({

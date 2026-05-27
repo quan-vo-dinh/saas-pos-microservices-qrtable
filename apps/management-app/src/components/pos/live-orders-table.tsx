@@ -132,7 +132,7 @@ export function LiveOrdersTable() {
           const id = row.original.id;
           const s = id.slice(-4);
           return (
-            <span className="font-mono text-xs tabular-nums text-muted-foreground" title={id}>
+            <span className="font-mono text-[0.8rem] tabular-nums text-muted-foreground" title={id}>
               {s}
             </span>
           );
@@ -142,7 +142,7 @@ export function LiveOrdersTable() {
       {
         id: 'table',
         header: 'Bàn / khu',
-        cell: ({ row }) => <span className="max-w-[8rem] truncate text-xs font-medium">{row.original.tableName}</span>,
+        cell: ({ row }) => <span className="max-w-[9rem] truncate text-sm font-medium">{row.original.tableName}</span>,
       },
       {
         id: 'count',
@@ -152,17 +152,17 @@ export function LiveOrdersTable() {
           return (
             <HoverCard>
               <HoverCardTrigger asChild>
-                <span className="text-xs text-muted-foreground underline decoration-dotted" tabIndex={0}>
+                <span className="text-sm text-muted-foreground underline decoration-dotted" tabIndex={0}>
                   {o.items.length}
                 </span>
               </HoverCardTrigger>
-              <HoverCardContent className="w-64 p-2" align="start" side="bottom">
-                <p className="text-[0.7rem] font-medium text-foreground/90">Nội dung ({o.items.length} món)</p>
-                <ul className="mt-1 flex max-h-40 flex-col gap-0.5 overflow-y-auto pr-0.5 text-xs">
+              <HoverCardContent className="w-72 p-2.5" align="start" side="bottom">
+                <p className="text-sm font-medium text-foreground/90">Nội dung ({o.items.length} món)</p>
+                <ul className="mt-1.5 flex max-h-40 flex-col gap-1 overflow-y-auto pr-0.5 text-sm">
                   {o.items.slice(0, 6).map((it) => (
-                    <li key={it.id} className="flex items-center justify-between gap-1">
+                    <li key={it.id} className="flex items-center justify-between gap-1.5">
                       <span className="truncate">{it.menuItemName}</span>
-                      <Badge className={cn('shrink-0 px-1 text-[0.6rem]', orderItemStatusChipClass(it.status))}>
+                      <Badge className={cn('h-6 shrink-0 px-2 text-xs', orderItemStatusChipClass(it.status))}>
                         {orderItemStatusVi(it.status)}
                       </Badge>
                     </li>
@@ -178,14 +178,14 @@ export function LiveOrdersTable() {
         id: 'total',
         header: 'Tổng',
         cell: ({ row }) => (
-          <span className="font-mono text-xs text-foreground tabular-nums">{formatVnd(row.original.totalAmount)}</span>
+          <span className="font-mono text-sm text-foreground tabular-nums">{formatVnd(row.original.totalAmount)}</span>
         ),
       },
       {
         id: 'status',
         header: 'TT',
         cell: ({ row }) => (
-          <Badge className={cn('h-5 px-1.5 text-[0.6rem] font-medium', orderStatusChipClass(row.original.status))}>
+          <Badge className={cn('h-6 px-2 text-xs font-medium', orderStatusChipClass(row.original.status))}>
             {orderStatusVi(row.original.status)}
           </Badge>
         ),
@@ -210,20 +210,20 @@ export function LiveOrdersTable() {
               .join(' · ') ||
             '';
           if (!n) {
-            return <span className="text-muted-foreground/50">—</span>;
+            return <span className="text-sm text-muted-foreground/50">—</span>;
           }
           return (
             <HoverCard>
               <HoverCardTrigger asChild>
                 <button
                   type="button"
-                  className="text-muted-foreground"
+                  className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground"
                   aria-label="Xem toàn bộ ghi chú"
                 >
                   <MessageSquareText className="size-4" />
                 </button>
               </HoverCardTrigger>
-              <HoverCardContent className="w-64 text-xs" align="end">
+              <HoverCardContent className="w-72 text-sm" align="end">
                 {n}
               </HoverCardContent>
             </HoverCard>
@@ -240,13 +240,13 @@ export function LiveOrdersTable() {
           if (o.status === OrderStatus.PENDING) {
             return (
               <div
-                className="flex flex-nowrap items-center justify-end gap-0.5"
+                className="flex flex-nowrap items-center justify-end gap-1"
                 onClick={(e) => e.stopPropagation()}
                 onKeyDown={(e) => e.stopPropagation()}
               >
                 <Button
                   type="button"
-                  className="h-7 px-2 text-[0.7rem]"
+                  className="h-8 px-2.5 text-xs"
                   onClick={() => confirmOrderMutation.mutate(o.id)}
                   disabled={isConfirming}
                 >
@@ -255,7 +255,7 @@ export function LiveOrdersTable() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-7 px-2 text-[0.7rem]"
+                  className="h-8 px-2.5 text-xs"
                   onClick={() => {
                     setCancelTarget({ orderId: o.id, orderStatus: o.status });
                     selectRow(o.id);
@@ -275,7 +275,7 @@ export function LiveOrdersTable() {
               >
                 <Button
                   type="button"
-                  className="h-7 px-2 text-[0.7rem]"
+                  className="h-8 px-2.5 text-xs"
                   onClick={() => markServedMutation.mutate(o.id)}
                   disabled={isServing}
                 >
@@ -284,7 +284,7 @@ export function LiveOrdersTable() {
               </div>
             );
           }
-          return <span className="text-xs text-muted-foreground">—</span>;
+          return <span className="text-sm text-muted-foreground">—</span>;
         },
         size: 150,
       },
@@ -300,7 +300,7 @@ export function LiveOrdersTable() {
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollParentRef.current,
-    estimateSize: () => 28,
+    estimateSize: () => 40,
     overscan: 12,
     enabled: useVirtual,
   });
@@ -309,15 +309,15 @@ export function LiveOrdersTable() {
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" data-slot="pos-live-orders">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="text-xs text-muted-foreground">Live API · {rows.length} hiển thị</p>
+          <p className="text-sm text-muted-foreground">Live API · {rows.length} hiển thị</p>
           {ordersQuery.isError ? (
-            <p className="text-xs text-destructive">{getErrorDisplayMessage(ordersQuery.error as Error)}</p>
+            <p className="text-sm text-destructive">{getErrorDisplayMessage(ordersQuery.error as Error)}</p>
           ) : null}
         </div>
         <div className="inline-flex min-w-0 max-w-full items-center justify-end">
           <ToggleGroup
             type="single"
-            className="flex h-auto min-w-0 max-w-full flex-wrap justify-end gap-0.5 p-0.5"
+            className="flex h-auto min-w-0 max-w-full flex-wrap justify-end gap-1 p-1"
             value={chip}
             onValueChange={(v) => {
               if (!v) return;
@@ -328,7 +328,7 @@ export function LiveOrdersTable() {
             aria-label="Lọc trạng thái nhanh"
           >
             {QUICK.map((q) => (
-              <ToggleGroupItem key={q.id} value={q.value} className="h-6 px-1.5 text-[0.6rem]">
+              <ToggleGroupItem key={q.id} value={q.value} className="h-8 px-2 text-xs">
                 {q.label}
               </ToggleGroupItem>
             ))}
@@ -348,9 +348,9 @@ export function LiveOrdersTable() {
           </colgroup>
           <TableHeader className={useVirtual ? 'sticky top-0 z-10 bg-background' : undefined}>
             {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id} className="h-7 hover:bg-transparent">
+              <TableRow key={hg.id} className="h-9 hover:bg-transparent">
                 {hg.headers.map((h) => (
-                  <TableHead key={h.id} className="p-1 text-[0.65rem] text-muted-foreground" style={{ width: h.getSize() }}>
+                  <TableHead key={h.id} className="px-1.5 py-2 text-xs text-muted-foreground" style={{ width: h.getSize() }}>
                     {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
                   </TableHead>
                 ))}
@@ -385,7 +385,7 @@ export function LiveOrdersTable() {
                         data-state={selectedRowId === o.id ? 'selected' : undefined}
                         onClick={() => void selectRow(o.id)}
                         className={cn(
-                          'absolute left-0 top-0 box-border h-7 w-full cursor-pointer border-b border-border/30 text-sm leading-tight',
+                          'absolute left-0 top-0 box-border h-10 w-full cursor-pointer border-b border-border/30 text-sm leading-snug',
                           selectedRowId === o.id && 'bg-muted/60',
                         )}
                         style={{ transform: `translateY(${vr.start}px)` }}
@@ -424,7 +424,7 @@ export function LiveOrdersTable() {
                         data-state={selectedRowId === o.id ? 'selected' : undefined}
                         onClick={() => void selectRow(o.id)}
                         className={cn(
-                          'h-7 cursor-pointer border-b border-border/30 text-sm leading-tight',
+                          'h-10 cursor-pointer border-b border-border/30 text-sm leading-snug',
                           selectedRowId === o.id && 'bg-muted/60',
                         )}
                       >
@@ -474,9 +474,9 @@ function WaitCell({ order, nowMs }: { order: Order; nowMs: number }) {
         ? 'from-amber-500/25 to-transparent'
         : 'from-destructive/30 to-transparent animate-pulse';
   return (
-    <div className={cn('rounded border border-transparent bg-gradient-to-r p-0.5 text-[0.65rem]', c)}>
+    <div className={cn('rounded border border-transparent bg-gradient-to-r p-1 text-xs leading-tight', c)}>
       <span className="block truncate text-muted-foreground">{label}</span>
-      <span className="font-mono text-[0.7rem] tabular-nums">{m.toFixed(0)}&apos;</span>
+      <span className="font-mono text-[0.8rem] tabular-nums">{m.toFixed(0)}&apos;</span>
     </div>
   );
 }

@@ -94,12 +94,12 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
       <div className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="font-mono text-xs text-muted-foreground">#{order.id}</p>
-            <p className="text-sm font-medium">{order.tableName}</p>
+            <p className="font-mono text-[0.8rem] text-muted-foreground">#{order.id}</p>
+            <p className="text-base font-medium">{order.tableName}</p>
           </div>
           <AnimatePresence mode="wait">
             <motion.div key={order.status} layout>
-              <Badge className={cn('border-0 font-normal', orderStatusChipClass(order.status))}>
+              <Badge className={cn('h-6 border-0 px-2 text-xs font-normal', orderStatusChipClass(order.status))}>
                 {orderStatusVi(order.status)}
               </Badge>
             </motion.div>
@@ -132,20 +132,20 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
             </Button>
           ) : null}
         </div>
-        <p className="text-xs text-muted-foreground">Tổng {formatVnd(order.totalAmount)}</p>
+        <p className="text-sm text-muted-foreground">Tổng {formatVnd(order.totalAmount)}</p>
       </div>
 
       <Separator />
 
       <Tabs defaultValue="items" className="min-h-0 flex-1 flex flex-col gap-2">
-        <TabsList className="h-8 w-full justify-start">
-          <TabsTrigger className="text-xs" value="items">
+        <TabsList className="h-9 w-full justify-start">
+          <TabsTrigger className="text-sm" value="items">
             Món
           </TabsTrigger>
-          <TabsTrigger className="text-xs" value="activity">
+          <TabsTrigger className="text-sm" value="activity">
             Nhật ký
           </TabsTrigger>
-          <TabsTrigger className="text-xs" value="customer">
+          <TabsTrigger className="text-sm" value="customer">
             Khách
           </TabsTrigger>
         </TabsList>
@@ -153,16 +153,16 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
           <ScrollArea className="h-[min(50vh,420px)] rounded-md border border-border/40 pr-1">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="h-9">
                   <TableHead className="w-8" />
-                  <TableHead>Món</TableHead>
-                  <TableHead className="w-20 text-end">SL</TableHead>
-                  <TableHead className="w-24">Trạng thái</TableHead>
+                  <TableHead className="text-sm">Món</TableHead>
+                  <TableHead className="w-20 text-end text-sm">SL</TableHead>
+                  <TableHead className="w-28 text-sm">Trạng thái</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {order.items.map((it) => (
-                  <TableRow key={it.id}>
+                  <TableRow key={it.id} className="h-12">
                     <TableCell>
                       <Checkbox
                         checked={it.status === OrderItemStatus.SERVED}
@@ -178,21 +178,21 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
                             alt={it.menuItemName}
                             className="rounded-md object-cover"
                           />
-                          <AvatarFallback className="rounded-md text-[0.6rem]">
+                          <AvatarFallback className="rounded-md text-xs">
                             {it.menuItemName.slice(0, 2)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span className="truncate text-xs font-medium">{it.menuItemName}</span>
+                          <span className="truncate text-sm font-medium">{it.menuItemName}</span>
                           {it.note ? (
-                            <em className="text-[0.7rem] leading-tight text-muted-foreground">{it.note}</em>
+                            <em className="text-xs leading-snug text-muted-foreground">{it.note}</em>
                           ) : null}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-end font-mono text-xs tabular-nums">{it.quantity}</TableCell>
+                    <TableCell className="text-end font-mono text-sm tabular-nums">{it.quantity}</TableCell>
                     <TableCell>
-                      <Badge className={cn('px-1 font-mono text-[0.65rem]', orderItemStatusChipClass(it.status))}>
+                      <Badge className={cn('px-2 font-mono text-xs', orderItemStatusChipClass(it.status))}>
                         {orderItemStatusVi(it.status)}
                       </Badge>
                     </TableCell>
@@ -201,16 +201,16 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
               </TableBody>
             </Table>
           </ScrollArea>
-          {order.notes ? <p className="mt-1 text-xs text-muted-foreground">Ghi chú: {order.notes}</p> : null}
+          {order.notes ? <p className="mt-1 text-sm text-muted-foreground">Ghi chú: {order.notes}</p> : null}
         </TabsContent>
         <TabsContent value="activity" className="min-h-0">
-          <ul className="flex flex-col gap-2 pl-0 text-xs">
+          <ul className="flex flex-col gap-2 pl-0 text-sm">
             {events.map((ev) => (
               <li
                 key={`${ev.at}-${ev.text}`}
                 className="flex gap-2 border-s-2 border-border ps-2"
               >
-                <span className="shrink-0 font-mono text-[0.65rem] text-muted-foreground">
+                <span className="shrink-0 font-mono text-xs text-muted-foreground">
                   {new Date(ev.at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 <span className="text-foreground/90">{ev.text}</span>
@@ -219,7 +219,7 @@ export function OrderDetailPanel({ orderId }: { orderId: string }) {
           </ul>
         </TabsContent>
         <TabsContent value="customer" className="min-h-0">
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-sm">
             <Avatar className="size-8">
               <AvatarImage src="" alt="" />
               <AvatarFallback>
