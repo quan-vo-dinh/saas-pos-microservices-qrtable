@@ -1,11 +1,32 @@
-# SePay configuration instructions for QRTable — Phase 3 (VietQR + Webhook)
+# SePay configuration instructions for QRTable — VietQR, webhooks, OAuth Connect
 
-This document describes **from start to finish** the steps that need to be taken **in addition to the codebase** (SePay dashboard, bank account, public URL, environment variables) to get the static **VietQR flow + receive transactions via Bank Hub** to work with BFF/Payment service according to the Phase 3 design.
+This document describes **from start to finish** the steps needed **outside the codebase** (SePay dashboard, bank account, public URL, environment variables) so QRTable can receive Bank Hub webhooks and run **Tier 1 OAuth Connect** (tenant bill payments) and **Tier 2 subscription** (platform `QRSUB`) flows.
 
-**Internal reference:** [phase-3-payment.md](../phases/phase-3-payment.md)
-**SePay technical reference (Context7 — `developer.sepay.vn`):** Bank Hub webhook, JSON payload, header `X-Secret-Key`, API sandbox.
+**Internal references:** [phase-3-payment.md](../phases/phase-3-payment.md), [phase-4b-saas-onboarding.md](../phases/phase-4b-saas-onboarding.md), [phase-5-sepay-local-mock-testing-policy.md](../testing/phase-5/specs/phase-5-sepay-local-mock-testing-policy.md), [tools/sepay/README.md](../../tools/sepay/README.md) (manual OAuth smoke before go-live).
 
-> **Status after refactor docs 2026-05-14:** This guide is still useful for configuring SePay Bank Hub/SECRET_KEY mode in the dashboard, but the current code of direct Phase 3 route has been harden to HMAC raw-body (`X-SePay-Signature` / `X-SePay-Timestamp`). Route tenant/platform Phase 4B uses its own `x-secret-key` path. Before production, clearly select the actual route/auth and re-sync the SePay dashboard, BFF guard, and this document.
+**SePay technical reference:** [developer.sepay.vn](https://developer.sepay.vn) — Bank Hub webhook, OAuth2 Connect, sandbox transaction API.
+
+> **Last synced with code:** 2026-05-26 (`a484992` tenant OAuth connect hardening, `867bd09` platform webhook `Authorization: Apikey`, `QRSUB` match from `content` when `code` is null).
+
+---
+
+## 0. Three BFF webhook routes (do not mix them)
+
+All paths are under BFF global prefix `api/v1` (see `AppModule.CONFIGURATION.GLOBAL_PREFIX`).
+
+| Route                          | Full path                                        | Tier                           | Auth accepted by BFF                                                        | Secret / verification                                   | Billing reference                                  |
+| ------------------------------ | ------------------------------------------------ | ------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
+| **Legacy direct (Phase 3)**    | `POST /api/v1/payment/sepay/webhook`             | Dev/legacy VietQR              | `X-SePay-Signature` + `X-SePay-Timestamp` (HMAC raw body)                   | `SEPAY_WEBHOOK_SECRET`                                  | `QRTBL` + 8 chars (`code` or `content`)            |
+| **Tenant (Phase 4B Tier 1)**   | `POST /api/v1/payment/sepay/webhook/:tenantSlug` | Customer → tenant bills        | `x-secret-key`, `api-key`, `x-api-key`, or `Authorization: Apikey <secret>` | Per-tenant secret stored by Payment after OAuth Connect | `QRTBL`                                            |
+| **Platform (Phase 4B Tier 2)** | `POST /api/v1/payment/sepay/webhook/platform`    | Tenant → platform subscription | Same headers as tenant route                                                | `SEPAY_PLATFORM_WEBHOOK_SECRET` (SaaS verifies)         | `QRSUB` (+ match from `content` if `code` is null) |
+
+**Common mistakes during re-setup:**
+
+- Registering only the Phase 3 URL while testing **subscription** (`QRSUB`) — use **`/webhook/platform`**.
+- Registering tenant URL without **tenant slug** in the path — URL must match `PUBLIC_API_BASE_URL` + `/api/v1/payment/sepay/webhook/{slug}` (shown in Management App payment settings after connect).
+- SePay dashboard sends `Authorization: Apikey <secret>` but BFF was configured only for `x-secret-key` — current BFF accepts both (since 2026-05-26).
+
+Tier 1 webhook URL is **created/configured during OAuth Connect** (Payment service), not copied from the Phase 3 single URL.
 
 ---
 
@@ -28,21 +49,32 @@ SePay has many products. **QRTable Phase 3** uses the model:
    - **Sandbox:** suitable for dev/demo; There is a transaction simulation API (see section 9).
    - **Production:** needs a real HTTPS domain, a bank account to receive real money linked to SePay.
 
-2. **Prepare QRTable webhook URL (BFF)**
-   Destination endpoint after deploying code (according to repo documentation):
+2. **Prepare QRTable webhook URLs (BFF)** — pick the row from section 0:
 
    ```text
+   # Phase 3 legacy / HMAC lab
    https://<bff-host>/api/v1/payment/sepay/webhook
+
+   # Phase 4B Tier 1 — replace {tenantSlug} (e.g. pho-viet)
+   https://<bff-host>/api/v1/payment/sepay/webhook/{tenantSlug}
+
+   # Phase 4B Tier 2 — platform subscription
+   https://<bff-host>/api/v1/payment/sepay/webhook/platform
    ```
 
-- `<bff-host>`: BFF's public hostname (local dev often needs **tunnel** — see section 8).
-  - **HTTPS** is a production standard; The Bank Hub API documentation also notes that HTTPS is required in real time.
+   `<bff-host>` must be reachable from the internet (tunnel or staging). Management App shows the tenant webhook URL when `PUBLIC_API_BASE_URL` is set.
 
-3. **Prepare the env value to match the selected auth webhook**
-   - `SEPAY_WEBHOOK_SECRET` — secret used for the current HMAC direct route or SECRET_KEY mode if the route is configured according to that path.
-   - `SEPAY_PLATFORM_WEBHOOK_SECRET` — secret server-side for route platform subscription Phase 4B (`QRSUB`).
-   - `PAYMENT_SEPAY_QR_ACCOUNT`, `PAYMENT_SEPAY_QR_BANK` — **correct** receiving account used in VietQR URL (`acc`, `bank`).
-   - `BILL_REF_PREFIX` — by default the project uses `QRTBL` (bill reference code in the CK content).
+3. **Prepare env values** (see `.env.example`):
+
+   | Variable                                             | Used for                                                                                    |
+   | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+   | `SEPAY_WEBHOOK_SECRET`                               | HMAC route `POST .../payment/sepay/webhook` only                                            |
+   | `SEPAY_PLATFORM_WEBHOOK_SECRET`                      | Platform route `.../webhook/platform` (`QRSUB`)                                             |
+   | `SEPAY_OAUTH_*`                                      | Tier 1 OAuth Connect (`SEPAY_OAUTH_BASE_URL`, `CLIENT_ID`, `CLIENT_SECRET`, `REDIRECT_URI`) |
+   | `PUBLIC_API_BASE_URL`                                | BFF public origin for generated tenant webhook URLs                                         |
+   | `PAYMENT_SECRETS_ENCRYPTION_KEY`                     | Encrypt tenant OAuth tokens and webhook secrets in Payment DB                               |
+   | `PAYMENT_SEPAY_QR_ACCOUNT` / `PAYMENT_SEPAY_QR_BANK` | Static VietQR `acc` / `bank` when not using tenant OAuth account                            |
+   | `BILL_REF_PREFIX`                                    | Default `QRTBL`; subscription uses `QRSUB` via `BILL_REF_PREFIXES.SUBSCRIPTION` in code     |
 
 ---
 
@@ -66,12 +98,14 @@ SePay has many products. **QRTable Phase 3** uses the model:
 
 ### 4.1. Important fields (according to SePay documentation)
 
-- **`webhook_url`:** BFF's full HTTPS URL, e.g.:
+Pick the URL from **section 0** (legacy HMAC vs `/{tenantSlug}` vs `/platform`). Examples:
 
-  `https://api.yourdomain.com/api/v1/payment/sepay/webhook`
+- Tier 2 platform: `https://api.yourdomain.com/api/v1/payment/sepay/webhook/platform`
+- Tier 1 tenant: `https://api.yourdomain.com/api/v1/payment/sepay/webhook/{tenantSlug}`
+- Phase 3 lab only: `https://api.yourdomain.com/api/v1/payment/sepay/webhook` (HMAC — not for `QRSUB`)
 
-- **`auth_type`:** select **`SECRET_KEY`** — SePay will send header **`X-Secret-Key`** (only if you configure this type).
-- **`secret_key`:** secret string; You copy **the same value** into env `SEPAY_WEBHOOK_SECRET` on the BFF side.
+- **`auth_type`:** for tenant/platform routes, **`SECRET_KEY`** with header **`X-Secret-Key`** or **`Authorization: Apikey <secret>`** (BFF accepts both). Legacy HMAC route uses `X-SePay-Signature` / `X-SePay-Timestamp` instead.
+- **`secret_key`:** platform → `SEPAY_PLATFORM_WEBHOOK_SECRET`; tenant → stored per tenant after OAuth Connect; legacy → `SEPAY_WEBHOOK_SECRET`.
 - **`active`:** enable webhooks (e.g. `1`).
 - **`allow_events`:** SePay UI/API dependency; You can use `["*"]` to receive all events (follow the Upsert webhook API example in the Bank Hub documentation). For Phase 3, the main flow is **input transactions** — making sure not to accidentally turn off the relevant event type.
 
@@ -110,7 +144,9 @@ According to [Webhook integration](https://developer.sepay.vn/vi/sepay-webhooks/
 
 ---
 
-## 6. Step 4 — Configure “payment code” recognition (prefix `QRTBL`)
+## 6. Step 4 — Configure payment code recognition (`QRTBL` and `QRSUB`)
+
+### 6.1 Restaurant bills — prefix `QRTBL`
 
 According to the SePay documentation, field `code` is populated when SePay **recognizes** a pattern in the content — the configuration is located at **Company → General Configuration** (dashboard).
 
@@ -118,6 +154,14 @@ According to the SePay documentation, field `code` is populated when SePay **rec
 
 1. Enable/configure code recognition with prefix **`QRTBL`** (matches `BILL_REF_PREFIX` in env).
 2. Purpose: when a customer transfers money with content containing `QRTBLXXXXXXXX`, the webhook may have a different `code` than `null`, helping to match the bill faster; if still `null`, the backend can still fallback the regex on `content`.
+
+### 6.2 Platform subscription — prefix `QRSUB`
+
+For Tier 2 subscription invoices, transfer content must contain a reference matching `QRSUB` + 10 alphanumeric characters (see `subscription-invoice.service.ts`). Configure SePay code recognition for **`QRSUB`** when possible.
+
+If SePay leaves `code` null, SaaS still parses `content` / `referenceCode` (fixed 2026-05-26). Always include the full `QRSUB…` string in the transfer description when testing manually.
+
+Platform webhook URL: `https://<bff>/api/v1/payment/sepay/webhook/platform` with secret `SEPAY_PLATFORM_WEBHOOK_SECRET` (header `x-secret-key` or `Authorization: Apikey …`).
 
 ---
 
@@ -136,7 +180,13 @@ Once you have the value from SePay and your bank account, configure the monorepo
 | `BILL_REF_PREFIX`               | Usually `QRTBL`                                                                                                                                                                                                                    |
 | `PAYMENT_TYPEORM_DATABASE`      | **Staging/production:** separate database for Payment (eg `qrtable_payment`). Dev can fallback `TYPEORM_DATABASE`; See phase record `docs/phases/phase-3-payment.md` and Payment architecture in `docs/technical-architecture.md`. |
 
-**Authentication explanation:** Original Guide Phase 3 configures SePay SECRET_KEY mode (`X-Secret-Key`). The current BFF code for the direct route verifies the HMAC raw-body with `SEPAY_WEBHOOK_SECRET`; tenant/platform routes Phase 4B uses its own `x-secret-key` path. tenant route `QRTBL` verify secret stored by tenant in Payment DB; platform route `QRSUB` now verifies with `SEPAY_PLATFORM_WEBHOOK_SECRET`. Do not mix these paths during demo/production.
+**Authentication explanation:**
+
+- **Direct route:** HMAC only (`verify-sepay-webhook-secret.ts` + `SepayWebhookSecretGuard`).
+- **Tenant/platform routes:** Plain secret in header — `x-secret-key`, `api-key`, `x-api-key`, or `Authorization: Apikey <token>` / `Bearer <token>`. SaaS/Payment compare to stored platform or per-tenant secret.
+- **OAuth Connect:** Requires `SEPAY_OAUTH_CLIENT_ID`, `SEPAY_OAUTH_CLIENT_SECRET`, `SEPAY_OAUTH_REDIRECT_URI` registered in SePay; Payment validates secrets before consuming OAuth `state` (commit `a484992`). Manual credential check: [tools/sepay/README.md](../../tools/sepay/README.md).
+
+Do not point all three routes at the same SePay webhook entry unless you intentionally use the same auth model (they differ).
 
 **Pipeline webhook BFF (safe refactor):** (1) `SepayWebhookSecretGuard` or equivalent — reject early if secret is wrong; (2) `ValidationPipe` + DTO runtime (`class-validator`) on Bank Hub body — reject malformed payload before calling Payment over TCP. The endpoint is still a public URL but **doesn't** receive arbitrary, unvalidated JSON.
 
@@ -191,27 +241,31 @@ Request with **access token** OAuth/API (401 if wrong token). This endpoint help
 
 ## 11. Summary checklist (print and tick)
 
-| #   | Things to do                                                                                   | Done |
-| --- | ---------------------------------------------------------------------------------------------- | ---- |
-| 1   | Have a SePay account + STK link to receive money                                               | ☐    |
-| 2   | Webhook URL = `https://<bff>/api/v1/payment/sepay/webhook`                                     | ☐    |
-| 3   | Select the current auth: direct HMAC webhook or the SECRET_KEY route/path that needs hardening | ☐    |
-| 4   | Copy/transfer the corresponding secret to `SEPAY_WEBHOOK_SECRET`                               | ☐    |
-| 5   | `PAYMENT_SEPAY_QR_ACCOUNT` / `PAYMENT_SEPAY_QR_BANK` matches VietQR                            | ☐    |
-| 6   | Prefix identification configuration `QRTBL` (Company → General configuration)                  | ☐    |
-| 7   | BFF public HTTPS (tunnel/staging) for dev                                                      | ☐    |
-| 8   | Test sandbox `transaction/create` or real CK                                                   | ☐    |
+| #   | Things to do                                                                                | Done |
+| --- | ------------------------------------------------------------------------------------------- | ---- |
+| 1   | SePay account + bank linked (tenant + platform accounts as needed)                          | ☐    |
+| 2   | **Tier 1:** OAuth app + `SEPAY_OAUTH_*` + redirect URI matches Management callback          | ☐    |
+| 3   | **Tier 1:** Connect in `/dashboard/payment-settings` → select bank → webhook URL shows slug | ☐    |
+| 4   | **Tier 2:** Webhook URL = `.../api/v1/payment/sepay/webhook/platform` + platform secret     | ☐    |
+| 5   | **Phase 3 lab (optional):** `.../payment/sepay/webhook` + HMAC `SEPAY_WEBHOOK_SECRET`       | ☐    |
+| 6   | SePay code rules: `QRTBL` (bills) and `QRSUB` (subscription)                                | ☐    |
+| 7   | `PUBLIC_API_BASE_URL` points to public BFF (tunnel/staging/prod)                            | ☐    |
+| 8   | Test: sandbox `transaction/create` or real transfer with correct `content`                  | ☐    |
 
 ---
 
 ## 12. Troubleshooting common problems
 
-| Symptoms                                       | Processing directions                                                                                                              |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Webhook not reaching BFF                       | Check SePay URL, tunnel is alive, correct path `/api/v1/payment/sepay/webhook`.                                                    |
-| 401 Unauthorized                               | Wrong auth header according to route being used or env `SEPAY_WEBHOOK_SECRET` wrong characters/spaces.                             |
-| There is a webhook but the bill does not match | `content` does not contain `QRTBL...`; or amount `< rounded_total`; or `transferType` not `in`.                                    |
-| `code` is also `null`                          | Check the code identification configuration at SePay; Matching via regex `content` is still possible if the content is sufficient. |
+| Symptoms                                  | Processing directions                                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Webhook not reaching BFF                  | Tunnel alive; URL matches **tier** (platform vs `/{slug}` vs legacy); path includes `/api/v1`.                                  |
+| 401 on platform subscription              | Use `SEPAY_PLATFORM_WEBHOOK_SECRET`; try `Authorization: Apikey <secret>` if dashboard sends that instead of `x-secret-key`.    |
+| 401 on tenant bills                       | Re-connect SePay; secret is per-tenant in DB, not `SEPAY_PLATFORM_WEBHOOK_SECRET`.                                              |
+| 401 on legacy route                       | HMAC headers + `SEPAY_WEBHOOK_SECRET`; raw body must be preserved for signature.                                                |
+| OAuth callback fails / invalid state      | `SEPAY_OAUTH_REDIRECT_URI` must match SePay app exactly; `PUBLIC_API_BASE_URL` set; secrets validated before state consume.     |
+| Webhook OK but bill not paid              | `content` missing `QRTBL…`; amount &lt; rounded total; `transferType` not `in`.                                                 |
+| Webhook OK but subscription not activated | Wrong URL (not `/platform`); `content` missing `QRSUB…`; amount mismatch; invoice still `PENDING` past `qrExpiresAt` (expired). |
+| `code` is null                            | Configure SePay prefixes; backend still parses `content` for `QRTBL`/`QRSUB` when content is complete.                          |
 
 ---
 

@@ -56,7 +56,7 @@ Implemented HTTP surfaces include:
 
 - Staff BFF: `POST /payment/vietqr/create-qr`, `POST /payment/cash/confirm`, `GET /payment/history`, `POST /payment/refund/request`, `POST /payment/refund/confirm`.
 - Customer BFF: `POST /customer/bill/request`, `GET /customer/bill/current`, `POST /customer/payment/vietqr/create-qr`.
-- SePay webhook routes: the direct Phase 3 route `POST /payment/sepay/webhook` returns raw `{ "success": true }` after Payment TCP succeeds and currently verifies raw-body HMAC headers `X-SePay-Signature` / `X-SePay-Timestamp`. The post-Phase-4B tenant route `POST /payment/sepay/webhook/:tenantSlug` routes Tier 1 webhook payloads to Payment Service with `x-secret-key` presence checking at the BFF edge.
+- SePay webhook routes (BFF global prefix `api/v1`): direct Phase 3 `POST /api/v1/payment/sepay/webhook` (HMAC raw body, raw `{ "success": true }` response); Phase 4B tenant `POST /api/v1/payment/sepay/webhook/:tenantSlug` (Tier 1 `QRTBL`, secret per tenant); platform `POST /api/v1/payment/sepay/webhook/platform` (Tier 2 `QRSUB`). See [sepay-configuration-guide-phase3.md](../guides/sepay-configuration-guide-phase3.md) §0.
 
 Implemented TCP/event contracts include:
 

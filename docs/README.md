@@ -23,14 +23,14 @@ If current code and an accepted spec disagree, verify the behavior in code first
 
 ## Supporting Docs
 
-| Folder           | Role                                                                                                                                                               |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `architecture/`  | ERD, diagrams, permission matrix, and derived architecture artifacts. `architecture/permission-matrix.md` is canonical for RBAC only after verification with code. |
-| `guides/`        | Setup and operation guides that are still useful for development, deployment, or maintenance.                                                                      |
-| `references/`    | Long-form references that are too detailed for core docs but still current and linked from canonical docs when relevant.                                           |
-| `specs/`         | Accepted specs that still add detail not yet absorbed into phase or core docs.                                                                                     |
-| `testing/`       | Testing execution plans, traceability matrices, and handoff notes derived from canonical phase/testing strategy.                                                   |
-| `presentations/` | Thesis and presentation assets; not an engineering source of truth.                                                                                                |
+| Folder           | Role                                                                                                                                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `architecture/`  | ERD, diagrams, permission matrix, and derived architecture artifacts. `architecture/permission-matrix.md` is canonical for RBAC only after verification with code.                                                                                                              |
+| `guides/`        | Setup and operation guides that are still useful for development, deployment, or maintenance. Includes [frontend domain display](guides/frontend-domain-display.md) and [SePay / VietQR / OAuth](guides/sepay-configuration-guide-phase3.md) (three webhook routes + Tier 1/2). |
+| `references/`    | Long-form references that are too detailed for core docs but still current and linked from canonical docs when relevant.                                                                                                                                                        |
+| `specs/`         | Accepted specs that still add detail not yet absorbed into phase or core docs.                                                                                                                                                                                                  |
+| `testing/`       | Testing execution plans, traceability matrices, and handoff notes derived from canonical phase/testing strategy.                                                                                                                                                                |
+| `presentations/` | Thesis and presentation assets; not an engineering source of truth.                                                                                                                                                                                                             |
 
 ## English Writing Standard
 
@@ -71,3 +71,7 @@ If a rule affects architecture, service ownership, data ownership, Redis, Kafka,
 If roadmap, status, sequencing, or deferred work changes, update `implementation_plan.md`.
 
 If permissions or roles change, update `architecture/permission-matrix.md` and verify the change against code.
+
+If SePay webhook routes, OAuth env, or payment connection behavior changes, update `guides/sepay-configuration-guide-phase3.md` and verify against `apps/bff` (`sepay-webhook.controller.ts`, `payment.controller.ts`).
+
+If frontend display enums or SaaS badge layout changes, update `guides/frontend-domain-display.md` and `libs/shared/constants` (`vi-domain-labels.ts`, `saas-wire-types.ts` must stay aligned with `libs/constants/saas.constants.ts`).

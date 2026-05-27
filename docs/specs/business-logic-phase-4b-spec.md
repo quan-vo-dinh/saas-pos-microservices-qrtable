@@ -5,6 +5,8 @@
 > **Status:** ✅ **Finalized** after Phase 4B audit rounds and Q1–Q25 decisions of the project Owner.
 > **Purpose:** This document is the **finalized architecture + business standard** for Phase 4B. Not implementation plan, not task code decomposition. Final deployment status see [Phase 4B record](../phases/phase-4b-saas-onboarding.md).
 
+> **Operational source of truth (2026-05-26):** For **current routes, env vars, and setup steps**, prefer [phase-4b-saas-onboarding.md](../phases/phase-4b-saas-onboarding.md), [sepay-configuration-guide-phase3.md](../guides/sepay-configuration-guide-phase3.md), and [frontend-domain-display.md](../guides/frontend-domain-display.md) over older sections in this spec if they disagree with code on `main`.
+
 ---
 
 ## 0. Record of Decision (Locked)

@@ -168,6 +168,7 @@ Lưu ý quan trọng: `AGENTS.md` mô tả target standards của dự án. Tron
 | `docs/guides/websocket-socketio-qrtable.md`       | Đọc khi trace realtime.                                             |
 | `docs/guides/keycloak-qrtable.md`                 | Đọc khi trace auth/Keycloak.                                        |
 | `docs/guides/sepay-configuration-guide-phase3.md` | Đọc khi trace VietQR/SePay setup.                                   |
+| `docs/guides/frontend-domain-display.md`          | Map enum wire → nhãn UI; cấu trúc `vi-domain-labels`, SaaS badges.  |
 
 Sau đó đọc phase records theo thứ tự:
 
@@ -760,7 +761,7 @@ sequenceDiagram
   Payment-->>BFF: QR presentation
   BFF-->>PWA: QR URL and payment info
 
-  SePay->>BFF: POST /payment/sepay/webhook
+  SePay->>BFF: POST /api/v1/payment/sepay/webhook/{tenantSlug} (Tier 1) or /platform (Tier 2 QRSUB)
   BFF->>BFF: SepayWebhookSecretGuard
   BFF->>Payment: TCP PAYMENT.HANDLE_SEPAY_WEBHOOK
   Payment->>Payment: Extract billReference and verify tenant secret if tenant route
@@ -787,7 +788,7 @@ sequenceDiagram
 
 1. UI gọi `POST /payment/vietqr/create-qr` hoặc customer route từ BFF.
 2. Payment tạo pending payment, generate bill reference và QR presentation.
-3. SePay webhook vào `POST /payment/sepay/webhook`.
+3. SePay webhook vào BFF: Tier 1 `POST /api/v1/payment/sepay/webhook/:tenantSlug`, Tier 2 `.../webhook/platform`, hoặc legacy HMAC `.../payment/sepay/webhook` (xem [sepay-configuration-guide-phase3.md](sepay-configuration-guide-phase3.md) §0).
 4. `SepayWebhookService` verify tenant webhook secret nếu dùng tenant route, extract bill reference, lock payment, check duplicate/underpaid.
 5. Nếu valid, mark payment `PAID`, audit, outbox `payment.completed`, gọi Order mark bill paid.
 6. Order consume/mark paid idempotently nếu event đi qua async path.
@@ -811,9 +812,13 @@ sequenceDiagram
 | Layer         | Files                                                                           |
 | ------------- | ------------------------------------------------------------------------------- |
 | Management UI | `apps/management-app/src/features/saas/api.ts`                                  |
+| Management UI | `apps/management-app/src/features/saas/README.md` (layering: labels vs badges)  |
+| Management UI | `apps/management-app/src/features/saas/components/badges/*`                     |
+| Management UI | `libs/shared/constants/src/lib/vi-domain-labels.ts`                             |
 | Management UI | `apps/management-app/src/features/saas/admin-tenants/onboard-tenant-dialog.tsx` |
 | Management UI | `apps/management-app/src/features/saas/subscription/*`                          |
 | Management UI | `apps/management-app/src/features/saas/payment-settings/*`                      |
+| Customer PWA  | `apps/customer-pwa` pages using `*Vi()` from `@einvoice/shared-constants`       |
 | BFF           | `apps/bff/src/app/modules/saas/controllers/*.ts`                                |
 | BFF           | `apps/bff/src/app/modules/saas/saas-bff-routes.ts`                              |
 | SaaS          | `apps/saas/src/controllers/saas.controller.ts`                                  |
@@ -1102,27 +1107,27 @@ sequenceDiagram
 
 Đọc shared libs sau khi đã nắm flow, vì lúc đó bạn mới hiểu contract nào được dùng ở đâu.
 
-| Lib path                      | Current role                                                               |
-| ----------------------------- | -------------------------------------------------------------------------- |
-| `libs/configuration`          | Config modules, TCP service tokens, Redis/throttler config.                |
-| `libs/constants`              | TCP messages, role/permission enum, RedisKey, WsRoom, SaaS constants.      |
-| `libs/interfaces`             | Gateway DTOs, TCP request/response interfaces, gRPC proto/contracts.       |
-| `libs/entities`               | TypeORM entities shared by backend services.                               |
-| `libs/schemas`                | Mongo/Mongoose schemas for user-access.                                    |
-| `libs/guards`                 | BFF global guards.                                                         |
-| `libs/middlewares`            | Logger/tenant middleware.                                                  |
-| `libs/interceptors`           | Exception/TCP logging interceptors.                                        |
-| `libs/decorators`             | Authorization, permission, request/process decorators.                     |
-| `libs/error-messages`         | BusinessException, ErrorCode, i18n error registry, DB error transformer.   |
-| `libs/providers/redis-client` | Redis client module/service.                                               |
-| `libs/providers/cloudinary`   | Cloudinary integration.                                                    |
-| `libs/utils`                  | Shared backend utilities, request helpers, VND rounding checks.            |
-| `libs/shared/types`           | Cross-platform shared frontend/backend types exposed as `@einvoice/types`. |
-| `libs/shared/constants`       | Cross-platform constants.                                                  |
-| `libs/frontend/ui`            | Frontend UI components.                                                    |
-| `libs/frontend/hooks`         | Shared frontend hooks.                                                     |
-| `libs/frontend/utils`         | Shared frontend utilities.                                                 |
-| `libs/shared/mock-data`       | Mock/seed data for frontend/test contexts.                                 |
+| Lib path                      | Current role                                                                            |
+| ----------------------------- | --------------------------------------------------------------------------------------- |
+| `libs/configuration`          | Config modules, TCP service tokens, Redis/throttler config.                             |
+| `libs/constants`              | TCP messages, role/permission enum, RedisKey, WsRoom, SaaS constants.                   |
+| `libs/interfaces`             | Gateway DTOs, TCP request/response interfaces, gRPC proto/contracts.                    |
+| `libs/entities`               | TypeORM entities shared by backend services.                                            |
+| `libs/schemas`                | Mongo/Mongoose schemas for user-access.                                                 |
+| `libs/guards`                 | BFF global guards.                                                                      |
+| `libs/middlewares`            | Logger/tenant middleware.                                                               |
+| `libs/interceptors`           | Exception/TCP logging interceptors.                                                     |
+| `libs/decorators`             | Authorization, permission, request/process decorators.                                  |
+| `libs/error-messages`         | BusinessException, ErrorCode, i18n error registry, DB error transformer.                |
+| `libs/providers/redis-client` | Redis client module/service.                                                            |
+| `libs/providers/cloudinary`   | Cloudinary integration.                                                                 |
+| `libs/utils`                  | Shared backend utilities, request helpers, VND rounding checks.                         |
+| `libs/shared/types`           | Cross-platform shared frontend/backend types exposed as `@einvoice/types`.              |
+| `libs/shared/constants`       | Cross-platform constants; `vi-domain-labels.ts` maps wire enums → Vietnamese UI labels. |
+| `libs/frontend/ui`            | Frontend UI components.                                                                 |
+| `libs/frontend/hooks`         | Shared frontend hooks.                                                                  |
+| `libs/frontend/utils`         | Shared frontend utilities.                                                              |
+| `libs/shared/mock-data`       | Mock/seed data for frontend/test contexts.                                              |
 
 **Cần đọc kỹ:**
 

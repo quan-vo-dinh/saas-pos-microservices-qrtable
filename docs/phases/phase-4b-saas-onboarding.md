@@ -2,7 +2,7 @@
 
 > **Status:** Done
 > **Canonical Role:** Final phase record after implementation and audit.
-> **Last Updated:** 2026-05-13
+> **Last Updated:** 2026-05-26
 
 ## Final Scope
 
@@ -35,6 +35,9 @@ The final scope includes:
 - Suspended tenant can still process the SePay webhook for the created bill, order `PROCESSING` is still completed by the kitchen, and the client receives a warning banner instead of force-disconnect.
 - `/admin/*` belongs to `management-app`; Phase 4B does not separate the app admin platform separately. Landing page is static pricing/contact/login page reading public plans.
 - Phase 4B does not add notification/email suspension; That part belongs to Phase 4C.
+- **UI display contract:** Wire enums stay English in API/DB; management-app and customer-pwa map statuses, billing periods, plan features, and connection states to Vietnamese via `@einvoice/shared-constants` (`vi-domain-labels.ts`). SaaS badges live under `management-app/src/features/saas/components/badges/`. See [frontend-domain-display.md](../guides/frontend-domain-display.md).
+- Subscription invoices in `PENDING` auto-transition to `EXPIRED` after `qrExpiresAt` (scheduled job in SaaS service).
+- Admin tenant list shows owner display name/email; `owner_id` is persisted on onboard with optional DB backfill and runtime lookup fallback when legacy rows lack `owner_id`.
 
 ## Final Business Behavior
 
@@ -79,6 +82,7 @@ Implementation and stabilization evidence on 2026-05-13 showed the phase is comp
 - Browser verification covered SUPER_ADMIN admin routes, OWNER subscription/payment-settings routes, public landing, mobile responsive surfaces, OAuth invalid-state handling, and active Customer PWA QR flow. No blank pages, 401/500 dashboard screens, console crashes, or exposed SePay secrets were observed in those checks.
 - Suspended Customer PWA behavior is covered by automated tests and component/guard checks. Real browser verification for a suspended tenant was limited by missing suspended seed route/data in the available local UI.
 - Stabilization on 2026-05-26 tightened SUPER_ADMIN plan/onboarding/billing behavior: active plans are loaded from SaaS instead of fake UI defaults, onboarding forwards the Owner temporary password, plan code update is blocked, VND amounts are rounded through the shared utility, `UNDERPAID` subscription invoices can be manually confirmed after audit evidence, and manual confirm uses an app dialog instead of browser confirm.
+- Further stabilization (2026-05-26): systematic frontend label mapping for SaaS/dashboard surfaces (subscription status, billing period, SePay connection status, invoice/tenant badges); SePay platform webhook accepts `Authorization: Apikey` as well as `x-secret-key`; `QRSUB` billing reference resolved from transfer content when `code` is null; invoice cancel flows for admin and owner; billing list enriches tenant name/slug.
 
 ## Handoff / Deferred Work
 
@@ -86,7 +90,8 @@ Implementation and stabilization evidence on 2026-05-13 showed the phase is comp
 - Phase 4C owns notification/email flows such as welcome/suspend/expiry messaging and reset-password email improvements.
 - Phase 4C should absorb deferred Phase 4B communication flows: welcome email from `tenant.created`, tenant suspended email via direct task/TCP (not Kafka), subscription warning/expired email, and Owner password reset/Required Action handoff.
 - Suspended Customer PWA browser verification still needs a reliable suspended seed route or demo fixture so manual route-level smoke can match automated coverage.
-- Production SePay setup still requires public BFF/webhook URLs, platform webhook secret, OAuth redirect registration, and live provider-side validation.
-- Tenant/platform `x-secret-key` webhook value verification needs production hardening against stored platform/tenant secrets; current documented route shape is correct, but security verification must be rechecked before go-live.
+- Production SePay setup still requires public BFF/webhook URLs, platform webhook secret, OAuth redirect registration, and live provider-side validation. Operator checklist: [sepay-configuration-guide-phase3.md](../guides/sepay-configuration-guide-phase3.md) (section 0 — three webhook routes).
+- Tenant/platform webhook auth accepts `x-secret-key`, `api-key`, `x-api-key`, or `Authorization: Apikey <secret>`; platform secret is `SEPAY_PLATFORM_WEBHOOK_SECRET`. Recheck stored secrets and SePay dashboard auth mode before go-live.
 - Existing production databases created before the 2026-05-26 actor-id fix must alter SaaS actor columns from `uuid` to `varchar(64)` before deploying the fixed code: `subscriptions.created_by_user_id`, `subscription_invoices.requested_by_user_id`, and `subscription_invoices.manually_confirmed_by_user_id`.
 - Hard-delete, retention cleanup, tenant data erasure policy, transfer ownership, promotions/discounts, webhook replay dashboard, and partial subscription refund/proration are out of scope for Phase 4B.
+- ESLint or review rule to block raw `{status}` rendering in user-facing SaaS components is not implemented yet; convention is documented in [frontend-domain-display.md](../guides/frontend-domain-display.md). FE wire types: `libs/shared/constants/saas-wire-types.ts` (must match `libs/constants/saas.constants.ts`).

@@ -2519,16 +2519,19 @@ Phỏng vấn nên nói:
 
 Frontend không nên tự định nghĩa lại domain type/status/formatter:
 
-| Nhu cầu                 | Dùng trong repo hiện tại     | Ý nghĩa                                           |
-| ----------------------- | ---------------------------- | ------------------------------------------------- |
-| Domain types            | `@einvoice/types`            | shared FE/BE contract: Order, Bill, Session, Menu |
-| Domain labels/constants | `@einvoice/shared-constants` | status labels, query config                       |
-| UI primitives           | `@einvoice/frontend-ui`      | shadcn-style shared components                    |
-| Utilities               | `@einvoice/frontend-utils`   | api client, currency formatter, error helpers     |
+| Nhu cầu                 | Dùng trong repo hiện tại                              | Ý nghĩa                                                    |
+| ----------------------- | ----------------------------------------------------- | ---------------------------------------------------------- |
+| Domain types            | `@einvoice/types`                                     | shared FE/BE contract: Order, Bill, Session, Menu          |
+| Domain labels/constants | `@einvoice/shared-constants`                          | `*Vi()` label maps (`vi-domain-labels.ts`), `QUERY_CONFIG` |
+| UI primitives           | `@einvoice/frontend-ui`                               | shadcn-style shared components                             |
+| Utilities               | `@einvoice/frontend-utils`                            | api client, currency formatter, error helpers              |
+| SaaS status badges      | `management-app/.../features/saas/components/badges/` | Presentation only; labels still from shared-constants      |
+
+**Display rule:** API returns English enums; UI calls `orderStatusVi`, `subscriptionStatusVi`, `billingPeriodVi`, etc. Do not render `{row.status}` raw. Details: [frontend-domain-display.md](../guides/frontend-domain-display.md).
 
 Khi trả lời phỏng vấn:
 
-> "Tôi cố gắng không duplicate enum/status/type ở frontend. Shared types giúp UI compile-time align với backend contract, nhất là order status, bill status và realtime event payload."
+> "Tôi cố gắng không duplicate enum/status/type ở frontend. Shared types giúp UI compile-time align với backend contract; shared-constants chứa map nhãn tiếng Việt; component Badge chỉ là lớp presentation."
 
 ## 37. Data Flow: BFF, Tenant, Query Cache, Realtime
 

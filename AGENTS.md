@@ -142,12 +142,28 @@ User-Access → TCP: User profile, roles, staff. DB: qrtable_auth (MongoDB).
 
 ### Cross-Platform & Frontend
 
-| Path                   | Import alias     | Chứa gì                                       |
-| ---------------------- | ---------------- | --------------------------------------------- |
-| `libs/shared/types/`   | `@qrtable/types` | TypeScript interfaces, DTOs (FE + BE)         |
-| `libs/shared/utils/`   | `@qrtable/utils` | Pure functions, formatters (incl. `roundVnd`) |
-| `libs/frontend/ui/`    | `@qrtable/ui`    | Shadcn-based UI components                    |
-| `libs/frontend/hooks/` | `@qrtable/hooks` | React Query hooks, WebSocket hooks            |
+| Path                     | Import alias                                 | Chứa gì                                                                      |
+| ------------------------ | -------------------------------------------- | ---------------------------------------------------------------------------- |
+| `libs/shared/types/`     | `@qrtable/types`                             | TypeScript interfaces, DTOs (FE + BE)                                        |
+| `libs/shared/constants/` | `@einvoice/shared-constants` (repo hiện tại) | `vi-domain-labels` (\*Vi), `saas-wire-types` (SaaS wire enums), query config |
+| `libs/shared/utils/`     | `@qrtable/utils`                             | Pure functions, formatters (incl. `roundVnd`)                                |
+| `libs/frontend/ui/`      | `@qrtable/ui`                                | Shadcn-based UI components                                                   |
+| `libs/frontend/hooks/`   | `@qrtable/hooks`                             | React Query hooks, WebSocket hooks                                           |
+
+### Tài liệu canonical (đồng bộ với code)
+
+Trước khi đổi webhook SePay, OAuth, enum hiển thị UI, hoặc cấu trúc `features/saas/` — đọc và cập nhật doc tương ứng:
+
+| Chủ đề                            | Doc                                               |
+| --------------------------------- | ------------------------------------------------- |
+| Map tài liệu                      | `docs/README.md`                                  |
+| Enum wire → nhãn UI               | `docs/guides/frontend-domain-display.md`          |
+| SePay / VietQR / 3 webhook routes | `docs/guides/sepay-configuration-guide-phase3.md` |
+| Phase 4B final behavior           | `docs/phases/phase-4b-saas-onboarding.md`         |
+
+**UI:** API trả enum tiếng Anh → map qua `*Vi()` từ `@einvoice/shared-constants`; badge SaaS ở `management-app/.../features/saas/components/badges/`. **Không** render `{status}` raw trên UI.
+
+**SaaS types (FE):** import `SaasSubscriptionStatus`, … từ `@einvoice/shared-constants` (file `saas-wire-types.ts` — phải khớp `libs/constants/saas.constants.ts`).
 
 ---
 
@@ -196,6 +212,12 @@ User-Access → TCP: User profile, roles, staff. DB: qrtable_auth (MongoDB).
 
 ❌ Code đã comment out còn tồn tại
 → Xóa đi — git history lưu giữ rồi
+
+❌ Render enum wire (ACTIVE, CONNECTED, PENDING) trực tiếp trên UI
+→ `*Vi()` từ `@einvoice/shared-constants`; badge ở `features/saas/components/badges/`
+
+❌ Duplicate SaaS status union trong app khi đã có `saas-wire-types.ts`
+→ Re-export type từ `@einvoice/shared-constants` trong `features/saas/types.ts`
 
 ```
 
@@ -399,6 +421,13 @@ Trước khi viết code, làm placement check:
 1. Pattern tương tự đã có trong service này chưa? → Có: follow y chang. Không: hỏi.
 2. Folder đích đã tồn tại chưa? → Có: đặt vào, match tên sibling. Không: tạo folder chỉ khi 3+ file sẽ ở đó.
 3. Code này có cần vào `libs/` không? → Chỉ khi 2+ service/app sẽ dùng.
+
+### Tài liệu và đồng bộ với code (cho AI và dev)
+
+- **Đọc trước khi audit sâu:** `docs/README.md` → `docs/DOC-CODE-ANCHORS.md` (bảng topic → file path thật).
+- **UI labels:** `docs/guides/frontend-domain-display.md` + `libs/shared/constants/vi-domain-labels.ts` — không render enum wire raw.
+- **SePay / webhook / OAuth:** `docs/guides/sepay-configuration-guide-phase3.md` §0 (3 route BFF) — không nhầm Tier 1 / Tier 2 / Phase 3 HMAC.
+- **Sau khi đổi route, enum, env, folder layout:** cập nhật anchor + phase/technical-architecture tương ứng, chạy `pnpm verify:doc-anchors`.
 
 ### Khi refactor
 

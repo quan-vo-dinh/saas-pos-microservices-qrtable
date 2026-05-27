@@ -251,7 +251,7 @@ Diagram §4.2 above describes the **objective** of “FE & BE joint contract”.
 | Ingredients               | Technology                               | Reason for choosing                                                            |
 | ------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------ |
 | **App 1: Customer PWA**   | React + Vite, TypeScript, service Worker | Fast download, offline-first, mobile-first, lightweight build, no need for SSR |
-| **App 2: Management App** | Next.js (App Router) + React 18          | Role-based routing, auth middleware, flexible SSR/CSR, complex layout          |
+| **App 2: Management App** | Next.js (App Router) + React 19          | Role-based routing, auth middleware, flexible SSR/CSR, complex layout          |
 | **State/Data**            | React Query + Zustand                    | Server-state is clear, local state is light, cache & refetch are good          |
 | **Real-time**             | Socket.io client                         | Reconnect, room-based updates by tenant/session                                |
 | **Form & Validation**     | React Hook Form + Zod                    | Validation schema-based, good UX                                               |
@@ -307,6 +307,20 @@ Diagram §4.2 above describes the **objective** of “FE & BE joint contract”.
 - **tenant routing**: subdomain `{slug}.qrtable.io` resolve tenant_id before rendering.
 - **Shared Libraries**: UI components, hooks, types are shared between 2 apps via Nx libs.
 
+#### 4.4.1 Domain display labels (wire enum → UI copy)
+
+Backend and JSON responses keep **English enum wire values** (`OrderStatus.PENDING`, `TenantStatus.SUSPENDED`, `SubscriptionInvoiceStatus.PAID`). User-facing apps map them to Vietnamese (or formatted locale output) in a fixed stack:
+
+| Layer                 | Package / path                                                                                                       | Role                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| Enum source of truth  | `libs/constants` (e.g. `saas.constants.ts`), `@einvoice/types` (POS)                                                 | Valid domain states for DB/API  |
+| SaaS wire unions (FE) | `@einvoice/shared-constants` → `saas-wire-types.ts` (CI test vs `saas.constants.ts`)                                 | Frontend contract; no drift     |
+| Label functions       | `@einvoice/shared-constants` → `vi-domain-labels.ts` (`orderStatusVi`, `subscriptionStatusVi`, `billingPeriodVi`, …) | Shared FE label map; no React   |
+| Locale formatting     | `@einvoice/frontend-utils` (`formatCurrency`), app `formatters.ts` (`formatVnd`, `formatDateTime`)                   | Money and timestamps            |
+| Badges (optional)     | App feature components (e.g. `management-app/.../features/saas/components/badges/`)                                  | Presentation only; call `*Vi()` |
+
+**Rules:** Do not render raw enum strings in UI. Do not duplicate label maps inside apps. Do not mix re-export barrels that bundle shared-constants with React components. Full playbook: [frontend-domain-display.md](guides/frontend-domain-display.md).
+
 ### 4.5 Details by application
 
 #### App 1: Customer PWA
@@ -328,7 +342,7 @@ Diagram §4.2 above describes the **objective** of “FE & BE joint contract”.
 | **Actors**      | Staff (Waiter, Chef, Barista), Owner/Manager, Super Admin                                         |
 | **Entry point** | `https://app.qrtable.io/login` → Keycloak OAuth                                                   |
 | **Auth**        | JWT (Keycloak) — middleware checks roles, redirects according to role after login                 |
-| **Tech**        | Next.js (App Router) + React 18 + TypeScript                                                      |
+| **Tech**        | Next.js (App Router) + React 19 + TypeScript                                                      |
 | **Real-time**   | Socket.io → rooms by role (`tenant:{tid}:staff`, `tenant:{tid}:kds:*`, `tenant:{tid}:management`) |
 
 **Role → Route Mapping (Next.js Middleware):**
