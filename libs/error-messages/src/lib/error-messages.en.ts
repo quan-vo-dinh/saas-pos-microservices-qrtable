@@ -39,6 +39,8 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.ORDER_JOIN_TABLE_CLEANING]: 'Table is being cleaned; cannot start ordering session',
   [ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE]:
     'Table session state is inconsistent; ask staff to refresh table status',
+  [ErrorCode.ORDER_EMPTY_TABLE_SESSION_RELEASE_INVALID]:
+    'Table can only be released when the session belongs to it and has no orders or bill',
   [ErrorCode.CATALOG_CATEGORY_DUPLICATE_NAME]: 'Category name already exists',
   [ErrorCode.CATALOG_CATEGORY_NOT_FOUND]: 'Category not found',
   [ErrorCode.CATALOG_CATEGORY_HAS_ACTIVE_ITEMS]: 'Cannot delete category with active menu items',

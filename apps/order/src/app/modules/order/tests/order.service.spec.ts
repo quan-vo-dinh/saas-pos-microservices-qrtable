@@ -4,6 +4,7 @@ import { TCP_SERVICES } from '@common/configuration/tcp.config';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { Session } from '@common/entities/session.entity';
+import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderItemStatus, OrderStatus, SessionStatus } from '@einvoice/types';
@@ -23,12 +24,15 @@ describe('OrderService', () => {
     findByIdAndTenantForUpdate: jest.Mock;
     findBySessionIdAndTenant: jest.Mock;
     findActiveKdsOrders: jest.Mock;
+    countCreatedBetweenByTenant: jest.Mock;
   };
   let orderItemRepository: { findByOrderIdAndTenant: jest.Mock; findByOrderIdAndTenantWithManager: jest.Mock };
   let sessionRepository: { findByIdAndTenant: jest.Mock; save: jest.Mock; findActiveByIdAndTenant: jest.Mock };
   let sessionService: {
     getActiveSessionOrThrow: jest.Mock;
     touchCustomerSessionActivity: jest.Mock;
+    releaseTableForClosedSession: jest.Mock;
+    releaseEmptyTableSession: jest.Mock;
   };
   let catalogClient: { send: jest.Mock };
   let orderSubmitService: { submitOrder: jest.Mock };
@@ -47,13 +51,19 @@ describe('OrderService', () => {
       findByIdAndTenantForUpdate: jest.fn(),
       findBySessionIdAndTenant: jest.fn(),
       findActiveKdsOrders: jest.fn(),
+      countCreatedBetweenByTenant: jest.fn(),
     };
     orderItemRepository = {
       findByOrderIdAndTenant: jest.fn(),
       findByOrderIdAndTenantWithManager: jest.fn(),
     };
     sessionRepository = { findByIdAndTenant: jest.fn(), save: jest.fn(), findActiveByIdAndTenant: jest.fn() };
-    sessionService = { getActiveSessionOrThrow: jest.fn(), touchCustomerSessionActivity: jest.fn() };
+    sessionService = {
+      getActiveSessionOrThrow: jest.fn(),
+      touchCustomerSessionActivity: jest.fn(),
+      releaseTableForClosedSession: jest.fn(),
+      releaseEmptyTableSession: jest.fn(),
+    };
     catalogClient = { send: jest.fn() };
     orderSubmitService = { submitOrder: jest.fn() };
     orderStateTransitionService = {
@@ -81,6 +91,10 @@ describe('OrderService', () => {
     }).compile();
 
     service = module.get(OrderService);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('lists customer session orders after validating active session', async () => {
@@ -132,6 +146,20 @@ describe('OrderService', () => {
     expect(result[0].items[0].menuItemImageUrl).toBe('https://cdn.example.com/pho.jpg');
   });
 
+  it('counts all persisted tenant orders created during the current Ho Chi Minh day', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-05-26T18:15:30.000Z'));
+    orderRepository.countCreatedBetweenByTenant.mockResolvedValue(7);
+
+    const result = await service.countTodayByTenant({ tenantId: 't1' });
+
+    expect(result).toEqual({ tenantId: 't1', count: 7 });
+    expect(orderRepository.countCreatedBetweenByTenant).toHaveBeenCalledWith(
+      't1',
+      new Date('2026-05-26T17:00:00.000Z'),
+      new Date('2026-05-27T17:00:00.000Z'),
+    );
+  });
+
   describe('joinSession', () => {
     const baseTable = {
       id: 'tbl-1',
@@ -146,6 +174,8 @@ describe('OrderService', () => {
       sessionRepository.findActiveByIdAndTenant.mockReset();
       sessionService.getActiveSessionOrThrow.mockReset();
       sessionService.touchCustomerSessionActivity.mockReset();
+      sessionService.releaseTableForClosedSession.mockReset();
+      sessionService.releaseTableForClosedSession.mockResolvedValue(true);
     });
 
     it('creates session when table is AVAILABLE', async () => {
@@ -212,6 +242,7 @@ describe('OrderService', () => {
         version: 1,
       } as Session;
 
+      sessionService.getActiveSessionOrThrow.mockResolvedValue(existing);
       sessionRepository.findActiveByIdAndTenant.mockResolvedValue(existing);
 
       const result = await service.joinSession({
@@ -225,6 +256,124 @@ describe('OrderService', () => {
       expect(sessionService.touchCustomerSessionActivity).toHaveBeenCalledWith('t1', 'sess-1');
     });
 
+    it('creates a fresh session when the stale session was already idle-closed and table was released', async () => {
+      const validateResponses = [
+        { ...baseTable, status: TABLE_STATUS.OCCUPIED, sessionId: 'sess-stale' },
+        { ...baseTable, status: TABLE_STATUS.AVAILABLE, sessionId: null },
+      ];
+      catalogClient.send.mockImplementation((msg: string) => {
+        if (msg === TCP_REQUEST_MESSAGE.TABLE.VALIDATE_QR_TOKEN) {
+          return of({ statusCode: 200, data: validateResponses.shift() });
+        }
+        if (msg === TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS) {
+          return of({ statusCode: 200, data: {} });
+        }
+        return of({ statusCode: 500, data: null });
+      });
+
+      const savedSession = {
+        id: 'sess-new',
+        tenantId: 't1',
+        tableId: 'tbl-1',
+        tableName: 'T1',
+        status: SessionStatus.ACTIVE,
+        startedAt: new Date(),
+        lastActivity: new Date(),
+        closedAt: null,
+        orderCount: 0,
+        currentBillId: null,
+        version: 1,
+      } as Session;
+      sessionRepository.save.mockResolvedValue(savedSession);
+      sessionService.getActiveSessionOrThrow
+        .mockRejectedValueOnce(new BusinessException(ErrorCode.SESSION_CLOSED, 410))
+        .mockResolvedValueOnce(savedSession);
+
+      const result = await service.joinSession({
+        tenantId: 't1',
+        tableId: 'tbl-1',
+        qrToken: 'tok',
+      });
+
+      expect(sessionService.releaseTableForClosedSession).not.toHaveBeenCalled();
+      expect(sessionRepository.save).toHaveBeenCalled();
+      expect(result.id).toBe('sess-new');
+    });
+
+    it('releases an OCCUPIED table before creating a fresh session when the stale session was closed elsewhere', async () => {
+      const validateResponses = [
+        { ...baseTable, status: TABLE_STATUS.OCCUPIED, sessionId: 'sess-stale' },
+        { ...baseTable, status: TABLE_STATUS.OCCUPIED, sessionId: 'sess-stale' },
+        { ...baseTable, status: TABLE_STATUS.AVAILABLE, sessionId: null },
+      ];
+      catalogClient.send.mockImplementation((msg: string) => {
+        if (msg === TCP_REQUEST_MESSAGE.TABLE.VALIDATE_QR_TOKEN) {
+          return of({ statusCode: 200, data: validateResponses.shift() });
+        }
+        if (msg === TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS) {
+          return of({ statusCode: 200, data: {} });
+        }
+        return of({ statusCode: 500, data: null });
+      });
+
+      const savedSession = {
+        id: 'sess-new',
+        tenantId: 't1',
+        tableId: 'tbl-1',
+        tableName: 'T1',
+        status: SessionStatus.ACTIVE,
+        startedAt: new Date(),
+        lastActivity: new Date(),
+        closedAt: null,
+        orderCount: 0,
+        currentBillId: null,
+        version: 1,
+      } as Session;
+      sessionRepository.save.mockResolvedValue(savedSession);
+      sessionService.getActiveSessionOrThrow
+        .mockRejectedValueOnce(new BusinessException(ErrorCode.SESSION_CLOSED, 410))
+        .mockResolvedValueOnce(savedSession);
+
+      const result = await service.joinSession({
+        tenantId: 't1',
+        tableId: 'tbl-1',
+        qrToken: 'tok',
+      });
+
+      expect(sessionService.releaseTableForClosedSession).toHaveBeenCalledWith('t1', 'sess-stale', 'tbl-1');
+      expect(sessionRepository.save).toHaveBeenCalled();
+      expect(result.id).toBe('sess-new');
+    });
+
+    it('rejects stale occupied recovery when the closed session is not empty', async () => {
+      catalogClient.send.mockImplementation((msg: string) => {
+        if (msg === TCP_REQUEST_MESSAGE.TABLE.VALIDATE_QR_TOKEN) {
+          return of({
+            statusCode: 200,
+            data: { ...baseTable, status: TABLE_STATUS.OCCUPIED, sessionId: 'sess-with-orders' },
+          });
+        }
+        return of({ statusCode: 500, data: null });
+      });
+      sessionService.getActiveSessionOrThrow.mockRejectedValueOnce(
+        new BusinessException(ErrorCode.SESSION_CLOSED, 410),
+      );
+      sessionService.releaseTableForClosedSession.mockResolvedValue(false);
+
+      await expect(
+        service.joinSession({
+          tenantId: 't1',
+          tableId: 'tbl-1',
+          qrToken: 'tok',
+        }),
+      ).rejects.toMatchObject({
+        errorCode: ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE,
+      });
+
+      expect(sessionService.releaseTableForClosedSession).toHaveBeenCalledWith('t1', 'sess-with-orders', 'tbl-1');
+      expect(sessionRepository.save).not.toHaveBeenCalled();
+    });
+
     it('rejects BILLING table', async () => {
       catalogClient.send.mockImplementation(() =>
         of({
@@ -236,6 +385,78 @@ describe('OrderService', () => {
       await expect(service.joinSession({ tenantId: 't1', tableId: 'tbl-1', qrToken: 'tok' })).rejects.toMatchObject({
         errorCode: ErrorCode.ORDER_JOIN_TABLE_BILLING,
       });
+    });
+  });
+
+  describe('releaseEmptyTableSession', () => {
+    beforeEach(() => {
+      sessionRepository.findByIdAndTenant.mockReset();
+      orderRepository.findBySessionIdAndTenant.mockReset();
+      sessionService.releaseEmptyTableSession.mockReset();
+    });
+
+    it('releases an empty session that belongs to the requested table', async () => {
+      sessionRepository.findByIdAndTenant.mockResolvedValue({
+        id: 'sess-empty',
+        tenantId: 't1',
+        tableId: 'tbl-1',
+        tableName: 'T1',
+        status: SessionStatus.ACTIVE,
+        startedAt: new Date(),
+        lastActivity: new Date(),
+        closedAt: null,
+        orderCount: 0,
+        currentBillId: null,
+        version: 1,
+      } as Session);
+      orderRepository.findBySessionIdAndTenant.mockResolvedValue([]);
+      sessionService.releaseEmptyTableSession.mockResolvedValue(true);
+
+      const result = await service.releaseEmptyTableSession({
+        tenantId: 't1',
+        tableId: 'tbl-1',
+        sessionId: 'sess-empty',
+        userId: 'staff-1',
+      });
+
+      expect(orderRepository.findBySessionIdAndTenant).toHaveBeenCalledWith('sess-empty', 't1');
+      expect(sessionService.releaseEmptyTableSession).toHaveBeenCalledWith('t1', 'sess-empty', 'tbl-1');
+      expect(result).toEqual({
+        tenantId: 't1',
+        tableId: 'tbl-1',
+        sessionId: 'sess-empty',
+        released: true,
+      });
+    });
+
+    it('rejects release when the session already has persisted orders', async () => {
+      sessionRepository.findByIdAndTenant.mockResolvedValue({
+        id: 'sess-with-orders',
+        tenantId: 't1',
+        tableId: 'tbl-1',
+        tableName: 'T1',
+        status: SessionStatus.ACTIVE,
+        startedAt: new Date(),
+        lastActivity: new Date(),
+        closedAt: null,
+        orderCount: 0,
+        currentBillId: null,
+        version: 1,
+      } as Session);
+      orderRepository.findBySessionIdAndTenant.mockResolvedValue([{ id: 'order-1' } as Order]);
+
+      await expect(
+        service.releaseEmptyTableSession({
+          tenantId: 't1',
+          tableId: 'tbl-1',
+          sessionId: 'sess-with-orders',
+          userId: 'staff-1',
+        }),
+      ).rejects.toMatchObject({
+        errorCode: ErrorCode.ORDER_EMPTY_TABLE_SESSION_RELEASE_INVALID,
+      });
+
+      expect(sessionService.releaseEmptyTableSession).not.toHaveBeenCalled();
     });
   });
 

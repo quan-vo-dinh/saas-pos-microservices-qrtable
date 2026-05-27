@@ -39,6 +39,11 @@ export type TransferTablePayload = {
   requestId: string;
 };
 
+export type ReleaseEmptyTableSessionPayload = {
+  tableId: string;
+  sessionId: string;
+};
+
 export type OrderActionResult = {
   order: Order;
   bill?: Bill;
@@ -52,6 +57,13 @@ export type TransferTableResult = {
   events: {
     tableTransferred: TableTransferredEvent;
   };
+};
+
+export type ReleaseEmptyTableSessionResult = {
+  tenantId: string;
+  tableId: string;
+  sessionId: string;
+  released: true;
 };
 
 export type ReopenBillResult = {
@@ -155,6 +167,15 @@ export const orderService = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  releaseEmptyTableSession: (payload: ReleaseEmptyTableSessionPayload): Promise<ReleaseEmptyTableSessionResult> =>
+    authApiClient<ReleaseEmptyTableSessionResult>(
+      API_CONFIG.ENDPOINTS.ADMIN_TABLES_RELEASE_EMPTY_SESSION(payload.tableId),
+      {
+        method: 'POST',
+        body: JSON.stringify({ sessionId: payload.sessionId }),
+      },
+    ),
 
   reopenBill: (sessionId: string): Promise<ReopenBillResult> =>
     authApiClient<ReopenBillResult>(

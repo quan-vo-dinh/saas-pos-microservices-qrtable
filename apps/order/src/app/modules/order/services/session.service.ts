@@ -1,11 +1,21 @@
+import { TCP_SERVICES } from '@common/configuration/tcp.config';
+import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
+import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { RedisClientService } from '@common/providers/redis-client/redis-client.service';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Session } from '@common/entities/session.entity';
 import { RedisKey } from '@common/constants/redis-key.constants';
+import { Request } from '@common/interfaces/tcp/common/request.interface';
+import type { ResponseType } from '@common/interfaces/tcp/common/response.interface';
+import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
+import type { UpdateTableStatusTcpRequest } from '@common/interfaces/tcp/catalog/table-request.interface';
+import type { Table } from '@common/entities/table.entity';
 import { SessionStatus } from '@einvoice/types';
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { RpcException } from '@nestjs/microservices';
 import type Redis from 'ioredis';
+import { firstValueFrom } from 'rxjs';
 import { SESSION_POLICY } from '../constants/session-policy';
 import { SessionRepository } from '../repositories/session.repository';
 
@@ -26,6 +36,7 @@ export class SessionService {
   constructor(
     private readonly redisClient: RedisClientService,
     private readonly sessionRepository: SessionRepository,
+    @Inject(TCP_SERVICES.CATALOG_SERVICE) private readonly catalogClient: TcpClient,
   ) {}
 
   sessionKey(tenantId: string, sessionId: string): string {
@@ -77,6 +88,59 @@ export class SessionService {
     const redis = this.redisClient.getClient();
     await redis.del(this.sessionKey(tenantId, sessionId));
     await redis.del(RedisKey.cart.data(tenantId, sessionId));
+  }
+
+  async releaseTableForClosedSession(tenantId: string, sessionId: string, tableId: string): Promise<boolean> {
+    const session = await this.sessionRepository.findByIdAndTenant(sessionId, tenantId);
+    if (
+      !session ||
+      session.status !== SessionStatus.CLOSED ||
+      session.orderCount > 0 ||
+      session.currentBillId ||
+      session.tableId !== tableId
+    ) {
+      return false;
+    }
+
+    await this.releaseCatalogTable({
+      id: tableId,
+      tenantId,
+      status: TABLE_STATUS.AVAILABLE,
+      sessionId,
+    });
+
+    const redis = this.redisClient.getClient();
+    await redis.del(this.sessionKey(tenantId, sessionId));
+    await redis.del(RedisKey.cart.data(tenantId, sessionId));
+    return true;
+  }
+
+  async releaseEmptyTableSession(tenantId: string, sessionId: string, tableId: string): Promise<boolean> {
+    const session = await this.sessionRepository.findByIdAndTenant(sessionId, tenantId);
+    if (!this.isReleasableEmptyTableSession(session, tableId)) {
+      return false;
+    }
+
+    if (session.status === SessionStatus.CLOSED) {
+      return this.releaseTableForClosedSession(tenantId, sessionId, tableId);
+    }
+
+    const closed = await this.sessionRepository.markActiveClosedIfEmpty(sessionId, tenantId, new Date());
+    if (!closed) {
+      return false;
+    }
+
+    await this.releaseCatalogTable({
+      id: tableId,
+      tenantId,
+      status: TABLE_STATUS.AVAILABLE,
+      sessionId,
+    });
+
+    const redis = this.redisClient.getClient();
+    await redis.del(this.sessionKey(tenantId, sessionId));
+    await redis.del(RedisKey.cart.data(tenantId, sessionId));
+    return true;
   }
 
   async getSessionForReadOnlyBill(tenantId: string, sessionId: string): Promise<Session> {
@@ -206,6 +270,18 @@ export class SessionService {
     await redis.hset(key, f as unknown as Record<string, string>);
   }
 
+  private isReleasableEmptyTableSession(session: Session | null, tableId: string): session is Session {
+    if (!session) {
+      return false;
+    }
+    return (
+      session.tableId === tableId &&
+      session.orderCount === 0 &&
+      !session.currentBillId &&
+      (session.status === SessionStatus.ACTIVE || session.status === SessionStatus.CLOSED)
+    );
+  }
+
   private isWrongTypeRedisError(error: unknown): boolean {
     return error instanceof Error && error.message.includes('WRONGTYPE');
   }
@@ -239,9 +315,59 @@ export class SessionService {
     }
 
     const closedAt = new Date();
-    await this.sessionRepository.markClosed(fields.sessionId, fields.tenantId, closedAt);
+    const staleBefore = new Date(closedAt.getTime() - SESSION_POLICY.IDLE_CLOSE_MS);
+    const closed = await this.sessionRepository.markIdleClosedIfEmptyAndStale(
+      fields.sessionId,
+      fields.tenantId,
+      staleBefore,
+      closedAt,
+    );
+    if (!closed) {
+      const latest = await this.sessionRepository.findActiveByIdAndTenant(fields.sessionId, fields.tenantId);
+      if (!latest) {
+        await redis.del(redisKey);
+        await redis.del(RedisKey.cart.data(fields.tenantId, fields.sessionId));
+        return true;
+      }
+      Object.assign(fields, this.entityToRedisFields(latest));
+      await this.writeSessionRedis(redis, redisKey, latest);
+      await redis.pexpire(redisKey, SESSION_POLICY.TTL_MS);
+      return false;
+    }
+
+    await this.releaseCatalogTable({
+      id: fields.tableId,
+      tenantId: fields.tenantId,
+      status: TABLE_STATUS.AVAILABLE,
+      sessionId: fields.sessionId,
+    });
     await redis.del(redisKey);
     await redis.del(RedisKey.cart.data(fields.tenantId, fields.sessionId));
     return true;
+  }
+
+  private async releaseCatalogTable(payload: UpdateTableStatusTcpRequest): Promise<void> {
+    try {
+      const response = await firstValueFrom(
+        this.catalogClient.send<ResponseType<Table>, UpdateTableStatusTcpRequest>(
+          TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS,
+          new Request<UpdateTableStatusTcpRequest>({ tenantId: payload.tenantId, data: payload }),
+        ),
+      );
+      if (response.statusCode >= 400) {
+        throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, response.statusCode as HttpStatus);
+      }
+    } catch (error) {
+      if (error instanceof BusinessException) {
+        throw error;
+      }
+      if (error instanceof RpcException) {
+        const rpcError = error.getError() as { code?: number; errorCode?: ErrorCode };
+        if (rpcError?.errorCode) {
+          throw new BusinessException(rpcError.errorCode, (rpcError.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
+        }
+      }
+      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
+    }
   }
 }

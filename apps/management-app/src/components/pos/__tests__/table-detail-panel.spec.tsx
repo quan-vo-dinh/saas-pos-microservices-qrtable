@@ -1,21 +1,26 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { OrderStatus } from '@einvoice/types';
 
 const mockUseTablesQuery = jest.fn();
 const mockUseOrdersQuery = jest.fn();
 const mockMutate = jest.fn();
+const mockReleaseMutate = jest.fn();
 
 jest.mock('@/features/tables/hooks/use-tables-query', () => ({
   useTablesQuery: (...args: unknown[]) => mockUseTablesQuery(...args),
 }));
 
-jest.mock('@/features/order/hooks/use-order-query', () => ({
-  useOrdersQuery: (...args: unknown[]) => mockUseOrdersQuery(...args),
-}));
-
 jest.mock('@/features/tables/hooks/use-tables-mutations', () => ({
   useUpdateTableStatusMutation: () => ({
     mutate: mockMutate,
+    isPending: false,
+  }),
+}));
+
+jest.mock('@/features/order/hooks/use-order-query', () => ({
+  useOrdersQuery: (...args: unknown[]) => mockUseOrdersQuery(...args),
+  useReleaseEmptyTableSessionMutation: () => ({
+    mutate: mockReleaseMutate,
     isPending: false,
   }),
 }));
@@ -97,5 +102,24 @@ describe('TableDetailPanel', () => {
     const dialog = screen.getByTestId('transfer-dialog');
     expect(dialog.getAttribute('data-from')).toBe('table-1');
     expect(dialog.getAttribute('data-session')).toBe('session-real-1');
+  });
+
+  it('asks for confirmation before releasing an occupied empty table session', () => {
+    mockUseOrdersQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<TableDetailPanel tableId="table-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Thả bàn rỗng/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận/ }));
+
+    expect(mockReleaseMutate).toHaveBeenCalledWith({
+      tableId: 'table-1',
+      sessionId: 'session-real-1',
+    });
   });
 });

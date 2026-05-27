@@ -221,8 +221,8 @@ async function createHarness(): Promise<Harness> {
   const redis = createRedis();
   const redisClient = { getClient: () => redis } as unknown as RedisClientService;
   const sessionRepository = new SessionRepository(dataSource.getRepository(Session));
-  const sessionService = new SessionService(redisClient, sessionRepository);
   const catalogClient = { send: jest.fn(), emit: jest.fn() } as unknown as TcpClient;
+  const sessionService = new SessionService(redisClient, sessionRepository, catalogClient);
   const saasClient = {
     send: jest.fn(() =>
       of({

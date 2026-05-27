@@ -5,12 +5,24 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { TransferTableDialog } from '@/components/pos/transfer-table-dialog';
 import { formatVnd } from '@/lib/format-vnd';
 import { orderStatusVi, tableStatusVi } from '@einvoice/shared-constants';
 import { OrderStatus, type Order } from '@einvoice/types';
 import { getErrorDisplayMessage } from '@einvoice/frontend-utils';
-import { useOrdersQuery } from '@/features/order/hooks/use-order-query';
+import { Unlock } from 'lucide-react';
+import { useOrdersQuery, useReleaseEmptyTableSessionMutation } from '@/features/order/hooks/use-order-query';
 import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 import { useUpdateTableStatusMutation } from '@/features/tables/hooks/use-tables-mutations';
 
@@ -22,11 +34,7 @@ function statusVariant(s: string) {
 }
 
 function isActiveOrder(o: Order) {
-  return (
-    o.status !== OrderStatus.CANCELED &&
-    o.status !== OrderStatus.COMPLETED &&
-    o.status !== OrderStatus.DRAFT
-  );
+  return o.status !== OrderStatus.CANCELED && o.status !== OrderStatus.COMPLETED && o.status !== OrderStatus.DRAFT;
 }
 
 function formatActivityTime(iso: string) {
@@ -46,12 +54,10 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
   const tablesQuery = useTablesQuery();
   const ordersQuery = useOrdersQuery({ tableId, limit: 50 });
   const updateStatusMutation = useUpdateTableStatusMutation();
+  const releaseEmptySessionMutation = useReleaseEmptyTableSessionMutation();
   const [transferOpen, setTransferOpen] = useState(false);
 
-  const table = useMemo(
-    () => tablesQuery.data?.find((t) => t.id === tableId),
-    [tablesQuery.data, tableId],
-  );
+  const table = useMemo(() => tablesQuery.data?.find((t) => t.id === tableId), [tablesQuery.data, tableId]);
 
   const orders = useMemo(
     () => (ordersQuery.data ?? []).filter((o) => o.tableId === tableId && isActiveOrder(o)),
@@ -59,9 +65,7 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
   );
 
   const activityLines = useMemo(() => {
-    const sorted = [...orders].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-    );
+    const sorted = [...orders].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     return sorted.slice(0, 5).map((o) => ({
       key: o.id,
       text: `Đơn …${o.id.slice(-4)} · ${orderStatusVi(o.status)} · ${formatActivityTime(o.updatedAt)}`,
@@ -69,15 +73,19 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
   }, [orders]);
 
   const total = orders.reduce((s, o) => s + o.totalAmount, 0);
+  const canReleaseEmptySession =
+    table?.status === 'occupied' &&
+    Boolean(table.sessionId) &&
+    !ordersQuery.isLoading &&
+    !ordersQuery.isError &&
+    orders.length === 0;
 
   if (tablesQuery.isLoading) {
     return <p className="text-sm text-muted-foreground">Đang tải thông tin bàn...</p>;
   }
 
   if (tablesQuery.isError) {
-    return (
-      <p className="text-sm text-destructive">{getErrorDisplayMessage(tablesQuery.error as Error)}</p>
-    );
+    return <p className="text-sm text-destructive">{getErrorDisplayMessage(tablesQuery.error as Error)}</p>;
   }
 
   if (!table) {
@@ -98,11 +106,7 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
         </div>
         <p className="text-xs text-muted-foreground">
           Sức chứa {table.capacity} · Phiên{' '}
-          {table.sessionId ? (
-            <span className="font-mono text-foreground">{table.sessionId}</span>
-          ) : (
-            '—'
-          )}
+          {table.sessionId ? <span className="font-mono text-foreground">{table.sessionId}</span> : '—'}
         </p>
       </div>
       <Separator />
@@ -154,17 +158,41 @@ export function TableDetailPanel({ tableId }: { tableId: string }) {
       )}
       <p className="text-sm font-mono">Tổng chạy: {formatVnd(total)}</p>
       <div className="mt-auto flex flex-col gap-1.5">
-        <Button
-          type="button"
-          className="w-full"
-          onClick={() => setTransferOpen(true)}
-          disabled={!table.sessionId}
-        >
+        <Button type="button" className="w-full" onClick={() => setTransferOpen(true)} disabled={!table.sessionId}>
           Chuyển bàn
         </Button>
-        <Button type="button" variant="secondary" className="w-full" disabled title="Giai đoạn thanh toán (Phase 3)">
-          Đóng phiên
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full gap-2"
+              disabled={!canReleaseEmptySession || releaseEmptySessionMutation.isPending}
+            >
+              <Unlock className="size-4" aria-hidden="true" />
+              Thả bàn rỗng
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Thả bàn {table.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Chỉ xác nhận khi bàn không có khách và phiên này chưa phát sinh đơn hoặc hóa đơn.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Hủy</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (!table.sessionId) return;
+                  releaseEmptySessionMutation.mutate({ tableId: table.id, sessionId: table.sessionId });
+                }}
+              >
+                Xác nhận
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <Button
           type="button"
           variant="outline"

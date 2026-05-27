@@ -39,6 +39,8 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.ORDER_JOIN_TABLE_CLEANING]: 'Bàn đang được dọn, không thể vào phiên đặt món',
   [ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE]:
     'Trạng thái bàn và phiên không khớp; vui lòng nhờ nhân viên kiểm tra',
+  [ErrorCode.ORDER_EMPTY_TABLE_SESSION_RELEASE_INVALID]:
+    'Chỉ có thể thả bàn khi phiên thuộc đúng bàn và chưa phát sinh đơn hoặc hóa đơn',
   [ErrorCode.CATALOG_CATEGORY_DUPLICATE_NAME]: 'Tên danh mục đã tồn tại',
   [ErrorCode.CATALOG_CATEGORY_NOT_FOUND]: 'Danh mục không tìm thấy',
   [ErrorCode.CATALOG_CATEGORY_HAS_ACTIVE_ITEMS]: 'Không thể xóa danh mục đang có món hoạt động',

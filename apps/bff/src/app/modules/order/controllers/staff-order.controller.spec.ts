@@ -253,4 +253,38 @@ describe('StaffOrderController', () => {
     });
     expect(orderClient.send).toHaveBeenCalledTimes(1);
   });
+
+  it('releaseEmptyTableSession sends tenant-scoped ORDER release payload', async () => {
+    orderClient.send.mockReturnValueOnce(
+      of(
+        Response.success({
+          tenantId: 'tenant-1',
+          tableId: 'table-1',
+          sessionId: 'session-1',
+          released: true,
+        }),
+      ),
+    );
+
+    await controller.releaseEmptyTableSession('table-1', { sessionId: 'session-1' }, 'pid-1', staffReq());
+
+    expect(orderClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.ORDER.RELEASE_EMPTY_TABLE_SESSION,
+      expect.objectContaining({
+        processId: 'pid-1',
+        data: {
+          tenantId: 'tenant-1',
+          tableId: 'table-1',
+          sessionId: 'session-1',
+          userId: 'staff-1',
+        },
+      }),
+    );
+  });
+
+  it('releaseEmptyTableSession requires TABLE_UPDATE_STATUS permission', () => {
+    const reflector = new Reflector();
+    const required = reflector.get(Permissions, StaffOrderController.prototype.releaseEmptyTableSession);
+    expect(required).toEqual([PERMISSION.TABLE_UPDATE_STATUS]);
+  });
 });

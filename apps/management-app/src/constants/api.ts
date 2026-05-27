@@ -14,6 +14,8 @@ export const API_CONFIG = {
     ADMIN_ORDERS: '/admin/orders',
     ADMIN_SERVICE_REQUESTS: '/admin/service-requests',
     ADMIN_TABLES_TRANSFER: '/admin/tables/transfer',
+    ADMIN_TABLES_RELEASE_EMPTY_SESSION: (tableId: string) =>
+      `/admin/tables/${encodeURIComponent(tableId)}/release-empty-session`,
     ADMIN_BILLS: '/admin/bills',
     ADMIN_BILLS_REOPEN: '/admin/bills',
     ADMIN_CURRENT_TENANT: '/admin/tenant/current',

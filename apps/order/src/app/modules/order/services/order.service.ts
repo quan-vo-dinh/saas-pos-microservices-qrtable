@@ -17,20 +17,24 @@ import type {
 import type {
   CustomerCancelPendingTcpRequest,
   CustomerListOrdersTcpRequest,
+  CountTodayOrdersByTenantTcpRequest,
   JoinSessionTcpRequest,
   KdsActiveOrdersGetTcpRequest,
   ListOrdersTcpRequest,
   MarkOrderItemsReadyTcpRequest,
   OrderIdTcpRequest,
+  ReleaseEmptyTableSessionTcpRequest,
   RevertOrderItemsProcessingTcpRequest,
   StaffOrderActionTcpRequest,
   SubmitOrderTcpRequest,
 } from '@common/interfaces/tcp/order/order-request.interface';
 import type {
   KdsActiveOrdersGetTcpResponse,
+  CountTodayOrdersByTenantTcpResponse,
   MarkOrderItemsReadyTcpResponse,
   OrderActionTcpResponse,
   OrderTcpResponse,
+  ReleaseEmptyTableSessionTcpResponse,
   RevertOrderItemsProcessingTcpResponse,
   SessionTcpResponse,
   SubmitOrderTcpResponse,
@@ -53,6 +57,9 @@ import { OrderStateTransitionService } from './order-state-transition.service';
 import { OrderSubmitService } from './order-submit.service';
 import { SessionService } from './session.service';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HCM_UTC_OFFSET_MS = 7 * 60 * 60 * 1000;
+
 @Injectable()
 export class OrderService {
   constructor(
@@ -68,6 +75,13 @@ export class OrderService {
 
   async joinSession(dto: JoinSessionTcpRequest): Promise<SessionTcpResponse> {
     const table = await this.callCatalogValidateQrToken(dto);
+    return this.joinValidatedTable(dto, table);
+  }
+
+  private async joinValidatedTable(dto: JoinSessionTcpRequest, table: Table): Promise<SessionTcpResponse> {
+    if (table.status === TABLE_STATUS.OCCUPIED) {
+      return this.joinOccupiedTable(dto, table);
+    }
 
     if (table.status === TABLE_STATUS.BILLING) {
       throw new BusinessException(ErrorCode.ORDER_JOIN_TABLE_BILLING, HttpStatus.CONFLICT);
@@ -76,22 +90,10 @@ export class OrderService {
       throw new BusinessException(ErrorCode.ORDER_JOIN_TABLE_CLEANING, HttpStatus.CONFLICT);
     }
 
-    if (table.status === TABLE_STATUS.OCCUPIED) {
-      if (!table.sessionId) {
-        throw new BusinessException(ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE, HttpStatus.CONFLICT);
-      }
-      const existing = await this.sessionRepository.findActiveByIdAndTenant(table.sessionId, dto.tenantId);
-      if (!existing) {
-        throw new BusinessException(ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE, HttpStatus.CONFLICT);
-      }
-      await this.sessionService.touchCustomerSessionActivity(dto.tenantId, existing.id);
-      const refreshed = await this.sessionRepository.findActiveByIdAndTenant(existing.id, dto.tenantId);
-      if (!refreshed) {
-        throw new BusinessException(ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE, HttpStatus.CONFLICT);
-      }
-      return this.toSessionDto(refreshed);
-    }
+    return this.createSessionForTable(dto, table);
+  }
 
+  private async createSessionForTable(dto: JoinSessionTcpRequest, table: Table): Promise<SessionTcpResponse> {
     const now = new Date();
     const row = new Session();
     row.tenantId = dto.tenantId;
@@ -113,6 +115,51 @@ export class OrderService {
       sessionId: saved.id,
     });
     return this.toSessionDto(saved);
+  }
+
+  private async joinOccupiedTable(dto: JoinSessionTcpRequest, table: Table): Promise<SessionTcpResponse> {
+    if (!table.sessionId) {
+      throw new BusinessException(ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE, HttpStatus.CONFLICT);
+    }
+
+    try {
+      const existing = await this.sessionService.getActiveSessionOrThrow(dto.tenantId, table.sessionId);
+      await this.sessionService.touchCustomerSessionActivity(dto.tenantId, existing.id);
+      const refreshed = await this.sessionRepository.findActiveByIdAndTenant(existing.id, dto.tenantId);
+      return this.toSessionDto(refreshed ?? existing);
+    } catch (error) {
+      if (!this.isSessionClosedError(error)) {
+        throw error;
+      }
+    }
+
+    let revalidated = await this.callCatalogValidateQrToken(dto);
+    if (revalidated.status === TABLE_STATUS.OCCUPIED) {
+      const released = await this.sessionService.releaseTableForClosedSession(dto.tenantId, table.sessionId, table.id);
+      if (!released) {
+        throw new BusinessException(ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE, HttpStatus.CONFLICT);
+      }
+      revalidated = await this.callCatalogValidateQrToken(dto);
+    }
+    if (revalidated.status !== TABLE_STATUS.AVAILABLE) {
+      throw new BusinessException(ErrorCode.ORDER_SESSION_MISSING_FOR_OCCUPIED_TABLE, HttpStatus.CONFLICT);
+    }
+    return this.createSessionForTable(dto, revalidated);
+  }
+
+  private isSessionClosedError(error: unknown): boolean {
+    if (error instanceof BusinessException && error.errorCode === ErrorCode.SESSION_CLOSED) {
+      return true;
+    }
+    const response =
+      typeof (error as { getResponse?: unknown }).getResponse === 'function'
+        ? (error as { getResponse: () => unknown }).getResponse()
+        : null;
+    return (
+      typeof response === 'object' &&
+      response !== null &&
+      (response as { errorCode?: unknown }).errorCode === ErrorCode.SESSION_CLOSED
+    );
   }
 
   async listOrdersForStaff(dto: ListOrdersTcpRequest): Promise<OrderTcpResponse[]> {
@@ -141,6 +188,46 @@ export class OrderService {
       out.push(this.toOrderDto(r, items));
     }
     return out;
+  }
+
+  async countTodayByTenant(dto: CountTodayOrdersByTenantTcpRequest): Promise<CountTodayOrdersByTenantTcpResponse> {
+    const { start, end } = this.getHoChiMinhDayRange(new Date());
+
+    const count = await this.orderRepository.countCreatedBetweenByTenant(dto.tenantId, start, end);
+    return { tenantId: dto.tenantId, count };
+  }
+
+  async releaseEmptyTableSession(
+    dto: ReleaseEmptyTableSessionTcpRequest,
+  ): Promise<ReleaseEmptyTableSessionTcpResponse> {
+    const session = await this.sessionRepository.findByIdAndTenant(dto.sessionId, dto.tenantId);
+    if (!session || session.tableId !== dto.tableId || session.orderCount > 0 || session.currentBillId) {
+      throw new BusinessException(ErrorCode.ORDER_EMPTY_TABLE_SESSION_RELEASE_INVALID, HttpStatus.CONFLICT);
+    }
+
+    const orders = await this.orderRepository.findBySessionIdAndTenant(dto.sessionId, dto.tenantId);
+    if (orders.length > 0) {
+      throw new BusinessException(ErrorCode.ORDER_EMPTY_TABLE_SESSION_RELEASE_INVALID, HttpStatus.CONFLICT);
+    }
+
+    const released = await this.sessionService.releaseEmptyTableSession(dto.tenantId, dto.sessionId, dto.tableId);
+    if (!released) {
+      throw new BusinessException(ErrorCode.ORDER_EMPTY_TABLE_SESSION_RELEASE_INVALID, HttpStatus.CONFLICT);
+    }
+
+    return {
+      tenantId: dto.tenantId,
+      tableId: dto.tableId,
+      sessionId: dto.sessionId,
+      released: true,
+    };
+  }
+
+  private getHoChiMinhDayRange(now: Date): { start: Date; end: Date } {
+    const hcmTime = now.getTime() + HCM_UTC_OFFSET_MS;
+    const start = new Date(Math.floor(hcmTime / DAY_MS) * DAY_MS - HCM_UTC_OFFSET_MS);
+    const end = new Date(start.getTime() + DAY_MS);
+    return { start, end };
   }
 
   async getOrderById(dto: OrderIdTcpRequest): Promise<OrderTcpResponse> {

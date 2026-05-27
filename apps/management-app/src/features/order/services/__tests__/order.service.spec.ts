@@ -115,6 +115,20 @@ describe('orderService', () => {
     });
   });
 
+  it('posts empty table session release to the table-specific endpoint', async () => {
+    mockAuthApiClient.mockResolvedValue({ released: true });
+
+    await orderService.releaseEmptyTableSession({
+      tableId: 'table-1',
+      sessionId: 'session-1',
+    });
+
+    expect(mockAuthApiClient).toHaveBeenCalledWith('/admin/tables/table-1/release-empty-session', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: 'session-1' }),
+    });
+  });
+
   it('posts bill reopen to the session-specific endpoint', async () => {
     mockAuthApiClient.mockResolvedValue({ sessionId: 'session-1' });
 

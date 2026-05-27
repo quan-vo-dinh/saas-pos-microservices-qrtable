@@ -24,6 +24,11 @@ export type BillListTcpResponse = Bill[];
 
 export type ServiceRequestListTcpResponse = ServiceRequest[];
 
+export type CountTodayOrdersByTenantTcpResponse = {
+  tenantId: string;
+  count: number;
+};
+
 export type SubmitOrderTcpResponse = {
   order: Order;
   bill: Bill;
@@ -73,6 +78,13 @@ export type TableTransferredTcpResponse = {
     tableId: string;
     tableName: string;
   };
+};
+
+export type ReleaseEmptyTableSessionTcpResponse = {
+  tenantId: string;
+  tableId: string;
+  sessionId: string;
+  released: true;
 };
 
 /** Current bill for session (may be null before first submit). */

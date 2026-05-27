@@ -113,6 +113,12 @@ export class TransferTableRequestDto {
   requestId: string;
 }
 
+export class ReleaseEmptyTableSessionRequestDto {
+  @ApiProperty()
+  @IsUUID()
+  sessionId: string;
+}
+
 export class CustomerCancelOrderRequestDto {
   @ApiPropertyOptional()
   @IsOptional()

@@ -5,6 +5,10 @@ import { SessionRepository } from '../repositories/session.repository';
 import { Session } from '@common/entities/session.entity';
 import { SessionStatus } from '@einvoice/types';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { TCP_SERVICES } from '@common/configuration/tcp.config';
+import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
+import { of } from 'rxjs';
 
 describe('SessionService', () => {
   let service: SessionService;
@@ -16,7 +20,15 @@ describe('SessionService', () => {
     exists: jest.Mock;
     type: jest.Mock;
   };
-  let sessionRepo: { findActiveByIdAndTenant: jest.Mock; updateLastActivity: jest.Mock; markClosed: jest.Mock };
+  let sessionRepo: {
+    findActiveByIdAndTenant: jest.Mock;
+    findByIdAndTenant: jest.Mock;
+    updateLastActivity: jest.Mock;
+    markClosed: jest.Mock;
+    markActiveClosedIfEmpty: jest.Mock;
+    markIdleClosedIfEmptyAndStale: jest.Mock;
+  };
+  let catalogClient: { send: jest.Mock };
 
   beforeEach(async () => {
     redis = {
@@ -29,8 +41,14 @@ describe('SessionService', () => {
     };
     sessionRepo = {
       findActiveByIdAndTenant: jest.fn(),
+      findByIdAndTenant: jest.fn(),
       updateLastActivity: jest.fn().mockResolvedValue(undefined),
       markClosed: jest.fn().mockResolvedValue(undefined),
+      markActiveClosedIfEmpty: jest.fn().mockResolvedValue(true),
+      markIdleClosedIfEmptyAndStale: jest.fn().mockResolvedValue(true),
+    };
+    catalogClient = {
+      send: jest.fn().mockReturnValue(of({ statusCode: 200, data: {} })),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -38,6 +56,7 @@ describe('SessionService', () => {
         SessionService,
         { provide: RedisClientService, useValue: { getClient: () => redis } },
         { provide: SessionRepository, useValue: sessionRepo },
+        { provide: TCP_SERVICES.CATALOG_SERVICE, useValue: catalogClient },
       ],
     }).compile();
 
@@ -134,7 +153,23 @@ describe('SessionService', () => {
     await expect(service.getActiveSessionOrThrow('tenant-1', 'sess-1')).rejects.toMatchObject({
       errorCode: ErrorCode.SESSION_CLOSED,
     });
-    expect(sessionRepo.markClosed).toHaveBeenCalled();
+    expect(sessionRepo.markIdleClosedIfEmptyAndStale).toHaveBeenCalledWith(
+      'sess-1',
+      'tenant-1',
+      expect.any(Date),
+      expect.any(Date),
+    );
+    expect(catalogClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          id: '00000000-0000-4000-8000-000000000001',
+          tenantId: 'tenant-1',
+          status: TABLE_STATUS.AVAILABLE,
+          sessionId: 'sess-1',
+        }),
+      }),
+    );
     expect(redis.del).toHaveBeenCalled();
   });
 
@@ -168,6 +203,7 @@ describe('SessionService', () => {
 
     expect(row.orderCount).toBe(3);
     expect(sessionRepo.markClosed).not.toHaveBeenCalled();
+    expect(sessionRepo.markIdleClosedIfEmptyAndStale).not.toHaveBeenCalled();
     expect(redis.hset).toHaveBeenCalledWith('session:tenant-1:sess-1', expect.objectContaining({ orderCount: '3' }));
     expect(redis.del).not.toHaveBeenCalledWith('cart:tenant-1:sess-1');
   });
@@ -197,5 +233,128 @@ describe('SessionService', () => {
     const row = await service.getActiveSessionOrThrow('tenant-1', 'sess-1');
     expect(row.orderCount).toBe(2);
     expect(sessionRepo.markClosed).not.toHaveBeenCalled();
+    expect(sessionRepo.markIdleClosedIfEmptyAndStale).not.toHaveBeenCalled();
+  });
+
+  it('does not release the table when conditional idle-close loses a submit race', async () => {
+    const stale = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    redis.hgetall.mockResolvedValue({
+      tenantId: 'tenant-1',
+      sessionId: 'sess-1',
+      tableId: '00000000-0000-4000-8000-000000000001',
+      tableName: 'T1',
+      status: SessionStatus.ACTIVE,
+      startedAt: stale,
+      lastActivity: stale,
+      orderCount: '0',
+      closedAt: '',
+    });
+    const staleDurable = {
+      id: 'sess-1',
+      tenantId: 'tenant-1',
+      tableId: '00000000-0000-4000-8000-000000000001',
+      tableName: 'T1',
+      status: SessionStatus.ACTIVE,
+      startedAt: new Date(stale),
+      lastActivity: new Date(stale),
+      closedAt: null,
+      orderCount: 0,
+    } as Session;
+    const submittedDurable = { ...staleDurable, orderCount: 1 } as Session;
+    sessionRepo.findActiveByIdAndTenant.mockResolvedValueOnce(staleDurable).mockResolvedValueOnce(submittedDurable);
+    sessionRepo.markIdleClosedIfEmptyAndStale.mockResolvedValue(false);
+
+    const row = await service.getActiveSessionOrThrow('tenant-1', 'sess-1');
+
+    expect(row.orderCount).toBe(1);
+    expect(catalogClient.send).not.toHaveBeenCalled();
+    expect(redis.hset).toHaveBeenCalledWith('session:tenant-1:sess-1', expect.objectContaining({ orderCount: '1' }));
+  });
+
+  it('does not release a closed session that already has orders', async () => {
+    sessionRepo.findByIdAndTenant.mockResolvedValue({
+      id: 'sess-closed',
+      tenantId: 'tenant-1',
+      tableId: '00000000-0000-4000-8000-000000000001',
+      tableName: 'T1',
+      status: SessionStatus.CLOSED,
+      startedAt: new Date(),
+      lastActivity: new Date(),
+      closedAt: new Date(),
+      orderCount: 2,
+    } as Session);
+
+    await expect(
+      service.releaseTableForClosedSession('tenant-1', 'sess-closed', '00000000-0000-4000-8000-000000000001'),
+    ).resolves.toBe(false);
+
+    expect(catalogClient.send).not.toHaveBeenCalled();
+  });
+
+  it('releases a closed empty session table for stale-session recovery', async () => {
+    sessionRepo.findByIdAndTenant.mockResolvedValue({
+      id: 'sess-empty',
+      tenantId: 'tenant-1',
+      tableId: '00000000-0000-4000-8000-000000000001',
+      tableName: 'T1',
+      status: SessionStatus.CLOSED,
+      startedAt: new Date(),
+      lastActivity: new Date(),
+      closedAt: new Date(),
+      orderCount: 0,
+    } as Session);
+
+    await expect(
+      service.releaseTableForClosedSession('tenant-1', 'sess-empty', '00000000-0000-4000-8000-000000000001'),
+    ).resolves.toBe(true);
+
+    expect(catalogClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          id: '00000000-0000-4000-8000-000000000001',
+          tenantId: 'tenant-1',
+          status: TABLE_STATUS.AVAILABLE,
+          sessionId: 'sess-empty',
+        }),
+      }),
+    );
+    expect(redis.del).toHaveBeenCalledWith('session:tenant-1:sess-empty');
+    expect(redis.del).toHaveBeenCalledWith('cart:tenant-1:sess-empty');
+  });
+
+  it('manually closes and releases an active empty table session', async () => {
+    const activeSession = {
+      id: 'sess-empty',
+      tenantId: 'tenant-1',
+      tableId: '00000000-0000-4000-8000-000000000001',
+      tableName: 'T1',
+      status: SessionStatus.ACTIVE,
+      startedAt: new Date(),
+      lastActivity: new Date(),
+      closedAt: null,
+      orderCount: 0,
+      currentBillId: null,
+    } as Session;
+    sessionRepo.findByIdAndTenant.mockResolvedValue(activeSession);
+
+    await expect(
+      service.releaseEmptyTableSession('tenant-1', 'sess-empty', '00000000-0000-4000-8000-000000000001'),
+    ).resolves.toBe(true);
+
+    expect(sessionRepo.markActiveClosedIfEmpty).toHaveBeenCalledWith('sess-empty', 'tenant-1', expect.any(Date));
+    expect(catalogClient.send).toHaveBeenCalledWith(
+      TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          id: '00000000-0000-4000-8000-000000000001',
+          tenantId: 'tenant-1',
+          status: TABLE_STATUS.AVAILABLE,
+          sessionId: 'sess-empty',
+        }),
+      }),
+    );
+    expect(redis.del).toHaveBeenCalledWith('session:tenant-1:sess-empty');
+    expect(redis.del).toHaveBeenCalledWith('cart:tenant-1:sess-empty');
   });
 });

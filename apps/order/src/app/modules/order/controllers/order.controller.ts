@@ -10,6 +10,7 @@ import type {
   CartGetTcpRequest,
   CartMutateTcpRequest,
   CreateServiceRequestTcpRequest,
+  CountTodayOrdersByTenantTcpRequest,
   CustomerCancelPendingTcpRequest,
   CustomerListOrdersTcpRequest,
   JoinSessionTcpRequest,
@@ -19,6 +20,7 @@ import type {
   ListServiceRequestsTcpRequest,
   MarkOrderItemsReadyTcpRequest,
   OrderIdTcpRequest,
+  ReleaseEmptyTableSessionTcpRequest,
   RevertOrderItemsProcessingTcpRequest,
   ServiceRequestActionTcpRequest,
   StaffOrderActionTcpRequest,
@@ -32,10 +34,12 @@ import type {
   BillPaymentSnapshotTcpResponse,
   BillRequestedTcpResponse,
   CartTcpResponse,
+  CountTodayOrdersByTenantTcpResponse,
   KdsActiveOrdersGetTcpResponse,
   MarkOrderItemsReadyTcpResponse,
   OrderActionTcpResponse,
   OrderTcpResponse,
+  ReleaseEmptyTableSessionTcpResponse,
   RevertOrderItemsProcessingTcpResponse,
   ServiceRequestCreatedTcpResponse,
   ServiceRequestListTcpResponse,
@@ -120,6 +124,14 @@ export class OrderController {
   @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.GET_BY_ID)
   async getById(@RequestParams() body: OrderIdTcpRequest): Promise<Response<OrderTcpResponse>> {
     const data = await this.orderService.getOrderById(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.COUNT_TODAY_BY_TENANT)
+  async countTodayByTenant(
+    @RequestParams() body: CountTodayOrdersByTenantTcpRequest,
+  ): Promise<Response<CountTodayOrdersByTenantTcpResponse>> {
+    const data = await this.orderService.countTodayByTenant(body);
     return Response.success(data);
   }
 
@@ -234,6 +246,14 @@ export class OrderController {
   @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.TABLE_TRANSFER)
   async tableTransfer(@RequestParams() body: TransferTableTcpRequest): Promise<Response<TableTransferredTcpResponse>> {
     const data = await this.transferService.transferTable(body);
+    return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.RELEASE_EMPTY_TABLE_SESSION)
+  async releaseEmptyTableSession(
+    @RequestParams() body: ReleaseEmptyTableSessionTcpRequest,
+  ): Promise<Response<ReleaseEmptyTableSessionTcpResponse>> {
+    const data = await this.orderService.releaseEmptyTableSession(body);
     return Response.success(data);
   }
 

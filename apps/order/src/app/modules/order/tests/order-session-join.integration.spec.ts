@@ -222,7 +222,7 @@ async function createHarness(): Promise<Harness> {
   });
   await catalogClient.connect();
   const sessionRepository = new SessionRepository(dataSource.getRepository(Session));
-  const sessionService = new SessionService(redisClient, sessionRepository);
+  const sessionService = new SessionService(redisClient, sessionRepository, catalogClient as unknown as TcpClient);
   const cartService = new CartService(redisClient, catalogClient as unknown as TcpClient, sessionService);
   const orderQuotaService = new OrderQuotaService(redisClient);
   const saasClient = createSaasClient();

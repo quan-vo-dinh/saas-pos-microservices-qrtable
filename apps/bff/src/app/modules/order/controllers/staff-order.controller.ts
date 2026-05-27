@@ -10,6 +10,7 @@ import { Permissions } from '@common/decorators/permission.decorator';
 import { ProcessId } from '@common/decorators/processId.decorator';
 import {
   CancelProcessingRequestDto,
+  ReleaseEmptyTableSessionRequestDto,
   StaffCancelPendingRequestDto,
   TransferTableRequestDto,
 } from '@common/interfaces/gateway/order';
@@ -22,6 +23,7 @@ import type {
   ListOrdersTcpRequest,
   ListServiceRequestsTcpRequest,
   OrderIdTcpRequest,
+  ReleaseEmptyTableSessionTcpRequest,
   ServiceRequestActionTcpRequest,
   StaffOrderActionTcpRequest,
   TransferTableTcpRequest,
@@ -32,6 +34,7 @@ import type {
   BillRequestedTcpResponse,
   OrderActionTcpResponse,
   OrderTcpResponse,
+  ReleaseEmptyTableSessionTcpResponse,
   ServiceRequestCreatedTcpResponse,
   ServiceRequestListTcpResponse,
   TableTransferredTcpResponse,
@@ -591,6 +594,42 @@ export class StaffOrderController {
       this.realtimeEvents.emitTableTransferred(tcp.data.events.tableTransferred);
     }
     return new ResponseDto<TableTransferredTcpResponse>({
+      data: tcp.data,
+      statusCode: tcp.statusCode,
+      message: tcp.code as HTTP_MESSAGE,
+      processID: processId,
+    });
+  }
+
+  @Post('tables/:tableId/release-empty-session')
+  @Authorization({ secured: true })
+  @Permissions([PERMISSION.TABLE_UPDATE_STATUS])
+  @ApiOkResponse({ type: ResponseDto })
+  @ApiOperation({ summary: 'Release an empty table session' })
+  async releaseEmptyTableSession(
+    @Param('tableId') tableId: string,
+    @Body() body: ReleaseEmptyTableSessionRequestDto,
+    @ProcessId() processId: string,
+    @Req() req: Request,
+  ): Promise<ResponseDto<ReleaseEmptyTableSessionTcpResponse>> {
+    const tenantId = req[MetadataKey.TENANT_ID] as string;
+    const userId = this.staffUserId(req);
+    const payload: ReleaseEmptyTableSessionTcpRequest = {
+      tenantId,
+      tableId,
+      sessionId: body.sessionId,
+      userId,
+    };
+    const tcp = await firstValueFrom(
+      this.orderClient
+        .send<
+          ReleaseEmptyTableSessionTcpResponse,
+          ReleaseEmptyTableSessionTcpRequest
+        >(TCP_REQUEST_MESSAGE.ORDER.RELEASE_EMPTY_TABLE_SESSION, buildTcpRequestContext<ReleaseEmptyTableSessionTcpRequest>(req, processId, payload))
+        .pipe(map((r) => r)),
+    );
+
+    return new ResponseDto<ReleaseEmptyTableSessionTcpResponse>({
       data: tcp.data,
       statusCode: tcp.statusCode,
       message: tcp.code as HTTP_MESSAGE,

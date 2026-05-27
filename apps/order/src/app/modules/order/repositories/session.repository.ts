@@ -2,7 +2,7 @@ import { Session } from '@common/entities/session.entity';
 import { SessionStatus } from '@einvoice/types';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, IsNull, LessThanOrEqual, Repository } from 'typeorm';
 
 @Injectable()
 export class SessionRepository {
@@ -42,6 +42,45 @@ export class SessionRepository {
         closedAt,
       },
     );
+  }
+
+  async markActiveClosedIfEmpty(id: string, tenantId: string, closedAt: Date): Promise<boolean> {
+    const result = await this.repo.update(
+      {
+        id,
+        tenantId,
+        status: SessionStatus.ACTIVE,
+        orderCount: 0,
+        currentBillId: IsNull(),
+      },
+      {
+        status: SessionStatus.CLOSED,
+        closedAt,
+      },
+    );
+    return (result.affected ?? 0) > 0;
+  }
+
+  async markIdleClosedIfEmptyAndStale(
+    id: string,
+    tenantId: string,
+    staleBefore: Date,
+    closedAt: Date,
+  ): Promise<boolean> {
+    const result = await this.repo.update(
+      {
+        id,
+        tenantId,
+        status: SessionStatus.ACTIVE,
+        orderCount: 0,
+        lastActivity: LessThanOrEqual(staleBefore),
+      },
+      {
+        status: SessionStatus.CLOSED,
+        closedAt,
+      },
+    );
+    return (result.affected ?? 0) > 0;
   }
 
   save(entity: Session): Promise<Session> {

@@ -6,7 +6,12 @@ import { OrderStatus } from '@einvoice/types';
 import { toast } from 'sonner';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { tableKeys } from '@/features/tables/hooks/use-tables-query';
-import { orderService, type OrderListParams, type TransferTablePayload } from '../services/order.service';
+import {
+  orderService,
+  type OrderListParams,
+  type ReleaseEmptyTableSessionPayload,
+  type TransferTablePayload,
+} from '../services/order.service';
 
 const ORDER_LIST_REALTIME_FALLBACK_POLL_MS = 15_000;
 const ORDER_DETAIL_POLL_MS = 4_000;
@@ -133,6 +138,22 @@ export function useTransferTableMutation() {
       await invalidateOrderQueries(queryClient);
       await Promise.all([queryClient.invalidateQueries({ queryKey: tableKeys.all })]);
       toast.success(successMessage('updated', 'table'));
+    },
+    onError: (error: Error) => {
+      toast.error(getErrorDisplayMessage(error));
+    },
+  });
+}
+
+export function useReleaseEmptyTableSessionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: ReleaseEmptyTableSessionPayload) => orderService.releaseEmptyTableSession(payload),
+    onSuccess: async () => {
+      await invalidateOrderQueries(queryClient);
+      await queryClient.invalidateQueries({ queryKey: tableKeys.all });
+      toast.success('Đã thả bàn rỗng.');
     },
     onError: (error: Error) => {
       toast.error(getErrorDisplayMessage(error));

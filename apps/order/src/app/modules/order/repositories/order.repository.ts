@@ -31,6 +31,15 @@ export class OrderRepository {
     return this.repo.find({ where: { sessionId, tenantId } });
   }
 
+  countCreatedBetweenByTenant(tenantId: string, start: Date, end: Date): Promise<number> {
+    return this.repo
+      .createQueryBuilder('o')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.createdAt >= :start', { start })
+      .andWhere('o.createdAt < :end', { end })
+      .getCount();
+  }
+
   findByIdsAndTenant(ids: string[], tenantId: string): Promise<Order[]> {
     if (ids.length === 0) {
       return Promise.resolve([]);

@@ -68,6 +68,10 @@ export type ListOrdersTcpRequest = {
   offset?: number;
 };
 
+export type CountTodayOrdersByTenantTcpRequest = {
+  tenantId: string;
+};
+
 export type ListBillsTcpRequest = {
   tenantId: string;
   status?: string;
@@ -113,6 +117,13 @@ export type TransferTableTcpRequest = {
   toTableId: string;
   userId: string;
   requestId: string;
+};
+
+export type ReleaseEmptyTableSessionTcpRequest = {
+  tenantId: string;
+  tableId: string;
+  sessionId: string;
+  userId: string;
 };
 
 export type KdsActiveOrdersGetTcpRequest = {
