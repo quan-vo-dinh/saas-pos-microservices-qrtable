@@ -30,7 +30,7 @@ describe('TenantStatusBanner', () => {
 
     expect(screen.getByText('Cửa hàng đang tạm khóa')).toBeTruthy();
     expect(screen.getByText(/Nhà hàng hiện chưa nhận đơn qua QRTable/)).toBeTruthy();
-    expect(screen.getByText(/SUBSCRIPTION_EXPIRED/)).toBeTruthy();
+    expect(screen.getByText(/Gói đăng ký đã hết hạn/)).toBeTruthy();
   });
 
   it('renders closed tenant banner', () => {
@@ -40,6 +40,6 @@ describe('TenantStatusBanner', () => {
 
     expect(screen.getByText('Cửa hàng không còn hoạt động trên QRTable')).toBeTruthy();
     expect(screen.getByText(/Vui lòng liên hệ nhân viên tại quầy/)).toBeTruthy();
-    expect(screen.getByText(/CLOSED_BY_ADMIN/)).toBeTruthy();
+    expect(screen.getByText(/Đóng bởi quản trị viên/)).toBeTruthy();
   });
 });

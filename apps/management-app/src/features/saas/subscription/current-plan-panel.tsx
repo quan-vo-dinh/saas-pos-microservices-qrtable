@@ -5,6 +5,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/constants/routes';
+import { billingPeriodVi, planFeatureVi } from '@einvoice/shared-constants';
+import { SubscriptionStatusBadge, TenantStatusBadge } from '@/features/saas/components/badges';
 import { formatDateTime } from '@/features/saas/formatters';
 import type { DashboardSubscription } from '@/features/saas/types';
 
@@ -34,7 +36,9 @@ export function CurrentPlanPanel({ data }: { data: DashboardSubscription }) {
     <div className="space-y-4">
       {tenant?.status === 'SUSPENDED' ? (
         <Alert variant="destructive">
-          <AlertTitle>Tenant đang tạm khóa</AlertTitle>
+          <AlertTitle className="flex flex-wrap items-center gap-2">
+            Tenant đang tạm khóa <TenantStatusBadge status="SUSPENDED" />
+          </AlertTitle>
           <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span>Vui lòng thanh toán hóa đơn hoặc chọn gói mới để tiếp tục.</span>
             <Button asChild size="sm" variant="secondary">
@@ -48,7 +52,7 @@ export function CurrentPlanPanel({ data }: { data: DashboardSubscription }) {
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-semibold">Gói hiện tại</h2>
           {cur ? <Badge>{cur.planCode}</Badge> : <Badge variant="secondary">Chưa có</Badge>}
-          {cur ? <Badge variant="outline">{cur.status}</Badge> : null}
+          {cur?.status ? <SubscriptionStatusBadge status={cur.status} /> : null}
         </div>
         {cur ? (
           <p className="text-muted-foreground mt-2 text-sm">Hết hạn: {formatDateTime(cur.expiresAt)}</p>
@@ -56,7 +60,7 @@ export function CurrentPlanPanel({ data }: { data: DashboardSubscription }) {
           <p className="text-muted-foreground mt-2 text-sm">Chưa có subscription kích hoạt.</p>
         )}
         {cur?.billingPeriod ? (
-          <p className="text-muted-foreground text-xs">Chu kỳ: {cur.billingPeriod}</p>
+          <p className="text-muted-foreground text-xs">Chu kỳ: {billingPeriodVi(cur.billingPeriod)}</p>
         ) : null}
         <div className="mt-4 max-w-md space-y-3">
           <Bar label="Bàn" used={usage.tablesUsed ?? 0} max={usage.tablesMax ?? cur?.maxTables ?? 0} />
@@ -66,7 +70,7 @@ export function CurrentPlanPanel({ data }: { data: DashboardSubscription }) {
         {cur?.features?.length ? (
           <ul className="text-muted-foreground mt-3 list-inside list-disc text-xs">
             {cur.features.map((f) => (
-              <li key={f}>{f}</li>
+              <li key={f}>{planFeatureVi(f)}</li>
             ))}
           </ul>
         ) : null}

@@ -1,14 +1,18 @@
 'use client';
 
+import { planFeatureVi } from '@einvoice/shared-constants';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
-export const PLAN_FEATURE_OPTIONS = [
-  { value: 'basic_pos', label: 'basic_pos' },
-  { value: 'analytics_basic', label: 'analytics_basic' },
-  { value: 'analytics_advanced', label: 'analytics_advanced' },
-  { value: 'priority_support', label: 'priority_support' },
+/** Wire codes stored in DB/API — display via planFeatureVi(). */
+export const PLAN_FEATURE_WIRE_CODES = [
+  'basic_pos',
+  'analytics_basic',
+  'analytics_advanced',
+  'priority_support',
 ] as const;
+
+export type PlanFeatureWireCode = (typeof PLAN_FEATURE_WIRE_CODES)[number];
 
 export function PlanFeaturePicker({
   value,
@@ -29,10 +33,10 @@ export function PlanFeaturePicker({
     <div className="grid gap-2">
       <Label>Tính năng</Label>
       <div className="grid gap-2">
-        {PLAN_FEATURE_OPTIONS.map((f) => (
-          <label key={f.value} className="flex items-center gap-2 text-sm">
-            <Checkbox checked={value.includes(f.value)} onCheckedChange={(v) => toggle(f.value, v === true)} />
-            {f.label}
+        {PLAN_FEATURE_WIRE_CODES.map((code) => (
+          <label key={code} className="flex items-center gap-2 text-sm">
+            <Checkbox checked={value.includes(code)} onCheckedChange={(v) => toggle(code, v === true)} />
+            {planFeatureVi(code)}
           </label>
         ))}
       </div>

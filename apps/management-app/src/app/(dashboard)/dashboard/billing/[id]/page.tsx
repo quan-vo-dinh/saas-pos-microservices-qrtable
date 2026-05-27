@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/constants/routes';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { saasApi } from '@/features/saas/api';
+import { billingPeriodVi } from '@einvoice/shared-constants';
+import { InvoiceStatusBadge } from '@/features/saas/components/badges';
 import { formatDateTime, formatVnd } from '@/features/saas/formatters';
-import { InvoiceStatusBadge } from '@/features/saas/admin-billing/invoice-status-badge';
 import { InvoiceStatusPoller } from '@/features/saas/subscription/invoice-status-poller';
 
 export default function DashboardBillingInvoicePage() {
@@ -64,7 +65,7 @@ export default function DashboardBillingInvoicePage() {
       </div>
       <p className="font-mono text-sm">{row.billingReference}</p>
       <p className="text-sm">
-        Gói: {row.planCodeSnapshot} · Chu kỳ: {row.billingPeriod}
+        Gói: {row.planCodeSnapshot} · Chu kỳ: {billingPeriodVi(row.billingPeriod)}
       </p>
       <p className="text-lg font-medium">{formatVnd(row.amountVnd)}</p>
       {row.qrUrl && row.status === 'PENDING' ? (

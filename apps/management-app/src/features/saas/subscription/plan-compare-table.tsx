@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { planFeatureVi } from '@einvoice/shared-constants';
 import {
   Table,
   TableBody,
@@ -47,6 +48,7 @@ export function PlanCompareTable({
           {rows.map((p) => {
             const isCurrent = currentPlanCode === p.code;
             const isFree = p.code === 'FREE';
+            const featureLabels = p.features?.map(planFeatureVi).join(', ') || '—';
             return (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.name}</TableCell>
@@ -55,7 +57,7 @@ export function PlanCompareTable({
                 <TableCell>{formatQuota(p.maxStaff)}</TableCell>
                 <TableCell>{formatQuota(p.maxOrdersPerDay)}</TableCell>
                 <TableCell className="max-w-[220px] text-xs text-muted-foreground">
-                  {p.features?.join(', ')}
+                  {featureLabels}
                 </TableCell>
                 <TableCell className="text-end">
                   {isCurrent ? (

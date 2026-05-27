@@ -26,7 +26,7 @@ import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import type { InvoiceStatus, SubscriptionInvoice } from '@/features/saas/types';
 
 const INVOICE_STATUS_OPTIONS: InvoiceStatus[] = ['PENDING', 'PAID', 'UNDERPAID', 'EXPIRED', 'CANCELED'];
-import { InvoiceStatusBadge } from './invoice-status-badge';
+import { InvoiceStatusBadge } from '@/features/saas/components/badges';
 import { ManualConfirmDialog } from './manual-confirm-dialog';
 
 export function AdminBillingClient() {

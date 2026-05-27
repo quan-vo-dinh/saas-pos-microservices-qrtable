@@ -38,7 +38,7 @@ import { saasApi } from '@/features/saas/api';
 import { formatDateTime } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import type { TenantListItem } from '@/features/saas/types';
-import { TenantStatusBadge } from './tenant-status-badge';
+import { TenantStatusBadge } from '@/features/saas/components/badges';
 
 type TenantsTableProps = {
   data: TenantListItem[];

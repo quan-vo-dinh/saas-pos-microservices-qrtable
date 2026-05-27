@@ -19,7 +19,8 @@ import { formatDateTime } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import type { TenantDetail, TenantStatus } from '@/features/saas/types';
 import { getActivePlanOptions, getNextPlanCode } from './plan-options';
-import { TenantStatusBadge } from './tenant-status-badge';
+import { tenantTypeVi } from '@einvoice/shared-constants';
+import { SubscriptionStatusBadge, TenantStatusBadge } from '@/features/saas/components/badges';
 
 export function TenantDetailHeader({ tenant, permissions }: { tenant: TenantDetail; permissions: string[] }) {
   const qc = useQueryClient();
@@ -128,7 +129,7 @@ export function TenantOverviewTab({ tenant }: { tenant: TenantDetail }) {
     <div className="grid max-w-2xl gap-3 text-sm">
       <div className="flex justify-between gap-4 border-b py-2">
         <span className="text-muted-foreground">Loại</span>
-        <span>{tenant.type}</span>
+        <span>{tenantTypeVi(tenant.type)}</span>
       </div>
       <div className="flex justify-between gap-4 border-b py-2">
         <span className="text-muted-foreground">Địa chỉ</span>
@@ -264,7 +265,9 @@ export function TenantSubscriptionsTab({
             {(list.data ?? []).map((row) => (
               <tr key={row.id} className="border-t">
                 <td className="p-2">{row.planCode}</td>
-                <td className="p-2">{row.status}</td>
+                <td className="p-2">
+                  <SubscriptionStatusBadge status={row.status} />
+                </td>
                 <td className="p-2">{formatDateTime(row.expiresAt ?? null)}</td>
               </tr>
             ))}

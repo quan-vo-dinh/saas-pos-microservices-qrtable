@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { billStatusVi } from '@einvoice/shared-constants';
 import { BillStatus } from '@einvoice/types';
 import { toast } from 'sonner';
 import { Button } from '@einvoice/frontend-ui';
@@ -119,7 +120,7 @@ export function RequestPaymentPage() {
       <div className="rounded-lg border border-border/80 bg-card/40 p-4">
         <p className="text-sm text-muted-foreground">Trạng thái bill</p>
         <p className="mt-1 text-base font-semibold">
-          {billPending ? 'Đang chờ thanh toán' : bill ? bill.status : 'Chưa tạo bill'}
+          {billPending ? 'Đang chờ thanh toán' : bill ? billStatusVi(bill.status) : 'Chưa tạo bill'}
         </p>
         {billPending ? (
           <p className="mt-2 text-xs text-muted-foreground">

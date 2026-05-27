@@ -1,10 +1,21 @@
 /** Phase 4B SaaS / subscription UI types (aligned with BFF + TCP contracts). */
 
-export type TenantStatus = 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
-export type SubscriptionStatus = 'ACTIVE' | 'EXPIRED' | 'SUPERSEDED' | 'CANCELED';
-export type InvoiceStatus = 'PENDING' | 'PAID' | 'UNDERPAID' | 'EXPIRED' | 'CANCELED';
-export type BillingPeriod = 'MONTHLY' | 'YEARLY';
-export type PaymentConnectionStatus = 'NOT_CONNECTED' | 'CONNECTED' | 'TOKEN_EXPIRED' | 'REVOKED' | 'ERROR';
+import type {
+  SaasBillingPeriod,
+  SaasInvoiceStatus,
+  SaasPaymentConnectionStatus,
+  SaasSubscriptionStatus,
+  SaasTenantStatus,
+  SaasTenantType,
+} from '@einvoice/shared-constants';
+
+/** Wire enums — re-exported from @einvoice/shared-constants (synced with libs/constants/saas.constants.ts). */
+export type TenantStatus = SaasTenantStatus;
+export type SubscriptionStatus = SaasSubscriptionStatus;
+export type InvoiceStatus = SaasInvoiceStatus;
+export type BillingPeriod = SaasBillingPeriod;
+export type PaymentConnectionStatus = SaasPaymentConnectionStatus;
+export type TenantType = SaasTenantType;
 
 export interface PricingPlan {
   id: string;

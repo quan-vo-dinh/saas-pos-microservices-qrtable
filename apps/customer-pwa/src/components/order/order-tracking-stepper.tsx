@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { orderStatusVi } from '@einvoice/shared-constants';
 import { OrderStatus, type Order } from '@einvoice/types';
 import { Badge } from '@einvoice/frontend-ui';
 import { cn } from '@/lib/utils';
@@ -41,7 +42,7 @@ export function OrderTrackingStepper({ order, onOpenJourney }: OrderTrackingStep
       >
         <span className="text-xs font-medium text-muted-foreground">Trạng thái đơn (chạm để xem hành trình)</span>
         <Badge variant="secondary" className="mt-1">
-          {STEPS[Math.min(active, STEPS.length - 1)]?.label ?? order.status}
+          {STEPS[Math.min(active, STEPS.length - 1)]?.label ?? orderStatusVi(order.status)}
         </Badge>
       </button>
 

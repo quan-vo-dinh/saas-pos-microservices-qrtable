@@ -1,3 +1,4 @@
+import { tenantLifecycleReasonVi } from '@einvoice/shared-constants';
 import { AlertTriangle, Store } from 'lucide-react';
 import { useTenantStatus } from '@/features/tenant/use-tenant-status';
 
@@ -27,7 +28,7 @@ export function TenantStatusBanner() {
               <p className="font-semibold">Cửa hàng không còn hoạt động trên QRTable</p>
               <p className="text-amber-900/90 dark:text-amber-100/90">
                 Vui lòng liên hệ nhân viên tại quầy.
-                {reason ? ` (${reason})` : ''}
+                {reason ? ` (${tenantLifecycleReasonVi(reason)})` : ''}
               </p>
             </>
           ) : (
@@ -35,7 +36,7 @@ export function TenantStatusBanner() {
               <p className="font-semibold">Cửa hàng đang tạm khóa</p>
               <p className="text-amber-900/90 dark:text-amber-100/90">
                 Nhà hàng hiện chưa nhận đơn qua QRTable. Vui lòng liên hệ nhân viên tại quầy.
-                {reason ? ` (${reason})` : ''}
+                {reason ? ` (${tenantLifecycleReasonVi(reason)})` : ''}
               </p>
             </>
           )}

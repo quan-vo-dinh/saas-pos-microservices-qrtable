@@ -1,3 +1,4 @@
+/** Locale/format helpers for SaaS screens. Domain enum labels → @einvoice/shared-constants. */
 export function formatVnd(value: number): string {
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { saasApi } from '@/features/saas/api';
+import { SubscriptionStatusBadge } from '@/features/saas/components/badges';
 import { formatDateTime } from '@/features/saas/formatters';
 import type { BillingPeriod } from '@/features/saas/types';
 import { CheckoutQrDialog } from '@/features/saas/subscription/checkout-qr-dialog';
@@ -109,7 +110,9 @@ export default function DashboardSubscriptionPage() {
               {(sub.data?.history ?? []).map((h) => (
                 <TableRow key={h.id}>
                   <TableCell>{h.planCode}</TableCell>
-                  <TableCell>{h.status}</TableCell>
+                  <TableCell>
+                    <SubscriptionStatusBadge status={h.status} />
+                  </TableCell>
                   <TableCell>{formatDateTime(h.expiresAt ?? null)}</TableCell>
                 </TableRow>
               ))}
