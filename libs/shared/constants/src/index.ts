@@ -27,6 +27,10 @@ export {
   subscriptionStatusVi,
   tenantTypeVi,
   paymentConnectionStatusVi,
+  displayDomainLabel,
+  planFeatureVi,
+  tenantLifecycleReasonVi,
+  booleanEnabledVi,
   type BillingPeriod,
   type InvoiceStatusLabel,
   type TenantStatusLabel,
@@ -34,3 +38,17 @@ export {
   type TenantTypeLabel,
   type PaymentConnectionStatusLabel,
 } from './lib/vi-domain-labels';
+export {
+  SAAS_BILLING_PERIOD,
+  SAAS_INVOICE_STATUS,
+  SAAS_PAYMENT_CONNECTION_STATUS,
+  SAAS_SUBSCRIPTION_STATUS,
+  SAAS_TENANT_STATUS,
+  SAAS_TENANT_TYPE,
+  type SaasBillingPeriod,
+  type SaasInvoiceStatus,
+  type SaasPaymentConnectionStatus,
+  type SaasSubscriptionStatus,
+  type SaasTenantStatus,
+  type SaasTenantType,
+} from './lib/saas-wire-types';

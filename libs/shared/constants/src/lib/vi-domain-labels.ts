@@ -148,26 +148,81 @@ const PAYMENT_CONNECTION_STATUS_VI = {
   ERROR: 'Lỗi',
 } as const satisfies Record<PaymentConnectionStatusLabel, string>;
 
-export function billingPeriodVi(period: BillingPeriod): string {
-  return BILLING_PERIOD_VI[period];
+const PLAN_FEATURE_VI: Record<string, string> = {
+  basic_pos: 'POS cơ bản',
+  analytics_basic: 'Báo cáo cơ bản',
+  analytics_advanced: 'Báo cáo nâng cao',
+  priority_support: 'Hỗ trợ ưu tiên',
+  kds: 'Màn hình bếp (KDS)',
+  multi_branch: 'Nhiều chi nhánh',
+  vietqr: 'Thanh toán VietQR',
+  staff_roles: 'Phân quyền nhân sự',
+};
+
+const TENANT_LIFECYCLE_REASON_VI: Record<string, string> = {
+  SUBSCRIPTION_EXPIRED: 'Gói đăng ký đã hết hạn',
+  'subscription expired': 'Gói đăng ký đã hết hạn',
+  expired: 'Gói đã hết hạn',
+  CLOSED_BY_ADMIN: 'Đóng bởi quản trị viên',
+  TENANT_ONBOARDING_FAILED: 'Onboard thất bại',
+};
+
+function humanizeToken(value: string): string {
+  return value
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
 }
 
-export function invoiceStatusVi(status: InvoiceStatusLabel): string {
-  return INVOICE_STATUS_VI[status];
+/** Map wire enum → Vietnamese label; unknown values get a readable fallback (never raw UPPER_SNAKE). */
+export function displayDomainLabel(map: Record<string, string>, value: string | null | undefined): string {
+  if (!value?.trim()) {
+    return '—';
+  }
+  const normalized = value.trim();
+  const direct = map[normalized] ?? map[normalized.toUpperCase()] ?? map[normalized.toLowerCase()];
+  if (direct) {
+    return direct;
+  }
+  return humanizeToken(normalized);
 }
 
-export function tenantStatusVi(status: TenantStatusLabel): string {
-  return TENANT_STATUS_VI[status];
+export function billingPeriodVi(period: BillingPeriod | string): string {
+  return displayDomainLabel(BILLING_PERIOD_VI, period);
 }
 
-export function subscriptionStatusVi(status: SubscriptionStatusLabel): string {
-  return SUBSCRIPTION_STATUS_VI[status];
+export function invoiceStatusVi(status: InvoiceStatusLabel | string): string {
+  return displayDomainLabel(INVOICE_STATUS_VI, status);
 }
 
-export function tenantTypeVi(type: TenantTypeLabel): string {
-  return TENANT_TYPE_VI[type];
+export function tenantStatusVi(status: TenantStatusLabel | string): string {
+  return displayDomainLabel(TENANT_STATUS_VI, status);
 }
 
-export function paymentConnectionStatusVi(status: PaymentConnectionStatusLabel): string {
-  return PAYMENT_CONNECTION_STATUS_VI[status];
+export function subscriptionStatusVi(status: SubscriptionStatusLabel | string): string {
+  return displayDomainLabel(SUBSCRIPTION_STATUS_VI, status);
+}
+
+export function tenantTypeVi(type: TenantTypeLabel | string): string {
+  return displayDomainLabel(TENANT_TYPE_VI, type);
+}
+
+export function paymentConnectionStatusVi(status: PaymentConnectionStatusLabel | string): string {
+  return displayDomainLabel(PAYMENT_CONNECTION_STATUS_VI, status);
+}
+
+export function planFeatureVi(code: string): string {
+  return displayDomainLabel(PLAN_FEATURE_VI, code);
+}
+
+export function tenantLifecycleReasonVi(reason: string | null | undefined): string {
+  if (!reason?.trim()) {
+    return '';
+  }
+  return displayDomainLabel(TENANT_LIFECYCLE_REASON_VI, reason);
+}
+
+export function booleanEnabledVi(enabled: boolean): string {
+  return enabled ? 'Bật' : 'Tắt';
 }

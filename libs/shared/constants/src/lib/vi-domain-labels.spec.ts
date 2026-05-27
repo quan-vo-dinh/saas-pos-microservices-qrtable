@@ -28,7 +28,12 @@ import {
   sessionStatusVi,
   tableStatusVi,
   billingPeriodVi,
+  displayDomainLabel,
   invoiceStatusVi,
+  paymentConnectionStatusVi,
+  planFeatureVi,
+  subscriptionStatusVi,
+  tenantLifecycleReasonVi,
 } from './vi-domain-labels';
 
 describe('vi-domain-labels', () => {
@@ -90,5 +95,21 @@ describe('vi-domain-labels — SaaS', () => {
     expect(billingPeriodVi('MONTHLY')).toBe('Hàng tháng');
     expect(invoiceStatusVi('PENDING')).toBe('Chờ thanh toán');
     expect(invoiceStatusVi('PENDING')).not.toMatch(/^PENDING$/);
+  });
+
+  it('maps subscription and payment connection statuses', () => {
+    expect(subscriptionStatusVi('ACTIVE')).toBe('Đang hiệu lực');
+    expect(paymentConnectionStatusVi('CONNECTED')).toBe('Đã kết nối');
+    expect(paymentConnectionStatusVi('CONNECTED')).not.toMatch(/^CONNECTED$/);
+  });
+
+  it('humanizes unknown enum tokens instead of echoing wire values', () => {
+    expect(displayDomainLabel({ FOO_BAR: 'Nhãn' }, 'UNKNOWN_CODE')).toBe('Unknown Code');
+  });
+
+  it('maps plan features and tenant lifecycle reasons', () => {
+    expect(planFeatureVi('basic_pos')).toBe('POS cơ bản');
+    expect(planFeatureVi('priority_support')).toBe('Hỗ trợ ưu tiên');
+    expect(tenantLifecycleReasonVi('SUBSCRIPTION_EXPIRED')).toBe('Gói đăng ký đã hết hạn');
   });
 });
