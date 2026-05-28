@@ -47,6 +47,12 @@
       "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
       "computedHash": "ef32aea0a8fab9b365ff9e08a95f8d353e20ca21ea46ec2e73587c86dd341351"
     },
+    "latex-document-skill": {
+      "source": "ndpvt-web/latex-document-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "cc2d8b425f319aad9c2e75a43be4028c32ae5cbc10fb9f2d374395e341b9cd5b"
+    },
     "microservices-architect": {
       "source": "jeffallan/claude-skills",
       "sourceType": "github",
@@ -70,6 +76,12 @@
       "sourceType": "github",
       "skillPath": "plugins/developer-essentials/skills/nx-workspace-patterns/SKILL.md",
       "computedHash": "c998c269c46455ad2bd9a1b61fb7db9ced887ddca40c2f3e54a610c6d9f9b09c"
+    },
+    "pandoc-unicode-sanitize": {
+      "source": "HKUDS/OpenSpace",
+      "sourceType": "github",
+      "skillPath": "gdpval_bench/skills/pandoc-unicode-sanitize/SKILL.md",
+      "computedHash": "fd5e78e506c3fd7c1b1129a430877c8e964ff490c4cf213ac5603041bd3de231"
     },
     "pptx": {
       "source": "anthropics/skills",
