@@ -64,3 +64,19 @@ tools/ngrok/qrtable-dev-ngrok.yml
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# LaTeX build artifacts for the graduation thesis report
+docs/graduation-thesis-resources/thesis-report/*.aux
+docs/graduation-thesis-resources/thesis-report/*.bbl
+docs/graduation-thesis-resources/thesis-report/*.bcf
+docs/graduation-thesis-resources/thesis-report/*.blg
+docs/graduation-thesis-resources/thesis-report/*-blx.bib
+docs/graduation-thesis-resources/thesis-report/*.fdb_latexmk
+docs/graduation-thesis-resources/thesis-report/*.fls
+docs/graduation-thesis-resources/thesis-report/*.lof
+docs/graduation-thesis-resources/thesis-report/*.log
+docs/graduation-thesis-resources/thesis-report/*.lot
+docs/graduation-thesis-resources/thesis-report/*.out
+docs/graduation-thesis-resources/thesis-report/*.pdf
+docs/graduation-thesis-resources/thesis-report/*.run.xml
+docs/graduation-thesis-resources/thesis-report/*.toc

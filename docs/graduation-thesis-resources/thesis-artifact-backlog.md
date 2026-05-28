@@ -1,0 +1,160 @@
+# Backlog artifact cho khóa luận QRTable
+
+> Tài liệu sống dùng để quản lý diagram, bảng, screenshot, demo evidence và phụ lục.
+> Cập nhật gần nhất: 2026-05-28.
+
+## 1. Mục đích
+
+File này giúp theo dõi artifact cần chuẩn bị cho khóa luận để tránh mất ngữ cảnh giữa các phiên làm việc. Mỗi artifact cần gắn với một claim hoặc một vai trò lập luận cụ thể. Artifact chỉ có vai trò lưu bằng chứng đầy đủ nên đưa vào phụ lục, không nhồi vào chương chính.
+
+Nguồn nền:
+
+- `docs/graduation-thesis-resources/thesis-official-outline.md`
+- `docs/graduation-thesis-resources/thesis-evidence-map.md`
+- `docs/graduation-thesis-resources/presentation-format-graduation-thesis.md`
+- `docs/technical-architecture.md`
+- `docs/business-logic.md`
+- `docs/testing/phase-5/traceability-matrix.md`
+- `docs/architecture/erd.png`
+- `docs/architecture/erd.mmd`
+
+## 2. Quy ước trạng thái
+
+| Trạng thái      | Ý nghĩa                                                                  |
+| --------------- | ------------------------------------------------------------------------ |
+| `planned`       | Đã xác định cần có, chưa tạo nội dung.                                   |
+| `source-exists` | Đã có source/asset nền trong repo nhưng chưa biên tập cho khóa luận.     |
+| `drafted`       | Đã có bản nháp nội dung/diagram/table.                                   |
+| `captured`      | Đã chụp screenshot hoặc lưu demo artifact.                               |
+| `inserted`      | Đã đưa vào LaTeX/chương/phụ lục.                                         |
+| `verified`      | Đã kiểm tra caption, nguồn, số hiệu, render PDF và claim liên quan.      |
+| `deferred`      | Tạm hoãn, chỉ dùng nếu chưa có evidence thật hoặc vượt phạm vi bản nháp. |
+
+Mức ưu tiên:
+
+- `P0`: cần có cho bản nháp đầy đủ.
+- `P1`: nên có nếu muốn tăng sức thuyết phục.
+- `P2`: đưa vào phụ lục hoặc làm sau nếu còn thời gian.
+
+## 3. Artifact tối thiểu trong chương chính
+
+| ID       | Loại     | Vị trí   | Artifact                                            | Claim/vai trò hỗ trợ                                                                | Nguồn chính                                         | Trạng thái | Ưu tiên |
+| -------- | -------- | -------- | --------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------- | ---------- | ------- |
+| Hình 1.1 | Diagram  | Chương 1 | Luồng tổng quát từ QR ordering đến POS/KDS/payment  | Làm rõ bài toán QR ordering cần tích hợp vào vận hành POS, bếp và thanh toán        | `docs/business-logic.md`, research survey           | planned    | P0      |
+| Bảng 1.1 | Bảng     | Chương 1 | Vấn đề, nguyên nhân và hướng giải quyết             | Kết nối pain point F&B với hướng tiếp cận SaaS POS QRTable                          | Proposal, research survey                           | planned    | P0      |
+| Bảng 2.1 | Bảng     | Chương 2 | So sánh SaaS POS và POS truyền thống                | Giải thích vì sao mô hình SaaS phù hợp với POS hiện đại                             | NIST, nguồn thị trường, related work                | planned    | P0      |
+| Bảng 2.2 | Bảng     | Chương 2 | So sánh multi-tenancy models                        | Làm nền cho quyết định tenant isolation                                             | NIST, AWS/Microsoft SaaS guidance                   | planned    | P0      |
+| Bảng 2.3 | Bảng     | Chương 2 | So sánh monolith, modular monolith và microservices | Đặt microservices vào bối cảnh trade-off, không trình bày một chiều                 | Fowler/Lewis, Azure Architecture Center, sách/paper | planned    | P0      |
+| Bảng 2.4 | Bảng     | Chương 2 | So sánh giao tiếp đồng bộ và bất đồng bộ            | Làm nền cho quyết định TCP/gRPC + Kafka có chọn lọc                                 | Kafka docs, microservices docs                      | planned    | P0      |
+| Hình 2.1 | Diagram  | Chương 2 | Mô hình khái niệm SaaS multi-tenancy                | Minh họa tenant, shared resources và isolation boundary ở mức lý thuyết             | NIST, SaaS architecture guidance                    | planned    | P1      |
+| Hình 3.1 | Diagram  | Chương 3 | Actor/use-case overview                             | Chuyển bối cảnh thành actor và use case hệ thống                                    | `docs/business-logic.md`, permission matrix         | planned    | P0      |
+| Bảng 3.1 | Bảng     | Chương 3 | Functional requirements theo domain                 | Chốt phạm vi chức năng theo actor/domain                                            | `docs/business-logic.md`, phase docs                | planned    | P0      |
+| Bảng 3.2 | Bảng     | Chương 3 | Non-functional requirements và tiêu chí đánh giá    | Làm cầu nối từ ISO/IEC 25010 sang Chương 6                                          | ISO/IEC 25010, evidence map                         | planned    | P0      |
+| Hình 3.2 | Diagram  | Chương 3 | Business flow từ khách hàng đến bếp và thanh toán   | Trình bày flow nghiệp vụ end-to-end trước khi vào kiến trúc                         | `docs/business-logic.md`                            | planned    | P0      |
+| Bảng 3.3 | Bảng     | Chương 3 | Actor, vai trò và quyền truy cập chính              | Tóm tắt RBAC và tenant-aware access ở mức yêu cầu                                   | `docs/architecture/permission-matrix.md`            | planned    | P0      |
+| Hình 4.1 | Diagram  | Chương 4 | Overall architecture                                | Chứng minh cấu trúc client -> BFF -> services -> infrastructure                     | `docs/technical-architecture.md`, `apps/`, `libs/`  | planned    | P0      |
+| Hình 4.2 | Diagram  | Chương 4 | C4/container diagram                                | Cho người đọc thấy container chính và boundary giữa frontend/backend/infrastructure | `docs/technical-architecture.md`, source tree       | planned    | P0      |
+| Bảng 4.1 | Bảng     | Chương 4 | Service ownership/data ownership                    | Chứng minh database-per-service và không cross-service DB ownership                 | `docs/technical-architecture.md`, `apps/*`          | planned    | P0      |
+| Bảng 4.2 | Bảng     | Chương 4 | Communication matrix                                | Giải thích HTTP/TCP/gRPC/Kafka/WebSocket/Webhook dùng ở đâu                         | `docs/technical-architecture.md`                    | planned    | P0      |
+| Bảng 4.3 | Bảng     | Chương 4 | Kafka topic registry                                | Tránh invent topic; làm rõ event-driven có chọn lọc                                 | `libs/constants`, queue docs/tests                  | planned    | P0      |
+| Hình 4.3 | Diagram  | Chương 4 | Multi-tenancy isolation diagram                     | Minh họa tenant boundary ở DB/cache/event/API                                       | `docs/technical-architecture.md`, evidence map      | planned    | P0      |
+| Hình 4.4 | Diagram  | Chương 4 | Kafka decision flow                                 | Giải thích khi nào dùng sync call, khi nào dùng event                               | `docs/technical-architecture.md`, evidence map      | planned    | P1      |
+| Hình 5.1 | Sequence | Chương 5 | QR ordering sequence                                | Chứng minh flow customer QR/session/menu/cart/order đã được thiết kế/triển khai     | `docs/business-logic.md`, source code               | planned    | P0      |
+| Hình 5.2 | Sequence | Chương 5 | Order confirm và stock consistency sequence         | Nhấn mạnh Catalog sở hữu stock, Order không update DB Catalog trực tiếp             | `docs/business-logic.md`, Order/Catalog code        | planned    | P0      |
+| Hình 5.3 | Sequence | Chương 5 | KDS ticket lifecycle                                | Chứng minh luồng `order.confirmed` -> Kitchen/KDS/Realtime UI                       | Kitchen code, Kafka topic registry                  | planned    | P0      |
+| Hình 5.4 | Sequence | Chương 5 | Payment settlement sequence                         | Chứng minh cash/VietQR/SePay settlement và idempotency ở mức evidence               | Payment docs/code, SePay guide                      | planned    | P0      |
+| Hình 5.5 | Sequence | Chương 5 | SaaS onboarding sequence                            | Chứng minh tenant onboarding, subscription, owner/admin setup                       | SaaS docs/code, phase 4B docs                       | planned    | P0      |
+| Bảng 5.1 | Bảng     | Chương 5 | Implemented evidence table                          | Map feature -> code/docs/tests/screenshot để tránh viết mơ hồ                       | Source code, docs, tests                            | planned    | P0      |
+| Bảng 5.2 | Bảng     | Chương 5 | Shared libraries và vai trò trong consistency       | Chứng minh maintainability qua DTO/constants/providers/guards/shared types          | `libs/`, `docs/DOC-CODE-ANCHORS.md`                 | planned    | P1      |
+| Bảng 6.1 | Bảng     | Chương 6 | Evaluation claim policy                             | Chặn overclaim trong performance/scalability/observability                          | `thesis-evidence-map.md`                            | planned    | P0      |
+| Bảng 6.2 | Bảng     | Chương 6 | Requirement traceability summary                    | Chứng minh yêu cầu được đánh giá bằng test/demo/evidence                            | `docs/testing/phase-5/traceability-matrix.md`       | planned    | P0      |
+| Bảng 6.3 | Bảng     | Chương 6 | Architecture/NFR evidence status                    | Đánh giá scalability/maintainability bằng architecture/code evidence                | Evidence map, technical docs, tests                 | planned    | P0      |
+| Bảng 6.4 | Bảng     | Chương 6 | Demo evidence checklist                             | Ghi GitHub/release/screenshots/test outputs/video demo nếu có                       | Demo artifacts, test outputs                        | planned    | P0      |
+| Bảng 7.1 | Bảng     | Chương 7 | Đóng góp, hạn chế và hướng phát triển               | Tổng kết kết quả mà không phóng đại                                                 | Chương 1-6                                          | planned    | P0      |
+
+## 4. Artifact mở rộng nên cân nhắc
+
+| ID        | Loại          | Vị trí   | Artifact                                          | Khi nào nên dùng                                                              | Nguồn chính                          | Trạng thái    | Ưu tiên |
+| --------- | ------------- | -------- | ------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------ | ------------- | ------- |
+| Hình 1.2  | Diagram       | Chương 1 | Pain point của quy trình phục vụ thủ công         | Nếu Chương 1 cần làm rõ vấn đề trước khi giới thiệu QRTable                   | Research survey, proposal            | planned       | P1      |
+| Bảng 1.2  | Bảng          | Chương 1 | Mapping pain point -> yêu cầu hệ thống            | Nếu muốn nối Chương 1 sang Chương 3 mượt hơn                                  | Research survey, business logic      | planned       | P1      |
+| Bảng 2.5  | Bảng          | Chương 2 | SaaS vs on-premise trong bối cảnh POS             | Nếu phần SaaS cần sâu hơn Bảng 2.1                                            | NIST, SaaS guidance                  | planned       | P1      |
+| Hình 2.2  | Diagram       | Chương 2 | Event-driven architecture khái niệm               | Nếu cần giải thích event, topic, producer, consumer trước Chương 4            | Kafka docs                           | planned       | P1      |
+| Bảng 2.6  | Bảng          | Chương 2 | Quality attributes theo ISO/IEC 25010             | Nếu Chương 6 cần nền lý thuyết đánh giá NFR rõ hơn                            | ISO/IEC 25010                        | planned       | P1      |
+| Hình 3.3  | State machine | Chương 3 | Session state machine                             | Nếu flow QR/session có nhiều trạng thái cần làm rõ                            | `docs/business-logic.md`             | planned       | P1      |
+| Hình 3.4  | State machine | Chương 3 | Order/payment state machine                       | Nếu cần chuẩn bị cho Chương 5 và Chương 6                                     | `docs/business-logic.md`             | planned       | P1      |
+| Bảng 3.4  | Bảng          | Chương 3 | P0/P1/P2 requirements                             | Nếu cần phân cấp phạm vi chức năng trong bản nháp dài                         | Specs, traceability matrix           | planned       | P1      |
+| Bảng 3.5  | Bảng          | Chương 3 | Abuse case/threat ở mức yêu cầu                   | Nếu muốn làm phần security/tenant isolation chặt hơn                          | OWASP, permission matrix             | planned       | P2      |
+| Hình 4.5  | Diagram       | Chương 4 | ERD rút gọn theo service                          | Nếu cần minh họa data ownership mà không đưa ERD đầy đủ                       | `docs/architecture/erd.*`            | source-exists | P1      |
+| Hình 4.6  | Diagram       | Chương 4 | Nx dependency graph hoặc module boundary          | Nếu cần chứng minh monorepo/shared libs hỗ trợ maintainability                | Nx project graph, source tree        | planned       | P2      |
+| Hình 4.7  | Diagram       | Chương 4 | Redis key/domain ownership                        | Nếu cần giải thích cache/session/KDS queue boundary                           | `libs/common`, Redis policy/tests    | planned       | P1      |
+| Hình 4.8  | Diagram       | Chương 4 | WebSocket room và hint/refetch model              | Nếu cần tránh hiểu nhầm WebSocket là source of truth                          | BFF realtime code, evidence map      | planned       | P1      |
+| Hình 4.9  | Diagram       | Chương 4 | Deployment topology                               | Chỉ đưa vào chương chính nếu có deployment evidence đủ rõ                     | Docker/provider docs                 | planned       | P2      |
+| Hình 4.10 | Diagram       | Chương 4 | Observability design                              | Chỉ dùng như thiết kế/hướng vận hành nếu chưa có dashboard thật               | Observability docs/design            | planned       | P2      |
+| Hình 5.6  | Sequence      | Chương 5 | Shared cart mutation/version/idempotency          | Nếu cần chứng minh xử lý concurrency ở cart/session                           | Order/session code                   | planned       | P1      |
+| Hình 5.7  | Sequence      | Chương 5 | Table transfer/safe empty-session release         | Nếu flow table/session lifecycle là điểm hội đồng dễ hỏi                      | Business logic, Order code           | planned       | P1      |
+| Hình 5.8  | Sequence      | Chương 5 | Subscription checkout                             | Nếu SaaS subscription/payment cần minh họa sâu                                | SaaS/Payment docs/code               | planned       | P1      |
+| Hình 5.9  | Sequence      | Chương 5 | Tenant suspend/activate behavior                  | Nếu cần làm rõ tenant lifecycle và access restriction                         | SaaS/User-Access/Authorizer docs     | planned       | P1      |
+| Bảng 5.3  | Bảng          | Chương 5 | API/route groups theo domain                      | Nếu Chương 5 cần tóm tắt implementation surface mà không liệt kê endpoint dài | BFF controllers, docs anchors        | planned       | P2      |
+| Bảng 6.5  | Bảng          | Chương 6 | Test coverage theo requirement                    | Nếu cần trình bày traceability chi tiết hơn Bảng 6.2                          | Traceability matrix                  | planned       | P1      |
+| Bảng 6.6  | Bảng          | Chương 6 | Scenario analysis cho scalability/maintainability | Nếu đánh giá NFR bằng architecture/code evidence                              | Evidence map, technical architecture | planned       | P1      |
+| Bảng 6.7  | Bảng          | Chương 6 | Limitation vs future work                         | Nếu cần chuyển từ đánh giá sang kết luận mượt hơn                             | Evidence map                         | planned       | P1      |
+| Hình 6.1  | Screenshot    | Chương 6 | Test run summary hoặc health check                | Chỉ đưa nếu có artifact thật                                                  | Test output, local/demo environment  | planned       | P1      |
+
+## 5. Screenshot/UI gallery backlog
+
+Chương 5 chỉ nên dùng khoảng 8-12 screenshot đại diện. Phần còn lại đưa vào phụ lục A để báo cáo vẫn tự chứa bằng chứng khi demo domain không còn hoạt động.
+
+| ID            | Nhóm                     | Vị trí khuyến nghị | Screenshot/artifact                                                       | Vai trò                                                         | Trạng thái | Ưu tiên |
+| ------------- | ------------------------ | ------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- | ------- |
+| Ảnh 5.1       | Customer PWA             | Chương 5           | QR join/session screen                                                    | Minh họa khách vào phiên gọi món từ QR                          | planned    | P0      |
+| Ảnh 5.2       | Customer PWA             | Chương 5           | Menu browsing screen                                                      | Minh họa trải nghiệm menu điện tử                               | planned    | P0      |
+| Ảnh 5.3       | Customer PWA             | Chương 5           | Cart/order submit screen                                                  | Minh họa submit order và cart                                   | planned    | P0      |
+| Ảnh 5.4       | Customer PWA             | Chương 5           | Order tracking/payment request/VietQR                                     | Minh họa trạng thái order và thanh toán                         | planned    | P0      |
+| Ảnh 5.5       | Staff POS                | Chương 5           | Table map hoặc live orders                                                | Minh họa vận hành POS của nhân viên                             | planned    | P0      |
+| Ảnh 5.6       | Staff POS                | Chương 5           | Order detail confirm/cancel                                               | Minh họa staff confirmation và xử lý order                      | planned    | P0      |
+| Ảnh 5.7       | KDS                      | Chương 5           | Kitchen/bar queue                                                         | Minh họa luồng bếp/bar                                          | planned    | P0      |
+| Ảnh 5.8       | KDS                      | Chương 5           | Ticket detail/status update                                               | Minh họa lifecycle ticket trong KDS                             | planned    | P0      |
+| Ảnh 5.9       | Owner dashboard          | Chương 5           | Menu/category management                                                  | Minh họa quản trị catalog                                       | planned    | P0      |
+| Ảnh 5.10      | Owner dashboard          | Chương 5           | Table/QR management                                                       | Minh họa tạo bàn/QR theo tenant                                 | planned    | P0      |
+| Ảnh 5.11      | Owner dashboard          | Chương 5           | Payment settings/subscription                                             | Minh họa cấu hình thanh toán và SaaS subscription               | planned    | P1      |
+| Ảnh 5.12      | Super Admin              | Chương 5           | Tenant onboarding/lifecycle                                               | Minh họa onboarding và quản lý tenant                           | planned    | P1      |
+| Ảnh A.1-A.8   | Customer PWA             | Phụ lục A          | Toàn bộ journey customer                                                  | Lưu bằng chứng UI đầy đủ hơn Chương 5                           | planned    | P1      |
+| Ảnh A.9-A.18  | Staff POS                | Phụ lục A          | Table/session/order/bill lifecycle                                        | Lưu bằng chứng UI staff workflow                                | planned    | P1      |
+| Ảnh A.19-A.26 | KDS                      | Phụ lục A          | Queue, ticket, status, empty state, realtime refresh                      | Lưu bằng chứng UI bếp/bar                                       | planned    | P1      |
+| Ảnh A.27-A.38 | Owner dashboard          | Phụ lục A          | Menu, table, QR, payment, staff, subscription                             | Lưu bằng chứng owner workflow                                   | planned    | P1      |
+| Ảnh A.39-A.48 | Super Admin              | Phụ lục A          | Tenant, plan, subscription, invoice                                       | Lưu bằng chứng admin/SaaS workflow                              | planned    | P1      |
+| Ảnh A.49-A.54 | Auth/security            | Phụ lục A          | Keycloak login, role-based blocked route, suspended tenant warning nếu có | Minh họa security/access control, chỉ dùng nếu có evidence thật | planned    | P2      |
+| Ảnh A.55-A.60 | Evaluation/demo          | Phụ lục D          | Test run, traceability summary, health check, demo checklist              | Bằng chứng đánh giá và reproducibility                          | planned    | P1      |
+| Ảnh A.61-A.70 | Observability/deployment | Phụ lục D/E        | Grafana/log/trace/deployment screen                                       | Chỉ dùng nếu Phase 6/7 hoặc dashboard thật được backfill        | deferred   | P2      |
+
+## 6. Phụ lục và artifact nộp kèm
+
+| ID        | Vị trí        | Artifact                                                     | Mục đích                                                | Trạng thái | Ưu tiên |
+| --------- | ------------- | ------------------------------------------------------------ | ------------------------------------------------------- | ---------- | ------- |
+| Phụ lục A | Appendices    | UI gallery đầy đủ                                            | Lưu screenshot theo user journey                        | planned    | P0      |
+| Phụ lục B | Appendices    | Hướng dẫn setup/demo                                         | Giúp hội đồng hoặc agent sau tái hiện demo              | planned    | P0      |
+| Phụ lục C | Appendices    | GitHub repository, release/tag/commit hash, source structure | Bảo toàn bằng chứng source code sau khi domain hết hạn  | planned    | P0      |
+| Phụ lục D | Appendices    | Test command output, traceability summary, demo checklist    | Hỗ trợ Chương 6 và kiểm chứng kết quả                   | planned    | P0      |
+| Phụ lục E | Appendices    | ERD, permission matrix, diagram mở rộng                      | Giữ chi tiết kỹ thuật mà không làm chương chính quá dài | planned    | P1      |
+| Demo-1    | Demo evidence | Demo domain nếu còn hoạt động                                | Phụ trợ cho hội đồng xem trực tiếp                      | planned    | P1      |
+| Demo-2    | Demo evidence | Video demo link/file                                         | Bằng chứng ổn định hơn domain live                      | planned    | P1      |
+| Demo-3    | Demo evidence | Seed/demo script hoặc hướng dẫn dữ liệu thử                  | Giúp tái hiện scenario đã báo cáo                       | planned    | P1      |
+
+## 7. Quy tắc cập nhật backlog
+
+1. Khi tạo diagram/table/screenshot, cập nhật trạng thái từ `planned` sang `drafted`, `captured` hoặc `source-exists`.
+2. Khi đưa vào LaTeX, cập nhật sang `inserted` và ghi đúng vị trí chương/phụ lục nếu khác dự kiến.
+3. Khi build PDF và kiểm tra caption/số hiệu/nguồn thành công, cập nhật sang `verified`.
+4. Không đổi artifact thành `verified` nếu chưa kiểm tra render PDF.
+5. Không thêm screenshot observability/deployment nếu chưa có artifact thật.
+6. Không dùng screenshot thay thế cho evidence kiến trúc; screenshot chỉ chứng minh UI/demo, không chứng minh scalability hay production readiness.
+
+## 8. Bước tiếp theo cho backlog
+
+Sau khi Phase 1 LaTeX preflight xong, quay lại file này để:
+
+1. Dùng thư mục asset ổn định trong LaTeX project: `docs/graduation-thesis-resources/thesis-report/assets/figures/` và `docs/graduation-thesis-resources/thesis-report/assets/screenshots/`.
+2. Chọn tool vẽ diagram: Mermaid, PlantUML, draw.io hoặc LaTeX-native tùy mức cần chỉnh sửa.
+3. Tạo trước nhóm diagram P0 của Chương 3 và Chương 4 vì chúng quyết định mạch lập luận của khóa luận.
+4. Chỉ chụp screenshot sau khi UI/demo data ổn định, tránh phải chụp lại nhiều lần.
