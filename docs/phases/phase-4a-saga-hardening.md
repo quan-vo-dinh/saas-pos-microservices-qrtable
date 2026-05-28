@@ -1,5 +1,7 @@
 # Phase 4A — Saga + Hardening (Order / Payment)
 
+> **Tiếng Việt:** [phase-4a-saga-hardening.vi.md](phase-4a-saga-hardening.vi.md)
+
 > **Goal:** Standardize multi-step transactions for order confirmation and payment completion — with clear compensation, limits and idempotency against double-submission, data deletion constraints, and order cancellation audits; put a simple transactional outbox in Order/Payment so that Kafka doesn't lose events when the DB commit is successful.
 > **Estimated:** ~1 week
 > **Status:** ⏸ Deferred — not yet implemented/closed as a separate phase after Phase 3; Some local hardening occurred in Phase 3/4B but does not count as completing Phase 4A.

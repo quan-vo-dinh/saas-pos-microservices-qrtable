@@ -1,5 +1,7 @@
 # Phase 5–7 — Finalization: Testing, Observation & Demo Deployment
 
+> **Tiếng Việt:** [phase-5-7-finalization.vi.md](phase-5-7-finalization.vi.md)
+
 > **Goal:** Lock down the quality of the QRTable SaaS POS system with multi-tier automated testing, make the distributed system **observable** (service health, log, metrics, trace), and package **deploy + sample data + demo script** for end-to-end reproducible thesis and review — reduce business regression risk (single, cash, multi-tenant, kitchen) and demonstrate the QR → kitchen → payment flow to the board.
 > **Estimated:** ~3–5 weeks (total Phase 5 + 6 + 7)
 > **Status:** ⬜ TODO

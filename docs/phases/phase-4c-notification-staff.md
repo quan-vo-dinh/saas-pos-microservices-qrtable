@@ -1,5 +1,7 @@
 # Phase 4C — Notification Service + Staff Management
 
+> **Tiếng Việt:** [phase-4c-notification-staff.vi.md](phase-4c-notification-staff.vi.md)
+
 > **Goal:** Standardized domain event-driven transactional and operational (email) communication and enable Owner/Manager to manage POS personnel in the tenant — invite, assign roles, disable — with synchronization between IdP and application profile, reducing risk of incorrect role access and increasing post-incident auditability.
 > **Estimated:** ~1 week
 > **Status:** ⬜ TODO
