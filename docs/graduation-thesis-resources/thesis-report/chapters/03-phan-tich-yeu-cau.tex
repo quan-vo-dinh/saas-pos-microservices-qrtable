@@ -1,13 +1,226 @@
 \chapter{Phân tích yêu cầu}
 
+Chương này chuyển bài toán SaaS POS tích hợp đặt món qua mã QR thành tập yêu cầu cụ thể cho hệ thống QRTable. Trọng tâm của chương không phải là mô tả cách cài đặt từng service, mà là làm rõ hệ thống cần phục vụ những nhóm người dùng nào, mỗi nhóm thực hiện nghiệp vụ gì, dữ liệu và trạng thái nào cần được kiểm soát, cũng như những yêu cầu chất lượng nào phải được xét đến khi thiết kế và đánh giá hệ thống.
+
+Các yêu cầu trong chương được tổng hợp từ tài liệu nghiệp vụ, ma trận phân quyền, ma trận truy vết yêu cầu-kiểm thử và các tài liệu ghi nhận phạm vi triển khai của dự án. Vì QRTable là hệ thống nhiều tenant, nhiều vai trò và có các luồng trạng thái liên quan đến đơn hàng, bếp và thanh toán, phần phân tích yêu cầu cần giữ ba nguyên tắc: actor phải được phân biệt rõ, nguồn trạng thái có thẩm quyền (\textit{source of truth}) phải ổn định, và các yêu cầu phi chức năng chỉ được diễn đạt trong phạm vi có thể kiểm chứng ở các chương sau.
+
 \section{Tổng quan nghiệp vụ QRTable}
+
+QRTable được định vị là nền tảng POS theo mô hình SaaS dành cho nhà hàng, quán ăn và quán đồ uống. Mỗi nhà hàng sử dụng hệ thống như một tenant độc lập trên cùng nền tảng. Bên trong một tenant, hệ thống hỗ trợ các hoạt động vận hành chính: quản lý thông tin nhà hàng, quản lý thực đơn, quản lý khu vực và bàn, phát hành mã QR tại bàn, tiếp nhận order từ khách hàng, điều phối bếp/bar, xử lý thanh toán và quản lý gói dịch vụ của tenant.
+
+Luồng nghiệp vụ điển hình bắt đầu từ khâu khởi tạo tenant. Super Admin tạo tenant, gán Restaurant Owner, chọn gói dịch vụ ban đầu và khởi tạo thông tin cấu hình thanh toán. Owner sau đó quản lý nhân sự, thực đơn, bàn và mã QR. Khi khách đến nhà hàng, khách quét mã QR tại bàn để tham gia một phiên gọi món. Nhiều khách cùng bàn có thể thao tác trên cùng một giỏ hàng chia sẻ. Sau khi khách gửi order, nhân viên xác nhận order trước khi món được chuyển vào KDS. Bếp hoặc bar xử lý ticket theo station, cập nhật trạng thái món, trong khi nhân viên phục vụ theo dõi trạng thái order và xử lý bill. Khi khách yêu cầu thanh toán, hệ thống khóa phiên gọi món, tổng hợp bill, hỗ trợ thanh toán tiền mặt hoặc VietQR/SePay, sau đó chuyển bàn sang trạng thái cần dọn dẹp trước khi sẵn sàng phục vụ lượt khách tiếp theo.
+
+Từ góc nhìn yêu cầu, QRTable không chỉ là một menu điện tử. Hệ thống phải đồng bộ nhiều luồng nghiệp vụ có ràng buộc trạng thái: bàn không thể vừa đang thanh toán vừa nhận thêm món; order chưa được xác nhận không được trừ tồn kho; customer không được nhìn thấy order của bàn khác; manager không được thực hiện những thao tác tài chính nhạy cảm dành riêng cho owner; webhook thanh toán có thể đến trùng lặp nhưng không được làm bill bị đóng nhiều lần. Vì vậy, phần phân tích yêu cầu cần mô tả QRTable như một hệ thống vận hành nhà hàng có kiểm soát trạng thái và phân quyền, thay vì chỉ là giao diện đặt món.
+
+Về phạm vi nghiệp vụ, hệ thống tập trung vào các domain chính sau:
+
+\begin{itemize}
+  \item \textbf{SaaS lifecycle}: quản lý tenant, gói dịch vụ, subscription, quota và trạng thái hoạt động của tenant.
+  \item \textbf{Catalog, table và QR}: quản lý danh mục món, trạng thái món, khu vực, bàn và mã QR tenant/table-scoped.
+  \item \textbf{Customer session, cart và order}: tạo hoặc tham gia phiên gọi món, giỏ hàng chia sẻ, submit order, cancel order pending và yêu cầu hỗ trợ.
+  \item \textbf{POS và KDS}: xác nhận order, điều phối món sang bếp/bar, cập nhật ticket, phục vụ món và theo dõi trạng thái vận hành.
+  \item \textbf{Payment settlement}: tổng hợp bill, thanh toán tiền mặt, tạo VietQR/SePay, xử lý webhook và hoàn tất phiên bàn.
+  \item \textbf{Security, RBAC và tenant isolation}: xác thực staff/admin bằng JWT, kiểm soát quyền theo vai trò, và cô lập dữ liệu theo tenant.
+\end{itemize}
 
 \section{Actor và use case chính}
 
+QRTable có hai nhóm actor lớn: nhóm actor nội bộ vận hành nền tảng/nhà hàng và nhóm actor theo phiên của khách hàng. Nhóm nội bộ sử dụng tài khoản, vai trò và permission được kiểm soát qua hệ thống xác thực/ủy quyền. Customer không phải là một role trong cơ sở dữ liệu phân quyền; customer đi vào hệ thống qua mã QR và session của bàn. Phân biệt này quan trọng vì nếu xem customer như một user đăng nhập thông thường, yêu cầu bảo mật và trải nghiệm của QR ordering sẽ bị hiểu sai.
+
+Hình~\ref{fig:chapter3-actor-use-case-overview} minh họa quan hệ giữa các nhóm actor và các cụm use case ở mức phân tích yêu cầu bằng sơ đồ use case UML (PlantUML). Sơ đồ này cố ý tách Customer theo session QR khỏi các vai trò RBAC của staff/admin, đồng thời đặt tenant isolation và ownership của session như yêu cầu xuyên suốt thay vì một chức năng riêng lẻ.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{chapter3-actor-use-case-overview.pdf}
+  \caption{Tổng quan actor và nhóm use case chính của QRTable. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ, permission matrix và traceability matrix của QRTable.}
+  \label{fig:chapter3-actor-use-case-overview}
+\end{figure}
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.54\textwidth}@{}}
+\caption{Actor, phạm vi truy cập và use case chính của QRTable. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ và permission matrix của dự án.}
+\label{tab:chapter3-actors}\\
+\toprule
+\textbf{Actor} & \textbf{Phạm vi} & \textbf{Use case chính} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Actor} & \textbf{Phạm vi} & \textbf{Use case chính} \\
+\midrule
+\endhead
+Super Admin & Toàn nền tảng, cross-tenant & Onboard tenant, quản lý trạng thái tenant, quản lý pricing plan, xem subscription/invoice ở lớp platform, hỗ trợ xác nhận subscription invoice khi cần. \\
+\addlinespace
+Restaurant Owner & Một tenant & Quản lý menu, category, bàn, QR, nhân sự, order, KDS, payment, subscription của tenant; checkout subscription; cập nhật payment settings của tenant. \\
+\addlinespace
+Manager & Một tenant & Vận hành nhà hàng gần giống Owner ở lớp nghiệp vụ hằng ngày: quản lý menu/bàn/order/KDS/payment và xem subscription/payment settings; không checkout subscription, không cập nhật payment settings và không xóa user. \\
+\addlinespace
+Waiter/Staff POS & Một tenant, phạm vi vận hành sàn & Xem order, xác nhận hoặc hủy order đang pending, xử lý thanh toán tiền mặt, xem payment history, chuyển bàn, cập nhật trạng thái bàn và xử lý service request. \\
+\addlinespace
+Chef/Barista & Một tenant, theo station bếp/bar & Xem KDS queue theo station, cập nhật ticket, recall ticket đã thao tác nhầm; không mặc định có quyền CRUD menu, staff, payment hoặc POS. \\
+\addlinespace
+Customer & Một session/bàn & Quét QR, tham gia hoặc tạo session, xem menu public, thao tác shared cart, submit order, theo dõi trạng thái order, yêu cầu hỗ trợ, yêu cầu thanh toán và thanh toán bill hiện tại. \\
+\addlinespace
+Webhook SePay & Hệ thống ngoài, theo payment reference & Gửi sự kiện thanh toán cho bill nhà hàng hoặc invoice gói dịch vụ; không phải actor người dùng và phải đi qua route xác minh tương ứng. \\
+\bottomrule
+\end{longtable}
+
+Các use case của Super Admin thuộc lớp platform, không nằm trong tenant vận hành hằng ngày. Super Admin có thể tạo tenant, quản lý lifecycle của tenant và quản lý gói dịch vụ. Tuy nhiên, các thao tác vận hành nhà hàng thông thường vẫn thuộc owner, manager và staff trong tenant. Điều này giúp tránh tình trạng một actor platform bị mô tả như nhân viên vận hành của từng nhà hàng.
+
+Restaurant Owner là actor có phạm vi quyền rộng nhất trong tenant. Owner chịu trách nhiệm thiết lập dữ liệu vận hành ban đầu như menu, khu vực, bàn, mã QR, nhân sự và cấu hình thanh toán. Owner cũng là actor có quyền thực hiện các thao tác nhạy cảm với SaaS subscription và payment settings của tenant. Manager có quyền vận hành mạnh nhưng bị giới hạn ở các thao tác có rủi ro tài chính hoặc quản trị nhân sự, ví dụ không được checkout subscription, không được cập nhật payment settings và không được xóa user. Đây là ranh giới quan trọng để chương thiết kế sau này giải thích RBAC và chuỗi guard.
+
+Staff/Waiter tập trung vào luồng POS: nhận thông báo order pending, xác nhận order, xử lý hủy order pending, quản lý bàn, chuyển bàn và thanh toán. Chef/Barista tập trung vào KDS, tức xem queue và cập nhật ticket theo station. Hai nhóm này đều là nhân sự của tenant nhưng có trách nhiệm khác nhau; việc tách Waiter khỏi Chef/Barista giúp yêu cầu hệ thống phản ánh đúng luồng phối hợp giữa sàn phục vụ và bếp/bar.
+
+Customer là actor session-scoped. Customer không đăng nhập bằng Keycloak, không có role trong permission matrix và không được truy cập dữ liệu ngoài session/bàn của mình. Các yêu cầu của customer xoay quanh trải nghiệm không ma sát: quét QR, xem menu, cùng bàn thao tác trên giỏ hàng chung, gửi order, theo dõi trạng thái và thanh toán. Các kiểm soát bảo mật đối với customer vì vậy phải dựa trên QR token, session guard, tenant/table/session ownership và trạng thái bàn.
+
 \section{Functional requirements theo domain}
+
+Các functional requirements được nhóm theo domain nghiệp vụ để giữ ranh giới phân tích rõ ràng. Cách nhóm này giúp tránh mô tả yêu cầu theo màn hình giao diện hoặc theo service implementation quá sớm. Trong Chương 4 và Chương 5, các domain này sẽ được ánh xạ sang service boundary, data ownership và bằng chứng triển khai.
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.10\textwidth}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.43\textwidth}>{\raggedright\arraybackslash}p{0.21\textwidth}@{}}
+\caption{Functional requirements theo domain. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ, tài liệu triển khai và ma trận truy vết của QRTable.}
+\label{tab:chapter3-functional-requirements}\\
+\toprule
+\textbf{ID} & \textbf{Domain} & \textbf{Yêu cầu chức năng} & \textbf{Tiêu chí kiểm soát} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Domain} & \textbf{Yêu cầu chức năng} & \textbf{Tiêu chí kiểm soát} \\
+\midrule
+\endhead
+FR-SAAS-01 & SaaS onboarding & Hệ thống phải hỗ trợ onboarding tenant theo hướng admin-assisted: tạo tenant, owner ban đầu, subscription mặc định và payment settings row trong một quy trình nhất quán. & Tạo tenant không để lại dữ liệu mồ côi khi một bước con thất bại; owner được gắn tenant đúng. \\
+\addlinespace
+FR-SAAS-02 & Tenant lifecycle và subscription & Hệ thống phải quản lý trạng thái tenant, pricing plan, active subscription, invoice subscription và quota như số bàn, số staff, số order/ngày. & Một tenant chỉ có một active subscription; tenant suspended bị giới hạn thao tác mới nhưng vẫn xử lý được payment path đã phát sinh. \\
+\addlinespace
+FR-CAT-01 & Catalog & Owner và Manager phải quản lý category, menu item, ảnh, thứ tự hiển thị và trạng thái còn hàng hoặc hết hàng; customer và staff chỉ xem dữ liệu menu phù hợp với tenant. & Public menu chỉ hiển thị category active và item available, chưa bị xóa. \\
+\addlinespace
+FR-CAT-02 & Table và QR & Hệ thống phải quản lý khu vực, bàn, trạng thái bàn và QR token tenant/table-scoped để customer đi vào đúng session. & QR token không hợp lệ hoặc không khớp tenant/table phải bị từ chối. \\
+\addlinespace
+FR-ORD-01 & Session và shared cart & Customer cùng bàn phải dùng chung session/cart; các thao tác giỏ hàng phải kiểm soát phiên bản để tránh ghi đè khi nhiều thiết bị cùng thao tác. & Cart mutation stale bị từ chối và client phải refetch snapshot từ server. \\
+\addlinespace
+FR-ORD-02 & Order submit & Submit order phải tạo order pending một lần theo idempotency key, không tạo order draft trong database và clear cart sau khi submit thành công. & Submit lặp cùng idempotency key không tạo order trùng. \\
+\addlinespace
+FR-ORD-03 & Order confirmation và stock & Staff/Owner/Manager phải xác nhận order pending trước khi món vào bếp; tồn kho chỉ được trừ tại thời điểm xác nhận và thuộc quyền kiểm soát của Catalog. & Order không được cập nhật trực tiếp dữ liệu stock của Catalog; lỗi thiếu stock phải trả về có cấu trúc cho nhân viên. \\
+\addlinespace
+FR-ORD-04 & Cancel policy & Customer chỉ được hủy order pending thuộc session của mình; staff được hủy pending; Owner/Manager được hủy processing với lý do và chính sách stock phù hợp. & Không cho customer hủy order đã vào bếp; cancellation phải giữ vết nghiệp vụ. \\
+\addlinespace
+FR-ORD-05 & Bill và service request & Customer có thể yêu cầu hỗ trợ và yêu cầu thanh toán; bill request chỉ hợp lệ khi cart rỗng và các order đang hoạt động đã ở trạng thái phục vụ xong. & Khi bill pending payment, hệ thống khóa cart và chuyển bàn sang billing. \\
+\addlinespace
+FR-KDS-01 & Kitchen/KDS & Kitchen phải nhận ticket từ order đã xác nhận, tách theo station bếp/bar, chống trùng ticket theo tenant, order và station. & KDS queue hiển thị đúng station và không tạo ticket trùng khi nhận event lặp. \\
+\addlinespace
+FR-KDS-02 & KDS operation & Chef/Barista phải xem FIFO queue, cập nhật trạng thái ticket, recall thao tác nhầm, nhận cảnh báo SLA và realtime hint để refetch. & WebSocket chỉ là tín hiệu cập nhật; snapshot trạng thái vẫn lấy từ backend. \\
+\addlinespace
+FR-PAY-01 & Payment settlement & Hệ thống phải hỗ trợ thanh toán tiền mặt và VietQR/SePay cho bill nhà hàng, sử dụng payment reference ổn định và quy tắc làm tròn VND. & Underpaid webhook không đóng bill; duplicate webhook không làm payment bị ghi nhận nhiều lần. \\
+\addlinespace
+FR-PAY-02 & Refund và reconciliation & Owner/Manager có thể xử lý refund trong phạm vi hiện tại là manual full refund; payment history phục vụ đối soát vận hành. & Refund không reopen bill và không tạo nhiều active refund trên cùng payment. \\
+\addlinespace
+FR-RBAC-01 & Auth/RBAC & Protected APIs phải được kiểm soát bằng chuỗi guard, tenant context và permission matrix; frontend navigation chỉ hỗ trợ UX, không thay thế enforcement ở backend. & API phải từ chối actor thiếu quyền hoặc sai tenant ngay cả khi UI bị bypass. \\
+\bottomrule
+\end{longtable}
+
+Nhóm yêu cầu SaaS xác định QRTable là nền tảng nhiều nhà hàng, không phải phần mềm cài riêng cho từng nhà hàng. Do đó, việc tạo tenant, gắn owner, quản lý subscription và quota là yêu cầu nền tảng. Trạng thái tenant cũng ảnh hưởng trực tiếp tới luồng customer: tenant suspended không nên tiếp nhận thao tác mới tùy tiện, nhưng các payment path đã tạo trước đó cần được xử lý an toàn để không làm thất thoát giao dịch.
+
+Nhóm Catalog, table và QR xác định điểm vào vật lý của khách hàng. Mỗi QR phải gắn với đúng tenant và bàn. Public menu cần tôn trọng trạng thái category/item để khách chỉ thấy các món đang được phép bán. Các thao tác thay đổi menu hoặc bàn thuộc owner/manager, trong khi customer không có quyền quản lý catalog. Đây là nền cho yêu cầu tenant isolation: cùng một hệ thống có nhiều tenant nhưng menu, bàn và QR của tenant này không được lẫn với tenant khác.
+
+Nhóm session, cart và order là lõi của QR ordering. Một bàn có thể có nhiều khách cùng thao tác, nên giỏ hàng phải được chia sẻ và có cơ chế chống ghi đè. Submit order chỉ tạo order chính thức khi khách gửi đơn, còn giỏ hàng trước đó là trạng thái tạm của session. Staff confirmation là điểm chuyển từ mong muốn của khách sang cam kết vận hành của nhà hàng: tồn kho được kiểm tra và trừ tại đây, order chuyển sang processing và ticket được gửi sang KDS. Quy tắc này giúp tránh trừ tồn kho quá sớm khi khách chỉ đang thêm món vào giỏ.
+
+Nhóm KDS và payment hoàn tất vòng đời vận hành. KDS cần ưu tiên tính đúng đắn của queue và station hơn là chỉ hiển thị realtime. Payment cần xử lý cả payment do nhân viên xác nhận trực tiếp và payment do webhook từ hệ thống ngoài gửi về. Vì webhook có thể đến trễ hoặc đến nhiều lần, yêu cầu idempotency là bắt buộc trong luồng thanh toán.
+
+Hình~\ref{fig:chapter3-business-flow} gom các yêu cầu chức năng trên thành một luồng nghiệp vụ end-to-end từ lúc khách quét QR cho đến khi bàn được dọn và sẵn sàng phục vụ lượt tiếp theo. Ở mức Chương 3, luồng này chỉ thể hiện trình tự nghiệp vụ và điều kiện kiểm soát chính; sequence chi tiết giữa các service được dành cho Chương 5.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter3-business-flow.pdf}
+  \caption{Luồng nghiệp vụ từ QR ordering đến KDS, thanh toán và dọn bàn. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ, permission matrix và traceability matrix của QRTable.}
+  \label{fig:chapter3-business-flow}
+\end{figure}
 
 \section{Non-functional requirements}
 
+Các yêu cầu phi chức năng của QRTable được diễn đạt dựa trên đặc thù hệ thống SaaS nhiều tenant và các thuộc tính chất lượng thường dùng trong đánh giá hệ thống phần mềm như security, reliability, maintainability và performance efficiency \cite{iso-iec-25010-2023}. Trong phạm vi khóa luận, các yêu cầu này không được viết như cam kết sẵn sàng production tuyệt đối; chúng là tiêu chí để thiết kế và đánh giá có kiểm soát ở Chương 4, Chương 5 và Chương 6.
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.44\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}@{}}
+\caption{Non-functional requirements và tiêu chí đánh giá. Nguồn: tác giả tổng hợp từ mô hình chất lượng ISO/IEC 25010 và bản đồ bằng chứng của QRTable.}
+\label{tab:chapter3-non-functional-requirements}\\
+\toprule
+\textbf{NFR} & \textbf{Yêu cầu} & \textbf{Cách đánh giá an toàn} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{NFR} & \textbf{Yêu cầu} & \textbf{Cách đánh giá an toàn} \\
+\midrule
+\endhead
+Tenant isolation & Dữ liệu, API, cache key, event payload và file upload liên quan tenant phải luôn được ràng buộc bởi tenant context. & Đánh giá bằng service tests, guard tests, ma trận truy vết và scenario tenant A/B khi có môi trường live phù hợp. \\
+\addlinespace
+Security và authorization & Staff/owner/admin dùng JWT/OIDC và RBAC; customer dùng QR/session scoped auth; webhook/payment settings phải không lộ secret hoặc token ra browser. & Đánh giá bằng permission matrix, chuỗi guard, route contract và security scenario cho QR/webhook. \\
+\addlinespace
+Consistency và idempotency & Các write flow ảnh hưởng trạng thái tiền hoặc order phải có idempotency và source of truth rõ ràng: submit order, confirm stock, webhook settlement, bill mark paid. & Đánh giá bằng state-machine tests, integration tests và replay/duplicate scenarios. \\
+\addlinespace
+Realtime feedback & Hệ thống cần phản hồi kịp thời cho POS, KDS và customer PWA, nhưng realtime event chỉ đóng vai trò hint hoặc invalidation. & Kiểm tra UI nhận hint rồi refetch snapshot; không xem WebSocket là nguồn trạng thái nghiệp vụ cuối cùng. \\
+\addlinespace
+Khả năng bảo trì & Hệ thống cần có domain boundary rõ, shared contracts ổn định và cấu trúc monorepo hỗ trợ thay đổi có kiểm soát. & Đánh giá bằng service ownership, shared libraries, architecture contracts và khả năng trace requirement sang module liên quan. \\
+\addlinespace
+Scalability ở mức thiết kế & Kiến trúc cần cho phép mở rộng theo service boundary, cache, consumer group hoặc realtime adapter khi cần. & Chỉ phân tích ở mức thiết kế nếu chưa có benchmark tải lớn; không tự tạo throughput hoặc latency. \\
+\addlinespace
+Testability và reproducible demo & Yêu cầu P0/P1 cần có mapping sang test, demo script hoặc artifact bằng chứng để người đọc kiểm tra được luận điểm. & Đánh giá bằng ma trận truy vết, test outputs, screenshot/demo artifact và checklist build. \\
+\addlinespace
+Operational visibility & Hệ thống nên có định hướng logging, metrics và tracing để phục vụ vận hành. & Nếu chưa có dashboard/trace proof ổn định, chỉ viết như giới hạn hoặc hướng phát triển, không khẳng định observability cấp production. \\
+\bottomrule
+\end{longtable}
+
+Tenant isolation là yêu cầu phi chức năng trung tâm vì QRTable phục vụ nhiều nhà hàng trên cùng nền tảng. Isolation không chỉ nằm ở database query mà còn ở cache key, WebSocket room, QR token, file upload, payment reference và permission guard. Nếu một API hoặc cache key bỏ qua tenant context, dữ liệu của tenant này có thể bị lộ sang tenant khác. Vì vậy, mọi yêu cầu chức năng ở trên đều phải được đọc cùng yêu cầu isolation.
+
+Security của QRTable có hai mặt khác nhau. Với staff, owner, manager và super admin, hệ thống cần xác thực bằng JWT/OIDC và ủy quyền bằng RBAC. Với customer, hệ thống cần tối ưu trải nghiệm quét QR nên không yêu cầu tài khoản Keycloak; thay vào đó, quyền truy cập được giới hạn bằng QR/session/table ownership. Với webhook thanh toán, yêu cầu bảo mật nằm ở xác minh route, secret/HMAC, payment reference và idempotency. Ba nhóm cơ chế này không nên bị trộn lẫn khi thiết kế hoặc đánh giá.
+
+Consistency và idempotency xuất hiện ở các điểm có rủi ro cao: nhiều khách cùng sửa shared cart, khách submit order nhiều lần do retry, nhân viên xác nhận order trong khi stock thay đổi, webhook SePay gửi lặp, hoặc payment event được replay để đồng bộ sang Order. Yêu cầu hệ thống không phải là loại bỏ hoàn toàn tính phân tán, mà là xác định rõ mỗi trạng thái do domain nào sở hữu và thao tác lặp có tạo tác dụng phụ trùng lặp hay không.
+
+Realtime feedback giúp trải nghiệm vận hành mượt hơn nhưng không được dùng thay thế nguồn trạng thái có thẩm quyền. POS, KDS và Customer PWA có thể nhận WebSocket hint để biết cần refetch. Trạng thái cuối cùng vẫn phải được lấy từ backend snapshot. Cách diễn đạt này giúp tránh phóng đại rằng giao diện realtime tự nó đảm bảo tính đúng đắn của order, kitchen ticket hoặc payment.
+
 \section{Business state machines}
 
+QRTable có nhiều business state machines liên kết với nhau. Bàn, session, cart, order, KDS ticket, bill/payment và tenant đều có vòng đời riêng. Một yêu cầu quan trọng là không để một trạng thái ở domain này bị cập nhật tùy tiện bởi domain khác. Ví dụ, payment hoàn tất có thể kích hoạt việc đóng bill và chuyển bàn sang cleaning, nhưng không có nghĩa Payment tự sở hữu toàn bộ vòng đời bàn; tương tự, Order xác nhận món có thể yêu cầu Catalog trừ stock, nhưng Order không sở hữu dữ liệu stock.
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.35\textwidth}>{\raggedright\arraybackslash}p{0.42\textwidth}@{}}
+\caption{Tóm tắt các state machine nghiệp vụ chính của QRTable. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ và ma trận truy vết của dự án.}
+\label{tab:chapter3-state-machines}\\
+\toprule
+\textbf{State machine} & \textbf{Trạng thái chính} & \textbf{Quy tắc chuyển trạng thái quan trọng} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{State machine} & \textbf{Trạng thái chính} & \textbf{Quy tắc chuyển trạng thái quan trọng} \\
+\midrule
+\endhead
+Tenant lifecycle & \texttt{ACTIVE}, \texttt{SUSPENDED}, \texttt{CLOSED} & Super Admin quản lý lifecycle; suspended giới hạn thao tác mới nhưng vẫn cho xử lý payment path đã phát sinh; closed là trạng thái kết thúc hợp đồng trong phạm vi hiện tại. \\
+\addlinespace
+Subscription lifecycle & Draft/issued invoice, active subscription, expired/superseded subscription & Một tenant chỉ có một active subscription; subscription invoice dùng reference \texttt{QRSUB}; quota được áp vào bàn, staff và số order/ngày. \\
+\addlinespace
+Table/session lifecycle & Available, occupied, billing, cleaning; active/closed session & QR scan tạo hoặc join session khi bàn available/occupied; billing và cleaning chặn order mới; safe empty-session release chỉ hợp lệ khi Order chứng minh session rỗng. \\
+\addlinespace
+Cart/order lifecycle & Cart draft, \texttt{PENDING}, \texttt{PROCESSING}, \texttt{READY}, \texttt{SERVED}, completed/canceled & Cart draft không phải DB order; submit tạo pending order một lần; staff confirm mới trừ stock; customer chỉ cancel pending order của chính session. \\
+\addlinespace
+KDS ticket lifecycle & Queued, processing, ready/done, recalled & Ticket sinh từ order đã confirm, tách theo station, sắp xếp theo FIFO/priority/SLA; recall dùng để sửa thao tác nhầm. \\
+\addlinespace
+Bill/payment lifecycle & \texttt{OPEN}, \texttt{PENDING\_PAYMENT}, \texttt{PAID}; refund manual full & Bill request yêu cầu cart rỗng và order đã served; payment paid đóng bill/session và chuyển bàn sang cleaning; webhook duplicate phải idempotent. \\
+\bottomrule
+\end{longtable}
+
+Vòng đời bàn/session là cầu nối giữa thế giới vật lý của nhà hàng và trạng thái phần mềm. Khi bàn available và khách quét QR, hệ thống tạo session mới và đánh dấu bàn occupied. Khi bàn occupied và session còn hợp lệ, khách khác cùng bàn join vào session hiện tại. Khi khách yêu cầu thanh toán, bàn chuyển sang billing để khóa gọi món mới. Sau khi payment hoàn tất, bàn chuyển sang cleaning để nhân viên dọn bàn, rồi mới trở lại available. Quy tắc safe empty-session release chỉ áp dụng khi có bằng chứng rằng session rỗng, không có bill và không có persisted order; nó không phải là chức năng force-unlock tùy tiện.
+
+Vòng đời cart/order tách rõ trạng thái trước và sau khi submit. Trước submit, khách chỉ đang thao tác trên cart của session. Sau submit, hệ thống tạo order pending để staff xác nhận. Tồn kho không bị trừ khi khách mới submit, vì order pending vẫn có thể bị hủy hoặc bị từ chối do thiếu hàng. Tồn kho được xử lý tại thời điểm staff confirm, khi order chuyển sang processing. Cách tách này phù hợp với thực tế nhà hàng: khách gửi yêu cầu, nhân viên kiểm tra rồi nhà bếp mới bắt đầu thực hiện.
+
+Vòng đời KDS bắt đầu sau khi order được xác nhận. Ticket cần được định tuyến tới bếp hoặc bar theo station của món. Chef/Barista thao tác trên ticket để chuyển trạng thái, còn Waiter/POS theo dõi món sẵn sàng để phục vụ. KDS có thể nhận realtime hint để màn hình cập nhật nhanh hơn, nhưng ticket queue và trạng thái order vẫn phải dựa vào backend snapshot.
+
+Vòng đời bill/payment kết thúc phiên bàn. Bill chỉ nên vào pending payment khi không còn cart đang mở và các order cần thanh toán đã sẵn sàng. Thanh toán tiền mặt do staff xác nhận trực tiếp, còn VietQR/SePay được xác nhận thông qua webhook. Vì payment liên quan tiền và đối soát, các trường hợp underpaid, duplicate hoặc after-paid webhook phải được xử lý idempotently. Sau khi bill paid, session được đóng, dữ liệu cart/session tạm được dọn và bàn chuyển sang cleaning.
+
 \section{Phạm vi loại trừ và giới hạn đánh giá}
+
+Phân tích yêu cầu cần xác định rõ phạm vi để các chương sau không đánh giá vượt quá bằng chứng. Trong phạm vi chính của khóa luận, QRTable tập trung vào SaaS POS cho F\&B, QR ordering tại bàn, quản lý tenant/subscription, catalog/table/QR, shared cart/order, KDS, payment settlement, RBAC và tenant isolation. Các yêu cầu này có đủ cơ sở để tiếp tục thiết kế kiến trúc, trình bày triển khai và đánh giá bằng ma trận truy vết, test và demo ở các chương sau.
+
+Một số nội dung được xem là ngoài phạm vi kết quả chính hoặc chỉ nên trình bày như hướng phát triển. Thứ nhất, khóa luận không khẳng định benchmark tải lớn, throughput, latency hoặc khả năng chịu tải production nếu chưa có phép đo thực nghiệm tương ứng. Scalability có thể được phân tích ở mức thiết kế dựa trên service boundary, cache, queue và consumer group, nhưng không được diễn đạt như kết quả đã chứng minh bằng stress test.
+
+Thứ hai, observability và deployment chỉ nên được viết ở mức thiết kế hoặc phạm vi demo có giới hạn nếu chưa có dashboard, trace, log pipeline và quy trình deployment được kiểm chứng đầy đủ. Các cụm từ như high availability, chaos engineering hoặc production-grade monitoring không phù hợp nếu không có bằng chứng độc lập.
+
+Thứ ba, offline behavior trong phạm vi hiện tại chỉ nên hiểu là degraded, reconnect và refetch UI. Full offline action queue, background sync và conflict resolver cho mọi thao tác customer, POS hoặc KDS là hướng phát triển, không phải yêu cầu đã hoàn thiện trong bản đánh giá chính. Tương tự, các nội dung như QR scan rate limit theo từng bàn, notification service, email receipt, email welcome/suspend/reset-password, multi-bank active payment settings, partial subscription refund, advanced inventory/BOM, tax/accounting, HRM, CRM, BI/AI analytics, native mobile app và tích hợp sâu với nền tảng giao đồ ăn bên thứ ba không thuộc phạm vi kết quả chính của Chương 3.
+
+Cuối cùng, SePay/VietQR là yêu cầu thanh toán trọng tâm của hệ thống, nhưng kiểm chứng với provider thật cần được tách khỏi bằng chứng kiểm thử unit, contract và mock. Chương 3 có thể nêu yêu cầu xử lý webhook, reference, underpaid và duplicate, còn Chương 6 phải phân biệt rõ phần đã kiểm chứng bằng test nội bộ với phần cần xác nhận thêm khi chạy với provider thật.
+
+Tóm lại, Chương 3 đã xác định actor, use case, functional requirements, non-functional requirements và các state machine chính của QRTable. Đây là cơ sở để Chương 4 giải thích thiết kế kiến trúc và service boundary, Chương 5 chứng minh quá trình triển khai, và Chương 6 đánh giá mức độ đáp ứng yêu cầu mà không phóng đại kết quả.

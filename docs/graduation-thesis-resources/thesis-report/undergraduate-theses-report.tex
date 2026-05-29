@@ -1,7 +1,8 @@
-% !TeX program = tectonic
+% !TeX document-id = {639a1635-118c-435b-a520-0a3fffad3c3f}
+% !TeX program = xelatex
 % !TeX encoding = UTF-8
 % Main LaTeX file for the QRTable undergraduate thesis.
-% Build from this directory with: tectonic undergraduate-theses-report.tex
+% Build from this directory with: xelatex undergraduate-theses-report.tex
 \documentclass[12pt,a4paper,oneside]{report}
 
 \usepackage{iftex}
@@ -29,6 +30,7 @@
 \usepackage{csquotes}
 \usepackage{xcolor}
 \usepackage{graphicx}
+\usepackage{xurl}
 \usepackage{hyperref}
 \usepackage[
   backend=bibtex,
@@ -38,6 +40,9 @@
 ]{biblatex}
 
 \addbibresource{references.bib}
+\setcounter{biburlnumpenalty}{9000}
+\setcounter{biburlucpenalty}{9000}
+\setcounter{biburllcpenalty}{9000}
 
 \hypersetup{
   unicode=true,
@@ -85,12 +90,12 @@
 }
 
 \newcommand{\thesistitle}{Nghiên cứu và xây dựng nền tảng POS theo mô hình SaaS tích hợp đặt món qua mã QR dựa trên kiến trúc vi dịch vụ}
-\newcommand{\thesisenglishtitle}{Research on the Development of a SaaS-Based POS Platform Integrating QR Code Ordering under a Microservices Architecture}
+\newcommand{\thesisenglishtitle}{\textcolor{red}{Research on the Development of a SaaS-Based POS Platform Integrating QR Code Ordering under a Microservices Architecture}}
 \newcommand{\thesisauthor}{Võ Đình Minh Quân}
-\newcommand{\thesisstudentid}{<MÃ SỐ SINH VIÊN>}
-\newcommand{\thesisfaculty}{<KHOA>}
-\newcommand{\thesismajor}{<TÊN NGÀNH>}
-\newcommand{\thesissupervisor}{<TÊN GIẢNG VIÊN HƯỚNG DẪN>}
+\newcommand{\thesisstudentid}{22521193}
+\newcommand{\thesisfaculty}{KHOA HỆ THỐNG THÔNG TIN}
+\newcommand{\thesismajor}{HỆ THỐNG THÔNG TIN}
+\newcommand{\thesissupervisor}{TS. NGUYỄN THANH BÌNH}
 \newcommand{\thesisyear}{2026}
 
 \newcommand{\covergeometry}{\newgeometry{top=2cm,right=2cm,bottom=1.5cm,left=2.54cm,headheight=14pt,footskip=0.7cm}}
@@ -132,10 +137,13 @@
 \phantomsection
 \addcontentsline{toc}{chapter}{TÀI LIỆU THAM KHẢO}
 \chapter*{TÀI LIỆU THAM KHẢO}
+\begingroup
+\setlength{\emergencystretch}{3em}
 \section*{Tài liệu tiếng Việt}
 \printbibliography[heading=none,keyword=vietnamese]
 \section*{Tài liệu tiếng Anh}
 \printbibliography[heading=none,notkeyword=vietnamese]
+\endgroup
 
 \cleardoublepage
 \appendix

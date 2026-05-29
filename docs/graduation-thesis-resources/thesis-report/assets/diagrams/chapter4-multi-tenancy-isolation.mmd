@@ -1,0 +1,71 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#f8fafc", "primaryBorderColor": "#334155", "lineColor": "#475569"}}}%%
+flowchart TB
+  subgraph Requests["Tenant-scoped requests"]
+    TenantA["Tenant A<br/>restaurant A users / QR sessions"]
+    TenantB["Tenant B<br/>restaurant B users / QR sessions"]
+  end
+
+  Bff["BFF guard chain<br/>resolve tenantId from JWT, route, QR token, or session"]
+  Context["Request context<br/>tenantId + actor + permissions"]
+  ServiceBoundary["Tenant-aware service boundary<br/>TCP/gRPC commands carry tenantId"]
+
+  subgraph Services["Domain services receive tenant context"]
+    Catalog["Catalog<br/>tenant-owned menu/table/stock"]
+    Order["Order<br/>tenant-owned session/cart/order/bill"]
+    Payment["Payment<br/>tenant-owned settlement/settings"]
+    Saas["SaaS<br/>tenant lifecycle/subscription"]
+    Kitchen["Kitchen<br/>tenant-scoped KDS queue"]
+  end
+
+  subgraph Isolation["Isolation mechanisms"]
+    Pg[("PostgreSQL service DBs<br/>tenant_id discriminator")]
+    RedisKeys[("Redis keys<br/>menu:{tenantId}, session:{tenantId}:{sessionId},<br/>cart:{tenantId}:{sessionId}, kds:{tenantId}:{station}")]
+    KafkaPayload[("Kafka payloads<br/>tenantId in approved domain events")]
+    WsRooms[("WebSocket rooms<br/>tenant:{id}:staff, tenant:{id}:kds:{station},<br/>session:{id}:customer")]
+  end
+
+  EventBoundary["Event boundary<br/>Order, Payment, Kitchen, SaaS produce approved events"]
+  TenantConsumers["Tenant-aware consumers<br/>Kitchen, BFF bridge, Catalog, Order"]
+  Guardrails["Guardrails<br/>No cross-service DB writes<br/>No database-per-tenant claim<br/>WebSocket is hint/refetch, not source of truth"]
+
+  TenantA -->|"HTTP / WebSocket"| Bff
+  TenantB -->|"HTTP / WebSocket"| Bff
+  Bff --> Context
+  Context --> ServiceBoundary
+  ServiceBoundary --> Catalog
+  ServiceBoundary --> Order
+  ServiceBoundary --> Payment
+  ServiceBoundary --> Saas
+  ServiceBoundary --> Kitchen
+
+  Catalog --> Pg
+  Order --> Pg
+  Payment --> Pg
+  Saas --> Pg
+  Order --> RedisKeys
+  Kitchen --> RedisKeys
+  Saas --> RedisKeys
+  Bff --> WsRooms
+
+  Catalog -.->|"tenantId in cache invalidation"| RedisKeys
+  ServiceBoundary --> EventBoundary
+  EventBoundary --> KafkaPayload
+  KafkaPayload -->|"fan-out with tenantId"| TenantConsumers
+  KafkaPayload -->|"realtime bridge"| Bff
+
+  Pg --> Guardrails
+  RedisKeys --> Guardrails
+  KafkaPayload --> Guardrails
+  WsRooms --> Guardrails
+
+  classDef request fill:#eff6ff,stroke:#2563eb,color:#111827;
+  classDef edge fill:#fff7ed,stroke:#ea580c,color:#111827;
+  classDef service fill:#f0fdf4,stroke:#16a34a,color:#111827;
+  classDef isolation fill:#f8fafc,stroke:#64748b,color:#111827;
+  classDef guard fill:#fee2e2,stroke:#dc2626,color:#111827;
+
+  class TenantA,TenantB request;
+  class Bff,Context,ServiceBoundary,EventBoundary,TenantConsumers edge;
+  class Catalog,Order,Payment,Saas,Kitchen service;
+  class Pg,RedisKeys,KafkaPayload,WsRooms isolation;
+  class Guardrails guard;

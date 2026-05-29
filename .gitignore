@@ -79,4 +79,5 @@ docs/graduation-thesis-resources/thesis-report/*.lot
 docs/graduation-thesis-resources/thesis-report/*.out
 docs/graduation-thesis-resources/thesis-report/*.pdf
 docs/graduation-thesis-resources/thesis-report/*.run.xml
+docs/graduation-thesis-resources/thesis-report/*.synctex.gz
 docs/graduation-thesis-resources/thesis-report/*.toc

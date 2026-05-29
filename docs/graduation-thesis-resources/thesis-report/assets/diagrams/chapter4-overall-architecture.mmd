@@ -1,0 +1,73 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "lineColor": "#475569", "tertiaryColor": "#f8fafc"}}}%%
+flowchart TB
+  subgraph Client["Client layer"]
+    direction LR
+    CustomerPwa["Customer PWA<br/>QR session"]
+    ManagementApp["Management App<br/>POS, KDS, Dashboard, Admin"]
+  end
+
+  Bff["BFF service<br/>HTTP REST, guard chain, WebSocket gateway<br/>TCP/gRPC clients; no business database"]
+
+  subgraph Domain["Domain service layer"]
+    direction TB
+    AuthServices["Auth and access<br/>Authorizer + User-Access"]
+    SaasCatalog["Tenant and catalog<br/>SaaS + Catalog"]
+    OrderKitchen["Ordering runtime<br/>Order + Kitchen"]
+    PaymentService["Settlement<br/>Payment"]
+  end
+
+  subgraph DataInfra["Data, cache, and event infrastructure"]
+    direction LR
+    Postgres[("PostgreSQL<br/>per-service data")]
+    Mongo[("MongoDB<br/>User-Access profile/roles")]
+    Redis[("Redis<br/>cache, session, cart, KDS")]
+    Kafka[("Kafka<br/>6 approved domain topics")]
+  end
+
+  subgraph External["External systems"]
+    direction LR
+    Keycloak["Keycloak<br/>staff/owner/admin IAM"]
+    Sepay["SePay / VietQR<br/>webhook, OAuth, QR"]
+    Cloudinary["Cloudinary<br/>menu images"]
+  end
+
+  CustomerPwa -->|"HTTP REST / WebSocket"| Bff
+  ManagementApp -->|"HTTP REST / WebSocket"| Bff
+
+  Bff -->|"gRPC / TCP auth"| AuthServices
+  Bff -->|"TCP command/query"| SaasCatalog
+  Bff -->|"TCP command/query"| OrderKitchen
+  Bff -->|"TCP command/query"| PaymentService
+
+  AuthServices --> Mongo
+  AuthServices --> Keycloak
+  SaasCatalog --> Postgres
+  OrderKitchen --> Postgres
+  PaymentService --> Postgres
+
+  Bff -->|"edge cache / socket rooms"| Redis
+  SaasCatalog -->|"tenant and menu cache"| Redis
+  OrderKitchen -->|"session, cart, KDS queue"| Redis
+  PaymentService -->|"OAuth state"| Redis
+
+  SaasCatalog -->|"tenant.created"| Kafka
+  OrderKitchen -->|"order.confirmed / SLA warning"| Kafka
+  PaymentService -->|"payment.completed / refunded"| Kafka
+  Kafka -->|"async consumers and realtime bridge"| Bff
+  Kafka -->|"KDS, tenant seed, bill recovery"| OrderKitchen
+
+  Sepay -->|"QRTBL / QRSUB webhook via BFF"| Bff
+  PaymentService -->|"provider API"| Sepay
+  SaasCatalog -->|"image upload path"| Cloudinary
+
+  classDef client fill:#eff6ff,stroke:#2563eb,color:#0f172a;
+  classDef edge fill:#fff7ed,stroke:#ea580c,color:#111827;
+  classDef service fill:#f0fdf4,stroke:#16a34a,color:#111827;
+  classDef infra fill:#f8fafc,stroke:#64748b,color:#111827;
+  classDef external fill:#fdf2f8,stroke:#db2777,color:#111827;
+
+  class CustomerPwa,ManagementApp client;
+  class Bff edge;
+  class AuthServices,SaasCatalog,OrderKitchen,PaymentService service;
+  class Postgres,Mongo,Redis,Kafka infra;
+  class Keycloak,Sepay,Cloudinary external;

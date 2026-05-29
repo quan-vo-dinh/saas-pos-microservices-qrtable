@@ -1,0 +1,39 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#f8fafc", "primaryBorderColor": "#334155", "lineColor": "#475569"}}}%%
+flowchart TD
+  Start["Need to communicate across a boundary"]
+  Immediate{"Does the caller need<br/>an immediate domain response?"}
+  Sync["Use TCP/gRPC command or query<br/>Examples: BFF to service, Order to Catalog stock,<br/>Payment to Order bill finalization"]
+  Durable{"Is it a durable domain event<br/>with fan-out, recovery, or temporal decoupling?"}
+  Kafka["Use Kafka through approved topic registry<br/>order.confirmed, order.status_changed,<br/>payment.completed, payment.refunded,<br/>kitchen.sla_warning, tenant.created"]
+  UiOnly{"Is it only a UI notification,<br/>cache invalidation, or refetch hint?"}
+  Direct["Use BFF Direct, Socket.IO,<br/>Redis internal hint, or normal refetch<br/>Do not add a Kafka topic"]
+  Provider{"Is it an external provider callback<br/>or provider API operation?"}
+  Webhook["Use BFF webhook/provider adapter,<br/>then delegate to Payment or SaaS owner"]
+  Reconsider["Recheck service ownership and evidence<br/>before introducing a new integration pattern"]
+  Guardrail["Guardrails<br/>Kafka is selective, not universal<br/>WebSocket is not source of truth<br/>No topic outside the approved registry"]
+
+  Start --> Immediate
+  Immediate -->|"Yes"| Sync
+  Immediate -->|"No"| Durable
+  Durable -->|"Yes"| Kafka
+  Durable -->|"No"| UiOnly
+  UiOnly -->|"Yes"| Direct
+  UiOnly -->|"No"| Provider
+  Provider -->|"Yes"| Webhook
+  Provider -->|"No"| Reconsider
+
+  Sync --> Guardrail
+  Kafka --> Guardrail
+  Direct --> Guardrail
+  Webhook --> Guardrail
+  Reconsider --> Guardrail
+
+  classDef question fill:#fef3c7,stroke:#d97706,color:#111827;
+  classDef action fill:#dcfce7,stroke:#16a34a,color:#111827;
+  classDef caution fill:#fee2e2,stroke:#dc2626,color:#111827;
+  classDef start fill:#dbeafe,stroke:#2563eb,color:#111827;
+
+  class Start start;
+  class Immediate,Durable,UiOnly,Provider question;
+  class Sync,Kafka,Direct,Webhook action;
+  class Reconsider,Guardrail caution;

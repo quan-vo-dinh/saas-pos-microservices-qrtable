@@ -1,0 +1,63 @@
+%% DEPRECATED: Hình 3.1 dùng PlantUML — xem chapter3-actor-use-case-overview.puml
+%% Hình 3.1 — use case overview (bản Mermaid cũ, không còn render vào PDF)
+%% Quy ước: ([...]) = ellipse use case; subgraph = system boundary; [[...]] = external system; -.-> = note/constraint
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#ffffff", "primaryBorderColor": "#334155", "lineColor": "#475569", "tertiaryColor": "#ffffff"}, "flowchart": {"curve": "basis", "htmlLabels": true}}}%%
+flowchart LR
+  subgraph RBAC["Actor — tài khoản & RBAC"]
+    direction TB
+    SuperAdmin["«actor»<br/><b>Super Admin</b><br/>cross-tenant"]
+    Owner["«actor»<br/><b>Restaurant Owner</b><br/>một tenant"]
+    Manager["«actor»<br/><b>Manager</b><br/>một tenant"]
+    Waiter["«actor»<br/><b>Waiter / Staff POS</b><br/>vận hành sàn"]
+    KitchenStaff["«actor»<br/><b>Chef / Barista</b><br/>station bếp/bar"]
+  end
+
+  subgraph SYS["«system» QRTable"]
+    direction TB
+    UC_Platform(["Quản lý SaaS lifecycle<br/>tenant · plan · subscription · quota"])
+    UC_Catalog(["Quản lý catalog, bàn và QR<br/>menu · khu vực · bàn · QR token"])
+    UC_Ordering(["Session, cart và order khách<br/>join session · shared cart · submit order"])
+    UC_Pos(["Vận hành POS<br/>confirm order · bill · chuyển bàn · service request"])
+    UC_Kds(["Kitchen / KDS<br/>queue station · ticket · recall · SLA"])
+    UC_Payment(["Thanh toán và đối soát<br/>cash · VietQR/SePay · refund"])
+  end
+
+  Customer["«actor»<br/><b>Customer / Guest</b><br/>session QR — không RBAC DB"]
+  Sepay[["«external»<br/><b>Webhook SePay</b><br/>QRTBL · QRSUB"]]
+
+  CrossCut["«note»<br/>Tenant isolation<br/>RBAC · session ownership"]
+
+  SuperAdmin --> UC_Platform
+  Owner --> UC_Platform
+  Owner --> UC_Catalog
+  Owner --> UC_Pos
+  Owner --> UC_Kds
+  Owner --> UC_Payment
+
+  Manager -->|"xem subscription/settings"| UC_Platform
+  Manager --> UC_Catalog
+  Manager --> UC_Pos
+  Manager --> UC_Kds
+  Manager --> UC_Payment
+
+  Waiter --> UC_Pos
+  Waiter --> UC_Payment
+  KitchenStaff --> UC_Kds
+
+  Customer --> UC_Ordering
+  Customer -->|"request bill · thanh toán bill"| UC_Payment
+  Sepay -->|"webhook đối soát"| UC_Payment
+
+  CrossCut -.-> SYS
+
+  classDef actor fill:#fff7ed,stroke:#d97706,color:#111827,stroke-width:1.5px;
+  classDef usecase fill:#f0fdf4,stroke:#16a34a,color:#111827,stroke-width:1.5px;
+  classDef session fill:#eff6ff,stroke:#2563eb,color:#111827,stroke-width:1.5px;
+  classDef external fill:#fdf2f8,stroke:#db2777,color:#111827,stroke-width:1.5px;
+  classDef note fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray:4 3;
+
+  class SuperAdmin,Owner,Manager,Waiter,KitchenStaff actor;
+  class Customer session;
+  class UC_Platform,UC_Catalog,UC_Ordering,UC_Pos,UC_Kds,UC_Payment usecase;
+  class Sepay external;
+  class CrossCut note;

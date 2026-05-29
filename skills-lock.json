@@ -53,6 +53,12 @@
       "skillPath": "SKILL.md",
       "computedHash": "cc2d8b425f319aad9c2e75a43be4028c32ae5cbc10fb9f2d374395e341b9cd5b"
     },
+    "mermaid-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/mermaid-expert/SKILL.md",
+      "computedHash": "6dae987d8d84e071e106d7f181a07dd85ae1b62292891cf524addea7048f179d"
+    },
     "microservices-architect": {
       "source": "jeffallan/claude-skills",
       "sourceType": "github",

@@ -46,6 +46,20 @@ cd docs/graduation-thesis-resources/thesis-report
 tectonic --keep-logs --keep-intermediates undergraduate-theses-report.tex
 ```
 
+Ở cuối Phase 2A, `references.bib` chưa chứa entry thật và các chương chưa có `\cite{...}`. Vì vậy log có thể báo `Keyword 'vietnamese' not found` hoặc `Empty bibliography`; đây là trạng thái chấp nhận được trước Phase 2B, miễn là build vẫn chạy BibTeX và không có LaTeX error.
+
+Với MacTeX/TeXstudio, metadata trong main `.tex` có thể dùng XeLaTeX để preview. Khi đã có citation thật, cần chạy đủ chuỗi XeLaTeX -> BibTeX -> XeLaTeX -> XeLaTeX, hoặc cấu hình TeXstudio/latexmk tương đương, để bibliography được cập nhật.
+
+Các dòng magic comments ở đầu `undergraduate-theses-report.tex` được giữ có chủ đích để TeXstudio/MacTeX trên macOS nhận diện đúng document, compiler và encoding:
+
+```tex
+% !TeX document-id = {...}
+% !TeX program = xelatex
+% !TeX encoding = UTF-8
+```
+
+Không tự ý đổi các dòng này sang `tectonic` chỉ vì command verification trong repo dùng `tectonic`. `tectonic` là lệnh kiểm chứng nhanh trong workflow; TeXstudio/MacTeX vẫn có thể dùng XeLaTeX theo magic comments.
+
 Các file phụ trợ như `.aux`, `.toc`, `.lof`, `.lot`, `.out`, `.log`, `.bbl`, `.bcf`, `.blg`, `.run.xml`, `*-blx.bib` và PDF preview đã được ignore trong `.gitignore`.
 
 ## Ghi chú khi chuyển môi trường

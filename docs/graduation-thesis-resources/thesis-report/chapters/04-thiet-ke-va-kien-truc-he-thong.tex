@@ -1,25 +1,234 @@
 \chapter{Thiết kế và kiến trúc hệ thống}
 
+Chương này trình bày cách QRTable được thiết kế ở mức kiến trúc hệ thống. Nếu Chương 3 trả lời câu hỏi hệ thống cần phục vụ những actor, use case và yêu cầu chất lượng nào, Chương 4 trả lời câu hỏi các yêu cầu đó được chuyển thành ranh giới kỹ thuật, service ownership, data ownership và cơ chế giao tiếp như thế nào. Trọng tâm của chương không phải là liệt kê công nghệ, mà là giải thích vì sao từng quyết định kiến trúc phù hợp với bài toán SaaS POS cho F\&B có QR ordering, KDS, thanh toán và quản trị tenant.
+
+QRTable được thiết kế theo hướng microservices có kiểm soát. Các tài liệu về microservices thường nhấn mạnh việc tách hệ thống theo năng lực nghiệp vụ, sở hữu dữ liệu riêng và giao tiếp qua hợp đồng rõ ràng \cite{lewis-fowler-microservices-2014}. Tuy nhiên, trong một hệ thống khóa luận có phạm vi triển khai và đánh giá hữu hạn, việc dùng microservices cũng tạo thêm chi phí về giao tiếp mạng, nhất quán dữ liệu và quan sát lỗi phân tán. Vì vậy, QRTable không sử dụng Kafka cho mọi tương tác, không xem WebSocket là nguồn trạng thái nghiệp vụ, và không tách service chỉ vì lý do kỹ thuật. Các ranh giới được chọn dựa trên actor, bounded context và ownership của dữ liệu cốt lõi.
+
 \section{Nguyên tắc thiết kế kiến trúc}
+
+Các quyết định kiến trúc của QRTable được dẫn dắt bởi sáu nguyên tắc chính.
+
+Thứ nhất, hệ thống áp dụng database-per-service ở mức bounded context. Mỗi service nghiệp vụ chịu trách nhiệm với một nhóm dữ liệu và quy tắc nghiệp vụ riêng; service khác không được truy cập trực tiếp database của service đó. Ví dụ, Catalog sở hữu menu, bàn và stock; Order sở hữu session, cart, order và bill; Payment sở hữu payment record, refund và tenant payment settings. Nguyên tắc này giảm coupling giữa service và làm rõ nơi đặt invariant nghiệp vụ.
+
+Thứ hai, tenant isolation phải là mặc định. QRTable là hệ thống SaaS phục vụ nhiều nhà hàng trên cùng nền tảng, nên mọi thao tác của tenant phải mang tenant context. Mô hình hiện tại kết hợp database-per-service với discriminator column \texttt{tenant\_id}. Cách tiếp cận này không phải mức cô lập vật lý cao nhất như database-per-tenant, nhưng phù hợp với phạm vi hệ thống hiện tại vì giảm chi phí vận hành, giữ migration đơn giản và vẫn cho phép kiểm soát dữ liệu theo tenant ở các lớp API, database, Redis, Kafka payload và WebSocket room. Khái niệm SaaS và chia sẻ tài nguyên nền tảng cũng làm tenant isolation trở thành một yêu cầu thiết kế cốt lõi \cite{nist-sp800145-2011}.
+
+Thứ ba, BFF/API Gateway là single entry point cho client. Customer PWA và Management App không gọi trực tiếp các microservice nội bộ. BFF chịu trách nhiệm route HTTP, guard chain, validation, rate limit, WebSocket gateway và gọi TCP/gRPC đến domain services. Quyết định này giúp gom các cross-cutting concerns ở edge layer, đồng thời tránh để client biết topology nội bộ của hệ thống.
+
+Thứ tư, QRTable sử dụng event-driven communication có chọn lọc. TCP/gRPC được dùng cho command/query cần phản hồi ngay, chẳng hạn BFF gọi Order để submit order hoặc Order gọi Catalog để trừ stock khi staff xác nhận. Kafka được dùng cho domain event hoặc side effect bất đồng bộ, chẳng hạn \texttt{order.confirmed} để Kitchen tạo KDS tickets hoặc \texttt{payment.completed} để Order finalizes bill. Cách dùng này tận dụng khả năng decoupling của Kafka \cite{apache-kafka-docs-2026} nhưng tránh biến broker thành proxy cho mọi thao tác UI.
+
+Thứ năm, Redis là lớp cache/runtime state cho hot path nhưng không tự động trở thành source of truth của mọi dữ liệu. Menu cache, session/cart active state, KDS queue, tenant suspend flag và OAuth state đều dùng Redis với ownership rõ ràng. Với order, bill, payment, tenant và catalog data, nguồn sự thật vẫn nằm ở service owner tương ứng.
+
+Thứ sáu, các thao tác ghi có ảnh hưởng đến trạng thái bên ngoài phải hướng tới idempotency và timestamp server-side. Điều này đặc biệt quan trọng ở payment webhook, order confirmation, outbox publishing và customer order submission. Trong phạm vi hiện tại, hệ thống có baseline cho idempotency/outbox ở các flow chính; các hardening sâu hơn như CDC hoặc exactly-once delivery được xem là hướng tăng cường, không phải claim đã hoàn tất ở mức production.
 
 \section{Kiến trúc tổng thể}
 
+Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng thể của QRTable theo các lớp client, BFF, domain service và infrastructure. Hình~\ref{fig:chapter4-c4-container} trình bày cùng hệ thống ở mức container để làm rõ actor, ứng dụng web, microservice, data store và hệ thống ngoài.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{chapter4-overall-architecture.pdf}
+  \caption{Kiến trúc tổng thể của QRTable. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \label{fig:chapter4-overall-architecture}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{chapter4-c4-container.pdf}
+  \caption{Sơ đồ container của QRTable theo góc nhìn C4. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \label{fig:chapter4-c4-container}
+\end{figure}
+
+Ở lớp client, QRTable có hai ứng dụng chính. Customer PWA phục vụ khách hàng tại bàn, bắt đầu từ thao tác quét mã QR, xem menu, cập nhật shared cart, submit order, theo dõi trạng thái và yêu cầu thanh toán. Management App phục vụ các actor đã xác thực như Super Admin, Owner, Manager, Waiter, Chef và Barista thông qua các vùng chức năng POS, KDS, dashboard và platform admin. Keycloak theme là tài sản giao diện cho quá trình đăng nhập của nhóm staff/owner/admin.
+
+Ở lớp edge, BFF là cửa vào duy nhất của hệ thống. BFF xử lý HTTP REST, WebSocket/Socket.IO, guard chain và các client nội bộ đến domain services. Cách đặt BFF ở edge giúp QRTable tách rõ hai loại logic: cross-cutting concerns nằm ở BFF, còn business invariants nằm ở service owner. BFF có thể emit WebSocket hoặc invalidate cache sau khi nhận response từ service, nhưng không trở thành nơi sở hữu trạng thái nghiệp vụ như order, stock, bill hoặc subscription.
+
+Ở lớp domain service, hệ thống gồm Authorizer, User-Access, SaaS, Catalog, Order, Kitchen và Payment. Mỗi service đại diện cho một bounded context rõ ràng: identity verification, application profile/RBAC, tenant lifecycle, menu/table/stock, order/session/bill, KDS runtime và payment settlement. Service \texttt{product} tồn tại trong source tree như phần legacy/template của workspace, không được đưa vào core architecture của khóa luận vì không có ownership nghiệp vụ hiện tại.
+
+Ở lớp infrastructure, QRTable dùng PostgreSQL cho các service nghiệp vụ quan hệ, MongoDB cho User-Access, Redis cho cache/session/KDS/runtime flags, Kafka cho domain events, Keycloak cho IAM, SePay/VietQR cho thanh toán chuyển khoản, Cloudinary cho file ảnh menu, và Docker/Docker Compose cho môi trường chạy. Grafana, Loki, Prometheus và Tempo nằm trong thiết kế quan sát hệ thống, nhưng trong báo cáo này chỉ được trình bày như hướng thiết kế/vận hành demo nếu chưa có bằng chứng runtime đầy đủ.
+
 \section{Tổ chức Nx monorepo}
+
+QRTable được tổ chức trong một Nx monorepo. Thư mục \texttt{apps/} chứa các đơn vị deployable như BFF, domain services, Customer PWA, Management App và Keycloak theme. Thư mục \texttt{libs/} chứa các thư viện chia sẻ như configuration, constants, DTOs, guards, providers, queue, shared types, shared utils, frontend UI và hooks. Cấu trúc này giúp một repo duy nhất quản lý cả backend, frontend, shared contracts và test configuration.
+
+Lý do dùng monorepo không phải để làm mờ ranh giới service. Ngược lại, monorepo được dùng để giữ hợp đồng dùng chung ở một nơi có kiểm soát. Các phần như Kafka topic constants, Redis key builders, WebSocket room builders, DTO, interface và guard provider có thể được import thống nhất thay vì định nghĩa lại ở từng service. Điều này giảm nguy cơ drift giữa BFF, service và frontend khi hệ thống phát triển.
+
+Một lợi ích khác của Nx là hỗ trợ task graph và affected commands. Với hệ thống nhiều app, thay đổi ở shared library có thể ảnh hưởng đến nhiều project. Việc để các app và libs trong cùng workspace giúp phát hiện phụ thuộc rõ hơn, thuận lợi cho test/build chọn lọc và tăng khả năng bảo trì. Tuy nhiên, monorepo không thay thế cho service boundary: một service vẫn không được import repository/entity nội bộ của service khác để truy cập database trực tiếp. Mọi truy cập chéo domain vẫn phải đi qua TCP/gRPC hoặc Kafka event theo contract.
 
 \section{Service boundaries và data ownership}
 
+Bảng~\ref{tab:chapter4-service-ownership} tóm tắt ownership chính của các thành phần trong QRTable. Đây là quyết định quan trọng nhất của Chương 4 vì nó xác định nơi đặt business rules, nơi lưu dữ liệu và cách service phối hợp mà không phá vỡ tính độc lập của bounded context.
+
+{\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.21\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}}
+  \caption{Service ownership và data ownership chính trong QRTable. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \label{tab:chapter4-service-ownership}\\
+  \toprule
+  Thành phần & Interface chính & Data ownership & Ghi chú kiến trúc \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Thành phần & Interface chính & Data ownership & Ghi chú kiến trúc \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Customer PWA & HTTP REST và WebSocket qua BFF & Không sở hữu server state & Customer dùng QR/session scoped auth, không dùng Keycloak. \\
+  Management App & HTTP REST và WebSocket qua BFF & Không sở hữu server state & Gồm các vùng POS, KDS, dashboard, SaaS/admin trong một Next.js app. \\
+  BFF & HTTP REST, WebSocket, TCP/gRPC clients & Không có database nghiệp vụ riêng & Single entry point, guard chain, routing, realtime bridge và cross-cutting concerns. \\
+  Authorizer & gRPC/TCP, Keycloak Admin API & Không sở hữu application profile & Xác thực JWT/OIDC cho staff/owner/admin; identity source nằm ở Keycloak. \\
+  User-Access & TCP, MongoDB/Mongoose & User profile, role, staff mapping & Sở hữu application profile và RBAC mapping theo tenant. \\
+  SaaS & TCP, Kafka outbox, Redis cache & Tenant, pricing plan, subscription, subscription invoice & Sở hữu tenant lifecycle và subscription state; không sở hữu profile hoặc payment settlement. \\
+  Catalog & TCP, Kafka consumer & Category, menu item, area, table, QR token, stock & Service duy nhất ghi stock; Order chỉ gọi Catalog qua TCP khi cần trừ/hoàn stock. \\
+  Order & TCP, Kafka producer/consumer, Redis & Session, shared cart, order, order item, bill, service request & Sở hữu order/bill lifecycle; không ghi trực tiếp database của Catalog hoặc Payment. \\
+  Kitchen & TCP, Kafka consumer/producer, Redis & Không có PostgreSQL/MongoDB riêng & Redis Sorted Set/hash là runtime projection cho KDS queue. \\
+  Payment & TCP, webhook path qua BFF, Kafka outbox & Payment, refund, audit payment, tenant payment settings & Sở hữu settlement/settings; Order vẫn sở hữu bill/session finalization. \\
+\end{longtable}
+}
+
+Catalog và Order là ví dụ điển hình cho cách QRTable xử lý ownership. Khi customer submit order, Order có thể lưu order ở trạng thái chờ xử lý và quản lý bill/session. Tuy nhiên, stock là invariant thuộc Catalog, vì Catalog mới là service sở hữu menu item và số lượng tồn. Khi staff xác nhận order, Order gọi Catalog qua TCP để trừ stock trong transaction của Catalog. Nếu để Order ghi trực tiếp bảng menu item, hệ thống sẽ phá vỡ database-per-service và khiến logic stock phân tán ở nhiều nơi.
+
+Payment và Order cũng được tách tương tự. Payment sở hữu payment transaction, refund, tenant payment settings và webhook settlement. Order sở hữu bill/session lifecycle. Khi payment hoàn tất, Payment có thể gọi Order theo fast path idempotent hoặc publish \texttt{payment.completed} để Order xử lý recovery/fan-out, nhưng Payment không tự đóng bill/session hay cập nhật trạng thái bàn. Ranh giới này giúp tránh việc một service bên ngoài order context quyết định trực tiếp lifecycle của order/bill.
+
+Kitchen là một trường hợp khác: service này không có PostgreSQL hoặc MongoDB riêng trong kiến trúc hiện tại. Kitchen tiêu thụ event \texttt{order.confirmed}, dựng KDS tickets và lưu runtime queue trong Redis Sorted Set/hash. Quyết định này phù hợp vì KDS queue là projection vận hành tốc độ cao, cần sắp xếp FIFO/priority/SLA và cập nhật realtime; nó không cần một database quan hệ riêng cho phạm vi hiện tại. Nếu sau này cần phân tích lịch sử bếp hoặc audit sâu hơn, có thể bổ sung storage hoặc projection riêng mà không làm thay đổi ownership của Order.
+
 \section{Multi-tenancy strategy}
+
+Hình~\ref{fig:chapter4-multi-tenancy-isolation} minh họa cách tenant context đi qua các lớp API, service, database, Redis, Kafka và WebSocket. Mô hình hiện tại là database-per-service kết hợp discriminator column \texttt{tenant\_id}. Với các bảng thuộc phạm vi nhà hàng như menu item, table, order, bill, payment hoặc subscription, \texttt{tenant\_id} là điều kiện bắt buộc để tách dữ liệu giữa các tenant. Với một số entity platform-level như pricing plan hoặc root tenant record, tenant scope được xử lý theo vai trò của service SaaS và quyền Super Admin.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{chapter4-multi-tenancy-isolation.pdf}
+  \caption{Cơ chế tenant isolation ở API, service, database, Redis, Kafka và WebSocket. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \label{fig:chapter4-multi-tenancy-isolation}
+\end{figure}
+
+Ở request layer, staff/owner/admin đi qua JWT/OIDC và tenant claim, còn customer đi qua QR/session scoped context. BFF và guard chain có trách nhiệm đưa tenant context vào request trước khi gọi service. Ở service layer, repository/query của service phải lọc theo tenant. Ở cache layer, Redis key dùng tenant-aware namespace cho menu, session, cart và KDS queue. Ở event layer, payload Kafka phải có tenantId để consumer route và xử lý đúng tenant. Ở realtime layer, WebSocket room dùng tenant/session namespace để tránh phát event sang sai nhóm người dùng.
+
+Trade-off của mô hình này là QRTable chưa đạt mức cô lập vật lý như database-per-tenant. Nếu hệ thống đi tới quy mô lớn hơn hoặc có yêu cầu compliance cao hơn, có thể cân nhắc schema-per-tenant, database-per-tenant hoặc mô hình hybrid. Tuy nhiên, đối với mục tiêu khóa luận và giai đoạn xây dựng hiện tại, database-per-service kết hợp \texttt{tenant\_id} tạo được cân bằng giữa tính rõ ràng của ownership, chi phí vận hành và khả năng kiểm thử bằng dữ liệu seed/demo.
 
 \section{Inter-service communication}
 
+Bảng~\ref{tab:chapter4-communication-matrix} trình bày các kênh giao tiếp chính trong QRTable. Điểm cần nhấn mạnh là hệ thống không áp dụng một cơ chế duy nhất cho mọi tương tác. Mỗi kênh được chọn theo yêu cầu phản hồi, mức coupling, tính bất đồng bộ và ownership của domain operation.
+
+{\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}}
+  \caption{Communication matrix của QRTable. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \label{tab:chapter4-communication-matrix}\\
+  \toprule
+  Kênh & From--To & Mục đích & Guardrail \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Kênh & From--To & Mục đích & Guardrail \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  HTTP REST & Customer PWA / Management App -- BFF & External API, route auth, validation và request orchestration ở edge layer. & Client không gọi service nội bộ trực tiếp. \\
+  WebSocket / Socket.IO & BFF -- Customer / Staff / KDS / Management clients & Realtime hint, invalidation và refetch cho order, cart, KDS, payment và tenant lifecycle. & Không phải authoritative state. \\
+  TCP RPC & BFF -- Catalog / Order / Kitchen / Payment / SaaS / User-Access & Internal command/query cần phản hồi ngay. & Không dùng thay cho event fan-out. \\
+  TCP RPC & Order -- Catalog & Trừ/hoàn stock và thao tác liên quan table theo ownership của Catalog. & Order không ghi DB Catalog. \\
+  TCP RPC & Payment -- Order & Lấy bill snapshot và mark paid idempotent cho fast path/recovery. & Payment không sở hữu bill/session. \\
+  TCP RPC & SaaS -- Authorizer / User-Access / Payment / Catalog / Order & Onboarding mini-saga, tạo owner/profile/settings, usage counter và quota. & SaaS orchestration không đồng nghĩa sở hữu data của service khác. \\
+  gRPC & BFF -- Authorizer & Token verification và auth fast path bằng typed service contract. & Customer QR flow không đi qua Keycloak. \\
+  Kafka & Order / Payment / Kitchen / SaaS -- consumers & Domain event bất đồng bộ, temporal decoupling, fan-out và recovery. & Chỉ dùng 6 approved topics. \\
+  Redis internal hint & Kitchen/KDS runtime -- BFF WebSocket bridge & Báo KDS queue changed sau khi Redis mutation. & Hint/refetch, không thay thế Kitchen state. \\
+  Webhook HTTP & SePay -- BFF -- Payment/SaaS & Bank transfer settlement cho tenant bill \texttt{QRTBL} và subscription invoice \texttt{QRSUB}. & Không trộn route webhook theo tier. \\
+  External HTTP/API & Catalog / Payment / Authorizer -- Cloudinary / SePay / Keycloak & Upload image, OAuth/provider API và IAM admin operations. & Chỉ claim phần có code/evidence. \\
+\end{longtable}
+}
+
+HTTP REST chỉ xuất hiện ở ranh giới client đến BFF hoặc external provider đến BFF. TCP RPC được dùng cho các command/query nội bộ cần kết quả ngay, ví dụ BFF cần trả menu/order response cho client, Order cần biết Catalog có trừ stock thành công hay không, hoặc Payment cần lấy bill snapshot từ Order. gRPC được dùng cho đường xác thực đến Authorizer vì đây là fast path có contract typed và tần suất gọi cao.
+
+Kafka được dùng khi producer không cần đợi consumer hoàn thành hoặc khi sự kiện cần kích hoạt business reaction ở bounded context khác. Ví dụ, khi order được confirm, Order không cần chờ Kitchen tạo xong KDS ticket để trả kết quả xác nhận cho staff; do đó \texttt{order.confirmed} đi qua Kafka. Ngược lại, khi customer cập nhật cart hoặc khi BFF cần emit thông báo UI sau một TCP response đã thành công, dùng Kafka sẽ làm tăng latency và coupling hạ tầng mà không thêm business value. Trường hợp này được xử lý bằng BFF Direct hoặc WebSocket hint/refetch.
+
+WebSocket trong QRTable được dùng để cải thiện trải nghiệm realtime nhưng không thay thế nguồn sự thật của hệ thống. Theo bản chất giao thức, WebSocket cung cấp kênh hai chiều lâu dài giữa client và server \cite{fette-websocket-rfc6455-2011}; trong QRTable, kênh này chỉ mang event thông báo, invalidation hoặc gợi ý refetch. Nếu client mất kết nối hoặc nhận event trễ, trạng thái đúng vẫn phải được lấy lại từ API và service owner.
+
 \section{Kafka decision framework và topic registry}
+
+Hình~\ref{fig:chapter4-kafka-decision-flow} trình bày decision flow chọn TCP/gRPC, Kafka, WebSocket/BFF Direct hoặc webhook adapter. Flow này giúp tránh hai cực đoan: dùng Kafka cho mọi thứ, hoặc dùng RPC đồng bộ cho các side effect có thể chạy bất đồng bộ.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter4-kafka-decision-flow.pdf}
+  \caption{Decision flow chọn TCP/gRPC, Kafka, WebSocket/BFF Direct hoặc webhook adapter. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \label{fig:chapter4-kafka-decision-flow}
+\end{figure}
+
+Decision framework của QRTable có thể tóm tắt như sau. Nếu một thay đổi trạng thái cần business logic ở bounded context khác, Kafka là lựa chọn phù hợp. Nếu producer không cần đợi consumer, hoặc event được tạo bởi timer/worker nội bộ, Kafka cũng phù hợp. Nếu event là kết quả của một database write và cần phát ra ngoài service, outbox baseline được dùng để giảm rủi ro dual-write. Ngược lại, nếu side effect chỉ là UI notification hoặc cache invalidation sau khi BFF đã có response từ TCP, BFF Direct là lựa chọn đơn giản hơn. Nếu command cần biết kết quả ngay để quyết định transaction hoặc trả lỗi cho người dùng, TCP/gRPC phù hợp hơn Kafka.
+
+{\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}}
+  \caption{Kafka topic registry được chấp nhận trong QRTable. Nguồn: tác giả tổng hợp từ source code và architecture contract tests.}
+  \label{tab:chapter4-kafka-topic-registry}\\
+  \toprule
+  Topic & Producer & Consumer / trạng thái & Lý do dùng Kafka \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Topic & Producer & Consumer / trạng thái & Lý do dùng Kafka \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  \texttt{order.confirmed} & Order & Kitchen & Order confirmed cần tạo KDS tickets nhưng Order không cần đợi Kitchen xử lý xong. \\
+  \texttt{order.status\_}\newline\texttt{changed} & Order & Approved topic, consumer runtime hiện còn hạn chế & Dòng trạng thái bền vững cho projection hoặc audit; UI feedback tức thời vẫn đi qua BFF Direct. \\
+  \texttt{payment.}\newline\texttt{completed} & Payment & Order, BFF realtime bridge & Payment completion cần finalize bill và phát realtime hoặc fan-out theo tenant và session. \\
+  \texttt{payment.refunded} & Payment & Approved topic, consumer runtime hiện còn hạn chế & Refund audit và outbox contract cho future fan-out. \\
+  \texttt{kitchen.sla\_}\newline\texttt{warning} & Kitchen & BFF realtime bridge & SLA warning là timer hoặc internal event, không gắn với TCP request đang chờ phản hồi. \\
+  \texttt{tenant.created} & SaaS & Catalog & Tenant onboarding cần kích hoạt seed/default setup ở Catalog mà không làm chặt coupling runtime. \\
+\end{longtable}
+}
+
+Bảng~\ref{tab:chapter4-kafka-topic-registry} cũng thể hiện một guardrail quan trọng: QRTable chỉ công nhận sáu topic trong registry hiện tại. Các event như cart updated, bill requested, table transferred, KDS queue changed, tenant suspended hoặc menu updated không được viết như Kafka topic core nếu chưa có contract tương ứng. Chúng có thể là socket event, Redis internal hint, cache invalidation hoặc UI refetch tùy trường hợp.
 
 \section{Redis, cache, session và KDS strategy}
 
+Redis được dùng trong QRTable vì một số trạng thái có tần suất đọc/ghi cao, cần TTL hoặc cần cấu trúc dữ liệu runtime phù hợp hơn database quan hệ. Tuy nhiên, mỗi nhóm key phải có owner rõ ràng.
+
+Menu cache phục vụ public menu và giảm số lần query Catalog cho các request đọc lặp lại từ customer. BFF có thể cache hoặc invalidate menu sau mutation, nhưng Catalog database vẫn là source of truth. Session và cart được Order quản lý: \texttt{session:\{tenantId\}:\{sessionId\}} là active cache/mirror của durable session, còn \texttt{cart:\{tenantId\}:\{sessionId\}} lưu shared cart và version để hỗ trợ nhiều khách cùng bàn thao tác. Redis expiry không tự động có nghĩa là order/session nghiệp vụ đã biến mất; Order vẫn là nơi quyết định đóng session, release table và xóa cart khi đủ điều kiện.
+
+KDS sử dụng Redis Sorted Set/hash để lưu queue runtime theo tenant và station. Cấu trúc này phù hợp với yêu cầu sắp xếp FIFO, priority, SLA và cập nhật nhanh cho màn hình bếp/bar. Kitchen service sở hữu các key \texttt{kds:*} và publish internal hint sau khi Redis mutation. BFF nhận hint đó để phát WebSocket đến room KDS phù hợp. Thiết kế này tránh việc BFF tự suy luận trạng thái bếp, đồng thời giữ Kitchen là service duy nhất hiểu logic KDS queue.
+
+SaaS dùng Redis cho tenant suspend flag và subscription cache để BFF/guard có thể đọc nhanh trạng thái vận hành. Payment dùng OAuth state cache với TTL ngắn để chống replay/CSRF trong SePay OAuth Connect. Các key này hỗ trợ fast path, nhưng database của service owner vẫn là nơi lưu trạng thái bền vững.
+
 \section{Security, authentication và authorization}
+
+QRTable có hai luồng xác thực khác nhau. Nhóm staff/owner/admin dùng Keycloak, JWT/OIDC và RBAC. JWT là chuẩn phổ biến để truyền identity claims và xác thực dựa trên token \cite{jones-jwt-rfc7519-2015}. Trong QRTable, Keycloak là identity source, Authorizer xác minh token, còn User-Access lưu application profile, role và permission mapping theo tenant.
+
+Customer không dùng Keycloak. Customer là actor anonymous theo session, bắt đầu từ QR URL có table token và sau đó đi qua session guard. Quyết định này phù hợp với bối cảnh F\&B: khách tại bàn cần truy cập nhanh, không nên bị buộc đăng nhập tài khoản chỉ để xem menu hoặc đặt món. Bảo mật của luồng customer dựa trên QR token, HMAC, session ownership, tenant context và giới hạn hành vi theo phiên tại bàn.
+
+Guard chain ở BFF giúp tách các câu hỏi bảo mật thành nhiều lớp. UserGuard hoặc SessionGuard trả lời ``người gọi là ai'', TenantGuard trả lời ``request thuộc tenant nào'', PermissionGuard trả lời ``actor có quyền thực hiện hành động này không''. Với staff/owner/admin, role và permission được quản lý qua Keycloak claim và User-Access profile. Với customer, quyền không đến từ RBAC role trong database mà từ session ownership và phạm vi bàn/tenant.
+
+Security cũng xuất hiện ở payment webhook. QRTable phân biệt các route webhook của SePay theo tier: route legacy/lab, tenant bill route và platform subscription route. Tenant bill dùng prefix \texttt{QRTBL}, subscription invoice dùng prefix \texttt{QRSUB}. BFF xác thực route/header phù hợp trước khi chuyển payload đến Payment hoặc SaaS. Phần này chỉ nên được đánh giá ở Chương 6 theo bằng chứng test/demo thật; Chương 4 trình bày thiết kế và guardrail, không claim live provider validation nếu chưa kiểm chứng bằng môi trường provider thật.
 
 \section{Payment architecture với SePay/VietQR}
 
+Payment architecture của QRTable phản ánh hai dòng tiền khác nhau. Dòng tiền thứ nhất là customer trả tiền hóa đơn cho nhà hàng. Dòng này dùng reference prefix \texttt{QRTBL}; Payment service sở hữu payment record, tenant payment settings, trạng thái kết nối SePay và webhook settlement. Dòng tiền thứ hai là tenant trả phí subscription cho nền tảng. Dòng này dùng reference prefix \texttt{QRSUB}; SaaS service sở hữu subscription invoice và xử lý trạng thái subscription.
+
+Việc tách hai tier giúp tránh nhầm lẫn ownership. Payment service không sở hữu subscription lifecycle của tenant, còn SaaS service không sở hữu từng payment record của bill nhà hàng. BFF route webhook dựa trên route và billing reference để chuyển đúng handler. Với bill của khách, Payment xử lý settlement và sau đó phối hợp với Order để mark bill paid. Với subscription invoice, SaaS xử lý việc active/cập nhật subscription sau khi xác nhận thanh toán.
+
+VietQR flow cũng phải giữ nguyên tắc idempotency. Một webhook từ provider có thể đến trễ, đến nhiều lần hoặc thiếu field nhận dạng trong một số tình huống. Payment/SaaS cần match reference trong \texttt{code}, \texttt{content} hoặc dữ liệu liên quan, kiểm tra amount, ghi audit và chỉ chuyển trạng thái khi đủ điều kiện. Chương này mô tả kiến trúc; phần mức độ kiểm chứng live provider, mock webhook hoặc manual smoke sẽ thuộc Chương 6.
+
 \section{Deployment và observability design}
 
+QRTable có thiết kế chạy bằng Docker/Docker Compose cùng các dependency như PostgreSQL, MongoDB, Redis, Kafka và Keycloak. Stack quan sát gồm Grafana, Loki, Prometheus và Tempo. Thiết kế này giúp gom môi trường phát triển/demo vào một stack có thể tái lập, giảm chênh lệch giữa máy phát triển và môi trường trình diễn.
+
+Tuy nhiên, deployment và observability là khu vực cần diễn đạt thận trọng. Có cấu trúc Docker và monitoring stack trong thiết kế không đồng nghĩa hệ thống đã đạt high availability, production-ready observability, stress-test dưới tải lớn hoặc chaos engineering. Trong phạm vi Chương 4, deployment/observability được trình bày như hướng thiết kế vận hành và nền tảng cho demo/evaluation. Các claim về dashboard thật, trace/log coverage, uptime, throughput hoặc khả năng phục hồi chỉ nên đưa vào Chương 6 nếu có artifact kiểm chứng.
+
 \section{Trade-off kiến trúc}
+
+Quyết định dùng microservices thay vì monolith giúp QRTable tách rõ các bounded context có nhịp thay đổi khác nhau: Catalog/stock, Order/session/bill, Kitchen/KDS, Payment/settlement, SaaS/subscription và User-Access/RBAC. Lợi ích chính là data ownership rõ hơn, giảm cross-domain coupling và dễ trình bày/đánh giá từng flow theo service boundary. Đổi lại, hệ thống phải xử lý distributed complexity: network failure, eventual consistency, idempotency, tracing và contract drift. Vì vậy, microservices trong QRTable được dùng như một lựa chọn thiết kế có trade-off, không phải khẳng định luôn tốt hơn monolith.
+
+Quyết định kết hợp sync RPC và Kafka cũng là một trade-off. TCP/gRPC đơn giản hơn cho command/query cần response tức thời và lỗi rõ ràng với người dùng. Kafka phù hợp hơn cho domain event bất đồng bộ, temporal decoupling và fan-out. Nếu dùng Kafka cho mọi request, hệ thống sẽ khó debug hơn và tăng latency cho luồng customer/staff. Nếu chỉ dùng RPC, các side effect như KDS ticket, payment completion hoặc SLA warning sẽ dễ coupling chặt với producer. Decision framework ở Hình~\ref{fig:chapter4-kafka-decision-flow} là cách QRTable giữ cân bằng giữa hai hướng này.
+
+Quyết định dùng Redis cho cache/session/KDS giúp tăng tốc các luồng hot path và hỗ trợ cấu trúc queue realtime. Nhưng Redis không được dùng như lối tắt để bỏ qua service ownership. Với menu, database Catalog vẫn là source of truth; với session/cart, Order vẫn quyết định lifecycle; với KDS, Kitchen sở hữu projection runtime; với tenant suspend, SaaS sở hữu trạng thái bền vững. Cách viết này giúp tránh hiểu nhầm rằng cache là authoritative state của toàn hệ thống.
+
+Quyết định dùng database-per-service kết hợp \texttt{tenant\_id} phù hợp với mục tiêu SaaS thesis/MVP vì giảm chi phí vận hành và vẫn giữ được tenant-aware data access. Hạn chế là mức cô lập vật lý giữa tenant chưa bằng database-per-tenant. Đây là trade-off có thể chấp nhận trong phạm vi hiện tại, đồng thời mở đường cho hybrid isolation nếu hệ thống cần phục vụ tenant lớn hơn hoặc yêu cầu tuân thủ nghiêm ngặt hơn.
+
+Cuối cùng, WebSocket được chọn để cải thiện realtime UX nhưng không được dùng làm source of truth. Thiết kế hint/refetch cho phép UI phản hồi nhanh khi có order, KDS, payment hoặc tenant lifecycle event, đồng thời vẫn cho phép client tái đồng bộ bằng REST/query khi mất kết nối. Đây là lựa chọn an toàn hơn so với việc để client tin tuyệt đối vào stream realtime trong một hệ thống có nhiều service và eventual consistency.
+
+Tóm lại, kiến trúc QRTable hướng tới sự cân bằng giữa tính tách biệt theo domain và khả năng triển khai/đánh giá trong phạm vi khóa luận. Các boundary quan trọng nhất là BFF single entry point, service/data ownership, tenant isolation, selective event-driven communication, Redis ownership rõ ràng, dual authentication model và two-tier payment architecture. Những phần như full saga hardening, deployment production-grade, observability đầy đủ và offline action queue được xem là hướng tăng cường hoặc nội dung đánh giá giới hạn, không phải claim đã chứng minh trong Chương 4.

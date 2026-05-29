@@ -1,7 +1,7 @@
 # Backlog artifact cho khóa luận QRTable
 
 > Tài liệu sống dùng để quản lý diagram, bảng, screenshot, demo evidence và phụ lục.
-> Cập nhật gần nhất: 2026-05-28.
+> Cập nhật gần nhất: 2026-05-29.
 
 ## 1. Mục đích
 
@@ -36,6 +36,16 @@ Mức ưu tiên:
 - `P1`: nên có nếu muốn tăng sức thuyết phục.
 - `P2`: đưa vào phụ lục hoặc làm sau nếu còn thời gian.
 
+## 2.1. Nguyên tắc đa dạng artifact theo chương
+
+Không chọn diagram chỉ để tạo cảm giác đa dạng. Mỗi artifact phải trả lời một câu hỏi đọc hiểu cụ thể và đúng mức trừu tượng của chương:
+
+- Chương 3 ưu tiên actor/use-case overview, business flow và state/requirement table để làm rõ phạm vi nghiệp vụ trước khi nói đến kiến trúc.
+- Chương 4 ưu tiên architecture/C4/container, service ownership, communication matrix, tenant isolation và decision flow để giải thích thiết kế hệ thống.
+- Chương 5 ưu tiên sequence/runtime flow, implemented evidence table và screenshot/demo artifact đại diện để chứng minh implementation đã hiện thực các flow chính.
+- Chương 6 ưu tiên traceability/evaluation/limitation table; chỉ dùng screenshot test output hoặc health check khi có artifact thật.
+- Chương 1-2 có thể dùng conceptual diagram/comparison table nhưng phải bám nguồn học thuật hoặc nguồn chính thức, không bám implementation QRTable để định nghĩa khái niệm phổ quát.
+
 ## 3. Artifact tối thiểu trong chương chính
 
 | ID       | Loại     | Vị trí   | Artifact                                            | Claim/vai trò hỗ trợ                                                                | Nguồn chính                                         | Trạng thái | Ưu tiên |
@@ -47,18 +57,19 @@ Mức ưu tiên:
 | Bảng 2.3 | Bảng     | Chương 2 | So sánh monolith, modular monolith và microservices | Đặt microservices vào bối cảnh trade-off, không trình bày một chiều                 | Fowler/Lewis, Azure Architecture Center, sách/paper | planned    | P0      |
 | Bảng 2.4 | Bảng     | Chương 2 | So sánh giao tiếp đồng bộ và bất đồng bộ            | Làm nền cho quyết định TCP/gRPC + Kafka có chọn lọc                                 | Kafka docs, microservices docs                      | planned    | P0      |
 | Hình 2.1 | Diagram  | Chương 2 | Mô hình khái niệm SaaS multi-tenancy                | Minh họa tenant, shared resources và isolation boundary ở mức lý thuyết             | NIST, SaaS architecture guidance                    | planned    | P1      |
-| Hình 3.1 | Diagram  | Chương 3 | Actor/use-case overview                             | Chuyển bối cảnh thành actor và use case hệ thống                                    | `docs/business-logic.md`, permission matrix         | planned    | P0      |
-| Bảng 3.1 | Bảng     | Chương 3 | Functional requirements theo domain                 | Chốt phạm vi chức năng theo actor/domain                                            | `docs/business-logic.md`, phase docs                | planned    | P0      |
-| Bảng 3.2 | Bảng     | Chương 3 | Non-functional requirements và tiêu chí đánh giá    | Làm cầu nối từ ISO/IEC 25010 sang Chương 6                                          | ISO/IEC 25010, evidence map                         | planned    | P0      |
-| Hình 3.2 | Diagram  | Chương 3 | Business flow từ khách hàng đến bếp và thanh toán   | Trình bày flow nghiệp vụ end-to-end trước khi vào kiến trúc                         | `docs/business-logic.md`                            | planned    | P0      |
-| Bảng 3.3 | Bảng     | Chương 3 | Actor, vai trò và quyền truy cập chính              | Tóm tắt RBAC và tenant-aware access ở mức yêu cầu                                   | `docs/architecture/permission-matrix.md`            | planned    | P0      |
-| Hình 4.1 | Diagram  | Chương 4 | Overall architecture                                | Chứng minh cấu trúc client -> BFF -> services -> infrastructure                     | `docs/technical-architecture.md`, `apps/`, `libs/`  | planned    | P0      |
-| Hình 4.2 | Diagram  | Chương 4 | C4/container diagram                                | Cho người đọc thấy container chính và boundary giữa frontend/backend/infrastructure | `docs/technical-architecture.md`, source tree       | planned    | P0      |
-| Bảng 4.1 | Bảng     | Chương 4 | Service ownership/data ownership                    | Chứng minh database-per-service và không cross-service DB ownership                 | `docs/technical-architecture.md`, `apps/*`          | planned    | P0      |
-| Bảng 4.2 | Bảng     | Chương 4 | Communication matrix                                | Giải thích HTTP/TCP/gRPC/Kafka/WebSocket/Webhook dùng ở đâu                         | `docs/technical-architecture.md`                    | planned    | P0      |
-| Bảng 4.3 | Bảng     | Chương 4 | Kafka topic registry                                | Tránh invent topic; làm rõ event-driven có chọn lọc                                 | `libs/constants`, queue docs/tests                  | planned    | P0      |
-| Hình 4.3 | Diagram  | Chương 4 | Multi-tenancy isolation diagram                     | Minh họa tenant boundary ở DB/cache/event/API                                       | `docs/technical-architecture.md`, evidence map      | planned    | P0      |
-| Hình 4.4 | Diagram  | Chương 4 | Kafka decision flow                                 | Giải thích khi nào dùng sync call, khi nào dùng event                               | `docs/technical-architecture.md`, evidence map      | planned    | P1      |
+| Hình 3.1 | Diagram  | Chương 3 | Actor/use-case overview                             | Chuyển bối cảnh thành actor và use case hệ thống                                    | `docs/business-logic.md`, permission matrix         | verified   | P0      |
+| Bảng 3.1 | Bảng     | Chương 3 | Actor, phạm vi truy cập và use case chính           | Tóm tắt RBAC/session actor và tenant-aware access ở mức yêu cầu                     | `docs/architecture/permission-matrix.md`            | verified   | P0      |
+| Bảng 3.2 | Bảng     | Chương 3 | Functional requirements theo domain                 | Chốt phạm vi chức năng theo actor/domain                                            | `docs/business-logic.md`, phase docs                | verified   | P0      |
+| Bảng 3.3 | Bảng     | Chương 3 | Non-functional requirements và tiêu chí đánh giá    | Làm cầu nối từ ISO/IEC 25010 sang Chương 6                                          | ISO/IEC 25010, evidence map                         | verified   | P0      |
+| Hình 3.2 | Diagram  | Chương 3 | Business flow từ khách hàng đến bếp và thanh toán   | Trình bày flow nghiệp vụ end-to-end trước khi vào kiến trúc                         | `docs/business-logic.md`                            | verified   | P0      |
+| Bảng 3.4 | Bảng     | Chương 3 | State machine nghiệp vụ chính                       | Tóm tắt lifecycle table/session/order/payment/KDS để chuẩn bị cho Chương 5-6        | `docs/business-logic.md`, traceability matrix       | verified   | P0      |
+| Hình 4.1 | Diagram  | Chương 4 | Overall architecture                                | Chứng minh cấu trúc client -> BFF -> services -> infrastructure                     | `docs/technical-architecture.md`, `apps/`, `libs/`  | verified   | P0      |
+| Hình 4.2 | Diagram  | Chương 4 | C4/container diagram                                | Cho người đọc thấy container chính và boundary giữa frontend/backend/infrastructure | `docs/technical-architecture.md`, source tree       | verified   | P0      |
+| Bảng 4.1 | Bảng     | Chương 4 | Service ownership/data ownership                    | Chứng minh database-per-service và không cross-service DB ownership                 | `docs/technical-architecture.md`, `apps/*`          | verified   | P0      |
+| Bảng 4.2 | Bảng     | Chương 4 | Communication matrix                                | Giải thích HTTP/TCP/gRPC/Kafka/WebSocket/Webhook dùng ở đâu                         | `docs/technical-architecture.md`                    | verified   | P0      |
+| Bảng 4.3 | Bảng     | Chương 4 | Kafka topic registry                                | Tránh invent topic; làm rõ event-driven có chọn lọc                                 | `libs/constants`, queue docs/tests                  | verified   | P0      |
+| Hình 4.3 | Diagram  | Chương 4 | Multi-tenancy isolation diagram                     | Minh họa tenant boundary ở DB/cache/event/API                                       | `docs/technical-architecture.md`, evidence map      | verified   | P0      |
+| Hình 4.4 | Diagram  | Chương 4 | Kafka decision flow                                 | Giải thích khi nào dùng sync call, khi nào dùng event                               | `docs/technical-architecture.md`, evidence map      | verified   | P1      |
 | Hình 5.1 | Sequence | Chương 5 | QR ordering sequence                                | Chứng minh flow customer QR/session/menu/cart/order đã được thiết kế/triển khai     | `docs/business-logic.md`, source code               | planned    | P0      |
 | Hình 5.2 | Sequence | Chương 5 | Order confirm và stock consistency sequence         | Nhấn mạnh Catalog sở hữu stock, Order không update DB Catalog trực tiếp             | `docs/business-logic.md`, Order/Catalog code        | planned    | P0      |
 | Hình 5.3 | Sequence | Chương 5 | KDS ticket lifecycle                                | Chứng minh luồng `order.confirmed` -> Kitchen/KDS/Realtime UI                       | Kitchen code, Kafka topic registry                  | planned    | P0      |
@@ -83,8 +94,8 @@ Mức ưu tiên:
 | Bảng 2.6  | Bảng          | Chương 2 | Quality attributes theo ISO/IEC 25010             | Nếu Chương 6 cần nền lý thuyết đánh giá NFR rõ hơn                            | ISO/IEC 25010                        | planned       | P1      |
 | Hình 3.3  | State machine | Chương 3 | Session state machine                             | Nếu flow QR/session có nhiều trạng thái cần làm rõ                            | `docs/business-logic.md`             | planned       | P1      |
 | Hình 3.4  | State machine | Chương 3 | Order/payment state machine                       | Nếu cần chuẩn bị cho Chương 5 và Chương 6                                     | `docs/business-logic.md`             | planned       | P1      |
-| Bảng 3.4  | Bảng          | Chương 3 | P0/P1/P2 requirements                             | Nếu cần phân cấp phạm vi chức năng trong bản nháp dài                         | Specs, traceability matrix           | planned       | P1      |
-| Bảng 3.5  | Bảng          | Chương 3 | Abuse case/threat ở mức yêu cầu                   | Nếu muốn làm phần security/tenant isolation chặt hơn                          | OWASP, permission matrix             | planned       | P2      |
+| Bảng 3.5  | Bảng          | Chương 3 | P0/P1/P2 requirements                             | Nếu cần phân cấp phạm vi chức năng trong bản nháp dài                         | Specs, traceability matrix           | planned       | P1      |
+| Bảng 3.6  | Bảng          | Chương 3 | Abuse case/threat ở mức yêu cầu                   | Nếu muốn làm phần security/tenant isolation chặt hơn                          | OWASP, permission matrix             | planned       | P2      |
 | Hình 4.5  | Diagram       | Chương 4 | ERD rút gọn theo service                          | Nếu cần minh họa data ownership mà không đưa ERD đầy đủ                       | `docs/architecture/erd.*`            | source-exists | P1      |
 | Hình 4.6  | Diagram       | Chương 4 | Nx dependency graph hoặc module boundary          | Nếu cần chứng minh monorepo/shared libs hỗ trợ maintainability                | Nx project graph, source tree        | planned       | P2      |
 | Hình 4.7  | Diagram       | Chương 4 | Redis key/domain ownership                        | Nếu cần giải thích cache/session/KDS queue boundary                           | `libs/common`, Redis policy/tests    | planned       | P1      |
@@ -149,12 +160,20 @@ Chương 5 chỉ nên dùng khoảng 8-12 screenshot đại diện. Phần còn 
 4. Không đổi artifact thành `verified` nếu chưa kiểm tra render PDF.
 5. Không thêm screenshot observability/deployment nếu chưa có artifact thật.
 6. Không dùng screenshot thay thế cho evidence kiến trúc; screenshot chỉ chứng minh UI/demo, không chứng minh scalability hay production readiness.
+7. Với Mermaid/PlantUML/draw.io, source text chỉ tương ứng trạng thái `drafted`; chỉ chuyển sang `inserted` khi đã render thành PDF/PNG/SVG phù hợp và chèn vào LaTeX.
+8. Không chèn trực tiếp Mermaid code vào `.tex` trừ khi template đã được cấu hình renderer rõ ràng; mặc định LaTeX chỉ chèn file đã render bằng `\includegraphics`.
+9. Nếu môi trường không render được diagram, giữ source trong `thesis-report/assets/diagrams/`, ghi command render thủ công và không đánh dấu artifact là `inserted` hoặc `verified`.
 
 ## 8. Bước tiếp theo cho backlog
 
-Sau khi Phase 1 LaTeX preflight xong, quay lại file này để:
+Phase 4B đã tạo và verify nhóm diagram/table P0 của Chương 4; Phase 4C đã viết bản nháp Chương 4 và giữ nguyên các artifact đó; Phase 4D đã bổ sung và verify nhóm artifact P0 còn thiếu của Chương 3:
 
-1. Dùng thư mục asset ổn định trong LaTeX project: `docs/graduation-thesis-resources/thesis-report/assets/figures/` và `docs/graduation-thesis-resources/thesis-report/assets/screenshots/`.
-2. Chọn tool vẽ diagram: Mermaid, PlantUML, draw.io hoặc LaTeX-native tùy mức cần chỉnh sửa.
-3. Tạo trước nhóm diagram P0 của Chương 3 và Chương 4 vì chúng quyết định mạch lập luận của khóa luận.
-4. Chỉ chụp screenshot sau khi UI/demo data ổn định, tránh phải chụp lại nhiều lần.
+1. Source Mermaid Chương 4 đã lưu tại `docs/graduation-thesis-resources/thesis-report/assets/diagrams/chapter4-*.mmd`.
+2. PDF render Chương 4 đã lưu tại `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter4-*.pdf`.
+3. Hình 4.1-4.4 và Bảng 4.1-4.3 đã được chèn vào `docs/graduation-thesis-resources/thesis-report/chapters/04-thiet-ke-va-kien-truc-he-thong.tex`.
+4. Build LaTeX cuối Phase 4C đã pass; Chương 4 hiện có nội dung prose/trade-off, không chỉ là artifact placeholder.
+5. Source Mermaid Chương 3 đã lưu tại `docs/graduation-thesis-resources/thesis-report/assets/diagrams/chapter3-actor-use-case-overview.mmd` và `docs/graduation-thesis-resources/thesis-report/assets/diagrams/chapter3-business-flow.mmd`.
+6. PDF render Chương 3 đã lưu tại `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter3-actor-use-case-overview.pdf` và `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter3-business-flow.pdf`.
+7. Hình 3.1, Hình 3.2 và Bảng 3.1-3.4 đã được build/kiểm tra trong PDF; `.lof`, `.lot`, `pdftotext` và preview PNG xác nhận caption, nguồn, số hiệu và nội dung không bị trắng.
+
+Bước tiếp theo là Phase 5A: audit implementation evidence cho Chương 5. Phase 5A không chỉ tạo một bảng audit chung; cần lập artifact plan cụ thể cho Chương 5 gồm năm sequence diagram P0 (`Hình 5.1`-`Hình 5.5`), implemented evidence table, shared library/consistency table nếu đủ evidence và screenshot/demo plan. Diagram Chương 5 nên là sequence/runtime flow vì mục tiêu là chứng minh implementation flow, không lặp lại architecture diagram của Chương 4.

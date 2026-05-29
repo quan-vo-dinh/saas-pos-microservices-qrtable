@@ -1,0 +1,72 @@
+@startuml chapter3-actor-use-case-overview
+' Hình 3.1 — Actor và nhóm use case chính (UML use case diagram)
+' Render: java -jar tools/plantuml.jar -charset UTF-8 -tpdf -o assets/figures assets/diagrams/chapter3-actor-use-case-overview.puml
+' (chạy từ thư mục thesis-report)
+
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #f0fdf4
+  BorderColor #16a34a
+}
+skinparam actor {
+  BackgroundColor #fff7ed
+  BorderColor #d97706
+}
+skinparam rectangle {
+  BorderColor #334155
+  FontStyle bold
+}
+
+left to right direction
+
+actor "Super Admin\n<<cross-tenant>>" as SuperAdmin
+actor "Restaurant Owner\n<<một tenant>>" as Owner
+actor "Manager\n<<một tenant>>" as Manager
+actor "Waiter / Staff POS\n<<vận hành sàn>>" as Waiter
+actor "Chef / Barista\n<<station bếp/bar>>" as KitchenStaff
+
+rectangle "«system» QRTable" as QRTable {
+  usecase "Quản lý SaaS lifecycle\ntenant · plan · subscription · quota" as UC_Platform
+  usecase "Quản lý catalog, bàn và QR\nmenu · khu vực · bàn · QR token" as UC_Catalog
+  usecase "Session, cart và order khách\njoin session · shared cart · submit order" as UC_Ordering
+  usecase "Vận hành POS\nconfirm order · bill · chuyển bàn · service request" as UC_Pos
+  usecase "Kitchen / KDS\nqueue station · ticket · recall · SLA" as UC_Kds
+  usecase "Thanh toán và đối soát\ncash · VietQR/SePay · refund" as UC_Payment
+}
+
+actor "Customer / Guest\n<<session QR — không RBAC DB>>" as Customer
+actor "Webhook SePay\n<<external>>\nQRTBL · QRSUB" as Sepay <<External>>
+
+SuperAdmin --> UC_Platform
+
+Owner --> UC_Platform
+Owner --> UC_Catalog
+Owner --> UC_Pos
+Owner --> UC_Kds
+Owner --> UC_Payment
+
+Manager --> UC_Platform : <<xem subscription/settings>>
+Manager --> UC_Catalog
+Manager --> UC_Pos
+Manager --> UC_Kds
+Manager --> UC_Payment
+
+Waiter --> UC_Pos
+Waiter --> UC_Payment
+
+KitchenStaff --> UC_Kds
+
+Customer --> UC_Ordering
+Customer --> UC_Payment : <<request bill · thanh toán bill>>
+
+Sepay --> UC_Payment : <<webhook đối soát>>
+
+note bottom of QRTable
+  **«note»** Tenant isolation
+  RBAC · session ownership
+end note
+
+@enduml
