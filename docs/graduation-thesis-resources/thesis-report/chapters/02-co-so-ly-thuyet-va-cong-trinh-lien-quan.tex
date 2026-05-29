@@ -1,19 +1,302 @@
 \chapter{Cơ sở lý thuyết và các công trình liên quan}
 
+Chương này trình bày nền tảng lý thuyết và bối cảnh công nghệ liên quan đến QRTable trước khi đi vào phân tích yêu cầu, thiết kế kiến trúc và triển khai hệ thống ở các chương sau. Trọng tâm của chương không phải là chứng minh QRTable đã triển khai từng cơ chế cụ thể, mà là làm rõ các khái niệm nền: POS trong lĩnh vực F\&B, đặt món qua mã QR, SaaS và multi-tenancy, microservices, event-driven architecture, nhất quán dữ liệu trong hệ thống phân tán, realtime communication và security trong SaaS POS.
+
+Các nguồn được sử dụng trong chương này được chia thành hai nhóm. Nhóm thứ nhất là nguồn học thuật, chuẩn hoặc tài liệu chính thức như NIST, ISO/IEC, RFC, OpenID, OWASP, Apache Kafka documentation và các sách/paper về microservices. Nhóm này được dùng để định nghĩa khái niệm và giải thích trade-off kỹ thuật. Nhóm thứ hai là nguồn thị trường hoặc tài liệu sản phẩm như KiotViet, Sapo, iPOS và NAPAS/VietQR. Nhóm này chỉ được dùng để minh họa hệ thống liên quan, bối cảnh sản phẩm và nhu cầu thực tiễn, không được dùng thay cho định nghĩa học thuật.
+
+Về mạch lập luận, Chương 2 đóng vai trò cầu nối giữa bài toán nghiệp vụ và quyết định thiết kế. Các khái niệm về POS và QR ordering giúp giải thích vì sao hệ thống phải xử lý bàn, phiên gọi món, order, bếp và thanh toán như một chuỗi nghiệp vụ thống nhất. Các khái niệm về SaaS, multi-tenancy và security giải thích vì sao tenant isolation, RBAC và phân tách dữ liệu là yêu cầu cốt lõi. Các khái niệm về microservices, Kafka, WebSocket, idempotency và saga giúp đặt nền cho các quyết định kiến trúc ở Chương 4, nhưng chương này không claim rằng mọi pattern đó đã được triển khai đầy đủ ở mức production.
+
 \section{Tổng quan về POS trong lĩnh vực F\&B}
+
+POS (\textit{Point of Sale}) trong bối cảnh nhà hàng không chỉ là điểm thu ngân hoặc phần mềm ghi nhận giao dịch bán hàng. Đối với lĩnh vực F\&B, POS thường nằm ở trung tâm của nhiều hoạt động vận hành: tiếp nhận order, quản lý thực đơn, theo dõi bàn, điều phối bếp, xử lý thanh toán, đối soát doanh thu và hỗ trợ quản trị nhân sự hoặc chi nhánh. Khác với bán lẻ đơn giản, một phiên phục vụ nhà hàng có thể kéo dài qua nhiều lần gọi món, nhiều thiết bị thao tác cùng lúc, nhiều trạng thái bàn và một thời điểm thanh toán cuối phiên.
+
+Đặc thù đầu tiên của POS F\&B là dữ liệu gắn với không gian phục vụ. Bàn, khu vực, quầy bar, bếp nóng hoặc bếp lạnh đều ảnh hưởng đến cách order được tiếp nhận và xử lý. Một bàn có thể đang trống, đang có khách, đang gọi món, đang thanh toán hoặc đang cần dọn dẹp. POS vì vậy phải hiểu trạng thái của bàn chứ không chỉ lưu một hóa đơn độc lập.
+
+Đặc thù thứ hai là order trong nhà hàng thường có vòng đời dài hơn một giao dịch bán lẻ. Khách có thể gọi thêm món nhiều lần, nhân viên có thể cần xác nhận order trước khi đưa vào bếp, bếp có thể xử lý từng nhóm món theo station, và món có thể chuyển qua nhiều trạng thái trước khi được phục vụ. Do đó, một hệ thống POS F\&B cần mô hình hóa order, order item, kitchen ticket và bill như các thực thể có trạng thái thay vì chỉ là một dòng giao dịch.
+
+Đặc thù thứ ba là thanh toán có thể diễn ra sau khi nhiều order con đã phát sinh. Việc tổng hợp bill, áp dụng phương thức thanh toán, ghi nhận trạng thái trả tiền và giải phóng bàn phải nhất quán với trạng thái order và bàn. Trong bối cảnh Việt Nam, thanh toán QR/chuyển khoản qua VietQR cũng là một ngữ cảnh thực tiễn đáng chú ý; NAPAS mô tả VietQR trong dịch vụ chuyển tiền nhanh 24/7 như một dạng mã QR dùng cho thông tin chuyển tiền ngân hàng \cite{napas-fastfund-vietqr}. Tuy nhiên, việc hỗ trợ VietQR ở mức sản phẩm không tự động chứng minh một hệ thống đã có settlement, reconciliation hoặc webhook security đầy đủ; các cơ chế đó phải được thiết kế và đánh giá riêng.
+
+Bảng~\ref{tab:chapter2-pos-qr-comparison} tóm tắt sự khác biệt giữa POS truyền thống ở mức thu ngân và mô hình SaaS POS tích hợp QR ordering mà khóa luận hướng đến. Bảng này không nhằm khẳng định một mô hình luôn tốt hơn mô hình kia trong mọi bối cảnh, mà chỉ làm rõ vì sao QRTable cần xử lý nhiều ràng buộc hơn một ứng dụng menu điện tử đơn giản.
+
+{\footnotesize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.21\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}}
+  \caption{So sánh POS truyền thống và SaaS POS tích hợp QR ordering trong bối cảnh F\&B.}
+  \label{tab:chapter2-pos-qr-comparison}\\
+  \toprule
+  Khía cạnh & POS truyền thống thiên về thu ngân & SaaS POS tích hợp QR ordering \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Khía cạnh & POS truyền thống thiên về thu ngân & SaaS POS tích hợp QR ordering \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Điểm bắt đầu nghiệp vụ & Nhân viên nhập order hoặc hóa đơn tại quầy/POS. & Khách có thể tự bắt đầu phiên gọi món bằng cách quét QR tại bàn. \\
+  \addlinespace
+  Phạm vi trạng thái & Thường tập trung vào order, hóa đơn và thanh toán. & Cần gắn order với tenant, bàn, session, shared cart, KDS, bill và payment lifecycle. \\
+  \addlinespace
+  Vai trò người dùng & Chủ yếu là nhân viên, quản lý và chủ cửa hàng. & Có thêm customer anonymous/session-scoped và platform-level Super Admin trong mô hình SaaS. \\
+  \addlinespace
+  Đồng bộ vận hành & Nhân viên là trung gian chính giữa khách và bếp. & Cần đồng bộ trực tiếp giữa Customer PWA, POS, KDS và payment thông qua API/realtime. \\
+  \addlinespace
+  Triển khai & Có thể là phần mềm cài đặt riêng hoặc dịch vụ độc lập cho từng cửa hàng. & Nhiều nhà hàng dùng chung nền tảng, yêu cầu tenant isolation, subscription và quota. \\
+  \addlinespace
+  Rủi ro kỹ thuật nổi bật & Sai sót nhập liệu, đồng bộ ca, lỗi tính tiền hoặc báo cáo. & QR giả/sai bàn, session leakage, duplicate order, webhook trùng, cross-tenant data leak. \\
+\end{longtable}
+}
+
+Từ góc nhìn nghiên cứu phần mềm, vấn đề không nằm ở việc số hóa menu bằng QR code đơn lẻ, mà ở việc tích hợp QR ordering vào một POS vận hành đầy đủ. Một mã QR chỉ là điểm vào; hệ thống phía sau mới quyết định việc nhận diện bàn, ràng buộc session, cập nhật giỏ hàng chung, xác nhận order, điều phối bếp và thanh toán có nhất quán hay không.
 
 \section{Đặt món qua mã QR}
 
+QR code là một dạng mã vạch hai chiều được chuẩn hóa. ISO/IEC 18004:2024 mô tả QR code ở mức symbology, bao gồm đặc tính mã, phương pháp mã hóa ký tự, định dạng symbol, đặc tính kích thước, quy tắc sửa lỗi và các tham số ứng dụng \cite{iso-iec-18004-2024}. Trong bối cảnh F\&B, QR code thường được dùng như một đường dẫn để khách truy cập menu điện tử hoặc phiên gọi món của một bàn.
+
+Một hệ thống QR ordering cơ bản có thể chỉ cần hiển thị menu sau khi khách quét mã. Tuy nhiên, QR ordering trong POS nhà hàng có nhiều yêu cầu hơn. Mã QR phải xác định đúng tenant và bàn, token phải chống việc sửa URL tùy tiện, hệ thống phải biết khi nào tạo session mới hoặc cho khách tham gia session đang tồn tại, và các thao tác trên giỏ hàng phải được đồng bộ giữa nhiều thiết bị của cùng bàn. Nếu nhiều khách cùng quét một mã QR, họ không nên tạo ra nhiều phiên bàn độc lập gây trùng order hoặc chia sai bill.
+
+Lợi ích thực tiễn của QR ordering là giảm thao tác trung gian của nhân viên, giúp khách truy cập menu nhanh hơn và hỗ trợ gọi thêm món trong lúc đang dùng bữa. Các nền tảng POS F\&B tại Việt Nam đã cung cấp hoặc mô tả các luồng gọi món qua QR trong tài liệu sản phẩm, ví dụ KiotViet hướng dẫn chức năng gọi món qua mã QR \cite{kiotviet-qr-order-doc}, còn iPOS mô tả giải pháp O2O/QR ordering cho vận hành nhà hàng \cite{ipos-o2o-qr-order}. Những nguồn này cho thấy QR ordering là nhu cầu sản phẩm thực tế, nhưng không phải bằng chứng học thuật rằng mọi hệ thống QR ordering đều đúng, an toàn hoặc phù hợp với microservices.
+
+Thách thức quan trọng của QR ordering là xác thực ngữ cảnh. Khác với staff đăng nhập bằng tài khoản, customer thường không muốn tạo tài khoản chỉ để gọi món tại bàn. Vì vậy, hệ thống phải cân bằng giữa trải nghiệm không ma sát và kiểm soát bảo mật. QR token, session token, rate limit, table state và tenant context trở thành các lớp kiểm soát thay cho mô hình đăng nhập truyền thống.
+
+Thách thức thứ hai là chống tác dụng phụ trùng lặp. Mạng di động có thể chập chờn, khách có thể bấm gửi lại, trình duyệt có thể retry request, hoặc nhiều khách cùng bàn có thể thao tác gần như đồng thời. Nếu hệ thống không có idempotency key hoặc cart version, cùng một order có thể bị tạo nhiều lần hoặc giỏ hàng có thể bị ghi đè. Vì vậy, QR ordering không thể chỉ được thiết kế như một form submit đơn giản.
+
+Thách thức thứ ba là liên kết realtime với nguồn trạng thái có thẩm quyền. Khách và nhân viên đều mong muốn thấy trạng thái order hoặc bếp cập nhật nhanh, nhưng kênh realtime không nên trở thành nơi quyết định trạng thái nghiệp vụ cuối cùng. Thiết kế an toàn hơn là dùng realtime notification để báo client refetch snapshot từ API/service owner. Nguyên tắc này sẽ được nối với WebSocket ở mục~\ref{sec:chapter2-realtime}.
+
 \section{SaaS và multi-tenancy}
+
+NIST định nghĩa cloud computing là mô hình cho phép truy cập mạng thuận tiện, theo nhu cầu, tới một nhóm tài nguyên tính toán dùng chung có thể được cấp phát và thu hồi nhanh với ít công sức quản trị \cite{nist-sp800145-2011}. Trong các service model của cloud computing, SaaS cho phép người dùng sử dụng ứng dụng của nhà cung cấp chạy trên hạ tầng cloud mà không quản trị trực tiếp hạ tầng, hệ điều hành hoặc phần lớn thành phần nền bên dưới. Đối với QRTable, ý nghĩa thực tiễn của SaaS là nhiều nhà hàng có thể sử dụng cùng một nền tảng POS thay vì mỗi nhà hàng tự triển khai một hệ thống riêng.
+
+Multi-tenancy là vấn đề trung tâm của SaaS. Một tenant có thể hiểu là một đơn vị khách hàng hoặc tổ chức sử dụng hệ thống như một phạm vi vận hành riêng. Trong QRTable, một tenant tương ứng với một nhà hàng hoặc chuỗi nhà hàng trong phạm vi đề tài. Tenant có dữ liệu riêng về menu, bàn, nhân sự, order, payment settings, subscription và trạng thái vận hành. Dù nhiều tenant dùng chung codebase và hạ tầng, dữ liệu và quyền truy cập của họ phải được cô lập.
+
+Multi-tenancy không chỉ là một quyết định database. Nó liên quan đến API, authentication, authorization, cache, event, realtime room, file upload và cả payment reference. Nếu chỉ lọc tenant ở database nhưng cache key hoặc WebSocket room không có tenant namespace, hệ thống vẫn có nguy cơ lộ dữ liệu chéo tenant. Vì vậy, tenant isolation phải được xem là invariant xuyên suốt kiến trúc.
+
+Microsoft Azure Architecture Center mô tả khi thiết kế storage/data cho multitenant systems cần quyết định mức chia sẻ hoặc cô lập dữ liệu giữa tenant, đồng thời có thể chọn một pattern nhất quán hoặc kết hợp nhiều pattern tùy quy mô và yêu cầu \cite{microsoft-multitenant-storage-data-2026}. Bảng~\ref{tab:chapter2-multitenancy-models} tóm tắt một số mô hình phổ biến ở mức khái niệm.
+
+{\footnotesize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.23\textwidth}}
+  \caption{So sánh các mô hình lưu trữ dữ liệu trong multi-tenancy.}
+  \label{tab:chapter2-multitenancy-models}\\
+  \toprule
+  Mô hình & Đặc điểm & Ưu điểm & Hạn chế / rủi ro \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Mô hình & Đặc điểm & Ưu điểm & Hạn chế / rủi ro \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Shared database, shared schema & Nhiều tenant dùng chung database/schema; bảng có cột phân biệt tenant như \texttt{tenant\_id}. & Chi phí vận hành thấp, migration đơn giản, phù hợp giai đoạn đầu. & Cần guard/query filter nghiêm ngặt; lỗi tenant filter có thể gây rò rỉ dữ liệu. \\
+  \addlinespace
+  Shared database, schema-per-tenant & Tenant dùng chung database server nhưng có schema riêng. & Cô lập tốt hơn ở lớp schema, dễ backup/migration theo tenant hơn shared schema. & Số lượng schema lớn làm migration và vận hành phức tạp. \\
+  \addlinespace
+  Database-per-tenant & Mỗi tenant có database riêng. & Cô lập vật lý cao hơn, dễ đáp ứng yêu cầu compliance hoặc khách hàng lớn. & Chi phí và automation vận hành cao; khó tối ưu tài nguyên cho nhiều tenant nhỏ. \\
+  \addlinespace
+  Hybrid / deployment stamp & Kết hợp nhiều mức cô lập, ví dụ tenant nhỏ dùng shared model, tenant lớn dùng isolated deployment. & Linh hoạt theo gói dịch vụ, quy mô và yêu cầu đặc biệt của tenant. & Kiến trúc và automation phức tạp hơn; cần quản trị lifecycle rõ. \\
+\end{longtable}
+}
+
+Trong một SaaS POS cho F\&B, việc chọn mô hình multi-tenancy phải cân bằng giữa chi phí, độ phức tạp và mức cô lập. Với hệ thống khóa luận hoặc giai đoạn sản phẩm ban đầu, shared schema có \texttt{tenant\_id} kết hợp kiểm soát ở API/cache/event có thể là lựa chọn thực dụng. Với quy mô lớn hơn, tenant có yêu cầu compliance cao hoặc dữ liệu nhạy cảm hơn, database-per-tenant hoặc hybrid có thể phù hợp hơn. Điều quan trọng là khóa luận không nên trình bày multi-tenancy như một lựa chọn duy nhất; mỗi mô hình đều có trade-off.
+
+Ngoài data isolation, SaaS còn đặt ra bài toán tenant lifecycle. Tenant cần được tạo, cấu hình owner, gói dịch vụ, quota, payment settings và trạng thái hoạt động. Khi tenant bị suspend, hệ thống phải xác định thao tác nào bị chặn, thao tác nào vẫn được xử lý để không làm mất trạng thái tiền/order đã phát sinh. Đây là điểm khác biệt giữa một ứng dụng POS đơn lẻ và nền tảng SaaS POS có quản trị tenant.
 
 \section{Kiến trúc microservices}
 
+Microservices là một phong cách kiến trúc trong đó hệ thống được tổ chức thành nhiều service nhỏ, mỗi service chạy trong tiến trình riêng, giao tiếp qua cơ chế nhẹ và có thể được triển khai độc lập theo năng lực nghiệp vụ. Lewis và Fowler nhấn mạnh các đặc trưng như service theo business capability, tự động hóa triển khai, decentralized data management và thiết kế hướng failure \cite{lewis-fowler-microservices-2014}. Trong ngữ cảnh QRTable, microservices được xem là cách tách các bounded context như Catalog, Order, Kitchen, Payment, SaaS và User-Access.
+
+Lợi ích chính của microservices không phải là hiệu năng tự động cao hơn. Lợi ích quan trọng hơn là làm rõ ownership và giảm coupling theo domain. Catalog sở hữu menu, bàn và stock; Order sở hữu session, cart, order và bill; Payment sở hữu settlement và refund; Kitchen sở hữu KDS runtime projection; SaaS sở hữu tenant lifecycle và subscription. Khi ownership rõ, các invariant nghiệp vụ có nơi đặt cụ thể, ví dụ chỉ Catalog được quyết định stock, chỉ Order được quyết định vòng đời order/bill, chỉ Payment được quyết định trạng thái payment record.
+
+Newman nhấn mạnh việc thiết kế ranh giới service phải quan tâm đến coupling, cohesion và khả năng thay đổi độc lập \cite{newman-building-microservices-2021}. Nếu chia service theo layer kỹ thuật như controller/service/repository hoặc theo tên bảng thay vì domain, hệ thống vẫn có coupling cao nhưng lại gánh thêm chi phí phân tán. Vì vậy, microservices cần đi cùng service boundary có nghĩa nghiệp vụ, không chỉ là nhiều thư mục hoặc nhiều container.
+
+Richardson mô tả các pattern quan trọng trong microservices như database-per-service, saga và transactional messaging \cite{richardson-microservices-patterns-2018}. Database-per-service giúp mỗi service kiểm soát dữ liệu và schema của mình, nhưng đổi lại các truy vấn hoặc transaction xuyên service trở nên khó hơn. Hệ thống phải chọn giữa giao tiếp đồng bộ, event bất đồng bộ, replicated read model, saga hoặc outbox tùy tình huống. Đây là lý do microservices phù hợp với bài toán nhiều bounded context nhưng cũng tạo distributed complexity.
+
+Các trade-off chính của microservices gồm:
+
+\begin{itemize}
+  \item \textbf{Độ phức tạp giao tiếp}: thay vì gọi hàm trong cùng process, service phải xử lý network failure, timeout, retry và serialization.
+  \item \textbf{Nhất quán dữ liệu}: transaction ACID trong một database không còn bao phủ toàn bộ flow xuyên service.
+  \item \textbf{Quan sát lỗi phân tán}: lỗi có thể nằm ở producer, consumer, broker, cache, gateway hoặc downstream service.
+  \item \textbf{Chi phí vận hành}: nhiều service cần cấu hình, deploy, logging, health check, versioning và contract management.
+\end{itemize}
+
+Do đó, một khóa luận không nên dùng microservices như một khẩu hiệu. Quyết định dùng microservices chỉ thuyết phục khi có các domain thực sự khác nhau, có ownership dữ liệu riêng và có lý do bảo trì/mở rộng rõ. Với QRTable, cơ sở lập luận là hệ thống có nhiều domain vận hành độc lập tương đối: tenant lifecycle, catalog/table/QR, order/session/bill, kitchen queue, payment settlement và user access.
+
 \section{Event-driven architecture và Kafka}
+
+Event-driven architecture tổ chức hệ thống quanh các sự kiện biểu diễn việc đã xảy ra trong domain, ví dụ order đã được xác nhận hoặc payment đã hoàn tất. Thay vì service A gọi trực tiếp service B để thực hiện mọi side effect, service A có thể publish event và các consumer liên quan xử lý bất đồng bộ. Cách tiếp cận này tạo temporal decoupling: producer không cần biết consumer đang chạy ngay lúc đó hoặc có bao nhiêu consumer cùng quan tâm tới event.
+
+Apache Kafka là một nền tảng distributed event streaming. Documentation chính thức của Kafka trình bày các khái niệm như event/record, topic, producer, consumer, partition và consumer group \cite{apache-kafka-docs-2026}. Producer ghi event vào topic; consumer đọc event từ topic; partition giúp chia dữ liệu và xử lý song song; consumer group giúp nhiều instance cùng xử lý một tập event theo cách phối hợp.
+
+Kafka phù hợp với các tình huống cần lưu và truyền event bền vững, fan-out đến nhiều consumer, xử lý bất đồng bộ hoặc khôi phục consumer sau downtime. Trong QRTable, ví dụ điển hình là khi order đã được xác nhận, Kitchen có thể tạo KDS ticket từ event \texttt{order.confirmed}; hoặc khi payment completed, hệ thống có thể phát event để các thành phần liên quan cập nhật trạng thái hoặc realtime hint. Producer không nhất thiết phải chờ tất cả side effect hoàn thành trước khi trả response cho người dùng.
+
+Tuy nhiên, Kafka không nên được dùng thay cho mọi lời gọi đồng bộ. Nếu một command cần biết kết quả ngay để quyết định transaction, ví dụ Order cần biết Catalog có trừ stock thành công hay không trước khi chuyển order sang trạng thái processing, RPC đồng bộ thường phù hợp hơn. Nếu thao tác chỉ là UI notification sau khi BFF đã có response, WebSocket/BFF direct có thể đơn giản hơn Kafka. Nếu dùng Kafka cho mọi việc, hệ thống có thể tăng latency, khó debug và làm mờ transaction boundary.
+
+Bảng~\ref{tab:chapter2-sync-async-communication} so sánh giao tiếp đồng bộ và bất đồng bộ trong microservices. Bảng này là nền cho decision framework ở Chương 4, nơi QRTable chọn TCP/gRPC cho command/query cần phản hồi và Kafka cho domain event/side effect bất đồng bộ.
+
+{\footnotesize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}}
+  \caption{So sánh giao tiếp đồng bộ và bất đồng bộ trong microservices.}
+  \label{tab:chapter2-sync-async-communication}\\
+  \toprule
+  Khía cạnh & Giao tiếp đồng bộ & Giao tiếp bất đồng bộ / event-driven \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Khía cạnh & Giao tiếp đồng bộ & Giao tiếp bất đồng bộ / event-driven \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Mục tiêu chính & Lấy kết quả ngay cho command/query. & Phát sinh event để consumer xử lý sau hoặc xử lý song song. \\
+  \addlinespace
+  Coupling thời gian & Caller và callee cần sẵn sàng cùng thời điểm. & Producer và consumer tách nhau hơn về thời gian. \\
+  \addlinespace
+  Ví dụ phù hợp & Validate QR, lấy menu, trừ stock khi xác nhận order, lấy bill snapshot. & Tạo KDS ticket sau order confirmed, fan-out payment completed, cảnh báo SLA. \\
+  \addlinespace
+  Ưu điểm & Dễ hiểu, dễ trả lỗi tức thời, phù hợp với transaction boundary cần quyết định ngay. & Decoupling tốt hơn, mở rộng consumer, hỗ trợ replay/recovery tùy cấu hình broker. \\
+  \addlinespace
+  Hạn chế & Dễ lan truyền lỗi/timeout, coupling runtime cao hơn. & Khó debug hơn, cần idempotent consumer, eventual consistency và monitoring tốt. \\
+  \addlinespace
+  Guardrail trong QRTable & Không dùng để fan-out side effect không cần chờ. & Không dùng để thay thế mọi RPC hoặc làm source of truth của UI. \\
+\end{longtable}
+}
+
+Một điểm cần nhấn mạnh là event không thay thế database transaction. Kafka có thể giúp truyền đạt rằng một việc đã xảy ra, nhưng tính đúng đắn của nghiệp vụ vẫn phụ thuộc vào transaction boundary và service owner. Nếu Order publish event trước khi database commit, hoặc commit database nhưng fail publish event, hệ thống có nguy cơ dual-write. Vì vậy, các pattern như transactional outbox thường được dùng để giảm rủi ro giữa database write và event publishing \cite{richardson-microservices-patterns-2018}. Chương 4 và Chương 5 sẽ chỉ claim mức QRTable đã triển khai khi có bằng chứng source/test tương ứng.
 
 \section{Data consistency, idempotency và distributed transaction patterns}
 
+Trong monolith dùng một database duy nhất, nhiều thao tác có thể được bao phủ bởi một transaction ACID. Trong microservices, mỗi service sở hữu database riêng nên transaction xuyên service không còn đơn giản. Ví dụ, xác nhận order trong QRTable liên quan đến Order DB, Catalog stock, Kafka event và Kitchen projection. Nếu cố gắng gom tất cả vào một transaction phân tán, hệ thống sẽ phức tạp và phụ thuộc hạ tầng hơn; nếu tách rời hoàn toàn, hệ thống phải chấp nhận eventual consistency và thiết kế compensation phù hợp.
+
+Data consistency trong microservices vì vậy cần được hiểu theo từng invariant nghiệp vụ. Invariant stock thuộc Catalog; invariant order lifecycle thuộc Order; invariant payment settlement thuộc Payment; invariant tenant lifecycle thuộc SaaS. Mỗi service nên đảm bảo tính nhất quán mạnh trong phạm vi dữ liệu mình sở hữu. Khi cần phối hợp với service khác, hệ thống dùng RPC, event, outbox, saga hoặc compensation tùy tính chất thao tác.
+
+Idempotency là khả năng xử lý một yêu cầu lặp lại mà không tạo thêm tác dụng phụ ngoài lần xử lý đầu tiên. Trong QR ordering, idempotency cần cho order submit vì khách hoặc browser có thể gửi request lặp. Trong payment, idempotency cần cho webhook vì provider có thể gửi lại cùng một thông báo. Trong event-driven flow, idempotency cần cho consumer vì cùng một event có thể được xử lý lại khi retry hoặc rebalance.
+
+Saga là một pattern cổ điển cho long-lived transaction. Garcia-Molina và Salem giới thiệu saga như một chuỗi transaction con, trong đó mỗi bước có thể có transaction bù trừ nếu cần rollback logic nghiệp vụ \cite{garcia-molina-sagas-1987}. Trong microservices hiện đại, saga thường được diễn đạt như orchestration hoặc choreography giữa nhiều service. Tuy nhiên, saga không phải là cách làm cho mọi thao tác; nó phù hợp với quy trình dài, nhiều bước, có compensation rõ và chấp nhận trạng thái trung gian.
+
+Outbox là một pattern thường đi cùng event-driven systems. Ý tưởng cơ bản là ghi thay đổi nghiệp vụ và message cần publish vào cùng database transaction của service owner; sau đó một worker publish message từ outbox ra broker. Pattern này giảm rủi ro giữa commit database và publish event, nhưng vẫn cần xử lý duplicate publish, consumer idempotency và monitoring hàng đợi outbox.
+
+Đối với QRTable, các khái niệm này tạo nền cho ba guardrail:
+
+\begin{itemize}
+  \item Không dùng Kafka để thay thế transaction nghiệp vụ nội bộ của service owner.
+  \item Không viết webhook hoặc event consumer như thao tác chỉ chạy đúng một lần.
+  \item Không claim saga/outbox production-grade nếu mới có baseline hoặc thiết kế mà chưa có kiểm chứng đầy đủ.
+\end{itemize}
+
+Những guardrail này đặc biệt quan trọng trong payment và stock. Payment sai có thể ảnh hưởng đến tiền; stock sai có thể làm nhà hàng bán món đã hết hoặc từ chối món còn hàng; duplicate order có thể làm bếp xử lý trùng. Vì vậy, các cơ chế consistency/idempotency không phải tối ưu phụ, mà là yêu cầu correctness.
+
 \section{Real-time communication}
+\label{sec:chapter2-realtime}
+
+WebSocket là giao thức cho phép giao tiếp hai chiều giữa client và server qua một kết nối TCP. RFC 6455 mô tả WebSocket như một giải pháp thay thế polling HTTP cho các ứng dụng web cần giao tiếp hai chiều, thời gian thực hơn giữa trang web và server \cite{fette-websocket-rfc6455-2011}. Trong F\&B POS, realtime communication thường được dùng để cập nhật order mới cho nhân viên, ticket mới cho bếp, trạng thái món cho khách hoặc cảnh báo thanh toán.
+
+Lợi ích của realtime là giảm độ trễ nhận biết trên giao diện. Nếu customer submit order, POS có thể nhận thông báo ngay để nhân viên xác nhận. Nếu order được xác nhận, KDS có thể nhận hint để refetch queue. Nếu payment hoàn tất, POS hoặc customer UI có thể biết cần cập nhật bill/table state. Với trải nghiệm vận hành nhà hàng, các cập nhật này giúp giảm việc nhân viên phải bấm refresh thủ công.
+
+Tuy nhiên, realtime communication không đồng nghĩa với source of truth. Kết nối WebSocket có thể bị mất, client có thể offline, event có thể đến trễ, hoặc user có thể mở lại trình duyệt sau một khoảng thời gian. Nếu UI tin tuyệt đối vào event payload mà không refetch state từ backend, trạng thái hiển thị có thể lệch với database/service owner. Vì vậy, một pattern an toàn là dùng WebSocket như notification hoặc invalidation hint: client nhận event, sau đó refetch snapshot từ API.
+
+Trong SaaS nhiều tenant, realtime còn cần kiểm soát room/namespace. Staff của tenant A không được nhận event của tenant B; customer của bàn này không được nhận event của bàn khác. Do đó, WebSocket phải gắn với tenant/session/table context và guard chain tương ứng. Đây là lý do realtime không thể được thiết kế tách khỏi tenant isolation và authorization.
+
+Một điểm khác là realtime không thay thế queue hoặc broker. WebSocket phù hợp để đẩy thông báo tới client đang kết nối. Kafka phù hợp hơn cho domain event bền vững giữa backend services. Redis có thể phù hợp cho runtime queue hoặc pub/sub nội bộ. Việc chọn sai công cụ có thể làm hệ thống khó vận hành: dùng WebSocket để lưu event bền vững sẽ mất dữ liệu khi client offline; dùng Kafka chỉ để báo UI refetch sau một response HTTP có thể làm hệ thống nặng hơn cần thiết.
 
 \section{Authentication, authorization và security trong SaaS POS}
 
+Authentication trả lời câu hỏi người gọi là ai; authorization trả lời người đó có được phép thực hiện hành động hay không. Trong SaaS POS, hai câu hỏi này phải luôn đi cùng tenant context. Một Owner có quyền trong tenant của mình không có nghĩa người đó có quyền xem dữ liệu của tenant khác. Một Staff có quyền xác nhận order không nhất thiết có quyền cập nhật payment settings hoặc subscription.
+
+JWT là một format token dùng để truyền claims dưới dạng JSON và có thể được ký hoặc bảo vệ toàn vẹn theo các cơ chế JOSE. RFC 7519 định nghĩa JWT như một cách biểu diễn claims gọn cho môi trường hạn chế về kích thước như HTTP Authorization header hoặc URI query parameter \cite{jones-jwt-rfc7519-2015}. Trong các hệ thống web hiện đại, JWT thường được dùng như access token hoặc identity token, nhưng token chỉ an toàn khi được kiểm tra issuer, audience, expiration, signature và các claims cần thiết theo ngữ cảnh ứng dụng.
+
+OpenID Connect là identity layer xây trên OAuth 2.0, cho phép client xác minh danh tính end-user dựa trên quá trình authentication do authorization server thực hiện, đồng thời nhận thông tin profile cơ bản theo cách interoperable \cite{openid-connect-core-2023}. Với QRTable, nhóm staff/owner/admin có thể dùng Keycloak/OIDC/JWT để đăng nhập và gọi các API protected. Tuy nhiên, customer quét QR tại bàn không nhất thiết là một user account trong hệ thống IAM; customer nên được mô hình hóa như actor theo session.
+
+Authorization trong POS thường dùng RBAC (\textit{Role-Based Access Control}) vì vai trò vận hành khá rõ: Super Admin, Owner, Manager, Waiter, Chef/Barista. RBAC giúp gắn permission với role thay vì kiểm tra rời rạc ở từng màn hình. Tuy nhiên, UI navigation chỉ là lớp hỗ trợ trải nghiệm. Enforcement phải nằm ở backend guard/API vì client có thể bị bypass.
+
+OWASP ASVS cung cấp một chuẩn tham chiếu để kiểm tra các yêu cầu security của ứng dụng, bao gồm authentication, session management, access control, validation và nhiều nhóm kiểm soát khác \cite{owasp-asvs-2026}. Trong khóa luận này, ASVS được dùng như nguồn nền để diễn đạt các nhóm rủi ro và nguyên tắc kiểm soát, không phải để claim QRTable đã đạt một level ASVS cụ thể nếu chưa có audit tương ứng.
+
+Security trong SaaS POS còn bao gồm các rủi ro riêng:
+
+\begin{itemize}
+  \item \textbf{Cross-tenant access}: user hoặc request của tenant này truy cập dữ liệu tenant khác.
+  \item \textbf{QR/session abuse}: QR bị sửa, scan spam, session token bị dùng sai bàn hoặc sai tenant.
+  \item \textbf{Payment webhook abuse}: webhook giả, duplicate webhook, underpaid payment hoặc reference không khớp.
+  \item \textbf{Secret exposure}: token, webhook secret, OAuth state hoặc payment settings bị lộ ra frontend/log.
+  \item \textbf{Privilege escalation}: staff role được cấp nhầm quyền owner/platform.
+\end{itemize}
+
+ISO/IEC 25010:2023 đặt security là một thuộc tính chất lượng trong product quality model, cùng với các thuộc tính như reliability, maintainability và performance efficiency \cite{iso-iec-25010-2023}. Điều này giúp Chương 3 và Chương 6 diễn đạt security không chỉ như tính năng đăng nhập, mà là một yêu cầu chất lượng xuyên suốt thiết kế và đánh giá.
+
 \section{Các hệ thống và công trình liên quan}
+
+Phần này xem xét các hệ thống/sản phẩm và nguồn liên quan ở mức phù hợp với phạm vi khóa luận. Vì QRTable là đề tài xây dựng hệ thống phần mềm ứng dụng, related work không chỉ gồm paper học thuật mà còn gồm các nền tảng POS/QR ordering thực tế trong thị trường Việt Nam. Tuy nhiên, cần phân biệt rõ: nguồn sản phẩm chỉ cho thấy chức năng tồn tại trên thị trường hoặc cách nhà cung cấp mô tả giải pháp; chúng không chứng minh claim học thuật về kiến trúc, hiệu năng, bảo mật hoặc độ tin cậy.
+
+KiotViet có tài liệu hướng dẫn gọi món qua mã QR trong ngữ cảnh F\&B \cite{kiotviet-qr-order-doc}. Nguồn này cho thấy một hướng triển khai phổ biến: khách quét QR để xem thực đơn/gọi món, còn nhà hàng quản lý đơn trong hệ thống POS. Sapo mô tả phần mềm quản lý nhà hàng/quán ăn với các chức năng vận hành như quản lý order, bàn, thanh toán và báo cáo \cite{sapo-fnb-restaurant-pos}. iPOS mô tả giải pháp O2O/QR ordering nhằm tối ưu thao tác order trong nhà hàng \cite{ipos-o2o-qr-order}. Các hệ thống này cho thấy QR ordering và SaaS/POS F\&B là nhu cầu thực tế, đặc biệt trong bối cảnh nhà hàng muốn giảm thao tác thủ công và tăng tốc phục vụ.
+
+Bảng~\ref{tab:chapter2-related-systems} tóm tắt cách nhìn an toàn về các hệ thống liên quan. Bảng không so sánh hơn/thua vì khóa luận không có benchmark hoặc audit nội bộ của các sản phẩm thương mại. Thay vào đó, bảng xác định các khía cạnh liên quan đến QRTable và khoảng trống mà đề tài tập trung mô tả.
+
+{\footnotesize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.21\textwidth}}
+  \caption{Tổng hợp hệ thống/sản phẩm liên quan ở mức bối cảnh.}
+  \label{tab:chapter2-related-systems}\\
+  \toprule
+  Hệ thống / nguồn & Khía cạnh liên quan & Giá trị tham khảo cho đề tài & Giới hạn khi sử dụng làm nguồn \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Hệ thống / nguồn & Khía cạnh liên quan & Giá trị tham khảo cho đề tài & Giới hạn khi sử dụng làm nguồn \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  KiotViet QR ordering & Gọi món qua mã QR trong F\&B. & Chứng minh QR ordering là chức năng thực tế trong POS Việt Nam. & Không cung cấp chi tiết kiến trúc/service boundary của hệ thống. \\
+  \addlinespace
+  Sapo F\&B POS & Quản lý nhà hàng/quán ăn, order, bàn, thanh toán và vận hành. & Cho thấy POS F\&B cần nhiều module vận hành hơn một menu điện tử. & Là trang sản phẩm; không dùng để định nghĩa học thuật về SaaS/microservices. \\
+  \addlinespace
+  iPOS O2O/QR ordering & Giải pháp order qua QR/O2O cho nhà hàng. & Là ví dụ thị trường về việc tích hợp QR ordering vào quy trình vận hành. & Không thể suy ra mức tenant isolation, consistency hoặc security của sản phẩm. \\
+  \addlinespace
+  NAPAS/VietQR & QR/chuyển tiền nhanh trong bối cảnh thanh toán nội địa. & Hỗ trợ bối cảnh payment QR tại Việt Nam. & Không thay thế evidence triển khai webhook, settlement hoặc reconciliation của QRTable. \\
+\end{longtable}
+}
+
+Từ các nguồn liên quan, có thể rút ra ba nhận xét. Thứ nhất, POS F\&B và QR ordering đã là nhu cầu sản phẩm rõ ràng, nên đề tài không cần claim novelty ở bản thân QR code. Thứ hai, thách thức của QRTable nằm ở việc tích hợp các domain POS, QR session, KDS, payment, tenant lifecycle và RBAC thành một hệ thống có service boundary rõ. Thứ ba, các tài liệu sản phẩm công khai thường không trình bày chi tiết cách xử lý tenant isolation, idempotency, outbox, Kafka, WebSocket hint/refetch hoặc payment webhook security; đây là khoảng trống mà khóa luận có thể tập trung phân tích ở mức software engineering.
+
+Về phía học thuật/kỹ thuật, các nguồn về SaaS, microservices, Kafka, WebSocket, JWT/OIDC, ASVS và saga/outbox cung cấp cơ sở để đánh giá quyết định thiết kế của QRTable. Khoảng trống của đề tài không phải là phát minh một thuật toán mới, mà là thiết kế và hiện thực một nền tảng SaaS POS có QR ordering trong bối cảnh F\&B Việt Nam, với các ràng buộc thực tế về tenant isolation, realtime, payment nội địa và kiểm soát consistency.
+
+\section{Tổng hợp nền tảng lý thuyết cho QRTable}
+
+Bảng~\ref{tab:chapter2-theory-to-qrtable} tổng hợp cách các khái niệm trong Chương 2 ánh xạ sang các chương sau. Bảng này giúp giữ ranh giới giữa lý thuyết và implementation: Chương 2 giải thích khái niệm, Chương 3 biến chúng thành yêu cầu, Chương 4 thiết kế kiến trúc, Chương 5 trình bày triển khai và Chương 6 đánh giá bằng evidence.
+
+{\footnotesize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.19\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.15\textwidth}}
+  \caption{Ánh xạ cơ sở lý thuyết sang phạm vi QRTable.}
+  \label{tab:chapter2-theory-to-qrtable}\\
+  \toprule
+  Nền tảng & Hàm ý đối với QRTable & Guardrail khi viết các chương sau & Chương liên quan \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Nền tảng & Hàm ý đối với QRTable & Guardrail khi viết các chương sau & Chương liên quan \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  POS F\&B & Hệ thống phải quản lý bàn, order, bếp, bill và payment như một flow vận hành. & Không viết QRTable như menu điện tử đơn lẻ. & Chương 3, 5 \\
+  \addlinespace
+  QR ordering & Customer vào hệ thống qua QR/session thay vì tài khoản staff. & Không đồng nhất customer với user RBAC/Keycloak. & Chương 3, 4, 5 \\
+  \addlinespace
+  SaaS/multi-tenancy & Mọi dữ liệu tenant-scoped cần tenant context xuyên API, DB, cache, event và realtime. & Không claim isolation toàn diện nếu thiếu evidence kiểm thử. & Chương 3, 4, 6 \\
+  \addlinespace
+  Microservices & Service boundary phải bám domain và data ownership. & Không chia service chỉ vì công nghệ; không truy cập chéo database. & Chương 4, 5 \\
+  \addlinespace
+  Kafka/event-driven & Domain event phù hợp cho side effect bất đồng bộ và fan-out. & Không dùng Kafka để thay thế mọi RPC hoặc transaction boundary. & Chương 4, 5 \\
+  \addlinespace
+  Idempotency, saga và outbox & Flow order, payment và webhook cần chống duplicate và xử lý consistency có kiểm soát. & Không claim full saga hardening nếu chưa có evidence. & Chương 4, 5, 6 \\
+  \addlinespace
+  WebSocket/realtime & UI nhận hint/refetch nhanh hơn nhưng backend/service state vẫn là source of truth. & Không xem socket payload là trạng thái có thẩm quyền cuối cùng. & Chương 4, 5, 6 \\
+  \addlinespace
+  JWT, OIDC, RBAC và security & Staff/admin dùng identity provider và permission; customer dùng QR/session-scoped access. & Không claim đạt ASVS level nếu chưa audit. & Chương 3, 4, 6 \\
+\end{longtable}
+}
+
+Tóm lại, Chương 2 đặt nền cho cách QRTable được phân tích và thiết kế như một hệ thống software engineering hoàn chỉnh. POS F\&B và QR ordering xác định bài toán nghiệp vụ; SaaS và multi-tenancy xác định yêu cầu cô lập dữ liệu; microservices và event-driven architecture cung cấp khung phân tách domain và giao tiếp; consistency/idempotency/saga/outbox giải thích các rủi ro khi state trải qua nhiều service; WebSocket giải thích cơ chế realtime nhưng cũng đặt guardrail về source of truth; authentication/authorization/security xác định cách bảo vệ staff, customer, tenant và webhook. Các chương sau sẽ dùng nền này để trình bày yêu cầu, kiến trúc, triển khai và đánh giá QRTable theo phạm vi evidence thực tế.

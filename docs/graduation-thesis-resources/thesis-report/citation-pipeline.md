@@ -39,6 +39,8 @@ Main LaTeX render hai nhóm bằng:
 \printbibliography[heading=none,notkeyword=vietnamese]
 ```
 
+Với backend BibTeX hiện tại, không bật `defernumbers=true`. Trong Phase 7A, tùy chọn này làm một số nguồn mới ở Chương 2 và bibliography split render thành citation `[0]`. Main file giữ numbering IEEE liên tục qua hai nhóm tài liệu và tắt warning split bibliography bằng `\BiblatexSplitbibDefernumbersWarningOff`.
+
 ## Build command
 
 ```bash

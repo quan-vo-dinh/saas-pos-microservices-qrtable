@@ -341,6 +341,8 @@ Không nên chỉ để link domain website. Domain có thể hết hạn hoặc
 
 Nên chụp screenshot theo nhóm, không cần nhồi tất cả vào chương chính. Chương chính chỉ cần các màn hình đại diện; phụ lục có thể chứa UI gallery đầy đủ hơn.
 
+Với Phase 5D, workflow dùng chế độ scaffold/manual capture handoff: agent tạo mapping, placeholder trắng và LaTeX refs trước; người viết thay screenshot thật thủ công sau. Placeholder không phải evidence và không được dùng để claim demo đã kiểm chứng.
+
 Vị trí đưa artifact vào báo cáo nên chia theo hai tầng:
 
 - Trong Chương 5: đưa các screenshot đại diện cho những flow chính để chứng minh hệ thống đã có giao diện và luồng vận hành cụ thể, ví dụ customer ordering, staff POS, KDS, payment và owner/admin management.

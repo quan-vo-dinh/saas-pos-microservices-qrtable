@@ -1,0 +1,67 @@
+%%{init: {"theme": "base", "sequence": {"showSequenceNumbers": true, "actorMargin": 90, "messageMargin": 48}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "actorBkg": "#f0fdf4", "actorBorder": "#16a34a", "noteBkgColor": "#fff7ed", "noteBorderColor": "#ea580c", "lineColor": "#475569"}}}%%
+sequenceDiagram
+  autonumber
+  actor Staff as Staff/Customer
+  participant BFF as BFF<br/>Payment API + webhook edge
+  participant Payment as Payment<br/>settlement services
+  participant PDB as PostgreSQL<br/>Payment DB
+  participant Order as Order<br/>bill/session owner
+  participant ODB as PostgreSQL<br/>Order DB
+  participant Sepay as SePay / VietQR
+  participant Outbox as Payment<br/>Outbox relay
+  participant Kafka as Kafka<br/>payment.completed
+
+  rect rgb(240, 249, 255)
+    Note over Staff,Kafka: Cash branch
+    Staff->>BFF: Confirm cash payment
+    BFF->>Payment: TCP PAYMENT.CONFIRM_CASH(billId, amountReceived)
+    Payment->>Order: TCP BILL_GET_PAYMENT_SNAPSHOT
+    Order->>ODB: Read bill status and rounded total
+    Order-->>Payment: PENDING_PAYMENT bill snapshot
+    Payment->>Payment: Validate VND rounding snapshot
+    Payment->>PDB: Transaction: lock/create payment
+    Payment->>PDB: Save PAID CASH + audit logs
+    Payment->>PDB: Insert outbox payment.completed
+    Payment->>Order: TCP BILL_MARK_PAID(paymentId, method=CASH)
+    Order->>ODB: Lock bill/session, mark bill PAID
+    Order->>ODB: Close session and clear session/cart via SessionService
+    Order-->>Payment: Bill marked paid
+    Payment-->>BFF: Payment response
+    BFF-->>Staff: Settlement completed
+    Outbox->>PDB: Poll completed payment event
+    Outbox->>Kafka: Publish payment.completed
+  end
+
+  rect rgb(240, 253, 244)
+    Note over Staff,Kafka: VietQR / SePay branch
+    Staff->>BFF: Request VietQR for bill
+    BFF->>Payment: TCP PAYMENT.CREATE_VIETQR(billId)
+    Payment->>Order: TCP BILL_GET_PAYMENT_SNAPSHOT
+    Order-->>Payment: PENDING_PAYMENT bill snapshot
+    Payment->>Payment: billReference = QRTBL + bill id prefix
+    Payment->>PDB: Create/reuse PENDING payment
+    Payment-->>BFF: qrUrl, bank account, roundedTotal
+    BFF-->>Staff: Display VietQR
+    Staff->>Sepay: Bank transfer with billReference
+    Sepay->>BFF: POST /webhooks/sepay/{tenantSlug}
+    BFF->>Payment: TCP PAYMENT.HANDLE_SEPAY_WEBHOOK
+    Payment->>Payment: Verify tenant secret with timingSafeEqual
+    Payment->>Payment: Extract billReference from code/content
+    Payment->>PDB: Transaction: lock payment by billReference
+    alt Duplicate webhook
+      Payment->>PDB: Audit SEPAY_WEBHOOK_DUPLICATE
+      Payment-->>BFF: success
+    else Underpaid transfer
+      Payment->>PDB: Audit SEPAY_WEBHOOK_UNDERPAID
+      Payment-->>BFF: success without marking paid
+    else Amount is sufficient
+      Payment->>PDB: Save PAID VIETQR + sepayTransactionId
+      Payment->>PDB: Insert outbox payment.completed
+      Payment->>Order: TCP BILL_MARK_PAID(paymentId, method=VIETQR)
+      Order->>ODB: Mark bill PAID, close session, table CLEANING
+      Payment-->>BFF: success
+      Outbox->>Kafka: Publish payment.completed
+    end
+  end
+
+  Note over Payment,Order: Payment owns payment records, Order owns bill/session finalization

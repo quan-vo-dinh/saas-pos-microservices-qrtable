@@ -634,6 +634,8 @@ Nhóm này không bắt buộc đưa hết vào bản đầu, nhưng nên dùng 
 
 Chương 5 chỉ nên dùng screenshot đại diện. Phụ lục chứa gallery đầy đủ hơn. Cách chia hợp lý là: trong thân bài chọn khoảng 8-12 screenshot thật sự đại diện cho các journey chính; trong phụ lục lưu bộ ảnh đầy đủ hơn theo từng vai trò để bản khóa luận không phụ thuộc vào demo domain còn sống hay không.
 
+Phase 5D có thể dựng trước scaffold screenshot bằng placeholder trắng, filename ổn định, caption và LaTeX label để người viết thay ảnh thật thủ công. Placeholder không được tính là screenshot thật hoặc demo evidence trong bản nộp.
+
 | Nhóm màn hình   | Screenshot đại diện trong Chương 5                                                                   | UI gallery/phụ lục nên có                                                                                             |
 | --------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Customer PWA    | QR join/session, menu, cart, order tracking, request payment/VietQR.                                 | Toàn bộ journey: vào bàn, xem menu, lọc/chọn món, chi tiết món, giỏ hàng, gửi order, theo dõi trạng thái, thanh toán. |

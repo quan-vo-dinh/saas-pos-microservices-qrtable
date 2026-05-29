@@ -26,6 +26,7 @@ Nguồn nền:
 | `source-exists` | Đã có source/asset nền trong repo nhưng chưa biên tập cho khóa luận.     |
 | `drafted`       | Đã có bản nháp nội dung/diagram/table.                                   |
 | `captured`      | Đã chụp screenshot hoặc lưu demo artifact.                               |
+| `placeholder`   | Đã có file ảnh trắng/khung LaTeX đúng tên để thay bằng screenshot thật.  |
 | `inserted`      | Đã đưa vào LaTeX/chương/phụ lục.                                         |
 | `verified`      | Đã kiểm tra caption, nguồn, số hiệu, render PDF và claim liên quan.      |
 | `deferred`      | Tạm hoãn, chỉ dùng nếu chưa có evidence thật hoặc vượt phạm vi bản nháp. |
@@ -70,13 +71,13 @@ Không chọn diagram chỉ để tạo cảm giác đa dạng. Mỗi artifact p
 | Bảng 4.3 | Bảng     | Chương 4 | Kafka topic registry                                | Tránh invent topic; làm rõ event-driven có chọn lọc                                 | `libs/constants`, queue docs/tests                  | verified   | P0      |
 | Hình 4.3 | Diagram  | Chương 4 | Multi-tenancy isolation diagram                     | Minh họa tenant boundary ở DB/cache/event/API                                       | `docs/technical-architecture.md`, evidence map      | verified   | P0      |
 | Hình 4.4 | Diagram  | Chương 4 | Kafka decision flow                                 | Giải thích khi nào dùng sync call, khi nào dùng event                               | `docs/technical-architecture.md`, evidence map      | verified   | P1      |
-| Hình 5.1 | Sequence | Chương 5 | QR ordering sequence                                | Chứng minh flow customer QR/session/menu/cart/order đã được thiết kế/triển khai     | `docs/business-logic.md`, source code               | planned    | P0      |
-| Hình 5.2 | Sequence | Chương 5 | Order confirm và stock consistency sequence         | Nhấn mạnh Catalog sở hữu stock, Order không update DB Catalog trực tiếp             | `docs/business-logic.md`, Order/Catalog code        | planned    | P0      |
-| Hình 5.3 | Sequence | Chương 5 | KDS ticket lifecycle                                | Chứng minh luồng `order.confirmed` -> Kitchen/KDS/Realtime UI                       | Kitchen code, Kafka topic registry                  | planned    | P0      |
-| Hình 5.4 | Sequence | Chương 5 | Payment settlement sequence                         | Chứng minh cash/VietQR/SePay settlement và idempotency ở mức evidence               | Payment docs/code, SePay guide                      | planned    | P0      |
-| Hình 5.5 | Sequence | Chương 5 | SaaS onboarding sequence                            | Chứng minh tenant onboarding, subscription, owner/admin setup                       | SaaS docs/code, phase 4B docs                       | planned    | P0      |
-| Bảng 5.1 | Bảng     | Chương 5 | Implemented evidence table                          | Map feature -> code/docs/tests/screenshot để tránh viết mơ hồ                       | Source code, docs, tests                            | planned    | P0      |
-| Bảng 5.2 | Bảng     | Chương 5 | Shared libraries và vai trò trong consistency       | Chứng minh maintainability qua DTO/constants/providers/guards/shared types          | `libs/`, `docs/DOC-CODE-ANCHORS.md`                 | planned    | P1      |
+| Hình 5.1 | Sequence | Chương 5 | QR ordering sequence                                | Chứng minh flow customer QR/session/menu/cart/order đã được thiết kế/triển khai     | `docs/business-logic.md`, source code               | verified   | P0      |
+| Hình 5.2 | Sequence | Chương 5 | Order confirm và stock consistency sequence         | Nhấn mạnh Catalog sở hữu stock, Order không update DB Catalog trực tiếp             | `docs/business-logic.md`, Order/Catalog code        | verified   | P0      |
+| Hình 5.3 | Sequence | Chương 5 | KDS ticket lifecycle                                | Chứng minh luồng `order.confirmed` -> Kitchen/KDS/Realtime UI                       | Kitchen code, Kafka topic registry                  | verified   | P0      |
+| Hình 5.4 | Sequence | Chương 5 | Payment settlement sequence                         | Chứng minh cash/VietQR/SePay settlement và idempotency ở mức evidence               | Payment docs/code, SePay guide                      | verified   | P0      |
+| Hình 5.5 | Sequence | Chương 5 | SaaS onboarding sequence                            | Chứng minh tenant onboarding, subscription, owner/admin setup                       | SaaS docs/code, phase 4B docs                       | verified   | P0      |
+| Bảng 5.1 | Bảng     | Chương 5 | Implemented evidence table                          | Map feature -> code/docs/tests/screenshot để tránh viết mơ hồ                       | Source code, docs, tests                            | verified   | P0      |
+| Bảng 5.2 | Bảng     | Chương 5 | Shared libraries và vai trò trong consistency       | Chứng minh maintainability qua DTO/constants/providers/guards/shared types          | `libs/`, `docs/DOC-CODE-ANCHORS.md`                 | verified   | P1      |
 | Bảng 6.1 | Bảng     | Chương 6 | Evaluation claim policy                             | Chặn overclaim trong performance/scalability/observability                          | `thesis-evidence-map.md`                            | planned    | P0      |
 | Bảng 6.2 | Bảng     | Chương 6 | Requirement traceability summary                    | Chứng minh yêu cầu được đánh giá bằng test/demo/evidence                            | `docs/testing/phase-5/traceability-matrix.md`       | planned    | P0      |
 | Bảng 6.3 | Bảng     | Chương 6 | Architecture/NFR evidence status                    | Đánh giá scalability/maintainability bằng architecture/code evidence                | Evidence map, technical docs, tests                 | planned    | P0      |
@@ -116,6 +117,8 @@ Không chọn diagram chỉ để tạo cảm giác đa dạng. Mỗi artifact p
 
 Chương 5 chỉ nên dùng khoảng 8-12 screenshot đại diện. Phần còn lại đưa vào phụ lục A để báo cáo vẫn tự chứa bằng chứng khi demo domain không còn hoạt động.
 
+Phase 5D dùng chế độ scaffold/manual capture handoff: agent không mở Browser và không chụp UI. Agent chỉ tạo mapping, ref/caption, file placeholder trắng trong `thesis-report/assets/screenshots/` và khung LaTeX để người viết thay bằng screenshot thật sau.
+
 | ID            | Nhóm                     | Vị trí khuyến nghị | Screenshot/artifact                                                       | Vai trò                                                         | Trạng thái | Ưu tiên |
 | ------------- | ------------------------ | ------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------- | ------- |
 | Ảnh 5.1       | Customer PWA             | Chương 5           | QR join/session screen                                                    | Minh họa khách vào phiên gọi món từ QR                          | planned    | P0      |
@@ -139,6 +142,25 @@ Chương 5 chỉ nên dùng khoảng 8-12 screenshot đại diện. Phần còn 
 | Ảnh A.55-A.60 | Evaluation/demo          | Phụ lục D          | Test run, traceability summary, health check, demo checklist              | Bằng chứng đánh giá và reproducibility                          | planned    | P1      |
 | Ảnh A.61-A.70 | Observability/deployment | Phụ lục D/E        | Grafana/log/trace/deployment screen                                       | Chỉ dùng nếu Phase 6/7 hoặc dashboard thật được backfill        | deferred   | P2      |
 
+### 5.1. Mapping filename/label Phase 5D
+
+Các filename dưới đây là contract để Phase 5D tạo placeholder trắng và để người viết thay bằng ảnh thật mà không phải sửa LaTeX ref.
+
+| ID       | Filename trong `assets/screenshots/`         | LaTeX label                                       | Vị trí mặc định | Flow liên quan |
+| -------- | -------------------------------------------- | ------------------------------------------------- | --------------- | -------------- |
+| Ảnh 5.1  | `chapter5-01-customer-qr-session.png`        | `fig:chapter5-screenshot-customer-qr-session`     | Chương 5        | Hình 5.1       |
+| Ảnh 5.2  | `chapter5-02-customer-menu-browsing.png`     | `fig:chapter5-screenshot-customer-menu`           | Chương 5        | Hình 5.1       |
+| Ảnh 5.3  | `chapter5-03-customer-cart-submit.png`       | `fig:chapter5-screenshot-customer-cart-submit`    | Chương 5        | Hình 5.1/5.2   |
+| Ảnh 5.4  | `chapter5-04-customer-order-payment.png`     | `fig:chapter5-screenshot-customer-payment`        | Chương 5        | Hình 5.4       |
+| Ảnh 5.5  | `chapter5-05-staff-pos-table-map.png`        | `fig:chapter5-screenshot-staff-table-map`         | Chương 5        | Hình 5.2       |
+| Ảnh 5.6  | `chapter5-06-staff-order-confirm.png`        | `fig:chapter5-screenshot-staff-order-confirm`     | Chương 5        | Hình 5.2       |
+| Ảnh 5.7  | `chapter5-07-kds-queue.png`                  | `fig:chapter5-screenshot-kds-queue`               | Chương 5        | Hình 5.3       |
+| Ảnh 5.8  | `chapter5-08-kds-ticket-status.png`          | `fig:chapter5-screenshot-kds-ticket-status`       | Chương 5        | Hình 5.3       |
+| Ảnh 5.9  | `chapter5-09-owner-menu-management.png`      | `fig:chapter5-screenshot-owner-menu-management`   | Chương 5        | Catalog        |
+| Ảnh 5.10 | `chapter5-10-owner-table-qr-management.png`  | `fig:chapter5-screenshot-owner-table-qr`          | Chương 5        | Catalog/QR     |
+| Ảnh 5.11 | `chapter5-11-owner-payment-subscription.png` | `fig:chapter5-screenshot-owner-payment-settings`  | Chương 5        | Hình 5.4/5.5   |
+| Ảnh 5.12 | `chapter5-12-admin-tenant-onboarding.png`    | `fig:chapter5-screenshot-admin-tenant-onboarding` | Chương 5        | Hình 5.5       |
+
 ## 6. Phụ lục và artifact nộp kèm
 
 | ID        | Vị trí        | Artifact                                                     | Mục đích                                                | Trạng thái | Ưu tiên |
@@ -154,7 +176,7 @@ Chương 5 chỉ nên dùng khoảng 8-12 screenshot đại diện. Phần còn 
 
 ## 7. Quy tắc cập nhật backlog
 
-1. Khi tạo diagram/table/screenshot, cập nhật trạng thái từ `planned` sang `drafted`, `captured` hoặc `source-exists`.
+1. Khi tạo diagram/table/screenshot, cập nhật trạng thái từ `planned` sang `drafted`, `placeholder`, `captured` hoặc `source-exists`.
 2. Khi đưa vào LaTeX, cập nhật sang `inserted` và ghi đúng vị trí chương/phụ lục nếu khác dự kiến.
 3. Khi build PDF và kiểm tra caption/số hiệu/nguồn thành công, cập nhật sang `verified`.
 4. Không đổi artifact thành `verified` nếu chưa kiểm tra render PDF.
@@ -163,10 +185,11 @@ Chương 5 chỉ nên dùng khoảng 8-12 screenshot đại diện. Phần còn 
 7. Với Mermaid/PlantUML/draw.io, source text chỉ tương ứng trạng thái `drafted`; chỉ chuyển sang `inserted` khi đã render thành PDF/PNG/SVG phù hợp và chèn vào LaTeX.
 8. Không chèn trực tiếp Mermaid code vào `.tex` trừ khi template đã được cấu hình renderer rõ ràng; mặc định LaTeX chỉ chèn file đã render bằng `\includegraphics`.
 9. Nếu môi trường không render được diagram, giữ source trong `thesis-report/assets/diagrams/`, ghi command render thủ công và không đánh dấu artifact là `inserted` hoặc `verified`.
+10. Với Phase 5D scaffold, file ảnh trắng chỉ được đánh dấu `placeholder`; chỉ chuyển sang `captured` khi người viết thay bằng screenshot thật, và chỉ chuyển sang `verified` sau khi build PDF kiểm tra ảnh/caption/label thành công.
 
 ## 8. Bước tiếp theo cho backlog
 
-Phase 4B đã tạo và verify nhóm diagram/table P0 của Chương 4; Phase 4C đã viết bản nháp Chương 4 và giữ nguyên các artifact đó; Phase 4D đã bổ sung và verify nhóm artifact P0 còn thiếu của Chương 3:
+Phase 4B đã tạo và verify nhóm diagram/table P0 của Chương 4; Phase 4C đã viết bản nháp Chương 4 và giữ nguyên các artifact đó; Phase 4D đã bổ sung và verify nhóm artifact P0 còn thiếu của Chương 3; **Phase 5A đã hoàn tất** audit implementation evidence cho Chương 5:
 
 1. Source Mermaid Chương 4 đã lưu tại `docs/graduation-thesis-resources/thesis-report/assets/diagrams/chapter4-*.mmd`.
 2. PDF render Chương 4 đã lưu tại `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter4-*.pdf`.
@@ -175,5 +198,8 @@ Phase 4B đã tạo và verify nhóm diagram/table P0 của Chương 4; Phase 4C
 5. Source Mermaid Chương 3 đã lưu tại `docs/graduation-thesis-resources/thesis-report/assets/diagrams/chapter3-actor-use-case-overview.mmd` và `docs/graduation-thesis-resources/thesis-report/assets/diagrams/chapter3-business-flow.mmd`.
 6. PDF render Chương 3 đã lưu tại `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter3-actor-use-case-overview.pdf` và `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter3-business-flow.pdf`.
 7. Hình 3.1, Hình 3.2 và Bảng 3.1-3.4 đã được build/kiểm tra trong PDF; `.lof`, `.lot`, `pdftotext` và preview PNG xác nhận caption, nguồn, số hiệu và nội dung không bị trắng.
+8. `docs/graduation-thesis-resources/thesis-phase5a-evidence-audit.md` đã tạo với: ma trận evidence 6 flow, kế hoạch 5 sequence diagram (Hình 5.1–5.5), Bảng 5.1 implemented evidence (20 dòng), Bảng 5.2 shared libraries, screenshot plan 12 ảnh đại diện P0/P1.
 
-Bước tiếp theo là Phase 5A: audit implementation evidence cho Chương 5. Phase 5A không chỉ tạo một bảng audit chung; cần lập artifact plan cụ thể cho Chương 5 gồm năm sequence diagram P0 (`Hình 5.1`-`Hình 5.5`), implemented evidence table, shared library/consistency table nếu đủ evidence và screenshot/demo plan. Diagram Chương 5 nên là sequence/runtime flow vì mục tiêu là chứng minh implementation flow, không lặp lại architecture diagram của Chương 4.
+**Phase 5C đã hoàn tất:** Chương 5 đã được viết prose vào `thesis-report/chapters/05-trien-khai-he-thong.tex`, giữ nguyên Hình 5.1-Hình 5.5 đã verify, chèn Bảng 5.1 implemented evidence và Bảng 5.2 shared libraries, sau đó build LaTeX và kiểm tra `.lof`/`.lot`.
+
+**Bước tiếp theo là Phase 5D scaffold/manual capture handoff:** không dùng Browser để chụp UI. Agent cần tạo `thesis-phase5d-screenshot-scaffold.md`, tạo placeholder trắng theo mapping §5.1, chèn khung LaTeX vào Chương 5/Phụ lục A, cập nhật trạng thái screenshot sang `placeholder` và build PDF để kiểm tra ref/caption/path. Người viết sẽ thay các file placeholder bằng screenshot thật sau.

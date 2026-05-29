@@ -1,0 +1,47 @@
+%%{init: {"theme": "base", "sequence": {"showSequenceNumbers": true, "actorMargin": 90, "messageMargin": 48}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "actorBkg": "#f0fdf4", "actorBorder": "#16a34a", "noteBkgColor": "#fff7ed", "noteBorderColor": "#ea580c", "lineColor": "#475569"}}}%%
+sequenceDiagram
+  autonumber
+  actor Staff as Staff<br/>POS browser
+  participant BFF as BFF<br/>JWT + Tenant guards
+  participant Order as Order<br/>state transition
+  participant ODB as PostgreSQL<br/>Order DB
+  participant Catalog as Catalog<br/>stock owner
+  participant CDB as PostgreSQL<br/>Catalog DB
+  participant Outbox as Order<br/>Outbox relay
+  participant Kafka as Kafka<br/>order.confirmed
+
+  Staff->>BFF: Confirm pending order
+  BFF->>BFF: Verify JWT, tenant, permission
+  BFF->>Order: TCP CONFIRM_ORDER(orderId, tenantId, userId)
+  Order->>ODB: Transaction begins
+  Order->>ODB: SELECT order FOR UPDATE
+
+  alt Order already PROCESSING
+    ODB-->>Order: Replay existing order state
+    Order-->>BFF: Idempotent confirmation response
+  else Order is PENDING and bill is OPEN
+    Order->>ODB: Load order items and bill in tenant scope
+    Order->>Catalog: TCP STOCK_DEDUCT_FOR_ORDER(idempotencyKey=confirm-order:{orderId})
+    Catalog->>CDB: Transaction: lock menu item rows in stable order
+    alt Stock is sufficient
+      Catalog->>CDB: Deduct stock and update item status
+      Catalog-->>Order: StockMutationResult[]
+      Order->>ODB: Set order PROCESSING and items PROCESSING
+      Order->>ODB: Insert outbox event order.confirmed
+      ODB-->>Order: Commit Order transaction
+      Order-->>BFF: OrderStatusChangedEvent
+      BFF-->>Staff: Confirmation success
+      Outbox->>ODB: Poll pending outbox row
+      Outbox->>Kafka: Publish topic order.confirmed
+    else Stock is insufficient
+      Catalog-->>Order: CATALOG_STOCK_INSUFFICIENT
+      Order->>ODB: Roll back Order transaction
+      Order-->>BFF: Structured conflict error
+      BFF-->>Staff: Show stock error
+    end
+  else Invalid order or bill state
+    Order-->>BFF: ORDER_INVALID_STATE or BILL_NOT_OPEN
+    BFF-->>Staff: Show validation error
+  end
+
+  Note over Order,Catalog: Order never writes Catalog DB directly, stock consistency is owned by Catalog

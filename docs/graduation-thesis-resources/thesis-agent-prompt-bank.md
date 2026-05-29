@@ -30,7 +30,7 @@ Yêu cầu chung:
 - Không invent nguồn, số liệu, service, endpoint, database table, Kafka topic hoặc security claim.
 - Không revert thay đổi không do bạn tạo.
 - Nếu cần tài liệu framework/library/API/cloud hiện tại, dùng Context7/ctx7 trước.
-- Nếu cần kiểm tra UI/screenshot/local app, dùng Browser.
+- Nếu cần kiểm tra UI/screenshot/local app, dùng Browser, trừ Phase 5D scaffold/manual capture handoff vì phase đó cố ý không chụp UI tự động.
 - Cuối session, chạy verification phù hợp và cập nhật `thesis-workflow-plan.md`.
 ```
 
@@ -249,60 +249,125 @@ Output mong muốn:
   - Hình 5.4 Payment settlement sequence.
   - Hình 5.5 SaaS onboarding sequence.
 - Sequence/runtime diagram P1 nếu đủ evidence: shared cart mutation/version/idempotency, table transfer/safe release, subscription checkout, tenant suspend/activate behavior.
-- Danh sách screenshot đại diện cần capture cho Chương 5.
+- Danh sách screenshot đại diện cần scaffold/capture thủ công cho Chương 5.
 - Quy tắc chọn artifact Chương 5: dùng sequence diagram cho runtime interaction, table cho evidence/coverage, screenshot cho UI/demo thật; không lặp lại architecture diagram của Chương 4.
 - Danh sách nội dung không đủ evidence hoặc chỉ được viết như thiết kế/hướng phát triển.
 
 Không làm:
 
 - Không draft Chương 5 dài.
-- Không chạy/chụp UI nếu demo data chưa ổn.
+- Không chạy/chụp UI trong Phase 5A; Phase 5D sẽ dựng scaffold và người viết thay screenshot thật thủ công.
 - Không invent endpoint/table/topic.
 
-Cuối session, cập nhật workflow plan; next step là Phase 5B hoặc 5C tùy tình trạng screenshot.
+Cuối session, cập nhật workflow plan; next step là Phase 5B.
 ```
 
-## 11. Prompt Phase 5B: Draft Chương 5
+## 11. Prompt Phase 5B: Tạo diagram P0 cho Chương 5
 
-```md
-Tiếp tục Phase 5B: Draft Chương 5 - Triển khai hệ thống.
+````md
+Tiếp tục Phase 5B: Tạo diagram P0 cho Chương 5 — 5 sequence diagram Mermaid.
 
-Mục tiêu duy nhất là viết bản nháp Chương 5 vào `thesis-report/chapters/05-trien-khai-he-thong.tex` dựa trên audit Phase 5A.
+Mục tiêu duy nhất là tạo Mermaid source cho 5 sequence diagram P0 (Hình 5.1–5.5), render PDF, chèn vào LaTeX và build verify. **Không viết prose Chương 5 dài trong phase này.**
+
+Đọc workflow plan, `thesis-phase5a-evidence-audit.md` (toàn bộ §2 kế hoạch diagram), `thesis-artifact-backlog.md` và `thesis-official-outline.md` trước khi vẽ.
+
+Diễn giải từng diagram:
+
+- **Hình 5.1**: QR ordering & session flow (Customer, BFF, Order, Catalog, Redis).
+- **Hình 5.2**: Order confirm & stock consistency (Staff, BFF, Order, Catalog, PG Order DB, PG Catalog DB, Outbox, Kafka).
+- **Hình 5.3**: KDS ticket lifecycle (Kafka, Kitchen, Redis Sorted Set, WebSocket, KDS UI, Chef, Order).
+- **Hình 5.4**: Payment settlement — cả 2 nhánh cash và VietQR/SePay.
+- **Hình 5.5**: SaaS onboarding saga với compensation (Super Admin, SaaS, Authorizer, User-Access, Payment, Outbox).
 
 Yêu cầu:
 
-- Chứng minh hệ thống được hiện thực hóa bằng code/docs/tests/evidence.
+- Dùng Mermaid `sequenceDiagram` cho tất cả 5 hình.
+- Lưu source vào `thesis-report/assets/diagrams/chapter5-*.mmd`.
+- Render sang PDF bằng `mmdc --pdfFit` hoặc `npx @mermaid-js/mermaid-cli`; lưu vào `thesis-report/assets/figures/`.
+- Nếu renderer không chạy, chỉ để lại source `.mmd`, ghi command render thủ công và không đánh dấu `inserted`/`verified`.
+- Chèn vào `thesis-report/chapters/05-trien-khai-he-thong.tex` bằng `\includegraphics` với caption/source/label; placeholder prose tối thiểu đủ để LaTeX build không gãy.
+- Cập nhật `thesis-artifact-backlog.md` đúng trạng thái thật (`drafted` / `inserted` / `verified`).
+- Service names: Authorizer, User-Access, SaaS, Catalog, Order, Kitchen, Payment — không ghi `Auth Service`, không thêm `Notification Service`.
+- Kafka chỉ dùng 6 topic approved; WebSocket là hint/refetch.
+- Không lặp lại architecture diagram của Chương 4; sequence diagram Chương 5 là runtime/interaction flow.
+
+Verification:
+
+```bash
+cd docs/graduation-thesis-resources/thesis-report
+tectonic --keep-logs --keep-intermediates undergraduate-theses-report.tex
+```
+````
+
+Sau build, kiểm tra `.lof` chứa Hình 5.1–5.5; preview PNG trang chứa hình để đảm bảo không bị trắng, caption/source/số hiệu đúng.
+
+Cuối session, cập nhật workflow plan; next step là Phase 5C (draft prose Chương 5).
+
+````
+
+## 12. Prompt Phase 5C: Draft Chương 5
+
+```md
+Tiếp tục Phase 5C: Draft Chương 5 - Triển khai hệ thống.
+
+Mục tiêu duy nhất là viết bản nháp Chương 5 vào `thesis-report/chapters/05-trien-khai-he-thong.tex` dựa trên audit Phase 5A và diagram Phase 5B. **Không tạo diagram mới trong phase này.**
+
+Yêu cầu:
+
+- Chứng minh hệ thống được hiện thực hóa bằng code/docs/tests/evidence (không chỉ mô tả cấu trúc).
 - Không biến Chương 5 thành README hoặc user manual.
 - Chỉ đưa implementation detail khi phục vụ claim kỹ thuật.
-- Screenshot chỉ dùng đại diện; UI gallery đầy đủ để phụ lục.
+- Giữ nguyên Hình 5.1–5.5 đã chèn từ Phase 5B; chỉ bổ sung prose giải thích và bảng evidence.
+- Screenshot chỉ dùng đại diện; UI gallery đầy đủ hoặc placeholder scaffold để phụ lục/Phase 5D xử lý.
 - Không claim phần chưa có evidence là đã kiểm chứng.
+- Ghi đúng caption/source cho artifact nếu chèn vào LaTeX.
 
 Verification: build LaTeX từ `thesis-report/`.
 
-Cuối session, cập nhật workflow plan; next step là Phase 5C nếu cần screenshot, hoặc Phase 6A.
-```
+Cuối session, cập nhật workflow plan; next step là Phase 5D screenshot/demo scaffold.
+````
 
-## 12. Prompt Phase 5C: Screenshot/demo artifact capture
+## 13. Prompt Phase 5D: Screenshot/demo scaffold
 
-```md
-Tiếp tục Phase 5C: Screenshot/demo artifact capture.
+````md
+Tiếp tục Phase 5D: Screenshot/demo scaffold và manual capture handoff.
 
-Mục tiêu duy nhất là chuẩn bị/chụp screenshot và demo artifact theo `thesis-artifact-backlog.md`.
+Mục tiêu duy nhất là dựng khung screenshot/demo artifact cho Chương 5 và Phụ lục A: xác định ảnh cần có từ tài liệu dự án/source code, tạo mapping/ref/caption, tạo file ảnh placeholder trắng đúng tên/vị trí, chèn khung vào LaTeX và build verify. Không chụp UI tự động trong phase này.
+
+Đọc workflow plan trước, sau đó đọc tối thiểu: `thesis-artifact-backlog.md` §5, `thesis-phase5a-evidence-audit.md` §4, `thesis-report/chapters/05-trien-khai-he-thong.tex`, `thesis-report/appendices/a-ui-gallery.tex`, `docs/business-logic.md` và source path cần thiết để hiểu màn hình tương ứng.
+
+Output mong muốn:
+
+- `docs/graduation-thesis-resources/thesis-phase5d-screenshot-scaffold.md` với mapping: artifact ID, filename, LaTeX label, vị trí chèn, caption dự kiến, flow liên quan và ghi chú thay ảnh thủ công.
+- File placeholder trắng trong `thesis-report/assets/screenshots/`, tên ổn định theo mẫu `chapter5-01-customer-qr-session.png`.
+- Khung `figure`/refs trong Chương 5 hoặc Phụ lục A, dùng `\includegraphics`, `\caption{...}` và `\label{...}`.
+- `thesis-artifact-backlog.md` cập nhật trạng thái `placeholder` cho ảnh đã có file placeholder và đã chèn khung.
 
 Yêu cầu:
 
-- Dùng Browser khi cần mở local app hoặc chụp UI.
-- Chỉ chụp sau khi xác định app/demo data chạy ổn.
-- Lưu screenshot vào `thesis-report/assets/screenshots/` với tên ổn định.
-- Cập nhật `thesis-artifact-backlog.md` trạng thái `captured` cho ảnh đã chụp.
-- Không dùng screenshot observability/deployment nếu chưa có artifact thật.
+- Không dùng Browser, không mở local app, không yêu cầu demo data chạy ổn.
+- Placeholder trắng không phải screenshot thật; không đánh dấu `captured` hoặc `verified`.
+- Caption/đoạn dẫn trong bản nháp phải tránh làm người đọc hiểu nhầm ảnh trắng là evidence thật. Ghi rõ đây là placeholder bản nháp cần thay bằng screenshot demo thật trước khi nộp.
+- Chỉ chọn screenshot phục vụ flow chính: Customer PWA, Staff POS, KDS, Owner dashboard, Super Admin.
+- Không tạo screenshot observability/deployment giả.
+- Không sửa nội dung prose dài của Chương 5 ngoài các câu nối cần thiết cho refs.
+- Không thay đổi Hình 5.1-Hình 5.5 hoặc Bảng 5.1-Bảng 5.2 đã verify.
 
-Verification: kiểm tra file ảnh tồn tại, mở/preview được; nếu chèn vào LaTeX thì build PDF.
+Verification:
+
+```bash
+cd docs/graduation-thesis-resources/thesis-report
+tectonic --keep-logs --keep-intermediates undergraduate-theses-report.tex
+```
+````
+
+Sau build, kiểm tra `.lof` và PDF text để xác nhận label/caption/placeholder không gãy. Không cần kiểm tra UI bằng Browser.
 
 Cuối session, cập nhật workflow plan; next step là Phase 6A.
-```
 
-## 13. Prompt Phase 6A: Build evaluation tables/claim policy
+````
+
+## 14. Prompt Phase 6A: Build evaluation tables/claim policy
 
 ```md
 Tiếp tục Phase 6A: Build evaluation tables/claim policy.
@@ -326,9 +391,9 @@ Không làm:
 - Không claim production-grade observability/deployment.
 
 Cuối session, cập nhật workflow plan; next step là Phase 6B.
-```
+````
 
-## 14. Prompt Phase 6B: Draft Chương 6
+## 15. Prompt Phase 6B: Draft Chương 6
 
 ```md
 Tiếp tục Phase 6B: Draft Chương 6 - Đánh giá.
@@ -348,7 +413,7 @@ Verification: build LaTeX.
 Cuối session, cập nhật workflow plan; next step là Phase 7A.
 ```
 
-## 15. Prompt Phase 7A: Draft Chương 2
+## 16. Prompt Phase 7A: Draft Chương 2
 
 ```md
 Tiếp tục Phase 7A: Draft Chương 2 - Cơ sở lý thuyết và công trình liên quan.
@@ -367,7 +432,7 @@ Verification: build LaTeX, kiểm tra citation/bibliography render.
 Cuối session, cập nhật workflow plan; next step là Phase 7B.
 ```
 
-## 16. Prompt Phase 7B: Draft Chương 1
+## 17. Prompt Phase 7B: Draft Chương 1
 
 ```md
 Tiếp tục Phase 7B: Draft Chương 1 - Mở đầu.
@@ -386,7 +451,7 @@ Verification: build LaTeX.
 Cuối session, cập nhật workflow plan; next step là Phase 7C.
 ```
 
-## 17. Prompt Phase 7C: Draft Chương 7, Abstract và phụ lục
+## 18. Prompt Phase 7C: Draft Chương 7, Abstract và phụ lục
 
 ```md
 Tiếp tục Phase 7C: Draft Chương 7, Abstract và phụ lục nền.
@@ -405,7 +470,7 @@ Verification: build LaTeX.
 Cuối session, cập nhật workflow plan; next step là Phase 8A.
 ```
 
-## 18. Prompt Phase 8A: Build/format/citation audit
+## 19. Prompt Phase 8A: Build/format/citation audit
 
 ```md
 Tiếp tục Phase 8A: Build/format/citation audit.
@@ -425,7 +490,7 @@ Không rewrite nội dung lớn trong phase này; chỉ sửa lỗi format/citat
 Cuối session, cập nhật workflow plan; next step là Phase 8B.
 ```
 
-## 19. Prompt Phase 8B: Reader/reviewer/overclaim audit
+## 20. Prompt Phase 8B: Reader/reviewer/overclaim audit
 
 ```md
 Tiếp tục Phase 8B: Reader/reviewer/overclaim audit.

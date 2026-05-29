@@ -1,19 +1,243 @@
 \chapter{Đánh giá}
 
+Chương này đánh giá QRTable dựa trên bằng chứng có thể truy vết từ yêu cầu, thiết kế, triển khai và kiểm thử. Mục tiêu của chương không phải là chứng minh hệ thống đã sẵn sàng vận hành production, mà là trả lời ba câu hỏi: các luồng nghiệp vụ chính đã được kiểm chứng ở mức nào; các quyết định kiến trúc có được bảo vệ bằng contract, code và test hay không; và những yêu cầu phi chức năng nào mới được hỗ trợ bởi thiết kế thay vì được đo lường bằng benchmark thực nghiệm.
+
+Vì QRTable là một hệ thống SaaS POS theo kiến trúc microservices, đánh giá không thể chỉ dựa trên một số test pass/fail đơn lẻ. Một flow như đặt món QR đi qua Customer PWA, BFF, Order, Catalog, Redis và PostgreSQL; một flow như thanh toán VietQR/SePay còn đi qua webhook, Payment, Order và realtime bridge. Do đó, chương này sử dụng kết hợp requirement traceability, unit/contract/integration test, evidence từ source code, kiểm chứng kiến trúc tĩnh và phân tích scenario. Với những khu vực chưa có benchmark, provider thật hoặc full-stack gate ổn định, báo cáo ghi rõ phạm vi giới hạn thay vì suy luận quá mức từ thiết kế.
+
 \section{Chiến lược đánh giá}
 
-\section{Evaluation Claim Policy}
+Chiến lược đánh giá của khóa luận được tổ chức theo bốn lớp bằng chứng.
+
+Lớp thứ nhất là functional validation, tập trung vào các luồng nghiệp vụ cốt lõi: quét QR và tạo session, thao tác shared cart, submit order, staff xác nhận order và trừ stock, KDS nhận ticket, payment settlement, SaaS onboarding, tenant lifecycle và RBAC. Lớp này chủ yếu dựa trên unit test, contract test, integration test có điều kiện và một số browser smoke test đã được ghi nhận trong traceability.
+
+Lớp thứ hai là architecture validation. Nhóm bằng chứng này kiểm tra service boundary, data ownership, Kafka topic registry, Redis access policy, WebSocket hint/refetch model và guardrail không truy cập chéo database. Với một hệ thống microservices, đây là lớp đánh giá quan trọng vì code có thể chạy đúng ở từng flow nhỏ nhưng vẫn phá vỡ kiến trúc nếu service import repository của nhau, tự tạo Kafka topic ngoài registry hoặc biến WebSocket event thành nguồn trạng thái nghiệp vụ.
+
+Lớp thứ ba là non-functional evaluation. Các thuộc tính chất lượng như security, reliability, maintainability, modifiability, performance efficiency và scalability được diễn đạt theo mô hình chất lượng phần mềm và bối cảnh SaaS nhiều tenant \cite{iso-iec-25010-2023}. Trong phạm vi hiện tại, security, idempotency, consistency và maintainability có nhiều bằng chứng code/test hơn; performance efficiency và scalability mới được đánh giá ở mức thiết kế vì chưa có benchmark tải lớn.
+
+Lớp thứ tư là demo và artifact validation. Screenshot, video demo, command output hoặc log runtime có thể giúp minh họa hệ thống, nhưng không thay thế kiểm thử chức năng hoặc kiểm chứng kiến trúc. Ở thời điểm bản nháp này, các ảnh giao diện chưa được dùng như bằng chứng demo chính thức nếu mới dừng ở placeholder kỹ thuật. Các artifact giao diện nếu được bổ sung sau nên đặt ở phụ lục và liên kết với flow kiểm thử tương ứng.
+
+Phạm vi đánh giá vì vậy được giới hạn rõ ràng: hệ thống có bằng chứng đáng kể cho các P0/P1 flow cốt lõi, nhưng chưa có stress test, chaos engineering, high availability proof, observability dashboard hoàn chỉnh hoặc validation tự động với live SePay provider. Những nội dung này được xem là giới hạn và hướng phát triển.
+
+\section{Evaluation claim policy}
+
+Để tránh overclaim, mỗi kết luận trong chương này được gắn với một mức bằng chứng. Bảng~\ref{tab:chapter6-claim-policy} là chính sách diễn đạt được dùng xuyên suốt phần đánh giá.
+
+{\footnotesize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.3\textwidth}>{\raggedright\arraybackslash}p{0.26\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}}
+  \caption{Evaluation claim policy cho Chương 6.}
+  \label{tab:chapter6-claim-policy}\\
+  \toprule
+  Mức claim & Điều kiện bằng chứng & Cách diễn đạt trong khóa luận & Ví dụ trong QRTable \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Mức claim & Điều kiện bằng chứng & Cách diễn đạt trong khóa luận & Ví dụ trong QRTable \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  A -- Đã kiểm chứng tự động & Có unit, contract, integration hoặc E2E test pass; test location hoặc command kiểm chứng rõ ràng. & ``Đã được kiểm chứng bằng test ở phạm vi tương ứng''. & VND rounding, submit idempotency, KDS dedupe, Kafka topic registry. \\
+  B -- Đã kiểm chứng một phần hoặc opt-in & Có integration/browser smoke cần stack, seed, Redis/Kafka/Keycloak hoặc provider riêng; chưa là default CI gate. & ``Đã được kiểm chứng trong phạm vi opt-in/local stack''. & SaaS live Payment onboarding slice, KDS Redis dedupe opt-in, Payment completed to Order bridge. \\
+  C -- Hỗ trợ bởi thiết kế/code structure & Có source code, docs, architecture contracts hoặc scenario analysis; thiếu full-stack proof hoặc benchmark. & ``Được hỗ trợ bởi thiết kế và cấu trúc triển khai''. & Scalability theo service boundary/Kafka/Redis; maintainability nhờ Nx và shared contracts. \\
+  D -- Demo-limited & Có route smoke, screenshot, demo script hoặc kiểm chứng thủ công đại diện; chưa thành regression gate. & ``Được minh họa bằng demo hoặc smoke test''. & Admin dashboard routes, suspended tenant browser smoke. \\
+  E -- Giới hạn/hướng phát triển & Thiếu implementation, thiếu evidence chạy thật hoặc còn phụ thuộc provider/full-stack chưa ổn định. & ``Là giới hạn hiện tại hoặc hướng phát triển''. & Full offline queue, notification/email, production observability, load test. \\
+\end{longtable}
+}
+
+Chính sách này cũng xác định những câu không được dùng trong phần kết quả. Báo cáo không viết rằng QRTable đã production-ready, đã chứng minh khả năng chịu tải lớn, đã validate live SePay tự động, hoặc đã chứng minh tenant isolation trên toàn bộ API surface nếu bằng chứng hiện tại chưa đủ. Ngược lại, báo cáo có thể kết luận rằng nhiều invariant cốt lõi đã có unit/contract/integration evidence và kiến trúc hiện tại tạo nền tảng hợp lý cho việc mở rộng, bảo trì và hardening sau này.
 
 \section{Requirement traceability}
 
+Ma trận traceability P0/P1 của QRTable ghi nhận 52 dòng yêu cầu hoặc rule quan trọng. Trong đó, 38 dòng đã có bằng chứng kiểm thử đủ mạnh ở lớp tương ứng, 10 dòng mới được kiểm chứng một phần, 1 dòng là khoảng trống triển khai và 3 dòng thuộc phạm vi mở rộng sau. Bảng~\ref{tab:chapter6-traceability-summary} tóm tắt kết quả theo domain thay vì liệt kê toàn bộ 52 dòng để giữ chương đánh giá tập trung vào kết luận chính.
+
+{\scriptsize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.19\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.35\textwidth}}
+  \caption{Requirement traceability summary của QRTable.}
+  \label{tab:chapter6-traceability-summary}\\
+  \toprule
+  Domain & Đã kiểm chứng & Một phần & Khoảng trống / ngoài phạm vi & Kết luận được phép rút ra \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Domain & Đã kiểm chứng & Một phần & Khoảng trống / ngoài phạm vi & Kết luận được phép rút ra \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Catalog và QR & 5 & 2 & 1 khoảng trống & Public menu, QR token và quota table có bằng chứng tốt; tenant A/B live API gate và QR scan rate limit chưa đủ để claim toàn diện. \\
+  Order, session, cart và bill & 8 & 1 & 0 & Đây là cụm evidence mạnh nhất: session join, cart version, submit idempotency, stock consistency, bill request và payment finalization đều có coverage rõ. \\
+  Kitchen/KDS realtime & 5 & 0 & 0 & KDS dedupe, station RBAC, FIFO/priority/SLA, refetch hint và Redis-only recovery có thể đánh giá tích cực trong phạm vi test hiện có. \\
+  Payment settlement & 9 & 1 & 0 & Cash, VietQR reference, webhook idempotency, refund baseline và payment-to-order bridge có bằng chứng tốt; live provider vẫn manual/opt-in. \\
+  SaaS lifecycle & 7 & 3 & 0 & Tenant lifecycle, subscription invoice, quota, payment settings và admin routes có evidence; onboarding full live stack còn cần bổ sung. \\
+  RBAC và tenant isolation & 2 & 1 & 0 & Guard chain và permission seed có bằng chứng mạnh; representative cross-tenant API suite chưa phủ rộng. \\
+  Architecture invariants & 2 & 2 & 0 & Kafka topic registry và Redis access policy có contract tests; một số pattern rộng như BFF Direct và TCP coverage còn cần kiểm chứng thêm. \\
+  Phạm vi mở rộng & 0 & 0 & 3 ngoài phạm vi hiện tại & Full offline queue, saga hardening sâu và notification/email không được xem là kết quả hoàn thành trong đánh giá hiện tại. \\
+\end{longtable}
+}
+
+Kết quả này cho thấy hệ thống có mức traceability đáng kể cho các flow trọng yếu, đặc biệt là Order, Kitchen và Payment. Tuy nhiên, không thể kết luận rằng toàn bộ P0 đã hoàn tất tuyệt đối, vì còn bốn dòng P0 mới được kiểm chứng một phần: tenant isolation ở Catalog/live API gate, onboarding SaaS full live stack, suspended tenant pending-bill browser path và representative RBAC cross-tenant API gate. Các dòng này không làm mất giá trị của hệ thống, nhưng buộc phần kết luận phải diễn đạt đúng phạm vi: QRTable đã chứng minh nhiều invariant cốt lõi, còn một số acceptance gate full-stack cần hoàn thiện trước khi gọi là kiểm chứng toàn diện.
+
+Default test baseline quan trọng nhất được ghi nhận là lệnh \texttt{pnpm exec nx run-many -t test --parallel=3} pass cho 23 projects trong workspace. Ngoài baseline này, một số lệnh opt-in đã được chạy cho KDS Redis dedupe và SaaS live Payment onboarding slice. Các gate còn phụ thuộc full stack, seed hoặc provider thật như frontend-utils tenant A/B, browser demo rộng và live SePay được giữ ở mức manual/opt-in. Đây là quyết định hợp lý cho một khóa luận phần mềm: ưu tiên regression deterministic làm baseline, đồng thời ghi rõ nơi nào cần môi trường demo đầy đủ.
+
 \section{Functional validation}
+
+Functional validation được đánh giá theo các cụm use case chính thay vì theo từng service. Cách nhìn này phù hợp với trải nghiệm người dùng cuối: customer không quan tâm Order hay Catalog xử lý phần nào, mà quan tâm flow quét QR, gọi món, bếp nhận ticket và thanh toán có đúng hay không.
+
+Với Catalog và QR, hệ thống đã có bằng chứng cho QR/table token, public menu filtering, upload path theo tenant và quota table theo subscription. Token QR được kiểm tra ở mức generation/validation và được dùng trong flow session join. Public menu chỉ trả category/item active, available và không bị xóa. Tuy nhiên, tenant isolation trên live BFF/Keycloak/Catalog stack vẫn chưa đủ rộng để claim toàn bộ API surface đã được chứng minh bằng tenant A/B test. QR scan/order spam limit cũng mới dừng ở throttler/config và chưa có rule table-scoped đầy đủ.
+
+Với Order/session/cart/bill, evidence mạnh hơn. Session join xử lý bàn available, occupied active session, stale empty session và các trạng thái không được phép như billing/cleaning. Shared cart dùng Redis và \texttt{cartVersion} để phát hiện stale mutation. Submit order dùng idempotency key, tạo order \texttt{PENDING}, gắn bill \texttt{OPEN} và clear cart một lần. Bill request yêu cầu cart rỗng và các order active đã served trước khi chuyển bill sang \texttt{PENDING\_PAYMENT}. Payment finalization đóng bill/session và chuyển bàn sang cleaning theo hướng idempotent. Các bằng chứng này cho phép kết luận rằng luồng đặt món QR cốt lõi đã được kiểm chứng tốt ở mức unit/contract/integration.
+
+Với staff confirmation và stock consistency, điểm quan trọng là Order không tự ghi stock. Staff confirm chuyển order từ \texttt{PENDING} sang \texttt{PROCESSING} chỉ sau khi Catalog TCP deduct stock thành công. Nếu Catalog báo thiếu stock hoặc lỗi nghiệp vụ, Order không được chuyển trạng thái. Cách kiểm chứng này phù hợp với service ownership đã trình bày ở Chương 4 và Chương 5: Catalog là owner của stock, Order là owner của order lifecycle.
+
+Với Kitchen/KDS, các test hiện có chứng minh consumer xử lý event order confirmed, tạo ticket theo station, lưu queue bằng Redis, dedupe event trùng và phát realtime hint để UI refetch. KDS là một trong các khu vực có traceability sạch vì không có P0 chưa phủ đầy đủ. Kết luận an toàn là KDS runtime projection đã được kiểm chứng trong phạm vi Redis/Kafka/WebSocket hint model hiện tại; không cần claim Kitchen có database lịch sử hoặc analytics bếp sâu hơn.
+
+Với Payment, hệ thống có evidence cho cash settlement, VietQR reference, SePay webhook verification/idempotency, underpaid handling, duplicate webhook và payment-to-order bridge. Điều này đủ để đánh giá tích cực về consistency và idempotency trong payment flow nội bộ. Tuy nhiên, live SePay provider validation không nằm trong automated baseline vì cần credentials, callback public và dữ liệu provider thật. Vì vậy, báo cáo chỉ kết luận phần code/unit/contract/integration đã được kiểm chứng; production provider validation là checklist riêng trước demo hoặc vận hành thật.
+
+Với SaaS lifecycle, QRTable đã có bằng chứng cho tenant lifecycle, subscription, invoice, quota, payment settings, slug policy và một phần onboarding saga. Điểm còn giới hạn là onboarding full live stack vẫn dùng contract doubles cho Authorizer/Keycloak và User-Access ở một số slice; live Payment TCP đã được kiểm chứng nhưng chưa đủ để gọi toàn bộ onboarding là end-to-end live proof. Suspended tenant behavior cũng có coverage chính, nhưng pending-bill payment exception trên browser path cần fixture và E2E bổ sung.
+
+{\scriptsize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.14\textwidth}}
+  \caption{Functional validation result theo cụm use case.}
+  \label{tab:chapter6-functional-validation}\\
+  \toprule
+  Cụm use case & Kết quả đánh giá & Bằng chứng chính & Mức claim \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Cụm use case & Kết quả đánh giá & Bằng chứng chính & Mức claim \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  QR/menu/session & Token QR, public menu và session join đã được kiểm chứng; tenant A/B live gate cần chạy ổn định hơn. & Catalog specs, Order session integration, frontend utils opt-in. & A/B \\
+  Shared cart/order submit & Cart version, submit idempotency và no-draft order row có evidence mạnh. & Order service specs, DB/Redis integration. & A \\
+  Stock consistency & Staff confirm deduct stock qua Catalog TCP và rollback trên lỗi nghiệp vụ. & Order/Catalog stock specs, external-stack integration. & A/B \\
+  KDS realtime & Ticket queue, station routing, dedupe và refetch hint đã được kiểm chứng. & Kitchen specs, Redis integration, realtime E2E. & A/B \\
+  Payment settlement & Cash/VietQR/webhook/idempotency có test; live provider không chạy mặc định. & Payment specs, webhook contract, bridge integration. & A/B \\
+  SaaS lifecycle & Tenant/subscription/quota/payment settings có evidence; onboarding full live harness còn một phần. & SaaS specs, live Payment TCP slice. & B/C \\
+  RBAC/session security & Staff/admin guard chain và customer session model có evidence; cross-tenant API proof chưa phủ toàn bộ. & Permission matrix, guard specs, frontend-utils opt-in. & A/B/C \\
+\end{longtable}
+}
 
 \section{Architecture validation}
 
+Architecture validation trả lời câu hỏi hệ thống có giữ đúng các guardrail kiến trúc đã thiết kế hay không. Với QRTable, các guardrail quan trọng gồm: BFF là entry point cho client, service owner sở hữu database của mình, shared libraries không được dùng để truy cập chéo dữ liệu, Kafka topic phải đến từ registry, Redis key phải có owner rõ ràng, WebSocket chỉ là hint/refetch và tenant context phải đi qua API/service/cache/event/realtime.
+
+Ở service boundary và data ownership, bằng chứng mạnh nhất đến từ Chương 4, Chương 5 và source tree. Catalog sở hữu menu, table và stock; Order sở hữu session, cart, order và bill; Payment sở hữu payment record, settings và refund; SaaS sở hữu tenant và subscription; Kitchen sở hữu Redis runtime queue. Các sequence diagram Chương 5 cho thấy các tương tác cross-service đi qua TCP/Kafka thay vì truy cập database trực tiếp. Đây là cơ sở để đánh giá kiến trúc microservices của QRTable là có kiểm soát, không chỉ là chia thư mục theo tên service.
+
+Ở Kafka, registry hiện tại công nhận sáu topic core đã trình bày trong Bảng~\ref{tab:chapter4-kafka-topic-registry}. Architecture contract tests bảo vệ registry này và ngăn một số event chưa thuộc scope như menu updated bị dùng sai. Điều này giúp QRTable giữ đúng quan điểm event-driven có chọn lọc: Kafka dùng cho domain event bất đồng bộ hoặc fan-out, không dùng thay cho mọi command/query.
+
+Ở Redis, evidence hiện tại cho thấy Redis được dùng với ownership theo domain: Order quản lý session/cart, Kitchen quản lý KDS queue, Catalog/BFF dùng cache menu theo contract, SaaS dùng tenant/subscription cache và Payment dùng OAuth state. Redis không được viết như source of truth chung cho tất cả domain. Với session/order/bill/payment/tenant, state bền vững vẫn nằm ở service database tương ứng.
+
+Ở WebSocket, các test và implementation đều ủng hộ mô hình hint/refetch. Client nhận event để invalidate query hoặc refetch snapshot; payload socket không được xem là state authoritative. Đây là một quyết định kiến trúc an toàn vì realtime channel có thể mất kết nối, nhận event trễ hoặc bỏ lỡ event. WebSocket cải thiện độ trễ nhận biết UI, còn correctness vẫn dựa vào service owner và API snapshot.
+
+Ở tenant isolation, kiến trúc có cơ sở tốt: tenantId nằm trong entity/query, guard chain, Redis key namespace, Kafka payload và WebSocket room. Tuy nhiên, hai P0 liên quan tenant isolation vẫn chưa được phủ đầy đủ ở live API gate. Do đó, kiến trúc được đánh giá là có invariant thiết kế rõ, có unit/contract evidence đáng kể, nhưng cần representative seeded full-stack suite để chứng minh toàn bộ API surface.
+
 \section{Non-functional evaluation}
+
+Yêu cầu phi chức năng được đánh giá theo mức độ bằng chứng khác nhau. Bảng~\ref{tab:chapter6-nfr-evidence} tóm tắt trạng thái hiện tại.
+
+{\scriptsize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.19\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}}
+  \caption{Architecture/NFR evidence status của QRTable.}
+  \label{tab:chapter6-nfr-evidence}\\
+  \toprule
+  Thuộc tính / claim & Evidence hiện có & Trạng thái đánh giá & Cách diễn đạt an toàn \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Thuộc tính / claim & Evidence hiện có & Trạng thái đánh giá & Cách diễn đạt an toàn \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Tenant isolation & TenantGuard, \texttt{tenant\_id}, tenant-aware Redis/event/room, một số test tenant. & Một phần & Có invariant thiết kế và test một phần; chưa claim toàn bộ live API surface đã được chứng minh. \\
+  Authentication/RBAC & Keycloak/JWT cho staff/admin, SessionGuard cho customer, six-role permission seed. & Mạnh & Guard chain và permission seed đã được kiểm chứng ở mức unit/contract/smoke. \\
+  Payment security & QR token, webhook secret/HMAC, secret redaction, duplicate/underpaid handling. & Mạnh ở unit/contract & Không claim live SePay production validation nếu chưa chạy provider thật. \\
+  Consistency/idempotency & Cart version, submit idempotency, stock deduct/release, payment finalization, duplicate webhook. & Mạnh cho core flows & Đánh giá tốt cho core flows; không claim exactly-once hoặc CDC hoàn chỉnh. \\
+  Realtime feedback & WebSocket hint/refetch, KDS/customer hooks, realtime E2E. & Mạnh & WebSocket giảm độ trễ nhận biết UI nhưng không là source of truth. \\
+  Maintainability & Nx monorepo, service ownership, shared contracts, architecture tests. & Mạnh ở mức kiến trúc & Đánh giá bằng scenario và code structure, không gán số liệu năng suất. \\
+  Scalability & Service boundaries, Kafka consumer group, Redis cache/queue, Socket.IO room model. & Hỗ trợ bởi thiết kế & Chỉ claim hỗ trợ mở rộng ở mức kiến trúc; chưa có load/stress test. \\
+  Performance efficiency & Chưa có benchmark throughput/latency được ghi nhận. & Chưa đo định lượng & Không tạo số; đề xuất metric và load test cho hướng phát triển. \\
+  Observability/deployment & Docker/Grafana/Loki/Prometheus/Tempo có trong docs/compose, thiếu artifact dashboard/trace đầy đủ. & Giới hạn & Chỉ viết demo-limited hoặc hướng hoàn thiện, không production-grade. \\
+  Offline resilience & Reconnect/refetch UI có evidence, full offline action queue chưa có. & Giới hạn & Đánh giá reconnect/refetch; offline-first write queue là hướng phát triển. \\
+\end{longtable}
+}
+
+\subsection{Security và tenant isolation}
+
+Security của QRTable có nhiều lớp: JWT/OIDC và RBAC cho staff/owner/admin, QR/session scoped access cho customer, TenantGuard cho request tenant context, permission matrix cho role/action và verification cho webhook/payment. Kết quả đánh giá tích cực nhất nằm ở guard chain, permission seed và payment webhook contract. Customer không dùng Keycloak, nhưng điều này không phải thiếu sót; đó là quyết định phù hợp với bối cảnh khách tại bàn và đã được bù bằng QR/session boundary.
+
+Tenant isolation là yêu cầu quan trọng hơn mức test hiện tại. Thiết kế đã đưa tenant context vào API, database, Redis, Kafka payload và WebSocket room. Tuy nhiên, hai gate live-stack đại diện vẫn chưa đủ rộng. Do đó, Chương 6 chỉ kết luận rằng tenant isolation đã có cơ sở thiết kế và kiểm thử một phần, chưa kết luận toàn bộ API surface đã được chứng minh dưới seeded BFF/Keycloak/service database stack.
+
+\subsection{Reliability, consistency và idempotency}
+
+Reliability của QRTable được thể hiện rõ ở các flow có nguy cơ duplicate hoặc race condition. Cart dùng version lock để tránh stale mutation. Submit order dùng idempotency key để tránh tạo order lặp. Staff confirm order chỉ deduct stock qua Catalog owner và có rollback khi lỗi. Payment webhook xử lý duplicate/underpaid và không finalize bill nhiều lần. KDS dedupe event trùng trước khi tạo ticket. Các cơ chế này cho phép đánh giá tốt về consistency ở core flows, dù hệ thống chưa claim exactly-once delivery, full saga hardening hoặc CDC/Debezium.
+
+\subsection{Maintainability và modifiability}
+
+Maintainability không nên đo bằng một con số thời gian phản hồi hoặc số dòng code. Với QRTable, cách đánh giá phù hợp hơn là scenario analysis. Nếu thêm một payment method mới, phần thay đổi chính nằm ở Payment service, BFF route/DTO, tenant payment settings và UI payment settings; Catalog và Kitchen không cần đổi database. Nếu thêm Kafka consumer cho một domain event đã có, thay đổi nằm ở consumer mới và topic contract, không buộc producer chờ side effect đồng bộ. Nếu thêm role/permission mới, thay đổi tập trung ở permission matrix, User-Access/guard và UI route protection.
+
+Nx monorepo và shared libraries hỗ trợ modifiability bằng cách gom contract dùng chung như constants, DTO, guard, provider token, shared type và UI utilities. Tuy nhiên, monorepo không được dùng như lý do để import repository giữa service. Chính sự kết hợp giữa shared contract và service boundary mới là điểm mạnh về bảo trì của QRTable.
+
+\subsection{Performance efficiency và scalability}
+
+Performance efficiency hiện chưa có số liệu định lượng như p50/p95/p99 latency, throughput, error rate hoặc resource usage. Vì vậy, báo cáo không đưa ra bất kỳ con số benchmark nào. Những gì có thể kết luận là thiết kế hỗ trợ các điểm tối ưu hợp lý: BFF có thể scale theo stateless edge path, Redis hỗ trợ hot path session/cart/KDS/menu cache, Kafka tách side effect bất đồng bộ, và service boundary cho phép scale các bounded context như Order, Kitchen hoặc Payment theo nhu cầu khác nhau.
+
+Scalability vì vậy chỉ được đánh giá ở mức kiến trúc. QRTable có cơ sở thiết kế cho mở rộng từng phần, nhưng chưa chứng minh chịu tải lớn bằng load test. Một kế hoạch đo lường đầy đủ nên bao gồm QR menu load, cart mutation, order submit, staff confirm/stock deduction, KDS propagation, payment webhook finalization, WebSocket hint latency và resource usage của PostgreSQL/Redis/Kafka.
+
+\subsection{Observability và deployment}
+
+QRTable có tài liệu và compose stack cho Docker, Grafana, Loki, Prometheus và Tempo, nhưng chưa có artifact đầy đủ chứng minh dashboard, trace walkthrough, alert rule hoặc runbook production. Vì vậy, deployment/observability chỉ được đánh giá là nền tảng demo-limited hoặc hướng vận hành cần hoàn thiện. Báo cáo không claim high availability, production-grade monitoring hoặc chaos engineering.
 
 \section{Demo và artifact validation}
 
+Artifact demo hiện có giá trị minh họa nhưng chưa thay thế được traceability/test evidence. Sequence diagram ở Chương 5 đã được render, chèn vào LaTeX và kiểm tra trong PDF; các bảng implementation evidence cũng đã được build. Đây là artifact kỹ thuật phục vụ lập luận của khóa luận.
+
+Đối với UI screenshot, bản nháp hiện tại chỉ xem ảnh giao diện là bằng chứng khi đó là ảnh chụp thật từ môi trường demo hoặc kiểm thử. Placeholder trắng chỉ là khung kỹ thuật để LaTeX build được, không phải demo evidence. Vì vậy, Chương 6 không dùng screenshot placeholder để chứng minh Customer PWA, POS, KDS hoặc dashboard đã được demo đầy đủ. Khi ảnh thật được bổ sung, chúng nên đi kèm caption, source, flow liên quan và nếu có thể là commit/test command hoặc demo script tương ứng.
+
+Đối với command output, baseline đáng tin cậy nhất là default Nx unit/contract gate. Các opt-in command cần Redis, PostgreSQL, Payment TCP, Keycloak, provider credential hoặc browser stack phải được ghi riêng để người đọc không nhầm chúng là CI gate mặc định. Với live SePay, mọi validation phải được guarded bằng credential và public callback; nếu chưa chạy, không đưa vào kết quả.
+
 \section{Giới hạn của quá trình đánh giá}
 
+Những giới hạn hiện tại không làm mất giá trị của hệ thống, nhưng xác định rõ ranh giới kết luận. Bảng~\ref{tab:chapter6-limitations} tổng hợp các giới hạn chính và hướng xử lý phù hợp.
+
+{\scriptsize\sloppy
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}}
+  \caption{Giới hạn đánh giá và hướng phát triển tương ứng.}
+  \label{tab:chapter6-limitations}\\
+  \toprule
+  Giới hạn hiện tại & Bằng chứng / nguyên nhân & Tác động đến kết luận & Hướng phát triển \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Giới hạn hiện tại & Bằng chứng / nguyên nhân & Tác động đến kết luận & Hướng phát triển \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Chưa có benchmark throughput/latency/stress test. & Traceability không ghi nhận benchmark được chấp nhận. & Không claim performance/scalability dưới tải lớn. & Thiết kế load test cho QR join, submit order, KDS queue và payment webhook. \\
+  Live tenant A/B API isolation chưa phủ rộng. & Một số P0 tenant/RBAC gate còn cần seeded BFF/Keycloak/service DB stack. & Tenant isolation được đánh giá mạnh ở design/unit, một phần ở live-stack. & Chuẩn hóa fixture và chạy representative cross-tenant API suite. \\
+  SaaS onboarding chưa có full live Authorizer/Keycloak/User-Access harness. & Live Payment TCP slice có bằng chứng, nhưng identity/profile còn dùng contract doubles ở một số flow. & Không gọi onboarding là fully E2E live validated. & Bổ sung full multi-service onboarding test với Keycloak, User-Access, Payment TCP và outbox. \\
+  Pending-bill exception khi tenant suspended chưa có browser proof đầy đủ. & Cần deterministic suspended tenant/session/bill fixture. & Suspended tenant behavior chỉ được đánh giá một phần. & Tạo E2E fixture cho pending-bill payment exception. \\
+  Live SePay provider validation không chạy mặc định. & Cần \texttt{RUN\_LIVE\_SEPAY}, credentials và public callback. & Không claim production live provider validation. & Dùng local mock cho regression và checklist live provider riêng trước demo. \\
+  Full offline action queue chưa implement. & Hiện có reconnect/refetch, chưa có IndexedDB action queue. & Không claim offline-first write queue. & Thiết kế action queue, conflict resolver và background sync. \\
+  Observability/deployment production-grade thiếu artifact runtime. & Thiếu dashboard/trace/log proof và runbook đầy đủ. & Không claim HA hoặc production-ready observability. & Chuẩn hóa deployment package, health-check runbook và dashboard evidence. \\
+  Notification/email service chưa có runtime. & Không có service notification trong core implementation hiện tại. & Không dùng email receipt/welcome email làm kết quả. & Triển khai Notification service hoặc SMTP/provider integration nếu mở rộng scope. \\
+\end{longtable}
+}
+
 \section{Thảo luận kết quả}
+
+Kết quả đánh giá cho thấy hướng tiếp cận SaaS POS tích hợp QR ordering theo kiến trúc microservices có chọn lọc là phù hợp với bài toán QRTable. Các flow cốt lõi đã có evidence theo traceability: customer có thể đi từ QR session đến shared cart/order; staff có thể xác nhận order mà vẫn giữ stock consistency ở Catalog; Kitchen có thể nhận ticket qua event và Redis runtime queue; Payment có thể xử lý settlement và duplicate webhook ở mức code/test; SaaS có baseline cho tenant lifecycle, subscription và onboarding.
+
+Về kiến trúc, QRTable giữ được các quyết định quan trọng: BFF là entry point, service owner giữ database/invariant, Kafka chỉ dùng cho domain event bất đồng bộ, Redis có ownership rõ, WebSocket là hint/refetch và customer không bị ép vào Keycloak. Những điểm này không chỉ là mô tả thiết kế ở Chương 4 mà đã có dấu vết triển khai và một số contract/static tests bảo vệ.
+
+Tuy nhiên, các kết luận về tải lớn, vận hành production, live provider và tenant isolation toàn API surface vẫn phải để ngỏ. Chưa có benchmark định lượng nên không thể kết luận latency/throughput. Chưa có observability artifact đầy đủ nên không thể gọi hệ thống là production-grade. Chưa có live SePay automation nên không thể claim provider thật đã được validate tự động. Một số P0 full-stack gate còn chưa được phủ đầy đủ nên không thể nói toàn bộ P0 đã covered tuyệt đối.
+
+Nhìn tổng thể, Chương 6 xác nhận QRTable đã đạt mức hoàn thiện đáng kể cho một khóa luận software engineering: có yêu cầu, thiết kế, implementation, traceability và evidence cho nhiều invariant quan trọng. Giá trị chính của kết quả không nằm ở việc claim hệ thống đã sẵn sàng production, mà ở việc chứng minh một kiến trúc và implementation có kiểm soát cho bài toán SaaS POS + QR ordering, đồng thời chỉ ra rõ những bước cần làm để chuyển từ prototype/khóa luận có kiểm chứng sang hệ thống vận hành thực tế.

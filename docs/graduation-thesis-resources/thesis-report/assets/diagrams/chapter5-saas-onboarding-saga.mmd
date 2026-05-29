@@ -1,0 +1,48 @@
+%%{init: {"theme": "base", "sequence": {"showSequenceNumbers": true, "actorMargin": 90, "messageMargin": 48}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "actorBkg": "#f0fdf4", "actorBorder": "#16a34a", "noteBkgColor": "#fff7ed", "noteBorderColor": "#ea580c", "lineColor": "#475569"}}}%%
+sequenceDiagram
+  autonumber
+  actor Admin as Super Admin<br/>Management App
+  participant BFF as BFF / SaaS controller
+  participant SaaS as SaaS<br/>OnboardingSagaService
+  participant SDB as PostgreSQL<br/>SaaS DB
+  participant Authz as Authorizer<br/>Keycloak TCP
+  participant UserAccess as User-Access<br/>profile TCP
+  participant Payment as Payment<br/>settings TCP
+  participant Outbox as SaaS<br/>Outbox relay
+  participant Kafka as Kafka<br/>tenant.created
+
+  Admin->>BFF: POST tenant onboarding
+  BFF->>BFF: Verify SUPER_ADMIN permission
+  BFF->>SaaS: TCP TENANT.ONBOARD
+  SaaS->>SaaS: Normalize slug, check uniqueness and reserved words
+  SaaS->>SDB: Create tenant ACTIVE
+  SaaS->>Authz: TCP CREATE_TENANT_OWNER(email, tenantId, role OWNER)
+  Authz-->>SaaS: ownerUserId from Keycloak
+  SaaS->>UserAccess: TCP UPSERT_WITH_TENANT(owner profile, OWNER role)
+  UserAccess-->>SaaS: Profile upserted
+  SaaS->>SDB: Update tenant.ownerId
+  SaaS->>SDB: assignPlan(source=INITIAL_ONBOARDING)
+  SaaS->>Payment: TCP PAYMENT_SETTINGS.CREATE_EMPTY(tenantId)
+  Payment-->>SaaS: Empty settings idempotently created
+  SaaS->>SDB: Insert outbox tenant.created
+  SaaS-->>BFF: {tenant, ownerUserId}
+  BFF-->>Admin: Onboarding success
+  Outbox->>SDB: Poll pending tenant.created
+  Outbox->>Kafka: Publish tenant.created
+
+  alt Failure after owner user was created
+    SaaS->>Authz: TCP DISABLE_USER(reason=TENANT_ONBOARDING_FAILED)
+    Authz-->>SaaS: User disabled or ignored
+    opt Initial subscription was assigned
+      SaaS->>SDB: compensateInitialOnboarding(tenantId)
+    end
+    SaaS->>SDB: Delete partially created tenant
+    SaaS-->>BFF: TENANT_ONBOARDING_FAILED
+    BFF-->>Admin: Show onboarding failure
+  else Failure before owner user creation
+    SaaS->>SDB: Delete tenant if it exists
+    SaaS-->>BFF: Validation or dependency error
+    BFF-->>Admin: Show failure reason
+  end
+
+  Note over SaaS,Payment: The saga coordinates services by TCP and keeps tenant ownership in SaaS DB

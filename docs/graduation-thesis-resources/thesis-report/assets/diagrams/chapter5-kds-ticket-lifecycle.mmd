@@ -1,0 +1,53 @@
+%%{init: {"theme": "base", "sequence": {"showSequenceNumbers": true, "actorMargin": 90, "messageMargin": 48}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "actorBkg": "#f0fdf4", "actorBorder": "#16a34a", "noteBkgColor": "#fff7ed", "noteBorderColor": "#ea580c", "lineColor": "#475569"}}}%%
+sequenceDiagram
+  autonumber
+  participant Kafka as Kafka<br/>order.confirmed
+  participant Kitchen as Kitchen<br/>OrderConfirmedConsumer
+  participant KdsRepo as KdsRedisRepository
+  participant Redis as Redis<br/>KDS Sorted Set
+  participant Pub as KitchenEventsPublisher
+  participant BFF as BFF<br/>Realtime + TCP edge
+  participant UI as KDS UI<br/>Kitchen/Bar screen
+  actor Chef as Chef
+  participant Order as Order<br/>item readiness
+
+  Kafka->>Kitchen: Deliver order.confirmed
+  Kitchen->>Kitchen: Parse JSON and validate schemaVersion = 1
+  Kitchen->>KdsRepo: createTicketsFromConfirmedOrder(event)
+  KdsRepo->>Redis: Write station tickets and queue revision
+  KdsRepo-->>Kitchen: KdsQueueChangedEvent[]
+  Kitchen->>Pub: publishMany(events)
+  Pub->>Redis: PUBLISH realtime:kds:{tenantId}
+  Redis-->>BFF: Redis pub/sub event
+  BFF-->>UI: WebSocket hint kds.queue_changed
+  UI->>BFF: Refetch GET /kds/queue
+  BFF->>Kitchen: TCP KITCHEN.GET_QUEUE(station)
+  Kitchen->>KdsRepo: getQueueSnapshot
+  KdsRepo->>Redis: ZRANGE/HGET ticket data
+  Kitchen-->>BFF: Queue snapshot
+  BFF-->>UI: Authoritative queue data
+
+  Chef->>UI: Start ticket
+  UI->>BFF: POST start ticket
+  BFF->>Kitchen: TCP KITCHEN.START_TICKET
+  Kitchen->>KdsRepo: startTicket
+  KdsRepo->>Redis: Move ticket to PROCESSING
+  Kitchen->>Pub: Publish TICKET_STARTED
+  Pub->>Redis: PUBLISH realtime:kds:{tenantId}
+  Redis-->>BFF: Queue changed hint
+  BFF-->>UI: WebSocket hint, UI refetches
+
+  Chef->>UI: Mark ticket ready
+  UI->>BFF: POST mark ready
+  BFF->>Kitchen: TCP KITCHEN.MARK_READY
+  Kitchen->>KdsRepo: markReady
+  KdsRepo->>Redis: Move ticket to READY
+  Kitchen->>Order: TCP ORDER.MARK_ITEMS_READY(orderItemIds, station)
+  Order->>Order: Update item READY, if all items ready then order READY
+  Order-->>Kitchen: kitchen.item_ready + optional orderStatusChanged
+  Kitchen->>Pub: Publish TICKET_READY
+  Pub->>Redis: PUBLISH realtime:kds:{tenantId}
+  Redis-->>BFF: Queue changed hint
+  BFF-->>UI: WebSocket hint, UI refetches
+
+  Note over UI,BFF: WebSocket only notifies that the queue changed, the UI refetches queue state

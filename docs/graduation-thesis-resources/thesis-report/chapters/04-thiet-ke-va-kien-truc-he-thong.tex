@@ -27,14 +27,14 @@ Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng th�
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{chapter4-overall-architecture.pdf}
-  \caption{Kiến trúc tổng thể của QRTable. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \caption{Kiến trúc tổng thể của QRTable.}
   \label{fig:chapter4-overall-architecture}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{chapter4-c4-container.pdf}
-  \caption{Sơ đồ container của QRTable theo góc nhìn C4. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \caption{Sơ đồ container của QRTable theo góc nhìn C4.}
   \label{fig:chapter4-c4-container}
 \end{figure}
 
@@ -61,7 +61,7 @@ Bảng~\ref{tab:chapter4-service-ownership} tóm tắt ownership chính của c�
 {\footnotesize
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.21\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}}
-  \caption{Service ownership và data ownership chính trong QRTable. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \caption{Service ownership và data ownership chính trong QRTable.}
   \label{tab:chapter4-service-ownership}\\
   \toprule
   Thành phần & Interface chính & Data ownership & Ghi chú kiến trúc \\
@@ -99,7 +99,7 @@ Hình~\ref{fig:chapter4-multi-tenancy-isolation} minh họa cách tenant context
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{chapter4-multi-tenancy-isolation.pdf}
-  \caption{Cơ chế tenant isolation ở API, service, database, Redis, Kafka và WebSocket. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \caption{Cơ chế tenant isolation ở API, service, database, Redis, Kafka và WebSocket.}
   \label{fig:chapter4-multi-tenancy-isolation}
 \end{figure}
 
@@ -114,7 +114,7 @@ Bảng~\ref{tab:chapter4-communication-matrix} trình bày các kênh giao tiế
 {\footnotesize
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}}
-  \caption{Communication matrix của QRTable. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \caption{Communication matrix của QRTable.}
   \label{tab:chapter4-communication-matrix}\\
   \toprule
   Kênh & From--To & Mục đích & Guardrail \\
@@ -153,7 +153,7 @@ Hình~\ref{fig:chapter4-kafka-decision-flow} trình bày decision flow chọn TC
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter4-kafka-decision-flow.pdf}
-  \caption{Decision flow chọn TCP/gRPC, Kafka, WebSocket/BFF Direct hoặc webhook adapter. Nguồn: tác giả tổng hợp từ source code và tài liệu kiến trúc QRTable.}
+  \caption{Decision flow chọn TCP/gRPC, Kafka, WebSocket/BFF Direct hoặc webhook adapter.}
   \label{fig:chapter4-kafka-decision-flow}
 \end{figure}
 
@@ -162,7 +162,7 @@ Decision framework của QRTable có thể tóm tắt như sau. Nếu một thay
 {\footnotesize
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}}
-  \caption{Kafka topic registry được chấp nhận trong QRTable. Nguồn: tác giả tổng hợp từ source code và architecture contract tests.}
+  \caption{Kafka topic registry được chấp nhận trong QRTable.}
   \label{tab:chapter4-kafka-topic-registry}\\
   \toprule
   Topic & Producer & Consumer / trạng thái & Lý do dùng Kafka \\

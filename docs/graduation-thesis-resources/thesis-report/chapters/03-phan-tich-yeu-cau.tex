@@ -32,12 +32,12 @@ Hình~\ref{fig:chapter3-actor-use-case-overview} minh họa quan hệ giữa cá
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{chapter3-actor-use-case-overview.pdf}
-  \caption{Tổng quan actor và nhóm use case chính của QRTable. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ, permission matrix và traceability matrix của QRTable.}
+  \caption{Tổng quan actor và nhóm use case chính của QRTable.}
   \label{fig:chapter3-actor-use-case-overview}
 \end{figure}
 
 \begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.54\textwidth}@{}}
-\caption{Actor, phạm vi truy cập và use case chính của QRTable. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ và permission matrix của dự án.}
+\caption{Actor, phạm vi truy cập và use case chính của QRTable.}
 \label{tab:chapter3-actors}\\
 \toprule
 \textbf{Actor} & \textbf{Phạm vi} & \textbf{Use case chính} \\
@@ -76,7 +76,7 @@ Customer là actor session-scoped. Customer không đăng nhập bằng Keycloak
 Các functional requirements được nhóm theo domain nghiệp vụ để giữ ranh giới phân tích rõ ràng. Cách nhóm này giúp tránh mô tả yêu cầu theo màn hình giao diện hoặc theo service implementation quá sớm. Trong Chương 4 và Chương 5, các domain này sẽ được ánh xạ sang service boundary, data ownership và bằng chứng triển khai.
 
 \begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.10\textwidth}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.43\textwidth}>{\raggedright\arraybackslash}p{0.21\textwidth}@{}}
-\caption{Functional requirements theo domain. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ, tài liệu triển khai và ma trận truy vết của QRTable.}
+\caption{Functional requirements theo domain.}
 \label{tab:chapter3-functional-requirements}\\
 \toprule
 \textbf{ID} & \textbf{Domain} & \textbf{Yêu cầu chức năng} & \textbf{Tiêu chí kiểm soát} \\
@@ -129,7 +129,7 @@ Hình~\ref{fig:chapter3-business-flow} gom các yêu cầu chức năng trên th
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter3-business-flow.pdf}
-  \caption{Luồng nghiệp vụ từ QR ordering đến KDS, thanh toán và dọn bàn. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ, permission matrix và traceability matrix của QRTable.}
+  \caption{Luồng nghiệp vụ từ QR ordering đến KDS, thanh toán và dọn bàn.}
   \label{fig:chapter3-business-flow}
 \end{figure}
 
@@ -138,7 +138,7 @@ Hình~\ref{fig:chapter3-business-flow} gom các yêu cầu chức năng trên th
 Các yêu cầu phi chức năng của QRTable được diễn đạt dựa trên đặc thù hệ thống SaaS nhiều tenant và các thuộc tính chất lượng thường dùng trong đánh giá hệ thống phần mềm như security, reliability, maintainability và performance efficiency \cite{iso-iec-25010-2023}. Trong phạm vi khóa luận, các yêu cầu này không được viết như cam kết sẵn sàng production tuyệt đối; chúng là tiêu chí để thiết kế và đánh giá có kiểm soát ở Chương 4, Chương 5 và Chương 6.
 
 \begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.44\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}@{}}
-\caption{Non-functional requirements và tiêu chí đánh giá. Nguồn: tác giả tổng hợp từ mô hình chất lượng ISO/IEC 25010 và bản đồ bằng chứng của QRTable.}
+\caption{Non-functional requirements và tiêu chí đánh giá.}
 \label{tab:chapter3-non-functional-requirements}\\
 \toprule
 \textbf{NFR} & \textbf{Yêu cầu} & \textbf{Cách đánh giá an toàn} \\
@@ -179,7 +179,7 @@ Realtime feedback giúp trải nghiệm vận hành mượt hơn nhưng không �
 QRTable có nhiều business state machines liên kết với nhau. Bàn, session, cart, order, KDS ticket, bill/payment và tenant đều có vòng đời riêng. Một yêu cầu quan trọng là không để một trạng thái ở domain này bị cập nhật tùy tiện bởi domain khác. Ví dụ, payment hoàn tất có thể kích hoạt việc đóng bill và chuyển bàn sang cleaning, nhưng không có nghĩa Payment tự sở hữu toàn bộ vòng đời bàn; tương tự, Order xác nhận món có thể yêu cầu Catalog trừ stock, nhưng Order không sở hữu dữ liệu stock.
 
 \begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.35\textwidth}>{\raggedright\arraybackslash}p{0.42\textwidth}@{}}
-\caption{Tóm tắt các state machine nghiệp vụ chính của QRTable. Nguồn: tác giả tổng hợp từ tài liệu nghiệp vụ và ma trận truy vết của dự án.}
+\caption{Tóm tắt các state machine nghiệp vụ chính của QRTable.}
 \label{tab:chapter3-state-machines}\\
 \toprule
 \textbf{State machine} & \textbf{Trạng thái chính} & \textbf{Quy tắc chuyển trạng thái quan trọng} \\
