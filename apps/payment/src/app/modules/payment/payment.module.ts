@@ -7,13 +7,11 @@ import { PaymentController } from './controllers/payment.controller';
 import { AuditPaymentEntity } from './entities/audit-payment.entity';
 import { PaymentOutboxEventEntity } from './entities/payment-outbox-event.entity';
 import { PaymentEntity } from './entities/payment.entity';
-import { RefundEntity } from './entities/refund.entity';
 import { TenantPaymentSettingsEntity } from './entities/tenant-payment-settings.entity';
 import { CONFIGURATION } from '../../../configuration';
 import { AuditPaymentRepository } from './repositories/audit-payment.repository';
 import { PaymentOutboxRepository } from './repositories/payment-outbox.repository';
 import { PaymentRepository } from './repositories/payment.repository';
-import { RefundRepository } from './repositories/refund.repository';
 import { TenantPaymentSettingsRepository } from './repositories/tenant-payment-settings.repository';
 import { PaymentOutboxPublisherService } from './services/payment-outbox-publisher.service';
 import { PaymentMapper } from './services/payment.mapper';
@@ -24,7 +22,6 @@ import { PAYMENT_SECRETS_ENCRYPTION_KEY, PaymentSecretsService } from './service
 import { PaymentSettlementService } from './services/payment-settlement.service';
 import { PaymentService } from './services/payment.service';
 import { PaymentTenantGateway } from './services/payment-tenant.gateway';
-import { RefundService } from './services/refund.service';
 import { SEPAY_OAUTH_CLIENT_CONFIG, SepayOAuthClientService } from './services/sepay-oauth-client.service';
 import { SepayWebhookService } from './services/sepay-webhook.service';
 import { TenantPaymentSettingsService } from './services/tenant-payment-settings.service';
@@ -33,7 +30,6 @@ import { TenantPaymentSettingsService } from './services/tenant-payment-settings
   imports: [
     TypeOrmModule.forFeature([
       PaymentEntity,
-      RefundEntity,
       AuditPaymentEntity,
       PaymentOutboxEventEntity,
       TenantPaymentSettingsEntity,
@@ -50,7 +46,6 @@ import { TenantPaymentSettingsService } from './services/tenant-payment-settings
     PaymentTenantGateway,
     SepayWebhookService,
     PaymentService,
-    RefundService,
     {
       provide: PAYMENT_SECRETS_ENCRYPTION_KEY,
       useFactory: () => CONFIGURATION.PAYMENT_SECRETS_CONFIG.ENCRYPTION_KEY,
@@ -70,7 +65,6 @@ import { TenantPaymentSettingsService } from './services/tenant-payment-settings
     PaymentReferenceService,
     PaymentOutboxPublisherService,
     PaymentRepository,
-    RefundRepository,
     AuditPaymentRepository,
     PaymentOutboxRepository,
     TenantPaymentSettingsRepository,

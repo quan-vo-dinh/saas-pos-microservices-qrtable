@@ -49,7 +49,7 @@ export function BillSettlementPanel({ bill }: { bill: Bill }) {
       (history ?? []).some(
         (r) =>
           r.billId === billId &&
-          (r.status === 'PAID' || r.status === 'FAILED' || r.status === 'REFUNDED'),
+          (r.status === 'PAID' || r.status === 'FAILED'),
       ),
     [history, billId],
   );

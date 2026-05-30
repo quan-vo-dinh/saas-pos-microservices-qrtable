@@ -35,24 +35,6 @@ export type HandleSepayWebhookTcpRequest = {
   processId?: string;
 };
 
-export type RefundRequestTcpRequest = {
-  tenantId: string;
-  paymentId: string;
-  userId: string;
-  reason: string;
-  customerBankAccount?: string;
-  customerBankName?: string;
-  customerAccountName?: string;
-  processId?: string;
-};
-
-export type RefundConfirmTcpRequest = {
-  tenantId: string;
-  refundId: string;
-  userId: string;
-  processId?: string;
-};
-
 export type PaymentHistoryTcpRequest = {
   tenantId: string;
   billId?: string;

@@ -1,9 +1,9 @@
-import { OrdersRefundSection } from '@/features/payment/components/orders-refund-section';
+import { PaymentHistorySection } from '@/features/payment/components/payment-history-section';
 
 export default function DashboardOrdersPage() {
   return (
     <div className="flex flex-col gap-6 p-6">
-      <OrdersRefundSection />
+      <PaymentHistorySection />
     </div>
   );
 }

@@ -35,9 +35,9 @@ echo ""
 # Usernames and passwords are resolved from tools/auth-bootstrap-users.json to avoid
 # drifting from the deterministic dev seed.
 declare -a TEST_CASES=(
-  "SUPER_ADMIN:66:saas.create,role.create,product.create,order.create:"
-  "OWNER:38:catalog.create,user.delete,table.delete,order.cancel_pending,order.cancel_processing:saas.create,role.create,product.create"
-  "MANAGER:35:catalog.create,user.update,order.cancel_pending,order.cancel_processing,payment.refund:saas.create,user.delete,role.create,product.create"
+  "SUPER_ADMIN:65:saas.create,role.create,product.create,order.create:"
+  "OWNER:37:catalog.create,user.delete,table.delete,order.cancel_pending,order.cancel_processing:saas.create,role.create,product.create"
+  "MANAGER:34:catalog.create,user.update,order.cancel_pending,order.cancel_processing:saas.create,user.delete,role.create,product.create"
   "WAITER:15:order.confirm,order.cancel_pending,payment.confirm_cash,payment.get_history,table.transfer,service_request.acknowledge:order.create,order.cancel_processing,kitchen.get_queue,user.create,catalog.create"
   "CHEF:6:catalog.get_list,kitchen.get_queue,kitchen.recall:order.confirm,payment.confirm_cash,catalog.create"
   "BARISTA:6:catalog.get_list,kitchen.update_ticket,kitchen.recall:order.confirm,payment.confirm_cash,catalog.create"

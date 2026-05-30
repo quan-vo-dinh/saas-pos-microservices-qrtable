@@ -78,14 +78,7 @@ describe('Phase 5 architecture contracts', () => {
       .sort();
 
     expect(topicEntries).toEqual(
-      [
-        'kitchen.sla_warning',
-        'order.confirmed',
-        'order.status_changed',
-        'payment.completed',
-        'payment.refunded',
-        'tenant.created',
-      ].sort(),
+      ['kitchen.sla_warning', 'order.confirmed', 'order.status_changed', 'payment.completed', 'tenant.created'].sort(),
     );
 
     const kafkaConfigSource = read(join(WORKSPACE_ROOT, 'libs/configuration/src/lib/kafka.config.ts'));

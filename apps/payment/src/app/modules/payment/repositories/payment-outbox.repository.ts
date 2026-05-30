@@ -5,8 +5,7 @@ import { randomUUID } from 'crypto';
 import { CONFIGURATION } from '../../../../configuration';
 import { PaymentOutboxEventEntity } from '../entities/payment-outbox-event.entity';
 import { PaymentEntity } from '../entities/payment.entity';
-import { RefundEntity } from '../entities/refund.entity';
-import { buildPaymentCompletedPayload, buildPaymentRefundedPayload } from '../services/payment-event-builder';
+import { buildPaymentCompletedPayload } from '../services/payment-event-builder';
 
 const MAX_SEND_ATTEMPTS = 10;
 
@@ -61,26 +60,6 @@ export class PaymentOutboxRepository {
       tenantId: payment.tenantId,
       topic: CONFIGURATION.KAFKA_CONFIG.PAYMENT_COMPLETED_TOPIC,
       eventType: 'payment.completed',
-      aggregateId: payment.id,
-      partitionKey: payment.tenantId,
-      payload,
-      status: 'PENDING',
-    });
-    await manager.save(PaymentOutboxEventEntity, row);
-  }
-
-  async createRefunded(
-    manager: EntityManager,
-    payment: PaymentEntity,
-    refund: RefundEntity,
-    correlationId?: string,
-  ): Promise<void> {
-    const eventId = randomUUID();
-    const payload = buildPaymentRefundedPayload(payment, refund, eventId, correlationId);
-    const row = manager.create(PaymentOutboxEventEntity, {
-      tenantId: payment.tenantId,
-      topic: CONFIGURATION.KAFKA_CONFIG.PAYMENT_REFUNDED_TOPIC,
-      eventType: 'payment.refunded',
       aggregateId: payment.id,
       partitionKey: payment.tenantId,
       payload,

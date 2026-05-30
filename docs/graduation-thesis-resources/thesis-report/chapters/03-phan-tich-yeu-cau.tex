@@ -110,7 +110,7 @@ FR-KDS-02 & Thao tác KDS & Bếp/bar phải xem hàng đợi FIFO, cập nhật
 \addlinespace
 FR-PAY-01 & Quyết toán thanh toán & Hệ thống phải hỗ trợ thanh toán tiền mặt và VietQR/SePay cho hóa đơn nhà hàng, dùng mã thanh toán ổn định và quy tắc làm tròn VND. & Webhook thiếu tiền không đóng hóa đơn; webhook trùng không làm thanh toán bị ghi nhận nhiều lần. \\
 \addlinespace
-FR-PAY-02 & Hoàn tiền và đối soát & Chủ quán/quản lý có thể xử lý hoàn tiền trong phạm vi hiện tại là hoàn toàn bộ thủ công; lịch sử thanh toán phục vụ đối soát vận hành. & Hoàn tiền không mở lại hóa đơn và không tạo nhiều hoàn tiền đang hiệu lực trên cùng một thanh toán. \\
+FR-PAY-02 & Lịch sử thanh toán và đối soát & Chủ quán/quản lý xem lịch sử thanh toán theo tenant (read-only) để đối soát vận hành; điều chỉnh sau thanh toán không thuộc phạm vi luận văn. & Dữ liệu lịch sử phải được lọc theo tenant; không cho phép sửa trạng thái thanh toán qua giao diện lịch sử. \\
 \addlinespace
 FR-RBAC-01 & Xác thực/RBAC & API được bảo vệ phải được kiểm soát bằng chuỗi guard, ngữ cảnh tenant và ma trận quyền; điều hướng giao diện chỉ hỗ trợ trải nghiệm người dùng, không thay thế kiểm soát ở phía máy chủ. & API phải từ chối tác nhân thiếu quyền hoặc sai tenant ngay cả khi giao diện bị bỏ qua. \\
 \bottomrule
@@ -199,7 +199,7 @@ Vòng đời giỏ/đơn & Giỏ nháp, \texttt{PENDING}, \texttt{PROCESSING}, \
 \addlinespace
 Vòng đời phiếu KDS & Chờ, đang xử lý, sẵn sàng/xong, thu hồi & Phiếu sinh từ đơn đã xác nhận, tách theo trạm, sắp xếp theo FIFO/ưu tiên/SLA; thu hồi dùng để sửa thao tác nhầm. \\
 \addlinespace
-Vòng đời hóa đơn/thanh toán & \texttt{OPEN}, \texttt{PENDING\_PAYMENT}, \texttt{PAID}; hoàn tiền toàn bộ thủ công & Yêu cầu hóa đơn cần giỏ rỗng và đơn đã phục vụ xong; thanh toán xong đóng hóa đơn/phiên và chuyển bàn sang dọn dẹp; webhook trùng phải idempotent. \\
+Vòng đời hóa đơn/thanh toán & \texttt{OPEN}, \texttt{PENDING\_PAYMENT}, \texttt{PAID} & Yêu cầu hóa đơn cần giỏ rỗng và đơn đã phục vụ xong; thanh toán xong đóng hóa đơn/phiên và chuyển bàn sang dọn dẹp; webhook trùng phải idempotent. \\
 \bottomrule
 \end{longtable}
 

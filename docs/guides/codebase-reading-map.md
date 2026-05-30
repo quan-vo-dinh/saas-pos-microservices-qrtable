@@ -69,7 +69,7 @@ flowchart TB
     Catalog["Catalog\nMenu/table/QR/stock"]
     Order["Order\nSession/cart/order/bill"]
     Kitchen["Kitchen\nKDS Redis queue"]
-    Payment["Payment\nCash/VietQR/SePay/refund"]
+    Payment["Payment\nCash/VietQR/SePay/history"]
   end
 
   subgraph STATE["State & Infra"]
@@ -128,7 +128,7 @@ flowchart TB
 | `apps/catalog`        | Area, table, QR token, category, menu item, public menu, stock.             | Đọc trước Order submit/confirm.                |
 | `apps/order`          | Session, cart, order, bill, service request, table transfer, outbox.        | Business core; đọc sau khi nắm BFF + Catalog.  |
 | `apps/kitchen`        | KDS queue trên Redis, consume `order.confirmed`, SLA, recovery.             | Đọc sau Order confirm.                         |
-| `apps/payment`        | Payment record, cash, VietQR, SePay webhook, refund, audit, payment outbox. | Đọc sau Bill flow.                             |
+| `apps/payment`        | Payment record, cash, VietQR, SePay webhook, audit, payment outbox.         | Đọc sau Bill flow.                             |
 | `apps/saas`           | Tenant, onboarding saga, plan, subscription, invoice, lifecycle cache.      | Đọc sau khi nắm Order/Payment và tenant guard. |
 | `apps/authorizer`     | Keycloak login/verify/admin, gRPC verify token.                             | Đọc khi cần auth/RBAC.                         |
 | `apps/user-access`    | User profile, staff, role, tenant user data trên MongoDB.                   | Đọc cùng Authorizer/SaaS onboarding.           |
@@ -688,7 +688,7 @@ sequenceDiagram
 | Payment       | `apps/payment/src/app/modules/payment/services/payment.service.ts` facade                       |
 | Payment       | `apps/payment/src/app/modules/payment/services/payment-settlement.service.ts`                   |
 | Payment       | `apps/payment/src/app/modules/payment/services/sepay-webhook.service.ts`                        |
-| Payment       | `apps/payment/src/app/modules/payment/services/refund.service.ts`                               |
+| Payment       | `apps/payment/src/app/modules/payment/services/payment.service.ts`                              |
 | Payment       | `apps/payment/src/app/modules/payment/services/payment-order.gateway.ts`                        |
 | Payment       | `apps/payment/src/app/modules/payment/services/payment-reference.service.ts`                    |
 | Payment       | `apps/payment/src/app/modules/payment/services/payment-outbox-publisher.service.ts`             |
@@ -806,14 +806,14 @@ sequenceDiagram
 
 **Lý thuyết cần nắm:**
 
-- Order là source of truth của bill/session; Payment là source of truth của payment ledger/audit/refund.
+- Order là source of truth của bill/session; Payment là source of truth của payment ledger/audit.
 - Payment không tự tính lại bill total; nó lấy snapshot từ Order và validate rounding snapshot.
 - Webhook phải idempotent vì nhà cung cấp có thể retry.
 - Audit payment giúp truy vết external money movement.
 
 **Cách nói trong phỏng vấn:**
 
-> Em tách bill và payment: bill nằm ở Order vì nó tổng hợp order/session, còn Payment nằm ở Payment service vì liên quan external money movement, audit và refund. Payment không tính lại bill; nó xin snapshot từ Order, validate VND rounding, sau đó mark paid và thông báo lại Order. Webhook được xử lý idempotent để chịu được retry từ SePay.
+> Em tách bill và payment: bill nằm ở Order vì nó tổng hợp order/session, còn Payment nằm ở Payment service vì liên quan external money movement và audit. Payment không tính lại bill; nó xin snapshot từ Order, validate VND rounding, sau đó mark paid và thông báo lại Order. Webhook được xử lý idempotent để chịu được retry từ SePay.
 
 ### Flow 6: SaaS Onboarding, Subscription, Tenant Lifecycle
 

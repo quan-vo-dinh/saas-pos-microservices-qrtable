@@ -190,15 +190,6 @@ describe('StaffOrderController', () => {
     );
   });
 
-  it('reopenBill rejects when payment history has REFUND_PENDING', async () => {
-    orderClient.send.mockReturnValueOnce(of(Response.success({ bill: { id: 'bill-1' }, cart: {} })));
-    paymentClient.send.mockReturnValueOnce(of(Response.success([minimalPayment(PaymentStatus.REFUND_PENDING)])));
-
-    await expect(controller.reopenBill('session-1', 'pid-1', staffReq())).rejects.toMatchObject({
-      errorCode: ErrorCode.BILL_REOPEN_BLOCKED_BY_PAYMENT,
-    });
-  });
-
   it('reopenBill calls BILL_REOPEN when history has only FAILED', async () => {
     const reopenPayload = {
       bill: { id: 'bill-1' },

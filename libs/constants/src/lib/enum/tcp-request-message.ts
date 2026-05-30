@@ -180,8 +180,6 @@ enum PAYMENT {
   CREATE_VIETQR = 'payment.create_vietqr',
   CONFIRM_CASH = 'payment.confirm_cash',
   HANDLE_SEPAY_WEBHOOK = 'payment.handle_sepay_webhook',
-  REFUND_REQUEST = 'payment.refund_request',
-  REFUND_CONFIRM = 'payment.refund_confirm',
   GET_HISTORY = 'payment.get_history',
   GET_STATUS = 'payment.get_status',
 }

@@ -1,14 +1,12 @@
 import { AuditPaymentEntity } from '../entities/audit-payment.entity';
 import { PaymentOutboxEventEntity } from '../entities/payment-outbox-event.entity';
 import { PaymentEntity } from '../entities/payment.entity';
-import { RefundEntity } from '../entities/refund.entity';
 import { getMetadataArgsStorage } from 'typeorm';
 
 describe('Payment persistence entities', () => {
   it('exposes stable table names', () => {
     expect(Reflect.getMetadata('typeorm:entity-schema', PaymentEntity)).toBeUndefined();
     expect(PaymentEntity.name).toBe('PaymentEntity');
-    expect(RefundEntity.name).toBe('RefundEntity');
     expect(AuditPaymentEntity.name).toBe('AuditPaymentEntity');
     expect(PaymentOutboxEventEntity.name).toBe('PaymentOutboxEventEntity');
   });
@@ -28,7 +26,6 @@ describe('Payment persistence entities', () => {
   it('registers PostgreSQL check constraints on payment aggregate roots', () => {
     const { checks } = getMetadataArgsStorage();
     expect(checks.filter((c) => c.target === PaymentEntity).length).toBe(7);
-    expect(checks.filter((c) => c.target === RefundEntity).length).toBe(2);
     expect(checks.filter((c) => c.target === AuditPaymentEntity).length).toBe(2);
   });
 });

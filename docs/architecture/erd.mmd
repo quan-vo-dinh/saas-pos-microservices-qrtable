@@ -18,8 +18,6 @@ erDiagram
   TENANTS ||--o{ BILLS : isolates
   BILLS ||--o{ PAYMENTS : paid_by
   TENANTS ||--o{ PAYMENTS : isolates
-  PAYMENTS ||--o{ REFUNDS : may_have
-  TENANTS ||--o{ REFUNDS : isolates
   SESSIONS ||--o{ SERVICE_REQUESTS : raises
   TABLES ||--o{ SERVICE_REQUESTS : from
   TENANTS ||--o{ SERVICE_REQUESTS : isolates
@@ -169,18 +167,6 @@ erDiagram
     string status
     string stripe_session_id UK
     timestamp paid_at
-    timestamp created_at
-    timestamp updated_at
-  }
-
-  REFUNDS {
-    uuid id PK
-    uuid tenant_id FK
-    uuid payment_id FK
-    bigint amount_vnd
-    string reason
-    string refunded_by_user_id
-    string status
     timestamp created_at
     timestamp updated_at
   }

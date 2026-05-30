@@ -288,7 +288,7 @@ Yêu cầu:
 - Chèn vào `thesis-report/chapters/05-trien-khai-he-thong.tex` bằng `\includegraphics` với caption/source/label; placeholder prose tối thiểu đủ để LaTeX build không gãy.
 - Cập nhật `thesis-artifact-backlog.md` đúng trạng thái thật (`drafted` / `inserted` / `verified`).
 - Service names: Authorizer, User-Access, SaaS, Catalog, Order, Kitchen, Payment — không ghi `Auth Service`, không thêm `Notification Service`.
-- Kafka chỉ dùng 6 topic approved; WebSocket là hint/refetch.
+- Kafka chỉ dùng 5 topic approved; WebSocket là hint/refetch.
 - Không lặp lại architecture diagram của Chương 4; sequence diagram Chương 5 là runtime/interaction flow.
 
 Verification:

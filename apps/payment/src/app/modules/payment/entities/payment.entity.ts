@@ -2,7 +2,7 @@ import type { PaymentMethod, PaymentStatusValue } from '@einvoice/types';
 import { Check, Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity({ name: 'payments' })
-@Check(`"status" IN ('PENDING', 'PAID', 'REFUND_PENDING', 'REFUNDED', 'FAILED')`)
+@Check(`"status" IN ('PENDING', 'PAID', 'FAILED')`)
 @Check(`"method" IS NULL OR "method" IN ('CASH', 'VIETQR')`)
 @Check(`"raw_total" >= 0`)
 @Check(`"rounded_total" >= 0`)

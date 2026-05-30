@@ -11,7 +11,6 @@ import {
   PaymentActorType,
   PaymentAuditAction,
   PaymentStatus,
-  RefundStatus,
 } from '../../index';
 import type { KdsQueueChangedEvent, KitchenSlaWarningEvent } from '../../index';
 import type { CartUpdatedEvent, OrderConfirmedEvent } from '../realtime-events.types';
@@ -59,7 +58,6 @@ describe('Enum completeness — canonical values per Step 2.3 spec', () => {
       KdsTicketStatus,
       KdsTicketItemStatus,
       PaymentStatus,
-      RefundStatus,
       PaymentAuditAction,
       PaymentActorType,
     ];
@@ -83,7 +81,6 @@ describe('Enum completeness — canonical values per Step 2.3 spec', () => {
       KdsTicketStatus,
       KdsTicketItemStatus,
       PaymentStatus,
-      RefundStatus,
       PaymentAuditAction,
       PaymentActorType,
     ];
@@ -97,13 +94,7 @@ describe('Enum completeness — canonical values per Step 2.3 spec', () => {
 
 describe('Phase 3 payment contracts', () => {
   it('PaymentStatus has exactly the Phase 3 values', () => {
-    expect(Object.values(PaymentStatus).sort()).toEqual(
-      ['FAILED', 'PAID', 'PENDING', 'REFUNDED', 'REFUND_PENDING'].sort(),
-    );
-  });
-
-  it('RefundStatus has exactly the Phase 3 values', () => {
-    expect(Object.values(RefundStatus).sort()).toEqual(['CANCELED', 'CONFIRMED', 'PENDING_STAFF_ACTION'].sort());
+    expect(Object.values(PaymentStatus).sort()).toEqual(['FAILED', 'PAID', 'PENDING'].sort());
   });
 
   it('Payment audit contracts have exactly the Phase 3 values', () => {
@@ -112,9 +103,6 @@ describe('Phase 3 payment contracts', () => {
         'CASH_CONFIRMED',
         'PAYMENT_COMPLETED',
         'PAYMENT_CREATED',
-        'REFUND_CANCELED',
-        'REFUND_CONFIRMED',
-        'REFUND_REQUESTED',
         'SEPAY_WEBHOOK_AFTER_PAID',
         'SEPAY_WEBHOOK_DUPLICATE',
         'SEPAY_WEBHOOK_RECEIVED',

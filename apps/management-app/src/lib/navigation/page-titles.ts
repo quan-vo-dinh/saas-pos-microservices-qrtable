@@ -5,7 +5,7 @@ const EXACT: Record<string, string> = {
   [ROUTES.MENU]: 'Thực đơn',
   [ROUTES.TABLES]: 'Quản lý bàn',
   [ROUTES.STAFF]: 'Nhân sự',
-  [ROUTES.ORDERS]: 'Đơn hàng',
+  [ROUTES.ORDERS]: 'Lịch sử thanh toán',
   [ROUTES.SUBSCRIPTION]: 'Đăng ký gói',
   [ROUTES.DASHBOARD_PAYMENT_SETTINGS]: 'Thanh toán tenant',
   [ROUTES.POS]: 'Đơn trực tiếp',

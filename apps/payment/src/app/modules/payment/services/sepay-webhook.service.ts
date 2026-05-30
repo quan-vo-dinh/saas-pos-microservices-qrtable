@@ -88,7 +88,7 @@ export class SepayWebhookService {
         return;
       }
 
-      if (payment.status === 'PAID' || payment.status === 'REFUND_PENDING' || payment.status === 'REFUNDED') {
+      if (payment.status === 'PAID') {
         await this.auditRepo.createPaymentAudit(
           payment,
           'SEPAY_WEBHOOK_AFTER_PAID',

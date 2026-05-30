@@ -425,7 +425,7 @@ Customers scan QR and transfer money
 Webhook SePay → BFF → Payment matches billReference (code or regex on content)
 - If amount < roundedTotal: keep payment PENDING, record audit SEPAY_WEBHOOK_UNDERPAID
 - If amount >= roundedTotal: payment_status = "Paid"; saved paidAmount = actual amount received
-(overpaid accepted; full refund using paidAmount ?? roundedTotal)
+(overpaid accepted; no automatic payout of the difference)
     ```
 
 > **Architecture note (2026-05):** Transfer payments are processed via **SePay + Dynamic VietQR** — QR code embedded inline in POS/PWA (no redirect). The Phase 3 direct webhook route now verifies HMAC raw-body; The Phase 4B tenant/platform route uses its own `x-secret-key` path and needs hardening value verification before production. See `technical-architecture.md` §6.2.7 and phase record `docs/phases/phase-3-payment.md`.
@@ -446,7 +446,7 @@ Webhook SePay → BFF → Payment matches billReference (code or regex on conten
 
 IF bill_status == "Completed" AND payment_status == "Paid"
 THEN disable all edit operations
-AND require Refund flow for any adjustment
+(Post-payment adjustments / refund are out of scope for the current thesis build.)
 
 ```
 

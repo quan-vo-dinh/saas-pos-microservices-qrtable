@@ -25,13 +25,12 @@ export type { Bill } from './lib/bill.types';
 export { BillStatus, PaymentMethod, ALLOWED_BILL_TRANSITIONS } from './lib/bill.types';
 
 // ─── Payment (Phase 3) ─────────────────────────────
-export type { PaymentCompletedEvent, PaymentRefundedEvent } from './lib/payment.types';
-export { PaymentActorType, PaymentAuditAction, PaymentStatus, RefundStatus } from './lib/payment.types';
+export type { PaymentCompletedEvent } from './lib/payment.types';
+export { PaymentActorType, PaymentAuditAction, PaymentStatus } from './lib/payment.types';
 export type {
   PaymentActorType as PaymentActorTypeValue,
   PaymentAuditAction as PaymentAuditActionValue,
   PaymentStatus as PaymentStatusValue,
-  RefundStatus as RefundStatusValue,
 } from './lib/payment.types';
 
 // ─── Session & Cart (Phase 2A) ──────────────────────

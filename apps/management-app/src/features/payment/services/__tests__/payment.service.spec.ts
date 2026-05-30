@@ -48,32 +48,6 @@ describe('paymentService', () => {
     });
   });
 
-  it('requestRefund posts input', async () => {
-    mockAuthApiClient.mockResolvedValue({ id: 'r1' });
-    await paymentService.requestRefund({
-      paymentId: '33333333-3333-4333-8333-333333333333',
-      reason: 'Customer request',
-      customerBankAccount: '123',
-    });
-    expect(mockAuthApiClient).toHaveBeenCalledWith(EP.PAYMENT_REFUND_REQUEST, {
-      method: 'POST',
-      body: JSON.stringify({
-        paymentId: '33333333-3333-4333-8333-333333333333',
-        reason: 'Customer request',
-        customerBankAccount: '123',
-      }),
-    });
-  });
-
-  it('confirmRefund posts refundId', async () => {
-    mockAuthApiClient.mockResolvedValue({ id: 'r1' });
-    await paymentService.confirmRefund('44444444-4444-4444-8444-444444444444');
-    expect(mockAuthApiClient).toHaveBeenCalledWith(EP.PAYMENT_REFUND_CONFIRM, {
-      method: 'POST',
-      body: JSON.stringify({ refundId: '44444444-4444-4444-8444-444444444444' }),
-    });
-  });
-
   it('history adds billId query when provided', async () => {
     mockAuthApiClient.mockResolvedValue([]);
     await paymentService.history('55555555-5555-4555-8555-555555555555');

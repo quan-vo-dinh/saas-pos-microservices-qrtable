@@ -328,7 +328,7 @@ Vai trò: Giải thích QRTable được thiết kế như thế nào và vì sa
 #### 4.7. Kafka decision framework và topic registry
 
 - Giải thích selective event-driven architecture.
-- Approved topics: `order.confirmed`, `order.status_changed`, `payment.completed`, `payment.refunded`, `kitchen.sla_warning`, `tenant.created`.
+- Approved topics: `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, `tenant.created`.
 - Không invent topics như `menu.updated` nếu chưa có contract.
 
 #### 4.8. Redis/cache/session/KDS strategy

@@ -42,7 +42,7 @@ flowchart LR
     subgraph orderOps["Ordering, Kitchen, Payment Services"]
       order["Order Service<br/>HTTP 3301<br/>TCP 3201<br/>Session, cart, order, bill, service request, outbox"]
       kitchen["Kitchen Service<br/>HTTP 3307<br/>TCP 3207<br/>KDS tickets, station queues, SLA worker"]
-      payment["Payment Service<br/>HTTP 3308<br/>TCP 3208<br/>Bill payment, SePay QR, webhook processing, refund, outbox"]
+      payment["Payment Service<br/>HTTP 3308<br/>TCP 3208<br/>Bill payment, SePay QR, webhook processing, outbox"]
     end
 
     subgraph roadmap["Legacy and Roadmap Services"]
@@ -52,10 +52,10 @@ flowchart LR
   end
 
   subgraph infra["Data, Messaging, and Provider Layer"]
-    postgres["PostgreSQL 5432<br/>Catalog tables<br/>Order sessions orders bills<br/>Payment records refunds audits<br/>SaaS tenants"]
+    postgres["PostgreSQL 5432<br/>Catalog tables<br/>Order sessions orders bills<br/>Payment records audits<br/>SaaS tenants"]
     mongo["MongoDB 27017<br/>Users, roles, permissions<br/>Future notification documents"]
     redis["Redis 6379<br/>Session cache, cart state<br/>Rate limit, auth cache<br/>KDS queues, pubsub<br/>Socket.IO adapter"]
-    kafka["Kafka KRaft<br/>Internal 9092<br/>Host 29092<br/>order.confirmed<br/>kitchen.sla_warning<br/>payment.completed<br/>payment.refunded"]
+    kafka["Kafka KRaft<br/>Internal 9092<br/>Host 29092<br/>order.confirmed<br/>kitchen.sla_warning<br/>payment.completed"]
     keycloak["Keycloak 8180<br/>Realm qrtable<br/>Client qrtable-bff<br/>OIDC, JWKS, admin API"]
     cloudinary["Cloudinary<br/>Menu image upload and delivery"]
     sepayQr["SePay VietQR<br/>qr.sepay.vn image endpoint"]
@@ -100,7 +100,7 @@ flowchart LR
   bffRest -->|"TCP 3205 menu, category, table, QR"| catalog
   bffRest -->|"TCP 3201 session, cart, order, bill"| order
   bffRest -->|"TCP 3207 KDS queue and item actions"| kitchen
-  bffRest -->|"TCP 3208 payment QR, cash, refund, webhook"| payment
+  bffRest -->|"TCP 3208 payment QR, cash, webhook"| payment
   bffRest -.->|"TCP 3202 legacy product API"| productLegacy
 
   bffRest -->|"Upload menu image stream"| cloudinary
@@ -141,9 +141,9 @@ flowchart LR
   kitchen -->|"TCP 3201 update item status<br/>ready, served, cancelled"| order
   kitchen -->|"Publish kitchen.sla_warning"| kafka
 
-  payment -->|"Payments, refunds, audit log, payment outbox"| postgres
+  payment -->|"Payments, audit log, payment outbox"| postgres
   payment -->|"TCP 3201 bill snapshot<br/>BILL_MARK_PAID fast path"| order
-  payment -->|"Outbox publisher<br/>payment.completed and payment.refunded"| kafka
+  payment -->|"Outbox publisher<br/>payment.completed"| kafka
   payment -.->|"Builds QR URL returned to client"| sepayQr
 
   customerPwa -->|"Fetch QR image when paying online"| sepayQr
@@ -152,7 +152,7 @@ flowchart LR
   sepayProvider -->|"HTTP webhook with route auth<br/>POST api/v1/payment/sepay/webhook"| bffRest
   bffRest -->|"Forward validated webhook command<br/>TCP 3208"| payment
 
-  kafka -->|"payment.completed<br/>payment.refunded<br/>future tenant events"| notificationPlanned
+  kafka -->|"payment.completed<br/>future tenant events"| notificationPlanned
   notificationPlanned -.->|"Store notification history"| mongo
   notificationPlanned -.->|"Send email"| smtpPlanned
 

@@ -12,8 +12,6 @@ import { ErrorCode } from '@common/error-messages/error-code.enum';
 import {
   ConfirmCashRequestDto,
   CreateVietQrRequestDto,
-  RefundConfirmRequestDto,
-  RefundRequestDto,
   SepayWebhookRequestDto,
 } from '@common/interfaces/gateway/payment';
 import { ResponseDto } from '@common/interfaces/gateway/response.interface';
@@ -26,14 +24,11 @@ import type {
   CreateVietQrTcpRequest,
   HandleSepayWebhookTcpRequest,
   PaymentHistoryTcpRequest,
-  RefundConfirmTcpRequest,
-  RefundRequestTcpRequest,
 } from '@common/interfaces/tcp/payment';
 import type {
   CreateVietQrTcpResponse,
   PaymentHistoryTcpResponse,
   PaymentTcpResponse,
-  RefundTcpResponse,
   SepayWebhookTcpResponse,
 } from '@common/interfaces/tcp/payment';
 import { buildTcpRequestContext } from '@common/utils/request.util';
@@ -145,52 +140,6 @@ export class PaymentController {
       { data: tcpData, processId },
     );
     return { success: true };
-  }
-
-  @Post('refund/request')
-  @Authorization({ secured: true })
-  @Permissions([PERMISSION.PAYMENT_REFUND])
-  @ApiOperation({ summary: 'Request refund' })
-  async requestRefund(
-    @Body() dto: RefundRequestDto,
-    @Req() req: Request,
-    @ProcessId() processId: string,
-  ): Promise<ResponseDto<RefundTcpResponse>> {
-    const tenantId = req[MetadataKey.TENANT_ID] as string;
-    const payload: RefundRequestTcpRequest = { tenantId, userId: this.userId(req), processId, ...dto };
-    const tcp = await this.sendPaymentTcp<RefundTcpResponse, RefundRequestTcpRequest>(
-      TCP_REQUEST_MESSAGE.PAYMENT.REFUND_REQUEST,
-      buildTcpRequestContext(req, processId, payload),
-    );
-    return new ResponseDto<RefundTcpResponse>({
-      data: tcp.data,
-      statusCode: tcp.statusCode,
-      message: tcp.code as HTTP_MESSAGE,
-      processID: processId,
-    });
-  }
-
-  @Post('refund/confirm')
-  @Authorization({ secured: true })
-  @Permissions([PERMISSION.PAYMENT_REFUND])
-  @ApiOperation({ summary: 'Confirm refund' })
-  async confirmRefund(
-    @Body() dto: RefundConfirmRequestDto,
-    @Req() req: Request,
-    @ProcessId() processId: string,
-  ): Promise<ResponseDto<RefundTcpResponse>> {
-    const tenantId = req[MetadataKey.TENANT_ID] as string;
-    const payload: RefundConfirmTcpRequest = { tenantId, refundId: dto.refundId, userId: this.userId(req), processId };
-    const tcp = await this.sendPaymentTcp<RefundTcpResponse, RefundConfirmTcpRequest>(
-      TCP_REQUEST_MESSAGE.PAYMENT.REFUND_CONFIRM,
-      buildTcpRequestContext(req, processId, payload),
-    );
-    return new ResponseDto<RefundTcpResponse>({
-      data: tcp.data,
-      statusCode: tcp.statusCode,
-      message: tcp.code as HTTP_MESSAGE,
-      processID: processId,
-    });
   }
 
   @Get('history')

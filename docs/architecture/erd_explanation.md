@@ -19,7 +19,7 @@ The QRTable system applies a combined data model:
 | `qrtable_saas` (PostgreSQL)    | SaaS Management | tenants, pricing_plans, subscriptions             |
 | `qrtable_catalog` (PostgreSQL) | Catalog         | categories, menu_items, areas, tables             |
 | `qrtable_order` (PostgreSQL)   | Order           | sessions, orders, order_items, service_requests   |
-| `qrtable_payment` (PostgreSQL) | Payment         | bills, payments, refunds                          |
+| `qrtable_payment` (PostgreSQL) | Payment         | bills, payments                                   |
 | `qrtable_auth` (MongoDB)       | User-Access     | users, roles                                      |
 | Redis only                     | Kitchen         | KDS queues (Sorted Set, has no persistent tables) |
 
@@ -124,12 +124,11 @@ _Standardize revenue and cash flow._
   - `total_vnd`: Total principal amount.
   - `rounding_delta_vnd`: Rounding error. (For example: The system rounds 127,500 VND to 128,000 VND, then the delta is 500 VND).
 
-### Table `payments` & `refunds` (Payments & Refunds)
+### Table `payments` (Payments)
 
 - **`payments`**: 1 Invoice can be paid multiple times or through multiple forms (split money).
   - `method`: Cash (`CASH`), VietQR Transfer (`VIETQR`).
   - `sepay_transaction_id`: Map with Webhook returned from SePay. Ensure consistency (idempotency key).
-- **`refunds`**: In case a customer complains or cancels an item after payment (`status = paid`), the system designs a separate Refund Line so that the Audit Trail is not lost.
 
 ---
 

@@ -52,7 +52,7 @@ flowchart TB
 
   SaasCatalog -->|"tenant.created"| Kafka
   OrderKitchen -->|"order.confirmed / SLA warning"| Kafka
-  PaymentService -->|"payment.completed / refunded"| Kafka
+  PaymentService -->|"payment.completed"| Kafka
   Kafka -->|"async consumers and realtime bridge"| Bff
   Kafka -->|"KDS, tenant seed, bill recovery"| OrderKitchen
 

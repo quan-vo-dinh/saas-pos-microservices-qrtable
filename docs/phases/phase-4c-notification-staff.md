@@ -20,17 +20,17 @@
 
 ## Overview
 
-Phase 4C adds two axes: **asynchronous notifications** and **staff management**. Email notifications help tenants and guests receive timely confirmations (welcome, receipts, refunds, suspend/expiry alerts) without blocking the main HTTP flow; Limited dispatch and retry recording reduces operational data loss and supports investigations. Manage staff in **user-access** (extend instead of separating services) because the source of truth and authorization needs a clear boundary — BFF only proxies and applies guard chain — avoid fragmentation of user/role creation logic between multiple services. UI `/dashboard/staff` completes the operational lifecycle: invite → log in to the correct role → adjust or disable as needed.
+Phase 4C adds two axes: **asynchronous notifications** and **staff management**. Email notifications help tenants and guests receive timely confirmations (welcome, receipts, suspend/expiry alerts) without blocking the main HTTP flow; Limited dispatch and retry recording reduces operational data loss and supports investigations. Manage staff in **user-access** (extend instead of separating services) because the source of truth and authorization needs a clear boundary — BFF only proxies and applies guard chain — avoid fragmentation of user/role creation logic between multiple services. UI `/dashboard/staff` completes the operational lifecycle: invite → log in to the correct role → adjust or disable as needed.
 
 ## Steps
 
 ### Step 4.5 — Notification service (2-3 days)
 
-**Goal:** Respond to Kafka-defined events with transactional/verifiable emails, with archive traces, and retry policies — so tenants and owners can feel secure about receipts, refunds, and onboarding.
+**Goal:** Respond to Kafka-defined events with transactional/verifiable emails, with archive traces, and retry policies — so tenants and owners can feel secure about receipts and onboarding.
 
 **Scope & reason:**
 
-- **Consumer Kafka** for 3 events (correct registry §7.2): `tenant.created` → welcome/onboarding email; `payment.completed` → receipt email for Customer if there is an email; `payment.refunded` → notify Owner and audit flow. **Do not** map `order.canceled` to notifications.
+- **Consumer Kafka** for 2 events (correct registry §7.2): `tenant.created` → welcome/onboarding email; `payment.completed` → receipt email for Customer if there is an email. **Do not** map `order.canceled` to notifications.
 - **tenant lifecycle tasks from Phase 4B:** `tenant.suspended` does not go through Kafka — uses Redis flag for quick blocking — so the suspend email to Owner goes through direct task/TCP from SaaS service or cron job. Phase 4C also receives subscription warning/expired email and Owner reset-password/Keycloak Required Action handoff after SMTP is ready.
 - **Email templates:** HTML templates with **tenant branding** (logo, restaurant name, brand colors) — consistent branding and reducing confusion with generic emails.
 - **Retry logic:** Maximum **3 retries** with **exponential backoff** for failed emails — balance between temporary resiliency (email infrastructure) and not keeping load on consumers indefinitely.
@@ -103,4 +103,4 @@ Phase 4C adds two axes: **asynchronous notifications** and **staff management**.
 - Notification service is an extension point for other email events (SLA alerts, marketing opt-in) without touching the main sync path
 - User-access is a tenant-scoped human resource management edge, ready to add additional policies (for example, number of staff slots according to SaaS package) if required by the following phase.
 - UI staff reuses the table + dialog + RBAC pattern for other admin screens
-- Quick lookup table: topics `tenant.created`, `payment.completed`, `payment.refunded`; collection audit notification; staff management endpoints via BFF
+- Quick lookup table: topics `tenant.created`, `payment.completed`; collection audit notification; staff management endpoints via BFF

@@ -5,20 +5,13 @@ import { CONFIGURATION, TConfiguration } from '../configuration';
 import { AuditPaymentEntity } from './modules/payment/entities/audit-payment.entity';
 import { PaymentOutboxEventEntity } from './modules/payment/entities/payment-outbox-event.entity';
 import { PaymentEntity } from './modules/payment/entities/payment.entity';
-import { RefundEntity } from './modules/payment/entities/refund.entity';
 import { TenantPaymentSettingsEntity } from './modules/payment/entities/tenant-payment-settings.entity';
 import { PaymentModule } from './modules/payment/payment.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [() => CONFIGURATION] }),
-    createTypeOrmProvider([
-      PaymentEntity,
-      RefundEntity,
-      AuditPaymentEntity,
-      PaymentOutboxEventEntity,
-      TenantPaymentSettingsEntity,
-    ]),
+    createTypeOrmProvider([PaymentEntity, AuditPaymentEntity, PaymentOutboxEventEntity, TenantPaymentSettingsEntity]),
     PaymentModule,
   ],
 })

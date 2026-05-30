@@ -8,7 +8,7 @@ QRTable được thiết kế theo hướng microservices có kiểm soát. Các
 
 Các quyết định kiến trúc của QRTable được dẫn dắt bởi sáu nguyên tắc chính.
 
-Thứ nhất, hệ thống áp dụng mô hình cơ sở dữ liệu riêng mỗi dịch vụ ở mức ngữ cảnh giới hạn. Mỗi dịch vụ nghiệp vụ chịu trách nhiệm với một nhóm dữ liệu và quy tắc nghiệp vụ riêng; dịch vụ khác không được truy cập trực tiếp cơ sở dữ liệu của dịch vụ đó. Ví dụ, Catalog sở hữu thực đơn, bàn và tồn kho; Order sở hữu phiên, giỏ, đơn và hóa đơn; Payment sở hữu bản ghi thanh toán, hoàn tiền và cấu hình thanh toán của tenant. Nguyên tắc này giảm phụ thuộc chéo giữa các dịch vụ và làm rõ nơi đặt bất biến nghiệp vụ.
+Thứ nhất, hệ thống áp dụng mô hình cơ sở dữ liệu riêng mỗi dịch vụ ở mức ngữ cảnh giới hạn. Mỗi dịch vụ nghiệp vụ chịu trách nhiệm với một nhóm dữ liệu và quy tắc nghiệp vụ riêng; dịch vụ khác không được truy cập trực tiếp cơ sở dữ liệu của dịch vụ đó. Ví dụ, Catalog sở hữu thực đơn, bàn và tồn kho; Order sở hữu phiên, giỏ, đơn và hóa đơn; Payment sở hữu bản ghi thanh toán và cấu hình thanh toán của tenant. Nguyên tắc này giảm phụ thuộc chéo giữa các dịch vụ và làm rõ nơi đặt bất biến nghiệp vụ.
 
 Thứ hai, cô lập tenant phải là mặc định. QRTable là hệ thống SaaS phục vụ nhiều nhà hàng trên cùng nền tảng, nên mọi thao tác của tenant phải mang ngữ cảnh tenant. Mô hình hiện tại kết hợp cơ sở dữ liệu riêng mỗi dịch vụ với cột phân biệt \texttt{tenant\_id}. Cách tiếp cận này không phải mức cô lập vật lý cao nhất như một CSDL riêng cho mỗi tenant, nhưng phù hợp với phạm vi hệ thống hiện tại vì giảm chi phí vận hành, giữ migration đơn giản và vẫn cho phép kiểm soát dữ liệu theo tenant ở các lớp API, cơ sở dữ liệu, Redis, tải trọng Kafka và phòng WebSocket. Khái niệm SaaS và chia sẻ tài nguyên nền tảng cũng làm cô lập tenant trở thành một yêu cầu thiết kế cốt lõi \cite{nist-sp800145-2011}.
 
@@ -82,13 +82,13 @@ Bảng~\ref{tab:chapter4-service-ownership} tóm tắt trách nhiệm sở hữu
   Catalog & TCP, Kafka consumer & Danh mục, món, khu vực, bàn, token QR, tồn kho & Dịch vụ duy nhất ghi tồn kho; Order chỉ gọi Catalog qua TCP khi cần trừ/hoàn tồn kho. \\
   Order & TCP, Kafka producer/consumer, Redis & Phiên, giỏ chung, đơn, dòng đơn, hóa đơn, yêu cầu hỗ trợ & Sở hữu vòng đời đơn/hóa đơn; không ghi trực tiếp CSDL của Catalog hoặc Payment. \\
   Kitchen & TCP, Kafka consumer/producer, Redis & Không có PostgreSQL/MongoDB riêng & Redis Sorted Set/hash là bản chiếu runtime cho hàng đợi KDS. \\
-  Payment & TCP, tuyến webhook qua BFF, Kafka outbox & Thanh toán, hoàn tiền, kiểm toán thanh toán, cấu hình thanh toán tenant & Sở hữu quyết toán/cấu hình; Order vẫn sở hữu hoàn tất hóa đơn/phiên. \\
+  Payment & TCP, tuyến webhook qua BFF, Kafka outbox & Thanh toán, kiểm toán thanh toán, cấu hình thanh toán tenant & Sở hữu quyết toán/cấu hình; Order vẫn sở hữu hoàn tất hóa đơn/phiên. \\
 \end{longtable}
 }
 
 Catalog và Order là ví dụ điển hình cho cách QRTable xử lý trách nhiệm sở hữu. Khi khách gửi đơn, Order có thể lưu đơn ở trạng thái chờ xử lý và quản lý hóa đơn/phiên. Tuy nhiên, tồn kho là bất biến thuộc Catalog, vì Catalog mới là dịch vụ sở hữu món và số lượng tồn. Khi nhân viên xác nhận đơn, Order gọi Catalog qua TCP để trừ tồn kho trong giao dịch của Catalog. Nếu để Order ghi trực tiếp bảng món, hệ thống sẽ phá vỡ mô hình CSDL riêng mỗi dịch vụ và khiến logic tồn kho phân tán ở nhiều nơi.
 
-Payment và Order cũng được tách tương tự. Payment sở hữu giao dịch thanh toán, hoàn tiền, cấu hình thanh toán tenant và quyết toán webhook. Order sở hữu vòng đời hóa đơn/phiên. Khi thanh toán hoàn tất, Payment có thể gọi Order theo đường nhanh idempotent hoặc xuất bản \texttt{payment.completed} để Order xử lý phục hồi/phân phối, nhưng Payment không tự đóng hóa đơn/phiên hay cập nhật trạng thái bàn. Ranh giới này giúp tránh việc một dịch vụ ngoài ngữ cảnh đơn quyết định trực tiếp vòng đời đơn/hóa đơn.
+Payment và Order cũng được tách tương tự. Payment sở hữu giao dịch thanh toán, cấu hình thanh toán tenant và quyết toán webhook. Order sở hữu vòng đời hóa đơn/phiên. Khi thanh toán hoàn tất, Payment có thể gọi Order theo đường nhanh idempotent hoặc xuất bản \texttt{payment.completed} để Order xử lý phục hồi/phân phối, nhưng Payment không tự đóng hóa đơn/phiên hay cập nhật trạng thái bàn. Ranh giới này giúp tránh việc một dịch vụ ngoài ngữ cảnh đơn quyết định trực tiếp vòng đời đơn/hóa đơn.
 
 Kitchen là một trường hợp khác: dịch vụ này không có PostgreSQL hoặc MongoDB riêng trong kiến trúc hiện tại. Kitchen tiêu thụ sự kiện \texttt{order.confirmed}, dựng phiếu KDS và lưu hàng đợi runtime trong Redis Sorted Set/hash. Quyết định này phù hợp vì hàng đợi KDS là bản chiếu vận hành tốc độ cao, cần sắp xếp FIFO/ưu tiên/SLA và cập nhật thời gian thực; nó không cần một CSDL quan hệ riêng cho phạm vi hiện tại. Nếu sau này cần phân tích lịch sử bếp hoặc kiểm toán sâu hơn, có thể bổ sung lưu trữ hoặc bản chiếu riêng mà không làm thay đổi trách nhiệm của Order.
 
@@ -133,7 +133,7 @@ Bảng~\ref{tab:chapter4-communication-matrix} trình bày các kênh giao tiế
   TCP RPC & Payment -- Order & Lấy ảnh chụp hóa đơn và đánh dấu đã thanh toán idempotent cho đường nhanh/phục hồi. & Payment không sở hữu hóa đơn/phiên. \\
   TCP RPC & SaaS -- Authorizer / User-Access / Payment / Catalog / Order & Mini-saga đưa tenant vào hệ thống, tạo chủ quán/hồ sơ/cấu hình, bộ đếm sử dụng và hạn mức. & Điều phối SaaS không đồng nghĩa sở hữu dữ liệu của dịch vụ khác. \\
   gRPC & BFF -- Authorizer & Xác minh token và đường xác thực nhanh bằng hợp đồng dịch vụ có kiểu. & Luồng QR khách không đi qua Keycloak. \\
-  Kafka & Order / Payment / Kitchen / SaaS -- consumer & Sự kiện miền bất đồng bộ, tách thời gian, phân phối và phục hồi. & Chỉ dùng 6 topic được chấp nhận. \\
+  Kafka & Order / Payment / Kitchen / SaaS -- consumer & Sự kiện miền bất đồng bộ, tách thời gian, phân phối và phục hồi. & Chỉ dùng 5 topic được chấp nhận. \\
   Gợi ý nội bộ Redis & Runtime KDS -- cầu nối WebSocket BFF & Báo hàng đợi KDS thay đổi sau khi ghi Redis. & Gợi ý/làm mới, không thay trạng thái Kitchen. \\
   Webhook HTTP & SePay -- BFF -- Payment/SaaS & Quyết toán chuyển khoản cho hóa đơn tenant \texttt{QRTBL} và hóa đơn gói \texttt{QRSUB}. & Không trộn tuyến webhook theo tầng. \\
   HTTP/API ngoài & Catalog / Payment / Authorizer -- Cloudinary / SePay / Keycloak & Tải ảnh, API OAuth/nhà cung cấp và thao tác quản trị IAM. & Chỉ khẳng định phần có mã/bằng chứng. \\
@@ -177,13 +177,12 @@ Khung quyết định của QRTable có thể tóm tắt như sau. Nếu một t
   \texttt{order.confirmed} & Order & Kitchen & Đơn đã xác nhận cần tạo phiếu KDS nhưng Order không cần đợi Kitchen xử lý xong. \\
   \texttt{order.status\_}\newline\texttt{changed} & Order & Topic được chấp nhận; consumer runtime hiện còn hạn chế & Dòng trạng thái bền vững cho bản chiếu hoặc kiểm toán; phản hồi giao diện tức thời vẫn đi qua BFF Direct. \\
   \texttt{payment.}\newline\texttt{completed} & Payment & Order, cầu nối thời gian thực BFF & Hoàn tất thanh toán cần chốt hóa đơn và phát thời gian thực hoặc phân phối theo tenant và phiên. \\
-  \texttt{payment.refunded} & Payment & Topic được chấp nhận; consumer runtime hiện còn hạn chế & Kiểm toán hoàn tiền và hợp đồng outbox cho phân phối tương lai. \\
   \texttt{kitchen.sla\_}\newline\texttt{warning} & Kitchen & Cầu nối thời gian thực BFF & Cảnh báo SLA là sự kiện hẹn giờ hoặc nội bộ, không gắn với yêu cầu TCP đang chờ phản hồi. \\
   \texttt{tenant.created} & SaaS & Catalog & Đưa tenant vào hệ thống cần kích hoạt seed/thiết lập mặc định ở Catalog mà không siết phụ thuộc runtime. \\
 \end{longtable}
 }
 
-Bảng~\ref{tab:chapter4-kafka-topic-registry} cũng thể hiện một ranh giới kiểm soát quan trọng: QRTable chỉ công nhận sáu topic trong sổ đăng ký hiện tại. Các sự kiện như giỏ cập nhật, yêu cầu hóa đơn, chuyển bàn, hàng đợi KDS thay đổi, tenant bị tạm ngưng hoặc thực đơn cập nhật không được viết như topic Kafka lõi nếu chưa có hợp đồng tương ứng. Chúng có thể là sự kiện socket, gợi ý nội bộ Redis, làm mất hiệu lực bộ nhớ đệm hoặc làm mới giao diện tùy trường hợp.
+Bảng~\ref{tab:chapter4-kafka-topic-registry} cũng thể hiện một ranh giới kiểm soát quan trọng: QRTable chỉ công nhận năm topic trong sổ đăng ký hiện tại. Các sự kiện như giỏ cập nhật, yêu cầu hóa đơn, chuyển bàn, hàng đợi KDS thay đổi, tenant bị tạm ngưng hoặc thực đơn cập nhật không được viết như topic Kafka lõi nếu chưa có hợp đồng tương ứng. Chúng có thể là sự kiện socket, gợi ý nội bộ Redis, làm mất hiệu lực bộ nhớ đệm hoặc làm mới giao diện tùy trường hợp.
 
 \section{Redis, bộ nhớ đệm, phiên và chiến lược KDS}
 

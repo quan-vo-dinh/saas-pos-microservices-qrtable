@@ -3,7 +3,7 @@
 > **Document philosophy:** Understand the _why_ before the _how_. Every concept is anchored in context
 > QRTable's specifics so you don't learn abstract theory but learn to apply it immediately.
 >
-> **Current code status (2026-05-22):** This document is a supporting guide. The approved Kafka topic registry is `order.confirmed`, `order.status_changed`, `payment.completed`, `payment.refunded`, `kitchen.sla_warning`, and `tenant.created`. Runtime consumers already included in the code include `order.confirmed → Kitchen`, `payment.completed → Order + BFF realtime bridge`, `kitchen.sla_warning → BFF realtime bridge`, and `tenant.created → Catalog`. `order.status_changed` is currently an Order outbox topic for durable status projection/audit; immediate order WebSocket feedback still uses BFF Direct after the TCP response. Notification service does not exist in `apps/`\*; The Notification examples below are Phase 4C+/future extensions, not the current runtime state.
+> **Current code status (2026-05-30):** This document is a supporting guide. The approved Kafka topic registry is `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, and `tenant.created`. Runtime consumers already included in the code include `order.confirmed → Kitchen`, `payment.completed → Order + BFF realtime bridge`, `kitchen.sla_warning → BFF realtime bridge`, and `tenant.created → Catalog`. `order.status_changed` is currently an Order outbox topic for durable status projection/audit; immediate order WebSocket feedback still uses BFF Direct after the TCP response. Notification service does not exist in `apps/`\*; The Notification examples below are Phase 4C+/future extensions, not the current runtime state.
 
 ---
 
@@ -1825,11 +1825,10 @@ After reading the entire document, here is a brief mental model to remember:
 
 > Quick summary of 6 Kafka topics with producer, consumer, partition key, acks level, and delivery semantics. Used as a "quick reference" when implementing.
 
-| Topic                  | Producer        | Consumer Groups                                       | Key      | acks | Delivery      | Principles   |
-| ---------------------- | --------------- | ----------------------------------------------------- | -------- | ---- | ------------- | ------------ |
-| `order.confirmed`      | Order service   | kitchen-service-group                                 | tenantId | all  | at-least-once | P1 + P2      |
-| `order.status_changed` | Order service   | none current; projection/audit consumer is future     | tenantId | all  | at-least-once | P4           |
-| `payment.completed`    | Payment service | order-payment-consumer-group, bff-kafka-bridge        | tenantId | all  | at-least-once | P1 + P2 + P3 |
-| `kitchen.sla_warning`  | Kitchen service | bff-kafka-bridge                                      | tenantId | 1    | at-least-once | P2           |
-| `tenant.created`       | SaaS Mgmt       | catalog-tenant-created-consumer-group                 | tenantId | all  | at-least-once | P1 + P3      |
-| `payment.refunded`     | Payment service | none current; notification-service-group is Phase 4C+ | tenantId | all  | at-least-once | P1           |
+| Topic                  | Producer        | Consumer Groups                                   | Key      | acks | Delivery      | Principles   |
+| ---------------------- | --------------- | ------------------------------------------------- | -------- | ---- | ------------- | ------------ |
+| `order.confirmed`      | Order service   | kitchen-service-group                             | tenantId | all  | at-least-once | P1 + P2      |
+| `order.status_changed` | Order service   | none current; projection/audit consumer is future | tenantId | all  | at-least-once | P4           |
+| `payment.completed`    | Payment service | order-payment-consumer-group, bff-kafka-bridge    | tenantId | all  | at-least-once | P1 + P2 + P3 |
+| `kitchen.sla_warning`  | Kitchen service | bff-kafka-bridge                                  | tenantId | 1    | at-least-once | P2           |
+| `tenant.created`       | SaaS Mgmt       | catalog-tenant-created-consumer-group             | tenantId | all  | at-least-once | P1 + P3      |

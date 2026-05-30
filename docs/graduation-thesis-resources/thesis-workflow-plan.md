@@ -456,7 +456,7 @@ Thực hiện **Phase 7B**: viết bản nháp Chương 1 vào `thesis-report/ch
 - Không sửa lại Chương 3 thành implementation walkthrough khi đang audit kiến trúc; Chương 3 hiện chỉ giữ vai trò phân tích yêu cầu.
 - Không đổi các điểm `Một phần` hoặc `Giới hạn/Hướng phát triển` trong audit thành claim đã kiểm chứng ở Chương 4/6.
 - Khi tạo diagram Chương 4, dùng đúng service names hiện tại: Authorizer, User-Access, SaaS, Catalog, Order, Kitchen, Payment; không ghi chung `Auth Service` và không thêm `Notification Service` vào core diagram.
-- Kafka diagram/table chỉ dùng 6 topic approved: `order.confirmed`, `order.status_changed`, `payment.completed`, `payment.refunded`, `kitchen.sla_warning`, `tenant.created`.
+- Kafka diagram/table chỉ dùng 5 topic approved: `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, `tenant.created`.
 - WebSocket trong diagram phải thể hiện là hint/refetch, không phải source of truth.
 - Không quay lại mục lục/danh mục hình/bảng thủ công; hiện đã sinh tự động.
 - Không xóa/sửa magic comments TeXstudio/MacTeX ở đầu main `.tex` nếu không có lý do rõ ràng.

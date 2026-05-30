@@ -105,16 +105,15 @@ Design principles:
 | 54  | `KITCHEN_SET_PRIORITY`          | `kitchen.set_priority`          | Set or clear KDS ticket priority.        |
 | 55  | `PAYMENT_CREATE`                | `payment.create`                | Create payment.                          |
 | 56  | `PAYMENT_CONFIRM_CASH`          | `payment.confirm_cash`          | Confirm cash payment.                    |
-| 57  | `PAYMENT_REFUND`                | `payment.refund`                | Refund payment.                          |
-| 58  | `PAYMENT_GET_HISTORY`           | `payment.get_history`           | Read payment history.                    |
-| 59  | `TABLE_CREATE`                  | `table.create`                  | Create table.                            |
-| 60  | `TABLE_UPDATE`                  | `table.update`                  | Update table.                            |
-| 61  | `TABLE_DELETE`                  | `table.delete`                  | Delete table.                            |
-| 62  | `TABLE_TRANSFER`                | `table.transfer`                | Transfer session/order between tables.   |
-| 63  | `TABLE_UPDATE_STATUS`           | `table.update_status`           | Update table status.                     |
-| 64  | `SERVICE_REQUEST_CREATE`        | `service_request.create`        | Create service request.                  |
-| 65  | `SERVICE_REQUEST_ACKNOWLEDGE`   | `service_request.acknowledge`   | Acknowledge service request.             |
-| 66  | `SERVICE_REQUEST_RESOLVE`       | `service_request.resolve`       | Resolve service request.                 |
+| 57  | `PAYMENT_GET_HISTORY`           | `payment.get_history`           | Read payment history.                    |
+| 58  | `TABLE_CREATE`                  | `table.create`                  | Create table.                            |
+| 59  | `TABLE_UPDATE`                  | `table.update`                  | Update table.                            |
+| 60  | `TABLE_DELETE`                  | `table.delete`                  | Delete table.                            |
+| 61  | `TABLE_TRANSFER`                | `table.transfer`                | Transfer session/order between tables.   |
+| 62  | `TABLE_UPDATE_STATUS`           | `table.update_status`           | Update table status.                     |
+| 63  | `SERVICE_REQUEST_CREATE`        | `service_request.create`        | Create service request.                  |
+| 64  | `SERVICE_REQUEST_ACKNOWLEDGE`   | `service_request.acknowledge`   | Acknowledge service request.             |
+| 65  | `SERVICE_REQUEST_RESOLVE`       | `service_request.resolve`       | Resolve service request.                 |
 
 ## 5. Removed Or Legacy Items
 
@@ -125,7 +124,7 @@ Design principles:
 | `SAAS_*` permissions                                           | Still present in code for SUPER*ADMIN backward compatibility; use Phase 4B `TENANT*\*` permissions for new SaaS behavior. |
 | `PRODUCT_*` permissions                                        | Still present for SUPER_ADMIN backward compatibility with template code.                                                  |
 
-## 6. Canonical Permission Matrix (6 Roles × 66 Permissions)
+## 6. Canonical Permission Matrix (6 Roles × 65 Permissions)
 
 Legend: `✅` = granted; blank = not granted.
 
@@ -187,16 +186,15 @@ Legend: `✅` = granted; blank = not granted.
 | 54        | `kitchen.set_priority`          |     ✅      |   ✅   |   ✅    |        |       |         |
 | 55        | `payment.create`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
 | 56        | `payment.confirm_cash`          |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 57        | `payment.refund`                |     ✅      |   ✅   |   ✅    |        |       |         |
-| 58        | `payment.get_history`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 59        | `table.create`                  |     ✅      |   ✅   |   ✅    |        |       |         |
-| 60        | `table.update`                  |     ✅      |   ✅   |   ✅    |        |       |         |
-| 61        | `table.delete`                  |     ✅      |   ✅   |   ✅    |        |       |         |
-| 62        | `table.transfer`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 63        | `table.update_status`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 64        | `service_request.create`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 65        | `service_request.acknowledge`   |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 66        | `service_request.resolve`       |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 57        | `payment.get_history`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 58        | `table.create`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 59        | `table.update`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 60        | `table.delete`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 61        | `table.transfer`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 62        | `table.update_status`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 63        | `service_request.create`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 64        | `service_request.acknowledge`   |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 65        | `service_request.resolve`       |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
 | **Total** |                                 |   **66**    | **38** | **35**  | **15** | **6** |  **6**  |
 
 ## 7. Assignment Notes

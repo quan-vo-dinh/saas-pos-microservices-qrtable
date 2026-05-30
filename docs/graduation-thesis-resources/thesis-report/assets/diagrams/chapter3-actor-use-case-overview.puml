@@ -34,7 +34,7 @@ rectangle "«system» QRTable" as QRTable {
   usecase "Session, cart và order khách\njoin session · shared cart · submit order" as UC_Ordering
   usecase "Vận hành POS\nconfirm order · bill · chuyển bàn · service request" as UC_Pos
   usecase "Kitchen / KDS\nqueue station · ticket · recall · SLA" as UC_Kds
-  usecase "Thanh toán và đối soát\ncash · VietQR/SePay · refund" as UC_Payment
+  usecase "Thanh toán và đối soát\ncash · VietQR/SePay · lịch sử" as UC_Payment
 }
 
 actor "Customer / Guest\n<<session QR — không RBAC DB>>" as Customer

@@ -80,7 +80,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 | QR session + cart       | QR/token helpers, cart version conflict, session status policy                                               | Redis cart/session TTL, idempotency key, request bill lock                                             | Customer scan QR, join session, cart mutation, submit, reload/reconnect                                       |
 | Order + table state     | Shared transition matrices, cancel policy, transfer request id, bill request policy                          | Order confirm with Catalog stock deduct/release; table transfer consistency; bill aggregates           | QR -> order -> POS confirm -> KDS -> served                                                                   |
 | Kitchen + realtime      | KDS queue scoring, station access, SLA worker, gateway room derivation                                       | Kafka `order.confirmed` -> Kitchen Redis ticket -> BFF `kds.queue_changed` hint                        | KDS station flow, reconnect/refetch snapshot, waiter sees ready/served                                        |
-| Payment + refund        | VND rounding, payment reference, cash/VIETQR policy, webhook duplicate/underpaid/after-paid, refund state    | Payment transaction + Order `BILL_MARK_PAID`; outbox `payment.completed`; payment history tenant scope | POS cash/VietQR panels, Customer payment screen, paid bill immutability/refund visibility                     |
+| Payment settlement      | VND rounding, payment reference, cash/VIETQR policy, webhook duplicate/underpaid/after-paid                  | Payment transaction + Order `BILL_MARK_PAID`; outbox `payment.completed`; payment history tenant scope | POS cash/VietQR panels, Customer payment screen, Dashboard payment history read-only                          |
 | SaaS Phase 4B           | Slug, onboarding saga, tenant lifecycle, subscription invoice, payment settings, OAuth state, feature gating | SaaS onboarding cross-service compensation; Redis suspend/subscription cache; `QRSUB` invoice matching | Public landing, SUPER_ADMIN tenant/plan/billing, Owner subscription/payment settings, suspended Customer PWA  |
 | Architecture invariants | Kafka topic registry, Redis access policy, no `menu.updated`, BFF route constants, TCP pattern exposure      | Allowed Redis/Kafka access checks; topic/env defaults match canonical 6-topic registry                 | Browser checks observe final UI snapshots and refetch behavior, not hidden event internals                    |
 
@@ -116,7 +116,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 - Phase 1/Catalog: QR/token, public menu, CRUD tenant isolation, table status/delete constraints, Cloudinary validation/path.
 - Phase 2A: session/cart/idempotency, order/bill/service request transitions, stock deduct on confirm, table transfer.
 - Phase 2B: KDS Redis queue, duplicate `order.confirmed`, station access, snapshot-refetch after realtime hint.
-- Phase 3: VND rounding, `QRTBL`, cash/VietQR settlement, webhook duplicate/underpaid/after-paid, refund full-only, payment completion -> Order finalization.
+- Phase 3: VND rounding, `QRTBL`, cash/VietQR settlement, webhook duplicate/underpaid/after-paid, payment history read-only, payment completion -> Order finalization.
 - Phase 4B: tenant lifecycle, subscription/plan, `QRSUB`, OAuth state, payment settings, feature gating, suspended/closed customer behavior.
 - Architecture: Kafka 6-topic registry, Redis access policy, no `menu.updated`, BFF Direct vs Kafka boundaries, permission matrix counts.
 
@@ -130,7 +130,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 
 - **Order/Bill/Table:** valid/invalid transitions, `DRAFT` does not persist DB row, `PENDING -> PROCESSING -> READY -> SERVED -> COMPLETED`, bill `OPEN -> PENDING_PAYMENT -> PAID`, table `AVAILABLE/OCCUPIED/BILLING/CLEANING`, cancel pending/processing policy.
 - **Catalog/QR/Menu/Table:** QR token tamper/invalid path, menu visibility contract, delete constraints, table status transition helpers, table quota guard inputs, upload validator/tenant folder contract.
-- **Payment:** VND rounding edge cases, `QRTBL` reference generation/collision fallback, cash `amountReceived >= roundedTotal`, VIETQR pending reuse, underpaid/duplicate/after-paid webhook, full refund-only policy.
+- **Payment:** VND rounding edge cases, `QRTBL` reference generation/collision fallback, cash `amountReceived >= roundedTotal`, VIETQR pending reuse, underpaid/duplicate/after-paid webhook, Dashboard payment history read-only.
 - **SaaS Phase 4B:** slug/reserved collision, tenant status semantics, feature quotas (`max_tables`, `max_staff`, `max_orders_per_day`), `QRSUB` invoice matching, one active subscription, OAuth state/token secrecy, payment settings permissions.
 - **BFF/auth:** `UserGuard -> TenantGuard -> PermissionGuard`, customer lifecycle guard, tenant plan/status guards, route permission metadata for SaaS/payment/order/kitchen surfaces.
 - **Frontend components/hooks:** disabled controls for suspended tenant, payment exception for pending bills, POS/KDS realtime refetch hooks, dashboard auth readiness, role-based navigation.
@@ -188,11 +188,11 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 
 **Current E2E status needs to be reflected in the matrix:**
 
-| Existing file                             | Proving                                                                        | Remaining Gap                                                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| `tests/e2e/step-2.7-realtime.spec.ts`     | QR -> cart -> order -> POS confirm -> KDS -> served, reconnect/reload snapshot | Close-session and SaaS/suspended tenant payments not yet covered                                                      |
-| `tests/e2e/phase-3-payment.spec.ts`       | Payment screen/POS tab/dashboard refund smoke when dev stack/auth available    | Full payment finalization, webhook settlement, bill immutable, session close/table cleaning end-to-end not yet proven |
-| There is no dedicated Phase 4B Playwright | —                                                                              | tenant onboarding, admin billing, Owner subscription/payment settings, suspended tenant browser fixture               |
+| Existing file                             | Proving                                                                              | Remaining Gap                                                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `tests/e2e/step-2.7-realtime.spec.ts`     | QR -> cart -> order -> POS confirm -> KDS -> served, reconnect/reload snapshot       | Close-session and SaaS/suspended tenant payments not yet covered                                                      |
+| `tests/e2e/phase-3-payment.spec.ts`       | Payment screen/POS tab/dashboard payment history smoke when dev stack/auth available | Full payment finalization, webhook settlement, bill immutable, session close/table cleaning end-to-end not yet proven |
+| There is no dedicated Phase 4B Playwright | —                                                                                    | tenant onboarding, admin billing, Owner subscription/payment settings, suspended tenant browser fixture               |
 
 **verify:** E2E runs serially with idempotent seed fixture. The test does not examine Kafka/Redis internal details; test checks the final UI and snapshot after refetch.
 

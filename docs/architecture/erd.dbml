@@ -5,7 +5,7 @@
 //   DB "qrtable_saas"     → tenants, pricing_plans, subscriptions
 //   DB "qrtable_catalog"  → categories, menu_items, areas, tables
 //   DB "qrtable_order"    → orders, order_items, sessions, service_requests (Phase 2)
-//   DB "qrtable_payment"  → bills, payments, refunds (Phase 3)
+//   DB "qrtable_payment"  → bills, payments (Phase 3)
 //   MongoDB "qrtable_auth" → users, roles (User-Access service)
 //
 // MULTI-TENANCY: Discriminator Column (tenant_id) on every tenant-scoped entity.
@@ -59,7 +59,6 @@ Enum bill_status {
 Enum payment_status {
   pending
   paid
-  refunded
   failed
 }
 
@@ -290,23 +289,6 @@ Table payments {
   }
 }
 
-Table refunds {
-  id uuid [pk]
-  tenant_id uuid [not null]
-  payment_id uuid [not null]
-  amount_vnd bigint [not null]
-  reason text
-  refunded_by_user_id varchar(80)
-  status payment_status [not null, default: 'pending']
-  created_at timestamp [not null]
-  updated_at timestamp [not null]
-
-  Indexes {
-    (tenant_id, payment_id)
-    (tenant_id, created_at)
-  }
-}
-
 Table service_requests {
   id uuid [pk]
   tenant_id uuid [not null]
@@ -350,7 +332,6 @@ Table service_requests {
 // TableGroup qrtable_payment [color: #9b59b6] {
 //   bills
 //   payments
-//   refunds
 // }
 
 // ─────────────────────────────────────────────────
@@ -366,7 +347,6 @@ Ref: orders.session_id > sessions.id
 Ref: order_items.order_id > orders.id
 Ref: bills.session_id > sessions.id
 Ref: payments.bill_id > bills.id
-Ref: refunds.payment_id > payments.id
 
 // Cross-service relationships (LOGICAL only — NOT enforced by DB FK, resolved via TCP/Kafka)
 // These references cross database boundaries. Data integrity maintained at application level.
@@ -382,7 +362,6 @@ Ref: order_items.tenant_id > tenants.id
 Ref: order_items.menu_item_id > menu_items.id
 Ref: bills.tenant_id > tenants.id 
 Ref: payments.tenant_id > tenants.id 
-Ref: refunds.tenant_id > tenants.id
 Ref: service_requests.tenant_id > tenants.id
 Ref: service_requests.table_id > tables.id 
 Ref: service_requests.session_id > sessions.id

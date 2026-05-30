@@ -338,11 +338,11 @@
 
 **Sources:** `business-logic` (6.B); `technical-architecture` (6.2.7, 10.1); `phase-3-payment` accepted decisions.
 
-**Tests:** VND rounding policy spec; Order bill roll-up and bill snapshot specs; Payment service spec; Payment refund service spec; customer PWA request-payment page spec.
+**Tests:** VND rounding policy spec; Order bill roll-up and bill snapshot specs; Payment service spec; customer PWA request-payment page spec.
 
 **Target layer:** unit-contract. **Stack:** none.
 
-**Notes:** Canonical helper now applies `Math.ceil(rawTotal / 1000) * 1000`, rejects negative/non-integer raw totals, and stores `rawTotal`, `roundedTotal`, and `roundingDelta` on the Order-owned bill snapshot. Payment validates snapshot consistency, persists Order snapshot totals, uses `roundedTotal` for VietQR/cash/webhook comparisons, and falls back to `paidAmount ?? roundedTotal` for full refund amount.
+**Notes:** Canonical helper now applies `Math.ceil(rawTotal / 1000) * 1000`, rejects negative/non-integer raw totals, and stores `rawTotal`, `roundedTotal`, and `roundingDelta` on the Order-owned bill snapshot. Payment validates snapshot consistency, persists Order snapshot totals, uses `roundedTotal` for VietQR/cash/webhook comparisons, and records `paidAmount` when webhook transfer differs from rounded total.
 
 ---
 
@@ -408,15 +408,15 @@
 
 ---
 
-### `P0-PAY-REFUND-FULL-ONLY` — `covered` (P0, money)
+### `P0-PAY-REFUND-FULL-ONLY` — `deferred-by-phase` (P0, money)
 
-**Requirement:** Refunds are manual full refunds only, one active or confirmed refund at a time, and do not reopen bills.
+**Requirement:** Post-payment refund flow — **out of thesis product scope** (see `phase-3-payment.md` scope note).
 
-**Sources:** `business-logic` (6.B); `phase-3-payment` accepted decisions.
+**Sources:** `phase-3-payment`; `business-logic` post-payment adjustments note.
 
-**Tests:** Payment refund service spec; management-app orders refund section spec; Phase 3 payment E2E.
+**Tests:** Replaced by payment history read-only coverage (`payment-history-section`, `usePaymentHistoryQuery`, Phase 3 payment E2E smoke).
 
-**Target layer:** unit-contract. **Stack:** optional browser dev stack.
+**Target layer:** deferred. **Stack:** n/a.
 
 ---
 
@@ -456,7 +456,7 @@
 
 **Target layer:** browser-e2e. **Stack:** PWA, management-app, BFF, Payment, Order, Catalog, Keycloak, seeded paid and pending bills.
 
-**Notes:** Current Playwright coverage is smoke for screens, tabs, and refund visibility; add a deterministic close-session journey once seed or fixture is stable.
+**Notes:** Current Playwright coverage is smoke for screens, tabs, and payment history visibility; add a deterministic close-session journey once seed or fixture is stable.
 
 ---
 
@@ -638,7 +638,7 @@
 
 ### `P1-ARCH-KAFKA-6-TOPIC-REGISTRY` — `covered` (P1, architecture)
 
-**Requirement:** Kafka topic registry is exactly the current domain topics: `order.confirmed`, `order.status_changed`, `payment.completed`, `payment.refunded`, `kitchen.sla_warning`, `tenant.created`; no UI-only Kafka topics.
+**Requirement:** Kafka topic registry is exactly the current domain topics: `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, `tenant.created`; no UI-only Kafka topics.
 
 **Sources:** `technical-architecture` (7.2, 7.4); `phase-5-7-finalization` architecture anchors.
 
@@ -757,7 +757,7 @@ Ordered by urgency; each line is **priority**, **rule id**, **status**, and **ne
 
 ## Acceptance check for Step 5.1
 
-- Every required Phase 5 anchor has at least one entry: Catalog and QR, Order and cart and session, Kitchen and realtime, Payment and refund, SaaS 4B, RBAC and auth, and architecture invariants.
+- Every required Phase 5 anchor has at least one entry: Catalog and QR, Order and cart and session, Kitchen and realtime, Payment settlement and history, SaaS 4B, RBAC and auth, and architecture invariants.
 - Every P0 entry either names concrete test locations in prose (app or lib plus spec purpose) or states a concrete `notes` or next action when tests are absent.
 - Phase 4A and Phase 4C items are explicitly marked `deferred-by-phase`.
 - This document does not include test implementation steps or code.

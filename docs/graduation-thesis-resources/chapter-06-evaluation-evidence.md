@@ -53,7 +53,7 @@ Traceability handoff ghi nhận lệnh default `pnpm exec nx run-many -t test --
 | Catalog và QR            |       5 |       2 | 1 implementation gap | Public menu, QR token và quota table có evidence; tenant A/B live gate và delete constraint chưa phủ toàn diện; QR scan rate limit là implementation gap.                                      |
 | Order/session/cart/bill  |       8 |       1 |                    0 | Core ordering, cart version, submit idempotency, stock consistency, bill request và payment finalization có coverage mạnh; table transfer cần integration sâu hơn.                             |
 | Kitchen/KDS realtime     |       5 |       0 |                    0 | KDS dedupe, station RBAC, FIFO/priority/SLA, refetch hint và Redis-only recovery có thể viết là đã kiểm chứng ở mức test hiện có.                                                              |
-| Payment settlement       |       9 |       1 |                    0 | Cash/VietQR/Webhook/idempotency/refund có unit-contract và một số opt-in integration; browser close-session còn partial; live SePay không tự động.                                             |
+| Payment settlement       |       9 |       1 |                    0 | Cash/VietQR/Webhook/idempotency/lịch sử thanh toán read-only có unit-contract và một số opt-in integration; browser close-session còn partial; live SePay không tự động.                       |
 | SaaS lifecycle           |       7 |       3 |                    0 | Tenant lifecycle, subscription invoice, quota, payment settings và admin routes có evidence; onboarding full live stack, suspended pending-bill browser path và OAuth state tests còn partial. |
 | RBAC và tenant isolation |       2 |       1 |                    0 | Guard chain và permission matrix counts mạnh; representative live tenant-isolation API gate còn partial.                                                                                       |
 | Architecture invariants  |       2 |       2 |                    0 | Kafka 6-topic registry và Redis access policy mạnh; BFF Direct/no-Kafka-for-UI và TCP pattern coverage còn partial.                                                                            |
@@ -118,7 +118,7 @@ Traceability handoff ghi nhận lệnh default `pnpm exec nx run-many -t test --
 | Order consistency       | Cart version, idempotency key, stock deduct qua Catalog TCP, bill finalization và webhook duplicate handling đã được kiểm chứng ở mức unit/contract/integration tùy flow. |
 | KDS realtime            | KDS dùng Redis runtime state, Kafka `order.confirmed` và WebSocket hint/refetch; duplicate event handling có integration proof với Redis.                                 |
 | RBAC                    | Guard chain, six-role permission seed và permission counts có test/smoke evidence; Customer là session actor, không dùng Keycloak.                                        |
-| Architecture validation | Kafka registry 6 topic và Redis access policy có architecture contract tests; WebSocket không phải source of truth.                                                       |
+| Architecture validation | Kafka registry 5 topic và Redis access policy có architecture contract tests; WebSocket không phải source of truth.                                                       |
 | Scalability             | Kiến trúc service boundary, Kafka, Redis và Socket.IO tạo cơ sở thiết kế cho mở rộng từng phần, nhưng chưa có load test định lượng.                                       |
 
 ### 7.2 Claim không được phép viết

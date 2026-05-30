@@ -94,7 +94,6 @@ export enum PERMISSION {
   /* PAYMENT (Phase 3) */
   PAYMENT_CREATE = 'payment.create',
   PAYMENT_CONFIRM_CASH = 'payment.confirm_cash',
-  PAYMENT_REFUND = 'payment.refund',
   PAYMENT_GET_HISTORY = 'payment.get_history',
 
   /* TABLE (Phase 1-2A) */

@@ -1,4 +1,4 @@
-import type { PaymentMethod, PaymentStatusValue, RefundStatusValue } from '@einvoice/types';
+import type { PaymentMethod, PaymentStatusValue } from '@einvoice/types';
 
 export class PaymentResponseDto {
   id!: string;
@@ -22,17 +22,4 @@ export class CreateVietQrResponseDto extends PaymentResponseDto {
   qrUrl!: string;
   bankAccount!: string;
   bankName!: string;
-}
-
-export class RefundResponseDto {
-  id!: string;
-  tenantId!: string;
-  paymentId!: string;
-  amount!: number;
-  reason!: string;
-  status!: RefundStatusValue;
-  requestedByUserId!: string;
-  requestedAt!: string;
-  confirmedByUserId?: string;
-  confirmedAt?: string;
 }

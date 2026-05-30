@@ -526,7 +526,7 @@ Do not claim the following events if there is no spec:
 ```txt
 events.menuUpdated ← menu uses cache/REST invalidation, no WS events
 events.menu.updated
-payment.refunded ← There is no WS bridge for refund yet
+(payment.refunded is not in the approved Kafka registry)
 generic notification stream
 ```
 

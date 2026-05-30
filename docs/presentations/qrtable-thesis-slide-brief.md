@@ -295,7 +295,7 @@ QRTable covers the full circle of POS operations at the table: from restaurant o
 - **Catalog:** category, item, photo, price, availability/out of stock, table and QR.
 - **Ordering:** session, shared cart, order, bill, service request.
 - **Kitchen/KDS:** ticket, kitchen/bar queue, SLA, priority, recall.
-- **Payment:** cash, SePay/VietQR, webhook, refund, audit.
+- **Payment:** cash, SePay/VietQR, webhook, payment history, audit.
 - **Operation:** RBAC, staff roles, monitoring, deployment.
 
 ### Visual / layout
@@ -527,7 +527,7 @@ service boundaries are divided by proprietary and operational data, not by scree
 | Catalog       | Category, menu item, table, QR, stock       | PostgreSQL                | TCP                  |
 | Order         | Session, cart, order, bill, service request | PostgreSQL + Redis        | TCP, Kafka           |
 | Kitchen       | KDS tickets, queue, SLA                     | Redis-only                | Kafka, TCP           |
-| Payment       | Payment, refund, audit                      | PostgreSQL                | TCP, webhooks, Kafka |
+| Payment       | Payment, audit, settings                    | PostgreSQL                | TCP, webhooks, Kafka |
 | Notifications | Email/audit async                           | MongoDB                   | Kafka                |
 
 ### Visual / layout
@@ -775,8 +775,8 @@ Kafka is only used for domain events that need decoupling, not as a proxy for UI
 **Core registry topic:**
 
 - `order.confirmed`
+- `order.status_changed`
 - `payment.completed`
-- `payment.refunded`
 - `kitchen.sla_warning`
 - `tenant.created`
 
@@ -1319,7 +1319,7 @@ Add small callout: `No redirect, QR inline`.
 
 Payment is designed to suit the Vietnamese context. Instead of using Stripe as some initial proposals, the system chose SePay + VietQR. Staff or customers see the QR directly on the interface, the customer transfers money via the banking app, SePay detects the transaction and calls the webhook to BFF.
 
-Payment service is responsible for recording payments, checking webhooks, saving paid amounts, refunds and audits. However, the lifecycle bill is still under Order service. This prevents Payment from arbitrarily closing the session or changing the table status without going through the bill's business Owner.
+Payment service is responsible for recording payments, checking webhooks, saving paid amounts and audits. However, the lifecycle bill is still under Order service. This prevents Payment from arbitrarily closing the session or changing the table status without going through the bill's business Owner.
 
 ---
 
@@ -1443,7 +1443,7 @@ QRTable demonstrates the core architectural direction and has a clear roadmap to
 - **Phase 1:** Catalog + menu + table + QR + Cloudinary.
 - **Phase 2A:** Permission + Order + Redis cart/session + Kafka `order.confirmed`.
 - **Phase 2B:** Kitchen/KDS + WebSocket realtime.
-- **Phase 3:** Payment SePay/VietQR + Cash + refund/audit.
+- **Phase 3:** Payment SePay/VietQR + Cash + payment history/audit.
 - **Phase 4:** Saga hardening, SaaS onboarding, notification/staff.
 - **Phase 5-7:** Testing, observability, Docker deploy, final demo.
 
@@ -1576,7 +1576,7 @@ When customers scan QR:
 | Chef updates ticket              | `kitchen.update_ticket`    | Only the kitchen/bar handles KDS tickets                                       |
 | Owner/Manager set priority KDS   | `kitchen.set_priority`     | Chef/Barista does not automatically change priority                            |
 | Waiter confirms cash             | `payment.confirm_cash`     | Cashier staff confirmed receipt of money                                       |
-| Owner/Manager refund             | `payment.refund`           | Refunds require management and auditing rights                                 |
+| Owner/Manager payment history    | `payment.get_history`      | Read-only reconciliation for management roles                                  |
 | Customer submit order            | `SessionGuard` + ownership | Customer does not have a DB role                                               |
 
 ### 3.4. Short explanation when asked "How does RBAC work?"

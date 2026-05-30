@@ -26,11 +26,11 @@ Phase 4C bổ sung hai trục: **thông báo bất đồng bộ** và **quản l
 
 ### Bước 4.5 — Notification service (2–3 ngày)
 
-**Mục tiêu:** Phản hồi event Kafka đã định nghĩa bằng email giao dịch/có thể kiểm chứng, có dấu vết lưu trữ và chính sách retry — tenant và owner yên tâm về biên lai, hoàn tiền và onboarding.
+**Mục tiêu:** Phản hồi event Kafka đã định nghĩa bằng email giao dịch/có thể kiểm chứng, có dấu vết lưu trữ và chính sách retry — tenant và owner yên tâm về biên lai và onboarding.
 
 **Phạm vi & lý do:**
 
-- **Consumer Kafka** cho 3 event (registry đúng §7.2): `tenant.created` → email welcome/onboarding; `payment.completed` → email biên lai cho Customer nếu có email; `payment.refunded` → thông báo Owner và luồng audit. **Không** map `order.canceled` sang notification.
+- **Consumer Kafka** cho 2 event (registry đúng §7.2): `tenant.created` → email welcome/onboarding; `payment.completed` → email biên lai cho Customer nếu có email. **Không** map `order.canceled` sang notification.
 - **Tác vụ lifecycle tenant từ Phase 4B:** `tenant.suspended` không qua Kafka — dùng Redis flag chặn nhanh — nên email suspend tới Owner qua task/TCP trực tiếp từ SaaS hoặc cron. Phase 4C cũng nhận email cảnh báo/hết hạn subscription và handoff reset-password Owner / Keycloak Required Action sau khi SMTP sẵn sàng.
 - **Email templates:** HTML có **tenant branding** (logo, tên nhà hàng, màu thương hiệu) — nhất quán thương hiệu, giảm nhầm với email generic.
 - **Retry logic:** Tối đa **3 lần** với **exponential backoff** khi gửi thất bại — cân bằng phục hồi tạm thời (hạ tầng email) và không giữ tải vô hạn trên consumer.
@@ -103,4 +103,4 @@ Phase 4C bổ sung hai trục: **thông báo bất đồng bộ** và **quản l
 - Notification service là điểm mở rộng cho email khác (SLA alert, marketing opt-in) mà không chạm luồng sync chính
 - User-access là cạnh quản lý nhân sự theo tenant, sẵn sàng thêm policy (ví dụ số slot staff theo gói SaaS) nếu phase sau yêu cầu
 - UI staff tái sử dụng pattern table + dialog + RBAC cho màn admin khác
-- Bảng tra nhanh: topics `tenant.created`, `payment.completed`, `payment.refunded`; collection audit notification; endpoint staff qua BFF
+- Bảng tra nhanh: topics `tenant.created`, `payment.completed`; collection audit notification; endpoint staff qua BFF

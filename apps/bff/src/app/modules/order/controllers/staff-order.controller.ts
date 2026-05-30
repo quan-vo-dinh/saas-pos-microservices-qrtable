@@ -63,12 +63,7 @@ import { firstValueFrom, map } from 'rxjs';
 import { RealtimeEventsService } from '../../realtime/services/realtime-events.service';
 
 /** Payment rows that must prevent staff reopen (race vs VietQR / settlement). */
-const REOPEN_BLOCKED_PAYMENT_STATUSES = new Set<string>([
-  PaymentStatus.PENDING,
-  PaymentStatus.PAID,
-  PaymentStatus.REFUND_PENDING,
-  PaymentStatus.REFUNDED,
-]);
+const REOPEN_BLOCKED_PAYMENT_STATUSES = new Set<string>([PaymentStatus.PENDING, PaymentStatus.PAID]);
 
 @ApiTags('Orders (Admin)')
 @Controller('admin')
@@ -93,7 +88,7 @@ export class StaffOrderController {
 
   /**
    * Loads the session's current bill; if present, rejects reopen when Payment lists any row in
-   * PENDING / PAID / REFUND_PENDING / REFUNDED for that bill (source of truth: Payment service).
+   * PENDING / PAID for that bill (source of truth: Payment service).
    */
   private async assertReopenAllowedAgainstPayments(
     req: Request,

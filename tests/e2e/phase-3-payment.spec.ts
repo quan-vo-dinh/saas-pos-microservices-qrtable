@@ -47,14 +47,14 @@ test.describe('Phase 3 payment smoke', () => {
       await expect(page.getByRole('tab', { name: /VietQR/i })).toBeVisible();
     });
 
-    test('refund action is visible for paid bill (dashboard)', async ({ page }) => {
+    test('payment history section is visible (dashboard)', async ({ page }) => {
       if (!OWNER_EMAIL || !OWNER_PASSWORD) {
         test.skip(true, 'Set PHASE3_OWNER_EMAIL and PHASE3_OWNER_PASSWORD (OWNER or MANAGER)');
         return;
       }
 
       await loginWithKeycloak(page, MGMT_BASE, '/dashboard/orders', OWNER_EMAIL, OWNER_PASSWORD);
-      await expect(page.getByRole('button', { name: /Refund|Hoàn tiền/i }).first()).toBeVisible();
+      await expect(page.getByText(/Lịch sử thanh toán/i).first()).toBeVisible();
     });
   });
 });

@@ -5,6 +5,8 @@
 > **Status:** Finalized after Phase 3 audit and project Owner's Q1-Q6 decision.
 > **Purpose:** This document is a business/technical standard for Phase 3. This is not an implementation plan and does not disassemble task code.
 > **Implementation note (2026-05-14):** Original Spec Phase 3 latches according to `X-Secret-Key` mechanism. The current code for the direct route `POST /api/v1/payment/sepay/webhook` has been hardened to HMAC raw-body (`X-SePay-Signature` + `X-SePay-Timestamp`). tenant/platform routes added in Phase 4B still use their own `x-secret-key` path. When deviating, prioritize the current phase record and code/tests.
+>
+> **Scope note (2026-05-30):** Manual refund sections in this historical spec are **superseded**. Canonical behavior is in `docs/phases/phase-3-payment.md` (cash/VietQR settlement + read-only payment history; post-payment adjustments out of thesis scope).
 
 ---
 

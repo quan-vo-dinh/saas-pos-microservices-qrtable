@@ -26,7 +26,7 @@ Order là service triển khai session, shared cart, order submission, order sta
 
 Kitchen triển khai KDS bằng Kafka consumer, Redis Sorted Set/hash và TCP command cho các thao tác start/ready/recall/priority. Service này không có PostgreSQL/MongoDB riêng trong phạm vi hiện tại. Thay vào đó, Kitchen xây dựng runtime projection từ \texttt{order.confirmed} và có cơ chế rebuild từ active order snapshot khi cần phục hồi projection.
 
-Payment triển khai hai nhánh settlement: cash tại POS và VietQR/SePay webhook. Payment sở hữu payment record, audit payment, refund baseline, tenant payment settings và payment outbox. Khi payment hoàn tất, Payment phối hợp với Order qua TCP hoặc event để mark bill paid, nhưng không tự sở hữu bill/session lifecycle.
+Payment triển khai hai nhánh settlement: cash tại POS và VietQR/SePay webhook. Payment sở hữu payment record, audit payment, tenant payment settings và payment outbox. Khi payment hoàn tất, Payment phối hợp với Order qua TCP hoặc event để mark bill paid, nhưng không tự sở hữu bill/session lifecycle.
 
 SaaS triển khai tenant onboarding, plan, subscription, tenant lifecycle, usage quota, subscription invoice và tenant status cache. Onboarding được triển khai như một mini-saga: SaaS tạo tenant/subscription, gọi Authorizer tạo owner identity, gọi User-Access tạo profile, gọi Payment tạo payment settings và ghi event tenant created vào outbox. Khi một bước phụ thuộc thất bại, service có compensation để tránh dữ liệu mồ côi.
 

@@ -9,8 +9,6 @@ import type {
   PaymentHistoryTcpRequest,
   PaymentByIdTcpRequest,
   PaymentSettingsByTenantTcpRequest,
-  RefundConfirmTcpRequest,
-  RefundRequestTcpRequest,
   CreateEmptyPaymentSettingsTcpRequest,
   DisconnectPaymentSettingsTcpRequest,
   GeneratePaymentAuthorizeUrlTcpRequest,
@@ -23,7 +21,6 @@ import type {
   CreateVietQrTcpResponse,
   PaymentHistoryTcpResponse,
   PaymentTcpResponse,
-  RefundTcpResponse,
   SepayWebhookTcpResponse,
   SelectBankTcpResponse,
   TenantPaymentSettingsTcpResponse,
@@ -31,7 +28,6 @@ import type {
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { PaymentService } from '../services/payment.service';
-import { RefundService } from '../services/refund.service';
 import { TenantPaymentSettingsService } from '../services/tenant-payment-settings.service';
 
 @UseInterceptors(TcpLoggingInterceptor)
@@ -39,7 +35,6 @@ import { TenantPaymentSettingsService } from '../services/tenant-payment-setting
 export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
-    private readonly refundService: RefundService,
     private readonly tenantPaymentSettingsService: TenantPaymentSettingsService,
   ) {}
 
@@ -58,16 +53,6 @@ export class PaymentController {
     @RequestParams() body: HandleSepayWebhookTcpRequest,
   ): Promise<Response<SepayWebhookTcpResponse>> {
     return Response.success(await this.paymentService.handleSepayWebhook(body));
-  }
-
-  @MessagePattern(TCP_REQUEST_MESSAGE.PAYMENT.REFUND_REQUEST)
-  async requestRefund(@RequestParams() body: RefundRequestTcpRequest): Promise<Response<RefundTcpResponse>> {
-    return Response.success(await this.refundService.requestRefund(body));
-  }
-
-  @MessagePattern(TCP_REQUEST_MESSAGE.PAYMENT.REFUND_CONFIRM)
-  async confirmRefund(@RequestParams() body: RefundConfirmTcpRequest): Promise<Response<RefundTcpResponse>> {
-    return Response.success(await this.refundService.confirmRefund(body));
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.PAYMENT.GET_HISTORY)

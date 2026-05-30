@@ -23,4 +23,4 @@ export const SERVICE_REQUEST_TYPES = Object.values(ServiceRequestType);
 export const SERVICE_REQUEST_STATUSES = Object.values(ServiceRequestStatus);
 export const PAYMENT_METHODS = Object.values(PaymentMethod);
 
-// Payment aggregate statuses (Phase 3) live in @einvoice/types — use PaymentStatus / RefundStatus / PaymentAuditAction there.
+// Payment aggregate statuses (Phase 3) live in @einvoice/types — use PaymentStatus / PaymentAuditAction there.

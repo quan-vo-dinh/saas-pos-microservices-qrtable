@@ -80,9 +80,9 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 | QR session + cart       | QR/token helpers, cart version conflict, chính sách session status                                           | Redis cart/session TTL, idempotency key, khóa request bill                                            | Customer scan QR, join session, cart mutation, submit, reload/reconnect                                      |
 | Order + table state     | Ma trận transition dùng chung, chính sách cancel, transfer request id, chính sách request bill               | Order confirm với Catalog trừ/hoàn stock; nhất quán chuyển bàn; tổng hợp bill                         | QR → order → POS confirm → KDS → served                                                                      |
 | Kitchen + realtime      | Điểm hàng đợi KDS, station access, SLA worker, suy ra room gateway                                           | Kafka `order.confirmed` → ticket Redis Kitchen → BFF hint `kds.queue_changed`                         | Luồng station KDS, reconnect/refetch snapshot, waiter thấy ready/served                                      |
-| Payment + refund        | Làm tròn VND, tham chiếu thanh toán, chính sách cash/VietQR, webhook trùng/thiếu/sau paid, state refund      | Transaction Payment + Order `BILL_MARK_PAID`; outbox `payment.completed`; lịch sử payment theo tenant | Panel cash/VietQR POS, màn thanh toán Customer, bill paid bất biến/khả năng refund                           |
+| Payment settlement      | Làm tròn VND, tham chiếu thanh toán, chính sách cash/VietQR, webhook trùng/thiếu/sau paid                    | Transaction Payment + Order `BILL_MARK_PAID`; outbox `payment.completed`; lịch sử payment theo tenant | Panel cash/VietQR POS, màn thanh toán Customer, Dashboard lịch sử thanh toán read-only                       |
 | SaaS Phase 4B           | Slug, saga onboarding, lifecycle tenant, invoice subscription, payment settings, OAuth state, feature gating | Compensation onboarding đa service; cache Redis suspend/subscription; khớp invoice `QRSUB`            | Landing public, SUPER_ADMIN tenant/plan/billing, Owner subscription/payment settings, Customer PWA suspended |
-| Invariant kiến trúc     | Registry topic Kafka, chính sách truy cập Redis, không `menu.updated`, hằng route BFF, pattern TCP           | Kiểm tra Redis/Kafka được phép; default topic/env khớp registry 6 topic                               | Browser kiểm snapshot UI cuối và hành vi refetch, không phụ thuộc nội bộ event ẩn                            |
+| Invariant kiến trúc     | Registry topic Kafka, chính sách truy cập Redis, không `menu.updated`, hằng route BFF, pattern TCP           | Kiểm tra Redis/Kafka được phép; default topic/env khớp registry 5 topic                               | Browser kiểm snapshot UI cuối và hành vi refetch, không phụ thuộc nội bộ event ẩn                            |
 
 ### Các bước
 
@@ -116,9 +116,9 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 - Phase 1/Catalog: QR/token, public menu, CRUD tenant isolation, trạng thái/xóa bàn, validation/path Cloudinary.
 - Phase 2A: session/cart/idempotency, transition order/bill/service request, trừ stock khi confirm, chuyển bàn.
 - Phase 2B: hàng đợi Redis KDS, `order.confirmed` trùng, station access, refetch snapshot sau realtime hint.
-- Phase 3: làm tròn VND, `QRTBL`, quyết toán cash/VietQR, webhook trùng/thiếu/sau paid, refund chỉ full, hoàn tất payment → finalize Order.
+- Phase 3: làm tròn VND, `QRTBL`, quyết toán cash/VietQR, webhook trùng/thiếu/sau paid, lịch sử thanh toán read-only, hoàn tất payment → finalize Order.
 - Phase 4B: lifecycle tenant, subscription/plan, `QRSUB`, OAuth state, payment settings, feature gating, hành vi customer suspended/closed.
-- Kiến trúc: registry 6 topic Kafka, chính sách Redis, không `menu.updated`, ranh giới BFF Direct vs Kafka, đếm ma trận permission.
+- Kiến trúc: registry 5 topic Kafka, chính sách Redis, không `menu.updated`, ranh giới BFF Direct vs Kafka, đếm ma trận permission.
 
 **verify:** Nhìn bảng trả lời được “quy tắc này được test nào bảo vệ” hoặc “vì sao chưa test trong Phase 5”.
 
@@ -130,7 +130,7 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 
 - **Order/Bill/Table:** transition hợp lệ/không hợp lệ, `DRAFT` không persist DB row, `PENDING → PROCESSING → READY → SERVED → COMPLETED`, bill `OPEN → PENDING_PAYMENT → PAID`, bàn `AVAILABLE/OCCUPIED/BILLING/CLEANING`, chính sách cancel pending/processing.
 - **Catalog/QR/Menu/Table:** QR token giả mạo/đường dẫn invalid, contract hiển thị menu, delete constraints, helper chuyển trạng thái bàn, input guard quota bàn, contract upload validator/thư mục tenant.
-- **Payment:** edge case làm tròn VND, sinh/collision fallback tham chiếu `QRTBL`, cash `amountReceived >= roundedTotal`, tái sử dụng VIETQR pending, webhook thiếu/trùng/sau paid, chính sách refund chỉ full.
+- **Payment:** edge case làm tròn VND, sinh/collision fallback tham chiếu `QRTBL`, cash `amountReceived >= roundedTotal`, tái sử dụng VIETQR pending, webhook thiếu/trùng/sau paid, Dashboard lịch sử thanh toán read-only.
 - **SaaS Phase 4B:** slug/reserved collision, ngữ nghĩa tenant status, quota feature (`max_tables`, `max_staff`, `max_orders_per_day`), khớp invoice `QRSUB`, một subscription active, bí mật OAuth state/token, permission payment settings.
 - **BFF/auth:** `UserGuard → TenantGuard → PermissionGuard`, guard lifecycle customer, guard plan/status tenant, metadata permission route cho surface SaaS/payment/order/kitchen.
 - **Component/hook frontend:** control disabled tenant suspended, ngoại lệ payment cho bill pending, hook refetch realtime POS/KDS, auth readiness dashboard, điều hướng theo role.
@@ -188,11 +188,11 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 
 **Trạng thái E2E hiện tại cần phản ánh trong ma trận:**
 
-| File hiện có                          | Đang chứng minh                                                           | Gap còn lại                                                                                               |
-| ------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `tests/e2e/step-2.7-realtime.spec.ts` | QR → cart → order → POS confirm → KDS → served, reconnect/reload snapshot | Chưa cover close-session và payment/SaaS/tenant suspended                                                 |
-| `tests/e2e/phase-3-payment.spec.ts`   | Smoke màn payment/POS tab/dashboard refund khi stack dev/auth có          | Chưa chứng minh full finalize payment, webhook settlement, bill bất biến, đóng session/dọn bàn end-to-end |
-| Chưa có Playwright Phase 4B chuyên    | —                                                                         | Onboarding tenant, admin billing, Owner subscription/payment settings, fixture browser tenant suspended   |
+| File hiện có                          | Đang chứng minh                                                              | Gap còn lại                                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `tests/e2e/step-2.7-realtime.spec.ts` | QR → cart → order → POS confirm → KDS → served, reconnect/reload snapshot    | Chưa cover close-session và payment/SaaS/tenant suspended                                                 |
+| `tests/e2e/phase-3-payment.spec.ts`   | Smoke màn payment/POS tab/dashboard lịch sử thanh toán khi stack dev/auth có | Chưa chứng minh full finalize payment, webhook settlement, bill bất biến, đóng session/dọn bàn end-to-end |
+| Chưa có Playwright Phase 4B chuyên    | —                                                                            | Onboarding tenant, admin billing, Owner subscription/payment settings, fixture browser tenant suspended   |
 
 **verify:** E2E chạy tuần tự với seed fixture idempotent. Test không soi nội bộ Kafka/Redis; kiểm UI cuối và snapshot sau refetch.
 

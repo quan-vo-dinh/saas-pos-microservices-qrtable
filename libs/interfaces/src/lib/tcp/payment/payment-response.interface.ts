@@ -1,4 +1,4 @@
-import type { PaymentMethod, PaymentStatusValue, RefundStatusValue } from '@einvoice/types';
+import type { PaymentMethod, PaymentStatusValue } from '@einvoice/types';
 
 export type PaymentTcpResponse = {
   id: string;
@@ -26,19 +26,6 @@ export type CreateVietQrTcpResponse = PaymentTcpResponse & {
 
 export type SepayWebhookTcpResponse = {
   status: 'success';
-};
-
-export type RefundTcpResponse = {
-  id: string;
-  tenantId: string;
-  paymentId: string;
-  amount: number;
-  reason: string;
-  status: RefundStatusValue;
-  requestedByUserId: string;
-  requestedAt: string;
-  confirmedByUserId?: string;
-  confirmedAt?: string;
 };
 
 export type PaymentHistoryTcpResponse = PaymentTcpResponse[];

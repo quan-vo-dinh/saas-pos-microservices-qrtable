@@ -369,7 +369,7 @@ Dashboard
   ├── /menu (Menu Management: Category, Item, Stock)
   ├── /tables (Table & Area Management, QR export)
   ├── /staff (Staff & Role Management)
-  ├── /orders (Orders & Bills: history, status, refund)
+  ├── /orders (Payment history — read-only)
   ├── /subscription (Subscription & Plan)
   ├── /billing/[invoiceId] (Subscription invoice VietQR + status polling)
   ├── /payment-settings (Tenant payment settings + SePay OAuth Connect)
@@ -447,9 +447,8 @@ PostgreSQL Instance (1 server, port 5432)
 │
 ├── DB "qrtable_payment"               ← Payment Service
 │   ├── payments                         (HAS tenant_id)
-│   ├── refunds                          (HAS tenant_id)
 │   ├── audit_payments                    (payment audit trail)
-│   ├── outbox_events                     (`payment.completed`, `payment.refunded`)
+│   ├── outbox_events                     (`payment.completed`)
 │   └── tenant_payment_settings           (HAS tenant_id — bank info + SePay OAuth tokens)
 │
 MongoDB Instance (1 server, port 27017)
@@ -818,25 +817,19 @@ Responsibility:
 - VND Rounding: apply Math.ceil(amount / 1000) * 1000 before creating bill
 - Payment records: save payment history (amount, method, timestamp)
 - Bill finalization: lock bill when payment completed (immutable after Paid)
-- Refund flow (manual): Owner/Manager creates record, Staff confirms after transfer
-- Reconciliation data: aggregation by day/month, method
+- Reconciliation data: aggregation by day/month, method (Dashboard payment history read-only)
 
 Entities (PostgreSQL):
   - payments: id, tenant_id, bill_id, bill_reference, method (enum: CASH | VIETQR),
               raw_total, rounded_total, rounding_delta,
               amount_received, change_amount,
               sepay_transaction_id, sepay_reference_code,
-              status (PENDING | PAID | REFUND_PENDING | REFUNDED | FAILED), paid_at
-  - refunds: id, tenant_id, payment_id, amount, reason,
-             requested_by_user_id, requested_at,
-             confirmed_by_user_id, confirmed_at,
-             customer_bank_account, customer_bank_name, customer_account_name,
-             status (PENDING_STAFF_ACTION | CONFIRMED | CANCELED)
+              status (PENDING | PAID | FAILED), paid_at
   - audit_payments: id, payment_id, action, actor_id, meta JSONB, timestamp
   - tenant_payment_settings: id, tenant_id, cash_enabled, vietqr_enabled,
                              vietqr_bank_name/account_number/account_holder,
                              sepay_* token/webhook fields, connection_status
-  - outbox_events: payment domain outbox for `payment.completed` / `payment.refunded`
+  - outbox_events: payment domain outbox for `payment.completed`
 
 VND Rounding Logic:
   raw_total = Σ(item_price × quantity)
@@ -872,16 +865,8 @@ Cash Flow:
   3. Payment Service: calculate change, update status = PAID, method = CASH
 4. Record outbox → Kafka: payment.completed (and possibly TCP Order similar to VietQR — idempotent markPaid)
 
-Refund Flow (Manual — Demo/Thesis):
-1. Owner/Manager creates a refund request: { paymentId, reason, customerBankAccount? }
-2. Payment service: creates a refund record PENDING_STAFF_ACTION, update payment REFUND_PENDING
-3. Staff/Owner transfers money manually via the banking app based on the displayed customerBankAccount
-4. Staff/Owner click "Confirm refund" → CONFIRMED status
-  5. Ghi audit_payments, Emit Kafka: payment.refunded
-
 Events emitted (Kafka):
 - payment.completed → Order consumer (idempotent BILL_MARK_PAID + Catalog TCP table status update) and BFF realtime bridge
-- payment.refunded → outbox/audit contract current; dashboard/notification consumers is Phase 4C+ or future extension
 ```
 
 #### 6.2.8 User-Access Service
@@ -931,14 +916,13 @@ Communicate:
 
 **Selection principle:** The system applies the 4P+2AP rule set (see §7.4) to decide which events use Kafka vs BFF Direct. Six topics pass the current code/test contract:
 
-| Topic                  | Producer          | Consumer(s)                                                             | Principle  | Main payload                       |
-| ---------------------- | ----------------- | ----------------------------------------------------------------------- | ---------- | ---------------------------------- |
-| `order.confirmed`      | Order service     | Kitchen service                                                         | P1, P2     | `{ tenantId, orderId, items[] }`   |
-| `order.status_changed` | Order service     | No current runtime consumer; durable status projection/audit extension  | P4         | `{ tenantId, orderId, toStatus }`  |
-| `payment.completed`    | Payment service   | Order service, BFF realtime bridge                                      | P1, P2, P3 | `{ tenantId, billId, method }`     |
-| `payment.refunded`     | Payment service   | No current runtime consumer; Phase 4C+ notification/dashboard extension | P1, P3     | `{ tenantId, paymentId, amount }`  |
-| `kitchen.sla_warning`  | Kitchen service   | BFF realtime bridge                                                     | P2         | `{ tenantId, ticketId, waitTime }` |
-| `tenant.created`       | SaaS Mgmt service | Catalog service; Notification is Phase 4C contract                      | P1, P3     | `{ tenantId, ownerEmail, slug }`   |
+| Topic                  | Producer          | Consumer(s)                                                            | Principle  | Main payload                       |
+| ---------------------- | ----------------- | ---------------------------------------------------------------------- | ---------- | ---------------------------------- |
+| `order.confirmed`      | Order service     | Kitchen service                                                        | P1, P2     | `{ tenantId, orderId, items[] }`   |
+| `order.status_changed` | Order service     | No current runtime consumer; durable status projection/audit extension | P4         | `{ tenantId, orderId, toStatus }`  |
+| `payment.completed`    | Payment service   | Order service, BFF realtime bridge                                     | P1, P2, P3 | `{ tenantId, billId, method }`     |
+| `kitchen.sla_warning`  | Kitchen service   | BFF realtime bridge                                                    | P2         | `{ tenantId, ticketId, waitTime }` |
+| `tenant.created`       | SaaS Mgmt service | Catalog service; Notification is Phase 4C contract                     | P1, P3     | `{ tenantId, ownerEmail, slug }`   |
 
 > UI-layer events like `order.created`, `cart.updated`, `bill.requested`, `table.transferred`, `service.requested`, `kds.queue_changed`, `tenant.suspended/activated/closed` DO NOT use Kafka as the source of truth — instead use BFF Direct, Redis internal hints, or socket emit after the source service has been committed (see §7.3). `order.status_changed` is the exception: it is an approved durable Order outbox topic, while immediate WebSocket feedback still comes from BFF Direct after the TCP response.
 
@@ -1200,18 +1184,17 @@ Configure via Keycloak **Protocol Mapper** (type: User Attribute → Token Claim
 
 ### 9.2 Real-time Use Cases
 
-| Use Case                    | Source                                                                    | Event                  | WebSocket Room                                     | Push payload                         |
-| --------------------------- | ------------------------------------------------------------------------- | ---------------------- | -------------------------------------------------- | ------------------------------------ |
-| New application for Staff   | BFF Direct                                                                | `order.created`        | `tenant:{tid}:staff`                               | `{ tableId, items, total }`          |
-| Order tracking (Customer)   | BFF Direct after Order TCP response                                       | `order.status_changed` | `session:{sid}:customer`                           | `{ orderId, status: "Processing" }`  |
-| KDS queue changed (Kitchen) | Kitchen Redis hint → BFF                                                  | `kds.queue_changed`    | `tenant:{tid}:kds:*`                               | `{ station, revision, reason }`      |
-| Item ready → notify waiter  | BFF Direct                                                                | `kitchen.item_ready`   | `tenant:{tid}:staff`                               | `{ tableId, itemName: "Beef pho" }`  |
-| Menu cache invalidation     | BFF/Catalog write path                                                    | no current WS event    | —                                                  | REST refetch reads invalidated cache |
-| Table status change         | BFF Direct                                                                | `table.status_chg`     | `tenant:{tid}:staff`                               | `{ tableId, status: "Billing" }`     |
-| POS payment settled         | Kafka `payment.completed` → BFF realtime bridge; polling remains fallback | `payment.completed`    | `session:{sid}:customer`                           | `{ status: "Paid", receipt_url }`    |
-| SLA warning (overtime)      | Kafka → BFF                                                               | `kitchen.sla_warning`  | `tenant:{tid}:management`                          | `{ ticketId, waitingMin: 18 }`       |
-| service Request (Customer)  | BFF Direct                                                                | `service.requested`    | `tenant:{tid}:staff`                               | `{ tableId, type: "CALL_STAFF" }`    |
-| Refund processed            | **Phase 3 baseline: polling**; bridge follow-up                           | `payment.refunded`     | (when the bridge exists) `tenant:{tid}:management` | `{ paymentId, amount, reason }`      |
+| Use Case                    | Source                                                                    | Event                  | WebSocket Room            | Push payload                         |
+| --------------------------- | ------------------------------------------------------------------------- | ---------------------- | ------------------------- | ------------------------------------ |
+| New application for Staff   | BFF Direct                                                                | `order.created`        | `tenant:{tid}:staff`      | `{ tableId, items, total }`          |
+| Order tracking (Customer)   | BFF Direct after Order TCP response                                       | `order.status_changed` | `session:{sid}:customer`  | `{ orderId, status: "Processing" }`  |
+| KDS queue changed (Kitchen) | Kitchen Redis hint → BFF                                                  | `kds.queue_changed`    | `tenant:{tid}:kds:*`      | `{ station, revision, reason }`      |
+| Item ready → notify waiter  | BFF Direct                                                                | `kitchen.item_ready`   | `tenant:{tid}:staff`      | `{ tableId, itemName: "Beef pho" }`  |
+| Menu cache invalidation     | BFF/Catalog write path                                                    | no current WS event    | —                         | REST refetch reads invalidated cache |
+| Table status change         | BFF Direct                                                                | `table.status_chg`     | `tenant:{tid}:staff`      | `{ tableId, status: "Billing" }`     |
+| POS payment settled         | Kafka `payment.completed` → BFF realtime bridge; polling remains fallback | `payment.completed`    | `session:{sid}:customer`  | `{ status: "Paid", receipt_url }`    |
+| SLA warning (overtime)      | Kafka → BFF                                                               | `kitchen.sla_warning`  | `tenant:{tid}:management` | `{ ticketId, waitingMin: 18 }`       |
+| service Request (Customer)  | BFF Direct                                                                | `service.requested`    | `tenant:{tid}:staff`      | `{ tableId, type: "CALL_STAFF" }`    |
 
 ### 9.3 Scaling Strategy
 

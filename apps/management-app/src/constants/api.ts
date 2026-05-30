@@ -27,8 +27,6 @@ export const API_CONFIG = {
     KDS_TICKET_PRIORITY: (ticketId: string) => `/admin/kds/tickets/${encodeURIComponent(ticketId)}/priority`,
     PAYMENT_CREATE_VIETQR: '/payment/vietqr/create-qr',
     PAYMENT_CONFIRM_CASH: '/payment/cash/confirm',
-    PAYMENT_REFUND_REQUEST: '/payment/refund/request',
-    PAYMENT_REFUND_CONFIRM: '/payment/refund/confirm',
     PAYMENT_HISTORY: '/payment/history',
   },
 } as const;

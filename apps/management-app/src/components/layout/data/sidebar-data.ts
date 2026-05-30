@@ -55,7 +55,7 @@ export const sidebarData: SidebarData = {
           roles: OM,
         },
         {
-          title: 'Orders',
+          title: 'Lịch sử thanh toán',
           url: ROUTES.ORDERS,
           icon: ClipboardList,
           roles: OM,

@@ -1,6 +1,6 @@
 import { authApiClient } from '@/lib/api/authenticated-client';
 import { API_CONFIG } from '@/constants/api';
-import type { PaymentStatusValue, RefundStatusValue } from '@einvoice/types';
+import type { PaymentStatusValue } from '@einvoice/types';
 
 const EP = API_CONFIG.ENDPOINTS;
 
@@ -25,27 +25,6 @@ export type StaffPaymentRecord = {
 
 export type CreateVietQrResponse = StaffPaymentRecord & { qrUrl: string };
 
-export type RefundRequestInput = {
-  paymentId: string;
-  reason: string;
-  customerBankAccount?: string;
-  customerBankName?: string;
-  customerAccountName?: string;
-};
-
-export type RefundRecord = {
-  id: string;
-  tenantId: string;
-  paymentId: string;
-  amount: number;
-  reason: string;
-  status: RefundStatusValue;
-  requestedByUserId: string;
-  requestedAt: string;
-  confirmedByUserId?: string;
-  confirmedAt?: string;
-};
-
 export const paymentService = {
   createVietQr: (billId: string): Promise<CreateVietQrResponse> =>
     authApiClient<CreateVietQrResponse>(EP.PAYMENT_CREATE_VIETQR, {
@@ -57,18 +36,6 @@ export const paymentService = {
     authApiClient<StaffPaymentRecord>(EP.PAYMENT_CONFIRM_CASH, {
       method: 'POST',
       body: JSON.stringify({ billId, amountReceived }),
-    }),
-
-  requestRefund: (input: RefundRequestInput): Promise<RefundRecord> =>
-    authApiClient<RefundRecord>(EP.PAYMENT_REFUND_REQUEST, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    }),
-
-  confirmRefund: (refundId: string): Promise<RefundRecord> =>
-    authApiClient<RefundRecord>(EP.PAYMENT_REFUND_CONFIRM, {
-      method: 'POST',
-      body: JSON.stringify({ refundId }),
     }),
 
   history: (billId?: string): Promise<StaffPaymentRecord[]> => {
