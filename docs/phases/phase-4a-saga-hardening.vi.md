@@ -119,7 +119,7 @@ Compensation thực hiện ngược thứ tự: Bước 4 → Bước 3 → Bư�
 ## Đầu ra
 
 - Luồng **Order Confirm Saga** và **Payment Complete Saga** được mô tả theo hành vi kèm compensation, khớp technical-architecture §12 và business-logic §4.B / §6.B.
-- Chính sách `**max_orders_per_session`\*\* (mặc định 20, cấu hình theo tenant) áp dụng nhất quán trên luồng order/confirm.
+- Chính sách `**max_orders_per_session` (mặc định 20, cấu hình theo tenant) áp dụng nhất quán trên luồng order/confirm.
 - Idempotency và delete constraints là **bất biến** trong integration/API test hoặc checklist QA tương đương.
 - Outbox đơn giản trên Order + Payment: event ghi cùng transaction, worker/cron đẩy Kafka và đánh dấu sent.
 - Roadmap ghi rõ: **Debezium / full CDC** — sau luận văn.

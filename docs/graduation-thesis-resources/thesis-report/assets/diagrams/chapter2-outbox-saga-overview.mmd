@@ -1,0 +1,28 @@
+%% MAP: chapter2-outbox-saga-overview.excalidraw | Hình 2.6 | §2.6
+%% ICON: postgresql.svg, kafka.svg
+%% Preview: mmdc -i chapter2-outbox-saga-overview.mmd -o preview-ch2-06.png -b transparent -w 1400
+flowchart TB
+  subgraph Problem["Vấn đề khi nhiều dịch vụ tách riêng"]
+    P["Vừa lưu vào database\nvừa gửi tin báo đi\n→ dễ một bên thành công, một bên thất bại"]
+  end
+
+  subgraph Outbox["Cách 1 — Outbox (ghi nháp cùng lúc)"]
+    direction LR
+    O1["Lưu nghiệp vụ\n+ ghi nháp tin cần gửi"] --> O2["Công cụ đưa tin\nra hàng đợi (Kafka)"]
+    O2 --> O3["Các bên khác\nnhận và xử lý"]
+  end
+
+  subgraph Saga["Cách 2 — Saga (chuỗi bước dài)"]
+    direction LR
+    S1["Bước 1"] --> S2["Bước 2"] --> S3["Bước 3"]
+    S3 -.->|"một bước hỏng"| SC["Hoàn tác / bù trừ\ntừng phần đã làm"]
+  end
+
+  Problem --> Outbox
+  Problem --> Saga
+
+  NOTE["Cùng mục tiêu: đúng tiền · đúng tồn kho ·\nkhông tạo đơn / thanh toán trùng"]
+  Outbox & Saga -.-> NOTE
+
+  classDef note fill:#fffbeb,stroke:#d97706,stroke-dasharray:4 4
+  class NOTE note

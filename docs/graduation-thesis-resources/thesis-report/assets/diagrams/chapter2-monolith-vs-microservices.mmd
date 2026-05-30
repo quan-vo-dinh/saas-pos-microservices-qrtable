@@ -1,0 +1,30 @@
+%% MAP: chapter2-monolith-vs-microservices.excalidraw | Hình 2.4 | §2.4
+%% ICON: postgresql.svg, docker.svg
+%% Preview: mmdc -i chapter2-monolith-vs-microservices.mmd -o preview-ch2-04.png -b transparent -w 1500
+flowchart LR
+  subgraph Mono["Kiểu monolith — một khối lớn"]
+    direction TB
+    M1["Một chương trình\ngộp giao diện + xử lý nghiệp vụ"]
+    M2[("Một kho dữ liệu chung")]
+    M1 --> M2
+    MP["Dễ triển khai ban đầu;\nkhó tách khi hệ thống lớn dần"]
+  end
+
+  subgraph Micro["Kiểu microservices — nhiều khối theo nghiệp vụ"]
+    direction TB
+    subgraph Parts["Ví dụ trong POS nhà hàng"]
+      direction LR
+      P1["Thực đơn & bàn"] --- P2["Đơn hàng & hóa đơn"] --- P3["Thanh toán"]
+      P4["Bếp (màn hình)"] --- P5["Quản lý thuê bao SaaS"]
+    end
+    DBM["Mỗi khối có kho dữ liệu riêng\n(không dùng chung một database)"]
+    Parts --> DBM
+  end
+
+  Mono ~~~ Micro
+
+  TALK["Hai khối nói chuyện:\n• Gọi trực tiếp — cần trả lời ngay\n• Gửi sự kiện (Kafka) — xử lý sau cũng được"]
+  Micro -.-> TALK
+
+  classDef talk fill:#f0fdf4,stroke:#16a34a,stroke-dasharray:4 4
+  class TALK,MP talk

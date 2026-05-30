@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1610" height="760" viewBox="0 0 1610 760">
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <polygon points="0 0, 8 4, 0 8" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <g transform="translate(40, 40)">
+  <rect x="200" y="260" width="931.9737863034629" height="420" rx="0" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/><text x="665.9868931517315" y="470" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="19.557614028386233" fill="#16a34a">Microservices</text>
+<rect x="772.6561063827247" y="299.7924450598642" width="339.760065892352" height="132.01389469160708" rx="0" fill="transparent" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="219.55761402838624" y="299.7924450598642" width="533.5408783259522" height="132.01389469160708" rx="0" fill="transparent" stroke="#1e1e1e" stroke-width="2"/>
+<rect x="1200" y="260" width="330" height="420" rx="0" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/><text x="1365" y="470" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="20" fill="#dc2626">Monolith</text>
+<rect x="1235" y="297.5" width="260" height="120" rx="0" fill="transparent" stroke="#1e1e1e" stroke-width="2"/><text x="1365" y="345" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="20" fill="#1e1e1e">Ứng dụng đơn khối\nUI +</text><text x="1365" y="370" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="20" fill="#1e1e1e">business logic</text>
+<rect x="253.78343857806215" y="336.46297136308834" width="124.75618636076062" height="58.672842085158706" rx="0" fill="transparent" stroke="#1e1e1e" stroke-width="2"/><text x="316.16153175844244" y="365.7993924056677" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="19.557614028386233" fill="#1e1e1e">Catalog</text>
+<rect x="427.43366000978835" y="336.46297136308834" width="108.62115478734198" height="58.672842085158706" rx="0" fill="transparent" stroke="#1e1e1e" stroke-width="2"/><text x="481.74423740345935" y="365.7993924056677" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="19.557614028386233" fill="#1e1e1e">Order</text>
+<rect x="584.948849868096" y="336.46297136308834" width="133.92381793656668" height="58.672842085158706" rx="0" fill="transparent" stroke="#1e1e1e" stroke-width="2"/><text x="651.9107588363793" y="365.7993924056677" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="19.557614028386233" fill="#1e1e1e">Payment</text>
+<rect x="806.8819309324007" y="336.46297136308834" width="124.3742017117687" height="58.672842085158706" rx="0" fill="transparent" stroke="#1e1e1e" stroke-width="2"/><text x="869.069031788285" y="365.7993924056677" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="19.557614028386233" fill="#1e1e1e">Kitchen</text>
+<rect x="980.1501677151349" y="336.46297136308834" width="98.04018001026584" height="58.672842085158706" rx="0" fill="transparent" stroke="#1e1e1e" stroke-width="2"/><text x="1029.1702577202677" y="365.7993924056677" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="19.557614028386233" fill="#1e1e1e">User</text>
+<line x1="null" y1="null" x2="0.00003472222226719168" y2="108" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="0.00003472222226719168,108 -3.9999684927981063,98.00000128600874 4.00003150720148,97.99999871399228" fill="#1e1e1e"/>
+<line x1="null" y1="null" x2="0" y2="0" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="0,0 0,0 0,0" fill="#1e1e1e"/>
+<line x1="null" y1="null" x2="0.00010416666668788821" y2="108" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="0.00010416666668788821,108 -3.9999054783931816,98.00000385802934 4.0000945216030965,97.99999614197995" fill="#1e1e1e"/>
+<line x1="null" y1="null" x2="0.00006944444453438336" y2="108" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="0.00006944444453438336,108 -3.999936985595799,98.00000257201854 4.000063014402547,97.9999974279856" fill="#1e1e1e"/>
+<line x1="null" y1="null" x2="0.00012152777776464063" y2="112.50000010907252" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="0.00012152777776464063,112.50000010907252 -3.999889274689026,102.500004430066 4.000110725306307,102.49999578809069" fill="#1e1e1e"/>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<text x="609.7045745849609" y="660.0792976020782" font-family="Arial,sans-serif" font-size="17.4778970902999" fill="#000000">Posgres DB</text>
+
+
+
+
+
+
+
+<text x="857.9185943603516" y="659.6691098673161" font-family="Arial,sans-serif" font-size="17.4778970902999" fill="#000000">Redis</text>
+
+
+
+
+
+
+
+<text x="997.5017929077148" y="660.103291088302" font-family="Arial,sans-serif" font-size="17.4778970902999" fill="#000000">Mongo DB</text>
+
+
+
+
+
+
+
+<text x="420" y="660.4855411967145" font-family="Arial,sans-serif" font-size="17.4778970902999" fill="#000000">Posgres DB</text>
+
+
+
+
+
+
+
+<text x="260" y="659.1680286759208" font-family="Arial,sans-serif" font-size="17.4778970902999" fill="#000000">Posgres DB</text>
+<line x1="300" y1="400" x2="300" y2="539.8769570791649" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="300,539.8769570791649 296,529.8769570791649 304,529.8769570791649" fill="#1e1e1e"/>
+<line x1="480" y1="400" x2="480" y2="540.0517676267617" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="480,540.0517676267617 476,530.0517676267617 484,530.0517676267617" fill="#1e1e1e"/>
+<line x1="660" y1="400" x2="660" y2="540" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="660,540 656,530 664,530" fill="#1e1e1e"/>
+<line x1="880" y1="400" x2="880" y2="540" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="880,540 876,530 884,530" fill="#1e1e1e"/>
+<line x1="1040" y1="400" x2="1040" y2="540.0007618466719" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="1040,540.0007618466719 1036,530.0007618466719 1044,530.0007618466719" fill="#1e1e1e"/>
+
+
+
+
+
+
+
+<text x="1320" y="660.4566973400044" font-family="Arial,sans-serif" font-size="17.4778970902999" fill="#000000">Database</text>
+<line x1="1360" y1="420" x2="1360" y2="540" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+<polygon points="1360,540 1356,530 1364,530" fill="#1e1e1e"/>
+  </g>
+</svg>

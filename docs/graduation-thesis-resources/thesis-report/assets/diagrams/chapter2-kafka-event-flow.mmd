@@ -1,0 +1,25 @@
+%% MAP: chapter2-kafka-event-flow.excalidraw | Hình 2.5 | §2.5
+%% ICON: kafka.svg
+%% Preview: mmdc -i chapter2-kafka-event-flow.mmd -o preview-ch2-05.png -b transparent -w 1400
+flowchart TB
+  subgraph Idea["Hình dung: sổ ghi sự việc chung (Apache Kafka)"]
+    WRITE["Bên A ghi:\n“Đơn đã xác nhận”"] --> BOOK["Sổ sự kiện\n(topic)"]
+    BOOK --> READ1["Bên B đọc:\nchuẩn bị món ở bếp"]
+    BOOK --> READ2["Bên C đọc:\nghi nhận doanh thu / thông báo"]
+  end
+
+  PLUS["Lợi ích: A không phải chờ B, C làm xong\nmới trả lời khách"]
+  WRITE -.-> PLUS
+
+  subgraph When["Khi nào phù hợp / không phù hợp"]
+    direction LR
+    OK["Phù hợp: việc làm sau,\nnhiều bên cùng quan tâm"]
+    NO["Không thay: hỏi ngay\n“còn hàng không?”\ntrước khi nhận đơn"]
+  end
+
+  Idea -.-> When
+
+  classDef plus fill:#fef9c3,stroke:#ca8a04
+  classDef when fill:#f8fafc,stroke:#64748b
+  class PLUS plus
+  class OK,NO when

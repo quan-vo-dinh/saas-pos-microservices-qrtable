@@ -27,3 +27,19 @@ Quy tắc:
 - Output: `figures/chapter3-actor-use-case-overview.pdf` (LaTeX chèn file này)
 
 Ghi chú: `plantuml.jar` trong repo không bundle Batik nên không dùng trực tiếp `-tpdf`; pipeline render SVG rồi `rsvg-convert` sang PDF.
+
+## Chương 2 — Excalidraw (có nhúng logo)
+
+- Source chỉnh sửa: `diagrams/chapter2-*.excalidraw` (embedded images trong trường `files`).
+- Icon gốc: `diagrams/chapter2-icons/*.svg` (Simple Icons).
+- Ảnh cho LaTeX Chương 2: `figures/chapter2-*.png` (export thủ công từ Excalidraw; giữ cùng tên file khi thay ảnh).
+- PDF/SVG trong `figures/` là artifact pipeline cũ hoặc trung gian, không dùng trong `\includegraphics` Chương 2.
+- **Không** dùng Mermaid (`.mmd`) cho Chương 2.
+
+Render:
+
+```bash
+bash thesis-report/tools/render-chapter2-diagrams.sh
+```
+
+Pipeline: fetch icons → generate `.excalidraw` → export SVG → `rsvg-convert` PDF.
