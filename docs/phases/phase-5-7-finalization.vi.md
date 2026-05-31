@@ -8,15 +8,16 @@
 
 ## Điều kiện tiên quyết
 
-- Các phase lõi đã đóng trên đường critical/demo: **0, 1, 2A, 2B, 3** và phần SaaS hoàn thành ở **4B**. Phase 4A hoãn và Phase 4C chưa bắt đầu; không chặn Phase 5–7 trừ khi demo bắt buộc saga-hardening hoặc notification/staff management.
+- Các phase lõi đã đóng trên đường critical/demo: **0, 1, 2A, 2B, 3**, phần SaaS hoàn thành ở **4B**, và lát cắt đại diện **4A Order Confirm Saga** đã triển khai. Full hardening vận hành của Phase 4A và Phase 4C chưa bắt đầu; không chặn Phase 5–7 trừ khi demo bắt buộc hardening kiểu Saga state bền vững/CDC/retry worker hoặc notification/staff management.
 
 ## Tài liệu tham chiếu
 
-| Tài liệu                  | Phần liên quan                                                                                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| technical-architecture.md | §13 Observability — nguyên tắc log/metric/trace trong microservices                                                                                  |
-| technical-architecture.md | §14 Deployment — deploy, compose, môi trường                                                                                                         |
-| business-logic.md         | Toàn bộ — kiểm thử tự động **xác minh** quy tắc nghiệp vụ đã mô tả (state machine, tiền, token, tenant isolation), không thay thế tài liệu nghiệp vụ |
+| Tài liệu                                    | Phần liên quan                                                                                                                                       |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| technical-architecture.md                   | §13 Observability — nguyên tắc log/metric/trace trong microservices                                                                                  |
+| technical-architecture.md                   | §14 Deployment — deploy, compose, môi trường                                                                                                         |
+| business-logic.md                           | Toàn bộ — kiểm thử tự động **xác minh** quy tắc nghiệp vụ đã mô tả (state machine, tiền, token, tenant isolation), không thay thế tài liệu nghiệp vụ |
+| testing/phase-5/saga-validation-strategy.md | Chiến lược bằng chứng khóa luận cho Order Confirm Saga và SaaS Onboarding Mini-Saga                                                                  |
 
 ## Tổng quan
 
@@ -28,11 +29,12 @@ Ba mảng gộp trong một tài liệu vì cùng “cổng hoàn thiện” tr�
 
 **Vì sao:** Sau Phase 4B, hệ thống không còn chỉ là demo đặt món QR đơn lẻ mà là SaaS POS đa tenant với Order, Kitchen, Payment, lifecycle SaaS, subscription gating, tenant payment settings và nhiều kênh realtime/cache. State machine đơn/bàn, tiền, QR/session, Redis/Kafka/WebSocket và tenant isolation — **sai một lần là sai tiền, rò dữ liệu hoặc demo hỏng**. Phase 5 phải khóa hành vi đã triển khai bằng test có mục tiêu, không đuổi số coverage đẹp.
 
-### Rà soát sau Phase 4B
+### Rà soát sau Phase 4A/4B
 
 Điểm cần chỉnh so với bản Phase 5 cũ:
 
-- **Điều kiện cũ “Phase 0–4 hoàn thành” không còn đúng.** Hiện tại: Phase 0, 1, 2A, 2B, 3 và **4B** xong; **4A hoãn**, **4C TODO**. Test Phase 5 phải xác minh hành vi hiện có và chỉ ghi gap test cho saga-hardening/notification/staff nếu nằm trong deferred scope.
+- **Điều kiện cũ “Phase 0–4 hoàn thành” không còn đúng.** Hiện tại: Phase 0, 1, 2A, 2B, 3 và **4B** xong; **4A có lát cắt Saga đại diện**, **4C TODO**. Test Phase 5 phải xác minh hành vi hiện có, bao gồm Order Confirm Saga, và chỉ ghi gap cho full saga-hardening/notification/staff nếu nằm trong deferred scope.
+- **Phase 4A không còn hoãn toàn bộ.** `OrderConfirmSagaService` và `CatalogStockGatewayService` là contract hiện tại của code. Phase 5 phải test replay confirm, lỗi tồn kho từ Catalog và compensation trả kho; Saga state bền vững, retry worker, stock ledger và CDC/Debezium vẫn là hardening tương lai.
 - **Phạm vi cũ thiếu Phase 4B.** Cần bổ sung lifecycle tenant `ACTIVE/SUSPENDED/CLOSED`, subscription/pricing plan, feature gating, tenant payment settings, hai tầng tham chiếu thanh toán `QRTBL`/`QRSUB`, onboarding do admin hỗ trợ và hành vi Customer PWA suspended/read-only.
 - **Phạm vi cũ gọi E2E là Supertest không khớp repo.** Hiện E2E browser dùng Playwright trong `tests/e2e`; Supertest phù hợp hơn nếu sau này thêm e2e API BFF/Nest. Phase 5 phải tách rõ `API integration/contract` và `browser E2E`.
 - **Phạm vi cũ chưa phản ánh kiến trúc snapshot + realtime hint.** WebSocket/Kafka/Redis không phải source of truth cho UI; test phải xác minh client refetch REST snapshot sau hint/reconnect, không assert UI dựng state từ packet.
@@ -48,20 +50,21 @@ Nguyên tắc chính:
 - **Test đúng tầng:** Unit khóa invariant/policy; integration khóa ranh giới DB/Redis/TCP/Kafka; E2E browser khóa user journey. Không lặp cùng assertion ở mọi tầng.
 - **Current-code first:** Khi tài liệu phase cũ lệch `business-logic.md`, `technical-architecture.md` hoặc test/code hiện tại, test theo hành vi canonical/đã triển khai mới nhất.
 - **Snapshot là source of truth:** Event realtime chỉ là hint invalidate/refetch; E2E không phụ thuộc payload packet làm canonical state.
-- **Deferred rõ ràng:** Không tính thiếu test Phase 4A/4C là lỗi Phase 5, trừ khi tài liệu Phase 5 vô tình yêu cầu hành vi chưa triển khai.
+- **Deferred rõ ràng:** Không tính thiếu test full hardening Phase 4A hoặc Phase 4C là lỗi Phase 5. Thiếu test cho Order Confirm Saga đã triển khai không phải deferred; đó là việc test bình thường của Phase 5.
+- **Bằng chứng Saga theo nhiều lớp:** Với hai luồng Saga đại diện, kết hợp unit/contract test, integration opt-in, fault injection deterministic khi có, artifact demo UI và bằng chứng DB/outbox/log. Chiến lược chi tiết nằm ở `docs/testing/phase-5/saga-validation-strategy.md`.
 
-### Phạm vi canonical sau Phase 4B
+### Phạm vi canonical sau Phase 4A/4B
 
 Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract hiện tại**. Nếu phát hiện lệch giữa docs và code, áp dụng thứ tự nguồn sự thật trong `docs/README.md`: code/test hiện tại → spec đã chấp nhận → bản ghi phase cuối → tài liệu tổng quan. Kết quả rà soát không chỉ thêm test mà còn phân loại chính xác trạng thái từng quy tắc.
 
-| Loại phạm vi         | Xử lý trong Phase 5                                                                         | Ví dụ cụ thể                                                                                                           |
-| -------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `covered`            | Giữ test hiện có, gắn ma trận traceability                                                  | Shared transition tests, BFF guards, webhook Payment trùng, test invoice subscription SaaS                             |
-| `partial`            | Thêm test ở tầng thấp nhất đủ chứng minh quy tắc                                            | Payment UI smoke có nhưng chưa chứng minh full close-session; permission unit có nhưng chưa smoke Keycloak live ổn     |
-| `missing`            | Thêm test nếu hành vi đã có code và thuộc Phase 0/1/2A/2B/3/4B                              | Catalog QR token invalid/rate limit; ràng buộc xóa table/menu; fixture browser route tenant suspended                  |
-| `implementation-gap` | Không sửa hành vi trong Phase 5; ghi cần phase/PR riêng nếu quy tắc canonical chưa có code  | Offline queue IndexedDB, UI invite staff đầy đủ, dashboard replay webhook production                                   |
-| `security-gap`       | Test contract hiện tại nếu có; đánh dấu blocker trước go-live/demo thật nếu thiếu hardening | Route Phase 4B tenant/platform `x-secret-key` cần verify giá trị với secret lưu, không chỉ kiểm presence               |
-| `deferred-by-phase`  | Không tính fail Phase 5; giữ backlog Phase 4A/4C hoặc sau luận văn                          | Full saga/CDC/Debezium, email receipt/welcome/suspend notification, email reset-password, runtime Notification service |
+| Loại phạm vi         | Xử lý trong Phase 5                                                                                | Ví dụ cụ thể                                                                                                                                                  |
+| -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `covered`            | Giữ test hiện có, gắn ma trận traceability                                                         | Shared transition tests, BFF guards, webhook Payment trùng, test invoice subscription SaaS                                                                    |
+| `partial`            | Thêm test ở tầng thấp nhất đủ chứng minh quy tắc                                                   | Payment UI smoke có nhưng chưa chứng minh full close-session; permission unit có nhưng chưa smoke Keycloak live ổn                                            |
+| `missing`            | Thêm test nếu hành vi đã có code và thuộc Phase 0/1/2A/2B/3/lát cắt đại diện 4A/4B                 | Gap integration cho Order Confirm Saga; Catalog QR token invalid/rate limit; ràng buộc xóa table/menu; fixture browser route tenant suspended                 |
+| `implementation-gap` | Không sửa hành vi trong Phase 5; ghi cần phase/PR riêng nếu quy tắc canonical chưa có code         | Offline queue IndexedDB, UI invite staff đầy đủ, dashboard replay webhook production                                                                          |
+| `security-gap`       | Test contract hiện tại nếu có; đánh dấu blocker trước go-live/demo thật nếu thiếu hardening        | Route Phase 4B tenant/platform `x-secret-key` cần verify giá trị với secret lưu, không chỉ kiểm presence                                                      |
+| `deferred-by-phase`  | Không tính fail Phase 5; giữ backlog full hardening Phase 4A và backlog Phase 4C hoặc sau luận văn | Saga state bền vững, retry worker, stock ledger, CDC/Debezium, email receipt/welcome/suspend notification, email reset-password, runtime Notification service |
 
 ### Dải ưu tiên
 
@@ -73,26 +76,26 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 
 ### Mục tiêu ma trận test
 
-| Vùng rủi ro             | Unit / contract                                                                                              | Integration                                                                                           | Browser E2E / smoke                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| tenant isolation + RBAC | Ma trận permission, guards, metadata route permission, đếm role seed                                         | Query theo tenant không trả dữ liệu cross-tenant; ngoại lệ SUPER_ADMIN có kiểm soát                   | Owner/MANAGER/WAITER/CHEF/BARISTA thấy route đúng và 403/redirect chính                                      |
-| Catalog + QR/table/menu | QR HMAC/token helpers, hằng route slug/table, upload validators, delete constraints, quota bàn theo plan     | Tenant isolation Catalog; QR validate/join; CRUD menu/table filter tenant; validation path Cloudinary | Customer QR landing/menu load; Owner quản category/item/table tối thiểu không lộ cross-tenant                |
-| QR session + cart       | QR/token helpers, cart version conflict, chính sách session status                                           | Redis cart/session TTL, idempotency key, khóa request bill                                            | Customer scan QR, join session, cart mutation, submit, reload/reconnect                                      |
-| Order + table state     | Ma trận transition dùng chung, chính sách cancel, transfer request id, chính sách request bill               | Order confirm với Catalog trừ/hoàn stock; nhất quán chuyển bàn; tổng hợp bill                         | QR → order → POS confirm → KDS → served                                                                      |
-| Kitchen + realtime      | Điểm hàng đợi KDS, station access, SLA worker, suy ra room gateway                                           | Kafka `order.confirmed` → ticket Redis Kitchen → BFF hint `kds.queue_changed`                         | Luồng station KDS, reconnect/refetch snapshot, waiter thấy ready/served                                      |
-| Payment settlement      | Làm tròn VND, tham chiếu thanh toán, chính sách cash/VietQR, webhook trùng/thiếu/sau paid                    | Transaction Payment + Order `BILL_MARK_PAID`; outbox `payment.completed`; lịch sử payment theo tenant | Panel cash/VietQR POS, màn thanh toán Customer, Dashboard lịch sử thanh toán read-only                       |
-| SaaS Phase 4B           | Slug, saga onboarding, lifecycle tenant, invoice subscription, payment settings, OAuth state, feature gating | Compensation onboarding đa service; cache Redis suspend/subscription; khớp invoice `QRSUB`            | Landing public, SUPER_ADMIN tenant/plan/billing, Owner subscription/payment settings, Customer PWA suspended |
-| Invariant kiến trúc     | Registry topic Kafka, chính sách truy cập Redis, không `menu.updated`, hằng route BFF, pattern TCP           | Kiểm tra Redis/Kafka được phép; default topic/env khớp registry 5 topic                               | Browser kiểm snapshot UI cuối và hành vi refetch, không phụ thuộc nội bộ event ẩn                            |
+| Vùng rủi ro             | Unit / contract                                                                                                                                      | Integration                                                                                                                   | Browser E2E / smoke                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| tenant isolation + RBAC | Ma trận permission, guards, metadata route permission, đếm role seed                                                                                 | Query theo tenant không trả dữ liệu cross-tenant; ngoại lệ SUPER_ADMIN có kiểm soát                                           | Owner/MANAGER/WAITER/CHEF/BARISTA thấy route đúng và 403/redirect chính                                      |
+| Catalog + QR/table/menu | QR HMAC/token helpers, hằng route slug/table, upload validators, delete constraints, quota bàn theo plan                                             | Tenant isolation Catalog; QR validate/join; CRUD menu/table filter tenant; validation path Cloudinary                         | Customer QR landing/menu load; Owner quản category/item/table tối thiểu không lộ cross-tenant                |
+| QR session + cart       | QR/token helpers, cart version conflict, chính sách session status                                                                                   | Redis cart/session TTL, idempotency key, khóa request bill                                                                    | Customer scan QR, join session, cart mutation, submit, reload/reconnect                                      |
+| Order + table state     | Ma trận transition dùng chung, chính sách cancel, transfer request id, chính sách request bill; unit test replay/compensation của Order Confirm Saga | Order Confirm Saga với Catalog deduct stock, Order commit/outbox và compensation trả kho; nhất quán chuyển bàn; tổng hợp bill | QR → order → POS confirm → KDS → served                                                                      |
+| Kitchen + realtime      | Điểm hàng đợi KDS, station access, SLA worker, suy ra room gateway                                                                                   | Kafka `order.confirmed` → ticket Redis Kitchen → BFF hint `kds.queue_changed`                                                 | Luồng station KDS, reconnect/refetch snapshot, waiter thấy ready/served                                      |
+| Payment settlement      | Làm tròn VND, tham chiếu thanh toán, chính sách cash/VietQR, webhook trùng/thiếu/sau paid                                                            | Transaction Payment + Order `BILL_MARK_PAID`; outbox `payment.completed`; lịch sử payment theo tenant                         | Panel cash/VietQR POS, màn thanh toán Customer, Dashboard lịch sử thanh toán read-only                       |
+| SaaS Phase 4B           | Slug, saga onboarding, lifecycle tenant, invoice subscription, payment settings, OAuth state, feature gating                                         | Compensation onboarding đa service; cache Redis suspend/subscription; khớp invoice `QRSUB`                                    | Landing public, SUPER_ADMIN tenant/plan/billing, Owner subscription/payment settings, Customer PWA suspended |
+| Invariant kiến trúc     | Registry topic Kafka, chính sách truy cập Redis, không `menu.updated`, hằng route BFF, pattern TCP                                                   | Kiểm tra Redis/Kafka được phép; default topic/env khớp registry 5 topic                                                       | Browser kiểm snapshot UI cuối và hành vi refetch, không phụ thuộc nội bộ event ẩn                            |
 
 ### Các bước
 
 #### Bước 5.1 — Inventory + Ma trận traceability (1–2 ngày)
 
-**Mục tiêu:** Biết chính xác quy tắc nghiệp vụ nào đã có test, tầng nào, gap nào hợp lệ vì Phase 4A/4C chưa làm.
+**Mục tiêu:** Biết chính xác quy tắc nghiệp vụ nào đã có test, tầng nào, gap nào hợp lệ vì full hardening Phase 4A/Phase 4C chưa làm.
 
 **Phạm vi:**
 
-- Tạo bảng traceability từ `business-logic.md`, `technical-architecture.md`, `docs/phases/phase-2a-order-kafka.md`, `phase-2b-kitchen-websocket.md`, `phase-3-payment.md`, `phase-4b-saas-onboarding.md` tới test hiện có.
+- Tạo bảng traceability từ `business-logic.md`, `technical-architecture.md`, `docs/phases/phase-2a-order-kafka.md`, `phase-2b-kitchen-websocket.md`, `phase-3-payment.md`, `phase-4a-saga-hardening.md`, `phase-4b-saas-onboarding.md` tới test hiện có.
 - Gán mỗi quy tắc một trong sáu trạng thái: `covered`, `partial`, `missing`, `implementation-gap`, `security-gap`, `deferred-by-phase`.
 - Đánh dấu test cần stack thật: PostgreSQL/Redis/Kafka/Keycloak/frontend servers.
 - Xác nhận baseline: nhiều Jest cho BFF, management-app, customer-pwa, saas, order, payment, catalog, kitchen; E2E top-level hiện chủ yếu Playwright smoke/journey.
@@ -117,6 +120,7 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 - Phase 2A: session/cart/idempotency, transition order/bill/service request, trừ stock khi confirm, chuyển bàn.
 - Phase 2B: hàng đợi Redis KDS, `order.confirmed` trùng, station access, refetch snapshot sau realtime hint.
 - Phase 3: làm tròn VND, `QRTBL`, quyết toán cash/VietQR, webhook trùng/thiếu/sau paid, lịch sử thanh toán read-only, hoàn tất payment → finalize Order.
+- Phase 4A: `OrderConfirmSagaService`, contract Catalog stock gateway, replay confirm, lỗi tồn kho từ Catalog, compensation trả kho sau khi Order commit/outbox thất bại, và SaaS onboarding mini-saga là luồng saga-style đại diện thứ hai.
 - Phase 4B: lifecycle tenant, subscription/plan, `QRSUB`, OAuth state, payment settings, feature gating, hành vi customer suspended/closed.
 - Kiến trúc: registry 5 topic Kafka, chính sách Redis, không `menu.updated`, ranh giới BFF Direct vs Kafka, đếm ma trận permission.
 
@@ -148,6 +152,7 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 
 - **Tenant isolation Catalog:** tenant A/B có category/menu/table riêng; public menu và admin CRUD luôn filter tenant; request thiếu tenant bị từ chối.
 - **Khóa stock đồng thời:** Hai confirm cùng lúc với stock = 1 chỉ một đơn thành công; đơn còn lại lỗi cấu trúc; stock không âm.
+- **Order Confirm Saga:** `OrderConfirmSagaService` lock và validate order/bill/items, gọi Catalog deduct với `confirm-order:{orderId}`, ghi `PROCESSING` + outbox `order.confirmed`, replay order đã `PROCESSING`, không compensation lỗi nghiệp vụ Catalog trước khi deduct thành công, và trả kho với `confirm-order-compensation:{orderId}` khi Order commit/outbox lỗi sau deduct.
 - **Redis order/session/cart:** Xung đột version cart, khóa cart khi bill `PENDING_PAYMENT`, TTL cache session, idempotency key chống submit trùng.
 - **Đường KDS:** `order.confirmed` → ticket Redis Kitchen theo station → `kds.queue_changed` nội bộ; event Kafka trùng không tạo ticket trùng.
 - **Finalize payment:** Cash/VietQR PAID ghi payment + audit + outbox; Order `BILL_MARK_PAID` idempotent; chuyển bàn `BILLING → CLEANING`; webhook trùng không settle đôi.
@@ -229,7 +234,7 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 
 ### Ngoài phạm vi Phase 5 hiện tại
 
-- **Không bắt buộc pass test cho saga-hardening Phase 4A đầy đủ** như compensation bền vững toàn diện, full CDC/Debezium hoặc framework audit mới nếu chưa triển khai. Phase 5 chỉ test baseline outbox/idempotency/compensation hiện có.
+- **Không bắt buộc pass test cho full hardening vận hành Phase 4A** như Saga state bền vững, retry worker, stock ledger, full CDC/Debezium hoặc framework audit mới nếu chưa triển khai. Phase 5 vẫn phải test Order Confirm Saga đã triển khai và baseline outbox/idempotency/compensation hiện có.
 - **Không yêu cầu notification/staff management Phase 4C** như email biên lai, welcome/suspend, UI invite staff, email reset-password hoặc notification logs nếu service chưa tồn tại.
 - **Không yêu cầu offline queue đầy đủ** như IndexedDB action queue, auto-sync POS/KDS/customer khi mất mạng lâu, hoặc conflict resolver đầy đủ nếu code hiện tại chưa có. Phase 5 chỉ test hành vi reconnect/refetch/snapshot hiện có.
 - **Không thay chứng nhận provider live.** SePay/OAuth/webhook provider vẫn cần validation manual/live khi có URL BFF public và credential hợp lệ; Phase 5 tự động chỉ khóa contract nội bộ và hành vi route bằng mock/local provider. Không dùng domain Vercel tạm hoặc tunnel local làm điều kiện pass mặc định.
@@ -237,16 +242,17 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 
 ### Tiêu chí nghiệm thu — Phase 5
 
-- [ ] Có ma trận traceability cho quy tắc P0/P1 trong `business-logic.md`, `technical-architecture.md`, Phase 1/2A/2B/3/4B và ma trận permission, với trạng thái `covered/partial/missing/implementation-gap/security-gap/deferred-by-phase`.
+- [ ] Có ma trận traceability cho quy tắc P0/P1 trong `business-logic.md`, `technical-architecture.md`, Phase 1/2A/2B/3/4A/4B và ma trận permission, với trạng thái `covered/partial/missing/implementation-gap/security-gap/deferred-by-phase`.
 - [ ] **Unit/contract:** Order + Payment đạt ít nhất **60%** coverage theo công cụ monorepo và mọi invariant P0 về state/tiền/idempotency/webhook có test cụ thể.
 - [ ] **Catalog/QR:** Có test QR token/token invalid, tenant isolation public menu, filter tenant CRUD, delete constraints table/menu và validation/path upload nếu hành vi đã có.
 - [ ] **SaaS Phase 4B:** Có test onboarding, lifecycle tenant, subscription/plan, payment settings/OAuth state, khớp invoice `QRSUB`, feature gating và hành vi customer suspended/closed.
 - [ ] **Chính sách test SePay:** Test tự động mặc định dùng mock SePay hoặc mock unit; mọi kiểm tra SePay live có `RUN_LIVE_SEPAY=1`, URL public hợp lệ, lý do skip rõ, không nằm PR gate mặc định.
-- [ ] **Integration:** Có ít nhất kịch bản tenant isolation, khóa stock đồng thời, finalize payment, cache Redis suspend/subscription, smoke permission/auth đại diện và tách route webhook `QRTBL`/`QRSUB`.
+- [ ] **Integration:** Có ít nhất kịch bản tenant isolation, Order Confirm Saga stock deduct/replay/compensation, khóa stock đồng thời, finalize payment, cache Redis suspend/subscription, smoke permission/auth đại diện và tách route webhook `QRTBL`/`QRSUB`.
 - [ ] **Hiển thị security gap:** Verify giá trị route `x-secret-key` Phase 4B được test nếu đã implement; nếu chưa, ghi `security-gap` blocker trước go-live/demo public.
 - [ ] **E2E Playwright:** Luồng đặt món QR realtime, đóng session thanh toán, onboarding tenant và tenant suspended ổn định trên seed/stack dev chuẩn, hoặc đánh dấu `missing` kèm fixture/credential bổ sung.
 - [ ] **CI/gates:** Baseline CI, gate PR nhanh, gate unit/contract đầy đủ, gate integration và lệnh browser E2E có tài liệu; test phụ thuộc stack local có chính sách skip minh bạch thay vì fail ngẫu nhiên.
-- [ ] **Deferred rõ:** Hành vi Phase 4A/4C chưa triển khai được đánh dấu deferred/gap hợp lệ, không trộn với acceptance Phase 5.
+- [ ] **Deferred rõ:** Full hardening Phase 4A và hành vi Phase 4C chưa triển khai được đánh dấu deferred/gap hợp lệ, còn Order Confirm Saga đã triển khai vẫn thuộc acceptance Phase 5.
+- [ ] **Bằng chứng Saga cho khóa luận:** Order Confirm Saga và SaaS Onboarding Mini-Saga có lệnh kiểm chứng, artifact kỳ vọng và giới hạn claim trong `docs/testing/phase-5/saga-validation-strategy.md`.
 
 ---
 
@@ -356,5 +362,5 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 ## Ghi chú lộ trình
 
 - **Critical Path:** Phase 0 → 1 → 2A → 2B → 3 → 5–7 (Demo)
-- **Nhánh song song:** Phase 4B xong; Phase 4A hoãn; Phase 4C chưa bắt đầu và phụ thuộc 4B.
+- **Nhánh song song:** Phase 4B xong; Phase 4A có lát cắt Saga đại diện đã triển khai, full hardening vẫn là việc tương lai; Phase 4C chưa bắt đầu và phụ thuộc 4B.
 - **4 điểm nhấn demo ấn tượng nhất:** Phase 1 (QR + Menu), Phase 2 (Đặt món realtime), Phase 3 (Thanh toán), Phase 6 (Grafana Tracing)

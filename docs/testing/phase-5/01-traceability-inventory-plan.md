@@ -10,7 +10,7 @@ Create the rule-to-test matrix that decides what Phase 5 must test, what is alre
 - `docs/business-logic.md`
 - `docs/technical-architecture.md`
 - `docs/architecture/permission-matrix.md`
-- Final phase records: Phase 1, 2A, 2B, 3, 4B
+- Final phase records: Phase 1, 2A, 2B, 3, 4A representative Saga slice, 4B
 - Existing tests under `apps/**`, `libs/**`, and `tests/e2e/**`
 
 ## Tasks
@@ -26,6 +26,7 @@ Create the rule-to-test matrix that decides what Phase 5 must test, what is alre
 ## Output
 
 - `docs/testing/phase-5/traceability-matrix.md`
+- `docs/testing/phase-5/saga-validation-strategy.md` when Saga evidence needs a focused thesis-proof map beyond individual matrix rows
 - A short prioritized backlog inside that matrix:
   - P0 tests to add now
   - P1 tests to add after P0
@@ -36,7 +37,7 @@ Create the rule-to-test matrix that decides what Phase 5 must test, what is alre
 
 - Every Phase 5 acceptance criterion has at least one matrix row.
 - Every P0 row has either a concrete test file or a concrete next action.
-- Phase 4A and 4C items are not mixed into Phase 5 acceptance unless already implemented and on the current demo path.
+- Full Phase 4A hardening and Phase 4C items are not mixed into Phase 5 acceptance unless already implemented and on the current demo path. The implemented Order Confirm Saga is part of Phase 5 traceability.
 
 ## Next Session Notes
 

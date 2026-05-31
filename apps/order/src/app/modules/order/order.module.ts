@@ -18,6 +18,8 @@ import { ServiceRequestRepository } from './repositories/service-request.reposit
 import { SessionRepository } from './repositories/session.repository';
 import { BillService } from './services/bill.service';
 import { CartService } from './services/cart.service';
+import { CatalogStockGatewayService } from './services/catalog-stock-gateway.service';
+import { OrderConfirmSagaService } from './services/order-confirm-saga.service';
 import { OrderKdsEventService } from './services/order-kds-event.service';
 import { OrderStateTransitionService } from './services/order-state-transition.service';
 import { OrderService } from './services/order.service';
@@ -39,6 +41,7 @@ import { TransferService } from './services/transfer.service';
   providers: [
     OrderService,
     OrderSubmitService,
+    OrderConfirmSagaService,
     OrderStateTransitionService,
     OrderKdsEventService,
     OrderQuotaService,
@@ -49,6 +52,7 @@ import { TransferService } from './services/transfer.service';
     PaymentEventsConsumerService,
     SessionService,
     CartService,
+    CatalogStockGatewayService,
     OrderRepository,
     OrderItemRepository,
     SessionRepository,

@@ -1,7 +1,7 @@
 # Bản đồ bằng chứng phục vụ viết khóa luận QRTable
 
 > Tài liệu làm việc phục vụ quá trình viết khóa luận tốt nghiệp.
-> Lần khảo sát gần nhất: 2026-05-28.
+> Lần khảo sát gần nhất: 2026-05-31.
 > Nếu tiếp tục công việc sau khi mất/compact context, đọc `thesis-workflow-plan.md` trước.
 
 ## 1. Mục đích
@@ -24,7 +24,7 @@ Khi các nguồn thông tin có mâu thuẫn, áp dụng thứ tự ưu tiên tr
 
 Bản nháp gửi giảng viên hướng dẫn cần được viết như một báo cáo hoàn chỉnh, có đầy đủ các phần nghiên cứu, phân tích, thiết kế, triển khai, đánh giá, kết luận và hướng phát triển. Không nên viết theo kiểu “dự án hiện mới làm tới Phase X nên báo cáo chỉ dừng ở Phase X”.
 
-Khi gặp các phần chưa implement đầy đủ như Phase 4A, Phase 4C, Phase 6 hoặc Phase 7, cách xử lý nên là:
+Khi gặp các phần chưa implement đầy đủ như full hardening Phase 4A, Phase 4C, Phase 6 hoặc Phase 7, cách xử lý nên là:
 
 - Trong bản khóa luận: trình bày chúng như một phần của thiết kế tổng thể hoặc phương án hoàn thiện hệ thống, nếu chúng cần thiết để cấu trúc báo cáo đầy đủ và thuyết phục.
 - Trong evidence map nội bộ: đánh dấu rõ trạng thái thực tế để agent/dev sau biết phần nào cần implement hoặc cần bổ sung bằng chứng.
@@ -61,7 +61,7 @@ Các claim cần tránh trong phần kết quả/đánh giá nếu chưa có b�
 - Payment service sở hữu bill.
 - Order service cập nhật trực tiếp bảng stock của Catalog.
 - Customer dùng Keycloak để xác thực.
-- Full offline queue, Notification Service, saga hardening đầy đủ, observability/deployment đầy đủ đã được kiểm chứng bằng code/test/demo nếu thực tế chưa có bằng chứng.
+- Full offline queue, Notification Service, saga hardening đầy đủ, observability/deployment đầy đủ đã được kiểm chứng bằng code/test/demo nếu thực tế chưa có bằng chứng. Riêng hai luồng Saga đại diện đã có bằng chứng là Order Confirm Saga và SaaS Onboarding Mini-Saga.
 
 ## 4. Bản đồ nguồn bằng chứng
 
@@ -103,14 +103,41 @@ Mục này phục vụ AI/dev, không đưa nguyên văn vào khóa luận. Khi 
 ### Đã có nhưng cần viết cẩn trọng
 
 - Testing khá nhiều nhưng chưa thể nói Phase 5 đã đóng hoàn toàn. Traceability matrix hiện có các dòng covered, partial, implementation-gap và deferred.
+- Saga đại diện đã có bằng chứng ở hai luồng: Order Confirm Saga trong POS core và SaaS Onboarding Mini-Saga trong platform. Khi viết khóa luận, có thể claim áp dụng Saga ở phạm vi đại diện, không claim full saga hardening vận hành.
 - Browser E2E đã có cho một số flow, nhưng vài demo gates vẫn cần full-stack/seed ổn định hơn.
 - Live SePay validation không nằm trong automated testing mặc định.
 - Observability và deployment đã có thiết kế trong docs, nhưng Phase 5-7 vẫn TODO.
 - Offline behavior hiện ở mức degraded/reconnect/refetch UI, chưa phải offline action queue đầy đủ.
 
+### Chiến lược chứng minh Saga trong khóa luận
+
+Nguồn kỹ thuật chính: `docs/testing/phase-5/saga-validation-strategy.md`. Khi viết Chương 5 và Chương 6, không chứng minh Saga chỉ bằng việc nói “code có service tên Saga”. Cách chứng minh nên là chuỗi bằng chứng nhiều lớp:
+
+1. Mô tả lý thuyết và lựa chọn phương pháp: QRTable chọn Saga điều phối tập trung cho hai luồng đại diện, không tạo Saga framework tổng quát.
+2. Chứng minh implementation: nêu bộ điều phối, participant, điểm commit nghiệp vụ và compensation.
+3. Chứng minh bằng test: dẫn unit/contract test cho thứ tự điều phối, replay, lỗi nghiệp vụ và compensation; dẫn integration opt-in cho DB/TCP boundary.
+4. Chứng minh bằng artifact demo: ảnh POS confirm/KDS, ảnh Super Admin onboarding/Owner payment settings, output terminal, snapshot DB/outbox/log.
+5. Ghi giới hạn: full Saga state bền vững, retry worker, CDC/Debezium, stock ledger và onboarding live đầy đủ qua Keycloak/User-Access là hướng hardening, không phải claim chính.
+
+Ánh xạ cụ thể:
+
+- **Order Confirm Saga:** claim tốt nhất là “đã kiểm chứng tự động ở mức unit/contract cho điều phối, replay, lỗi Catalog, outbox và compensation; có integration opt-in cho ranh giới Order-Catalog stock; còn thiếu live fault-injection harness cho lỗi commit/outbox sau deduct thật”.
+- **SaaS Onboarding Mini-Saga:** claim tốt nhất là “đã kiểm chứng DB integration cho success/rollback và live Payment TCP cho payment settings; Authorizer/Keycloak và User-Access vẫn là contract double trong proof tự động hiện tại”.
+
+Câu văn an toàn cho khóa luận:
+
+> Đề tài áp dụng Saga ở hai luồng đại diện: xác nhận đơn hàng và khởi tạo tenant. Cả hai luồng đều dùng điều phối tập trung, có điểm commit nghiệp vụ và có giao dịch bù trừ cho các side effect đã thực hiện. Việc kiểm chứng được thực hiện theo nhiều lớp: test unit/contract cho logic điều phối, integration test cho ranh giới DB/TCP, fault injection ở mức service cho compensation, và artifact demo/log/DB để minh họa flow runtime.
+
+Không nên viết:
+
+- “QRTable đã hoàn thiện Saga ở mức production.”
+- “Mọi giao dịch phân tán trong hệ thống đều dùng Saga.”
+- “Payment Complete là một Saga đầy đủ.”
+- “Onboarding đã được kiểm chứng full end-to-end live qua Keycloak, User-Access, Payment, Kafka và UI.”
+
 ### Chưa có bằng chứng implementation đầy đủ, cần backfill sau
 
-- Phase 4A full saga hardening, CDC/Debezium, deep saga observability.
+- Phase 4A full saga hardening ngoài lát cắt đại diện, CDC/Debezium, deep saga observability.
 - Phase 4C Notification Service, email receipt, welcome/suspend emails, reset-password email.
 - Full production-like deployment package và Grafana trace demo.
 - Native mobile apps.

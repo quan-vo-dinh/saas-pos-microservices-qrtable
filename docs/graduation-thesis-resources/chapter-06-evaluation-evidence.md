@@ -2,7 +2,7 @@
 
 > Tài liệu này là kết quả Phase 6A của workflow khóa luận QRTable.
 > Mục tiêu: chuẩn bị ma trận/bảng đánh giá cho Chương 6, chưa viết nội dung chương dài.
-> Cập nhật: 2026-05-29.
+> Cập nhật: 2026-05-31.
 
 ## 1. Phạm vi và nguyên tắc sử dụng
 
@@ -38,35 +38,46 @@ Nguồn chính: `docs/testing/phase-5/traceability-matrix.md` và `docs/testing/
 
 ### 3.1 Tổng quan trạng thái
 
-| Scope               | Tổng dòng | Covered |      Partial | Implementation gap | Deferred by phase | Ghi chú dùng trong Chương 6                                              |
-| ------------------- | --------: | ------: | -----------: | -----------------: | ----------------: | ------------------------------------------------------------------------ |
-| P0/P1 toàn hệ thống |        52 |      38 |           10 |                  1 |                 3 | Dùng để nói hệ thống có traceability test đáng kể nhưng còn gap rõ ràng. |
-| P0                  |        29 |       - | 4 partial P0 |                  0 |                 0 | Không được viết "toàn bộ P0 đã covered" vì còn bốn dòng partial.         |
-| P1                  |        23 |       - | 6 partial P1 |                  1 |                 3 | P1 chứa nhiều hardening/demo/future scope.                               |
+| Scope               | Tổng dòng | Covered |      Partial | Implementation gap | Deferred by phase | Ghi chú dùng trong Chương 6                                                                  |
+| ------------------- | --------: | ------: | -----------: | -----------------: | ----------------: | -------------------------------------------------------------------------------------------- |
+| P0/P1 toàn hệ thống |        52 |      36 |           11 |                  1 |                 4 | Dùng để nói hệ thống có traceability test đáng kể nhưng còn gap/deferred rõ ràng.            |
+| P0                  |        29 |       - | 5 partial P0 |                  0 |                 1 | Không được viết "toàn bộ P0 đã covered" vì còn năm dòng partial và một dòng refund deferred. |
+| P1                  |        23 |       - | 6 partial P1 |                  1 |                 3 | P1 chứa nhiều hardening/demo/future scope.                                                   |
 
-Traceability handoff ghi nhận lệnh default `pnpm exec nx run-many -t test --parallel=3` đã pass cho 23 projects vào 2026-05-22/2026-05-23, nhưng một số gate phụ thuộc full stack, seed, provider hoặc browser vẫn được đánh dấu manual/opt-in.
+Traceability handoff ghi nhận lệnh default `pnpm exec nx run-many -t test --parallel=3` đã pass cho 23 projects vào 2026-05-22/2026-05-23. Đến 2026-05-31, SaaS onboarding DB integration và live Payment TCP integration đã được re-verify cho chiến lược bằng chứng Saga. Một số gate phụ thuộc full stack, seed, provider hoặc browser vẫn được đánh dấu manual/opt-in.
 
 ### 3.2 Summary theo domain
 
-| Domain                   | Covered | Partial |         Gap/deferred | Claim được phép viết                                                                                                                                                                           |
-| ------------------------ | ------: | ------: | -------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Catalog và QR            |       5 |       2 | 1 implementation gap | Public menu, QR token và quota table có evidence; tenant A/B live gate và delete constraint chưa phủ toàn diện; QR scan rate limit là implementation gap.                                      |
-| Order/session/cart/bill  |       8 |       1 |                    0 | Core ordering, cart version, submit idempotency, stock consistency, bill request và payment finalization có coverage mạnh; table transfer cần integration sâu hơn.                             |
-| Kitchen/KDS realtime     |       5 |       0 |                    0 | KDS dedupe, station RBAC, FIFO/priority/SLA, refetch hint và Redis-only recovery có thể viết là đã kiểm chứng ở mức test hiện có.                                                              |
-| Payment settlement       |       9 |       1 |                    0 | Cash/VietQR/Webhook/idempotency/lịch sử thanh toán read-only có unit-contract và một số opt-in integration; browser close-session còn partial; live SePay không tự động.                       |
-| SaaS lifecycle           |       7 |       3 |                    0 | Tenant lifecycle, subscription invoice, quota, payment settings và admin routes có evidence; onboarding full live stack, suspended pending-bill browser path và OAuth state tests còn partial. |
-| RBAC và tenant isolation |       2 |       1 |                    0 | Guard chain và permission matrix counts mạnh; representative live tenant-isolation API gate còn partial.                                                                                       |
-| Architecture invariants  |       2 |       2 |                    0 | Kafka 6-topic registry và Redis access policy mạnh; BFF Direct/no-Kafka-for-UI và TCP pattern coverage còn partial.                                                                            |
-| Deferred/out of scope    |       0 |       0 |           3 deferred | Full offline queue, Phase 4A saga hardening và Phase 4C notification/email không viết như kết quả đã hoàn thành.                                                                               |
+| Domain                   | Covered | Partial |         Gap/deferred | Claim được phép viết                                                                                                                                                                               |
+| ------------------------ | ------: | ------: | -------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Catalog và QR            |       5 |       2 | 1 implementation gap | Public menu, QR token và quota table có evidence; tenant A/B live gate và delete constraint chưa phủ toàn diện; QR scan rate limit là implementation gap.                                          |
+| Order/session/cart/bill  |       7 |       2 |                    0 | Core ordering, cart version, submit idempotency, bill request và payment finalization có coverage mạnh; Order Confirm Saga live fault injection và table transfer cần integration sâu hơn.         |
+| Kitchen/KDS realtime     |       5 |       0 |                    0 | KDS dedupe, station RBAC, FIFO/priority/SLA, refetch hint và Redis-only recovery có thể viết là đã kiểm chứng ở mức test hiện có.                                                                  |
+| Payment settlement       |       8 |       1 |           1 deferred | Cash/VietQR/Webhook/idempotency/lịch sử thanh toán read-only có unit-contract và một số opt-in integration; refund và browser close-session không nằm trong claim chính; live SePay không tự động. |
+| SaaS lifecycle           |       7 |       3 |                    0 | Tenant lifecycle, subscription invoice, quota, payment settings và admin routes có evidence; onboarding full live stack, suspended pending-bill browser path và OAuth state tests còn partial.     |
+| RBAC và tenant isolation |       2 |       1 |                    0 | Guard chain và permission matrix counts mạnh; representative live tenant-isolation API gate còn partial.                                                                                           |
+| Architecture invariants  |       2 |       2 |                    0 | Kafka 6-topic registry và Redis access policy mạnh; BFF Direct/no-Kafka-for-UI và TCP pattern coverage còn partial.                                                                                |
+| Deferred/out of scope    |       0 |       0 |           3 deferred | Full offline queue, Phase 4A saga hardening và Phase 4C notification/email không viết như kết quả đã hoàn thành.                                                                                   |
 
 ### 3.3 P0 partial cần giữ nguyên trong Chương 6
 
-| Rule ID                          | Lý do còn partial                                                                                                                                    | Cách viết an toàn                                                                                                                                             |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `P0-CAT-TENANT-ISOLATION`        | Có unit/service coverage và opt-in integration skeleton, nhưng live BFF/Keycloak/Catalog tenant A/B gate chưa được chạy ổn định như acceptance gate. | Viết tenant isolation là requirement trọng tâm đã có guard/source/test một phần; chưa claim toàn bộ API surface đã được chứng minh bằng live tenant A/B test. |
-| `P0-SAAS-ONBOARDING-SAGA`        | DB success/compensation và live Payment TCP slice đã pass; Authorizer + Keycloak và User-Access vẫn là contract doubles trong full flow.             | Viết onboarding saga đã kiểm chứng phần DB/Payment/compensation, chưa gọi là end-to-end live multi-service proof đầy đủ.                                      |
-| `P0-SAAS-SUSPENDED-CUSTOMER-PWA` | Có unit/component và browser smoke cho suspended tenant; pending-bill payment exception browser path chưa đủ.                                        | Viết behavior suspended tenant đã có coverage chính, pending-bill browser payment path còn cần demo/E2E bổ sung.                                              |
-| `P0-RBAC-TENANT-ISOLATION-API`   | Guard/client tests có, nhưng representative seeded BFF/Keycloak/service database gate chưa đủ rộng.                                                  | Viết RBAC guard chain và seed counts đã kiểm chứng; cross-tenant API surface vẫn là limitation.                                                               |
+| Rule ID                          | Lý do còn partial                                                                                                                                                  | Cách viết an toàn                                                                                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `P0-CAT-TENANT-ISOLATION`        | Có unit/service coverage và opt-in integration skeleton, nhưng live BFF/Keycloak/Catalog tenant A/B gate chưa được chạy ổn định như acceptance gate.               | Viết tenant isolation là requirement trọng tâm đã có guard/source/test một phần; chưa claim toàn bộ API surface đã được chứng minh bằng live tenant A/B test.            |
+| `P0-ORD-STATE-STOCK`             | Order Confirm Saga có unit/contract và integration stock boundary, nhưng chưa có live fault-injection harness cho lỗi Order commit/outbox sau Catalog deduct thật. | Viết Order Confirm Saga đã kiểm chứng điều phối/replay/compensation ở service layer và ranh giới stock opt-in; live compensation fault injection là hardening tiếp theo. |
+| `P0-SAAS-ONBOARDING-SAGA`        | DB success/compensation và live Payment TCP slice đã pass; Authorizer + Keycloak và User-Access vẫn là contract doubles trong full flow.                           | Viết onboarding saga đã kiểm chứng phần DB/Payment/compensation, chưa gọi là end-to-end live multi-service proof đầy đủ.                                                 |
+| `P0-SAAS-SUSPENDED-CUSTOMER-PWA` | Có unit/component và browser smoke cho suspended tenant; pending-bill payment exception browser path chưa đủ.                                                      | Viết behavior suspended tenant đã có coverage chính, pending-bill browser payment path còn cần demo/E2E bổ sung.                                                         |
+| `P0-RBAC-TENANT-ISOLATION-API`   | Guard/client tests có, nhưng representative seeded BFF/Keycloak/service database gate chưa đủ rộng.                                                                | Viết RBAC guard chain và seed counts đã kiểm chứng; cross-tenant API surface vẫn là limitation.                                                                          |
+
+### 3.4 Saga evidence strategy
+
+Nguồn chính: `docs/testing/phase-5/saga-validation-strategy.md`.
+
+Chương 6 nên chứng minh Saga bằng chuỗi bằng chứng nhiều lớp, không chỉ dựa vào tên service:
+
+- Order Confirm Saga: unit/contract chứng minh điều phối, replay, lỗi Catalog, outbox và compensation; integration opt-in chứng minh ranh giới Order-Catalog stock; live fault-injection harness cho lỗi commit/outbox sau deduct thật vẫn là hướng hardening.
+- SaaS Onboarding Mini-Saga: PostgreSQL integration chứng minh success/rollback; live Payment TCP chứng minh tạo `tenant_payment_settings`; Authorizer/Keycloak và User-Access vẫn là contract double trong proof tự động hiện tại.
+- Artifact demo nên gồm screenshot UI happy path, terminal output, snapshot DB/outbox và log; artifact này minh họa, không thay thế test.
 
 ## 4. Architecture/NFR evidence status
 

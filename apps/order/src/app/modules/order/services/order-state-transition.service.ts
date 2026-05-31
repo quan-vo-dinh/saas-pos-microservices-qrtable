@@ -1,5 +1,3 @@
-import { TCP_SERVICES } from '@common/configuration/tcp.config';
-import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { Bill } from '@common/entities/bill.entity';
 import { OrderItem } from '@common/entities/order-item.entity';
 import { Order } from '@common/entities/order.entity';
@@ -7,14 +5,6 @@ import { OutboxEvent } from '@common/entities/outbox-event.entity';
 import { Session } from '@common/entities/session.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
-import { Request } from '@common/interfaces/tcp/common/request.interface';
-import type { ResponseType } from '@common/interfaces/tcp/common/response.interface';
-import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
-import type {
-  StockDeductForOrderTcpRequest,
-  StockReleaseForOrderTcpRequest,
-} from '@common/interfaces/tcp/catalog/menu-item-request.interface';
-import type { StockMutationResult } from '@common/interfaces/tcp/catalog/menu-item-response.interface';
 import type {
   CustomerCancelPendingTcpRequest,
   MarkOrderItemsReadyTcpRequest,
@@ -27,24 +17,16 @@ import type {
   RevertOrderItemsProcessingTcpResponse,
 } from '@common/interfaces/tcp/order/order-response.interface';
 import type { Bill as BillDto, Order as OrderDto, OrderItem as OrderItemDto } from '@einvoice/types';
-import { BillStatus, OrderItemStatus, OrderStatus, OrderStatusChangedEvent } from '@einvoice/types';
-import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
-import { firstValueFrom } from 'rxjs';
+import { OrderItemStatus, OrderStatus, OrderStatusChangedEvent } from '@einvoice/types';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { CONFIGURATION } from '../../../../configuration';
-import { buildOrderConfirmedKafkaPayload } from '../order-confirmed-payload';
 import { BillRepository } from '../repositories/bill.repository';
 import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { recalculateBillTotals } from '../utils/recalculate-bill-totals';
+import { CatalogStockGatewayService } from './catalog-stock-gateway.service';
 import { OrderKdsEventService } from './order-kds-event.service';
-
-type ConfirmTxOutcome =
-  | { kind: 'replay'; order: Order; items: OrderItem[]; bill: Bill | null }
-  | { kind: 'confirmed'; order: Order; items: OrderItem[]; bill: Bill | null };
-
-type TcpBusinessErrorPayload = { code?: number; errorCode?: ErrorCode; message?: string };
 
 const ORDER_STATUS_CHANGED_EVENT_TYPE = 'order.status_changed';
 
@@ -56,103 +38,8 @@ export class OrderStateTransitionService {
     private readonly orderItemRepository: OrderItemRepository,
     private readonly billRepository: BillRepository,
     private readonly orderKdsEventService: OrderKdsEventService,
-    @Inject(TCP_SERVICES.CATALOG_SERVICE) private readonly catalogClient: TcpClient,
+    private readonly catalogStockGateway: CatalogStockGatewayService,
   ) {}
-
-  async confirmOrder(dto: StaffOrderActionTcpRequest): Promise<OrderActionTcpResponse> {
-    const outcome = await this.dataSource.transaction(async (manager) => {
-      const order = await this.orderRepository.findByIdAndTenantForUpdate(dto.orderId, dto.tenantId, manager);
-      if (!order) {
-        throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
-      }
-
-      if (order.status === OrderStatus.PROCESSING) {
-        const items = await this.orderItemRepository.findByOrderIdAndTenantWithManager(
-          dto.orderId,
-          dto.tenantId,
-          manager,
-        );
-        const bill = await this.loadBillForSessionOrder(manager, order.sessionId, dto.tenantId, dto.orderId);
-        return { kind: 'replay', order, items, bill } satisfies ConfirmTxOutcome;
-      }
-
-      if (order.status !== OrderStatus.PENDING) {
-        throw new BusinessException(ErrorCode.ORDER_INVALID_STATE, HttpStatus.CONFLICT);
-      }
-
-      const bill = await this.loadBillForSessionOrder(manager, order.sessionId, dto.tenantId, dto.orderId);
-      if (!bill || bill.status !== BillStatus.OPEN) {
-        throw new BusinessException(ErrorCode.BILL_NOT_OPEN, HttpStatus.CONFLICT);
-      }
-
-      const items = await this.orderItemRepository.findByOrderIdAndTenantWithManager(
-        dto.orderId,
-        dto.tenantId,
-        manager,
-      );
-
-      await this.callCatalogStockDeduct({
-        tenantId: dto.tenantId,
-        orderId: order.id,
-        idempotencyKey: `confirm-order:${order.id}`,
-        items: items.map((it) => ({ menuItemId: it.menuItemId, quantity: it.quantity })),
-      });
-
-      const now = new Date();
-      order.status = OrderStatus.PROCESSING;
-      order.confirmedAt = now;
-      order.confirmedByUserId = dto.userId;
-      await manager.save(Order, order);
-
-      for (const line of items) {
-        line.status = OrderItemStatus.PROCESSING;
-        await manager.save(OrderItem, line);
-      }
-
-      const kafkaPayload = buildOrderConfirmedKafkaPayload({
-        tenantId: dto.tenantId,
-        order,
-        items,
-        confirmedAt: now,
-        confirmedByUserId: dto.userId,
-        correlationId: dto.processId,
-      });
-
-      const outbox = manager.create(OutboxEvent, {
-        tenantId: dto.tenantId,
-        topic: CONFIGURATION.KAFKA_CONFIG.ORDER_CONFIRMED_TOPIC,
-        eventType: 'order.confirmed',
-        aggregateId: order.id,
-        partitionKey: dto.tenantId,
-        payload: kafkaPayload as unknown as Record<string, unknown>,
-        status: 'PENDING',
-        publishedAt: null,
-        attemptCount: 0,
-        lastError: null,
-      });
-      await manager.save(OutboxEvent, outbox);
-
-      return { kind: 'confirmed', order, items, bill } satisfies ConfirmTxOutcome;
-    });
-
-    const orderDto = this.toOrderDto(outcome.order, outcome.items);
-    const billDto = outcome.bill ? this.toBillDto(outcome.bill) : undefined;
-
-    const orderStatusChanged: OrderStatusChangedEvent = {
-      tenantId: dto.tenantId,
-      orderId: outcome.order.id,
-      fromStatus: OrderStatus.PENDING,
-      toStatus: OrderStatus.PROCESSING,
-      changedByUserId: dto.userId,
-      timestamp: (outcome.order.confirmedAt ?? new Date()).toISOString(),
-    };
-
-    return {
-      order: orderDto,
-      bill: billDto,
-      events: { orderStatusChanged },
-    };
-  }
 
   async customerCancelPending(dto: CustomerCancelPendingTcpRequest): Promise<OrderActionTcpResponse> {
     const reason = (dto.reason ?? 'CUSTOMER_REQUESTED').trim().slice(0, 255) || 'CUSTOMER_REQUESTED';
@@ -198,7 +85,7 @@ export class OrderStateTransitionService {
         manager,
       );
 
-      await this.callCatalogStockRelease({
+      await this.catalogStockGateway.releaseForOrder({
         tenantId: dto.tenantId,
         orderId: ord.id,
         idempotencyKey: `cancel-processing:${ord.id}`,
@@ -537,65 +424,6 @@ export class OrderStateTransitionService {
       return null;
     }
     return bill;
-  }
-
-  private async callCatalogStockDeduct(payload: StockDeductForOrderTcpRequest): Promise<StockMutationResult[]> {
-    try {
-      const response = await firstValueFrom(
-        this.catalogClient.send<ResponseType<StockMutationResult[]>, StockDeductForOrderTcpRequest>(
-          TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_DEDUCT_FOR_ORDER,
-          new Request<StockDeductForOrderTcpRequest>({ tenantId: payload.tenantId, data: payload }),
-        ),
-      );
-      if (response.statusCode >= 400) {
-        throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, response.statusCode as HttpStatus);
-      }
-      const data = response.data;
-      return Array.isArray(data) ? data : [];
-    } catch (e) {
-      if (e instanceof BusinessException) {
-        throw e;
-      }
-      const tcpError = this.getTcpBusinessError(e);
-      if (tcpError?.errorCode) {
-        throw new BusinessException(tcpError.errorCode, (tcpError.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
-      }
-      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
-    }
-  }
-
-  private async callCatalogStockRelease(payload: StockReleaseForOrderTcpRequest): Promise<StockMutationResult[]> {
-    try {
-      const response = await firstValueFrom(
-        this.catalogClient.send<ResponseType<StockMutationResult[]>, StockReleaseForOrderTcpRequest>(
-          TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_RELEASE_FOR_ORDER,
-          new Request<StockReleaseForOrderTcpRequest>({ tenantId: payload.tenantId, data: payload }),
-        ),
-      );
-      if (response.statusCode >= 400) {
-        throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, response.statusCode as HttpStatus);
-      }
-      const data = response.data;
-      return Array.isArray(data) ? data : [];
-    } catch (e) {
-      if (e instanceof BusinessException) {
-        throw e;
-      }
-      const tcpError = this.getTcpBusinessError(e);
-      if (tcpError?.errorCode) {
-        throw new BusinessException(tcpError.errorCode, (tcpError.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
-      }
-      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
-    }
-  }
-
-  private getTcpBusinessError(error: unknown): TcpBusinessErrorPayload | null {
-    const payload = error instanceof RpcException ? error.getError() : error;
-    if (!payload || typeof payload !== 'object') {
-      return null;
-    }
-    const candidate = payload as TcpBusinessErrorPayload & { error?: TcpBusinessErrorPayload };
-    return candidate.errorCode ? candidate : (candidate.error ?? null);
   }
 
   private toOrderDto(entity: Order, items: OrderItem[]): OrderDto {

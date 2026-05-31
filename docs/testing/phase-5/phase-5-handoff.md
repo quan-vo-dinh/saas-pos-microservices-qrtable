@@ -1,6 +1,6 @@
 # Phase 5 Testing Handoff
 
-**Date:** 2026-05-23
+**Date:** 2026-05-31
 
 ## Current Traceability Counts
 
@@ -11,17 +11,39 @@ Traceability matrix state in `docs/testing/phase-5/traceability-matrix.md`:
 | Total P0/P1 rows   |    52 |
 | P0 rows            |    29 |
 | P1 rows            |    23 |
-| Covered            |    38 |
-| Partial            |    10 |
+| Covered            |    36 |
+| Partial            |    11 |
 | Implementation gap |     1 |
-| Deferred by phase  |     3 |
+| Deferred by phase  |     4 |
 
 Remaining P0 partial rows:
 
 - `P0-CAT-TENANT-ISOLATION`
+- `P0-ORD-STATE-STOCK`
 - `P0-SAAS-ONBOARDING-SAGA`
 - `P0-SAAS-SUSPENDED-CUSTOMER-PWA`
 - `P0-RBAC-TENANT-ISOLATION-API`
+
+## Saga Verification Update
+
+Fresh mini-saga verification on 2026-05-31 fixed the SaaS onboarding integration fixtures to use UUID-valid owner IDs because `tenants.owner_id` is a PostgreSQL `uuid` column. This was a test fixture bug, not a production saga bug.
+
+Commands run for the SaaS onboarding mini-saga:
+
+```bash
+RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-db.integration.spec.ts
+RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-live-payment.integration.spec.ts
+pnpm nx test saas --runInBand --skip-nx-cache
+```
+
+Results:
+
+- SaaS PostgreSQL onboarding integration passed `3/3` tests: success path, compensation before subscription assignment, and compensation after subscription assignment.
+- SaaS live Payment TCP integration passed `1/1` test: live Payment created exactly one Payment-owned `tenant_payment_settings` row.
+- Default SaaS suite passed `50` tests with `4` opt-in integration tests skipped by design.
+- `P0-SAAS-ONBOARDING-SAGA` stays `partial` because Authorizer/Keycloak and User-Access are still represented by contract doubles in these opt-in slices.
+
+The dedicated thesis evidence strategy is documented in `docs/testing/phase-5/saga-validation-strategy.md`.
 
 ## Commands Passed
 
@@ -105,6 +127,7 @@ Provider checks:
 
 - Stop before expanding browser E2E Flow B if default unit/contract gates are red.
 - Stop before marking `P0-CAT-TENANT-ISOLATION` or `P0-RBAC-TENANT-ISOLATION-API` as covered unless the opt-in BFF/Keycloak stack command has passed or the matrix clearly records the remaining stack dependency.
+- Stop before marking `P0-ORD-STATE-STOCK` as covered unless the Order Confirm Saga compensation path has a deterministic integration proof for "Catalog deduct succeeded, then Order commit/outbox failed, then Catalog release stock ran".
 - Stop before marking `P0-SAAS-ONBOARDING-SAGA` as covered until live Authorizer/Keycloak and live User-Access are proven; live Payment TCP alone is not enough.
 - Stop before automating live SePay; all live provider checks stay manual and guarded by `RUN_LIVE_SEPAY=1`.
 - Stop before Phase 5 completion while any P0 row is still untriaged.

@@ -6,6 +6,7 @@ import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { Session } from '@common/entities/session.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
+import type { OrderActionTcpResponse } from '@common/interfaces/tcp/order/order-response.interface';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrderItemStatus, OrderStatus, SessionStatus } from '@einvoice/types';
 import { of } from 'rxjs';
@@ -13,6 +14,7 @@ import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { SessionRepository } from '../repositories/session.repository';
 import { OrderKdsEventService } from '../services/order-kds-event.service';
+import { OrderConfirmSagaService } from '../services/order-confirm-saga.service';
 import { OrderService } from '../services/order.service';
 import { OrderStateTransitionService } from '../services/order-state-transition.service';
 import { OrderSubmitService } from '../services/order-submit.service';
@@ -36,8 +38,8 @@ describe('OrderService', () => {
   };
   let catalogClient: { send: jest.Mock };
   let orderSubmitService: { submitOrder: jest.Mock };
+  let orderConfirmSagaService: { confirmOrder: jest.Mock };
   let orderStateTransitionService: {
-    confirmOrder: jest.Mock;
     customerCancelPending: jest.Mock;
     cancelPendingStaff: jest.Mock;
     cancelProcessing: jest.Mock;
@@ -66,8 +68,8 @@ describe('OrderService', () => {
     };
     catalogClient = { send: jest.fn() };
     orderSubmitService = { submitOrder: jest.fn() };
+    orderConfirmSagaService = { confirmOrder: jest.fn() };
     orderStateTransitionService = {
-      confirmOrder: jest.fn(),
       customerCancelPending: jest.fn(),
       cancelPendingStaff: jest.fn(),
       cancelProcessing: jest.fn(),
@@ -84,6 +86,7 @@ describe('OrderService', () => {
         { provide: SessionRepository, useValue: sessionRepository },
         { provide: SessionService, useValue: sessionService },
         { provide: OrderSubmitService, useValue: orderSubmitService },
+        { provide: OrderConfirmSagaService, useValue: orderConfirmSagaService },
         { provide: OrderKdsEventService, useClass: OrderKdsEventService },
         { provide: OrderStateTransitionService, useValue: orderStateTransitionService },
         { provide: TCP_SERVICES.CATALOG_SERVICE, useValue: catalogClient },
@@ -158,6 +161,29 @@ describe('OrderService', () => {
       new Date('2026-05-26T17:00:00.000Z'),
       new Date('2026-05-27T17:00:00.000Z'),
     );
+  });
+
+  it('delegates order confirmation to the order confirm saga orchestrator', async () => {
+    const response = {
+      order: { id: 'o1', status: OrderStatus.PROCESSING },
+      events: {
+        orderStatusChanged: {
+          tenantId: 't1',
+          orderId: 'o1',
+          fromStatus: OrderStatus.PENDING,
+          toStatus: OrderStatus.PROCESSING,
+          changedByUserId: 'staff-1',
+          timestamp: '2026-05-02T08:00:00.000Z',
+        },
+      },
+    } as unknown as OrderActionTcpResponse;
+    orderConfirmSagaService.confirmOrder.mockResolvedValue(response);
+
+    const dto = { tenantId: 't1', orderId: 'o1', userId: 'staff-1' };
+    await expect(service.confirmOrder(dto)).resolves.toBe(response);
+
+    expect(orderConfirmSagaService.confirmOrder).toHaveBeenCalledWith(dto);
+    expect(orderStateTransitionService.customerCancelPending).not.toHaveBeenCalled();
   });
 
   describe('joinSession', () => {

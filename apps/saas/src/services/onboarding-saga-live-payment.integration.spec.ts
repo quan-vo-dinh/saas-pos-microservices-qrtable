@@ -27,6 +27,7 @@ import { SubscriptionService } from './subscription.service';
 const RUN_INTEGRATION = process.env['RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT'] === '1';
 const TCP_TIMEOUT_MS = 5_000;
 const READINESS_TIMEOUT_MS = 1_000;
+const OWNER_USER_ID = '22222222-2222-4222-8222-222222222222';
 
 type Harness = {
   saasDataSource: DataSource;
@@ -112,7 +113,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA live Payment TCP integration', ()
     currentPlanCode = planCode;
     currentSlug = slug;
     await seedPlan(h, planCode);
-    const contractClients = createContractClients('owner-phase5-live-payment');
+    const contractClients = createContractClients(OWNER_USER_ID);
     const service = createService(h, contractClients);
 
     const result = await service.onboard({
@@ -143,7 +144,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA live Payment TCP integration', ()
       payload: expect.objectContaining({
         tenantId: result.tenant.id,
         slug,
-        ownerUserId: 'owner-phase5-live-payment',
+        ownerUserId: OWNER_USER_ID,
         planCode,
         correlationId: processId,
       }),
@@ -170,7 +171,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA live Payment TCP integration', ()
     expect(contractClients.userClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.USER.UPSERT_WITH_TENANT,
       expect.objectContaining({
-        data: expect.objectContaining({ tenantId: result.tenant.id, userId: 'owner-phase5-live-payment' }),
+        data: expect.objectContaining({ tenantId: result.tenant.id, userId: OWNER_USER_ID }),
         processId,
       }),
     );

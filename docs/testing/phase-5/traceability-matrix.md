@@ -1,8 +1,8 @@
 # Phase 5 Step 5.1 Traceability Matrix
 
-**Scope:** P0 and P1 rules only. This inventory maps canonical rules from `docs/business-logic.md`, `docs/technical-architecture.md`, completed phase records (1, 2A, 2B, 3, 4B), and `docs/architecture/permission-matrix.md` to existing tests. It does not add or require new business behavior.
+**Scope:** P0 and P1 rules only. This inventory maps canonical rules from `docs/business-logic.md`, `docs/technical-architecture.md`, completed phase records (1, 2A, 2B, 3, the 4A representative Saga slice, 4B), and `docs/architecture/permission-matrix.md` to existing tests. It does not add or require new business behavior.
 
-**Phase context:** Phases 0, 1, 2A, 2B, 3, and 4B are complete. Phase 4A is deferred. Phase 4C is not started.
+**Phase context:** Phases 0, 1, 2A, 2B, 3, and 4B are complete. Phase 4A has an implemented Order Confirm Saga representative slice; full Phase 4A operational hardening remains future work. Phase 4C is not started.
 
 ---
 
@@ -13,7 +13,7 @@
 - **`missing`** — Behavior appears implemented or is the current contract, but no adequate test was found.
 - **`implementation-gap`** — Canonical docs describe a rule that is not clearly implemented; do not add tests until behavior is built or the spec changes.
 - **`security-gap`** — Security hardening is insufficient for production or demo-public exposure; current tests may only cover route shape or presence.
-- **`deferred-by-phase`** — Rule belongs to Phase 4A, Phase 4C, or explicit post-thesis or future hardening scope.
+- **`deferred-by-phase`** — Rule belongs to full Phase 4A operational hardening, Phase 4C, or explicit post-thesis or future hardening scope.
 
 ---
 
@@ -184,17 +184,17 @@
 
 ---
 
-### `P0-ORD-STATE-STOCK` — `covered` (P0, money)
+### `P0-ORD-STATE-STOCK` — `partial` (P0, money)
 
-**Requirement:** Staff confirm moves `PENDING` to `PROCESSING`, deducts stock through a Catalog TCP transaction, emits `order.confirmed`, and rolls back on stock errors.
+**Requirement:** Staff confirm is orchestrated by `OrderConfirmSagaService`: lock/validate order and bill, deduct stock through Catalog TCP, commit Order rows plus `order.confirmed` outbox, replay already-`PROCESSING` orders, and release stock if Order commit/outbox fails after Catalog deduct succeeds.
 
-**Sources:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); `phase-2a-order-kafka` accepted decisions; `phase-5-p0-order-stock-confirmation-spec`.
+**Sources:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); `phase-2a-order-kafka` accepted decisions; `phase-4a-saga-hardening`; `phase-5-p0-order-stock-confirmation-spec`.
 
-**Tests:** Order service spec; Catalog menu-item service spec; Catalog menu-item repository spec; order-confirmed payload spec in Order app; opt-in external-stack spec `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts`.
+**Tests:** `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`; `apps/order/src/app/modules/order/tests/catalog-stock-gateway.service.spec.ts`; Order service delegate spec; Catalog menu-item service spec; Catalog menu-item repository spec; order-confirmed payload spec in Order app; opt-in external-stack spec `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts`.
 
 **Target layer:** integration. **Stack:** PostgreSQL, Catalog TCP, Kafka or outbox harness.
 
-**Notes:** Step 5.2 unit-contract coverage proves stock deduct call shape, `PROCESSING` transition, outbox persistence, replay no-rededuct, Catalog sorted unique lock contract, and a stock=1 concurrent deduction simulation. Step 5.3A-1 external-stack coverage passed with PostgreSQL plus live Order and Catalog TCP using `RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand`; Order now preserves live TCP business error payloads such as `CATALOG_STOCK_INSUFFICIENT`.
+**Notes:** Unit-contract coverage proves Saga orchestration, stock deduct/release command shape, `PROCESSING` transition, outbox persistence, replay no-rededuct, no compensation before successful deduct, and compensation logging while preserving the original error. Step 5.3A-1 external-stack coverage passed with PostgreSQL plus live Order and Catalog TCP using `RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand`; Order preserves live TCP business error payloads such as `CATALOG_STOCK_INSUFFICIENT`. Thesis evidence strategy is captured in `docs/testing/phase-5/saga-validation-strategy.md`: use unit/contract tests for the deterministic compensation proof, opt-in stock integration for the real Order-Catalog boundary, and UI/DB/log artifacts for the visible demo. This remains `partial` because a focused integration test for Order commit/outbox failure after live Catalog deduct still needs a deterministic live fault-injection harness.
 
 ---
 
@@ -472,7 +472,7 @@
 
 **Target layer:** integration. **Stack:** SaaS database, Authorizer and Keycloak, User-Access, Payment TCP, Kafka or outbox.
 
-**Notes:** Step 5.3 SaaS PostgreSQL integration now proves successful tenant, initial subscription, payment-settings TCP contract, and `tenant.created` outbox persistence, plus compensation before and after subscription assignment. The service now deletes `INITIAL_ONBOARDING` subscriptions during rollback to avoid orphan rows. The live Payment slice passed on 2026-05-23 with `NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm nx test saas --testPathPatterns=onboarding-saga-live-payment.integration.spec.ts --runInBand`, proving real Payment TCP creates exactly one Payment-owned `tenant_payment_settings` row and that replaying `PAYMENT_SETTINGS.CREATE_EMPTY` remains idempotent. This remains `partial` because Authorizer + real Keycloak and live User-Access are still represented by TCP contract doubles rather than a full live multi-service harness. Opt-in prerequisites are PostgreSQL for SaaS/Payment tables, Payment TCP for the live Payment slice, and, before full live multi-service readiness, Keycloak, Authorizer, User-Access, Payment TCP, and Kafka or outbox verification running and seeded.
+**Notes:** Step 5.3 SaaS PostgreSQL integration proves successful tenant, initial subscription, payment-settings TCP contract call, and `tenant.created` outbox persistence, plus compensation before and after subscription assignment. The live Payment slice was re-verified on 2026-05-31 with `RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-live-payment.integration.spec.ts`, proving real Payment TCP creates exactly one Payment-owned `tenant_payment_settings` row. The PostgreSQL integration was re-verified with `RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-db.integration.spec.ts`; test fixtures now use UUID-valid owner IDs because `tenants.owner_id` is a `uuid` column. This remains `partial` because Authorizer + real Keycloak and live User-Access are still represented by TCP contract doubles rather than a full live multi-service harness. Opt-in prerequisites are PostgreSQL for SaaS/Payment tables, Payment TCP for the live Payment slice, and, before full live multi-service readiness, Keycloak, Authorizer, User-Access, Payment TCP, and Kafka or outbox verification running and seeded.
 
 ---
 
@@ -718,7 +718,7 @@
 
 **Target layer:** deferred. **Stack:** Kafka, PostgreSQL, observability stack.
 
-**Notes:** Phase 4A is deferred; do not fail Phase 5 Step 5.1 on missing tests. Track when Phase 4A resumes.
+**Notes:** The representative Order Confirm Saga is already implemented and tracked under `P0-ORD-STATE-STOCK`. This row only covers full operational hardening beyond the representative slice; do not fail Phase 5 Step 5.1 on missing tests for these future items.
 
 ---
 
@@ -740,16 +740,17 @@
 
 Ordered by urgency; each line is **priority**, **rule id**, **status**, and **next action**.
 
-1. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Add live Authorizer + Keycloak and User-Access proof; DB success/compensation and live Payment TCP are now covered.
-2. **P0** — `P0-CAT-TENANT-ISOLATION` — `partial` — Run the opt-in seeded BFF/Keycloak/Catalog gate and record evidence before treating it as a reliable live-stack gate.
-3. **P0** — `P0-RBAC-TENANT-ISOLATION-API` — `partial` — Add representative live-stack API checks once BFF/auth/service seed policy is stable.
-4. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Extend the browser smoke with a seeded pending-bill payment exception path after Flow B/B+D data is stable.
+1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Add deterministic fault injection for Order commit/outbox failure after live Catalog deduct, then assert release-stock compensation.
+2. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Add live Authorizer + Keycloak and User-Access proof; DB success/compensation and live Payment TCP are now covered.
+3. **P0** — `P0-CAT-TENANT-ISOLATION` — `partial` — Run the opt-in seeded BFF/Keycloak/Catalog gate and record evidence before treating it as a reliable live-stack gate.
+4. **P0** — `P0-RBAC-TENANT-ISOLATION-API` — `partial` — Add representative live-stack API checks once BFF/auth/service seed policy is stable.
+5. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Extend the browser smoke with a seeded pending-bill payment exception path after Flow B/B+D data is stable.
 
 ---
 
 ## First P0 batch candidates
 
-1. **Integration:** Finish `P0-SAAS-ONBOARDING-SAGA` live Authorizer/Keycloak + User-Access, or fix the frontend-utils Keycloak client mismatch before promoting `P0-CAT-TENANT-ISOLATION` / `P0-RBAC-TENANT-ISOLATION-API`.
+1. **Integration:** Finish `P0-ORD-STATE-STOCK` compensation fault injection, then continue `P0-SAAS-ONBOARDING-SAGA` live Authorizer/Keycloak + User-Access or fix the frontend-utils Keycloak client mismatch before promoting `P0-CAT-TENANT-ISOLATION` / `P0-RBAC-TENANT-ISOLATION-API`.
 2. **Browser E2E:** Extend `P0-SAAS-SUSPENDED-CUSTOMER-PWA` with pending-bill payment, then payment close-session coverage from `P1-PAY-BROWSER-CLOSE-SESSION` if promoted for demo risk.
 3. **Optional fast feedback:** BFF quota edge checks for `P0-SAAS-FEATURE-GATING-QUOTAS` if the UI needs pre-forward upgrade prompts.
 
@@ -759,5 +760,5 @@ Ordered by urgency; each line is **priority**, **rule id**, **status**, and **ne
 
 - Every required Phase 5 anchor has at least one entry: Catalog and QR, Order and cart and session, Kitchen and realtime, Payment settlement and history, SaaS 4B, RBAC and auth, and architecture invariants.
 - Every P0 entry either names concrete test locations in prose (app or lib plus spec purpose) or states a concrete `notes` or next action when tests are absent.
-- Phase 4A and Phase 4C items are explicitly marked `deferred-by-phase`.
+- Full Phase 4A hardening and Phase 4C items are explicitly marked `deferred-by-phase`; the implemented Order Confirm Saga is not deferred.
 - This document does not include test implementation steps or code.

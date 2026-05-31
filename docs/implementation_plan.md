@@ -30,24 +30,24 @@ Column **% phase** = internal completion level for that phase (0–100%), indepe
 
 Column **Cumulative range (P0→Pn @100%)** = weighted sum from **Phase 0** to **end of phase in that row**, **assume** every phase in that segment is **100%** complete. This is the **ceiling percentage of the entire project's volume** that has been "covered" when reaching that milestone — **not** the current actual progress (actual progress is still taken from `Σ (Weight × % phase)` below).
 
-| Phase     | Content                              | Estimate     | Weight   | % phase  | Accumulation range (P0→Pn @100%) | Status             | Detailed files                                    |
-| --------- | ------------------------------------ | ------------ | -------- | -------- | -------------------------------- | ------------------ | ------------------------------------------------- |
-| Phase 0   | Platform & Architecture              | ~1 week      | **7%**   | **100%** | **7%**                           | ✅ Complete        | [phase-0](phases/phase-0-foundation.md)           |
-| Phase 1   | Catalog + Menu + Table               | ~2-3 weeks   | **20%**  | **100%** | **27%**                          | ✅ Complete        | [phase-1](phases/phase-1-catalog.md)              |
-| Phase 2A  | Permissions + Orders + Kafka         | ~2-2.5 weeks | **18%**  | **100%** | **45%**                          | ✅ Complete        | [phase-2a](phases/phase-2a-order-kafka.md)        |
-| Phase 2B  | Kitchen/KDS + WebSocket              | ~1-1.5 weeks | **10%**  | **100%** | **55%**                          | ✅ Complete        | [phase-2b](phases/phase-2b-kitchen-websocket.md)  |
-| Phase 3   | Payment (SePay/VietQR + Cash)        | ~1-2 weeks   | **10%**  | **100%** | **65%**                          | ✅ Complete        | [phase-3](phases/phase-3-payment.md)              |
-| Phase 4A  | Saga + Hardening                     | ~1 week      | **8%**   | **0%**   | **73%**                          | ⏸ Deferred        | [phase-4a](phases/phase-4a-saga-hardening.md)     |
-| Phase 4B  | SaaS + tenant Onboarding             | ~1 week      | **7%**   | **100%** | **80%**                          | ✅ Complete        | [phase-4b](phases/phase-4b-saas-onboarding.md)    |
-| Phase 4C  | Notification + Staff Mgmt            | ~1 week      | **6%**   | **0%**   | **86%**                          | ⬜ Not started yet | [phase-4c](phases/phase-4c-notification-staff.md) |
-| Phase 5-7 | Testing + Observability + Deployment | ~3-5 weeks   | **14%**  | **0%**   | **100%**                         | ⬜ Not started yet | [phase-5-7](phases/phase-5-7-finalization.md)     |
-| **Σ**     |                                      |              | **100%** |          | —                                |                    |                                                   |
+| Phase     | Content                              | Estimate     | Weight   | % phase  | Accumulation range (P0→Pn @100%) | Status                 | Detailed files                                    |
+| --------- | ------------------------------------ | ------------ | -------- | -------- | -------------------------------- | ---------------------- | ------------------------------------------------- |
+| Phase 0   | Platform & Architecture              | ~1 week      | **7%**   | **100%** | **7%**                           | ✅ Complete            | [phase-0](phases/phase-0-foundation.md)           |
+| Phase 1   | Catalog + Menu + Table               | ~2-3 weeks   | **20%**  | **100%** | **27%**                          | ✅ Complete            | [phase-1](phases/phase-1-catalog.md)              |
+| Phase 2A  | Permissions + Orders + Kafka         | ~2-2.5 weeks | **18%**  | **100%** | **45%**                          | ✅ Complete            | [phase-2a](phases/phase-2a-order-kafka.md)        |
+| Phase 2B  | Kitchen/KDS + WebSocket              | ~1-1.5 weeks | **10%**  | **100%** | **55%**                          | ✅ Complete            | [phase-2b](phases/phase-2b-kitchen-websocket.md)  |
+| Phase 3   | Payment (SePay/VietQR + Cash)        | ~1-2 weeks   | **10%**  | **100%** | **65%**                          | ✅ Complete            | [phase-3](phases/phase-3-payment.md)              |
+| Phase 4A  | Saga + Hardening                     | ~1 week      | **8%**   | **40%**  | **73%**                          | ◐ Representative slice | [phase-4a](phases/phase-4a-saga-hardening.md)     |
+| Phase 4B  | SaaS + tenant Onboarding             | ~1 week      | **7%**   | **100%** | **80%**                          | ✅ Complete            | [phase-4b](phases/phase-4b-saas-onboarding.md)    |
+| Phase 4C  | Notification + Staff Mgmt            | ~1 week      | **6%**   | **0%**   | **86%**                          | ⬜ Not started yet     | [phase-4c](phases/phase-4c-notification-staff.md) |
+| Phase 5-7 | Testing + Observability + Deployment | ~3-5 weeks   | **14%**  | **0%**   | **100%**                         | ⬜ Not started yet     | [phase-5-7](phases/phase-5-7-finalization.md)     |
+| **Σ**     |                                      |              | **100%** |          | —                                |                        |                                                   |
 
-**Total project progress (weighted):** `Σ (Weight × % phase)` = **72.0%** (Phase 0, 1, 2A, 2B, 3 and 4B completed; Phase 4A deferred; Phase 4C and Phase 5-7 not yet started) — updated synchronously on 2026-05-27.
+**Total project progress (weighted):** `Σ (Weight × % phase)` = **75.2%** (Phase 0, 1, 2A, 2B, 3 and 4B completed; Phase 4A representative Saga slice implemented; Phase 4C and Phase 5-7 not yet started) — updated synchronously on 2026-05-30.
 
 **Phase 1 Note (✅):** Steps 1.1–1.6 and acceptance in `phase-1-catalog.md` have been closed according to Phase 1 scope. Improvements that do not block phases (eg export QR PDF, tenant dynamic resolution on Customer PWA) are recorded as backlog or later phases.
 
-**Notes after Phase 4B stabilization (2026-05-27):** This table reflects the current implementation status after Phase 4B is complete, May 27 SaaS/domain-label stabilization landed, and Phase 2A empty-session recovery was added. Future phases or historical supporting docs must still apply the source of truth order in [README](README.md).
+**Notes after Phase 4A representative saga slice (2026-05-30):** This table reflects the current implementation status after Phase 4B is complete, May 27 SaaS/domain-label stabilization landed, Phase 2A empty-session recovery was added, and the Order Confirm Saga representative slice was implemented. Future phases or historical supporting docs must still apply the source of truth order in [README](README.md).
 
 ---
 
@@ -72,10 +72,11 @@ CRITICAL PATH (demo / main thread)
       Phase 3 ────────────────────────────────────────────────► Phase 5-7
           │                    (Testing + Observability + Deploy)
           │
-│ PARALLEL TRACK (current state after Phase 4B)
+│ PARALLEL TRACK (current state after Phase 4A representative slice + Phase 4B)
           │
           ├──────────────────────────────► Phase 4A
-          │                                (deferred)
+          │                                (representative Saga slice done;
+          │                                 full hardening future work)
           │
           └──────────────────────────────► Phase 4B
 (completed)
@@ -93,7 +94,7 @@ Symbol
 
 **Critical Path:** Phase 0 → 1 → 2A → 2B → 3 → 5-7 (Demo)
 
-**Parallel Track:** Phase 4B has been completed after Phase 3. Phase 4A is currently deferred; Phase 4C depends on Phase 4B and has not yet begun.
+**Parallel Track:** Phase 4B has been completed after Phase 3. Phase 4A now has a representative Saga slice, while full hardening remains future work; Phase 4C depends on Phase 4B and has not yet begun.
 
 ---
 
@@ -133,11 +134,11 @@ Symbol
 | Phase 2A  | 18%      | 100%              | 18.0%                           | **45%**                          | 2026-05-27   | Permissions, Order service, Redis cart/session, safe empty-session recovery, Kafka `order.confirmed`, BFF Direct and FE↔BE integration implemented; The phase doc has been canonicalized into the final phase record.    |
 | Phase 2B  | 10%      | 100%              | 10.0%                           | **55%**                          | 2026-05-13   | Kitchen service, KDS, WebSocket Gateway and realtime FE↔BE deployed; The phase doc has been canonicalized into the final phase record.                                                                                   |
 | Phase 3   | 10%      | 100%              | 10.0%                           | **65%**                          | 2026-05-09   | Payment service + POS `/pos/bills` + Dashboard payment history (read-only) + post-payment bill/session/table finalization; email/receipt durable notification is deferred to Phase 4C.                                    |
-| Phase 4A  | 8%       | 0%                | 0%                              | **73%**                          | 2026-05-13   | Deferred: comprehensive saga/hardening not yet played as a separate phase; Some outbox/guard hardening patterns appeared in Phase 3/4B but did not count as completing Phase 4A.                                          |
+| Phase 4A  | 8%       | 40%               | 3.2%                            | **73%**                          | 2026-05-30   | Representative Saga slice implemented: `OrderConfirmSagaService` orchestrates stock deduct/order commit/outbox with Catalog release compensation; full hardening remains future work.                                     |
 | Phase 4B  | 7%       | 100%              | 7.0%                            | **80%**                          | 2026-05-27   | SaaS onboarding, tenant lifecycle, subscription/plan, live usage counters, domain label mapping, two-tier payment, tenant payment settings, landing/admin/dashboard/customer suspend behavior and verification completed. |
 | Phase 4C  | 6%       | 0%                | 0%                              | **86%**                          | —            | Notification + staff                                                                                                                                                                                                      |
 | Phase 5-7 | 14%      | 0%                | 0%                              | **100%**                         | —            | Test + PLG stack + deploy demo                                                                                                                                                                                            |
-| **Total** | **100%** | —                 | **72.0%**                       | —                                | 2026-05-27   | Real progress formula: `Σ (weight × % phase / 100)`                                                                                                                                                                       |
+| **Total** | **100%** | —                 | **75.2%**                       | —                                | 2026-05-30   | Real progress formula: `Σ (weight × % phase / 100)`                                                                                                                                                                       |
 
 > **4 most impressive demo highlights:** Phase 1 (QR + Menu), Phase 2 (Real-time Ordering), Phase 3 (Payment), Phase 6 (Grafana Tracing).
 

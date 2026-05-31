@@ -100,17 +100,14 @@ Prerequisites:
 - `RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1`
 - `RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1`
 
-```bash
-NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm nx test saas --testPathPatterns=onboarding-saga-db.integration.spec.ts --runInBand
-```
-
-Live Payment TCP slice, passed on 2026-05-23 against local Postgres and Payment TCP:
+Commands re-verified on 2026-05-31:
 
 ```bash
-NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm nx test saas --testPathPatterns=onboarding-saga-live-payment.integration.spec.ts --runInBand
+RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-db.integration.spec.ts
+RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-live-payment.integration.spec.ts
 ```
 
-This proves SaaS onboarding calls the real Payment TCP boundary and creates exactly one Payment-owned `tenant_payment_settings` row, including replay/idempotency of `PAYMENT_SETTINGS.CREATE_EMPTY`. It does not prove live Authorizer/Keycloak or live User-Access yet, so the matrix row remains `partial`.
+This proves SaaS onboarding persists the SaaS DB success path, records `tenant.created`, compensates before and after subscription assignment, calls the real Payment TCP boundary, and creates exactly one Payment-owned `tenant_payment_settings` row. The fixtures use UUID-valid owner IDs because `tenants.owner_id` is a PostgreSQL `uuid` column. It does not prove live Authorizer/Keycloak or live User-Access yet, so the matrix row remains `partial`.
 
 ## Next Code-Test Task After KDS
 

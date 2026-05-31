@@ -1,6 +1,6 @@
 # Phase 5 Testing Execution Plan
 
-> Working plan for implementing Phase 5 testing after Phase 4B. Canonical scope lives in `docs/phases/phase-5-7-finalization.md`; these files are execution plans for future sessions.
+> Working plan for implementing Phase 5 testing after the Phase 4A representative Saga slice and Phase 4B stabilization. Canonical scope lives in `docs/phases/phase-5-7-finalization.md`; these files are execution plans for future sessions.
 
 ## Goal
 
@@ -15,6 +15,10 @@ Turn Phase 5 from a testing strategy into an executable rollout: trace business 
 | 3     | `03-integration-boundary-plan.md`    | Prove real DB/Redis/Kafka/TCP/Auth boundaries and seed/reset policy.                      | Yes, after traceability identifies stack-dependent gaps. |
 | 4     | `04-playwright-e2e-plan.md`          | Build deterministic browser E2E for demo-critical flows.                                  | Partly; can prepare fixtures while integration matures.  |
 | 5     | `05-ci-gates-and-handoff-plan.md`    | Wire commands, documentation, reporting, skip policy, and session handoff.                | Last for final gates; command inventory can start early. |
+
+Additional focused evidence guide:
+
+- `saga-validation-strategy.md` — defines how to prove the two representative Saga flows for the thesis: Order Confirm Saga and SaaS Onboarding Mini-Saga.
 
 ## Recommended Order
 
@@ -51,6 +55,7 @@ flowchart TD
 - SePay local/mock testing policy that separates default automated coverage from live-provider smoke.
 - New or updated Jest tests for P0/P1 rules in BFF, Catalog, Order, Kitchen, Payment, SaaS, frontend apps, and shared libraries.
 - Integration test command(s), readiness checks, seed/reset policy, and documented skip behavior.
+- Saga validation evidence map for Order Confirm and SaaS Onboarding, including commands, claim limits, and thesis artifact checklist.
 - Playwright specs or fixtures for QR ordering, payment close-session, SaaS onboarding, suspended tenant, and admin/dashboard smoke.
 - Package scripts and CI/pre-demo gate documentation that distinguish quick PR checks from full stack checks.
 

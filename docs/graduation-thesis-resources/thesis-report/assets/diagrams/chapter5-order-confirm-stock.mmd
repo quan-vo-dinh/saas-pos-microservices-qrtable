@@ -3,7 +3,7 @@ sequenceDiagram
   autonumber
   actor Staff as Staff<br/>POS browser
   participant BFF as BFF<br/>JWT + Tenant guards
-  participant Order as Order<br/>state transition
+  participant Saga as Order<br/>OrderConfirmSagaService
   participant ODB as PostgreSQL<br/>Order DB
   participant Catalog as Catalog<br/>stock owner
   participant CDB as PostgreSQL<br/>Catalog DB
@@ -12,36 +12,45 @@ sequenceDiagram
 
   Staff->>BFF: Confirm pending order
   BFF->>BFF: Verify JWT, tenant, permission
-  BFF->>Order: TCP CONFIRM_ORDER(orderId, tenantId, userId)
-  Order->>ODB: Transaction begins
-  Order->>ODB: SELECT order FOR UPDATE
+  BFF->>Saga: TCP CONFIRM_ORDER(orderId, tenantId, userId)
+  Saga->>ODB: Transaction begins
+  Saga->>ODB: SELECT order FOR UPDATE
 
   alt Order already PROCESSING
-    ODB-->>Order: Replay existing order state
-    Order-->>BFF: Idempotent confirmation response
+    ODB-->>Saga: Replay existing order state
+    Saga-->>BFF: Idempotent confirmation response
   else Order is PENDING and bill is OPEN
-    Order->>ODB: Load order items and bill in tenant scope
-    Order->>Catalog: TCP STOCK_DEDUCT_FOR_ORDER(idempotencyKey=confirm-order:{orderId})
+    Saga->>ODB: Load order items and bill in tenant scope
+    Saga->>Catalog: TCP STOCK_DEDUCT_FOR_ORDER(idempotencyKey=confirm-order:{orderId})
     Catalog->>CDB: Transaction: lock menu item rows in stable order
     alt Stock is sufficient
       Catalog->>CDB: Deduct stock and update item status
-      Catalog-->>Order: StockMutationResult[]
-      Order->>ODB: Set order PROCESSING and items PROCESSING
-      Order->>ODB: Insert outbox event order.confirmed
-      ODB-->>Order: Commit Order transaction
-      Order-->>BFF: OrderStatusChangedEvent
-      BFF-->>Staff: Confirmation success
-      Outbox->>ODB: Poll pending outbox row
-      Outbox->>Kafka: Publish topic order.confirmed
+      Catalog-->>Saga: StockMutationResult[]
+      Saga->>ODB: Set order PROCESSING and items PROCESSING
+      Saga->>ODB: Insert outbox event order.confirmed
+      alt Order DB commit succeeds
+        ODB-->>Saga: Commit Order transaction
+        Saga-->>BFF: OrderStatusChangedEvent
+        BFF-->>Staff: Confirmation success
+        Outbox->>ODB: Poll pending outbox row
+        Outbox->>Kafka: Publish topic order.confirmed
+      else Order DB update or outbox fails
+        ODB--xSaga: Roll back Order transaction
+        Saga->>Catalog: TCP STOCK_RELEASE_FOR_ORDER(idempotencyKey=confirm-order-compensation:{orderId})
+        Catalog->>CDB: Transaction: release deducted stock
+        Catalog-->>Saga: Compensation result
+        Saga-->>BFF: Structured failure from original error
+        BFF-->>Staff: Show confirmation failure
+      end
     else Stock is insufficient
-      Catalog-->>Order: CATALOG_STOCK_INSUFFICIENT
-      Order->>ODB: Roll back Order transaction
-      Order-->>BFF: Structured conflict error
+      Catalog-->>Saga: CATALOG_STOCK_INSUFFICIENT
+      Saga->>ODB: Roll back Order transaction
+      Saga-->>BFF: Structured conflict error
       BFF-->>Staff: Show stock error
     end
   else Invalid order or bill state
-    Order-->>BFF: ORDER_INVALID_STATE or BILL_NOT_OPEN
+    Saga-->>BFF: ORDER_INVALID_STATE or BILL_NOT_OPEN
     BFF-->>Staff: Show validation error
   end
 
-  Note over Order,Catalog: Order never writes Catalog DB directly, stock consistency is owned by Catalog
+  Note over Saga,Catalog: Order never writes Catalog DB directly. Saga compensates by calling Catalog release stock.

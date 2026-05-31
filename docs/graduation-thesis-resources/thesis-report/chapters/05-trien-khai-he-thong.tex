@@ -51,8 +51,8 @@ Bảng~\ref{tab:chapter5-implemented-evidence} tóm tắt những bằng chứng
   Session cache & Active session được đọc Redis-first, fallback PostgreSQL và idle-close chỉ khi không có order. & Order session service; session unit tests. & Code + unit test \\
   Shared cart & Shared cart lưu trong Redis theo session, dùng \texttt{cartVersion} để phát hiện stale mutation. & Order cart service; cart concurrency tests. & Code + integration có điều kiện \\
   Order submit & Submit order tạo order \texttt{PENDING}, tạo hoặc cập nhật bill \texttt{OPEN}, clear cart và dùng idempotency key. & Order submit service; submit/idempotency tests. & Code + integration có điều kiện \\
-  Stock consistency & Staff confirm order gọi Catalog TCP để trừ stock trước khi chuyển order sang \texttt{PROCESSING}. & Order state transition service; Catalog stock contract. & Code + integration có điều kiện \\
-  Outbox order & Sau confirm, Order ghi outbox \texttt{order.confirmed} trong transaction của Order DB. & Order confirm flow; Kafka payload spec. & Code + unit/contract \\
+  Stock consistency & Staff confirm order gọi Catalog TCP để trừ stock trước khi chuyển order sang \texttt{PROCESSING}. & \texttt{OrderConfirmSagaService}; Catalog stock gateway. & Code + integration có điều kiện \\
+  Outbox order & Sau confirm, Order ghi outbox \texttt{order.confirmed} trong transaction của Order DB. & Order Confirm Saga; Kafka payload spec. & Code + unit/contract \\
   Stock release & Cancel order đã \texttt{PROCESSING} gọi Catalog TCP để hoàn stock; cancel \texttt{PENDING} không release vì chưa deduct. & Order cancel flow; pending/processing cancel tests. & Code + unit test \\
   KDS consumer & Kitchen subscribe \texttt{order.confirmed}, validate schema và tạo ticket theo station. & Kitchen consumer service; consumer specs. & Code + unit test \\
   KDS queue & Ticket KDS lưu trong Redis Sorted Set/hash theo tenant và station, không có DB riêng cho Kitchen. & KDS ticket store; KDS key tests. & Code + Redis integration \\
@@ -62,8 +62,8 @@ Bảng~\ref{tab:chapter5-implemented-evidence} tóm tắt những bằng chứng
   Cash settlement & Cash confirm ghi payment paid, audit log, outbox và gọi Order mark bill paid. & Payment cash flow; Order bill finalization. & Code + integration có điều kiện \\
   SePay webhook & Webhook xác minh secret theo tenant, match bill reference, xử lý duplicate/underpaid và mark bill paid khi đủ điều kiện. & SePay webhook service; BFF webhook specs. & Code + unit/contract \\
   Payment bridge & \texttt{payment.completed} hỗ trợ recovery/fan-out; BFF realtime chỉ là hint để UI refetch. & Payment outbox; Order consumer; BFF bridge. & Code + integration có điều kiện \\
-  SaaS onboarding & SaaS tạo tenant, owner, profile, subscription, payment settings và outbox \texttt{tenant.created}. & SaaS onboarding saga; onboarding specs. & Code + live stack một phần \\
-  Onboarding compensation & Khi lỗi sau bước tạo owner/subscription, saga disable user và rollback tenant/subscription đã tạo. & SaaS onboarding saga compensation. & Code + DB integration \\
+  SaaS onboarding & SaaS tạo tenant, owner, profile, subscription, payment settings và outbox \texttt{tenant.created}. & SaaS onboarding saga; onboarding DB/live Payment specs. & Code + live stack một phần \\
+  Onboarding compensation & Khi lỗi sau bước tạo owner/subscription, saga disable user và rollback tenant/subscription đã tạo. & SaaS onboarding saga compensation; PostgreSQL integration. & Code + DB integration \\
   Slug policy & Tenant slug normalize tiếng Việt, kiểm tra unique và chặn reserved words. & SaaS slug service; slug specs. & Code + unit test \\
   Tenant lifecycle & Tenant có trạng thái \texttt{ACTIVE}, \texttt{SUSPENDED}, \texttt{CLOSED}; Redis cache hỗ trợ guard fast path. & Tenant lifecycle and cache services. & Code + unit test \\
   Frontend runtime & Customer PWA và Management App dùng React Query/WebSocket hooks để refetch theo tenant/session event. & Customer PWA, POS and KDS hooks. & Code + component test \\
@@ -99,9 +99,9 @@ Shared cart được lưu trong Redis theo key tenant/session và có \texttt{ca
 
 Ở bước submit, Order chưa trừ stock ngay. Quyết định này giữ trải nghiệm khách đơn giản: order được ghi nhận ở trạng thái chờ staff xác nhận, còn invariant stock được xử lý ở bước staff confirm trong mục tiếp theo. Vì vậy, Chương 5 phân biệt rõ hai thời điểm: submit order là tạo order/bill và clear cart; confirm order là thời điểm Catalog thực sự deduct stock.
 
-\section{Order confirmation và stock consistency}
+\section{Order confirmation saga và stock consistency}
 
-Hình~\ref{fig:chapter5-order-confirm-stock} trình bày thời điểm staff xác nhận order và cơ chế bảo toàn stock: Order giữ lifecycle của order/bill, còn Catalog là service duy nhất sở hữu stock và cập nhật Catalog DB.
+Hình~\ref{fig:chapter5-order-confirm-stock} trình bày thời điểm staff xác nhận order và cơ chế bảo toàn stock. Đây là một saga điều phối tập trung ở mức ứng dụng: \texttt{OrderConfirmSagaService} trong Order đóng vai trò bộ điều phối, còn Catalog là service duy nhất sở hữu stock và cập nhật Catalog DB.
 
 \begin{figure}[htbp]
   \centering
@@ -110,11 +110,11 @@ Hình~\ref{fig:chapter5-order-confirm-stock} trình bày thời điểm staff x�
   \label{fig:chapter5-order-confirm-stock}
 \end{figure}
 
-Khi staff bấm xác nhận order ở POS, BFF kiểm tra JWT/permission/tenant context rồi gọi Order qua TCP. Trong Order, \texttt{confirmOrder} lock order theo tenant bằng pessimistic write trước khi xử lý. Nếu order đã ở \texttt{PROCESSING}, service trả lại kết quả theo hướng replay idempotent, không trừ stock lần nữa. Nếu order không còn \texttt{PENDING}, service trả lỗi state conflict.
+Khi staff bấm xác nhận order ở POS, BFF kiểm tra JWT/permission/tenant context rồi gọi Order qua TCP. Trong Order, \texttt{OrderConfirmSagaService} lock order theo tenant bằng pessimistic write trước khi xử lý. Nếu order đã ở \texttt{PROCESSING}, service trả lại kết quả theo hướng replay idempotent, không trừ stock lần nữa. Nếu order không còn \texttt{PENDING}, service trả lỗi state conflict.
 
 Trước khi cập nhật trạng thái order, Order gọi Catalog TCP với pattern deduct stock cho order, kèm \texttt{idempotencyKey} dạng \texttt{confirm-order:orderId}. Catalog là nơi lock và cập nhật stock trong database của chính nó. Nếu Catalog báo thiếu stock hoặc lỗi nghiệp vụ, Order không được chuyển order sang \texttt{PROCESSING}. Cách này giữ invariant stock ở service owner và tránh cross-service database access.
 
-Sau khi Catalog deduct thành công, Order cập nhật order sang \texttt{PROCESSING}, cập nhật item state và ghi outbox event \texttt{order.confirmed} trong cùng transaction của Order DB. Outbox publisher sau đó publish event sang Kafka để Kitchen xử lý. Việc trả response cho staff không phụ thuộc Kitchen đã dựng ticket xong hay chưa; KDS là side effect bất đồng bộ của order confirmation.
+Sau khi Catalog deduct thành công, Order cập nhật order sang \texttt{PROCESSING}, cập nhật item state và ghi outbox event \texttt{order.confirmed} trong cùng transaction của Order DB. Nếu bước cập nhật Order hoặc ghi outbox thất bại sau khi Catalog đã trừ stock, bộ điều phối gọi Catalog release stock bằng compensation key của order confirm. Outbox publisher sau đó publish event sang Kafka để Kitchen xử lý khi Order commit thành công. Việc trả response cho staff không phụ thuộc Kitchen đã dựng ticket xong hay chưa; KDS là side effect bất đồng bộ sau điểm commit của saga.
 
 Flow cancel cũng tuân theo cùng ownership. Nếu order còn \texttt{PENDING}, cancel không hoàn stock vì stock chưa từng bị trừ. Nếu order đã \texttt{PROCESSING}, cancel processing yêu cầu lý do và gọi Catalog TCP để release stock bằng idempotency key riêng. Đây là cách implementation giữ cho các state transition của order và inventory không bị trộn vào một transaction phân tán giả tạo.
 
@@ -171,7 +171,7 @@ Onboarding bắt đầu từ Super Admin trong Management App. BFF kiểm tra qu
 
 Subscription ban đầu được assign trong cùng saga với source onboarding ban đầu. Tiếp theo, SaaS gọi Payment để tạo empty payment settings row cho tenant. Bước này quan trọng vì Payment sở hữu tenant payment settings; SaaS không tự ghi bảng của Payment. Cuối flow, SaaS ghi outbox \texttt{tenant.created} để các side effect downstream có thể xử lý bất đồng bộ.
 
-Nhánh compensation xử lý các lỗi sau khi đã có side effect ở service khác. Nếu owner đã được tạo nhưng saga thất bại, SaaS gọi Authorizer disable user để tránh orphan user còn đăng nhập được. Nếu subscription đã được assign, SaaS gọi compensation cho initial onboarding subscription rồi xóa tenant record. Đây không phải saga hardening đầy đủ cho mọi failure mode production, nhưng là baseline rõ ràng để khóa luận chứng minh cách hệ thống xử lý distributed workflow quan trọng nhất của SaaS.
+Nhánh compensation xử lý các lỗi sau khi đã có side effect ở service khác. Nếu owner đã được tạo nhưng saga thất bại, SaaS gọi Authorizer disable user để tránh orphan user còn đăng nhập được. Nếu subscription đã được assign, SaaS gọi compensation cho initial onboarding subscription rồi xóa tenant record. Cùng với Order Confirm Saga, luồng này là saga đại diện thứ hai của đề tài ở nhóm platform/SaaS; các cơ chế vận hành sâu hơn như lưu trạng thái saga bền vững, retry worker hoặc quan sát compensation riêng được xem là hướng mở rộng.
 
 Tenant lifecycle sau onboarding gồm \texttt{ACTIVE}, \texttt{SUSPENDED} và \texttt{CLOSED}. Tenant suspend/activate dùng Redis cache để hỗ trợ guard fast path, trong khi SaaS database vẫn là nơi lưu trạng thái bền vững. Với tenant suspended, một số flow đọc hoặc payment cho bill đang chờ có thể vẫn được cho phép tùy business rule; các flow tạo order mới hoặc mutation không phù hợp phải bị chặn ở guard/service layer. Chương 6 sẽ là nơi đánh giá mức test/demo của các ngoại lệ tenant lifecycle này.
 

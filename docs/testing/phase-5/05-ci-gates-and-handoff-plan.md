@@ -73,8 +73,11 @@ SaaS live Payment integration:
 # Default deterministic gate: opt-in live Payment spec stays skipped.
 pnpm nx test saas --testPathPatterns=onboarding-saga-live-payment.integration.spec.ts --runInBand
 
+# Manual/pre-demo DB gate: requires Postgres for SaaS tables.
+RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-db.integration.spec.ts
+
 # Manual/pre-demo stack gate: requires Postgres plus Payment TCP.
-NX_SKIP_NX_CACHE=true RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm nx test saas --testPathPatterns=onboarding-saga-live-payment.integration.spec.ts --runInBand
+RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-live-payment.integration.spec.ts
 ```
 
 ## Next Session Notes

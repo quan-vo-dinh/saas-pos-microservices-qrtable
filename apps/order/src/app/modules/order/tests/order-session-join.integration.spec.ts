@@ -22,6 +22,8 @@ import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { SessionRepository } from '../repositories/session.repository';
 import { CartService } from '../services/cart.service';
+import { CatalogStockGatewayService } from '../services/catalog-stock-gateway.service';
+import { OrderConfirmSagaService } from '../services/order-confirm-saga.service';
 import { OrderKdsEventService } from '../services/order-kds-event.service';
 import { OrderQuotaService } from '../services/order-quota.service';
 import { OrderService } from '../services/order.service';
@@ -230,6 +232,7 @@ async function createHarness(): Promise<Harness> {
   const orderItemRepository = new OrderItemRepository(dataSource.getRepository(OrderItem));
   const billRepository = new BillRepository(dataSource.getRepository(Bill));
   const orderKdsEventService = new OrderKdsEventService();
+  const catalogStockGateway = new CatalogStockGatewayService(catalogClient as unknown as TcpClient);
   const orderSubmitService = new OrderSubmitService(
     dataSource,
     orderRepository,
@@ -241,13 +244,20 @@ async function createHarness(): Promise<Harness> {
     orderQuotaService,
     saasClient,
   );
+  const orderConfirmSagaService = new OrderConfirmSagaService(
+    dataSource,
+    orderRepository,
+    orderItemRepository,
+    billRepository,
+    catalogStockGateway,
+  );
   const orderStateTransitionService = new OrderStateTransitionService(
     dataSource,
     orderRepository,
     orderItemRepository,
     billRepository,
     orderKdsEventService,
-    catalogClient as unknown as TcpClient,
+    catalogStockGateway,
   );
   const orderService = new OrderService(
     orderRepository,
@@ -256,6 +266,7 @@ async function createHarness(): Promise<Harness> {
     sessionService,
     catalogClient as unknown as TcpClient,
     orderSubmitService,
+    orderConfirmSagaService,
     orderKdsEventService,
     orderStateTransitionService,
   );

@@ -1204,7 +1204,7 @@ TOPIC -.->|"future"| AS2["📊 Analytics service<br/><i>Just subscribe</i><br/><
 
 When a domain event is the result of a database write, the event _must_ be written in the same database transaction as that state change. Otherwise, a situation may occur: DB write succeeds but Kafka publish fails → system inconsistent.
 
-This is the reason for the Outbox Pattern (see section 10). P4 is documented in the QRTable architecture but has not been fully implemented in Phase 2 — this is a conscious trade-off to reduce complexity, will be hardened in Phase 4A.
+This is the reason for the Outbox Pattern (see section 10). P4 was intentionally simplified in early Phase 2 work to reduce complexity. The current implementation uses local outbox records for the Order and Payment flows that need durable Kafka publication, while deeper CDC/Debezium-style hardening remains future operational work.
 
 **AP1 — Kafka as UI Proxy (Forbidden):**
 
@@ -1457,7 +1457,7 @@ O4["→ CONSISTENT ✅<br/>(duplicate but idempotent)"]
 
 ### 10.3 Scope For QRTable
 
-Phase 2A will be implemented in a simpler way — publish straight after the transaction commit, accepting the small risk of dual-write. The new Phase 4A fully implements Outbox. However, understanding this pattern from the beginning has two benefits:
+Phase 2A originally described a simpler implementation path. The current code now uses local outbox rows for important domain events such as `order.confirmed` and `payment.completed`, and Phase 4A adds the representative Order Confirm Saga around stock deduction plus outbox commit. Full CDC/Debezium hardening is still outside the main thesis scope. Understanding this pattern from the beginning has two benefits:
 
 1. Design Phase 2A code to easily migrate to Outbox later (emit logic is separate from business logic)
 2. This trade-off document in the thesis — demonstrates senior thinking: knowing risks, having a migration plan, not pretending the problem does not exist

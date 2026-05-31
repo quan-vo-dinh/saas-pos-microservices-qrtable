@@ -2,9 +2,9 @@
 
 > **Bản tiếng Việt** — bản tiếng Anh canonical: [phase-4a-saga-hardening.md](phase-4a-saga-hardening.md)
 
-> **Mục tiêu:** Chuẩn hóa giao dịch nhiều bước cho xác nhận đơn hàng và hoàn tất thanh toán — có compensation rõ ràng, giới hạn và idempotency chống double-submit, ràng buộc xóa dữ liệu, audit hủy đơn; đặt transactional outbox đơn giản ở Order/Payment để Kafka không mất event khi DB đã commit thành công.
+> **Mục tiêu:** Chuẩn hóa một lát cắt Saga đại diện cho đề tài: xác nhận đơn hàng trong POS core và ghi nhận mini-saga khởi tạo tenant đã có trong SaaS. Các hardening vận hành sâu hơn như Saga state bền vững, retry worker, CDC/Debezium, payment saga đầy đủ và ledger tồn kho nằm ngoài phạm vi chính.
 > **Ước lượng:** ~1 tuần
-> **Trạng thái:** ⏸ Hoãn — chưa triển khai/đóng phase riêng sau Phase 3; một phần hardening cục bộ đã có trong Phase 3/4B nhưng **không** được tính là hoàn thành Phase 4A.
+> **Trạng thái:** ✅ Lát cắt đại diện đã triển khai — Order có `OrderConfirmSagaService` điều phối xác nhận đơn và compensation trả kho; SaaS onboarding mini-saga giữ nguyên từ Phase 4B. Full Phase 4A hardening vẫn là hướng mở rộng.
 
 ## Điều kiện tiên quyết
 
@@ -22,7 +22,9 @@
 
 ## Tổng quan
 
-Phase 4A tăng độ tin cậy của luồng POS lõi: mọi chuỗi hành động nhiều bước (tồn kho → đơn → thông báo; kiểm tra billing → đóng session → cập nhật bàn → lưu hóa đơn) được mô hình hóa thành saga có compensation — khi một bước lỗi, hệ thống không kẹt ở trạng thái nửa vời mà có lùi có kiểm soát. Sau Phase 4B, phase này cũng phải nhận diện onboarding tenant/Owner/payment settings là mini-saga trong SaaS: phạm vi 4A là harden retry/observability/compensation nếu cần, **không** đổi ownership nghiệp vụ đã đóng. Đồng thời phase cố định chính sách vận hành (giới hạn session, idempotency, ràng buộc xóa, audit hủy đơn) và lớp outbox tối giản để đồng bộ “DB đã ghi” với “Kafka đã publish”, tránh mất event. Full CDC (Debezium) là hướng sau luận văn — **không** nằm trong phạm vi phase này.
+Phase 4A trong phạm vi khóa luận tập trung vào hai luồng đại diện thay vì cố gắng bao phủ toàn bộ hardening vận hành. Luồng POS core là **Order Confirm Saga**: Order điều phối, Catalog sở hữu trừ/trả tồn kho, Order ghi trạng thái `PROCESSING` và outbox `order.confirmed`, Kitchen nhận event sau commit. Nếu Catalog đã trừ kho nhưng Order không commit được, Order gọi Catalog trả kho bằng command compensation. Luồng platform là **SaaS Onboarding Mini-Saga** đã có từ Phase 4B: SaaS điều phối tenant, Owner, profile, subscription, payment settings và rollback khi lỗi.
+
+Payment hiện được mô tả là settlement baseline với outbox + retry/idempotency, **không** claim là Payment Complete Saga đầy đủ. Các chính sách như `max_orders_per_session`, Redis SET NX cho order creation, bảng trạng thái Saga, audit table riêng và CDC/Debezium được ghi là hardening mở rộng nếu chưa có trong code hiện tại.
 
 ## Các bước
 
@@ -43,47 +45,37 @@ Phase 4A tăng độ tin cậy của luồng POS lõi: mọi chuỗi hành độ
 
 #### Order Confirm Saga
 
-**WHAT:** Chuỗi nghiệp vụ: khóa/giữ tồn kho phù hợp → tạo/ghi đơn → thông báo KDS (hoặc kênh bếp tương đương).
+**WHAT:** Chuỗi nghiệp vụ: kiểm tra order/bill → Catalog trừ tồn kho → Order xác nhận đơn và ghi outbox → Kitchen nhận `order.confirmed` sau commit.
 
 **Các bước Saga (Order Confirm):**
 
-| Bước | Hành động                                | Service | Compensation (lùi)           |
-| ---- | ---------------------------------------- | ------- | ---------------------------- |
-| 1    | Validate & Lock Stock                    | Catalog | Release locked stock         |
-| 2    | Update Order → Processing                | Order   | Mark order failed / rollback |
-| 3    | Route to KDS qua Kafka `order.confirmed` | Kitchen | Notify customer of failure   |
+| Bước | Hành động                                                       | Service        | Compensation (lùi)                                               |
+| ---- | --------------------------------------------------------------- | -------------- | ---------------------------------------------------------------- |
+| 1    | Lock order `PENDING`, kiểm tra bill `OPEN`, lấy order items     | Order          | Không cần — chưa có side effect ngoài Order transaction          |
+| 2    | Deduct stock bằng `confirm-order:{orderId}`                     | Catalog        | Release stock bằng `confirm-order-compensation:{orderId}`        |
+| 3    | Update order/items → `PROCESSING`, ghi outbox `order.confirmed` | Order          | Nếu lỗi sau bước 2, gọi Catalog release stock                    |
+| 4    | Publish Kafka `order.confirmed` để Kitchen tạo KDS ticket       | Outbox/Kitchen | Không nằm trong compensation tồn kho; consumer xử lý lặp an toàn |
 
-Compensation thực hiện ngược thứ tự: Bước 3 → Bước 2 → Bước 1.
+Điểm commit nghiệp vụ là Order DB commit thành công với order/items `PROCESSING` và outbox `order.confirmed`.
 
 **WHY:** Không có đơn “hợp lệ” khi hết tồn kho; không giữ tồn kho vĩnh viễn nếu bước sau thất bại.
 
-**Compensation (ý định):** Hoàn phần đã khóa; đánh dấu đơn/thao tác failed theo quy tắc nghiệp vụ; thông báo khách (hoặc kênh phù hợp) khi luồng không hoàn tất — staff/khách không kỳ vọng đơn đã vào bếp.
+**Compensation đã triển khai:** `OrderConfirmSagaService` gọi Catalog `releaseForOrder` nếu lỗi xảy ra sau khi Catalog deduct thành công nhưng trước khi Order commit hoàn tất.
 
-#### Payment Complete Saga
+#### Payment Settlement Baseline (không claim Payment Complete Saga đầy đủ)
 
-**WHAT:** Chuỗi nghiệp vụ: **validate billing** — toàn bộ line-item phải ở trạng thái cho phép thanh toán theo quy tắc (ví dụ Ready/Served theo §6.B) → đóng session → cập nhật trạng thái bàn → lưu hóa đơn (archive bill/session theo chính sách).
+**WHAT:** Payment ghi settlement, audit và outbox `payment.completed`; Order sở hữu bill/session finalization qua TCP fast path và Kafka retry path.
 
-**Các bước Saga (Payment Complete):**
+**WHY:** Payment không sở hữu bill/session/table; việc hoàn tất bill được đưa về Order để giữ đúng service boundary.
 
-| Bước | Hành động                                | Service | Compensation (lùi)                       |
-| ---- | ---------------------------------------- | ------- | ---------------------------------------- |
-| 1    | Validate billing: all items Ready/Served | Order   | —                                        |
-| 2    | Close Session                            | Order   | Reopen session                           |
-| 3    | Update Table → Cleaning                  | Catalog | Revert table status                      |
-| 4    | Archive Bill                             | Order   | Unarchive bill, revert to previous state |
-
-Compensation thực hiện ngược thứ tự: Bước 4 → Bước 3 → Bước 2 → Bước 1.
-
-**WHY:** Chỉ cho thanh toán khi phục vụ “đủ điều kiện”; tránh thanh toán khi món chưa sẵn sàng và session lệch thực tế.
-
-**Compensation (ý định):** Mở lại session nếu đã đóng nhưng bước sau lỗi; revert bàn về trạng thái nhất quán trước bước lỗi — không khóa bàn vĩnh viễn hoặc ghi occupancy sai.
+**Giới hạn hiện tại:** Đây là outbox + retry/idempotency baseline, chưa phải Saga đầy đủ có compensation mở lại session/revert table cho mọi failure mode.
 
 #### Hardening chung
 
 | Chủ đề                   | WHAT                                                                                                                | WHY                                                    |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `max_orders_per_session` | Giới hạn số đơn tối đa mỗi session (mặc định 20), **cấu hình theo gói tenant** — chống spam/đơn ảo                  | Chống lạm dụng đặt hàng, giữ POS ổn định               |
-| Idempotency              | Redis SET NX khi tạo đơn — cùng idempotency key chỉ thắng lần đầu, chống double-submit                              | Double tap/retry client không tạo đơn trùng            |
+| `max_orders_per_session` | Hardening mở rộng; code hiện có đang áp dụng quota theo ngày của tenant plan (`max_orders_per_day`)                 | Tránh claim sai với runtime hiện tại                   |
+| Idempotency              | Order submit dùng idempotency key + unique/replay ở PostgreSQL; Redis SET NX là hướng hardening nếu cần             | Double tap/retry client không tạo đơn trùng            |
 | Delete constraints       | Không xóa **Category** và **MenuItem**; không xóa **MenuItem** khi **OrderItem** đang active (IN PROCESSING, READY) | Giữ tham chiếu và lịch sử; tránh orphan và báo cáo sai |
 | Audit cancel             | Log **BẮT BUỘC** khi Cancel order — **actor** (ai), **reason** (vì sao), **timestamp** (khi nào)                    | Điều tra, kiểm soát và trách nhiệm vận hành            |
 
@@ -91,7 +83,9 @@ Compensation thực hiện ngược thứ tự: Bước 4 → Bước 3 → Bư�
 
 **WHAT:** Chuỗi onboarding tenant hiện có gồm tạo tenant/subscription mặc định, tạo Owner qua Authorizer/User-Access, khởi tạo `tenant_payment_settings`, outbox `tenant.created`, rollback/cleanup khi giữa chừng lỗi.
 
-**WHY:** Đây là luồng đa service sau spec Phase 4B. Nếu triển khai Phase 4A sau 4B, phải harden cùng Order/Payment: idempotency key cho onboarding, compensation có audit rõ, retry/cleanup user Keycloak orphan với metrics/log, không mất outbox event sau DB commit.
+**WHY:** Đây là luồng đa service sau spec Phase 4B. Trong phạm vi hiện tại, luồng này đủ làm bằng chứng platform saga: có orchestrator, nhiều participant, outbox `tenant.created` và compensation disable owner/xóa subscription/cache/xóa tenant khi lỗi.
+
+**Giới hạn hiện tại:** Chưa thêm idempotency key toàn luồng onboarding, Saga execution state hoặc observability riêng cho compensation.
 
 **Ranh giới:** Không biến onboarding thành self-service registration wizard; quyết định đó vẫn hoãn/sau luận văn theo Phase 4B.
 
@@ -109,17 +103,26 @@ Compensation thực hiện ngược thứ tự: Bước 4 → Bước 3 → Bư�
 
 ## Tiêu chí nghiệm thu
 
-- **Saga compensation (order):** Khi lock/giữ tồn kho thất bại → **không** tạo đơn hợp lệ; tồn kho và trạng thái hệ thống không ở dạng “có đơn nhưng không đủ hàng”.
-- **Billing validation (payment):** Billing **bị chặn** khi còn line-item chưa đạt Ready/Served (theo §6.B / cấu hình nghiệp vụ thống nhất).
-- **Idempotency:** Gửi cùng idempotency key (double-submit) → **một** hành động tương ứng, không nhân đôi side-effect.
-- **Delete constraints:** Không xóa Category khi còn MenuItem; không xóa MenuItem khi OrderItem active — API/DB trả lỗi rõ.
-- **Audit cancel:** Mọi thao tác hủy có bản ghi audit đủ **actor, reason, timestamp** để tra cứu sau.
-- **Onboarding mini-saga hardening:** Nếu mở lại Phase 4A sau 4B, onboarding tenant có idempotency/compensation/audit/observability rõ và không đổi quyết định onboarding do admin hỗ trợ.
+- **Order Confirm Saga:** `OrderConfirmSagaService` điều phối confirm; nếu Catalog deduct stock thành công nhưng Order commit/outbox thất bại, Order gọi Catalog release stock.
+- **Replay:** Order đã `PROCESSING` trả response hiện tại, không deduct stock lần nữa và không tạo outbox mới.
+- **Catalog error:** Nếu Catalog báo thiếu kho/lỗi nghiệp vụ trước khi deduct thành công, Order không chuyển sang `PROCESSING` và không gọi compensation.
+- **Payment:** Chỉ claim settlement + outbox + retry/idempotency baseline, không claim Payment Complete Saga đầy đủ.
+- **Onboarding mini-saga:** Giữ nguyên mini-saga Phase 4B và ghi rõ giới hạn hardening còn lại.
+
+## Kiểm chứng và bằng chứng cho khóa luận
+
+Bằng chứng Phase 4A trong khóa luận được giới hạn có chủ đích ở lát cắt Saga đại diện, không claim full hardening vận hành.
+
+- **Order Confirm Saga:** dùng `order-confirm-saga.service.spec.ts` và `catalog-stock-gateway.service.spec.ts` để chứng minh điều phối, replay, lỗi Catalog, outbox và compensation ở mức deterministic; dùng integration Order/Catalog opt-in để chứng minh ranh giới stock thật.
+- **SaaS Onboarding Mini-Saga:** dùng unit/mocked integration của onboarding, `onboarding-saga-db.integration.spec.ts` cho success/rollback trên PostgreSQL thật, và `onboarding-saga-live-payment.integration.spec.ts` cho ranh giới TCP thật với Payment.
+- **Artifact khóa luận:** screenshot UI, output terminal, snapshot DB/outbox và log có thể minh họa flow, nhưng lập luận nghiệm thu vẫn phải dựa trên các lớp test ở trên.
+- **Giới hạn:** không claim Saga state bền vững, retry worker, CDC/Debezium, stock ledger hoặc onboarding live đầy đủ qua Keycloak/User-Access nếu chưa có artifact bổ sung.
+
+Xem `docs/testing/phase-5/saga-validation-strategy.md` để biết kế hoạch kiểm chứng chi tiết.
 
 ## Đầu ra
 
-- Luồng **Order Confirm Saga** và **Payment Complete Saga** được mô tả theo hành vi kèm compensation, khớp technical-architecture §12 và business-logic §4.B / §6.B.
-- Chính sách `**max_orders_per_session` (mặc định 20, cấu hình theo tenant) áp dụng nhất quán trên luồng order/confirm.
-- Idempotency và delete constraints là **bất biến** trong integration/API test hoặc checklist QA tương đương.
-- Outbox đơn giản trên Order + Payment: event ghi cùng transaction, worker/cron đẩy Kafka và đánh dấu sent.
-- Roadmap ghi rõ: **Debezium / full CDC** — sau luận văn.
+- `OrderConfirmSagaService` và test bù kho cho luồng Order Confirm.
+- Tài liệu mô tả hai Saga đại diện: Order Confirm và SaaS Onboarding.
+- Payment, idempotency, delete constraints, session limit và CDC/Debezium được ghi đúng mức hiện có/hướng mở rộng, không overclaim.
+- Roadmap ghi rõ: Saga state bền vững, retry worker, ledger tồn kho và full CDC là hardening sau phạm vi chính.

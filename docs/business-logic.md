@@ -119,7 +119,8 @@ Responsible for digitizing the restaurant premises and creating "Entry Points" f
 
 Rate Limiting (Anti-spam):
 max_scans_per_table = 10 scans per 5 minutes
-max_orders_per_session = 20 items
+current_order_quota = tenant plan daily order quota (`max_orders_per_day`)
+future_hardening = optional per-session order cap
 
     IF rate_limit_exceeded
     THEN return 429 "Too many requests, please wait"
@@ -237,7 +238,7 @@ Trigger: Staff marks "Completed cleaning"
   Validate: destination table Available (Catalog); active session has orders/bill (Order).
   ```
 
-Step 2.4 flow (saga + transfer lock — no ACID transaction across Order PG + Catalog PG + Redis):
+Step 2.4 flow (saga-style transfer lock — no ACID transaction across Order PG + Catalog PG + Redis):
 
 - Transfer key + update orders/session in Order DB
 - TCP Catalog: updated `tables.status` and binding table
@@ -313,15 +314,17 @@ The process from the moment the customer scans the QR until the order is sent to
   AND show message "Table is paying, cannot order more dishes"
   ```
 
-- **Concurrent Inventory Handling (Race Condition):**
+- **Concurrent Inventory Handling / Order Confirm Saga:**
 
   ```
   Submit (customer): only checks snapshot availability — DOES NOT deduct inventory.
 
   Confirm (staff, PENDING → PROCESSING):
+  OrderConfirmSagaService orchestrates the flow.
   Catalog service (owns menu_items): pessimistic lock + deduct in transaction Catalog
   (via TCP transactional command — Order service does not directly UPDATE DB Catalog)
   Order service: update order status + write simplified outbox `order.confirmed` for Kafka publishing after commit
+  If Catalog deduct succeeds but Order commit/outbox fails, Order calls Catalog release stock with a compensation key.
   ```
 
 If not enough inventory → structured error for staff (previously submitted customer is only pending)
@@ -634,6 +637,8 @@ Actor: Staff, Manager (RBAC details: permission-matrix §6 / §6.1)
     - Update order_status = "Processing"
 - Route to KDS (Kafka order.confirmed + station from `MenuItem.station`)
     - Print KOT if printer connected
+  Compensation:
+    - If Catalog stock was deducted but Order commit/outbox fails, call Catalog release stock
 
 Pending → Canceled:
   Trigger: Customer or Staff cancel
@@ -642,8 +647,8 @@ Pending → Canceled:
     - order_status == "Pending"
     - confirmed == false
   Action:
-    - Soft delete (set deleted_at, keep audit)
-    - Log cancellation reason
+    - Update order_status = "Canceled"
+    - Store cancellation reason/actor/timestamp on the order row
 - Do not restore stock (not deducted when pending — specification Step 2.4 Q2)
     - Notify customer
 
@@ -655,7 +660,7 @@ Processing → Canceled:
     - Require cancellation reason
   Action:
     - Update order_status = "Canceled"
-    - Log audit trail (who, when, why)
+    - Store cancellation reason/actor/timestamp on the order row
     - Notify kitchen to stop
 - Restore/adjust stock through Catalog (already deducted during confirmation)
     - Write simplified outbox `order.status_changed` for durable status projection/audit

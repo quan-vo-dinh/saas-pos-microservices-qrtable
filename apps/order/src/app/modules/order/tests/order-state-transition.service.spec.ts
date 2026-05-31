@@ -1,5 +1,3 @@
-import { TCP_SERVICES } from '@common/configuration/tcp.config';
-import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { Bill } from '@common/entities/bill.entity';
 import { OrderItem } from '@common/entities/order-item.entity';
 import { Order } from '@common/entities/order.entity';
@@ -7,14 +5,14 @@ import { OutboxEvent } from '@common/entities/outbox-event.entity';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { BillStatus, OrderItemStatus, OrderStatus } from '@einvoice/types';
 import { Test, TestingModule } from '@nestjs/testing';
-import { of, throwError } from 'rxjs';
 import { DataSource } from 'typeorm';
+import { CONFIGURATION } from '../../../../configuration';
 import { BillRepository } from '../repositories/bill.repository';
 import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
+import { CatalogStockGatewayService } from '../services/catalog-stock-gateway.service';
 import { OrderKdsEventService } from '../services/order-kds-event.service';
 import { OrderStateTransitionService } from '../services/order-state-transition.service';
-import { CONFIGURATION } from '../../../../configuration';
 
 describe('OrderStateTransitionService', () => {
   let service: OrderStateTransitionService;
@@ -22,14 +20,14 @@ describe('OrderStateTransitionService', () => {
   let orderRepository: { findByIdAndTenantForUpdate: jest.Mock };
   let orderItemRepository: { findByOrderIdAndTenantWithManager: jest.Mock };
   let billRepository: { findByIdAndTenantForUpdate: jest.Mock };
-  let catalogClient: { send: jest.Mock };
+  let catalogStockGateway: { deductForOrder: jest.Mock; releaseForOrder: jest.Mock };
 
   beforeEach(async () => {
     dataSource = { transaction: jest.fn() };
     orderRepository = { findByIdAndTenantForUpdate: jest.fn() };
     orderItemRepository = { findByOrderIdAndTenantWithManager: jest.fn() };
     billRepository = { findByIdAndTenantForUpdate: jest.fn() };
-    catalogClient = { send: jest.fn() };
+    catalogStockGateway = { deductForOrder: jest.fn(), releaseForOrder: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,147 +37,11 @@ describe('OrderStateTransitionService', () => {
         { provide: OrderRepository, useValue: orderRepository },
         { provide: OrderItemRepository, useValue: orderItemRepository },
         { provide: BillRepository, useValue: billRepository },
-        { provide: TCP_SERVICES.CATALOG_SERVICE, useValue: catalogClient },
+        { provide: CatalogStockGatewayService, useValue: catalogStockGateway },
       ],
     }).compile();
 
     service = module.get(OrderStateTransitionService);
-  });
-
-  it('confirmOrder deducts stock, moves the order to processing, and records order.confirmed outbox', async () => {
-    const now = new Date('2026-05-02T08:00:00.000Z');
-    const pendingOrder = buildOrder({ createdAt: now, updatedAt: now });
-    const item = buildOrderItem({ createdAt: now, updatedAt: now });
-
-    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
-    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([item]);
-    billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(now));
-    catalogClient.send.mockReturnValue(
-      of({
-        statusCode: 200,
-        data: [{ menuItemId: 'm1', menuItemName: 'X', requestedQuantity: 2, remainingStock: 0 }],
-      }),
-    );
-
-    const savedRows: Array<{ ctor: unknown; row: unknown }> = [];
-    const manager = {
-      findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
-      create: jest.fn((_ctor: unknown, payload: Record<string, unknown>) => ({ id: 'outbox-1', ...payload })),
-      save: jest.fn((ctor: unknown, row: unknown) => {
-        savedRows.push({ ctor, row });
-        return Promise.resolve(row);
-      }),
-    };
-    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
-
-    const result = await service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' });
-
-    expect(catalogClient.send).toHaveBeenCalledWith(
-      TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_DEDUCT_FOR_ORDER,
-      expect.objectContaining({
-        tenantId: 't1',
-        data: expect.objectContaining({
-          tenantId: 't1',
-          orderId: 'o1',
-          idempotencyKey: 'confirm-order:o1',
-          items: [{ menuItemId: 'm1', quantity: 2 }],
-        }),
-      }),
-    );
-    expect(result.order.status).toBe(OrderStatus.PROCESSING);
-    expect(result.events.orderStatusChanged).toEqual(
-      expect.objectContaining({
-        fromStatus: OrderStatus.PENDING,
-        toStatus: OrderStatus.PROCESSING,
-        changedByUserId: 'staff-1',
-      }),
-    );
-    expect(savedRows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          ctor: Order,
-          row: expect.objectContaining({ status: OrderStatus.PROCESSING, confirmedByUserId: 'staff-1' }),
-        }),
-        expect.objectContaining({
-          ctor: OrderItem,
-          row: expect.objectContaining({ status: OrderItemStatus.PROCESSING }),
-        }),
-        expect.objectContaining({
-          ctor: OutboxEvent,
-          row: expect.objectContaining({
-            tenantId: 't1',
-            eventType: 'order.confirmed',
-            aggregateId: 'o1',
-            partitionKey: 't1',
-            status: 'PENDING',
-          }),
-        }),
-      ]),
-    );
-
-    const outbox = savedRows.find((entry) => entry.ctor === OutboxEvent)?.row as { payload?: Record<string, unknown> };
-    expect(outbox.payload).toEqual(expect.objectContaining({ eventType: 'order.confirmed', orderId: 'o1' }));
-  });
-
-  it('confirmOrder replay for an already processing order does not rededuct stock or create outbox', async () => {
-    const now = new Date('2026-05-02T08:00:00.000Z');
-    const processingOrder = buildOrder({
-      status: OrderStatus.PROCESSING,
-      confirmedAt: now,
-      confirmedByUserId: 'staff-1',
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(processingOrder);
-    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([
-      buildOrderItem({ createdAt: now, updatedAt: now }),
-    ]);
-    billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(now));
-
-    const manager = {
-      findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
-      create: jest.fn(),
-      save: jest.fn(),
-    };
-    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
-
-    const result = await service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' });
-
-    expect(result.order.status).toBe(OrderStatus.PROCESSING);
-    expect(catalogClient.send).not.toHaveBeenCalledWith(
-      TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_DEDUCT_FOR_ORDER,
-      expect.anything(),
-    );
-    expect(manager.create).not.toHaveBeenCalledWith(OutboxEvent, expect.anything());
-    expect(manager.save).not.toHaveBeenCalled();
-  });
-
-  it('confirmOrder propagates Catalog stock errors from live TCP payloads and does not persist confirmation', async () => {
-    const pendingOrder = buildOrder();
-
-    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
-    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem({ quantity: 1 })]);
-    billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date(), { subtotal: 2000, total: 2000 }));
-    catalogClient.send.mockReturnValue(
-      throwError(() => ({
-        code: 409,
-        message: 'Insufficient stock',
-        errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT,
-      })),
-    );
-
-    const manager = {
-      findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
-      save: jest.fn(),
-      create: jest.fn(),
-    };
-    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
-
-    await expect(service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' })).rejects.toMatchObject({
-      errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT,
-    });
-    expect(manager.save).not.toHaveBeenCalled();
   });
 
   it('requires reason for processing cancel', async () => {
@@ -259,10 +121,7 @@ describe('OrderStateTransitionService', () => {
       reason: 'STAFF_CANCELLED',
     });
 
-    expect(catalogClient.send).not.toHaveBeenCalledWith(
-      TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_RELEASE_FOR_ORDER,
-      expect.anything(),
-    );
+    expect(catalogStockGateway.releaseForOrder).not.toHaveBeenCalled();
     expect(result.order.status).toBe(OrderStatus.CANCELED);
     expect(result.events.orderStatusChanged).toMatchObject({
       tenantId: 't1',
@@ -300,12 +159,9 @@ describe('OrderStateTransitionService', () => {
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(processingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([item]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(now));
-    catalogClient.send.mockReturnValue(
-      of({
-        statusCode: 200,
-        data: [{ menuItemId: 'm1', menuItemName: 'X', requestedQuantity: 2, remainingStock: 5 }],
-      }),
-    );
+    catalogStockGateway.releaseForOrder.mockResolvedValue([
+      { menuItemId: 'm1', menuItemName: 'X', requestedQuantity: 2, remainingStock: 5 },
+    ]);
 
     const manager = {
       findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
@@ -326,18 +182,12 @@ describe('OrderStateTransitionService', () => {
       processId: 'process-1',
     });
 
-    expect(catalogClient.send).toHaveBeenCalledWith(
-      TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_RELEASE_FOR_ORDER,
-      expect.objectContaining({
-        tenantId: 't1',
-        data: expect.objectContaining({
-          tenantId: 't1',
-          orderId: 'o1',
-          idempotencyKey: 'cancel-processing:o1',
-          items: [{ menuItemId: 'm1', quantity: 2 }],
-        }),
-      }),
-    );
+    expect(catalogStockGateway.releaseForOrder).toHaveBeenCalledWith({
+      tenantId: 't1',
+      orderId: 'o1',
+      idempotencyKey: 'cancel-processing:o1',
+      items: [{ menuItemId: 'm1', quantity: 2 }],
+    });
     expect(result.events.orderStatusChanged).toMatchObject({
       tenantId: 't1',
       orderId: 'o1',

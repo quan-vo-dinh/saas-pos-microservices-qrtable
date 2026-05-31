@@ -52,6 +52,7 @@ import { firstValueFrom } from 'rxjs';
 import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { SessionRepository } from '../repositories/session.repository';
+import { OrderConfirmSagaService } from './order-confirm-saga.service';
 import { OrderKdsEventService } from './order-kds-event.service';
 import { OrderStateTransitionService } from './order-state-transition.service';
 import { OrderSubmitService } from './order-submit.service';
@@ -69,6 +70,7 @@ export class OrderService {
     private readonly sessionService: SessionService,
     @Inject(TCP_SERVICES.CATALOG_SERVICE) private readonly catalogClient: TcpClient,
     private readonly orderSubmitService: OrderSubmitService,
+    private readonly orderConfirmSagaService: OrderConfirmSagaService,
     private readonly orderKdsEventService: OrderKdsEventService,
     private readonly orderStateTransitionService: OrderStateTransitionService,
   ) {}
@@ -247,7 +249,7 @@ export class OrderService {
   }
 
   async confirmOrder(dto: StaffOrderActionTcpRequest): Promise<OrderActionTcpResponse> {
-    return this.orderStateTransitionService.confirmOrder(dto);
+    return this.orderConfirmSagaService.confirmOrder(dto);
   }
 
   async customerCancelPending(dto: CustomerCancelPendingTcpRequest): Promise<OrderActionTcpResponse> {

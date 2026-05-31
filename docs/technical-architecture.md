@@ -4,7 +4,7 @@
 
 > **Topic (English):** Design and Implementation of a SaaS-Based POS Platform with Integrated QR Code Ordering Using a Microservices Architecture
 
-> **Version:** 1.0  |  **Update:** 2026-05-27
+> **Version:** 1.0  |  **Update:** 2026-05-30
 
 ---
 
@@ -714,7 +714,7 @@ Responsibility:
 - service Request: receive service requests from customers (call staff, request payment, support); bill request is an explicit command, `REQUEST_BILL` can be a side effect notification
 
 Validation Rules:
-- max_orders_per_session = 20 items (anti-spam/virtual orders)
+- Tenant plan daily quota (`max_orders_per_day`) is enforced at order submit; per-session order cap is future hardening
 - All timestamps use server UTC (Date.now()), DO NOT use client timestamps
 - Cart validation: all items must be Available before when submit (availability snapshot)
 - Stock deduct + pessimistic rules **in Catalog** at the time of staff confirmation
@@ -975,7 +975,7 @@ Use Kafka when the same event needs to trigger a business response in **multiple
 **P4 — Atomicity Safeguard (Transactional Outbox):**
 When a domain event is the result of a DB write, the event **MUST** be written with the database transaction (Outbox Pattern) to avoid the Dual-Write Problem. Background process poll outbox → publish Kafka.
 
-> **Current implementation:** `order.confirmed` and `order.status_changed` use the Order `outbox_events` table before publishing to Kafka. Full CDC / transactional outbox hardening remains Phase 4A+ operational hardening.
+> **Current implementation:** `order.confirmed` and `order.status_changed` use the Order `outbox_events` table before publishing to Kafka. Full CDC / Debezium-style hardening remains future operational work beyond the representative Phase 4A Saga slice.
 
 #### Exclusion Anti-patterns (When NOT to use Kafka)
 
@@ -1363,29 +1363,39 @@ On Menu Update (admin changes price/availability):
 
 Applicable to complex business flows that require multiple services combined with compensation in case of failure.
 
-**Order Confirmation Saga (Phase 2A — finalized Step 2.4):**
+**Order Confirmation Saga (representative Phase 4A slice):**
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                  ORDER CONFIRMATION SAGA                  │
 ├──────────────────────────────────────────────────────────┤
 │                                                          │
-│  Step 1: Lock/validate order row in Order DB (PENDING) │
+│  Orchestrator: OrderConfirmSagaService (Order module)  │
 │                                                          │
-│  Step 2: Catalog service (TCP): deduct stock in TX    │
-│ Catalog — pessimistic lock on menu_items there │
-│    ✗ Compensation: release stock (Catalog command)       │
+│  Step 1: Lock/validate order row in Order DB (PENDING)  │
+│          and require current bill OPEN                  │
 │                                                          │
-│  Step 3: Order Service → status PROCESSING, outbox row   │
-│    ✗ Compensation: revert order + Catalog release        │
+│  Step 2: Catalog TCP deduct stock in Catalog TX          │
+│          idempotencyKey=confirm-order:{orderId}          │
+│    ✗ Compensation: Catalog release stock                 │
+│      idempotencyKey=confirm-order-compensation:{orderId} │
 │                                                          │
-│  Step 4: Publish Kafka order.confirmed (simplified       │
-│    outbox poll) → Kitchen consumer                       │
+│  Step 3: Order DB transaction commits PROCESSING rows    │
+│          and order.confirmed outbox row                  │
 │                                                          │
-│  IF any step fails → compensations / idempotent retry      │
+│  Step 4: Outbox poll publishes Kafka order.confirmed     │
+│          for Kitchen consumer                            │
+│                                                          │
+│  IF step 3 fails after step 2 succeeds → release stock   │
 │                                                          │
 └──────────────────────────────────────────────────────────┘
 ```
+
+SaaS onboarding is the second representative saga-style flow. `OnboardingSagaService` coordinates SaaS tenant/subscription creation, Authorizer owner identity, User-Access profile, Payment settings, and `tenant.created` outbox. When a dependent step fails, SaaS compensates by disabling the owner user, removing initial subscription/cache state, and deleting the partially created tenant.
+
+Payment completion is currently documented as settlement + outbox + idempotent retry/finalization baseline. It is not claimed as a full Payment Complete Saga with durable saga state and compensation for every session/table failure mode.
+
+**Validation strategy for thesis evidence:** Saga verification is multi-layered rather than a single browser proof. Order Confirm uses unit/contract tests for orchestration, replay, Catalog error handling, outbox creation, and deterministic compensation; opt-in integration proves the live Order-Catalog stock boundary. SaaS onboarding uses unit/contract tests for rollback rules, opt-in PostgreSQL integration for tenant/subscription/outbox persistence and rollback, and opt-in live Payment TCP integration for Payment-owned settings creation. UI screenshots, DB rows, outbox rows, and logs are supporting artifacts for the thesis; they do not replace the automated tests. The canonical evidence guide is `docs/testing/phase-5/saga-validation-strategy.md`.
 
 ### 12.2 Idempotency
 
@@ -1396,8 +1406,9 @@ Strategy:
 - Kafka consumer: dedup by message key + consumer offset
 
 Implementation:
-- Redis SET NX with TTL (check-and-set pattern)
-- PostgreSQL UNIQUE constraint on the idempotency_key column
+- Order submit: PostgreSQL UNIQUE/replay on the `idempotency_key` column
+- Order confirm stock commands carry stable command keys (`confirm-order:{orderId}` and compensation key)
+- Redis SET NX can be added later for edge request throttling, but is not required to describe current order submit behavior
 ```
 
 ---
@@ -1556,7 +1567,7 @@ Phase 3 — Payment (SePay/VietQR + Cash):
 └── Completed.
 
 Phase 4A — Saga + Hardening:
-└── Deferred; The phase is not yet considered complete even though there is some local hardening in Phase 3/4B.
+└── Representative Saga slice implemented; full hardening remains future work.
 
 Phase 4B — SaaS + Tenant Onboarding:
 └── Completed.
@@ -1650,8 +1661,8 @@ show_error("Unable to sync")
 Tech Stack:
   - Service Worker: cache menu assets, API responses (Cache-First)
   - IndexedDB: offline order queue, pending actions
-- Background Sync API: auto-retry when there is a network
-  - Idempotency Keys: Redis SET NX + PostgreSQL UNIQUE constraint
+  - Background Sync API: auto-retry when there is a network
+  - Idempotency Keys: PostgreSQL UNIQUE/replay today; Redis SET NX remains optional hardening
 ```
 
 ---

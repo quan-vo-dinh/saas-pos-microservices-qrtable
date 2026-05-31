@@ -2,9 +2,9 @@
 
 > **Tiếng Việt:** [phase-4a-saga-hardening.vi.md](phase-4a-saga-hardening.vi.md)
 
-> **Goal:** Standardize multi-step transactions for order confirmation and payment completion — with clear compensation, limits and idempotency against double-submission, data deletion constraints, and order cancellation audits; put a simple transactional outbox in Order/Payment so that Kafka doesn't lose events when the DB commit is successful.
+> **Goal:** Standardize a representative Saga slice for the thesis: POS order confirmation plus the existing SaaS tenant onboarding mini-saga. Deeper operational hardening such as durable Saga state, retry workers, CDC/Debezium, full payment saga, and stock ledger is outside the main scope.
 > **Estimated:** ~1 week
-> **Status:** ⏸ Deferred — not yet implemented/closed as a separate phase after Phase 3; Some local hardening occurred in Phase 3/4B but does not count as completing Phase 4A.
+> **Status:** ✅ Representative slice implemented — Order now has `OrderConfirmSagaService` with stock release compensation; SaaS onboarding mini-saga remains from Phase 4B. Full Phase 4A hardening remains future work.
 
 ## Prerequisites
 
@@ -22,7 +22,9 @@
 
 ## Overview
 
-Phase 4A increases the reliability of the POS core flow: every multi-step "action chain" (inventory → order → notification; check billing → close session → update table → store bill) is modeled as a saga with compensation — so that when a step fails, the system is not left in a half-baked state but has a controlled retreat. After Phase 4B, this phase must also identify onboarding tenant/Owner/payment settings as a mini-saga existing in the SaaS service: scope 4A is harden retry/observability/compensation if necessary, without changing the closed business ownership. At the same time, the phase fixed operational policies (session limit, idempotency, delete constraints, audit cancellation) and a minimalist outbox layer to synchronize "DB recorded" with "Kafka published", avoiding event loss. Full CDC (Debezium) is recognized as a post-thesis direction — not within the scope of this phase.
+Within the thesis scope, Phase 4A focuses on two representative workflows rather than claiming every production hardening item. The POS core workflow is **Order Confirm Saga**: Order orchestrates, Catalog owns stock deduction/release, Order commits `PROCESSING` state plus `order.confirmed` outbox, and Kitchen reacts after commit. If Catalog already deducted stock but Order cannot commit, Order sends a Catalog release command as compensation. The platform workflow is the existing **SaaS Onboarding Mini-Saga** from Phase 4B: SaaS orchestrates tenant, Owner, profile, subscription, payment settings, and rollback.
+
+Payment is documented as settlement baseline with outbox + retry/idempotency, **not** as a full Payment Complete Saga. `max_orders_per_session`, Redis SET NX for order creation, durable Saga state, dedicated cancellation audit table, and CDC/Debezium are recorded as future hardening unless code implements them.
 
 ## Steps
 
@@ -43,55 +45,47 @@ Phase 4A increases the reliability of the POS core flow: every multi-step "actio
 
 #### Order Confirm Saga
 
-**WHAT:** Business chain: lock/hold appropriate inventory → create/record order → KDS notification (or equivalent kitchen channel).
+**WHAT:** Business chain: validate order/bill → Catalog deducts stock → Order confirms rows and records outbox → Kitchen receives `order.confirmed` after commit.
 
 **Saga Steps (Order Confirm):**
 
-| Step | Action                                   | Service | Compensation (reverse)       |
-| ---- | ---------------------------------------- | ------- | ---------------------------- |
-| 1    | Validate & Lock Stock                    | Catalog | Release locked stock         |
-| 2    | Update Order → Processing                | Order   | Mark order failed / rollback |
-| 3    | Route to KDS via Kafka `order.confirmed` | Kitchen | Notify customer of failure   |
+| Step | Action                                                             | Service        | Compensation (reverse)                                      |
+| ---- | ------------------------------------------------------------------ | -------------- | ----------------------------------------------------------- |
+| 1    | Lock `PENDING` order, validate `OPEN` bill, load order items       | Order          | None — no external side effect yet                          |
+| 2    | Deduct stock with `confirm-order:{orderId}`                        | Catalog        | Release stock with `confirm-order-compensation:{orderId}`   |
+| 3    | Update order/items → `PROCESSING`, insert `order.confirmed` outbox | Order          | If this fails after step 2, call Catalog release stock      |
+| 4    | Publish Kafka `order.confirmed` for Kitchen tickets                | Outbox/Kitchen | Not part of stock compensation; consumer must be idempotent |
 
-Compensation is performed in reverse order: Step 3 → Step 2 → Step 1.
+The business commit point is a successful Order DB commit containing `PROCESSING` order/items and `order.confirmed` outbox.
 
 **WHY:** Make sure there are no "created" orders when inventory runs out, and don't let inventory be held permanently if the next step fails.
 
-**Compensation (intent):** Undo the locked portion; Mark failed orders/operations according to business rules; Notify the guest (or appropriate channel) when the stream is not complete — so staff/guests don't expect the order to have entered the kitchen.
+**Implemented compensation:** `OrderConfirmSagaService` calls Catalog `releaseForOrder` if an error happens after Catalog deduct succeeds but before Order commit completes.
 
-#### Payment Complete Saga
+#### Payment Settlement Baseline (not a full Payment Complete Saga)
 
-**WHAT:** Business chain: **validate billing** — the entire line-item must be in a state that allows payment according to the rule (eg Ready/Served as §6.B) → close session → update table status → archive bill (store invoice/session according to policy).
+**WHAT:** Payment records settlement, audit, and `payment.completed` outbox; Order owns bill/session finalization through TCP fast path and Kafka retry path.
 
-**Saga Steps (Payment Complete):**
+**WHY:** Payment does not own bill/session/table state; finalization stays in Order to preserve service boundaries.
 
-| Step | Action                                   | Service | Compensation (reverse)                   |
-| ---- | ---------------------------------------- | ------- | ---------------------------------------- |
-| 1    | Validate billing: all items Ready/Served | Order   | —                                        |
-| 2    | Close Session                            | Order   | Reopen session                           |
-| 3    | Update Table → Cleaning                  | Catalog | Revert table status                      |
-| 4    | Archive Bill                             | Order   | Unarchive bill, revert to previous state |
+**Current limit:** This is an outbox + retry/idempotency baseline, not a full saga with compensation for reopening sessions or reverting table status across every failure mode.
 
-Compensation is performed in reverse order: Step 4 → Step 3 → Step 2 → Step 1.
+#### Shared Hardening
 
-**WHY:** Payment is only allowed when the operation is "qualifiedly served"; Avoid paying on applications that are not ready and avoid discussions/sessions that differ from actual payment.
-
-**Compensation (intent):** Reopen session if closed but the following step fails; revert updates the table to a consistent state before the error step — so as not to permanently lock the table or record incorrect occupancy.
-
-#### Hardening chung
-
-| Topics                   | WHAT                                                                                                                                | WHY                                                                       |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `max_orders_per_session` | Limit the maximum number of orders per session (default 20), **configurable according to tenant plan** — anti-spam/virtual orders   | Prevent ordering abuse/spam and keep POS operations stable                |
-| Idempotency              | Redis SET NX for order creation — same idempotency key for first win only, prevent double-submit                                    | Double-submit (double tap, retry client) does not create duplicate orders |
-| Delete constraints       | Do not delete **Category** and **MenuItem**; do not delete **MenuItem** while **OrderItem** is active (status IN PROCESSING, READY) | Preserves single reference and history; Avoid orphans and false reports   |
-| Audit cancel             | **REQUIRED** log when Cancel order — **actor** (who), **reason** (why), **timestamp** (when)                                        | Serving investigation, control and operational responsibility             |
+| Topics                   | WHAT                                                                                                                                | WHY                                                                     |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `max_orders_per_session` | Future hardening; current runtime enforces tenant-plan daily quota (`max_orders_per_day`)                                           | Avoid claiming behavior not present in code                             |
+| Idempotency              | Order submit uses idempotency key with PostgreSQL unique/replay; Redis SET NX is future hardening if needed                         | Double-submit/retry does not create duplicate orders                    |
+| Delete constraints       | Do not delete **Category** and **MenuItem**; do not delete **MenuItem** while **OrderItem** is active (status IN PROCESSING, READY) | Preserves single reference and history; Avoid orphans and false reports |
+| Audit cancel             | **REQUIRED** log when Cancel order — **actor** (who), **reason** (why), **timestamp** (when)                                        | Serving investigation, control and operational responsibility           |
 
 #### SaaS Onboarding Mini-Saga (available from Phase 4B)
 
 **WHAT:** The existing tenant onboarding sequence includes creating the default tenant/subscription, creating the Owner via Authorizer/User-Access, initializing `tenant_payment_settings`, outboxing `tenant.created`, and rollback/cleanup when the mid-step fails.
 
-**WHY:** This is a multi-service business flow arising after spec Phase 4B. If Phase 4A is deployed after Phase 4B, it must harden this flow with Order/Payment: idempotency key for onboarding requests, compensation with clear audit, retry/cleanup orphan Keycloak user with metrics/log, and not lose outbox events after DB commit.
+**WHY:** This multi-service flow is enough evidence for a platform saga in the current scope: it has an orchestrator, participants, `tenant.created` outbox, and compensation that disables the owner, removes initial subscription/cache, and deletes the tenant on failure.
+
+**Current limit:** Whole-flow onboarding idempotency key, Saga execution state, and dedicated compensation observability are not implemented yet.
 
 **Boundary:** Do not turn onboarding into a self-service registration wizard; That decision remains deferred/post-thesis under Phase 4B.
 
@@ -109,17 +103,26 @@ Compensation is performed in reverse order: Step 4 → Step 3 → Step 2 → Ste
 
 ## Acceptance Criteria
 
-- **Saga compensation (order):** When locking/preserving fails → **does not** create a valid order; inventory and the system status is not in the state of "there are orders but not enough goods".
-- **Billing validation (payment):** Billing is **blocked** when there are still line-items that have not met the Ready/Served condition (according to rule §6.B / agreed business configuration).
-- **Idempotency:** Submit the same idempotency key (double-submit) → **one** corresponding action/action, do not duplicate the side-effect.
-- **Delete constraints:** Cannot delete Category but MenuItem; MenuItem cannot be deleted but OrderItem is active — API/DB returns clear error.
-- **Audit cancel:** All cancellation operations have an audit record with **actor, reason, timestamp** enough for later lookup.
-- **Onboarding mini-saga hardening:** If Phase 4A reopens after Phase 4B, onboarding the tenant has clear idempotency/compensation/audit/observability and does not change the admin-assisted onboarding decision.
+- **Order Confirm Saga:** `OrderConfirmSagaService` orchestrates confirm; if Catalog deduct succeeds but Order commit/outbox fails, Order calls Catalog release stock.
+- **Replay:** An already `PROCESSING` order returns current state without deducting stock again or creating a new outbox row.
+- **Catalog error:** If Catalog rejects before a successful deduct, Order does not move to `PROCESSING` and does not compensate.
+- **Payment:** Claim only settlement + outbox + retry/idempotency baseline, not a full Payment Complete Saga.
+- **Onboarding mini-saga:** Keep the Phase 4B mini-saga and document remaining hardening limits.
+
+## Verification And Thesis Evidence
+
+The thesis evidence for Phase 4A is intentionally scoped as a representative Saga slice, not full operational saga hardening.
+
+- **Order Confirm Saga:** use `order-confirm-saga.service.spec.ts` and `catalog-stock-gateway.service.spec.ts` for deterministic orchestration, replay, Catalog error, outbox, and compensation behavior; use the opt-in Order/Catalog stock integration for the live stock boundary.
+- **SaaS Onboarding Mini-Saga:** use SaaS onboarding unit/mocked integration tests, `onboarding-saga-db.integration.spec.ts` for real PostgreSQL success/rollback, and `onboarding-saga-live-payment.integration.spec.ts` for the live Payment TCP boundary.
+- **Thesis artifacts:** UI screenshots, terminal output, DB/outbox snapshots, and logs can illustrate the flows, but the acceptance argument should reference the test layers above.
+- **Limit:** do not claim durable Saga state, retry workers, CDC/Debezium, stock ledger, or full live Keycloak/User-Access onboarding validation unless those artifacts are added later.
+
+See `docs/testing/phase-5/saga-validation-strategy.md` for the detailed validation plan.
 
 ## Outputs
 
-- The **Order Confirm Saga** and **Payment Complete Saga** flows are described by behavior with compensation, matching technical-architecture §12 and business-logic §4.B / §6.B.
-- Policy `**max_orders_per_session`\*\* (default 20, configurable by tenant) applies consistently across the order/confirm flow.
-- Idempotency and delete constraints are **invariant** in integration/API tests or equivalent QA checklists.
-- Simple outbox on Order + Payment: event recorded with transaction, worker/cron pushes Kafka and marked sent.
-- Roadmap clearly states: **Debezium / full CDC** — after thesis.
+- `OrderConfirmSagaService` and tests for stock compensation in Order Confirm.
+- Documentation describes two representative sagas: Order Confirm and SaaS Onboarding.
+- Payment, idempotency, delete constraints, session limit, and CDC/Debezium are documented at their actual implementation level or as future hardening.
+- Roadmap clearly states durable Saga state, retry worker, stock ledger, and full CDC as hardening beyond the main scope.

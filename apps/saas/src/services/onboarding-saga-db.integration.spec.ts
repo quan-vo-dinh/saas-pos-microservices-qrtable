@@ -16,6 +16,7 @@ import { OnboardingSagaService } from './onboarding-saga.service';
 import { SubscriptionService } from './subscription.service';
 
 const RUN_INTEGRATION = process.env['RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION'] === '1';
+const OWNER_USER_ID = '11111111-1111-4111-8111-111111111111';
 
 type Harness = {
   dataSource: DataSource;
@@ -105,7 +106,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
       payload: expect.objectContaining({
         tenantId: result.tenant.id,
         slug,
-        ownerUserId: 'owner-phase5-success',
+        ownerUserId: OWNER_USER_ID,
         planCode,
         correlationId: 'phase5-onboarding-success',
       }),
@@ -120,7 +121,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
     expect(clients.userClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.USER.UPSERT_WITH_TENANT,
       expect.objectContaining({
-        data: expect.objectContaining({ tenantId: result.tenant.id, userId: 'owner-phase5-success' }),
+        data: expect.objectContaining({ tenantId: result.tenant.id, userId: OWNER_USER_ID }),
         processId: 'phase5-onboarding-success',
       }),
     );
@@ -160,7 +161,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
     expect(clients.authorizerClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.KEYCLOAK.DISABLE_USER,
       expect.objectContaining({
-        data: { userId: 'owner-phase5-success', reason: 'TENANT_ONBOARDING_FAILED' },
+        data: { userId: OWNER_USER_ID, reason: 'TENANT_ONBOARDING_FAILED' },
         processId: 'phase5-onboarding-profile-fail',
       }),
     );
@@ -197,7 +198,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
     expect(clients.authorizerClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.KEYCLOAK.DISABLE_USER,
       expect.objectContaining({
-        data: { userId: 'owner-phase5-success', reason: 'TENANT_ONBOARDING_FAILED' },
+        data: { userId: OWNER_USER_ID, reason: 'TENANT_ONBOARDING_FAILED' },
         processId: 'phase5-onboarding-payment-fail',
       }),
     );
@@ -284,10 +285,10 @@ function createTcpClients(options: { userError?: Error; paymentError?: Error } =
   const authorizerClient = {
     send: jest.fn((message: string) => {
       if (message === TCP_REQUEST_MESSAGE.KEYCLOAK.CREATE_TENANT_OWNER) {
-        return tcpResponse({ data: { userId: 'owner-phase5-success' } });
+        return tcpResponse({ data: { userId: OWNER_USER_ID } });
       }
       if (message === TCP_REQUEST_MESSAGE.KEYCLOAK.DISABLE_USER) {
-        return tcpResponse({ data: { userId: 'owner-phase5-success', enabled: false } });
+        return tcpResponse({ data: { userId: OWNER_USER_ID, enabled: false } });
       }
       return tcpResponse({ data: null });
     }),
@@ -297,7 +298,7 @@ function createTcpClients(options: { userError?: Error; paymentError?: Error } =
       if (options.userError) {
         return tcpError(options.userError);
       }
-      return tcpResponse({ data: { userId: 'owner-phase5-success' } });
+      return tcpResponse({ data: { userId: OWNER_USER_ID } });
     }),
   };
   const paymentClient = {
