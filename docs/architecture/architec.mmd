@@ -45,21 +45,19 @@ flowchart LR
       payment["Payment Service<br/>HTTP 3308<br/>TCP 3208<br/>Bill payment, SePay QR, webhook processing, outbox"]
     end
 
-    subgraph roadmap["Legacy and Roadmap Services"]
+    subgraph roadmap["Legacy Services"]
       productLegacy["Product Service<br/>HTTP 3302<br/>TCP 3202<br/>Legacy template service"]
-      notificationPlanned["Notification Service<br/>Planned<br/>Kafka consumer, SMTP, notification log"]
     end
   end
 
   subgraph infra["Data, Messaging, and Provider Layer"]
     postgres["PostgreSQL 5432<br/>Catalog tables<br/>Order sessions orders bills<br/>Payment records audits<br/>SaaS tenants"]
-    mongo["MongoDB 27017<br/>Users, roles, permissions<br/>Future notification documents"]
+    mongo["MongoDB 27017<br/>Users, roles, permissions"]
     redis["Redis 6379<br/>Session cache, cart state<br/>Rate limit, auth cache<br/>KDS queues, pubsub<br/>Socket.IO adapter"]
-    kafka["Kafka KRaft<br/>Internal 9092<br/>Host 29092<br/>order.confirmed<br/>kitchen.sla_warning<br/>payment.completed"]
+    kafka["Kafka KRaft<br/>Internal 9092<br/>Host 29092<br/>order.confirmed<br/>order.status_changed<br/>kitchen.sla_warning<br/>payment.completed<br/>tenant.created"]
     keycloak["Keycloak 8180<br/>Realm qrtable<br/>Client qrtable-bff<br/>OIDC, JWKS, admin API"]
     cloudinary["Cloudinary<br/>Menu image upload and delivery"]
     sepayQr["SePay VietQR<br/>qr.sepay.vn image endpoint"]
-    smtpPlanned["SMTP Provider<br/>Planned email notifications"]
     observabilityPlanned["Observability Stack<br/>Planned<br/>Prometheus, Grafana, Loki, Tempo"]
     pgAdmin["pgAdmin 5050<br/>Database administration"]
     redisInsight["RedisInsight 5540<br/>Redis administration"]
@@ -152,9 +150,6 @@ flowchart LR
   sepayProvider -->|"HTTP webhook with route auth<br/>POST api/v1/payment/sepay/webhook"| bffRest
   bffRest -->|"Forward validated webhook command<br/>TCP 3208"| payment
 
-  kafka -->|"payment.completed<br/>future tenant events"| notificationPlanned
-  notificationPlanned -.->|"Store notification history"| mongo
-  notificationPlanned -.->|"Send email"| smtpPlanned
 
   productLegacy -.->|"Legacy product data"| postgres
 
@@ -194,5 +189,5 @@ flowchart LR
   class authorizer,userAccess,saas,catalog,order,kitchen,payment service;
   class postgres,mongo,redis,kafka data;
   class keycloak,cloudinary,sepayQr,sepayProvider provider;
-  class productLegacy,notificationPlanned,smtpPlanned,observabilityPlanned planned;
+  class productLegacy,observabilityPlanned planned;
   class sharedLibs shared;

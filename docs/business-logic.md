@@ -21,7 +21,7 @@ This is the process of creating a restaurant tenant on the platform, attaching O
    - `SUPER_ADMIN` creates tenant through platform admin, declares shop name, type, address, Owner information and initial package.
    - The system creates tenant, Owner user, default subscription and initial payment settings row in the same onboarding process.
    - Onboarding Phase 4B is a mini-saga in SaaS service: if the step of creating user/profile/payment settings fails, the system rolls back the created data in the DB and has a cleanup path for orphan Keycloak users.
-   - Phase 4B uses the `SUPER_ADMIN` mechanism to manually enter the password for the Owner; sending email reset/required action is moved to Phase 4C after having SMTP/Notification.
+   - Phase 4B uses the `SUPER_ADMIN` mechanism to manually enter the password for the Owner; email reset/required action is outside the current implementation scope.
 
 2. **Initialize Restaurant Identity (tenant Identity):**
    - **Core Logic:** The system automatically generates a unique Slug/Subdomain (for example: `the-coffee-house.qrtable.io`) as a brand identifier on the Internet.
@@ -699,7 +699,7 @@ Served → Completed:
 
 Clearly define the authority of each role in the SaaS Multi-tenant system.
 
-> **Actor Architecture:** Described by **role group (business language)**; The actual RBAC matrix (6 roles × 66 permissions) is canonical at [permission matrix](architecture/permission-matrix.md) §6.
+> **Actor Architecture:** Described by **role group (business language)**; The actual RBAC matrix (6 roles × 65 permissions) is canonical at [permission matrix](architecture/permission-matrix.md) §6.
 
 > **Admin app navigation:** `management-app` (Phase 2.x) uses **role → tab/route** for UX; **BFF** still enforces **permission** for each endpoint. See [permission matrix](architecture/permission-matrix.md) §9 (synchronization principle + tech debt).
 
@@ -791,7 +791,7 @@ Clearly define the authority of each role in the SaaS Multi-tenant system.
 
 ### B. Permission Matrix (Business-Language Summary)
 
-> **Canonical source:** Full details of 6 roles × 66 permissions see [permission matrix](architecture/permission-matrix.md#6-canonical-permission-matrix-6-roles--66-permissions). The table below is the **business-language summary** for the 5 actor groups, NOT the source of truth for the RBAC guard check.
+> **Canonical source:** Full details of 6 roles × 65 permissions see [permission matrix](architecture/permission-matrix.md#6-canonical-permission-matrix-6-roles--65-permissions). The table below is the **business-language summary** for the 5 actor groups, NOT the source of truth for the RBAC guard check.
 
 | Features                             | Super Admin | Restaurant Owner | Staff (Waiter) | Staff (Chef/Bar) | Customers |
 | ------------------------------------ | ----------- | ---------------- | -------------- | ---------------- | --------- |

@@ -23,11 +23,11 @@
 | Q8                 | A                  | Self-service registration wizard **defer post-thesis**. Phase 4B only does admin-assisted onboarding via `/admin/tenants/onboard`.                                                                      |
 | Q9                 | a + b + c          | (a) SePay webhook until suspended → **still in process** (idempotent + audit `WEBHOOK_AFTER_SUSPEND`). (b) Order `PROCESSING` → kitchen finish to `Served`. (c) WS warning banner, no force disconnect. |
 | Q10                | A                  | `/admin/*` belongs to `apps/management-app` (filtered through middleware role check). Do not separate apps.                                                                                             |
-| Q11                | A → D              | Phase 4B **does** add a notification channel for suspend. Phase 4C will add `Notification.send_tenant_suspended` TCP endpoint (task model, not Kafka).                                                  |
+| Q11                | Scope reduced      | Phase 4B does not add a notification channel for suspend. Former Phase 4C Notification work is removed from the current implementation scope.                                                           |
 | Q12                | C                  | Data retention after `CLOSED` = defer. Phase 4B only soft-flag + disable Keycloak Owner. Hard-delete cron is post-thesis.                                                                               |
 | Q13                | C                  | Counter `max_orders_per_day` time-zone = hardcoded `Asia/Ho_Chi_Minh` (target market VN).                                                                                                               |
 | Q14                | defaults           | Legacy tenants migrate: (a) backfill `Free` plan with `expires_at = NULL`; (b) `isActive=false` → `status='SUSPENDED'`; (c) `default_currency='VND'`, `default_locale='vi-VN'`.                         |
-| Q15                | A → C              | Phase 4B: SUPER_ADMIN enters password manually when onboard. Phase 4C (after SMTP) upgrade to Keycloak `Required Action: UPDATE_PASSWORD` + email reset link.                                           |
+| Q15                | Current scope      | Phase 4B: SUPER_ADMIN enters password manually when onboard. Keycloak `Required Action: UPDATE_PASSWORD` + email reset link is outside the current implementation scope.                                |
 | Q16                | B                  | Landing page = static with pricing table (read from `GET /public/plans`) + CTA "Log in" + "Contact admin" (mailto). **REQUIRED to apply skill `ui-ux-pro-max` when deploying.**                         |
 | Q17, Q18, Q19, Q20 | **N/A** (replaced) | Round 2 questions are based on false assumptions. Replaced by Q23 + Q24 after verifying SePay capabilities.                                                                                             |
 | Q21                | Confirm            | Two webhook prefixes: `QRTBL*` (Tier 1, bill payment, goes to tenant's bank) and `QRSUB*` (Tier 2, subscription invoice, goes to platform's bank). Document in `BILL_REF_PREFIXES`.                     |
@@ -39,7 +39,7 @@
 ### 0.1 What Points Does This Document Override?
 
 1. **tenant entity (`libs/entities/src/lib/tenant.entity.ts`):** expands from 4 columns → 11+ columns. `isActive` is kept as a derived field (Q1=C).
-2. **Permission matrix:** 66 permissions in the current code (Q3=B), including `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`; keep `saas.*` legacy/backward compatibility.
+2. **Permission matrix:** 65 permissions in the current code (Q3=B), including `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`; keep `saas.*` legacy/backward compatibility.
 3. **Payment service (Phase 3):** **refactor** reads bank info from `tenant_payment_settings` (Q22=A) instead of env var `PAYMENT_SEPAY_QR_*` (still keeping env as fallback dev).
 4. **BFF webhook routing:** from single endpoint `/payment/sepay/webhook` (Phase 3) → 2 endpoints + prefix-based routing (Q21):
    - `/payment/sepay/webhook/platform` for Tier 2 (`QRSUB*`)
@@ -49,7 +49,7 @@
 7. **Phase 4B not implemented:**
    - Self-service registration wizard (Q8=A defer).
    - Hard-delete CLOSED tenant data (Q12=C defer).
-   - Notification email when suspending (Q11 waiting for Phase 4C).
+   - Notification email when suspending (removed from current project scope).
    - Internationalization (Q13 hardcoded VN).
    - Partial subscription refund (post-thesis).
 
@@ -72,7 +72,7 @@ Hybrid between Path 2 and Path 3 in audit §22:
 - `docs/phases/phase-4b-saas-onboarding.md` — final phase record.
 - `docs/business-logic.md` §1 (Onboarding), §9 (Permissions), §B (tenant Status), §D (tenant Isolation).
 - `docs/technical-architecture.md` §5 (Multi-tenancy), §6.2.3 (SaaS service), §7.2-7.4 (Kafka 4P+2AP), §8 (Auth), §11.2 (Redis Access Policy).
-- `docs/architecture/permission-matrix.md` (canonical 6 roles × 66 permissions).
+- `docs/architecture/permission-matrix.md` (canonical 6 roles × 65 permissions).
 - `docs/architecture/erd.dbml` + `erd_explanation.md`.
 - `docs/specs/business-logic-phase-3-spec.md` — pattern reference for spec format.
 - `docs/phases/phase-3-payment.md` — Payment/outbox pattern implemented.
@@ -201,11 +201,11 @@ Hybrid between Path 2 and Path 3 in audit §22:
 
 1. **Self-service registration wizard** (Q8=A) — defer post-thesis.
 2. **Hard-delete CLOSED tenant data** (Q12=C) — defer.
-3. **Notification emails** for lifecycle (welcome / suspended / expired) — Phase 4C.
+3. **Notification emails** for lifecycle (welcome / suspended / expired) — outside the current implementation scope.
 4. **Internationalization** — hardcoded `Asia/Ho_Chi_Minh` + `vi-VN`.
 5. **Partial subscription refund / proration on upgrade-downgrade** — post-thesis.
 6. **Multi-bank support per tenant** (Phase 4B = 1 SePay account → 1 active bank account per tenant; can switch, but not multi-active).
-7. **tenant transfer ownership** between users — Phase 4C or post-thesis.
+7. **tenant transfer ownership** between users — post-thesis.
 8. **Subscription discount codes / promotions** — post-thesis.
 9. **Webhook replay dashboard** — post-thesis.
 10. **Audit dashboard for compliance** — post-thesis.
@@ -349,13 +349,13 @@ Redis (Phase 4B additions)
 
 #### Transition Rules
 
-| From      | To         | Trigger                                                                                   | Actor        | Side-effects                                                                                                                                |
-| --------- | ---------- | ----------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| (initial) | ACTIVE     | Onboarding (Free plan, expires_at=NULL) or admin assign plan or Tier 2 webhook activate.  | SaaS service | Insert row. If supersede: set old `SUPERSEDED`. Update `tenant.subscription_summary` cache.                                                 |
-| ACTIVE    | EXPIRED    | Cron daily detect `expires_at + 24h < now() AND status='ACTIVE' AND plan_code != 'FREE'`. | Cron         | Update row `status='EXPIRED'`. Trigger tenant transition `ACTIVE → SUSPENDED`. Outbox `subscription.expired` (Phase 4C consumer for email). |
-| ACTIVE    | SUPERSEDED | New subscription `ACTIVE` already insert (upgrade scenario).                              | SaaS service | Set `status='SUPERSEDED'`, `superseded_by_subscription_id=<new_id>`.                                                                        |
-| ACTIVE    | CANCELED   | User clicks "Cancel" on `/dashboard/subscription`.                                        | Owner        | Set `status='CANCELED'`, `canceled_at=now()`, `canceled_reason`. tenant continues to use `expires_at`; then cron handle like EXPIRED.       |
-| EXPIRED   | (—)        | Terminal for subscription row. Admin can create new `ACTIVE` subscription.                | —            | —                                                                                                                                           |
+| From      | To         | Trigger                                                                                   | Actor        | Side-effects                                                                                                                          |
+| --------- | ---------- | ----------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| (initial) | ACTIVE     | Onboarding (Free plan, expires_at=NULL) or admin assign plan or Tier 2 webhook activate.  | SaaS service | Insert row. If supersede: set old `SUPERSEDED`. Update `tenant.subscription_summary` cache.                                           |
+| ACTIVE    | EXPIRED    | Cron daily detect `expires_at + 24h < now() AND status='ACTIVE' AND plan_code != 'FREE'`. | Cron         | Update row `status='EXPIRED'`. Trigger tenant transition `ACTIVE → SUSPENDED`. Email notification is outside current scope.           |
+| ACTIVE    | SUPERSEDED | New subscription `ACTIVE` already insert (upgrade scenario).                              | SaaS service | Set `status='SUPERSEDED'`, `superseded_by_subscription_id=<new_id>`.                                                                  |
+| ACTIVE    | CANCELED   | User clicks "Cancel" on `/dashboard/subscription`.                                        | Owner        | Set `status='CANCELED'`, `canceled_at=now()`, `canceled_reason`. tenant continues to use `expires_at`; then cron handle like EXPIRED. |
+| EXPIRED   | (—)        | Terminal for subscription row. Admin can create new `ACTIVE` subscription.                | —            | —                                                                                                                                     |
 
 #### Invariants
 
@@ -882,10 +882,10 @@ Update `libs/configuration/src/lib/kafka.config.ts`:
 TENANT_CREATED_TOPIC: string = 'tenant.created';
 
 @IsString() @IsNotEmpty()
-SUBSCRIPTION_ACTIVATED_TOPIC: string = 'subscription.activated';  // emitted from outbox; Phase 4C welcomes consume
+SUBSCRIPTION_ACTIVATED_TOPIC: string = 'subscription.activated';  // future extension only
 
 @IsString() @IsNotEmpty()
-SUBSCRIPTION_EXPIRED_TOPIC: string = 'subscription.expired';      // emitted from cron; Phase 4C consumer for warning email
+SUBSCRIPTION_EXPIRED_TOPIC: string = 'subscription.expired';      // future extension only
 
 @IsString() @IsNotEmpty()
 SAAS_CLIENT_ID: string = 'qrtable-saas-service';
@@ -916,7 +916,7 @@ type TenantCreatedEvent = {
 **Consumers:**
 
 - `Catalog service`: seed default area "General area" (group `catalog-tenant-created-consumer-group`).
-- `Notification service` (Phase 4C, contract documented now): welcome email (group `notification-tenant-created-consumer-group`).
+- No Notification/email consumer exists in the current scope. If added later, it must be documented as a separate future extension.
 
 #### Topic: `subscription.activated`
 
@@ -1830,16 +1830,16 @@ Legacy `saas.*` (5 entries) → mapped to new `tenant.*` namespace; keep legacy 
 
 ### 12.3 Updated Totals
 
-Current code-verified totals on 2026-05-13:
+Current code-verified totals on 2026-05-31:
 
-| Role        | Phase 3 Baseline | Phase 4B Total | Delta                                                                                                                                             |
-| ----------- | ---------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SUPER_ADMIN | 47               | **66**         | +19                                                                                                                                               |
-| OWNER       | 32               | **38**         | +6 (`tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, `payment_settings.read_own`, `payment_settings.update_own`) |
-| MANAGER     | 31               | **35**         | +4 (`tenant.read_own`, `subscription.read_own`, `plan.read`, `payment_settings.read_own`)                                                         |
-| WAITER      | 14               | **15**         | +1 (`plan.read`)                                                                                                                                  |
-| CHEF        | 5                | **6**          | +1 (`plan.read`)                                                                                                                                  |
-| BARISTA     | 5                | **6**          | +1 (`plan.read`)                                                                                                                                  |
+| Role        | Phase 3 Baseline | Phase 4B Total | Delta                                                                    |
+| ----------- | ---------------- | -------------- | ------------------------------------------------------------------------ |
+| SUPER_ADMIN | 47               | **65**         | +18                                                                      |
+| OWNER       | 32               | **37**         | Net +5 after Phase 4B SaaS/payment-settings additions and scope cleanup. |
+| MANAGER     | 31               | **34**         | Net +3 after Phase 4B SaaS/payment-settings additions and scope cleanup. |
+| WAITER      | 14               | **15**         | +1 (`plan.read`)                                                         |
+| CHEF        | 5                | **6**          | +1 (`plan.read`)                                                         |
+| BARISTA     | 5                | **6**          | +1 (`plan.read`)                                                         |
 
 > **Note:** `plan.read` is granted to all so any role can see plan info (FE displays plan name in widgets); only SUPER_ADMIN can mutate.
 
@@ -1850,7 +1850,7 @@ Current code-verified totals on 2026-05-13:
 - `apps/user-access/src/seeder/role.spec.ts` — update `EXPECTED_MATRIX`.
 - `apps/bff/src/app/guards/permission.guard.spec.ts` — add scenarios.
 - `tools/verify-permission-matrix.sh` — extend.
-- `docs/architecture/permission-matrix.md` — update §4, §6 to 6 × 66 matrix.
+- `docs/architecture/permission-matrix.md` — update §4, §6 to 6 × 65 matrix.
 
 ---
 
@@ -2225,18 +2225,18 @@ db.users.createIndex({ tenantId: 1, isActive: 1 });
 - Phase 4B's onboarding mini-saga uses similar Outbox pattern, mature in Phase 3 already.
 - If Phase 4A finishes first → refactor mini-saga to use saga framework (lift-and-shift).
 
-### 15.2 Phase 4C (Notification + Staff Management)
+### 15.2 Phase 4C (Staff Management)
 
 - **Phase 4C HARD depends on Phase 4B:**
-  - `tenant.created` Kafka contract (Phase 4B producer) → Phase 4C welcome email consumer.
-  - `subscription.expired` Kafka contract → Phase 4C warning email consumer.
   - `User.tenantId` field (Phase 4B migration) → Phase 4C list-staff-by-tenant query.
 
-- **Phase 4C TCP contracts that Phase 4B may pre-stub:**
-  - `Notification.send_tenant_suspended` (Q11=A→D upgrade path).
-  - `Notification.send_subscription_warning` (3 days before expiry).
+- **Removed from current scope:**
+  - Notification Service runtime.
+  - `Notification.send_tenant_suspended`.
+  - `Notification.send_subscription_warning`.
+  - Welcome/suspend/expiry/reset-password email delivery.
 
-- **Phase 4B documents contract; Phase 4C implements consumers.**
+- **Phase 4B documents tenant/user prerequisites; Phase 4C implements staff-management behavior through User-Access, Authorizer and BFF.**
 
 ### 15.3 Phase 5+ (Future)
 

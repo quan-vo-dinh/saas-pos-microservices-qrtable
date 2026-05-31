@@ -1606,7 +1606,7 @@ Step 2.4 is considered professionally complete when all of the criteria below ar
 
 The following items **have been synced in the repo** (2026-04-28); The Order/BFF implementation still needs to connect the endpoint/service according to the specification:
 
-1. `docs/architecture/permission-matrix.md` — the current RBAC matrix (66 permissions after the following phases) must still keep the cancel permission separation of Step 2.4.
+1. `docs/architecture/permission-matrix.md` — the current RBAC matrix (65 permissions after the following phases) must still keep the cancel permission separation of Step 2.4.
 2. `libs/constants/src/lib/enum/role.enum.ts` — `ORDER_CANCEL_PENDING` / `ORDER_CANCEL_PROCESSING` (replaced `ORDER_CANCEL`).
 3. `apps/user-access/src/seeder/role.json` + `role.spec.ts` + `apps/bff/.../permission.guard.spec.ts` + `tools/verify-permission-matrix.sh` — mapping WAITER pending cancel.
 4. `libs/shared/types/src/lib/realtime-events.types.ts` — `OrderConfirmedEvent` enrich, `CartUpdatedEvent`, `BillRequestedEvent`, `TableTransferredEvent`.

@@ -4,7 +4,7 @@
 **Update date:** 2026-05-13 (refresh supporting RBAC reference after Phase 4B)
 **Status:** Supporting reference, not canonical source for RBAC
 
-> **Current status:** RBAC canonical source of truth is [permission matrix](../architecture/permission-matrix.md), compared to `libs/constants/src/lib/enum/role.enum.ts` and `apps/user-access/src/seeder/role.json`. The current snapshot after Phase 4B has 66 permissions: `SUPER_ADMIN=66`, `Owner=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. If this document differs from canonical matrix or code/seed, give priority to canonical matrix and code/seed.
+> **Current status:** RBAC canonical source of truth is [permission matrix](../architecture/permission-matrix.md), compared to `libs/constants/src/lib/enum/role.enum.ts` and `apps/user-access/src/seeder/role.json`. The current snapshot after Phase 4B has 65 permissions: `SUPER_ADMIN=65`, `Owner=37`, `MANAGER=34`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. If this document differs from canonical matrix or code/seed, give priority to canonical matrix and code/seed.
 
 ---
 
@@ -148,9 +148,9 @@ The Next.js `management-app` application uses **middleware + role-based sidebar*
 
 | **Role**        | **Description**                                                                                  | **Scope**                   | **User**      | **Keycloak Role** | **Permissions** |
 | --------------- | ------------------------------------------------------------------------------------------------ | --------------------------- | ------------- | ----------------- | --------------- |
-| **SUPER_ADMIN** | Platform admin, entire system rights                                                             | Cross-tenant platform-level | System Admin  | `SUPER_ADMIN`     | 66              |
-| **Owner**       | Restaurant/store owners, including checkout subscription and payment settings                    | Single-tenant (Owner only)  | Shop Owner    | `Owner`           | 38              |
-| **MANAGER**     | Executive management; has own-tenant visibility, no checkout/update payment settings/delete user | Single-tenant               | Store Manager | `MANAGER`         | 35              |
+| **SUPER_ADMIN** | Platform admin, entire system rights                                                             | Cross-tenant platform-level | System Admin  | `SUPER_ADMIN`     | 65              |
+| **Owner**       | Restaurant/store owners, including checkout subscription and payment settings                    | Single-tenant (Owner only)  | Shop Owner    | `Owner`           | 37              |
+| **MANAGER**     | Executive management; has own-tenant visibility, no checkout/update payment settings/delete user | Single-tenant               | Store Manager | `MANAGER`         | 34              |
 | **WAITER**      | Waitress                                                                                         | Single-tenant               | Staff         | `WAITER`          | 15              |
 | **CHEF**        | Chef                                                                                             | Single-tenant               | Chef          | `CHEF`            | 6               |
 | **BARISTA**     | Bartender                                                                                        | Single-tenant               | Bartender     | `BARISTA`         | 6               |
@@ -1254,13 +1254,13 @@ export enum PERMISSION {
 
 ### 9.2 Permission Matrix: Role → Permissions (Supporting Snapshot — Phase 4B)
 
-> Single source of truth: [permission matrix](../architecture/permission-matrix.md). The table below is just a summary for quick reading, does not replace the canonical matrix 6 roles × 66 permissions.
+> Single source of truth: [permission matrix](../architecture/permission-matrix.md). The table below is just a summary for quick reading, does not replace the canonical matrix 6 roles × 65 permissions.
 
 | **Role**               | **Platform / SaaS domains**                                                                                                                        | **Operational domains**                                                                                                       | **Permission count** |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| **SUPER_ADMIN**        | All legacy `saas.*`, `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`                                                                  | All catalog/user/role/product/order/kitchen/payment/table/service-request permissions                                         | 66                   |
-| **OWNER**              | `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, `payment_settings.read_own`, `payment_settings.update_own`       | Full tenant operations except platform-only role/product/SaaS admin permissions                                               | 38                   |
-| **MANAGER**            | `tenant.read_own`, `subscription.read_own`, `plan.read`, `payment_settings.read_own`; no `subscription.checkout`, no `payment_settings.update_own` | Operational permissions similar to OWNER, but no `user.delete`                                                                | 35                   |
+| **SUPER_ADMIN**        | All legacy `saas.*`, `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`                                                                  | All catalog/user/role/product/order/kitchen/payment/table/service-request permissions                                         | 65                   |
+| **OWNER**              | `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, `payment_settings.read_own`, `payment_settings.update_own`       | Full tenant operations except platform-only role/product/SaaS admin permissions                                               | 37                   |
+| **MANAGER**            | `tenant.read_own`, `subscription.read_own`, `plan.read`, `payment_settings.read_own`; no `subscription.checkout`, no `payment_settings.update_own` | Operational permissions similar to OWNER, but no `user.delete`                                                                | 34                   |
 | **WAITER**             | `plan.read`                                                                                                                                        | Catalog read, order confirm/cancel pending/read, payment create/cash/history, table transfer/status, service-request handling | 15                   |
 | **CHEF**               | `plan.read`                                                                                                                                        | Catalog read plus KDS `get_queue`, `update_ticket`, `recall`; no `kitchen.set_priority`                                       | 6                    |
 | **BARISTA**            | `plan.read`                                                                                                                                        | Catalog read plus KDS `get_queue`, `update_ticket`, `recall`; no `kitchen.set_priority`                                       | 6                    |
@@ -1277,13 +1277,13 @@ export enum PERMISSION {
 
 **File:** `apps/user-access/src/seeder/role.json`
 
-**Current contents (Phase 4B — static-verified 2026-05-13):** Full canonical matrix with 6 roles and 66 permissions distributed per [permission matrix](../architecture/permission-matrix.md) §6. Permission counts:
+**Current contents (Phase 4B — static-verified 2026-05-31):** Full canonical matrix with 6 roles and 65 permissions distributed per [permission matrix](../architecture/permission-matrix.md) §6. Permission counts:
 
 | Role        | Permission count |
 | ----------- | ---------------- |
-| SUPER_ADMIN | 66               |
-| OWNER       | 38               |
-| MANAGER     | 35               |
+| SUPER_ADMIN | 65               |
+| OWNER       | 37               |
+| MANAGER     | 34               |
 | WAITER      | 15               |
 | CHEF        | 6                |
 | BARISTA     | 6                |
@@ -2035,7 +2035,7 @@ QRTable's authentication, authorization, role, and permission system is designed
 1. ✅ **Supports 2 actor types:** Staff (JWT from Keycloak) + Customer (Session anonymous)
 2. ✅ **Enforce tenant isolation:** Every request has tenantId, prevent cross-tenant access
 3. ✅ **Validate role consistency:** Keycloak roles ∩ Internal roles ≠ ∅
-4. ✅ **Granular permissions:** 6 roles + 66 permissions, flexible assignment
+4. ✅ **Granular permissions:** 6 roles + 65 permissions, flexible assignment
 5. ✅ **Caching & performance:** Token cached 30 min, BFF session cached 2h + idle 30 min
 6. ✅ **Debug-friendly:** Clear error codes, processId tracking, structured logging
 

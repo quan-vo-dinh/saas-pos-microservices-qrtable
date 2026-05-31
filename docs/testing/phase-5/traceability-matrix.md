@@ -2,7 +2,7 @@
 
 **Scope:** P0 and P1 rules only. This inventory maps canonical rules from `docs/business-logic.md`, `docs/technical-architecture.md`, completed phase records (1, 2A, 2B, 3, the 4A representative Saga slice, 4B), and `docs/architecture/permission-matrix.md` to existing tests. It does not add or require new business behavior.
 
-**Phase context:** Phases 0, 1, 2A, 2B, 3, and 4B are complete. Phase 4A has an implemented Order Confirm Saga representative slice; full Phase 4A operational hardening remains future work. Phase 4C is not started.
+**Phase context:** Phases 0, 1, 2A, 2B, 3, and 4B are complete. Phase 4A has an implemented Order Confirm Saga representative slice; full Phase 4A operational hardening remains future work. Phase 4C Staff Management is not started. Former Step 4.5 Notification Service is removed from the current scope.
 
 ---
 
@@ -13,7 +13,7 @@
 - **`missing`** — Behavior appears implemented or is the current contract, but no adequate test was found.
 - **`implementation-gap`** — Canonical docs describe a rule that is not clearly implemented; do not add tests until behavior is built or the spec changes.
 - **`security-gap`** — Security hardening is insufficient for production or demo-public exposure; current tests may only cover route shape or presence.
-- **`deferred-by-phase`** — Rule belongs to full Phase 4A operational hardening, Phase 4C, or explicit post-thesis or future hardening scope.
+- **`deferred-by-phase`** — Rule belongs to full Phase 4A operational hardening, Phase 4C Staff Management, or explicit post-thesis/future hardening scope.
 
 ---
 
@@ -610,7 +610,7 @@
 
 ### `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `covered` (P0, rbac)
 
-**Requirement:** Canonical RBAC seed has six roles and sixty-six permissions with role counts `SUPER_ADMIN=66`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`; live login smoke should verify representative permissions.
+**Requirement:** Canonical RBAC seed has six roles and sixty-five permissions with role counts `SUPER_ADMIN=65`, `OWNER=37`, `MANAGER=34`, `WAITER=15`, `CHEF=6`, `BARISTA=6`; live login smoke should verify representative permissions.
 
 **Sources:** `permission-matrix` (4, 6, 9.3).
 
@@ -636,7 +636,7 @@
 
 ---
 
-### `P1-ARCH-KAFKA-6-TOPIC-REGISTRY` — `covered` (P1, architecture)
+### `P1-ARCH-KAFKA-5-TOPIC-REGISTRY` — `covered` (P1, architecture)
 
 **Requirement:** Kafka topic registry is exactly the current domain topics: `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, `tenant.created`; no UI-only Kafka topics.
 
@@ -646,7 +646,7 @@
 
 **Target layer:** unit-contract. **Stack:** none.
 
-**Notes:** Static configuration test locks the exact six-topic registry and default environment topic names, including `KAFKA_ORDER_STATUS_CHANGED_TOPIC` defaulting to `order.status_changed`.
+**Notes:** Static configuration test locks the exact five-topic registry and default environment topic names, including `KAFKA_ORDER_STATUS_CHANGED_TOPIC` defaulting to `order.status_changed`.
 
 ---
 
@@ -722,17 +722,17 @@
 
 ---
 
-### `P1-PHASE4C-NOTIFICATIONS` — `deferred-by-phase` (P1, demo)
+### `P2-OUT-OF-SCOPE-NOTIFICATIONS` — `deferred-by-phase` (P2, demo)
 
-**Requirement:** Email receipts; welcome, suspend, and expiry emails; reset-password email; notification logs and service runtime.
+**Requirement:** Email receipts; welcome, suspend, and expiry emails; reset-password email; notification logs and Notification service runtime are outside the current implementation scope.
 
-**Sources:** `phase-4b-saas-onboarding` handoff; `phase-3-payment` handoff; `technical-architecture` (6.2.9).
+**Sources:** `phase-4c-staff-management` scope decision; `phase-4b-saas-onboarding` handoff; `phase-3-payment` handoff; `technical-architecture` (6.2.9).
 
 **Tests:** none.
 
-**Target layer:** deferred. **Stack:** SMTP or provider, or Notification service.
+**Target layer:** deferred. **Stack:** SMTP/provider or Notification service if the future scope reintroduces it.
 
-**Notes:** Phase 4C has not started; do not add tests or product behavior in Phase 5; keep on Phase 4C backlog.
+**Notes:** Former Step 4.5 Notification Service has been removed from Phase 4C. Do not add tests or product behavior in Phase 5; keep this as a post-thesis/future extension unless scope is explicitly reopened.
 
 ---
 
@@ -760,5 +760,5 @@ Ordered by urgency; each line is **priority**, **rule id**, **status**, and **ne
 
 - Every required Phase 5 anchor has at least one entry: Catalog and QR, Order and cart and session, Kitchen and realtime, Payment settlement and history, SaaS 4B, RBAC and auth, and architecture invariants.
 - Every P0 entry either names concrete test locations in prose (app or lib plus spec purpose) or states a concrete `notes` or next action when tests are absent.
-- Full Phase 4A hardening and Phase 4C items are explicitly marked `deferred-by-phase`; the implemented Order Confirm Saga is not deferred.
+- Full Phase 4A hardening and Phase 4C Staff Management items are explicitly marked `deferred-by-phase`; the implemented Order Confirm Saga is not deferred. Notification/email is outside current scope.
 - This document does not include test implementation steps or code.

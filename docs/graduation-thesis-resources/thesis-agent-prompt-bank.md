@@ -1,7 +1,7 @@
 # Prompt bank cho AI agent viết khóa luận QRTable
 
 > Tài liệu sống chứa prompt mẫu để khởi động các session mới mà không phụ thuộc vào trí nhớ của thread chat hiện tại.
-> Cập nhật gần nhất: 2026-05-29.
+> Cập nhật gần nhất: 2026-05-31.
 
 ## 1. Mục đích
 
@@ -31,6 +31,7 @@ Yêu cầu chung:
 - Không revert thay đổi không do bạn tạo.
 - Nếu cần tài liệu framework/library/API/cloud hiện tại, dùng Context7/ctx7 trước.
 - Nếu cần kiểm tra UI/screenshot/local app, dùng Browser, trừ Phase 5D scaffold/manual capture handoff vì phase đó cố ý không chụp UI tự động.
+- Nếu phase chạm Saga, consistency hoặc Chương 5/6, đọc `docs/testing/phase-5/saga-validation-strategy.md` và không claim full production-grade Saga hardening.
 - Cuối session, chạy verification phù hợp và cập nhật `thesis-workflow-plan.md`.
 ```
 
@@ -236,12 +237,12 @@ Tiếp tục Phase 5A: Audit implementation evidence cho Chương 5.
 
 Mục tiêu duy nhất là tạo implemented evidence table, runtime flow evidence, sequence diagram plan và screenshot/demo artifact plan cho Chương 5, chưa viết chương dài.
 
-Đọc workflow plan, evidence map, official outline, `docs/DOC-CODE-ANCHORS.md`, `docs/business-logic.md`, `docs/technical-architecture.md`, source code liên quan trong `apps/` và `libs/`.
+Đọc workflow plan, evidence map, official outline, `docs/DOC-CODE-ANCHORS.md`, `docs/business-logic.md`, `docs/technical-architecture.md`, `docs/testing/phase-5/saga-validation-strategy.md`, source code liên quan trong `apps/` và `libs/`.
 
 Output mong muốn:
 
 - Implemented evidence table: feature/flow -> source path -> docs/tests -> artifact/screenshot cần có.
-- Flow evidence cho QR session/cart/order, stock consistency, KDS, payment settlement, SaaS onboarding.
+- Flow evidence cho QR session/cart/order, Order Confirm Saga/stock consistency, KDS, payment settlement và SaaS Onboarding Mini-Saga.
 - Sequence diagram plan P0:
   - Hình 5.1 QR ordering sequence.
   - Hình 5.2 Order confirm và stock consistency sequence.
@@ -274,10 +275,10 @@ Mục tiêu duy nhất là tạo Mermaid source cho 5 sequence diagram P0 (Hình
 Diễn giải từng diagram:
 
 - **Hình 5.1**: QR ordering & session flow (Customer, BFF, Order, Catalog, Redis).
-- **Hình 5.2**: Order confirm & stock consistency (Staff, BFF, Order, Catalog, PG Order DB, PG Catalog DB, Outbox, Kafka).
+- **Hình 5.2**: Order Confirm Saga & stock consistency (Staff, BFF, Order, Catalog, PG Order DB, PG Catalog DB, Outbox, Kafka), có nhánh compensation release stock ở mức đại diện.
 - **Hình 5.3**: KDS ticket lifecycle (Kafka, Kitchen, Redis Sorted Set, WebSocket, KDS UI, Chef, Order).
 - **Hình 5.4**: Payment settlement — cả 2 nhánh cash và VietQR/SePay.
-- **Hình 5.5**: SaaS onboarding saga với compensation (Super Admin, SaaS, Authorizer, User-Access, Payment, Outbox).
+- **Hình 5.5**: SaaS Onboarding Mini-Saga với compensation (Super Admin, SaaS, Authorizer, User-Access, Payment, Outbox).
 
 Yêu cầu:
 
@@ -315,6 +316,7 @@ Mục tiêu duy nhất là viết bản nháp Chương 5 vào `thesis-report/cha
 Yêu cầu:
 
 - Chứng minh hệ thống được hiện thực hóa bằng code/docs/tests/evidence (không chỉ mô tả cấu trúc).
+- Khi viết Saga, dùng `docs/testing/phase-5/saga-validation-strategy.md`: chỉ claim hai luồng đại diện Order Confirm Saga và SaaS Onboarding Mini-Saga, không claim durable saga state/CDC/exactly-once/full hardening.
 - Không biến Chương 5 thành README hoặc user manual.
 - Chỉ đưa implementation detail khi phục vụ claim kỹ thuật.
 - Giữ nguyên Hình 5.1–5.5 đã chèn từ Phase 5B; chỉ bổ sung prose giải thích và bảng evidence.
@@ -334,11 +336,12 @@ Tiếp tục Phase 5D: Screenshot/demo scaffold và manual capture handoff.
 
 Mục tiêu duy nhất là dựng khung screenshot/demo artifact cho Chương 5 và Phụ lục A: xác định ảnh cần có từ tài liệu dự án/source code, tạo mapping/ref/caption, tạo file ảnh placeholder trắng đúng tên/vị trí, chèn khung vào LaTeX và build verify. Không chụp UI tự động trong phase này.
 
-Đọc workflow plan trước, sau đó đọc tối thiểu: `thesis-artifact-backlog.md` §5, `thesis-phase5a-evidence-audit.md` §4, `thesis-report/chapters/05-trien-khai-he-thong.tex`, `thesis-report/appendices/a-ui-gallery.tex`, `docs/business-logic.md` và source path cần thiết để hiểu màn hình tương ứng.
+Đọc workflow plan trước, sau đó đọc tối thiểu: `thesis-artifact-backlog.md` §5, `thesis-phase5a-evidence-audit.md` §4, `docs/testing/phase-5/saga-validation-strategy.md`, `thesis-report/chapters/05-trien-khai-he-thong.tex`, `thesis-report/appendices/a-ui-gallery.tex`, `docs/business-logic.md` và source path cần thiết để hiểu màn hình tương ứng.
 
 Output mong muốn:
 
 - `docs/graduation-thesis-resources/thesis-phase5d-screenshot-scaffold.md` với mapping: artifact ID, filename, LaTeX label, vị trí chèn, caption dự kiến, flow liên quan và ghi chú thay ảnh thủ công.
+- Checklist Phụ lục D cho bằng chứng Saga: output test, snapshot DB/outbox và log rút gọn. Không cần tạo artifact thật nếu phase chỉ dựng scaffold.
 - File placeholder trắng trong `thesis-report/assets/screenshots/`, tên ổn định theo mẫu `chapter5-01-customer-qr-session.png`.
 - Khung `figure`/refs trong Chương 5 hoặc Phụ lục A, dùng `\includegraphics`, `\caption{...}` và `\label{...}`.
 - `thesis-artifact-backlog.md` cập nhật trạng thái `placeholder` cho ảnh đã có file placeholder và đã chèn khung.
@@ -349,6 +352,7 @@ Yêu cầu:
 - Placeholder trắng không phải screenshot thật; không đánh dấu `captured` hoặc `verified`.
 - Caption/đoạn dẫn trong bản nháp phải tránh làm người đọc hiểu nhầm ảnh trắng là evidence thật. Ghi rõ đây là placeholder bản nháp cần thay bằng screenshot demo thật trước khi nộp.
 - Chỉ chọn screenshot phục vụ flow chính: Customer PWA, Staff POS, KDS, Owner dashboard, Super Admin.
+- Với Saga, ưu tiên Ảnh 5.6 staff confirm, Ảnh 5.7 KDS queue sau `order.confirmed`, Ảnh 5.11 payment/subscription và Ảnh 5.12 tenant onboarding. Compensation không được chứng minh bằng screenshot UI, mà bằng test/log/DB evidence.
 - Không tạo screenshot observability/deployment giả.
 - Không sửa nội dung prose dài của Chương 5 ngoài các câu nối cần thiết cho refs.
 - Không thay đổi Hình 5.1-Hình 5.5 hoặc Bảng 5.1-Bảng 5.2 đã verify.
@@ -374,12 +378,13 @@ Tiếp tục Phase 6A: Build evaluation tables/claim policy.
 
 Mục tiêu duy nhất là chuẩn bị bảng/ma trận đánh giá cho Chương 6, chưa viết Chương 6 dài.
 
-Đọc workflow plan, evidence map, traceability matrix, phase-5 handoff, tests/docs cần thiết.
+Đọc workflow plan, evidence map, traceability matrix, phase-5 handoff, `docs/testing/phase-5/saga-validation-strategy.md`, tests/docs cần thiết.
 
 Output mong muốn:
 
 - Requirement traceability summary.
 - Architecture/NFR evidence status.
+- Saga validation summary cho Order Confirm Saga và SaaS Onboarding Mini-Saga.
 - Evaluation claim policy table.
 - Limitation vs future work table.
 - Danh sách claim được phép/không được phép viết.
@@ -403,6 +408,7 @@ Mục tiêu duy nhất là viết bản nháp Chương 6 vào `thesis-report/cha
 Yêu cầu:
 
 - Đánh giá functional validation, architecture validation và NFR bằng evidence phù hợp.
+- Đánh giá Saga bằng nhiều lớp evidence: unit/contract, integration opt-in, fault injection ở service layer, UI happy path và DB/outbox evidence; không gọi là full production-grade Saga hardening.
 - Performance/scalability/maintainability/observability phải diễn đạt trung thực.
 - Với scalability: viết “hỗ trợ ở mức thiết kế/kiến trúc”, không viết “đã chứng minh dưới tải lớn” nếu chưa benchmark.
 - Với maintainability: dùng service ownership, shared contracts, Nx, scenario analysis.
@@ -443,6 +449,7 @@ Yêu cầu:
 
 - Dựa trên source backbone, proposal định hướng, research survey đã kiểm chứng và kết quả Chương 3-6.
 - Nêu bối cảnh, lý do chọn đề tài, bài toán, mục tiêu, phạm vi, phương pháp, đóng góp và cấu trúc khóa luận.
+- Nếu nêu đóng góp về Saga, diễn đạt là áp dụng Saga đại diện cho hai luồng nghiệp vụ, không viết như toàn bộ hệ thống đã có distributed transaction framework hoàn chỉnh.
 - Không viết như quảng cáo sản phẩm.
 - Không overclaim kết quả chưa đánh giá.
 

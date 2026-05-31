@@ -1,6 +1,6 @@
 # Permission Matrix — QRTable
 
-> **Status:** Active after Phase 4B · static-verified against `PERMISSION` enum and `role.json` on 2026-05-13
+> **Status:** Active after Phase 4B · static-verified against `PERMISSION` enum and `role.json` on 2026-05-31
 > **Version:** 2.0
 > **Single source of truth:** RBAC documentation is derived from `libs/constants/src/lib/enum/role.enum.ts` and `apps/user-access/src/seeder/role.json`.
 
@@ -45,7 +45,7 @@ Design principles:
 | BARISTA     | Single tenant         | Bar staff for KDS drink tickets                                                                | Bound to `tenant_id` claim            |
 | CUSTOMER    | Session scoped        | Anonymous diner using QR session APIs                                                          | Tenant from signed QR/session context |
 
-## 4. Permission Catalog (66 Values)
+## 4. Permission Catalog (65 Values)
 
 | #   | Enum                            | Value                           | Notes                                    |
 | --- | ------------------------------- | ------------------------------- | ---------------------------------------- |
@@ -195,11 +195,11 @@ Legend: `✅` = granted; blank = not granted.
 | 63        | `service_request.create`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
 | 64        | `service_request.acknowledge`   |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
 | 65        | `service_request.resolve`       |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| **Total** |                                 |   **66**    | **38** | **35**  | **15** | **6** |  **6**  |
+| **Total** |                                 |   **65**    | **37** | **34**  | **15** | **6** |  **6**  |
 
 ## 7. Assignment Notes
 
-- SUPER_ADMIN has every enum permission: 66/66.
+- SUPER_ADMIN has every enum permission: 65/65.
 - OWNER has full tenant operations plus own-tenant SaaS self-service: `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, and own payment-settings read/update.
 - MANAGER has operational permissions plus own-tenant SaaS visibility: `tenant.read_own`, `subscription.read_own`, `plan.read`, and `payment_settings.read_own`.
 - WAITER has catalog read, plan read, order confirm/cancel pending/read, payment create/cash/history, table transfer/status, and service-request handling.
@@ -247,7 +247,7 @@ node tools/seed.js apps/user-access/src/seeder prune
 
 `tools/verify-permission-matrix.sh` is an integration smoke test. It requires BFF/Authorizer and seeded MongoDB to be running, and it checks representative permissions rather than parsing this markdown file.
 
-> **2026-05-13 verification note, updated in Phase 5:** Static code/seed verification confirms 66 enum permissions and role seed counts `SUPER_ADMIN=66`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. The integration smoke script depends on live seeded credentials and now resolves username/password from `tools/auth-bootstrap-users.json`, checks `/authorizer/me` role identity, and asserts exact permission counts to avoid drift from the dev seed. Run Keycloak bootstrap, sync Mongo users, then rerun `bash tools/verify-permission-matrix.sh` before marking live RBAC smoke fully green.
+> **2026-05-31 verification note, updated after Phase 4C scope reduction:** Static code/seed verification confirms 65 enum permissions and role seed counts `SUPER_ADMIN=65`, `OWNER=37`, `MANAGER=34`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. The integration smoke script depends on live seeded credentials and resolves username/password from `tools/auth-bootstrap-users.json`, checks `/authorizer/me` role identity, and asserts exact permission counts to avoid drift from the dev seed. Run Keycloak bootstrap, sync Mongo users, then rerun `bash tools/verify-permission-matrix.sh` before marking live RBAC smoke fully green.
 
 ## 10. Frontend Navigation Vs API Enforcement
 

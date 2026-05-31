@@ -8,7 +8,7 @@
 
 ## Điều kiện tiên quyết
 
-- Các phase lõi đã đóng trên đường critical/demo: **0, 1, 2A, 2B, 3**, phần SaaS hoàn thành ở **4B**, và lát cắt đại diện **4A Order Confirm Saga** đã triển khai. Full hardening vận hành của Phase 4A và Phase 4C chưa bắt đầu; không chặn Phase 5–7 trừ khi demo bắt buộc hardening kiểu Saga state bền vững/CDC/retry worker hoặc notification/staff management.
+- Các phase lõi đã đóng trên đường critical/demo: **0, 1, 2A, 2B, 3**, phần SaaS hoàn thành ở **4B**, và lát cắt đại diện **4A Order Confirm Saga** đã triển khai. Full hardening vận hành của Phase 4A và Phase 4C Quản lý nhân sự chưa bắt đầu; không chặn Phase 5–7 trừ khi demo bắt buộc hardening kiểu Saga state bền vững/CDC/retry worker hoặc quản lý nhân sự. Notification/email nằm ngoài phạm vi triển khai hiện tại.
 
 ## Tài liệu tham chiếu
 
@@ -33,7 +33,7 @@ Ba mảng gộp trong một tài liệu vì cùng “cổng hoàn thiện” tr�
 
 Điểm cần chỉnh so với bản Phase 5 cũ:
 
-- **Điều kiện cũ “Phase 0–4 hoàn thành” không còn đúng.** Hiện tại: Phase 0, 1, 2A, 2B, 3 và **4B** xong; **4A có lát cắt Saga đại diện**, **4C TODO**. Test Phase 5 phải xác minh hành vi hiện có, bao gồm Order Confirm Saga, và chỉ ghi gap cho full saga-hardening/notification/staff nếu nằm trong deferred scope.
+- **Điều kiện cũ “Phase 0–4 hoàn thành” không còn đúng.** Hiện tại: Phase 0, 1, 2A, 2B, 3 và **4B** xong; **4A có lát cắt Saga đại diện**, **4C Staff Management TODO**. Test Phase 5 phải xác minh hành vi hiện có, bao gồm Order Confirm Saga, và chỉ ghi gap cho full saga-hardening hoặc quản lý nhân sự nếu nằm trong deferred scope.
 - **Phase 4A không còn hoãn toàn bộ.** `OrderConfirmSagaService` và `CatalogStockGatewayService` là contract hiện tại của code. Phase 5 phải test replay confirm, lỗi tồn kho từ Catalog và compensation trả kho; Saga state bền vững, retry worker, stock ledger và CDC/Debezium vẫn là hardening tương lai.
 - **Phạm vi cũ thiếu Phase 4B.** Cần bổ sung lifecycle tenant `ACTIVE/SUSPENDED/CLOSED`, subscription/pricing plan, feature gating, tenant payment settings, hai tầng tham chiếu thanh toán `QRTBL`/`QRSUB`, onboarding do admin hỗ trợ và hành vi Customer PWA suspended/read-only.
 - **Phạm vi cũ gọi E2E là Supertest không khớp repo.** Hiện E2E browser dùng Playwright trong `tests/e2e`; Supertest phù hợp hơn nếu sau này thêm e2e API BFF/Nest. Phase 5 phải tách rõ `API integration/contract` và `browser E2E`.
@@ -50,21 +50,21 @@ Nguyên tắc chính:
 - **Test đúng tầng:** Unit khóa invariant/policy; integration khóa ranh giới DB/Redis/TCP/Kafka; E2E browser khóa user journey. Không lặp cùng assertion ở mọi tầng.
 - **Current-code first:** Khi tài liệu phase cũ lệch `business-logic.md`, `technical-architecture.md` hoặc test/code hiện tại, test theo hành vi canonical/đã triển khai mới nhất.
 - **Snapshot là source of truth:** Event realtime chỉ là hint invalidate/refetch; E2E không phụ thuộc payload packet làm canonical state.
-- **Deferred rõ ràng:** Không tính thiếu test full hardening Phase 4A hoặc Phase 4C là lỗi Phase 5. Thiếu test cho Order Confirm Saga đã triển khai không phải deferred; đó là việc test bình thường của Phase 5.
+- **Deferred rõ ràng:** Không tính thiếu test full hardening Phase 4A hoặc Phase 4C Quản lý nhân sự chưa triển khai là lỗi Phase 5. Thiếu test cho Order Confirm Saga đã triển khai không phải deferred; đó là việc test bình thường của Phase 5. Test Notification/email nằm ngoài phạm vi hiện tại nếu service chưa được đưa lại vào code.
 - **Bằng chứng Saga theo nhiều lớp:** Với hai luồng Saga đại diện, kết hợp unit/contract test, integration opt-in, fault injection deterministic khi có, artifact demo UI và bằng chứng DB/outbox/log. Chiến lược chi tiết nằm ở `docs/testing/phase-5/saga-validation-strategy.md`.
 
 ### Phạm vi canonical sau Phase 4A/4B
 
 Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract hiện tại**. Nếu phát hiện lệch giữa docs và code, áp dụng thứ tự nguồn sự thật trong `docs/README.md`: code/test hiện tại → spec đã chấp nhận → bản ghi phase cuối → tài liệu tổng quan. Kết quả rà soát không chỉ thêm test mà còn phân loại chính xác trạng thái từng quy tắc.
 
-| Loại phạm vi         | Xử lý trong Phase 5                                                                                | Ví dụ cụ thể                                                                                                                                                  |
-| -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `covered`            | Giữ test hiện có, gắn ma trận traceability                                                         | Shared transition tests, BFF guards, webhook Payment trùng, test invoice subscription SaaS                                                                    |
-| `partial`            | Thêm test ở tầng thấp nhất đủ chứng minh quy tắc                                                   | Payment UI smoke có nhưng chưa chứng minh full close-session; permission unit có nhưng chưa smoke Keycloak live ổn                                            |
-| `missing`            | Thêm test nếu hành vi đã có code và thuộc Phase 0/1/2A/2B/3/lát cắt đại diện 4A/4B                 | Gap integration cho Order Confirm Saga; Catalog QR token invalid/rate limit; ràng buộc xóa table/menu; fixture browser route tenant suspended                 |
-| `implementation-gap` | Không sửa hành vi trong Phase 5; ghi cần phase/PR riêng nếu quy tắc canonical chưa có code         | Offline queue IndexedDB, UI invite staff đầy đủ, dashboard replay webhook production                                                                          |
-| `security-gap`       | Test contract hiện tại nếu có; đánh dấu blocker trước go-live/demo thật nếu thiếu hardening        | Route Phase 4B tenant/platform `x-secret-key` cần verify giá trị với secret lưu, không chỉ kiểm presence                                                      |
-| `deferred-by-phase`  | Không tính fail Phase 5; giữ backlog full hardening Phase 4A và backlog Phase 4C hoặc sau luận văn | Saga state bền vững, retry worker, stock ledger, CDC/Debezium, email receipt/welcome/suspend notification, email reset-password, runtime Notification service |
+| Loại phạm vi         | Xử lý trong Phase 5                                                                                              | Ví dụ cụ thể                                                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `covered`            | Giữ test hiện có, gắn ma trận traceability                                                                       | Shared transition tests, BFF guards, webhook Payment trùng, test invoice subscription SaaS                                                    |
+| `partial`            | Thêm test ở tầng thấp nhất đủ chứng minh quy tắc                                                                 | Payment UI smoke có nhưng chưa chứng minh full close-session; permission unit có nhưng chưa smoke Keycloak live ổn                            |
+| `missing`            | Thêm test nếu hành vi đã có code và thuộc Phase 0/1/2A/2B/3/lát cắt đại diện 4A/4B                               | Gap integration cho Order Confirm Saga; Catalog QR token invalid/rate limit; ràng buộc xóa table/menu; fixture browser route tenant suspended |
+| `implementation-gap` | Không sửa hành vi trong Phase 5; ghi cần phase/PR riêng nếu quy tắc canonical chưa có code                       | Offline queue IndexedDB, UI invite staff đầy đủ, dashboard replay webhook production                                                          |
+| `security-gap`       | Test contract hiện tại nếu có; đánh dấu blocker trước go-live/demo thật nếu thiếu hardening                      | Route Phase 4B tenant/platform `x-secret-key` cần verify giá trị với secret lưu, không chỉ kiểm presence                                      |
+| `deferred-by-phase`  | Không tính fail Phase 5; giữ backlog full hardening Phase 4A, backlog Phase 4C Quản lý nhân sự hoặc sau luận văn | Saga state bền vững, retry worker, stock ledger, CDC/Debezium, UI invite staff đầy đủ, dashboard replay webhook production                    |
 
 ### Dải ưu tiên
 
@@ -91,7 +91,7 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 
 #### Bước 5.1 — Inventory + Ma trận traceability (1–2 ngày)
 
-**Mục tiêu:** Biết chính xác quy tắc nghiệp vụ nào đã có test, tầng nào, gap nào hợp lệ vì full hardening Phase 4A/Phase 4C chưa làm.
+**Mục tiêu:** Biết chính xác quy tắc nghiệp vụ nào đã có test, tầng nào, gap nào hợp lệ vì full hardening Phase 4A/Phase 4C Quản lý nhân sự chưa làm.
 
 **Phạm vi:**
 
@@ -140,7 +140,7 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 - **Component/hook frontend:** control disabled tenant suspended, ngoại lệ payment cho bill pending, hook refetch realtime POS/KDS, auth readiness dashboard, điều hướng theo role.
 - **Test kiến trúc tĩnh:** route constant unique, pattern TCP message exposed, đếm enum/seed/matrix permission, topic Kafka giới hạn registry, không vô tình có contract event `menu.updated`.
 
-**Ghi chú RBAC:** `permission-matrix.md` hiện có 66 permission và đếm role seed đã verify tĩnh, nhưng smoke live còn phụ thuộc seed/credential `SUPER_ADMIN` và `MANAGER`. Phase 5 ghi trạng thái `partial` cho đến khi smoke login seeded live hoặc integration auth API-level ổn định.
+**Ghi chú RBAC:** `permission-matrix.md` hiện có 65 permission và đếm role seed đã verify tĩnh, nhưng smoke live còn phụ thuộc seed/credential `SUPER_ADMIN` và `MANAGER`. Phase 5 ghi trạng thái `partial` cho đến khi smoke login seeded live hoặc integration auth API-level ổn định.
 
 **verify:** `pnpm nx affected -t test` hoặc `pnpm nx test <project>` pass cho project chạm; báo coverage là tín hiệu phụ, không thay ma trận traceability.
 
@@ -235,7 +235,7 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 ### Ngoài phạm vi Phase 5 hiện tại
 
 - **Không bắt buộc pass test cho full hardening vận hành Phase 4A** như Saga state bền vững, retry worker, stock ledger, full CDC/Debezium hoặc framework audit mới nếu chưa triển khai. Phase 5 vẫn phải test Order Confirm Saga đã triển khai và baseline outbox/idempotency/compensation hiện có.
-- **Không yêu cầu notification/staff management Phase 4C** như email biên lai, welcome/suspend, UI invite staff, email reset-password hoặc notification logs nếu service chưa tồn tại.
+- **Không yêu cầu Notification/email** như email biên lai, welcome/suspend, email reset-password hoặc notification logs vì Notification Service nằm ngoài phạm vi hiện tại. Phase 4C Quản lý nhân sự cũng không là blocker của Phase 5 khi chưa triển khai.
 - **Không yêu cầu offline queue đầy đủ** như IndexedDB action queue, auto-sync POS/KDS/customer khi mất mạng lâu, hoặc conflict resolver đầy đủ nếu code hiện tại chưa có. Phase 5 chỉ test hành vi reconnect/refetch/snapshot hiện có.
 - **Không thay chứng nhận provider live.** SePay/OAuth/webhook provider vẫn cần validation manual/live khi có URL BFF public và credential hợp lệ; Phase 5 tự động chỉ khóa contract nội bộ và hành vi route bằng mock/local provider. Không dùng domain Vercel tạm hoặc tunnel local làm điều kiện pass mặc định.
 - **Không thêm hành vi nghiệp vụ mới chỉ để test.** Nếu test phát hiện docs yêu cầu hành vi chưa có, ghi `implementation gap` hoặc `deferred scope`, không âm thầm đổi contract sản phẩm.
@@ -251,7 +251,7 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 - [ ] **Hiển thị security gap:** Verify giá trị route `x-secret-key` Phase 4B được test nếu đã implement; nếu chưa, ghi `security-gap` blocker trước go-live/demo public.
 - [ ] **E2E Playwright:** Luồng đặt món QR realtime, đóng session thanh toán, onboarding tenant và tenant suspended ổn định trên seed/stack dev chuẩn, hoặc đánh dấu `missing` kèm fixture/credential bổ sung.
 - [ ] **CI/gates:** Baseline CI, gate PR nhanh, gate unit/contract đầy đủ, gate integration và lệnh browser E2E có tài liệu; test phụ thuộc stack local có chính sách skip minh bạch thay vì fail ngẫu nhiên.
-- [ ] **Deferred rõ:** Full hardening Phase 4A và hành vi Phase 4C chưa triển khai được đánh dấu deferred/gap hợp lệ, còn Order Confirm Saga đã triển khai vẫn thuộc acceptance Phase 5.
+- [ ] **Deferred rõ:** Full hardening Phase 4A và hành vi Phase 4C Quản lý nhân sự chưa triển khai được đánh dấu deferred/gap hợp lệ, còn Order Confirm Saga đã triển khai vẫn thuộc acceptance Phase 5. Notification/email nằm ngoài phạm vi hiện tại.
 - [ ] **Bằng chứng Saga cho khóa luận:** Order Confirm Saga và SaaS Onboarding Mini-Saga có lệnh kiểm chứng, artifact kỳ vọng và giới hạn claim trong `docs/testing/phase-5/saga-validation-strategy.md`.
 
 ---
@@ -362,5 +362,5 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 ## Ghi chú lộ trình
 
 - **Critical Path:** Phase 0 → 1 → 2A → 2B → 3 → 5–7 (Demo)
-- **Nhánh song song:** Phase 4B xong; Phase 4A có lát cắt Saga đại diện đã triển khai, full hardening vẫn là việc tương lai; Phase 4C chưa bắt đầu và phụ thuộc 4B.
+- **Nhánh song song:** Phase 4B xong; Phase 4A có lát cắt Saga đại diện đã triển khai, full hardening vẫn là việc tương lai; Phase 4C Quản lý nhân sự chưa bắt đầu và phụ thuộc 4B. Step 4.5 Notification Service đã loại khỏi phạm vi hiện tại.
 - **4 điểm nhấn demo ấn tượng nhất:** Phase 1 (QR + Menu), Phase 2 (Đặt món realtime), Phase 3 (Thanh toán), Phase 6 (Grafana Tracing)

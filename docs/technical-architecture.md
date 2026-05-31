@@ -456,8 +456,8 @@ MongoDB Instance (1 server, port 27017)
 │   ├── users                            (HAS tenant_id)
 │ └── roles (NO tenant_id — global)
 
-Phase 4C deferred:
-├── Notification service / `qrtable_notification` if implementing separate mail/push/audit log.
+Removed from current scope:
+└── Notification service / `qrtable_notification` is not part of the current runtime architecture.
 ```
 
 **Note:** Kitchen service **does not have its own database** — uses Redis only for KDS queue (Sorted Set).
@@ -887,13 +887,13 @@ Communicate:
   - ← Authorizer/Keycloak claims are identity input, not the application profile source of truth
 ```
 
-#### 6.2.9 Notification Service (Deferred / Phase 4C)
+#### 6.2.9 Notification / Email Scope Decision
 
 ```
 Current `apps/*` inventory does not contain `apps/notification`.
-Email/push/audit notification behavior remains a Phase 4C or later service unless reintroduced in code.
-Communicate:
-  - Kafka consumers and SMTP/push integrations must be documented when the service exists again.
+Email/push/audit notification behavior is outside the current implementation scope.
+If this service is introduced later, it must declare its database, Kafka consumers, provider
+configuration, retry policy, audit storage, and verification plan before being counted as runtime architecture.
 ```
 
 ---
@@ -914,7 +914,7 @@ Communicate:
 
 ### 7.2 Kafka Topic Registry
 
-**Selection principle:** The system applies the 4P+2AP rule set (see §7.4) to decide which events use Kafka vs BFF Direct. Six topics pass the current code/test contract:
+**Selection principle:** The system applies the 4P+2AP rule set (see §7.4) to decide which events use Kafka vs BFF Direct. Five topics pass the current code/test contract:
 
 | Topic                  | Producer          | Consumer(s)                                                            | Principle  | Main payload                       |
 | ---------------------- | ----------------- | ---------------------------------------------------------------------- | ---------- | ---------------------------------- |
@@ -922,7 +922,7 @@ Communicate:
 | `order.status_changed` | Order service     | No current runtime consumer; durable status projection/audit extension | P4         | `{ tenantId, orderId, toStatus }`  |
 | `payment.completed`    | Payment service   | Order service, BFF realtime bridge                                     | P1, P2, P3 | `{ tenantId, billId, method }`     |
 | `kitchen.sla_warning`  | Kitchen service   | BFF realtime bridge                                                    | P2         | `{ tenantId, ticketId, waitTime }` |
-| `tenant.created`       | SaaS Mgmt service | Catalog service; Notification is Phase 4C contract                     | P1, P3     | `{ tenantId, ownerEmail, slug }`   |
+| `tenant.created`       | SaaS Mgmt service | Catalog service                                                        | P1, P3     | `{ tenantId, ownerEmail, slug }`   |
 
 > UI-layer events like `order.created`, `cart.updated`, `bill.requested`, `table.transferred`, `service.requested`, `kds.queue_changed`, `tenant.suspended/activated/closed` DO NOT use Kafka as the source of truth — instead use BFF Direct, Redis internal hints, or socket emit after the source service has been committed (see §7.3). `order.status_changed` is the exception: it is an approved durable Order outbox topic, while immediate WebSocket feedback still comes from BFF Direct after the TCP response.
 
@@ -1324,7 +1324,7 @@ Redis is used in a controlled manner according to the **Tiered Access model**. N
 | **SaaS service**      | Phase 4B | tenant suspend flag writer, current subscription cache                                              | `tenant:*:suspended`, `subscription:*`                              |
 | **Payment service**   | Phase 4B | SePay OAuth state cache for tenant payment settings flow                                            | `oauth_state:*`                                                     |
 
-**service does not have verified Redis permissions in Phase 4B anchors:** Catalog, Authorizer, User-Access. `Notification` does not exist in current `apps/*`; If added again in Phase 4C, Redis access needs to be declared separately if there is a legitimate use case.
+**Services without verified Redis permissions in current anchors:** Catalog, Authorizer, User-Access. `Notification` does not exist in current `apps/*`; if introduced later, Redis access must be declared separately with a legitimate use case.
 
 **Reason:**
 
@@ -1572,8 +1572,8 @@ Phase 4A — Saga + Hardening:
 Phase 4B — SaaS + Tenant Onboarding:
 └── Completed.
 
-Phase 4C — Notification + Staff Management:
-└── Not started yet.
+Phase 4C — Staff Management:
+└── Not started yet. Former Step 4.5 Notification Service is removed from current scope.
 
 Phase 5-7 — Testing + Observability + Deploy:
 └── Not started yet; Phase 5 = testing, Phase 6 = observability, Phase 7 = deployment/demo.

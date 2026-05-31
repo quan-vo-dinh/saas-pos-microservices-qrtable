@@ -110,22 +110,22 @@ The important point is: the frontend does not talk directly to the database nor 
 
 ### Main idea to say
 
-| From           | To           | Protocol                                      | Purpose                                     |
-| -------------- | ------------ | --------------------------------------------- | ------------------------------------------- |
-| Customer PWA   | BFF          | HTTP REST 3300                                | Menu, cart, order, bill, payment            |
-| Management App | BFF          | HTTP REST 3300                                | POS, KDS, administration                    |
-| Frontend       | BFF Realtime | Socket.IO `/orders`                           | Get realtime updates                        |
-| BFF            | Authorizer   | gRPC 5100, TCP 3204                           | Token authentication, auth policy           |
-| BFF            | User Access  | TCP 3203                                      | User, role, permission                      |
-| BFF            | SaaS         | TCP 3206                                      | tenant, slug, tenant configuration          |
-| BFF            | Catalog      | TCP 3205                                      | Menu, category, table, QR                   |
-| BFF            | Order        | TCP 3201                                      | Session, cart, order, bill                  |
-| BFF            | Kitchen      | TCP 3207                                      | KDS queue, ticket action                    |
-| BFF            | Payment      | TCP 3208                                      | QR payment, webhook, cash, refund           |
-| Order          | Kafka        | Topic `order.confirmed`                       | Report confirmed order to the kitchen       |
-| Kitchen        | Kafka        | Topic `kitchen.sla_warning`                   | Report ticket time out                      |
-| Payment        | Kafka        | Topic `payment.completed`, `payment.refunded` | Notification of completed payment or refund |
-| SePay          | BFF          | HTTP webhooks                                 | Report transfer transactions                |
+| From           | To           | Protocol                    | Purpose                               |
+| -------------- | ------------ | --------------------------- | ------------------------------------- |
+| Customer PWA   | BFF          | HTTP REST 3300              | Menu, cart, order, bill, payment      |
+| Management App | BFF          | HTTP REST 3300              | POS, KDS, administration              |
+| Frontend       | BFF Realtime | Socket.IO `/orders`         | Get realtime updates                  |
+| BFF            | Authorizer   | gRPC 5100, TCP 3204         | Token authentication, auth policy     |
+| BFF            | User Access  | TCP 3203                    | User, role, permission                |
+| BFF            | SaaS         | TCP 3206                    | tenant, slug, tenant configuration    |
+| BFF            | Catalog      | TCP 3205                    | Menu, category, table, QR             |
+| BFF            | Order        | TCP 3201                    | Session, cart, order, bill            |
+| BFF            | Kitchen      | TCP 3207                    | KDS queue, ticket action              |
+| BFF            | Payment      | TCP 3208                    | QR payment, webhook, cash, refund     |
+| Order          | Kafka        | Topic `order.confirmed`     | Report confirmed order to the kitchen |
+| Kitchen        | Kafka        | Topic `kitchen.sla_warning` | Report ticket time out                |
+| Payment        | Kafka        | Topic `payment.completed`   | Notification of completed payment     |
+| SePay          | BFF          | HTTP webhooks               | Report transfer transactions          |
 
 ### Script read
 
@@ -640,7 +640,7 @@ WebSocket is used to push data from the server to the frontend. If there is only
 
 ### Main idea to say
 
-- Kafka main topic: `order.confirmed`, `kitchen.sla_warning`, `payment.completed`, `payment.refunded`.
+- Kafka main topics: `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, `tenant.created`.
 - Kafka uses at-least-once, consumers need idempotent.
 - Outbox helps avoid losing events when the database commit is successful but Kafka publish fails.
 
@@ -745,7 +745,7 @@ If you need to summarize the entire flow of communication in one paragraph, you 
 
 Users interact with the Customer PWA or Management App. These two applications call BFF using HTTP REST and receive realtime using Socket.IO. BFF is the single gateway, responsible for authentication, authorization, tenant identification and dispatching requests to microservices. BFF calls internal services mainly using TCP: Catalog for menu and table, Order for session/order/bill, Kitchen for KDS, Payment for payment, SaaS for tenant, User Access for user/role/permission. Token authentication alone goes through the Authorizer using gRPC.
 
-Services that own their own data: Catalog, Order, Payment and SaaS using PostgreSQL; User Access uses MongoDB; Redis is used for sessions, carts, caches, KDS and realtime pubsub. For operations that need asynchronous processing, the service broadcasts events to Kafka: Order broadcasts `order.confirmed`, Kitchen broadcasts `kitchen.sla_warning`, Payment broadcasts `payment.completed` and `payment.refunded`. BFF consumes some events to push realtime to the frontend. External providers include Keycloak for login, Cloudinary for menu images, and SePay for VietQR/payment webhooks.
+Services that own their own data: Catalog, Order, Payment and SaaS using PostgreSQL; User Access uses MongoDB; Redis is used for sessions, carts, caches, KDS and realtime pubsub. For operations that need asynchronous processing, services publish approved Kafka topics: Order publishes `order.confirmed` and `order.status_changed`, Kitchen publishes `kitchen.sla_warning`, Payment publishes `payment.completed`, and SaaS publishes `tenant.created`. BFF consumes selected events to push realtime hints to the frontend. External providers include Keycloak for login, Cloudinary for menu images, and SePay for VietQR/payment webhooks.
 
 ---
 

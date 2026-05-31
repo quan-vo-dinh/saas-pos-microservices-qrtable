@@ -696,7 +696,7 @@ Add mini matrix role x domain on the right:
 
 - Rows: Owner, Manager, Waiter, Chef, Barista, Customer.
 - Columns: Catalog, Order, Kitchen, Payment, Table, service Request.
-- No need to put all 66 permissions on the main slide; Just need 5-7 typical examples.
+- No need to put all 65 permissions on the main slide; Just need 5-7 typical examples.
 
 ### Speaker script
 
@@ -1444,7 +1444,7 @@ QRTable demonstrates the core architectural direction and has a clear roadmap to
 - **Phase 2A:** Permission + Order + Redis cart/session + Kafka `order.confirmed`.
 - **Phase 2B:** Kitchen/KDS + WebSocket realtime.
 - **Phase 3:** Payment SePay/VietQR + Cash + payment history/audit.
-- **Phase 4:** Saga hardening, SaaS onboarding, notification/staff.
+- **Phase 4:** Saga hardening, SaaS onboarding, staff management; Notification/email outside current scope.
 - **Phase 5-7:** Testing, observability, Docker deploy, final demo.
 
 **Recommended demo script:**

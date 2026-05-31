@@ -20,7 +20,7 @@ The final scope includes:
 ## Accepted Decisions
 
 - Onboarding Phase 4B is admin-assisted, not self-service registration wizard. `SUPER_ADMIN` creates tenant, Owner, selected initial subscription and initial payment settings.
-- Onboarding runs like a mini-saga in SaaS service; mid-failure must rollback DB-side effects and cleanup orphan Keycloak users. Phase 4B uses a manually entered password for the Owner, while reset link/Required Action belongs to Phase 4C.
+- Onboarding runs like a mini-saga in SaaS service; mid-failure must rollback DB-side effects and cleanup orphan Keycloak users. Phase 4B uses a manually entered password for the Owner; reset link/Required Action email is outside the current implementation scope.
 - Onboarding must receive an explicit initial plan selected from active pricing plans. The backend must not silently fall back to a hardcoded plan code when the UI or caller omits the plan.
 - `TenantStatus` is the main operating state: `ACTIVE` allows operations, `SUSPENDED` switches to read-only with pending bill payment exception, `CLOSED` is the state of closing the tenant and not reactivating in Phase 4B.
 - `isActive` only has the old DTO compatibility meaning; New behavior derived from `status`.
@@ -35,7 +35,7 @@ The final scope includes:
 - Suspend must take effect quickly via Redis key `tenant:{tenantId}:suspended`; The current subscription is cached with `subscription:{tenantId}` for the guard to read quickly.
 - Suspended tenant can still process the SePay webhook for the created bill, order `PROCESSING` is still completed by the kitchen, and the client receives a warning banner instead of force-disconnect.
 - `/admin/*` belongs to `management-app`; Phase 4B does not separate the app admin platform separately. Landing page is static pricing/contact/login page reading public plans.
-- Phase 4B does not add notification/email suspension; That part belongs to Phase 4C.
+- Phase 4B does not add notification/email suspension; email delivery is outside the current implementation scope.
 - **UI display contract:** Wire enums stay English in API/DB; management-app and customer-pwa map statuses, billing periods, plan features, and connection states to Vietnamese via `@einvoice/shared-constants` (`vi-domain-labels.ts`). SaaS badges live under `management-app/src/features/saas/components/badges/`. See [frontend-domain-display.md](../guides/frontend-domain-display.md).
 - Subscription invoices in `PENDING` auto-transition to `EXPIRED` after `qrExpiresAt` (scheduled job in SaaS service).
 - Admin tenant list shows owner display name/email; `owner_id` is persisted on onboard with optional DB backfill and runtime lookup fallback when legacy rows lack `owner_id`.
@@ -91,8 +91,8 @@ Implementation and stabilization evidence on 2026-05-13 showed the phase is comp
 
 - Phase 4A now references this onboarding flow as the existing SaaS Onboarding Mini-Saga representative; Phase 4B behavior remains unchanged.
 - Self-service restaurant registration wizard remains deferred; Phase 4B keeps admin-assisted onboarding plus public landing/contact path.
-- Phase 4C owns notification/email flows such as welcome/suspend/expiry messaging and reset-password email improvements.
-- Phase 4C should absorb deferred Phase 4B communication flows: welcome email from `tenant.created`, tenant suspended email via direct task/TCP (not Kafka), subscription warning/expired email, and Owner password reset/Required Action handoff.
+- Phase 4C now owns staff management only. Welcome/suspend/expiry emails and reset-password email improvements are future extension candidates, not Phase 4C acceptance criteria.
+- Former Phase 4B communication follow-ups such as welcome email from `tenant.created`, tenant suspended email, subscription warning/expired email, and Owner password reset/Required Action handoff are removed from the current project scope.
 - Suspended Customer PWA browser verification still needs a reliable suspended seed route or demo fixture so manual route-level smoke can match automated coverage.
 - Production SePay setup still requires public BFF/webhook URLs, platform webhook secret, OAuth redirect registration, and live provider-side validation. Operator checklist: [sepay-configuration-guide-phase3.md](../guides/sepay-configuration-guide-phase3.md) (section 0 — three webhook routes).
 - Tenant/platform webhook auth accepts `x-secret-key`, `api-key`, `x-api-key`, or `Authorization: Apikey <secret>`; platform secret is `SEPAY_PLATFORM_WEBHOOK_SECRET`. Recheck stored secrets and SePay dashboard auth mode before go-live.

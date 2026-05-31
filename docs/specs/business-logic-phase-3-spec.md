@@ -80,10 +80,8 @@ Content-Type: application/json
 4. Confirm cash payment on POS.
 5. Prevent duplicate webhooks with DB unique constraint.
 6. Prevent Cash vs VietQR race by transaction + row lock on payment.
-7. Emit Kafka:
-   - `payment.completed`
-   - `payment.refunded`
-8. Manual full refund with audit.
+7. Emit Kafka `payment.completed`.
+8. Manual full refund with audit is removed from the current product scope.
 9. Basic payment history for POS/Dashboard.
 10. Update necessary shared types, permissions, and config.
 
@@ -115,14 +113,14 @@ Content-Type: application/json
 
 ### 3.2 Communication
 
-| Flow                                        | Protocols                     | Reason                                                 |
-| ------------------------------------------- | ----------------------------- | ------------------------------------------------------ |
-| Client -> BFF payment endpoints             | HTTP REST                     | BFF is the only API gateway.                           |
-| BFF -> Payment service                      | TCP                           | According to the current service pattern.              |
-| Payment service -> Order service query bill | TCP                           | Payment needs a snapshot bill to create payment/QR.    |
-| Payment service -> Kafka                    | Kafka via local outbox        | Domain events `payment.completed`, `payment.refunded`. |
-| SePay -> BFF webhook                        | HTTP POST                     | External callbacks.                                    |
-| BFF -> realtime clients                     | WebSocket bridge / BFF Direct | UI status updated, source of truth not changed.        |
+| Flow                                        | Protocols                     | Reason                                              |
+| ------------------------------------------- | ----------------------------- | --------------------------------------------------- |
+| Client -> BFF payment endpoints             | HTTP REST                     | BFF is the only API gateway.                        |
+| BFF -> Payment service                      | TCP                           | According to the current service pattern.           |
+| Payment service -> Order service query bill | TCP                           | Payment needs a snapshot bill to create payment/QR. |
+| Payment service -> Kafka                    | Kafka via local outbox        | Domain event `payment.completed`.                   |
+| SePay -> BFF webhook                        | HTTP POST                     | External callbacks.                                 |
+| BFF -> realtime clients                     | WebSocket bridge / BFF Direct | UI status updated, source of truth not changed.     |
 
 ---
 
@@ -534,7 +532,9 @@ Rules:
 - Payment becomes `REFUND_PENDING`.
 - Create audit `REFUND_REQUESTED`.
 
-### 6.6 Refund Confirm
+### 6.6 Refund Confirm (removed from current scope)
+
+Manual refund was removed from the thesis product scope on 2026-05-30. The request/response below is historical context only and must not be treated as an implemented Phase 3 contract unless refund scope is reopened.
 
 Request:
 
@@ -561,7 +561,7 @@ Rules:
 - Refund must be `PENDING_STAFF_ACTION`.
 - Payment becomes `REFUNDED`.
 - Create audit `REFUND_CONFIRMED`.
-- Emit `payment.refunded`.
+- `payment.refunded` is not in the current approved Kafka registry.
 
 ---
 
@@ -720,7 +720,7 @@ If SePay wins:
 ### 8.1 Topic `payment.completed`
 
 Producer: Payment Service
-Current consumers in code: Order Service and BFF realtime bridge. Catalog table status is updated by Order through TCP inside `BillService.markPaid`; Notification is Phase 4C+.
+Current consumers in code: Order Service and BFF realtime bridge. Catalog table status is updated by Order through TCP inside `BillService.markPaid`. Notification/email is outside the current implementation scope.
 
 ```json
 {
@@ -746,10 +746,10 @@ Rules:
   - Order → Catalog TCP table update: if table already `Cleaning`, no-op/equivalent idempotent transition.
   - BFF: WebSocket hint only.
 
-### 8.2 Topic `payment.refunded`
+### 8.2 Topic `payment.refunded` (removed from current registry)
 
 Producer: Payment Service
-Current consumers in code: none. The event is emitted by Payment outbox for audit/future integration; Notification and BFF dashboard handling are Phase 4C+ extensions.
+Current consumers in code: none. The current approved Kafka registry does not include `payment.refunded`; refund handling is outside the current implementation scope. If refund support is reintroduced later, this contract must be revalidated against code and tests.
 
 ```json
 {
@@ -778,7 +778,6 @@ Payment Service / shared config needs:
 
 ```yaml
 KAFKA_PAYMENT_COMPLETED_TOPIC: payment.completed
-KAFKA_PAYMENT_REFUNDED_TOPIC: payment.refunded
 KAFKA_PAYMENT_CLIENT_ID: qrtable-payment-service
 ```
 
@@ -913,11 +912,11 @@ Dashboard refund UI:
 5. Underpaid VietQR keeps payment pending and creates audit.
 6. Overpaid VietQR marks payment paid and stores actual `paidAmount`.
 7. Unmatched webhook returns 200 and does not persist payment audit.
-8. Full manual refund creates request, confirm action, audit, and `payment.refunded`.
-9. Bill remains immutable after `PAID`; refund does not reopen bill.
+8. Manual refund and `payment.refunded` are outside the current product scope.
+9. Bill remains immutable after `PAID`; post-payment adjustment does not reopen bill in current scope.
 10. WAITER can create VietQR QR and confirm cash on POS.
 11. OWNER/MANAGER can request and confirm manual refund.
-12. `payment.completed` and `payment.refunded` payloads match this spec.
+12. `payment.completed` payload matches this spec.
 
 ---
 

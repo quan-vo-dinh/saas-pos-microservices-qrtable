@@ -3,7 +3,7 @@
 > **Document philosophy:** Understand the _why_ before the _how_. Every concept is anchored in context
 > QRTable's specifics so you don't learn abstract theory but learn to apply it immediately.
 >
-> **Current code status (2026-05-30):** This document is a supporting guide. The approved Kafka topic registry is `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, and `tenant.created`. Runtime consumers already included in the code include `order.confirmed → Kitchen`, `payment.completed → Order + BFF realtime bridge`, `kitchen.sla_warning → BFF realtime bridge`, and `tenant.created → Catalog`. `order.status_changed` is currently an Order outbox topic for durable status projection/audit; immediate order WebSocket feedback still uses BFF Direct after the TCP response. Notification service does not exist in `apps/`\*; The Notification examples below are Phase 4C+/future extensions, not the current runtime state.
+> **Current code status (2026-05-31):** This document is a supporting guide. The approved Kafka topic registry is `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, and `tenant.created`. Runtime consumers already included in the code include `order.confirmed → Kitchen`, `payment.completed → Order + BFF realtime bridge`, `kitchen.sla_warning → BFF realtime bridge`, and `tenant.created → Catalog`. `order.status_changed` is currently an Order outbox topic for durable status projection/audit; immediate order WebSocket feedback still uses BFF Direct after the TCP response. Notification service does not exist in `apps/`; Notification examples below are future-extension examples only, not the current runtime state and not Phase 4C scope.
 
 ---
 
@@ -34,14 +34,14 @@ Before learning what Kafka is, you need to understand what problem Kafka was bor
 Imagine a QRTable system without Kafka. When an order is confirmed, Order service needs to notify multiple parties:
 
 - Kitchen service must know to create kitchen tickets
-- (Phase 4C+) Notification service wants to record audit log
+- (future extension) Notification service wants to record audit log
 - (In the future) Analytics service wants to collect revenue statistics
 
 Without Kafka, the Order service must call each service directly:
 
 ```
 Order Service ──TCP──► Kitchen Service
-Order Service ──TCP──► Notification Service (Phase 4C+)
+Order Service ──TCP──► Notification Service (future extension)
 Order service ──TCP──► Analytics service (future)
 ```
 
@@ -55,7 +55,7 @@ subgraph "❌ No Kafka — Point-to-Point"
         OS["🛒 Order Service"]
         PS["💳 Payment Service"]
         KS["🍳 Kitchen Service"]
-        NS["📧 Notification Service<br/>Phase 4C+"]
+        NS["📧 Notification Service<br/>future extension"]
         AS["📊 Analytics Service"]
 
         OS -->|"TCP (blocking)"| KS
@@ -84,7 +84,7 @@ subgraph "✅ Yes Kafka — Decoupled"
         PS2["💳 Payment Service"]
         K["📋 Kafka Cluster"]
         KS2["🍳 Kitchen Service"]
-        NS2["📧 Notification Service<br/>Phase 4C+"]
+        NS2["📧 Notification Service<br/>future extension"]
         AS2["📊 Analytics Service"]
 
         OS2 -->|"publish"| K
@@ -220,7 +220,7 @@ C2["📧 Notification<br/>offset = 2"] -.->|"read now"| M2
 
 The append-only log design creates completely different characteristics from a message queue:
 
-**Feature 1 — Multiple independent consumers:** Because messages are not deleted after reading, multiple consumers can read the same message completely independently, each keeping track of their own location. In the current QRTable, `payment.completed` is read independently by the Order service and the BFF realtime bridge; `tenant.created` is read by the Catalog service to seed the default area. Notification is consumer Phase 4C+.
+**Feature 1 — Multiple independent consumers:** Because messages are not deleted after reading, multiple consumers can read the same message completely independently, each keeping track of their own location. In the current QRTable, `payment.completed` is read independently by the Order service and the BFF realtime bridge; `tenant.created` is read by the Catalog service to seed the default area. Notification is a future-extension consumer.
 
 **Feature 2 — Replay:** Consumer can "rewind" to an old location in the log and read the message again. If Kitchen service has a bug and incorrectly processed 100 orders in the past 2 hours, the team can fix the code, reset the offset to 2 hours ago, and let Kitchen service process everything again — without Order service doing anything else.
 
@@ -1174,7 +1174,7 @@ _Case 2 — Event generated from internal timer:_ `kitchen.sla_warning` is gener
 
 Kafka is especially suitable when the same event needs to trigger a business response in many different bounded contexts. Producer publishes once, every consumer receives regularly.
 
-Current example: `payment.completed` needs to handle Order service (close session, mark bill paid, call Catalog TCP to update table status) and BFF realtime bridge (hint UI). If you use TCP fan-out for every side-effect, the Payment service will know too much downstream. With Kafka, Payment publishes an event; Order/BFF consumes itself. Notification/email receipt is consumer Phase 4C+.
+Current example: `payment.completed` needs to handle Order service (close session, mark bill paid, call Catalog TCP to update table status) and BFF realtime bridge (hint UI). If you use TCP fan-out for every side-effect, the Payment service will know too much downstream. With Kafka, Payment publishes an event; Order/BFF consumes itself. Notification/email receipt is a future-extension consumer.
 
 #### Diagram: Fan-out — payment.completed
 
@@ -1189,7 +1189,7 @@ PAY["💳 Payment service<br/><i>Publish once only</i>"]
 
 TOPIC -->|"consume"| OS["🛒 Order service<br/>Close session/bill<br/>Call Catalog TCP"]
     TOPIC -->|"consume"| BFF["🌐 BFF Bridge<br/>WebSocket hint"]
-    TOPIC -.->|"Phase 4C+"| NS["📧 Notification Service<br/>Email receipt/audit"]
+    TOPIC -.->|"future extension"| NS["📧 Notification Service<br/>Email receipt/audit"]
 TOPIC -.->|"future"| AS2["📊 Analytics service<br/><i>Just subscribe</i><br/><i>Don't edit Payment!</i>"]
 
     style PAY fill:#748ffc,stroke:#333,color:#fff
@@ -1225,11 +1225,11 @@ Do not use TCP/gRPC for tasks where the producer does not need a response, espec
 
 #### Diagram: Event Map — All Topics In QRTable
 
-> Panoramic map of 6 Kafka topics and typical BFF Direct events in QRTable. Each topic is labeled with the corresponding 4P+2AP principle. Looking from above, you can clearly see which producer publishes which event, and which consumer that event goes to.
+> Panoramic map of 5 Kafka topics and typical BFF Direct events in QRTable. Each topic is labeled with the corresponding 4P+2AP principle. Looking from above, you can clearly see which producer publishes which event, and which consumer that event goes to.
 
 ```mermaid
 graph TB
-    subgraph KAFKA_EVENTS["📋 Kafka Topics — 6 Events"]
+    subgraph KAFKA_EVENTS["📋 Kafka Topics — 5 Events"]
         subgraph T1["order.confirmed (P1+P2)"]
             T1_PROD["🛒 Order Service"]
             T1_CONS1["🍳 Kitchen Service"]
@@ -1238,7 +1238,6 @@ graph TB
             T2_PROD["💳 Payment Service"]
             T2_CONS1["🛒 Order Service"]
             T2_CONS2["🌐 BFF Bridge"]
-            T2_CONS3["📧 Notification<br/>Phase 4C+"]
         end
         subgraph T3["kitchen.sla_warning (P2)"]
             T3_PROD["🍳 Kitchen Timer"]
@@ -1247,15 +1246,10 @@ graph TB
         subgraph T4["tenant.created (P1+P3)"]
             T4_PROD["🏢 SaaS Mgmt"]
             T4_CONS1["📋 Catalog Service"]
-            T4_CONS2["📧 Notification<br/>Phase 4C+"]
         end
-        subgraph T5["payment.refunded"]
-            T5_PROD["💳 Payment Service"]
-            T5_CONS1["📧 Notification<br/>Phase 4C+"]
-        end
-        subgraph T6["order.status_changed (P4)"]
-            T6_PROD["🛒 Order Service"]
-            T6_CONS1["📊 Projection/Audit<br/>future"]
+        subgraph T5["order.status_changed (P4)"]
+            T5_PROD["🛒 Order Service"]
+            T5_CONS1["📊 Projection/Audit<br/>future"]
         end
     end
 
@@ -1285,7 +1279,7 @@ P4: Order status transitions are database-backed domain state. The Kafka topic e
 
 `**payment.completed` → Kafka (P1 + P2 + P3)\*\*
 
-P1: Current code has two consumer runtimes — Order closes session/bill and calls Catalog TCP to update table; BFF realtime bridge plays UI hint. Notification/email is Phase 4C+.
+P1: Current code has two consumer runtimes — Order closes session/bill and calls Catalog TCP to update table; BFF realtime bridge plays UI hint. Notification/email is outside current scope and only a future extension.
 
 P2: Payment service must not wait for downstream consumers to complete processing.
 
@@ -1297,7 +1291,7 @@ This is the only event in QRTable that does not have a "core" producer (P1) or f
 
 `**tenant.created` → Kafka (P1 + P3)\*\*
 
-P1: Catalog service seed default area from `tenant.created` in the current code; Notification service sends welcome email as Phase 4C+.
+P1: Catalog service seeds the default area from `tenant.created` in the current code. Notification service is not a current consumer; it is only a future-extension option if reintroduced.
 
 P3: Current consumer is Catalog; Notification/IAM/Billing future consumers can subscribe later without editing the SaaS Mgmt code.
 
@@ -1611,13 +1605,12 @@ graph LR
         T2["payment.completed"]
         T3["kitchen.sla_warning"]
         T4["tenant.created"]
-        T5["payment.refunded"]
-        T6["order.status_changed"]
+        T5["order.status_changed"]
     end
 
     subgraph GROUPS["🏷️ Consumer Groups"]
         G1["kitchen-service-group<br/>🍳 Kitchen Service"]
-        G2["notification-service-group<br/>📧 Notification Service<br/>Phase 4C+"]
+        G2["notification-service-group<br/>📧 Future extension only"]
         G3["order-payment-consumer-group<br/>🛒 Order Service"]
         G4["bff-kafka-bridge<br/>🌐 BFF Gateway"]
         G5["catalog-tenant-created-consumer-group<br/>📋 Catalog Service"]
@@ -1632,7 +1625,6 @@ graph LR
     T4 --> G5
 
     T5 -.-> G2
-    T6 -.-> G2
 
     style T1 fill:#339af0,stroke:#333,color:#fff
     style T2 fill:#339af0,stroke:#333,color:#fff
@@ -1649,7 +1641,7 @@ graph LR
 
 `**kitchen-service-group`:\*\* Consume `order.confirmed` to create KDS ticket. Kitchen service is the only consumer in this group. If scaled to multiple instances, the instances share the partition in the group.
 
-`**notification-service-group` (Phase 4C+):\*_ When Notification service is added, this group can consume `payment.completed`, `payment.refunded`, `tenant.created` and possibly `order.status_changed` to send email and record audit log. Currently `apps/`_ does not have this service.
+`**notification-service-group` (future extension only):\*\_ If Notification service is added later, this group can consume approved existing topics such as `payment.completed`, `tenant.created` or `order.status_changed` to send email and record audit log. Currently `apps/` does not have this service, and it is not part of Phase 4C scope.
 
 `**order-payment-consumer-group`:\*\* Order service consumes `payment.completed` to close the session/bill and call Catalog TCP to update the table. This group name clearly shows: Order service is syncing status from Payment domain.
 
@@ -1661,7 +1653,7 @@ graph LR
 
 #### Diagram: Independent Offset Between Consumer Groups
 
-> Illustrate offset independence. `order-payment-consumer-group` is at offset 8 (realtime). `notification-service-group` is a Phase 4C+ example and is lagging at offset 3 (slow). These two groups **do not affect each other at all** — Current Orders/BFFs still run normally even though future Notifications will be slow.
+> Illustrate offset independence. `order-payment-consumer-group` is at offset 8 (realtime). `notification-service-group` is a future extension example and is lagging at offset 3 (slow). These two groups **do not affect each other at all** — Current Orders/BFFs still run normally even though future Notifications will be slow.
 
 ```mermaid
 graph TB
@@ -1671,7 +1663,7 @@ graph TB
     end
 
     G1["🛒 order-payment-consumer-group<br/>offset = 8 ✅ Realtime<br/>lag = 0"]
-    G2["📧 notification-service-group<br/>Phase 4C+<br/>offset = 3 ⚠️ Lagging<br/>lag = 5"]
+    G2["📧 notification-service-group<br/>future extension<br/>offset = 3 ⚠️ Lagging<br/>lag = 5"]
     G3["🌐 bff-kafka-bridge<br/>offset = 7 ✅ Near-realtime<br/>lag = 1"]
 
     M8 -.-> G1
@@ -1686,11 +1678,11 @@ INDEPENDENT["✅ Completely INDEPENDENT<br/>Notification lag ≠ Order/BFF affec
     style INDEPENDENT fill:#e8e8e8,stroke:#333
 ```
 
-**Reason 1 — Complete independence:** Each group has its own offset. `notification-service-group` Phase 4C+ lag or failure has no effect on the offset of `order-payment-consumer-group` or `bff-kafka-bridge`. This is something that cannot be done with TCP fan-out.
+**Reason 1 — Complete independence:** Each group has its own offset. `notification-service-group` future extension lag or failure has no effect on the offset of `order-payment-consumer-group` or `bff-kafka-bridge`. This is something that cannot be done with TCP fan-out.
 
-**Reason 2 — Independent restart and recovery:** When Notification service Phase 4C+ is restarted after maintenance, it continues from the committed offset — no events are skipped, no need to ask the Payment service again. Order/BFF is running normally and does not know anything about Notification being restarted.
+**Reason 2 — Independent restart and recovery:** When Notification service future extension is restarted after maintenance, it continues from the committed offset — no events are skipped, no need to ask the Payment service again. Order/BFF is running normally and does not know anything about Notification being restarted.
 
-**Reason 3 — Clear debugging and monitoring:** Kafka UI displays consumer lag (number of unprocessed messages) per group. Looking at `bff-kafka-bridge` lag = 0 means WebSocket events are being delivered real-time. If Phase 4C adds `notification-service-group`, lag = 500, it means Notification service is slow — the team can handle it independently.
+**Reason 3 — Clear debugging and monitoring:** Kafka UI displays consumer lag (number of unprocessed messages) per group. Looking at `bff-kafka-bridge` lag = 0 means WebSocket events are being delivered real-time. If a future Notification service adds `notification-service-group`, lag = 500 means Notification service is slow — the team can handle it independently.
 
 **Reason 4 — Do not share groups between different services:** This is a common mistake. If Kitchen service and Notification service have the same group ID, Kafka will assign a partition to the "pool" that includes both Kitchen and Notification instances — a Kitchen instance can receive events that Notification should have handled, and vice versa. Always: one service = one group.
 
@@ -1796,7 +1788,7 @@ Consumer must Idempotent
       Manual Commit
 Architecture
       4P+2AP Framework
-      6 Kafka Topics
+      5 Kafka Topics
       BFF Direct Events
 Outbox Pattern for Atomicity
     Multi-Tenant
@@ -1823,7 +1815,7 @@ After reading the entire document, here is a brief mental model to remember:
 
 #### Diagram: Cheat Sheet — Quick Decisions
 
-> Quick summary of 6 Kafka topics with producer, consumer, partition key, acks level, and delivery semantics. Used as a "quick reference" when implementing.
+> Quick summary of 5 Kafka topics with producer, consumer, partition key, acks level, and delivery semantics. Used as a "quick reference" when implementing.
 
 | Topic                  | Producer        | Consumer Groups                                   | Key      | acks | Delivery      | Principles   |
 | ---------------------- | --------------- | ------------------------------------------------- | -------- | ---- | ------------- | ------------ |

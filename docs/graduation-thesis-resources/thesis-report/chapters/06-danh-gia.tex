@@ -49,7 +49,7 @@ SaaS Onboarding Mini-Saga là luồng đại diện cho platform provisioning. B
   B -- Đã kiểm chứng một phần hoặc opt-in & Có integration/browser smoke cần stack, seed, Redis/Kafka/Keycloak hoặc provider riêng; chưa là default CI gate. & ``Đã được kiểm chứng trong phạm vi opt-in/local stack''. & SaaS live Payment onboarding slice, Order/Catalog stock integration, KDS Redis dedupe opt-in. \\
   C -- Hỗ trợ bởi thiết kế/code structure & Có source code, docs, architecture contracts hoặc scenario analysis; thiếu full-stack proof hoặc benchmark. & ``Được hỗ trợ bởi thiết kế và cấu trúc triển khai''. & Scalability theo service boundary/Kafka/Redis; maintainability nhờ Nx và shared contracts. \\
   D -- Demo-limited & Có route smoke, screenshot, demo script hoặc kiểm chứng thủ công đại diện; chưa thành regression gate. & ``Được minh họa bằng demo hoặc smoke test''. & Admin dashboard routes, suspended tenant browser smoke. \\
-  E -- Giới hạn/hướng phát triển & Thiếu implementation, thiếu evidence chạy thật hoặc còn phụ thuộc provider/full-stack chưa ổn định. & ``Là giới hạn hiện tại hoặc hướng phát triển''. & Full offline queue, notification/email, production observability, load test. \\
+  E -- Giới hạn/hướng phát triển & Nằm ngoài phạm vi triển khai chính, chỉ có bằng chứng thiết kế hoặc phụ thuộc provider/full-stack chuyên biệt. & ``Là giới hạn hiện tại hoặc hướng phát triển''. & Full offline queue, notification/email, production observability, load test. \\
 \end{longtable}
 }
 
@@ -57,7 +57,7 @@ Chính sách này cũng xác định những câu không được dùng trong ph
 
 \section{Requirement traceability}
 
-Ma trận traceability P0/P1 của QRTable ghi nhận 52 dòng yêu cầu hoặc rule quan trọng. Trong đó, 36 dòng đã có bằng chứng kiểm thử đủ mạnh ở lớp tương ứng, 11 dòng mới được kiểm chứng một phần, 1 dòng là khoảng trống triển khai và 4 dòng thuộc phạm vi mở rộng hoặc deferred. Bảng~\ref{tab:chapter6-traceability-summary} tóm tắt kết quả theo domain thay vì liệt kê toàn bộ 52 dòng để giữ chương đánh giá tập trung vào kết luận chính.
+Ma trận traceability P0/P1 của QRTable ghi nhận 52 dòng yêu cầu hoặc rule quan trọng. Trong đó, 36 dòng đã có bằng chứng kiểm thử đủ mạnh ở lớp tương ứng, 11 dòng mới được kiểm chứng một phần, 1 dòng là khoảng trống triển khai và 4 dòng thuộc phạm vi mở rộng. Bảng~\ref{tab:chapter6-traceability-summary} tóm tắt kết quả theo domain thay vì liệt kê toàn bộ 52 dòng để giữ chương đánh giá tập trung vào kết luận chính.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
@@ -81,7 +81,7 @@ Ma trận traceability P0/P1 của QRTable ghi nhận 52 dòng yêu cầu hoặc
   SaaS lifecycle & 7 & 3 & 0 & Tenant lifecycle, subscription invoice, quota, payment settings và admin routes có evidence; onboarding full live stack còn cần bổ sung. \\
   RBAC và tenant isolation & 2 & 1 & 0 & Guard chain và permission seed có bằng chứng mạnh; representative cross-tenant API suite chưa phủ rộng. \\
   Architecture invariants & 2 & 2 & 0 & Kafka topic registry và Redis access policy có contract tests; một số pattern rộng như BFF Direct và TCP coverage còn cần kiểm chứng thêm. \\
-  Phạm vi mở rộng & 0 & 0 & 3 ngoài phạm vi hiện tại & Full offline queue, saga hardening sâu và notification/email không được xem là kết quả hoàn thành trong đánh giá hiện tại. \\
+  Phạm vi mở rộng & 0 & 0 & 3 ngoài phạm vi hiện tại & Full offline queue, saga hardening sâu và notification/email được xếp vào phạm vi mở rộng, không thuộc kết quả đánh giá chính. \\
 \end{longtable}
 }
 
@@ -236,7 +236,7 @@ Những giới hạn hiện tại không làm mất giá trị của hệ thốn
   Live SePay provider validation không chạy mặc định. & Cần \texttt{RUN\_LIVE\_SEPAY}, credentials và public callback. & Không claim production live provider validation. & Dùng local mock cho regression và checklist live provider riêng trước demo. \\
   Full offline action queue chưa implement. & Hiện có reconnect/refetch, chưa có IndexedDB action queue. & Không claim offline-first write queue. & Thiết kế action queue, conflict resolver và background sync. \\
   Observability/deployment production-grade thiếu artifact runtime. & Thiếu dashboard/trace/log proof và runbook đầy đủ. & Không claim HA hoặc production-ready observability. & Chuẩn hóa deployment package, health-check runbook và dashboard evidence. \\
-  Notification/email service chưa có runtime. & Không có service notification trong core implementation hiện tại. & Không dùng email receipt/welcome email làm kết quả. & Triển khai Notification service hoặc SMTP/provider integration nếu mở rộng scope. \\
+  Notification/email nằm ngoài phạm vi đánh giá chính. & Các flow cốt lõi được đánh giá không phụ thuộc email giao dịch. & Không dùng email receipt/welcome email làm kết quả. & Có thể tích hợp Notification service hoặc SMTP/provider nếu phạm vi mở rộng. \\
 \end{longtable}
 }
 

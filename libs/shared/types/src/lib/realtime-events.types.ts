@@ -133,8 +133,8 @@ export type PaymentCompletedRealtimeEvent = {
  * Producer: Order Service (Step 2.4).
  * Consumers:
  *   - Kitchen Service (Phase 2B) — render KDS tickets
- *   - Notification Service (Phase 4C) — staff notifications
  *   - Analytics Service (future) — revenue tracking
+ *   - Notification/email consumer only if reintroduced as future scope
  *
  * Partition key: tenantId (per Kafka ADR partition strategy).
  */

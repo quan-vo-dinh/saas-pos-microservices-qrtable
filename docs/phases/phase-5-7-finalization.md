@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-- Completed core phases closed on critical/demo path: **0, 1, 2A, 2B, 3**, SaaS part completed at **4B**, and the representative **4A Order Confirm Saga** slice has been implemented. Full Phase 4A operational hardening and Phase 4C have not started; they do not block Phase 5-7 unless the demo requires durable saga-state/CDC/retry-worker hardening or notification/staff management.
+- Completed core phases closed on critical/demo path: **0, 1, 2A, 2B, 3**, SaaS part completed at **4B**, and the representative **4A Order Confirm Saga** slice has been implemented. Full Phase 4A operational hardening and Phase 4C Staff Management have not started; they do not block Phase 5-7 unless the demo requires durable saga-state/CDC/retry-worker hardening or staff management. Notification/email is outside the current implementation scope.
 
 ## Reference
 
@@ -33,7 +33,7 @@ These three areas are combined into one document because of the same "completion
 
 Points that need to be adjusted compared to the old Phase 5 version:
 
-- **Old prerequisite "Phase 0-4 completed" is no longer true.** Current status is Phase 0, 1, 2A, 2B, 3 and **4B** completed; **4A has a representative Saga slice**, **4C TODO**. Test Phase 5 must verify existing behaviors, including Order Confirm Saga, and only record gaps for full saga-hardening/notification/staff management if they are deferred scope.
+- **Old prerequisite "Phase 0-4 completed" is no longer true.** Current status is Phase 0, 1, 2A, 2B, 3 and **4B** completed; **4A has a representative Saga slice**, **4C Staff Management TODO**. Test Phase 5 must verify existing behaviors, including Order Confirm Saga, and only record gaps for full saga-hardening or staff management if they are deferred scope.
 - **Phase 4A is no longer fully deferred.** `OrderConfirmSagaService` and `CatalogStockGatewayService` are current code contracts. Phase 5 must test confirm replay, Catalog stock error handling, and release-stock compensation; durable Saga state, retry workers, stock ledger and CDC/Debezium remain future hardening.
 - **Old scope lacks Phase 4B.** Needs to add tenant lifecycle `ACTIVE/SUSPENDED/CLOSED`, subscription/pricing plan, feature gating, tenant payment settings, two-tier payment references `QRTBL`/`QRSUB`, admin-assisted onboarding and Customer PWA suspended/read-only behavior.
 - **The old scope called E2E as Supertest did not match the repo.** Currently E2E browser uses Playwright in `tests/e2e`; Supertest is more suitable if e2e API for BFF/Nest is added later. Phase 5 should clearly separate `API integration/contract` and `browser E2E`.
@@ -50,21 +50,21 @@ Main principle:
 - **Test correct floor:** Unit locks invariant/policy; integration lock DB/Redis/TCP/Kafka boundary; E2E browser locks user journey. Don't duplicate the same assertion at every layer.
 - **Current-code first:** When the old docs phase deviate from `business-logic.md`, `technical-architecture.md` or current tests/code, test according to the latest canonical/implemented behavior.
 - **Snapshot is the source of truth:** Realtime events are just hints to invalidate/refetch; E2E must not depend on the packet payload as state canonical.
-- **Explicit Deferred:** Do not count missing tests for full Phase 4A hardening or Phase 4C as a Phase 5 error. Missing tests for the implemented Order Confirm Saga are not deferred; they are normal Phase 5 test work.
+- **Explicit Deferred:** Do not count missing tests for full Phase 4A hardening or unimplemented Phase 4C Staff Management as a Phase 5 error. Missing tests for the implemented Order Confirm Saga are not deferred; they are normal Phase 5 test work. Notification/email tests are outside the current scope unless the service is reintroduced.
 - **Saga evidence is multi-layered:** For the two representative Saga flows, combine unit/contract tests, opt-in integration tests, deterministic fault injection where available, UI demo artifacts, and DB/outbox/log evidence. The detailed thesis strategy lives in `docs/testing/phase-5/saga-validation-strategy.md`.
 
 ### Canonical Scope After Phase 4A/4B
 
 Phase 5 canonicalizes testing for **deployed or finalized behavior as current contract**. If a discrepancy between docs and code is detected, apply the truth source order in `docs/README.md`: current code/tests -> accepted specs -> final phase records -> overview docs. The review results not only in adding tests, but also in accurately classifying the status of each rule.
 
-| Scope type           | How to handle in Phase 5                                                                                                 | Specific examples                                                                                                                                            |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `covered`            | Keep the existing test, attached to the traceability matrix                                                              | Shared transition tests, BFF guards, Payment duplicate webhooks, SaaS subscription invoice tests                                                             |
-| `partial`            | Adding tests at the lowest level is enough to prove the rule                                                             | Payment UI smoke exists but has not proven full close-session; permission unit is there but live Keycloak smoke is not good                                  |
-| `missing`            | Add a test if the behavior is already in the code and belongs to Phase 0/1/2A/2B/3/4A representative slice/4B            | Order Confirm Saga integration gap; Catalog QR invalid token/rate limit; table/menu delete constraints; suspended tenant browser route fixture               |
-| `implementation-gap` | Do not edit behavior in Phase 5; Specifies that a separate phase/PR is needed if the canonical rule does not have a code | Offline queue IndexedDB, full staff invite UI, production webhook replay dashboard                                                                           |
-| `security-gap`       | Test current contract if any, and mark blocker before real go-live/demo if hardening is missing                          | Phase 4B tenant/platform `x-secret-key` route now needs value verification with saved secret, not just presence check                                        |
-| `deferred-by-phase`  | Phase 5 failures are not included; kept in the full Phase 4A hardening/4C backlog or post-thesis                         | Durable Saga state, retry worker, stock ledger, CDC/Debezium, notification email receipt/welcome/suspend, reset-password email, Notification service runtime |
+| Scope type           | How to handle in Phase 5                                                                                                 | Specific examples                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `covered`            | Keep the existing test, attached to the traceability matrix                                                              | Shared transition tests, BFF guards, Payment duplicate webhooks, SaaS subscription invoice tests                                               |
+| `partial`            | Adding tests at the lowest level is enough to prove the rule                                                             | Payment UI smoke exists but has not proven full close-session; permission unit is there but live Keycloak smoke is not good                    |
+| `missing`            | Add a test if the behavior is already in the code and belongs to Phase 0/1/2A/2B/3/4A representative slice/4B            | Order Confirm Saga integration gap; Catalog QR invalid token/rate limit; table/menu delete constraints; suspended tenant browser route fixture |
+| `implementation-gap` | Do not edit behavior in Phase 5; Specifies that a separate phase/PR is needed if the canonical rule does not have a code | Offline queue IndexedDB, full staff invite UI, production webhook replay dashboard                                                             |
+| `security-gap`       | Test current contract if any, and mark blocker before real go-live/demo if hardening is missing                          | Phase 4B tenant/platform `x-secret-key` route now needs value verification with saved secret, not just presence check                          |
+| `deferred-by-phase`  | Phase 5 failures are not included; kept in the full Phase 4A hardening/4C Staff Management backlog or post-thesis        | Durable Saga state, retry worker, stock ledger, CDC/Debezium, full staff invite UI, production webhook replay dashboard                        |
 
 ### Priority Bands
 
@@ -85,13 +85,13 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 | Kitchen + realtime      | KDS queue scoring, station access, SLA worker, gateway room derivation                                                                 | Kafka `order.confirmed` -> Kitchen Redis ticket -> BFF `kds.queue_changed` hint                                                                | KDS station flow, reconnect/refetch snapshot, waiter sees ready/served                                        |
 | Payment settlement      | VND rounding, payment reference, cash/VIETQR policy, webhook duplicate/underpaid/after-paid                                            | Payment transaction + Order `BILL_MARK_PAID`; outbox `payment.completed`; payment history tenant scope                                         | POS cash/VietQR panels, Customer payment screen, Dashboard payment history read-only                          |
 | SaaS Phase 4B           | Slug, onboarding saga, tenant lifecycle, subscription invoice, payment settings, OAuth state, feature gating                           | SaaS onboarding cross-service compensation; Redis suspend/subscription cache; `QRSUB` invoice matching                                         | Public landing, SUPER_ADMIN tenant/plan/billing, Owner subscription/payment settings, suspended Customer PWA  |
-| Architecture invariants | Kafka topic registry, Redis access policy, no `menu.updated`, BFF route constants, TCP pattern exposure                                | Allowed Redis/Kafka access checks; topic/env defaults match canonical 6-topic registry                                                         | Browser checks observe final UI snapshots and refetch behavior, not hidden event internals                    |
+| Architecture invariants | Kafka topic registry, Redis access policy, no `menu.updated`, BFF route constants, TCP pattern exposure                                | Allowed Redis/Kafka access checks; topic/env defaults match canonical 5-topic registry                                                         | Browser checks observe final UI snapshots and refetch behavior, not hidden event internals                    |
 
 ### Steps
 
 #### Step 5.1 — Inventory + Traceability Matrix (1-2 days)
 
-**Goal:** Know exactly which business rules have been tested, which layers are tested, and which gaps are valid because full Phase 4A hardening/Phase 4C has not been done yet.
+**Goal:** Know exactly which business rules have been tested, which layers are tested, and which gaps are valid because full Phase 4A hardening/Phase 4C Staff Management has not been done yet.
 
 **Scope:**
 
@@ -122,7 +122,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 - Phase 3: VND rounding, `QRTBL`, cash/VietQR settlement, webhook duplicate/underpaid/after-paid, payment history read-only, payment completion -> Order finalization.
 - Phase 4A: `OrderConfirmSagaService`, Catalog stock gateway contract, confirm replay, Catalog stock error, release-stock compensation after Order commit/outbox failure, and SaaS onboarding mini-saga as the second representative saga-style flow.
 - Phase 4B: tenant lifecycle, subscription/plan, `QRSUB`, OAuth state, payment settings, feature gating, suspended/closed customer behavior.
-- Architecture: Kafka 6-topic registry, Redis access policy, no `menu.updated`, BFF Direct vs Kafka boundaries, permission matrix counts.
+- Architecture: Kafka 5-topic registry, Redis access policy, no `menu.updated`, BFF Direct vs Kafka boundaries, permission matrix counts.
 
 **verify:** You can look at the table and answer "which test is this rule protected by" or "why hasn't it been tested in Phase 5?"
 
@@ -140,7 +140,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 - **Frontend components/hooks:** disabled controls for suspended tenant, payment exception for pending bills, POS/KDS realtime refetch hooks, dashboard auth readiness, role-based navigation.
 - **Static architecture tests:** route constants unique, TCP message patterns exposed, permission enum/seed/matrix counts, Kafka topics restricted to registry, no accidental `menu.updated` event contract.
 
-**RBAC note:** `permission-matrix.md` now has static-verified 66 permissions and role seed counts, but live smoke also depends on seed/credentials for `SUPER_ADMIN` and `MANAGER`. Phase 5 must record this state as `partial` until the live seeded login smoke or equivalent API-level auth integration is stable.
+**RBAC note:** `permission-matrix.md` now has static-verified 65 permissions and role seed counts, but live smoke also depends on seed/credentials for `SUPER_ADMIN` and `MANAGER`. Phase 5 must record this state as `partial` until the live seeded login smoke or equivalent API-level auth integration is stable.
 
 **verify:** `pnpm nx affected -t test` or project-specific `pnpm nx test <project>` pass for touched projects; coverage report is used as an additional signal, not as a substitute for traceability.
 
@@ -235,7 +235,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 ### Outside of current Phase 5 scope
 
 - **No test pass required for full Phase 4A operational hardening** such as durable Saga state, retry workers, stock ledger, full CDC/Debezium or new audit framework if not yet implemented. Phase 5 must still test the implemented Order Confirm Saga and the existing local outbox/idempotency/compensation baseline.
-- **Does not require notification/staff management of Phase 4C** such as email receipt, welcome/suspend email, staff invite UI, reset-password email or notification logs if the service does not exist yet.
+- **Does not require notification/email** such as email receipt, welcome/suspend email, reset-password email or notification logs because Notification Service is outside the current scope. Phase 4C staff management is also not a Phase 5 blocker until implemented.
 - **Does not require full offline queue** such as IndexedDB action queue, auto-sync POS/KDS/customer when long-term network outage, or full conflict resolver if current code is not implemented. Phase 5 only tests existing reconnect/refetch/snapshot behavior.
 - **Does not replace live provider certification.** SePay/OAuth/webhook provider does require its own manual/live validation when it has a public BFF URL and a valid credential; Automated Phase 5 only locks the internal contract and route behavior using the mock/local provider. Do not use a temporary Vercel domain or local tunnel as the default pass condition.
 - **Do not add new business behavior just for testing.** If the test detects that the docs require a behavior that does not exist, write it as `implementation gap` or `deferred scope`, do not silently change the product contract.
@@ -251,7 +251,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 - [ ] **Security gap visibility:** Phase 4B `x-secret-key` route value verification is tested if implemented; if not, recorded as `security-gap` blocker before go-live/demo public.
 - [ ] **E2E Playwright:** QR ordering realtime, payment close session, tenant onboarding and suspended tenant pass flows are stable on the standardized seed/dev stack, or marked `missing` with additional fixture/credential.
 - [ ] **CI/gates:** Current CI baseline, PR quick gate, full unit/contract gate, integration gate and browser E2E command documented; Tests that depend on the local stack have a transparent skip policy instead of failing randomly.
-- [ ] **Deferred clarity:** Full Phase 4A hardening and unimplemented Phase 4C behaviors are clearly marked as valid deferred/test gaps, while the implemented Order Confirm Saga remains part of Phase 5 acceptance.
+- [ ] **Deferred clarity:** Full Phase 4A hardening and unimplemented Phase 4C Staff Management behaviors are clearly marked as valid deferred/test gaps, while the implemented Order Confirm Saga remains part of Phase 5 acceptance. Notification/email remains outside current scope.
 - [ ] **Saga thesis evidence:** Order Confirm Saga and SaaS Onboarding Mini-Saga have recorded commands, artifact expectations, and claim limits in `docs/testing/phase-5/saga-validation-strategy.md`.
 
 ---
@@ -362,5 +362,5 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 ## Note the Roadmap
 
 - **Critical Path:** Phase 0 → 1 → 2A → 2B → 3 → 5-7 (Demo)
-- **Parallel Track:** Phase 4B completed; Phase 4A representative Saga slice implemented while full hardening remains future work; Phase 4C has not yet started and depends on Phase 4B.
+- **Parallel Track:** Phase 4B completed; Phase 4A representative Saga slice implemented while full hardening remains future work; Phase 4C Staff Management has not yet started and depends on Phase 4B. Former Step 4.5 Notification Service is removed from current scope.
 - **4 most impressive demo highlights:** Phase 1 (QR + Menu), Phase 2 (Real-time Ordering), Phase 3 (Payment), Phase 6 (Grafana Tracing)
