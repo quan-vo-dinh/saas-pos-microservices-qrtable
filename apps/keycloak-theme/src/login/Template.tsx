@@ -21,6 +21,11 @@ function getPageLabel(pageId: string): PageLabel {
                 title: "Reset your password",
                 subtitle: "Enter your account email to recover access securely."
             };
+        case "login-update-password.ftl":
+            return {
+                title: "Set your new password",
+                subtitle: "Choose a secure password to continue to your workspace."
+            };
         default:
             return {
                 title: "Sign in to QRTable Management",
