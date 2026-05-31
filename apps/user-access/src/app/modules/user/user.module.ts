@@ -9,6 +9,7 @@ import { UserController } from './controllers/user.controller';
 import { UserService } from './services/user.service';
 import { UserGrpcController } from './controllers/user-grpc.controller';
 import { TenantUserService } from './services/tenant-user.service';
+import { StaffManagementService } from './services/staff-management.service';
 
 @Module({
   imports: [
@@ -16,6 +17,6 @@ import { TenantUserService } from './services/tenant-user.service';
     ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.AUTHORIZER_SERVICE), TcpProvider(TCP_SERVICES.SAAS_SERVICE)]),
   ],
   controllers: [UserController, UserGrpcController],
-  providers: [UserRepository, UserService, TenantUserService],
+  providers: [UserRepository, UserService, TenantUserService, StaffManagementService],
 })
 export class UserModule {}

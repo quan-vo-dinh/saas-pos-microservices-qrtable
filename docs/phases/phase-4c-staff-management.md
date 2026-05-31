@@ -61,14 +61,17 @@ Because Notification Service has been removed, staff onboarding must not depend 
 - **Staff Management Endpoints:**
   - Create/invite staff — Owner/Manager, `USER_CREATE`.
   - List staff by tenant — Owner/Manager, `USER_GET_ALL`.
-  - Change staff role — Owner only, `ROLE_UPDATE`.
+  - Change staff role — Owner only, `USER_UPDATE` plus Owner-only actor policy.
   - Disable staff account — Owner only, `USER_DELETE`.
+  - Re-enable staff account — Owner only, `USER_UPDATE`.
+
+- **Staff policy:** Owner can create `MANAGER`, `WAITER`, `CHEF`, and `BARISTA`; Manager can create only `WAITER`, `CHEF`, and `BARISTA`. `OWNER` and `SUPER_ADMIN` are not manageable from `/dashboard/staff`; owner transfer and platform admin management remain outside Phase 4C.
 
 - **Create staff flow:** Owner/Manager enters email, display name, role, and initial password/setup mode → BFF validates permission and tenant context → Authorizer creates Keycloak user and assigns role → User-Access creates MongoDB profile bound to the tenant → response returns safe staff profile data. Do not depend on email delivery.
 
 - **Role change flow:** Update Keycloak role and MongoDB profile/permission mapping as one coordinated operation. If one side fails, return a clear error and keep the profile in a state that can be retried or reconciled.
 
-- **Disable staff flow:** Disable user in Keycloak and deactivate profile in MongoDB. Do not hard-delete staff because order/payment/audit history may still reference the staff user.
+- **Disable/enable staff flow:** Disable or enable user in Keycloak and mirror `isActive` in MongoDB. Do not hard-delete staff because order/payment/audit history may still reference the staff user.
 
 - **Tenant isolation:** Staff queries and mutations must always be tenant-scoped. Non-`SUPER_ADMIN` actors cannot manage staff in another tenant.
 
@@ -86,7 +89,7 @@ Because Notification Service has been removed, staff onboarding must not depend 
 - **Staff table:** Name, email, role, status, joined date.
 - **Filters/search:** Filter by role/status and search by name/email.
 - **Create staff dialog:** Email, name, role, and initial password/setup mode. The UI must make clear that email delivery is not part of the current system flow.
-- **Role/status actions:** Owner-only controls for role change and disable/enable; Manager can list and create only if permission allows.
+- **Role/status actions:** Owner-only controls for role change and disable/enable; Manager can list and create allowed staff roles only if permission allows.
 
 **verify:** Owner/Manager sees only current-tenant staff; role and status actions match backend permissions; low roles do not see or cannot call Owner-only actions; UI renders no raw wire enum labels.
 
@@ -97,6 +100,7 @@ Because Notification Service has been removed, staff onboarding must not depend 
 - [ ] Staff can log in with the assigned role after creation/setup.
 - [ ] Role change updates both Keycloak and User-Access profile consistently or returns a retryable error.
 - [ ] Disable staff prevents login and marks the application profile inactive without hard delete.
+- [ ] Re-enable staff restores login after Keycloak and User-Access both succeed.
 - [ ] Cross-tenant staff access is blocked.
 - [ ] `/dashboard/staff` supports list, search/filter, create staff, role change, and disable/enable according to permissions.
 

@@ -117,6 +117,91 @@ export class UserRepository {
     return !!result;
   }
 
+  findRoleByName(roleName: ROLE): Promise<Role | null> {
+    return this.roleModel.findOne({ name: roleName }).exec();
+  }
+
+  findTenantStaffByUserId(params: { tenantId: string; userId: string }): Promise<User | null> {
+    return this.userModel.findOne({ tenantId: params.tenantId, userId: params.userId }).populate('roles').exec();
+  }
+
+  async createStaffProfile(data: Partial<User>): Promise<User> {
+    const created = await this.userModel.create(data);
+    return this.getByUserId(created.userId) as Promise<User>;
+  }
+
+  async listTenantStaff(params: {
+    tenantId: string;
+    manageableRoleIds: ObjectId[];
+    roleId?: ObjectId;
+    status?: 'ACTIVE' | 'DISABLED';
+    search?: string;
+    page: number;
+    limit: number;
+  }): Promise<{ items: User[]; total: number }> {
+    const query: Record<string, unknown> = {
+      tenantId: params.tenantId,
+      roles: params.roleId ?? { $in: params.manageableRoleIds },
+    };
+
+    if (params.status === 'ACTIVE') {
+      query.isActive = true;
+    }
+    if (params.status === 'DISABLED') {
+      query.isActive = false;
+    }
+    if (params.search?.trim()) {
+      const escaped = params.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { email: new RegExp(escaped, 'i') },
+        { firstName: new RegExp(escaped, 'i') },
+        { lastName: new RegExp(escaped, 'i') },
+      ];
+    }
+
+    const skip = (params.page - 1) * params.limit;
+    const [items, total] = await Promise.all([
+      this.userModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(params.limit).populate('roles').exec(),
+      this.userModel.countDocuments(query).exec(),
+    ]);
+
+    return { items, total };
+  }
+
+  async setTenantStaffRole(params: { tenantId: string; userId: string; roleId: ObjectId }): Promise<User | null> {
+    await this.userModel
+      .findOneAndUpdate(
+        { tenantId: params.tenantId, userId: params.userId },
+        { $set: { roles: [params.roleId] } },
+        { new: true },
+      )
+      .exec();
+    return this.findTenantStaffByUserId({ tenantId: params.tenantId, userId: params.userId });
+  }
+
+  async setTenantStaffActiveStatus(params: {
+    tenantId: string;
+    userId: string;
+    isActive: boolean;
+    disabledAt: Date | null;
+    reason: string;
+  }): Promise<User | null> {
+    await this.userModel
+      .findOneAndUpdate(
+        { tenantId: params.tenantId, userId: params.userId },
+        {
+          $set: {
+            isActive: params.isActive,
+            disabledAt: params.disabledAt,
+            disabledReason: params.reason,
+          },
+        },
+        { new: true },
+      )
+      .exec();
+    return this.findTenantStaffByUserId({ tenantId: params.tenantId, userId: params.userId });
+  }
+
   private async resolveRoleIds(roleNames?: string[]): Promise<ObjectId[]> {
     const normalizedRequestedRoles = Array.from(
       new Set((roleNames || []).map((role) => role?.trim()).filter((role): role is string => !!role)),

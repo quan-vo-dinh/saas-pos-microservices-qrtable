@@ -31,12 +31,16 @@ export {
   planFeatureVi,
   tenantLifecycleReasonVi,
   booleanEnabledVi,
+  staffRoleVi,
+  staffStatusVi,
   type BillingPeriod,
   type InvoiceStatusLabel,
   type TenantStatusLabel,
   type SubscriptionStatusLabel,
   type TenantTypeLabel,
   type PaymentConnectionStatusLabel,
+  type StaffRoleLabel,
+  type StaffStatusLabel,
 } from './lib/vi-domain-labels';
 export {
   SAAS_BILLING_PERIOD,

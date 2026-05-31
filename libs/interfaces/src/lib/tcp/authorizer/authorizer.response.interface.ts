@@ -52,6 +52,18 @@ export interface DisableKeycloakUserResponse {
   enabled: false;
 }
 
+export interface CreateStaffKeycloakResponse {
+  userId: string;
+  email: string;
+  enabled: boolean;
+  requiredActions: string[];
+}
+
+export interface SetKeycloakUserEnabledResponse {
+  userId: string;
+  enabled: boolean;
+}
+
 export interface KeycloakUserAdminResponse {
   userId: string;
   email?: string;

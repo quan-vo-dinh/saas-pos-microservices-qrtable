@@ -2,6 +2,12 @@ jest.mock('uuid', () => ({
   v4: jest.fn(() => '00000000-0000-4000-8000-000000000001'),
 }));
 
+jest.mock('../../../../configuration', () => ({
+  CONFIGURATION: {
+    REDIS_CONFIG: { HOST: '127.0.0.1', PORT: 6379 },
+  },
+}));
+
 import { RealtimeEventsService } from '../services/realtime-events.service';
 import { KdsInternalEventsSubscriber } from '../services/kds-internal-events.subscriber';
 

@@ -29,6 +29,9 @@ export class User extends BaseSchema {
   @Prop({ type: Date, default: null })
   disabledAt?: Date | null;
 
+  @Prop({ type: String, default: null })
+  disabledReason?: string | null;
+
   @Prop({ type: [ObjectId], ref: 'Role' })
   roles: ObjectId[];
 }

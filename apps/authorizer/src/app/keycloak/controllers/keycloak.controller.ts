@@ -8,9 +8,12 @@ import { CreateKeyCloakUserTcpRequest } from '@common/interfaces/tcp/authorizer'
 import { Response } from '@common/interfaces/tcp/common/response.interface';
 import {
   AssignKeycloakRealmRolesRequest,
+  CreateStaffKeycloakRequest,
   CreateTenantOwnerKeycloakRequest,
   DisableKeycloakUserRequest,
   GetKeycloakUserAdminRequest,
+  ReplaceKeycloakRealmRolesRequest,
+  SetKeycloakUserEnabledRequest,
 } from '@common/interfaces/tcp/authorizer';
 import { KeycloakAdminService } from '../services/keycloak-admin.service';
 
@@ -49,6 +52,24 @@ export class KeycloakController {
   @MessagePattern(TCP_REQUEST_MESSAGE.KEYCLOAK.GET_USER_ADMIN)
   async getUserAdmin(@RequestParams() data: GetKeycloakUserAdminRequest) {
     const result = await this.keycloakAdminService.getUserById(data);
+    return Response.success(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.KEYCLOAK.CREATE_STAFF_USER)
+  async createStaffUser(@RequestParams() data: CreateStaffKeycloakRequest) {
+    const result = await this.keycloakAdminService.createStaffUser(data);
+    return Response.success(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.KEYCLOAK.REPLACE_REALM_ROLES)
+  async replaceRealmRoles(@RequestParams() data: ReplaceKeycloakRealmRolesRequest) {
+    await this.keycloakAdminService.replaceRealmRoles(data);
+    return Response.success(true);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.KEYCLOAK.SET_USER_ENABLED)
+  async setUserEnabled(@RequestParams() data: SetKeycloakUserEnabledRequest) {
+    const result = await this.keycloakAdminService.setUserEnabled(data);
     return Response.success(result);
   }
 }

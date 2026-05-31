@@ -128,6 +128,24 @@ export class KeycloakHttpService {
     });
   }
 
+  getUserRealmRoles(accessToken: string, userId: string): Promise<Array<Record<string, unknown>>> {
+    return this.axiosInstance
+      .get(`/admin/realms/${this.realm}/users/${userId}/role-mappings/realm`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      .then(({ data }) => (Array.isArray(data) ? data : []));
+  }
+
+  deleteRealmRoles(accessToken: string, userId: string, roles: Record<string, unknown>[]): Promise<unknown> {
+    if (!roles.length) {
+      return Promise.resolve(true);
+    }
+    return this.axiosInstance.delete(`/admin/realms/${this.realm}/users/${userId}/role-mappings/realm`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      data: roles,
+    });
+  }
+
   async updateUser(accessToken: string, userId: string, payload: Record<string, unknown>): Promise<void> {
     await this.axiosInstance.put(`/admin/realms/${this.realm}/users/${userId}`, payload, {
       headers: {

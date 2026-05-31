@@ -19,6 +19,11 @@ enum USER {
   FIND_OWNER_BY_TENANT = 'user.find_owner_by_tenant',
   DISABLE_TENANT_USERS = 'user.disable_tenant_users',
   DISABLE = 'user.disable',
+  STAFF_CREATE = 'user.staff_create',
+  STAFF_LIST = 'user.staff_list',
+  STAFF_GET = 'user.staff_get',
+  STAFF_CHANGE_ROLE = 'user.staff_change_role',
+  STAFF_SET_STATUS = 'user.staff_set_status',
 }
 
 enum KEYCLOAK {
@@ -34,6 +39,9 @@ enum KEYCLOAK {
   DISABLE_USER = 'keycloak.disable_user',
   GET_USER = 'keycloak.get_user',
   GET_USER_ADMIN = 'keycloak.get_user_admin',
+  CREATE_STAFF_USER = 'keycloak.create_staff_user',
+  REPLACE_REALM_ROLES = 'keycloak.replace_realm_roles',
+  SET_USER_ENABLED = 'keycloak.set_user_enabled',
 }
 
 enum AUTHORIZER {

@@ -3,6 +3,7 @@
  * Wire/API/DB vẫn dùng chuỗi enum tiếng Anh; UI chỉ map qua các hàm dưới đây.
  */
 import type { TableStatus } from '@einvoice/types';
+import type { AppRole } from './roles';
 import {
   BillStatus,
   OrderItemStatus,
@@ -225,4 +226,28 @@ export function tenantLifecycleReasonVi(reason: string | null | undefined): stri
 
 export function booleanEnabledVi(enabled: boolean): string {
   return enabled ? 'Bật' : 'Tắt';
+}
+
+/** Phase 4C — staff role/status display labels (wire values stay English enums). */
+export type StaffRoleLabel = Extract<AppRole, 'MANAGER' | 'WAITER' | 'CHEF' | 'BARISTA'>;
+export type StaffStatusLabel = 'ACTIVE' | 'DISABLED';
+
+const STAFF_ROLE_VI = {
+  MANAGER: 'Quản lý ca',
+  WAITER: 'Phục vụ',
+  CHEF: 'Bếp',
+  BARISTA: 'Quầy bar',
+} as const satisfies Record<StaffRoleLabel, string>;
+
+const STAFF_STATUS_VI = {
+  ACTIVE: 'Đang hoạt động',
+  DISABLED: 'Đã vô hiệu hóa',
+} as const satisfies Record<StaffStatusLabel, string>;
+
+export function staffRoleVi(role: StaffRoleLabel | string): string {
+  return displayDomainLabel(STAFF_ROLE_VI, role);
+}
+
+export function staffStatusVi(status: StaffStatusLabel | string): string {
+  return displayDomainLabel(STAFF_STATUS_VI, status);
 }

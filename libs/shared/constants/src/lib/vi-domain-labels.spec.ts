@@ -34,6 +34,8 @@ import {
   planFeatureVi,
   subscriptionStatusVi,
   tenantLifecycleReasonVi,
+  staffRoleVi,
+  staffStatusVi,
 } from './vi-domain-labels';
 
 describe('vi-domain-labels', () => {
@@ -111,5 +113,16 @@ describe('vi-domain-labels — SaaS', () => {
     expect(planFeatureVi('basic_pos')).toBe('POS cơ bản');
     expect(planFeatureVi('priority_support')).toBe('Hỗ trợ ưu tiên');
     expect(tenantLifecycleReasonVi('SUBSCRIPTION_EXPIRED')).toBe('Gói đăng ký đã hết hạn');
+  });
+});
+
+describe('vi-domain-labels — staff', () => {
+  it('maps staff roles and statuses to Vietnamese', () => {
+    expect(staffRoleVi('MANAGER')).toBe('Quản lý ca');
+    expect(staffRoleVi('WAITER')).toBe('Phục vụ');
+    expect(staffRoleVi('MANAGER')).not.toMatch(/^MANAGER$/);
+    expect(staffStatusVi('ACTIVE')).toBe('Đang hoạt động');
+    expect(staffStatusVi('DISABLED')).toBe('Đã vô hiệu hóa');
+    expect(staffStatusVi('ACTIVE')).not.toMatch(/^ACTIVE$/);
   });
 });

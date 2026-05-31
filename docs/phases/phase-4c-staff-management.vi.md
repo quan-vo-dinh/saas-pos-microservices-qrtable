@@ -61,14 +61,17 @@ Vì Notification Service đã bị loại, onboarding staff không được ph�
 - **Endpoint quản lý staff:**
   - Tạo/mời staff — Owner/Manager, `USER_CREATE`.
   - List staff theo tenant — Owner/Manager, `USER_GET_ALL`.
-  - Đổi role staff — chỉ Owner, `ROLE_UPDATE`.
+  - Đổi role staff — chỉ Owner, `USER_UPDATE` cộng actor policy chỉ Owner.
   - Vô hiệu hóa tài khoản staff — chỉ Owner, `USER_DELETE`.
+  - Kích hoạt lại tài khoản staff — chỉ Owner, `USER_UPDATE`.
+
+- **Policy nhân sự:** Owner có thể tạo `MANAGER`, `WAITER`, `CHEF`, và `BARISTA`; Manager chỉ có thể tạo `WAITER`, `CHEF`, và `BARISTA`. Không quản lý `OWNER` hoặc `SUPER_ADMIN` từ `/dashboard/staff`; chuyển Owner và quản trị platform nằm ngoài Phase 4C.
 
 - **Luồng tạo staff:** Owner/Manager nhập email, tên hiển thị, role và mật khẩu khởi tạo/setup mode → BFF kiểm tra permission và tenant context → Authorizer tạo Keycloak user và gán role → User-Access tạo MongoDB profile gắn tenant → response chỉ trả dữ liệu staff an toàn. Không phụ thuộc email delivery.
 
 - **Luồng đổi role:** Cập nhật Keycloak role và MongoDB profile/permission mapping như một thao tác phối hợp. Nếu một bên lỗi, trả lỗi rõ ràng và giữ profile ở trạng thái có thể retry hoặc reconcile.
 
-- **Luồng disable staff:** Disable user trong Keycloak và deactivate profile trong MongoDB. Không hard-delete staff vì lịch sử order/payment/audit có thể còn tham chiếu user đó.
+- **Luồng disable/enable staff:** Disable hoặc enable user trong Keycloak và đồng bộ `isActive` trong MongoDB. Không hard-delete staff vì lịch sử order/payment/audit có thể còn tham chiếu user đó.
 
 - **Tenant isolation:** Mọi query/mutation staff phải theo tenant. Actor không phải `SUPER_ADMIN` không được quản lý staff của tenant khác.
 
@@ -86,7 +89,7 @@ Vì Notification Service đã bị loại, onboarding staff không được ph�
 - **Bảng staff:** Tên, email, role, trạng thái, ngày tham gia.
 - **Lọc/tìm kiếm:** Lọc theo role/status và tìm theo tên/email.
 - **Dialog tạo staff:** Email, tên, role và mật khẩu khởi tạo/setup mode. UI phải thể hiện rõ email delivery không nằm trong flow hiện tại.
-- **Thao tác role/status:** Control đổi role và disable/enable chỉ dành cho Owner; Manager chỉ list/create nếu có quyền tương ứng.
+- **Thao tác role/status:** Control đổi role và disable/enable chỉ dành cho Owner; Manager chỉ list/create các role staff được phép nếu có quyền tương ứng.
 
 **verify:** Owner/Manager chỉ thấy staff tenant hiện tại; thao tác role/status khớp permission backend; role thấp không thấy hoặc không gọi được hành động Owner-only; UI không render raw wire enum.
 
@@ -97,6 +100,7 @@ Vì Notification Service đã bị loại, onboarding staff không được ph�
 - [ ] Staff login được với role đã gán sau khi tạo/setup.
 - [ ] Đổi role cập nhật nhất quán Keycloak và User-Access profile hoặc trả lỗi có thể retry.
 - [ ] Disable staff chặn login và đánh dấu application profile inactive, không hard-delete.
+- [ ] Enable staff khôi phục login sau khi Keycloak và User-Access đều cập nhật thành công.
 - [ ] Cross-tenant staff access bị chặn.
 - [ ] `/dashboard/staff` hỗ trợ list, search/filter, tạo staff, đổi role và disable/enable theo permission.
 

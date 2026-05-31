@@ -4,7 +4,14 @@ import { Controller, UseInterceptors } from '@nestjs/common';
 import { UserService } from '../services/user.service';
 import { MessagePattern } from '@nestjs/microservices';
 import { RequestParams } from '@common/decorators/request-param.decorator';
-import { CreateUserTcpRequest } from '@common/interfaces/tcp/user';
+import {
+  ChangeStaffRoleTcpRequest,
+  CreateStaffTcpRequest,
+  CreateUserTcpRequest,
+  GetStaffTcpRequest,
+  ListStaffTcpRequest,
+  SetStaffStatusTcpRequest,
+} from '@common/interfaces/tcp/user';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { ProcessId } from '@common/decorators/processId.decorator';
@@ -15,12 +22,15 @@ import {
   UpsertTenantOwnerProfileRequest,
 } from '@common/interfaces/tcp/user';
 import { TenantUserService } from '../services/tenant-user.service';
+import { StaffManagementService } from '../services/staff-management.service';
+
 @Controller('users')
 @UseInterceptors(TcpLoggingInterceptor)
 export class UserController {
   constructor(
     private readonly userService: UserService,
     private readonly tenantUserService: TenantUserService,
+    private readonly staffManagementService: StaffManagementService,
   ) {}
 
   @MessagePattern(TCP_REQUEST_MESSAGE.USER.CREATE)
@@ -64,5 +74,35 @@ export class UserController {
   async findOwnerByTenant(@RequestParams() data: { tenantId: string }) {
     const user = await this.tenantUserService.findOwnerByTenantId(data.tenantId);
     return Response.success(user);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.STAFF_CREATE)
+  async createStaff(@RequestParams() data: CreateStaffTcpRequest) {
+    const result = await this.staffManagementService.createStaff(data);
+    return Response.success(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.STAFF_LIST)
+  async listStaff(@RequestParams() data: ListStaffTcpRequest) {
+    const result = await this.staffManagementService.listStaff(data);
+    return Response.success(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.STAFF_GET)
+  async getStaff(@RequestParams() data: GetStaffTcpRequest) {
+    const result = await this.staffManagementService.getStaff(data);
+    return Response.success(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.STAFF_CHANGE_ROLE)
+  async changeStaffRole(@RequestParams() data: ChangeStaffRoleTcpRequest) {
+    const result = await this.staffManagementService.changeRole(data);
+    return Response.success(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.USER.STAFF_SET_STATUS)
+  async setStaffStatus(@RequestParams() data: SetStaffStatusTcpRequest) {
+    const result = await this.staffManagementService.setStatus(data);
+    return Response.success(result);
   }
 }

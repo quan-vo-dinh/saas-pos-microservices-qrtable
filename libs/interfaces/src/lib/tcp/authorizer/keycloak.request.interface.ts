@@ -33,3 +33,28 @@ export interface GetKeycloakUserAdminRequest {
   userId: string;
   processId?: string;
 }
+
+export interface CreateStaffKeycloakRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+  tenantId: string;
+  roleNames: string[];
+  password: string;
+  requirePasswordUpdate?: boolean;
+  processId?: string;
+}
+
+export interface ReplaceKeycloakRealmRolesRequest {
+  userId: string;
+  managedRoleNames: string[];
+  nextRoleNames: string[];
+  processId?: string;
+}
+
+export interface SetKeycloakUserEnabledRequest {
+  userId: string;
+  enabled: boolean;
+  reason: string;
+  processId?: string;
+}
