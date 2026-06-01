@@ -1,8 +1,10 @@
-# Giám sát và khả năng quan sát: Lý thuyết và triển khai thực chiến — QRTable Phase 6
+# Giám sát (monitoring) và khả năng quan sát (observability): Lý thuyết và triển khai thực chiến — QRTable Phase 6
 
 > **Triết lý tài liệu:** Hiểu _tại sao_ trước _như thế nào_. Lý thuyết được dạy qua ngữ cảnh
 > cụ thể của QRTable — không học trừu tượng mà học để áp dụng ngay. Tài liệu bao phủ cả
-> **Giám sát** (phát hiện vấn đề, đo lường SLO) và **khả năng quan sát** (hiểu nguyên nhân, gỡ lỗi).
+> **giám sát (monitoring)** — phát hiện vấn đề, đo lường SLO; **khả năng quan sát (observability)** — hiểu nguyên nhân, gỡ lỗi.
+>
+> **Quy ước thuật ngữ:** Khái niệm chính được ghi **tiếng Việt (tiếng Anh)** — ví dụ giám sát (monitoring), khả năng quan sát (observability).
 >
 > **Phạm vi:** Phase 6 — Bước 6.1 (Kiểm tra sức khỏe + PLG + Prometheus + Tempo/OTel)
 > và Bước 6.2 (bảng điều khiển Grafana + cảnh báo). Đây là lý thuyết nền tảng kèm lộ trình
@@ -13,13 +15,13 @@
 ## Mục Lục
 
 1. [Vấn Đề Cần Giải Quyết](#1-vấn-đề-cần-giải-quyết)
-2. [Monolith vs Microservices — Tại sao khả năng quan sát trở thành bắt buộc](#2-monolith-vs-microservices--tại-sao-khả-năng-quan-sát-trở-thành-bắt-buộc)
-3. [Giám sát và khả năng quan sát — Hai khái niệm bổ sung cho nhau](#3-giám-sát-và-khả-năng-quan-sát--hai-khái-niệm-bổ-sung-cho-nhau)
-4. [Ba trụ cột của khả năng quan sát](#4-ba-trụ-cột-của-khả-năng-quan-sát)
+2. [Monolith vs Microservices — Tại sao khả năng quan sát (observability) trở thành bắt buộc](#2-monolith-vs-microservices--tại-sao-khả-năng-quan-sát-observability-trở-thành-bắt-buộc)
+3. [Giám sát (monitoring) và khả năng quan sát (observability) — Hai khái niệm bổ sung cho nhau](#3-giám-sát-monitoring-và-khả-năng-quan-sát-observability--hai-khái-niệm-bổ-sung-cho-nhau)
+4. [Ba trụ cột của khả năng quan sát (observability)](#4-ba-trụ-cột-của-khả-năng-quan-sát-observability)
 5. [Kiểm tra sức khỏe — Tiên quyết trước tất cả](#5-kiểm-tra-sức-khỏe--tiên-quyết-trước-tất-cả)
 6. [Tracing phân tán và lan truyền ngữ cảnh](#6-tracing-phân-tán-và-lan-truyền-ngữ-cảnh)
 7. [Ngăn xếp công nghệ — Tại sao chọn gì](#7-ngăn-xếp-công-nghệ--tại-sao-chọn-gì)
-8. [Kiến trúc quan sát trong QRTable](#8-kiến-trúc-quan-sát-trong-qrtable)
+8. [Kiến trúc khả năng quan sát (observability) trong QRTable](#8-kiến-trúc-khả-năng-quan-sát-observability-trong-qrtable)
 9. [Bước 6.1A — Kiểm tra sức khỏe toàn bộ service](#9-bước-61a--health-checks-toàn-service)
 10. [Bước 6.1B — Ngăn xếp PLG: Pino + Loki + Promtail + Grafana](#10-bước-61b--stack-plg-pino--loki--promtail--grafana)
 11. [Bước 6.1C — Prometheus và Chỉ số tùy chỉnh](#11-bước-61c--prometheus-và-custom-metrics)
@@ -55,14 +57,14 @@ KDS màn hình bếp
 
 **Câu hỏi thực tế:** Khách báo "đặt món rồi mà bếp không thấy gì". Bạn gỡ lỗi thế nào?
 
-Nếu không có giám sát và khả năng quan sát:
+Nếu không có giám sát (monitoring) và khả năng quan sát (observability):
 
 - SSH vào từng container, đọc `stdout` từng service
 - Không biết request có đến Order không, có qua Kafka không, Kitchen có nhận không
 - Không biết bước nào thất bại, bước nào trễ
 - Mỗi lần sự cố cần 20–30 phút để định vị, đôi khi không tìm được nguyên nhân
 
-Nếu có giám sát và khả năng quan sát:
+Nếu có giám sát (monitoring) và khả năng quan sát (observability):
 
 - Một ID trace duy nhất nối toàn bộ hành trình từ BFF đến KDS
 - Nhật ký tập trung: truy vấn `traceId = "abc123"` thấy ngay nhật ký của tất cả service liên quan
@@ -75,17 +77,17 @@ Nếu có giám sát và khả năng quan sát:
 
 **Tình huống 2 — Không biết tại sao chậm:** POS phàn nàn "danh sách đơn hàng tải rất chậm". Không có chỉ số thì không biết độ trễ P95 của `GET /admin/orders` là 2s hay 10s, không biết nút thắt ở BFF hay Order hay PostgreSQL. Prometheus + tracing giải quyết.
 
-**Tình huống 3 — Không thể demo tin cậy:** Demo với hội đồng nhưng không có bảng điều khiển nào cho thấy lưu lượng thời gian thực, đơn/phút, KDS độ trễ, tất cả service đang hoạt động tốt. bảng điều khiển Grafana giải quyết — biến dữ liệu thô thành câu chuyện vận hành có thể kể trong 5 phút.
+**Tình huống 3 — Không thể demo tin cậy:** Demo với hội đồng nhưng không có bảng điều khiển nào cho thấy lưu lượng thời gian thực, đơn/phút, KDS độ trễ, tất cả service đang hoạt động tốt. Bảng điều khiển Grafana giải quyết — biến dữ liệu thô thành câu chuyện vận hành có thể kể trong 5 phút.
 
 ---
 
-## 2. Monolith vs Microservices — Tại sao khả năng quan sát trở thành bắt buộc
+## 2. Monolith vs Microservices — Tại sao khả năng quan sát (observability) trở thành bắt buộc
 
-Đây là phần lý thuyết cốt lõi nhất. Hiểu sự khác biệt giữa hai kiến trúc từ góc nhìn khả năng quan sát mới hiểu tại sao QRTable — với 8 services và 4 protocol khác nhau — **không thể vận hành thiếu** giám sát và khả năng quan sát.
+Đây là phần lý thuyết cốt lõi nhất. Hiểu sự khác biệt giữa hai kiến trúc từ góc nhìn khả năng quan sát (observability) mới hiểu tại sao QRTable — với 8 services và 4 protocol khác nhau — **không thể vận hành thiếu** giám sát (monitoring) và khả năng quan sát (observability).
 
 ### 2.1 Gỡ lỗi trong monolith — Tại Sao Đơn Giản Hơn
 
-Trong monolith, toàn bộ business logic chạy trong **một process duy nhất** trên **một máy** (hoặc vài instance giống hệt nhau). Điều này có nghĩa:
+Trong monolith, toàn bộ logic nghiệp vụ chạy trong **một process duy nhất** trên **một máy** (hoặc vài instance giống hệt nhau). Điều này có nghĩa:
 
 ```
 Monolith Process
@@ -105,18 +107,18 @@ Monolith Process
 
 3. **In-process call không cần network:** Khi `OrderModule` gọi `CatalogModule`, đó là function call trong cùng process — không có độ trễ mạng, không có timeout, không có serialization. Không cần trace để biết "call đi qua đâu".
 
-4. **Transhành động rõ ràng:** Một database transhành động bao phủ toàn bộ operation — nếu lỗi thì rollback ngay, không có partial state trải khắp nhiều service.
+4. **Giao dịch (transaction) rõ ràng:** Một giao dịch database bao phủ toàn bộ thao tác — nếu lỗi thì rollback ngay, không có trạng thái dở dang trải khắp nhiều service.
 
-**Giám sát trong monolith cũng đủ với công cụ đơn giản:**
+**Giám sát (monitoring) trong monolith cũng đủ với công cụ đơn giản:**
 
 - Một tệp nhật ký → grep
 - Một process → `top` hoặc `htop` để xem CPU/memory
-- Một database → truy vấn `pg_stat_statements` để tìm slow truy vấn
+- Một database → truy vấn `pg_stat_statements` để tìm truy vấn chậm
 - Uptime check: nếu process sống, system sống
 
 Đây là lý do nhiều hệ thống monolith chạy nhiều năm chỉ với `console.log` và đôi khi cũng tốt.
 
-### 2.2 Debugging Trong Microservices — Tại Sao Phức Tạp Hơn Căn Bản
+### 2.2 Gỡ lỗi trong microservices — Tại Sao Phức Tạp Hơn Căn Bản
 
 Microservices phân rã monolith thành **nhiều process độc lập** giao tiếp qua **network**. Chính sự thay đổi này tạo ra một loạt vấn đề hoàn toàn mới:
 
@@ -155,14 +157,14 @@ graph TB
     style E2 fill:#ffe3e3,stroke:#ff6b6b
 ```
 
-**Vấn đề 1 — Network kiểu lỗis không tồn tại trong monolith:**
+**Vấn đề 1 — Kiểu lỗi mạng không tồn tại trong monolith:**
 
 Khi `OrderModule` gọi `CatalogModule` trong monolith, đó là function call — không thể "timeout", không thể "connection refused". Nhưng trong microservices, TCP call từ Order đến Catalog có thể:
 
 - Timeout (Catalog quá tải)
 - Connection refused (Catalog chưa khởi động)
-- Partial failure (Catalog nhận request nhưng không trả response)
-- Network partition (network glitch giữa hai container)
+- Lỗi một phần (Catalog nhận request nhưng không trả response)
+- Phân vùng mạng (network partition) giữa hai container
 
 Mỗi kiểu lỗi này yêu cầu chiến lược gỡ lỗi khác nhau — và **bạn cần chỉ số + trace để phân biệt chúng**.
 
@@ -174,85 +176,85 @@ Trong microservices: Khi Order gọi TCP đến Catalog và Catalog lỗi, **Ord
 
 **Vấn đề 3 — Nhật ký phân tán:**
 
-Một request trong QRTable tạo ra bản ghi nhật ký trong BFF, Order, Catalog, và Kitchen — bốn process riêng biệt, bốn stdout stream riêng. Nếu không có ghi nhật ký tập trung và `traceId` được propagate, không thể ghép lại toàn bộ câu chuyện của một request.
+Một request trong QRTable tạo ra bản ghi nhật ký trong BFF, Order, Catalog, và Kitchen — bốn process riêng biệt, bốn stdout stream riêng. Nếu không có ghi nhật ký tập trung và `traceId` được lan truyền, không thể ghép lại toàn bộ câu chuyện của một request.
 
-**Vấn đề 4 — Distributed transhành độngs và lỗi một phần:**
+**Vấn đề 4 — Giao dịch phân tán (distributed transactions) và lỗi một phần:**
 
-Trong monolith, nếu `OrderModule.save()` thành công nhưng `KitchenModule.createTicket()` fail, database transhành động rollback cả hai. Trong microservices, nếu Order save thành công nhưng Kafka message đến Kitchen bị lost, **trạng thái không nhất quán** — Order service nghĩ ticket đã được tạo, Kitchen không biết gì. Cần khả năng quan sát để phát hiện trạng thái này.
+Trong monolith, nếu `OrderModule.save()` thành công nhưng `KitchenModule.createTicket()` thất bại, giao dịch database rollback cả hai. Trong microservices, nếu Order save thành công nhưng Kafka message đến Kitchen bị mất, **trạng thái không nhất quán** — Order service nghĩ ticket đã được tạo, Kitchen không biết gì. Cần khả năng quan sát (observability) để phát hiện trạng thái này.
 
-**Vấn đề 5 — "Blame game" giữa services:**
+**Vấn đề 5 — "đổ lỗi" giữa services:**
 
 Khi có sự cố, câu hỏi đầu tiên là "lỗi ở service nào?". Không có tracing phân tán, đây là một cuộc tranh luận dựa trên phỏng đoán. Với tracing phân tán, có câu trả lời chính xác trong vài giây.
 
 ### 2.3 Bảng So Sánh Căn Bản
 
-| Khía cạnh              | Monolith                  | Microservices                                 |
-| ---------------------- | ------------------------- | --------------------------------------------- |
-| **Điểm quan sát**      | Một process               | N processes, N luồng nhật ký                  |
-| **Lỗi xác định bằng**  | Stack trace đơn lẻ        | Trace phân tán qua N bước                     |
-| **Nhật ký debug**      | Grep một file             | Truy vấn tập trung với traceId                |
-| **Network failures**   | Không tồn tại             | Timeout, partition, bão thử lại (retry storm) |
-| **Độ trễ attribution** | Rõ ràng trong call stack  | Cần trace để phân tích từng bước              |
-| **Partial failures**   | Không có (transhành động) | Có thể xảy ra ở mọi bước                      |
-| **Dependency health**  | Một DB, một external      | N databases, Kafka, Redis, gRPC...            |
-| **Công cụ tối thiểu**  | grep + top + truy vấn     | nhật ký tập trung + chỉ số + traces           |
+| Khía cạnh               | Monolith                 | Microservices                                 |
+| ----------------------- | ------------------------ | --------------------------------------------- |
+| **Điểm quan sát**       | Một process              | N processes, N luồng nhật ký                  |
+| **Lỗi xác định bằng**   | Stack trace đơn lẻ       | Trace phân tán qua N bước                     |
+| **Gỡ lỗi bằng nhật ký** | Grep một file            | Truy vấn tập trung với traceId                |
+| **Lỗi mạng**            | Không tồn tại            | Timeout, partition, bão thử lại (retry storm) |
+| **Quy kết độ trễ**      | Rõ ràng trong call stack | Cần trace để phân tích từng bước              |
+| **Lỗi một phần**        | Không có (transaction)   | Có thể xảy ra ở mọi bước                      |
+| **Sức khỏe phụ thuộc**  | Một DB, một external     | N databases, Kafka, Redis, gRPC...            |
+| **Công cụ tối thiểu**   | grep + top + truy vấn    | nhật ký tập trung + chỉ số + trace            |
 
-### 2.4 Monolith Cũng Cần Giám sát — Nhưng Ở Mức Khác
+### 2.4 Monolith Cũng Cần Giám sát (monitoring) — Nhưng Ở Mức Khác
 
-Không nên hiểu nhầm rằng monolith không cần giám sát. Mọi hệ thống môi trường sản xuất đều cần giám sát — sự khác biệt là **mức độ phức tạp và phạm vi cần thiết**:
+Không nên hiểu nhầm rằng monolith không cần giám sát (monitoring). Mọi hệ thống ở môi trường sản xuất đều cần giám sát (monitoring) — sự khác biệt là **mức độ phức tạp và phạm vi cần thiết**:
 
 **Monolith cần (và đủ với):**
 
-- Uptime giám sát: process còn sống không?
-- Resource giám sát: CPU, memory, disk của một server
+- Giám sát (monitoring) thời gian hoạt động (uptime): process còn sống không?
+- Giám sát (monitoring) tài nguyên: CPU, memory, disk của một server
 - Tỷ lệ lỗi từ tệp nhật ký
-- Database giám sát truy vấn chậm
-- HTTP response time (nếu có web layer)
+- Giám sát (monitoring) truy vấn chậm trên database
+- Thời gian phản hồi HTTP (nếu có web layer)
 
-**Monolith bắt đầu cần khả năng quan sát khi:**
+**Monolith bắt đầu cần khả năng quan sát (observability) khi:**
 
 - Codebase lớn, nhiều module tương tác phức tạp
 - Database truy vấn phức tạp, khó biết truy vấn nào chậm
 - Nhiều người dùng đồng thời — cần hiểu distribution, không chỉ trung bình
 - Business logic phức tạp — cần trace luồng gọi để gỡ lỗi các trường hợp biên
 
-**Microservices cần khả năng quan sát từ ngày đầu vì:**
+**Microservices cần khả năng quan sát (observability) từ ngày đầu vì:**
 
 - Sự phức tạp của hệ thống phân tán không cho phép gỡ lỗi thủ công
 - Miền lỗi (failure domain) nhiều hơn một monolith trưởng thành
 - Network là dependency — có thể fail bất cứ lúc nào
 - Không thể SSH vào 8 container để gỡ lỗi một request
 
-**Kết luận:** Cả monolith và microservices đều cần giám sát. Microservices **bắt buộc** phải có khả năng quan sát (nhật ký + chỉ số + trace) từ sớm vì không có nó, hệ thống trở thành "hộp đen" không thể vận hành tin cậy. QRTable với 8 services và 4 protocol (HTTP/TCP/Kafka/WebSocket) là minh chứng điển hình.
+**Kết luận:** Cả monolith và microservices đều cần giám sát (monitoring). Microservices **bắt buộc** phải có khả năng quan sát (observability) — nhật ký + chỉ số + trace — từ sớm vì không có nó, hệ thống trở thành "hộp đen" không thể vận hành tin cậy. QRTable với 8 services và 4 protocol (HTTP/TCP/Kafka/WebSocket) là minh chứng điển hình.
 
-### 2.5 Tại sao QRTable đặt Phase 6 là khả năng quan sát
+### 2.5 Tại sao QRTable đặt Phase 6 là khả năng quan sát (observability)
 
-Nhìn lại roadmap QRTable: Phase 0 → Phase 5 là xây feature. Phase 6 là khả năng quan sát. Tại sao không làm từ Phase 0?
+Nhìn lại roadmap QRTable: Phase 0 → Phase 5 là xây feature. Phase 6 là khả năng quan sát (observability). Tại sao không làm từ Phase 0?
 
 **Lý do thực tế:** Khi team nhỏ, codebase còn nhỏ, chạy local với Docker Compose — có thể gỡ lỗi bằng cách đọc nhật ký từng container. Nhưng khi hệ thống có 8 services và sẵn sàng demo/triển khai, không thể tiếp tục gỡ lỗi thủ công.
 
 **Lý do kỹ thuật:** Một số chỉ số (order rate, KDS độ trễ, payment success rate) chỉ có ý nghĩa khi có lưu lượng thật. Xây bảng điều khiển trước khi có lưu lượng là tối ưu sớm.
 
-**Lý do cho demo/luận văn:** Ngăn xếp quan sát chứng minh hệ thống không chỉ "chạy được" mà còn "có thể vận hành". Đây là điểm cộng quan trọng — hội đồng thấy bảng điều khiển Grafana với chỉ số thời gian thực chứng tỏ bạn hiểu sản xuất, không chỉ lập trình.
+**Lý do cho demo/luận văn:** Ngăn xếp khả năng quan sát (observability) chứng minh hệ thống không chỉ "chạy được" mà còn "có thể vận hành". Đây là điểm cộng quan trọng — hội đồng thấy bảng điều khiển Grafana với chỉ số thời gian thực chứng tỏ bạn hiểu sản xuất, không chỉ lập trình.
 
 ---
 
-## 3. Giám sát và khả năng quan sát — Hai khái niệm bổ sung cho nhau
+## 3. Giám sát (monitoring) và khả năng quan sát (observability) — Hai khái niệm bổ sung cho nhau
 
-### 3.1 Giám sát — Phát Hiện Vấn Đề, Đo Lường Cam Kết
+### 3.1 Giám sát (monitoring) — Phát Hiện Vấn Đề, Đo Lường Cam Kết
 
-Giám sát là quá trình **liên tục đo lường** và **so sánh với ngưỡng định trước** để phát hiện khi hệ thống lệch khỏi trạng thái bình thường. Giám sát trả lời câu hỏi bạn đã biết trước cần hỏi.
+Giám sát (monitoring) là quá trình **liên tục đo lường** và **so sánh với ngưỡng định trước** để phát hiện khi hệ thống lệch khỏi trạng thái bình thường. Giám sát (monitoring) trả lời câu hỏi bạn đã biết trước cần hỏi.
 
 ```
-Giám sát = đặt câu hỏi trước → hệ thống tự trả lời theo thời gian thực
-           = "Tỷ lệ lỗi > 5%? → Alert"
+Giám sát (monitoring) = đặt câu hỏi trước → hệ thống tự trả lời theo thời gian thực
+           = "Tỷ lệ lỗi > 5%? → Cảnh báo"
            = "Service down? → Cảnh báo"
            = phản ứng — biết KHI vấn đề đang xảy ra hoặc mới xảy ra
 ```
 
-#### SLI, SLO, SLA — Nền tảng của giám sát có ý nghĩa
+#### SLI, SLO, SLA — Nền tảng của giám sát (monitoring) có ý nghĩa
 
-Giám sát chỉ có giá trị khi được neo vào **cam kết về chất lượng dịch vụ**. Ba khái niệm này định nghĩa cái gì cần giám sát và tại sao:
+Giám sát (monitoring) chỉ có giá trị khi được neo vào **cam kết về chất lượng dịch vụ**. Ba khái niệm này định nghĩa cái gì cần giám sát (monitoring) và tại sao:
 
 **SLI (Service Level Indicator):** Chỉ số đo lường thực tế — con số bạn đo được.
 
@@ -278,9 +280,9 @@ SLO = KDS ticket created trong 30s sau order.confirmed
 
 **Tại sao quan trọng cho QRTable:** Bảng điều khiển Chỉ số nghiệp vụ (Section 14) không chỉ hiển thị số — nó cần ngưỡng cụ thể để biết "đang tốt" hay "cần hành động". KDS thời gian xử lý panel có ngưỡng 10 phút — đây là SLO thực tế của QRTable.
 
-#### RED Method — Khung giám sát Cho Services
+#### RED Method — Khung giám sát (monitoring) Cho Services
 
-RED (Rate, Errors, Duration) là khung chuẩn để monitor hệ thống hướng service. Với mỗi service trong QRTable, cần giám sát:
+RED (Rate, Errors, Duration) là khung chuẩn để giám sát (monitoring) hệ thống hướng service. Với mỗi service trong QRTable, cần giám sát (monitoring):
 
 | Chỉ số       | Ý nghĩa                                 | Ví dụ QRTable                                                              |
 | ------------ | --------------------------------------- | -------------------------------------------------------------------------- |
@@ -290,7 +292,7 @@ RED (Rate, Errors, Duration) là khung chuẩn để monitor hệ thống hướ
 
 RED method phù hợp cho tất cả services của QRTable — BFF, Order, Catalog, Kitchen, Payment, SaaS.
 
-#### USE Method — Khung giám sát Cho Infrastructure
+#### USE Method — Khung giám sát (monitoring) Cho Infrastructure
 
 USE (Utilization, Saturation, Errors) là khung cho tài nguyên hạ tầng:
 
@@ -302,59 +304,59 @@ USE (Utilization, Saturation, Errors) là khung cho tài nguyên hạ tầng:
 
 USE method áp dụng cho: PostgreSQL, Redis, Kafka, CPU, Memory, Network của Docker containers.
 
-### 3.2 Khả năng quan sát — Hiểu nguyên nhân, gỡ lỗi vấn đề chưa biết trước
+### 3.2 Khả năng quan sát (observability) — Hiểu nguyên nhân, gỡ lỗi vấn đề chưa biết trước
 
-Khả năng quan sát là khả năng **suy luận về trạng thái bên trong** của hệ thống chỉ từ các tín hiệu bên ngoài (nhật ký, chỉ số, trace) — kể cả với những kiểu lỗi bạn **chưa từng hình dung trước**.
+Khả năng quan sát (observability) là khả năng **suy luận về trạng thái bên trong** của hệ thống chỉ từ các tín hiệu bên ngoài (nhật ký, chỉ số, trace) — kể cả với những kiểu lỗi bạn **chưa từng hình dung trước**.
 
 ```
-Khả năng quan sát = khả năng trả lời câu hỏi chưa biết trước
+Khả năng quan sát (observability) = khả năng trả lời câu hỏi chưa biết trước
              = "Tại sao 2% request của tenant-A chậm hơn tenant-B?"
              = "Kafka consumer lag đột biến lúc 10:23 — do message nào?"
              = gỡ lỗi chủ động — tìm ra vấn đề chưa có cảnh báo cho nó
 ```
 
-**Ví dụ QRTable — câu hỏi khả năng quan sát, không chỉ là giám sát:**
+**Ví dụ QRTable — câu hỏi khả năng quan sát (observability), không chỉ là giám sát (monitoring):**
 
-- Một tenant cụ thể bị chậm hơn các tenant khác — không có cảnh báo cho điều này, nhưng với trace + nhật ký có cấu trúc có `tenantId`, bạn có thể truy vấn và phát hiện
+- Một tenant cụ thể bị chậm hơn các tenant khác — không có cảnh báo cho điều này, nhưng với trace + nhật ký có cấu trúc với `tenantId`, bạn có thể truy vấn và phát hiện
 - KDS ticket của một station chậm hơn station kia — cần trace để xem thời gian xử lý theo station
 - Một Kafka consumer message gây ra vòng lặp retry — cần trace message ID qua toàn bộ flow
 
-### 3.3 Giám sát và Khả năng quan sát Cần Nhau — Không Thay Thế Nhau
+### 3.3 Giám sát (monitoring) và Khả năng quan sát (observability) Cần Nhau — Không Thay Thế Nhau
 
-Đây là điểm hay bị hiểu nhầm nhất. Không phải "microservices cần khả năng quan sát, monolith chỉ cần giám sát". Cả hai cần cả hai — nhưng với vai trò khác nhau trong cùng một hệ thống:
+Đây là điểm hay bị hiểu nhầm nhất. Không phải "microservices cần khả năng quan sát (observability), monolith chỉ cần giám sát (monitoring)". Cả hai cần cả hai — nhưng với vai trò khác nhau trong cùng một hệ thống:
 
 ```
-Chỉ số cảnh báo kích hoạt (Giám sát)
+Chỉ số cảnh báo kích hoạt (Giám sát (monitoring))
         ↓
         "Có vấn đề với Order service"
         ↓
-Truy vấn nhật ký để hiểu vấn đề (Khả năng quan sát)
+Truy vấn nhật ký để hiểu vấn đề (Khả năng quan sát (observability))
         ↓
         "Order submit đang fail với error 'Catalog TCP timeout'"
         ↓
-Trace để tìm nguyên nhân gốc (Khả năng quan sát)
+Trace để tìm nguyên nhân gốc (Khả năng quan sát (observability))
         ↓
         "Catalog service có truy vấn chậm, 300ms trên UPDATE statement"
         ↓
-Sửa lỗi, xem phục hồi chỉ số (Giám sát)
+Sửa lỗi, xem phục hồi chỉ số (Giám sát (monitoring))
         ↓
         "Tỷ lệ lỗi đã về 0%, độ trễ P95 bình thường"
 ```
 
-**Giám sát không đủ một mình** vì nó chỉ nói "có vấn đề" — không nói "tại sao". Khi cảnh báo kích hoạt, bạn cần khả năng quan sát để tìm nguyên nhân.
+**Giám sát (monitoring) không đủ một mình** vì nó chỉ nói "có vấn đề" — không nói "tại sao". Khi cảnh báo kích hoạt, bạn cần khả năng quan sát (observability) để tìm nguyên nhân.
 
-**Khả năng quan sát không đủ một mình** vì bạn không thể ngồi nhìn Grafana 24/7 để phát hiện vấn đề. Cảnh báo giám sát là cơ chế chủ động thông báo khi có sự cố, không cần ai xem.
+**Khả năng quan sát (observability) không đủ một mình** vì bạn không thể ngồi nhìn Grafana 24/7 để phát hiện vấn đề. Cảnh báo giám sát (monitoring) là cơ chế chủ động thông báo khi có sự cố, không cần ai xem.
 
 **Quy trình thực tế:**
 
-1. Giám sát đặt cảnh báo + mục tiêu SLO
+1. Giám sát (monitoring) đặt cảnh báo + mục tiêu SLO
 2. Cảnh báo kích hoạt khi SLO bị vi phạm
-3. Khả năng quan sát (nhật ký + trace) giúp gỡ lỗi tìm nguyên nhân
-4. Sửa lỗi → giám sát xác nhận SLO đã phục hồi
+3. Khả năng quan sát (observability) (nhật ký + trace) giúp gỡ lỗi tìm nguyên nhân
+4. Sửa lỗi → giám sát (monitoring) xác nhận SLO đã phục hồi
 
-### 3.4 Ba tín hiệu — Nền tảng của giám sát và khả năng quan sát
+### 3.4 Ba tín hiệu — Nền tảng của giám sát (monitoring) và khả năng quan sát (observability)
 
-| Tín hiệu    | Vai trò trong giám sát                           | Vai trò trong khả năng quan sát                 |
+| Tín hiệu    | Vai trò trong giám sát (monitoring)              | Vai trò trong khả năng quan sát (observability) |
 | ----------- | ------------------------------------------------ | ----------------------------------------------- |
 | **Nhật ký** | Đếm tỷ lệ lỗi, đếm sự kiện                       | Gỡ lỗi "chuyện gì đã xảy ra" cho request cụ thể |
 | **Chỉ số**  | Cảnh báo khi ngưỡng bị vượt, bảng điều khiển SLO | Phân tích xu hướng, lập kế hoạch năng lực       |
@@ -368,11 +370,11 @@ Ba tín hiệu không thay thế nhau — chúng bổ sung:
 
 ---
 
-## 4. Ba trụ cột của khả năng quan sát
+## 4. Ba trụ cột của khả năng quan sát (observability)
 
-### 4.1 Trụ Cột 1: Nhật ký — Sự Kiện Có Ngữ Cảnh
+### 4.1 Trụ cột 1: Nhật ký — Sự kiện có ngữ cảnh
 
-Nhật ký là bản ghi sự kiện có timestamp xảy ra trong hệ thống. Trong microservices, không phải nhật ký nào cũng đủ để debug.
+Nhật ký là bản ghi sự kiện có timestamp xảy ra trong hệ thống. Trong microservices, không phải nhật ký nào cũng đủ để gỡ lỗi.
 
 #### Ghi nhật ký có cấu trúc — Không phải văn bản thuần
 
@@ -398,14 +400,14 @@ Nhật ký là bản ghi sự kiện có timestamp xảy ra trong hệ thống. 
 
 Với nhật ký có cấu trúc, truy vấn "Tìm tất cả nhật ký của tenant-abc trong 30 phút qua có level ERROR" là một dòng LogQL — thao tác không thể làm với văn bản thuần.
 
-#### Nhật ký Levels — Nguyên Tắc Sử Dụng
+#### Mức nhật ký — Nguyên Tắc Sử Dụng
 
 | Level   | Dùng khi nào                               | Ví dụ trong QRTable                                 |
 | ------- | ------------------------------------------ | --------------------------------------------------- |
 | `error` | Lỗi cần xử lý ngay — không phải user error | TCP call đến Catalog timeout, DB connection fail    |
 | `warn`  | Bất thường nhưng không cần hành động ngay  | Kafka độ trễ consumer tăng, cache miss rate cao     |
 | `info`  | Sự kiện bình thường quan trọng             | Order submitted, Payment completed, Session created |
-| `debug` | Chi tiết cho debug — tắt ở production      | Truy vấn parameters, intermediate state             |
+| `debug` | Chi tiết khi gỡ lỗi — tắt ở production     | Truy vấn parameters, intermediate state             |
 | `trace` | Cực kỳ verbose — chỉ khi gỡ lỗi sâu        | Từng bước trong saga, từng Kafka message            |
 
 **Quy tắc QRTable:** Môi trường sản xuất chạy `info` level. Khi gỡ lỗi sự cố, tạm bật `debug` cho service đó mà không restart toàn bộ ngăn xếp.
@@ -444,7 +446,7 @@ Câu truy vấn cuối cùng là ví dụ về sức mạnh của ghi nhật ký
 
 ---
 
-### 4.2 Trụ Cột 2: Chỉ số — Số Liệu Có Ngữ Cảnh
+### 4.2 Trụ cột 2: Chỉ số — Số Liệu Có Ngữ Cảnh
 
 Chỉ số là **đo lường định lượng** của hệ thống theo thời gian. Khác với nhật ký (sự kiện đơn lẻ), chỉ số là tổng hợp — tổng, trung bình, phần trăm tính trên nhiều sự kiện.
 
@@ -555,7 +557,7 @@ Từ trace này bạn biết ngay: 290ms trong 353ms là do Catalog TCP call, c�
 
 ## 5. Kiểm tra sức khỏe — Tiên quyết trước tất cả
 
-Kiểm tra sức khỏe không nằm trong "ba trụ cột" truyền thống nhưng trong thực tế là **tiên quyết** — nếu không biết service nào đang chạy, các tín hiệu khác vô nghĩa. Đây cũng là input quan trọng cho giám sát: Prometheus thu thập (scrape) health điểm cuối để tạo `up` chỉ số cho cảnh báo.
+Kiểm tra sức khỏe không nằm trong "ba trụ cột" truyền thống nhưng trong thực tế là **tiên quyết** — nếu không biết service nào đang chạy, các tín hiệu khác vô nghĩa. Đây cũng là input quan trọng cho giám sát (monitoring): Prometheus thu thập (scrape) health điểm cuối để tạo `up` chỉ số cho cảnh báo.
 
 ### 5.1 Hai Loại Kiểm tra sức khỏe
 
@@ -603,7 +605,7 @@ Check tất cả external dependencies. Nếu fail → không route lưu lượn
 
 ## 6. Tracing phân tán và lan truyền ngữ cảnh
 
-### 6.1 Tại Sao Lan truyền ngữ cảnh Là Thách Thức Kỹ Thuật
+### 6.1 Tại sao lan truyền ngữ cảnh là thách thức kỹ thuật
 
 Trong monolith, một request = một thread = một execution context duy nhất. Trace của request đó là call stack trong process đó. Trong microservices, một request vượt qua nhiều process và nhiều protocol:
 
@@ -623,9 +625,9 @@ BFF (WebSocket emit)
 - TCP metadata: custom field trong NestJS TCP message
 - Kafka header: `traceparent` header trong Kafka record
 
-### 6.2 OpenTelemetry — Standard Mở Tránh Vendor Lock-in
+### 6.2 OpenTelemetry — Chuẩn mở, tránh phụ thuộc nhà cung cấp
 
-OpenTelemetry (OTel) là chuẩn mở cho telemetry (trace, chỉ số, nhật ký). Trước OTel, mỗi vendor (Jaeger, Zipkin, Datadog) có SDK riêng — tích hợp một vendor là phụ thuộc nhà cung cấp. OTel giải quyết bằng cách là **trung lập nhà cung cấp layer**:
+OpenTelemetry (OTel) là chuẩn mở cho telemetry (trace, chỉ số, nhật ký). Trước OTel, mỗi vendor (Jaeger, Zipkin, Datadog) có SDK riêng — tích hợp một vendor là phụ thuộc nhà cung cấp. OTel giải quyết bằng cách là **tầng trung lập nhà cung cấp**:
 
 ```
 Application code
@@ -637,11 +639,11 @@ Application code
 
 QRTable dùng OTel SDK → push trực tiếp sang Tempo (không cần Collector cho local thiết lập).
 
-### 6.3 Tự động gắn instrumentation vs Manual Instrumentation
+### 6.3 Tự động gắn instrumentation so với gắn thủ công
 
 **Tự động gắn instrumentation:** OTel SDK tự động tạo spans cho HTTP, database queries, gRPC, Kafka — không cần thay đổi code. Chỉ cần import instrumentation package đầu entry file.
 
-**Gắn instrumentation thủ công:** Tự tạo span cho business logic quan trọng:
+**Gắn instrumentation thủ công:** Tự tạo span cho logic nghiệp vụ quan trọng:
 
 ```typescript
 const span = tracer.startSpan('order.confirmationSaga');
@@ -653,11 +655,11 @@ try {
 }
 ```
 
-**Chiến lược QRTable:** Auto cho HTTP + TypeORM + Kafka + Redis. Manual cho business operations quan trọng (saga, KDS operations, payment flow).
+**Chiến lược QRTable:** Tự động cho HTTP + TypeORM + Kafka + Redis. Thủ công cho thao tác nghiệp vụ quan trọng (saga, KDS, luồng thanh toán).
 
-### 6.4 W3C TraceContext Standard
+### 6.4 Chuẩn W3C TraceContext
 
-Format header chuẩn để propagate trace context qua HTTP:
+Format header chuẩn để lan truyền ngữ cảnh trace qua HTTP:
 
 ```
 traceparent: 00-abc123def456789012345678901234-span001-01
@@ -671,7 +673,7 @@ OTel SDK tự động đọc `traceparent` từ incoming request, tạo child sp
 
 ## 7. Ngăn xếp công nghệ — Tại sao chọn gì
 
-### 7.1 Bảng Quyết Định Tổng Thể
+### 7.1 Bảng quyết định tổng thể
 
 | Nhu cầu                    | Chọn                 | Lý do                                                                               |
 | -------------------------- | -------------------- | ----------------------------------------------------------------------------------- |
@@ -684,7 +686,7 @@ OTel SDK tự động đọc `traceparent` từ incoming request, tạo child sp
 | Trực quan hóa + cảnh báo   | **Grafana**          | Bảng điều khiển thống nhất nhật ký/chỉ số/trace, bộ cảnh báo, tương quan datasource |
 | Khung kiểm tra sức khỏe    | **@nestjs/terminus** | Chính thức NestJS, khai báo, bộ chỉ báo tích hợp sẵn                                |
 
-### 7.2 Tại Sao PLG (Không Phải ELK)
+### 7.2 Tại sao PLG (không phải ELK)
 
 **Ngăn xếp ELK:** Elasticsearch + Logstash + Kibana — stack phổ biến nhưng nặng:
 
@@ -698,15 +700,15 @@ OTel SDK tự động đọc `traceparent` từ incoming request, tạo child sp
 
 Cho QRTable (Docker Compose single-node, RAM hạn chế), PLG là lựa chọn đúng.
 
-### 7.3 Tại Sao Tempo (Không Phải Jaeger)
+### 7.3 Tại sao Tempo (không phải Jaeger)
 
 **Jaeger:** Tracing backend phổ biến nhưng cần Cassandra hoặc Elasticsearch cho storage, UI riêng biệt.
 
-**Tempo:** Backend lưu trữ đối tượng (local filesystem cho dev) — không cần infra phụ, tích hợp native Grafana. Từ nhật ký hoặc chỉ số, click `trace_id` → mở Tempo trace trực tiếp trong cùng Grafana.
+**Tempo:** Backend lưu trữ đối tượng (local filesystem cho dev) — không cần infra phụ, tích hợp native Grafana. Từ nhật ký hoặc chỉ số, nhấp `trace_id` → mở Tempo trace trực tiếp trong cùng Grafana.
 
 ---
 
-## 8. Kiến trúc quan sát trong QRTable
+## 8. Kiến trúc khả năng quan sát (observability) trong QRTable
 
 ### 8.1 Luồng dữ liệu Tổng Thể
 
@@ -743,7 +745,7 @@ graph TB
         TEMPO["Tempo\n:3200"]
     end
 
-    GRAFANA["📊 Grafana :3001\nLog + Metric + Trace\nAlert Engine"]
+    GRAFANA["📊 Grafana :3001\nNhật ký + Chỉ số + Trace\nBộ cảnh báo"]
 
     BFF & ORDER & CATALOG & KITCHEN & PAYMENT & SAAS & AUTH & UA --> PINO
     PINO -->|"stdout"| PROMTAIL
@@ -765,7 +767,7 @@ graph TB
     style PROM fill:#e6522c,stroke:#333,color:#fff
 ```
 
-### 8.2 Tương quan — Sức Mạnh Thực Sự Của Grafana
+### 8.2 Tương quan — Sức mạnh thực sự của Grafana
 
 Grafana không chỉ hiển thị từng tín hiệu riêng biệt — nó cho phép **tương quan** giữa chúng trong cùng một giao diện:
 
@@ -842,7 +844,7 @@ Terminus có built-in cho TypeORM, Redis, HTTP. Với Kafka consumer và NestJS 
 { "status": "error", "error": { "postgres": {"status":"down","message":"ECONNREFUSED"} } }
 ```
 
-### 9.4 Tích Hợp Với Prometheus — `up` Metric
+### 9.4 Tích hợp với Prometheus — chỉ số `up`
 
 ```yaml
 # prometheus.yml
@@ -909,9 +911,9 @@ class OrderService {
 }
 ```
 
-**Quy tắc:** Luôn nhật ký `tenantId` và `traceId` trong mọi nhật ký entry liên quan đến business operation. Đây là labels chính để filter và tương quan.
+**Quy tắc:** Luôn ghi nhật ký `tenantId` và `traceId` trong mọi bản ghi nhật ký liên quan đến thao tác nghiệp vụ. Đây là nhãn chính để lọc và tương quan.
 
-### 10.2 Promtail — Nhật ký Collector
+### 10.2 Promtail — Thu thập nhật ký
 
 Promtail autodiscover Docker containers và forward nhật ký về Loki:
 
@@ -953,7 +955,7 @@ services:
 
 ### 10.3 Loki — Nhật ký Storage
 
-Loki lưu nhật ký theo chuỗi thời gian + labels. Không chỉ mục toàn văn → truy vấn phải filter label trước, search text sau.
+Loki lưu nhật ký theo chuỗi thời gian + labels. Không chỉ mục toàn văn → truy vấn phải lọc nhãn trước, tìm văn bản sau.
 
 ```yaml
 # loki-config.yaml
@@ -975,8 +977,8 @@ limits_config:
 2. Tạo traffic (login, submit order, ...)
 3. Grafana :3001 → Explore → Loki
 4. Query: {app="bff"}                          → thấy log JSON
-5. Query: {app="order"} |= "ERROR"             → filter error
-6. Query: {app=~"bff|order"} | json | tenantId="t-001"  → filter tenant
+5. Query: {app="order"} |= "ERROR"             → lọc lỗi
+6. Query: {app=~"bff|order"} | json | tenantId="t-001"  → lọc tenant
 ```
 
 ---
@@ -1014,7 +1016,7 @@ export const revenueTotal = new Counter({
   labelNames: ['tenantId', 'paymentMethod'], // cash, vietqr
 });
 
-// Histogram: KDS thời gian xử lý (quan trọng cho SLO monitoring)
+// Histogram: KDS thời gian xử lý (quan trọng cho giám sát (monitoring) SLO)
 export const kdsProcessingDuration = new Histogram({
   name: 'qrtable_kds_processing_duration_seconds',
   help: 'Time from order.confirmed to KDS completion',
@@ -1192,7 +1194,7 @@ this.orderClient.send('ORDER_SUBMIT', {
 // → trace tiếp tục từ BFF sang Order với đúng parent
 ```
 
-Giải pháp chuẩn: OTel `TextMapPropagator` với custom carrier cho TCP, hoặc NestJS interceptor tự động propagate cho tất cả TCP call/handler.
+Giải pháp chuẩn: OTel `TextMapPropagator` với custom carrier cho TCP, hoặc NestJS interceptor tự động lan truyền cho tất cả TCP call/handler.
 
 ### 13.3 Kafka — Tự Động Với OTel Kafka.js Instrumentation
 
@@ -1293,7 +1295,7 @@ Row 3: Payment & Sessions
 │ [stat — target > 99%]    │ [pie — cash vs VietQR]   │
 └──────────────────────────┴──────────────────────────┘
 
-Row 4: Multi-tenant View (có filter variable theo tenantId)
+Row 4: Multi-tenant View (có biến lọc theo tenantId)
 ┌──────────────────────────┬──────────────────────────┐
 │ Active Sessions          │ Orders by Tenant         │
 │ (gauge per tenant)       │ (bar chart)              │
@@ -1345,7 +1347,7 @@ Row 3: Dependencies
 | Bộ nhớ Redis cao      | `redis_memory_pct > 0.8`         | Cảnh báo     | 5 phút |
 
 ```yaml
-# prometheus-rules.yaml (Prometheus Alert Rules)
+# prometheus-rules.yaml (Quy tắc cảnh báo Prometheus)
 groups:
   - name: qrtable
     rules:
@@ -1381,7 +1383,7 @@ Phase 6 hoàn thành khi kiểm tra được tất cả:
 curl http://localhost:3300/health/live    # BFF liveness
 curl http://localhost:3300/health/ready  # BFF readiness + dependencies
 
-# Test failure detection: dừng Redis
+# Kiểm tra phát hiện lỗi: dừng Redis
 docker stop redis
 curl http://localhost:3300/health/ready  # → 503, redis: down
 
@@ -1390,15 +1392,15 @@ docker start redis
 curl http://localhost:3300/health/ready  # → 200, redis: up
 ```
 
-### 15.2 Loki — Nhật ký Query
+### 15.2 Loki — Truy vấn nhật ký
 
 ```bash
 # Grafana :3001 → Explore → Loki
 # Sau khi chạy traffic thật hoặc load script:
 
 {app="order"}                                    # log của Order service
-{app="bff", level="error"}                       # filter error
-{app=~"order|catalog"} | json | tenantId="t-001" # filter tenant
+{app="bff", level="error"}                       # lọc lỗi
+{app=~"order|catalog"} | json | tenantId="t-001" # lọc tenant
 ```
 
 ### 15.3 Tempo — Trace Propagation
@@ -1424,16 +1426,16 @@ up{job="qrtable-services"}                       # tất cả = 1
 ### 15.5 Kiểm tra cảnh báo
 
 ```bash
-# Test "ServiceDown" alert:
+# Kiểm tra cảnh báo "ServiceDown":
 docker stop order                     # Dừng Order service
 
-# Đợi 2 phút (alert for: 2m)
-# Grafana → Alerting → Alert Rules
+# Đợi 2 phút (cảnh báo sau: 2 phút)
+# Grafana → Alerting → Quy tắc cảnh báo
 # → "ServiceDown" phải chuyển sang "Firing" state
 
 docker start order
 # Đợi ~2 phút
-# → Alert phải về "Normal"
+# → Cảnh báo phải về "Normal"
 ```
 
 ### 15.6 Kịch bản demo — Khả năng trình diễn trong 5 phút
@@ -1455,23 +1457,23 @@ Sau Phase 6, phải có khả năng demo luồng này trong dưới 5 phút:
 
 ## 16. Tổng kết mô hình tư duy
 
-#### Sơ đồ: Mô hình tư duy — Giám sát và khả năng quan sát trong QRTable
+#### Sơ đồ: Mô hình tư duy — Giám sát (monitoring) và khả năng quan sát (observability) trong QRTable
 
 ```mermaid
 mindmap
-  root((Giám sát &\nKhả năng quan sát\nQRTable))
+  root((Giám sát (monitoring) &\nKhả năng quan sát (observability)\nQRTable))
     Tại Sao Cần
-      Microservices = nhiều hop = nhiều điểm lỗi
+      Microservices = nhiều bước = nhiều điểm lỗi
       Gỡ lỗi monolith đơn giản hơn vì 1 process 1 stack trace
       Microservices PHẢI có từ sớm vì lỗi mạng tồn tại
-      Cả hai kiến trúc cần giám sáting nhưng mức độ khác nhau
-    Giám sát
+      Cả hai kiến trúc cần giám sát (monitoring) nhưng mức độ khác nhau
+    Giám sát (monitoring)
       Phát hiện vấn đề đã biết trước
       SLI = đo gì / SLO = mục tiêu / SLA = cam kết
       RED Method: Rate + Errors + Duration
       USE Method: Utilization + Saturation + Errors
       Cảnh báo kích hoạt chủ động
-    Khả năng quan sát
+    Khả năng quan sát (observability)
       Hiểu nguyên nhân vấn đề chưa biết trước
       Nhật ký → chuyện gì xảy ra
       Chỉ số → xảy ra ở quy mô nào
@@ -1497,11 +1499,11 @@ mindmap
       `traceId` là khóa tương quan giữa tất cả tín hiệu
 ```
 
-**Về tại sao microservices cần khả năng quan sát hơn monolith:**
-Monolith có một ngăn xếp lỗi (stack trace), một tệp nhật ký, không có lỗi mạng. Microservices có N process, N luồng nhật ký, network là dependency có thể fail bất cứ lúc nào. Gỡ lỗi hệ thống phân tán mà không có khả năng quan sát là tìm kim trong nhiều đống rơm — không phải một đống.
+**Về tại sao microservices cần khả năng quan sát (observability) hơn monolith:**
+Monolith có một ngăn xếp lỗi (stack trace), một tệp nhật ký, không có lỗi mạng. Microservices có N process, N luồng nhật ký, network là dependency có thể fail bất cứ lúc nào. Gỡ lỗi hệ thống phân tán mà không có khả năng quan sát (observability) là tìm kim trong nhiều đống rơm — không phải một đống.
 
-**Về giám sát và khả năng quan sát:**
-Không phải "chọn một trong hai". Giám sát phát hiện vấn đề (cảnh báo khi ngưỡng bị vượt). Khả năng quan sát hiểu nguyên nhân (nhật ký + trace sau khi cảnh báo). Quy trình: cảnh báo → nhật ký → trace → fix → chỉ số xác nhận phục hồi.
+**Về giám sát (monitoring) và khả năng quan sát (observability):**
+Không phải "chọn một trong hai". Giám sát (monitoring) phát hiện vấn đề (cảnh báo khi ngưỡng bị vượt). Khả năng quan sát (observability) hiểu nguyên nhân (nhật ký + trace sau khi cảnh báo). Quy trình: cảnh báo → nhật ký → trace → sửa lỗi → chỉ số xác nhận phục hồi.
 
 **Về ba tín hiệu:**
 Nhật ký trả lời "chuyện gì", Chỉ số trả lời "bao nhiêu và so với gì", Trace trả lời "ở đâu và mất bao lâu". Ba tín hiệu bổ sung không thay thế — mỗi cái có câu hỏi riêng.
@@ -1513,4 +1515,4 @@ Tiên quyết trước khi nghĩ đến bất cứ thứ gì khác. Nếu không
 HTTP tự động. Kafka tự động với OTel instrumentation. TCP cần xử lý thủ công — đây là điểm duy nhất cần viết code thủ công cho tracing trong QRTable. Nếu bỏ qua, trace sẽ dừng ở BFF và không nối được sang các microservices.
 
 **Về Grafana:**
-Không chỉ là công cụ bảng điều khiển. Nó là điểm tương quan: từ chỉ số spike → click → Loki truy vấn → click traceId → Tempo trace. Luồng gỡ lỗi này chỉ hoạt động khi cả ba datasource đều đã cấu hình và dữ liệu có đủ context (tenantId, traceId trong mọi nhật ký entry).
+Không chỉ là công cụ bảng điều khiển. Nó là điểm tương quan: từ chỉ số tăng đột biến → nhấp → Loki truy vấn → nhấp traceId → Tempo trace. Luồng gỡ lỗi này chỉ hoạt động khi cả ba datasource đều đã cấu hình và dữ liệu có đủ context (tenantId, traceId trong mọi bản ghi nhật ký).
