@@ -1,8 +1,10 @@
 import {
   BILL_REF_PREFIXES,
+  PLAN_FEATURE_CODES,
   RESERVED_TENANT_SLUGS,
   TenantStatus,
   buildTenantSuspendedRedisKey,
+  hasPlanFeature,
   normalizePlanCode,
 } from './saas.constants';
 
@@ -80,5 +82,11 @@ describe('saas.constants', () => {
 
   it('defines the locked tenant statuses', () => {
     expect(Object.values(TenantStatus)).toEqual(['ACTIVE', 'SUSPENDED', 'CLOSED']);
+  });
+
+  it('exposes canonical dashboard plan feature codes', () => {
+    expect(PLAN_FEATURE_CODES.ANALYTICS_BASIC).toBe('analytics_basic');
+    expect(hasPlanFeature(['analytics_basic'], PLAN_FEATURE_CODES.ANALYTICS_BASIC)).toBe(true);
+    expect(hasPlanFeature(['basic_pos'], PLAN_FEATURE_CODES.ANALYTICS_ADVANCED)).toBe(false);
   });
 });

@@ -73,6 +73,8 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.SAAS_PLAN_NOT_FOUND]: 'Pricing plan not found',
   [ErrorCode.SAAS_SUBSCRIPTION_NOT_FOUND]: 'Subscription not found',
   [ErrorCode.SAAS_ACTIVE_SUBSCRIPTION_NOT_FOUND]: 'Active subscription not found',
+  [ErrorCode.SAAS_PLAN_FEATURE_REQUIRED]:
+    'Your current plan does not include this feature. Please upgrade your subscription.',
   [ErrorCode.SAAS_CANCEL_REASON_REQUIRED]: 'Cancellation reason is required',
   [ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND]: 'Subscription invoice not found',
   [ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CANCELED]: 'Only pending invoices can be canceled',

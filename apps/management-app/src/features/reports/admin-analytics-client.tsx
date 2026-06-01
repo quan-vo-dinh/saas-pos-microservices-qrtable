@@ -4,7 +4,7 @@ import { invoiceStatusVi, tenantStatusVi } from '@einvoice/shared-constants';
 import { useMemo, useState } from 'react';
 import { formatVnd } from '@/lib/format-vnd';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ReportMetricCard } from './components/report-metric-card';
 import { ReportErrorState, ReportLoadingGrid } from './components/report-state';
 import { ReportRangeFilter } from './components/report-range-filter';

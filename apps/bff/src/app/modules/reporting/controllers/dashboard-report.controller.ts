@@ -3,9 +3,11 @@ import { MetadataKey } from '@common/constants/common.constant';
 import { HTTP_MESSAGE } from '@common/constants/enum/http-message.enum';
 import { PERMISSION } from '@common/constants/enum/role.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
+import { PLAN_FEATURE_CODES } from '@common/constants/saas.constants';
 import { Authorization } from '@common/decorators/authorizer.decorator';
 import { Permissions } from '@common/decorators/permission.decorator';
 import { ProcessId } from '@common/decorators/processId.decorator';
+import { RequiresPlanFeature } from '@common/decorators/requires-plan-feature.decorator';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { ReportRangeQueryDto } from '@common/interfaces/gateway/report';
@@ -30,6 +32,7 @@ export class DashboardReportController {
   ) {}
 
   @Get(REPORTING_BFF_ROUTES.dashboardRevenue)
+  @RequiresPlanFeature(PLAN_FEATURE_CODES.ANALYTICS_BASIC)
   @Permissions([PERMISSION.REPORT_READ_OWN])
   @ApiOkResponse({ type: ResponseDto })
   @ApiOperation({ summary: 'Tenant sales revenue report' })
@@ -44,6 +47,7 @@ export class DashboardReportController {
   }
 
   @Get(REPORTING_BFF_ROUTES.dashboardOrders)
+  @RequiresPlanFeature(PLAN_FEATURE_CODES.ANALYTICS_BASIC)
   @Permissions([PERMISSION.REPORT_READ_OWN])
   @ApiOkResponse({ type: ResponseDto })
   @ApiOperation({ summary: 'Tenant order and bill report' })
@@ -58,6 +62,7 @@ export class DashboardReportController {
   }
 
   @Get(REPORTING_BFF_ROUTES.dashboardTables)
+  @RequiresPlanFeature(PLAN_FEATURE_CODES.ANALYTICS_BASIC)
   @Permissions([PERMISSION.REPORT_READ_OWN])
   @ApiOkResponse({ type: ResponseDto })
   @ApiOperation({ summary: 'Tenant table and menu availability report' })

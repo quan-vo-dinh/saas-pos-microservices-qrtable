@@ -4,10 +4,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { SepayConnectButton } from '@/features/saas/payment-settings/sepay-connect-button';
 import { PaymentSettingsSummary } from '@/features/saas/payment-settings/payment-settings-summary';
 import { DisconnectSepayDialog } from '@/features/saas/payment-settings/disconnect-sepay-dialog';
+import { PaymentSettingsShell } from '@/features/saas/payment-settings/payment-settings-shell';
+import { PaymentPartnershipHero } from '@/features/saas/payment-settings/payment-partnership-hero';
 import { saasApi } from '@/features/saas/api';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 
 export default function DashboardPaymentSettingsPage() {
@@ -25,21 +28,23 @@ export default function DashboardPaymentSettingsPage() {
   const canUpdate = hasPermission(permissions, phase4bPermissions.paymentSettingsUpdateOwn);
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Thanh toán — VietQR / SePay</h1>
-        <p className="text-muted-foreground text-sm">Kết nối OAuth SePay cho tenant (không lưu client secret trên trình duyệt).</p>
-      </div>
+    <PaymentSettingsShell hero={<PaymentPartnershipHero />}>
+      {q.isLoading ? (
+        <div className="grid w-full gap-3">
+          <Skeleton className="h-40 w-full rounded-md" />
+          <Skeleton className="h-10 w-36" />
+        </div>
+      ) : null}
 
-      {q.isLoading ? <p className="text-muted-foreground text-sm">Đang tải…</p> : null}
       {q.isError ? <p className="text-destructive text-sm">{(q.error as Error).message}</p> : null}
+
       {q.data ? <PaymentSettingsSummary s={q.data} /> : null}
 
       <div className="flex flex-wrap gap-2">
         {canUpdate && q.data?.connectionStatus !== 'CONNECTED' ? <SepayConnectButton /> : null}
         {canUpdate && q.data?.connectionStatus === 'CONNECTED' ? (
           <>
-            <SepayConnectButton label="Đổi / kết nối lại SePay" />
+            <SepayConnectButton label="Đổi / kết nối lại SePay" variant="outline" />
             <DisconnectSepayDialog onDisconnected={() => void qc.invalidateQueries({ queryKey: ['dashboard-payment-settings'] })} />
           </>
         ) : null}
@@ -49,6 +54,6 @@ export default function DashboardPaymentSettingsPage() {
           </Button>
         ) : null}
       </div>
-    </div>
+    </PaymentSettingsShell>
   );
 }

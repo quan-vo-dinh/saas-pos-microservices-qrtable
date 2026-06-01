@@ -6,7 +6,12 @@ import { formatVnd } from '@/lib/format-vnd';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ReportEmptyState } from './report-state';
 
-type Point = { label: string; grossSalesVnd: number; collectedVnd?: number; platformRevenueVnd?: number };
+type Point = {
+  label: string;
+  grossSalesVnd?: number;
+  collectedVnd?: number;
+  platformRevenueVnd?: number;
+};
 
 type Props = {
   title: string;

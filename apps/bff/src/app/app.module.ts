@@ -18,8 +18,10 @@ import { ReportingModule } from './modules/reporting/reporting.module';
 import { UserGuard } from '@common/guards/user.guard';
 import { PermissionGuard } from '@common/guards/permission.guard';
 import { SessionGuard } from '@common/guards/session.guard';
+import { PlanFeatureGuard } from '@common/guards/plan-feature.guard';
 import { TenantGuard } from '@common/guards/tenant.guard';
 import { CustomerTenantLifecycleGuard } from './guards/customer-tenant-lifecycle.guard';
+import { TenantSubscriptionContextGuard } from './modules/reporting/guards/tenant-subscription-context.guard';
 import { RedisProvider } from '@common/configuration/redis.config';
 import { ThrottlerProvider } from '@common/configuration/throttler.config';
 import { ThrottlerGuard } from '@nestjs/throttler';
@@ -62,6 +64,14 @@ import { ThrottlerGuard } from '@nestjs/throttler';
     {
       provide: APP_GUARD,
       useClass: PermissionGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TenantSubscriptionContextGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PlanFeatureGuard,
     },
     {
       provide: APP_GUARD,

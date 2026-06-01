@@ -74,6 +74,7 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.SAAS_PLAN_NOT_FOUND]: 'Không tìm thấy gói dịch vụ',
   [ErrorCode.SAAS_SUBSCRIPTION_NOT_FOUND]: 'Không tìm thấy gói đăng ký',
   [ErrorCode.SAAS_ACTIVE_SUBSCRIPTION_NOT_FOUND]: 'Không tìm thấy gói đăng ký đang hoạt động',
+  [ErrorCode.SAAS_PLAN_FEATURE_REQUIRED]: 'Gói hiện tại chưa bao gồm tính năng này. Vui lòng nâng cấp gói đăng ký.',
   [ErrorCode.SAAS_CANCEL_REASON_REQUIRED]: 'Vui lòng nhập lý do hủy',
   [ErrorCode.SAAS_SUBSCRIPTION_INVOICE_NOT_FOUND]: 'Không tìm thấy hóa đơn đăng ký',
   [ErrorCode.SAAS_ONLY_PENDING_INVOICE_CAN_BE_CANCELED]: 'Chỉ hóa đơn đang chờ mới có thể hủy',

@@ -1,3 +1,12 @@
+export type DashboardEntitlements = {
+  currentPlanCode: string | null;
+  features: string[];
+  hasBasicAnalytics: boolean;
+  hasAdvancedAnalytics: boolean;
+  canUseExtendedRange: boolean;
+  upgradeUrl: string;
+};
+
 export type ReportGrain = 'day' | 'week' | 'month';
 
 export type ReportRangeQuery = {

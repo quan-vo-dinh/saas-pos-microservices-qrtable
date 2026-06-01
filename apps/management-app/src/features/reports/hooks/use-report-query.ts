@@ -4,24 +4,31 @@ import { useQuery } from '@tanstack/react-query';
 import { reportsApi } from '../api';
 import type { ReportRangeQuery } from '../types';
 
-export function useTenantRevenueReport(query: ReportRangeQuery) {
+type ReportQueryOptions = {
+  enabled?: boolean;
+};
+
+export function useTenantRevenueReport(query: ReportRangeQuery, options?: ReportQueryOptions) {
   return useQuery({
     queryKey: ['reports', 'tenant', 'revenue', query],
     queryFn: () => reportsApi.getTenantRevenue(query),
+    enabled: options?.enabled ?? true,
   });
 }
 
-export function useTenantOrderReport(query: ReportRangeQuery) {
+export function useTenantOrderReport(query: ReportRangeQuery, options?: ReportQueryOptions) {
   return useQuery({
     queryKey: ['reports', 'tenant', 'orders', query],
     queryFn: () => reportsApi.getTenantOrders(query),
+    enabled: options?.enabled ?? true,
   });
 }
 
-export function useTenantTableReport() {
+export function useTenantTableReport(options?: ReportQueryOptions) {
   return useQuery({
     queryKey: ['reports', 'tenant', 'tables'],
     queryFn: () => reportsApi.getTenantTables(),
+    enabled: options?.enabled ?? true,
   });
 }
 

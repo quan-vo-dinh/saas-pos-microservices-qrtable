@@ -6,6 +6,7 @@ import type { ReportGrain, ReportRangeQuery } from '../types';
 type Props = {
   value: ReportRangeQuery;
   onChange: (next: ReportRangeQuery) => void;
+  canUseExtendedRange?: boolean;
 };
 
 const GRAIN_OPTIONS: { value: ReportGrain; label: string }[] = [
@@ -14,7 +15,9 @@ const GRAIN_OPTIONS: { value: ReportGrain; label: string }[] = [
   { value: 'month', label: 'Theo tháng' },
 ];
 
-export function ReportRangeFilter({ value, onChange }: Props) {
+export function ReportRangeFilter({ value, onChange, canUseExtendedRange = true }: Props) {
+  const grainOptions = canUseExtendedRange ? GRAIN_OPTIONS : GRAIN_OPTIONS.filter((opt) => opt.value === 'day');
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Select
@@ -25,14 +28,17 @@ export function ReportRangeFilter({ value, onChange }: Props) {
           <SelectValue placeholder="Nhóm theo" />
         </SelectTrigger>
         <SelectContent>
-          {GRAIN_OPTIONS.map((opt) => (
+          {grainOptions.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
               {opt.label}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      <p className="text-muted-foreground text-xs">Mặc định 7 ngày gần nhất · múi giờ Asia/Ho_Chi_Minh</p>
+      <p className="text-muted-foreground text-xs">
+        Mặc định 7 ngày gần nhất · múi giờ Asia/Ho_Chi_Minh
+        {!canUseExtendedRange ? ' · nâng cấp Premium để xem theo tuần/tháng' : ''}
+      </p>
     </div>
   );
 }

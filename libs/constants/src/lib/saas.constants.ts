@@ -47,6 +47,22 @@ export const DEFAULT_PLAN_CODES = {
   PREMIUM: 'PREMIUM',
 } as const;
 
+/** Canonical SaaS plan feature codes (dashboard entitlements + plan editor). */
+export const PLAN_FEATURE_CODES = {
+  BASIC_POS: 'basic_pos',
+  ANALYTICS_BASIC: 'analytics_basic',
+  ANALYTICS_ADVANCED: 'analytics_advanced',
+  PRIORITY_SUPPORT: 'priority_support',
+} as const;
+
+export type PlanFeatureCode = (typeof PLAN_FEATURE_CODES)[keyof typeof PLAN_FEATURE_CODES];
+
+export const PLAN_FEATURE_CODE_VALUES = Object.values(PLAN_FEATURE_CODES) as PlanFeatureCode[];
+
+export function hasPlanFeature(features: string[] | null | undefined, required: PlanFeatureCode): boolean {
+  return Array.isArray(features) && features.includes(required);
+}
+
 export const SAAS_EVENTS = {
   TENANT_CREATED: 'tenant.created',
   TENANT_SUSPENDED: 'tenant.suspended',

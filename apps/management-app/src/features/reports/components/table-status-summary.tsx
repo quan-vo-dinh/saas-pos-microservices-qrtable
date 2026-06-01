@@ -1,6 +1,7 @@
 'use client';
 
 import { tableStatusVi } from '@einvoice/shared-constants';
+import type { TableStatus } from '@einvoice/types';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ReportEmptyState } from './report-state';
@@ -47,7 +48,7 @@ export function TableStatusSummary({ summary, tableStatusBreakdown }: Props) {
         <div className="flex flex-wrap gap-2">
           {tableStatusBreakdown.map((row) => (
             <Badge key={row.status} variant="secondary">
-              {tableStatusVi(row.status)}: {row.count}
+              {tableStatusVi(row.status as TableStatus)}: {row.count}
             </Badge>
           ))}
         </div>

@@ -240,6 +240,17 @@ Implementation evidence must include:
 
 Suggested verification commands are listed in the implementation plan.
 
+## Phase 4D.1 — Entitlements & UI Polish (2026-06-01)
+
+Implemented on top of the Phase 4D MVP:
+
+- Canonical plan feature codes in `libs/constants/saas.constants.ts` and `libs/shared/constants/saas-wire-types.ts`.
+- BFF `@RequiresPlanFeature` + `PlanFeatureGuard` on tenant dashboard report routes (`analytics_basic`).
+- `TenantSubscriptionContextGuard` hydrates subscription/features from SaaS `SUBSCRIPTION.GET_CURRENT` before plan checks.
+- Management App derives `DashboardEntitlements` from `GET /dashboard/subscription` and skips report API calls when widgets are locked.
+- Tenant `/dashboard` shows plan/quota overview, locked upgrade cards (FREE/BASIC), and full analytics for PREMIUM.
+- Super Admin `/admin/analytics` remains ungated; tenant drilldown shows selected tenant plan features for audit context.
+
 ## Handoff / Deferred Work
 
 Implementation should follow:

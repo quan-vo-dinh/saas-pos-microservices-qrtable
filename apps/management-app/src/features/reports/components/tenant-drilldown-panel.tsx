@@ -1,6 +1,6 @@
 'use client';
 
-import { tenantStatusVi } from '@einvoice/shared-constants';
+import { planFeatureVi, tenantStatusVi } from '@einvoice/shared-constants';
 import { useMemo, useState } from 'react';
 import { formatVnd } from '@/lib/format-vnd';
 import { saasApi } from '@/features/saas/api';
@@ -35,6 +35,18 @@ export function TenantDrilldownPanel({ query }: Props) {
     [tenantId, tenantsQuery.data?.items],
   );
 
+  const plansQuery = useQuery({
+    queryKey: ['admin', 'plans'],
+    queryFn: () => saasApi.listPlansAdmin(),
+  });
+
+  const tenantPlanFeatures = useMemo(() => {
+    if (!selectedTenant?.planCode) {
+      return [];
+    }
+    return plansQuery.data?.find((plan) => plan.code === selectedTenant.planCode)?.features ?? [];
+  }, [plansQuery.data, selectedTenant]);
+
   const revenue = useAdminTenantRevenueReport(tenantId || undefined, query);
   const orders = useAdminTenantOrderReport(tenantId || undefined, query);
   const tables = useAdminTenantTableReport(tenantId || undefined);
@@ -64,7 +76,29 @@ export function TenantDrilldownPanel({ query }: Props) {
         {selectedTenant ? (
           <Alert>
             <AlertTitle>Tenant đang xem: {selectedTenant.name}</AlertTitle>
-            <AlertDescription>Slug: {selectedTenant.slug}</AlertDescription>
+            <AlertDescription className="space-y-1">
+              <span className="block">Slug: {selectedTenant.slug}</span>
+              {selectedTenant.planCode ? (
+                <span className="block">
+                  Gói tenant: <strong>{selectedTenant.planCode}</strong>
+                  {selectedTenant.subscriptionStatus
+                    ? ` · ${tenantStatusVi(selectedTenant.subscriptionStatus)}`
+                    : ''}
+                </span>
+              ) : null}
+              <span className="block text-xs">
+                Trên dashboard của tenant: báo cáo cơ bản{' '}
+                {selectedTenant.planCode === 'FREE' ? 'bị khóa' : 'có thể mở tùy feature gói'} — Super Admin vẫn
+                drilldown được.
+              </span>
+              {tenantPlanFeatures.length > 0 ? (
+                <span className="block text-xs">
+                  Tính năng gói: {tenantPlanFeatures.map((f) => planFeatureVi(f)).join(', ')}
+                </span>
+              ) : selectedTenant.planCode && plansQuery.isLoading ? (
+                <span className="block text-xs text-muted-foreground">Đang tải feature gói…</span>
+              ) : null}
+            </AlertDescription>
           </Alert>
         ) : null}
 

@@ -48,6 +48,14 @@ export const SAAS_TENANT_TYPE = {
   OTHER: 'OTHER',
 } as const;
 
+/** Plan feature wire codes — must match `PLAN_FEATURE_CODES` in libs/constants/saas.constants.ts */
+export const SAAS_PLAN_FEATURE = {
+  BASIC_POS: 'basic_pos',
+  ANALYTICS_BASIC: 'analytics_basic',
+  ANALYTICS_ADVANCED: 'analytics_advanced',
+  PRIORITY_SUPPORT: 'priority_support',
+} as const;
+
 export type SaasTenantStatus = (typeof SAAS_TENANT_STATUS)[keyof typeof SAAS_TENANT_STATUS];
 export type SaasSubscriptionStatus = (typeof SAAS_SUBSCRIPTION_STATUS)[keyof typeof SAAS_SUBSCRIPTION_STATUS];
 export type SaasInvoiceStatus = (typeof SAAS_INVOICE_STATUS)[keyof typeof SAAS_INVOICE_STATUS];
@@ -55,3 +63,4 @@ export type SaasBillingPeriod = (typeof SAAS_BILLING_PERIOD)[keyof typeof SAAS_B
 export type SaasPaymentConnectionStatus =
   (typeof SAAS_PAYMENT_CONNECTION_STATUS)[keyof typeof SAAS_PAYMENT_CONNECTION_STATUS];
 export type SaasTenantType = (typeof SAAS_TENANT_TYPE)[keyof typeof SAAS_TENANT_TYPE];
+export type SaasPlanFeature = (typeof SAAS_PLAN_FEATURE)[keyof typeof SAAS_PLAN_FEATURE];

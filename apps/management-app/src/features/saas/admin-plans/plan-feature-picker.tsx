@@ -5,14 +5,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
 /** Wire codes stored in DB/API — display via planFeatureVi(). */
-export const PLAN_FEATURE_WIRE_CODES = [
-  'basic_pos',
-  'analytics_basic',
-  'analytics_advanced',
-  'priority_support',
-] as const;
+import { SAAS_PLAN_FEATURE, type SaasPlanFeature } from '@einvoice/shared-constants';
 
-export type PlanFeatureWireCode = (typeof PLAN_FEATURE_WIRE_CODES)[number];
+export const PLAN_FEATURE_WIRE_CODES = Object.values(SAAS_PLAN_FEATURE) as SaasPlanFeature[];
+
+export type PlanFeatureWireCode = SaasPlanFeature;
 
 export function PlanFeaturePicker({
   value,

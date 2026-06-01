@@ -1,4 +1,5 @@
 import {
+  PLAN_FEATURE_CODE_VALUES,
   SubscriptionInvoiceStatus,
   SubscriptionStatus,
   TenantPaymentConnectionStatus,
@@ -8,6 +9,7 @@ import {
 import {
   SAAS_INVOICE_STATUS,
   SAAS_PAYMENT_CONNECTION_STATUS,
+  SAAS_PLAN_FEATURE,
   SAAS_SUBSCRIPTION_STATUS,
   SAAS_TENANT_STATUS,
   SAAS_TENANT_TYPE,
@@ -34,5 +36,9 @@ describe('saas-wire-types', () => {
 
   it('matches backend TenantType enum values', () => {
     expect(Object.values(SAAS_TENANT_TYPE).sort()).toEqual(Object.values(TenantType).sort());
+  });
+
+  it('matches backend plan feature codes', () => {
+    expect(Object.values(SAAS_PLAN_FEATURE).sort()).toEqual([...PLAN_FEATURE_CODE_VALUES].sort());
   });
 });
