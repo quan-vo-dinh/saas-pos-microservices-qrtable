@@ -17,7 +17,7 @@ If current code and an accepted spec disagree, verify the behavior in code first
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `business-logic.md`                 | Current cross-phase business logic and domain rules.                                                 |
 | `technical-architecture.md`         | Current architecture, service ownership, data ownership, Redis/Kafka/TCP/auth/frontend architecture. |
-| `implementation_plan.md`            | Current roadmap/status after the Phase 4A representative Saga slice and Phase 4B stabilization.      |
+| `implementation_plan.md`            | Current roadmap/status after Phase 4D.1 dashboard reporting and entitlement synchronization.         |
 | `phases/`                           | Final phase records after implementation and audit.                                                  |
 | `architecture/permission-matrix.md` | RBAC source of truth after verification with code.                                                   |
 

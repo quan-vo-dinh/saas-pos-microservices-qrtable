@@ -1,7 +1,7 @@
 # Permission Matrix — QRTable
 
-> **Status:** Active after Phase 4B · static-verified against `PERMISSION` enum and `role.json` on 2026-05-31
-> **Version:** 2.0
+> **Status:** Active after Phase 4D.1 · static-verified against `PERMISSION` enum and `role.json` on 2026-06-01
+> **Version:** 2.1
 > **Single source of truth:** RBAC documentation is derived from `libs/constants/src/lib/enum/role.enum.ts` and `apps/user-access/src/seeder/role.json`.
 
 ## 1. Purpose And Principles
@@ -21,6 +21,7 @@ Design principles:
 - CUSTOMER has no `role.json` entry and is controlled by session-scoped customer guards.
 - SUPER_ADMIN receives every permission in the enum and bypasses tenant scoping for platform administration.
 - `SAAS_*` permissions are legacy aliases kept for backward compatibility; Phase 4B uses `TENANT_*`, `SUBSCRIPTION_*`, `PLAN_*`, and `PAYMENT_SETTINGS_*`.
+- Report permissions are RBAC capabilities only. SaaS plan feature entitlements such as `analytics_basic` are enforced separately by `PlanFeatureGuard` on feature-gated tenant report routes.
 
 ## 2. Glossary
 
@@ -126,7 +127,7 @@ Design principles:
 | `SAAS_*` permissions                                           | Still present in code for SUPER*ADMIN backward compatibility; use Phase 4B `TENANT*\*` permissions for new SaaS behavior. |
 | `PRODUCT_*` permissions                                        | Still present for SUPER_ADMIN backward compatibility with template code.                                                  |
 
-## 6. Canonical Permission Matrix (6 Roles × 65 Permissions)
+## 6. Canonical Permission Matrix (6 Roles × 67 Permissions)
 
 Legend: `✅` = granted; blank = not granted.
 
@@ -197,16 +198,20 @@ Legend: `✅` = granted; blank = not granted.
 | 63        | `service_request.create`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
 | 64        | `service_request.acknowledge`   |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
 | 65        | `service_request.resolve`       |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| **Total** |                                 |   **65**    | **37** | **34**  | **15** | **6** |  **6**  |
+| 66        | `report.read_own`               |     ✅      |   ✅   |   ✅    |        |       |         |
+| 67        | `report.read_any`               |     ✅      |        |         |        |       |         |
+| **Total** |                                 |   **67**    | **38** | **35**  | **15** | **6** |  **6**  |
 
 ## 7. Assignment Notes
 
-- SUPER_ADMIN has every enum permission: 65/65.
-- OWNER has full tenant operations plus own-tenant SaaS self-service: `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, and own payment-settings read/update.
-- MANAGER has operational permissions plus own-tenant SaaS visibility: `tenant.read_own`, `subscription.read_own`, `plan.read`, and `payment_settings.read_own`.
+- SUPER_ADMIN has every enum permission: 67/67, including platform analytics and tenant report drilldown through `report.read_any`.
+- OWNER has full tenant operations plus own-tenant SaaS self-service: `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, own payment-settings read/update, and own dashboard reporting through `report.read_own`.
+- MANAGER has operational permissions plus own-tenant SaaS visibility: `tenant.read_own`, `subscription.read_own`, `plan.read`, `payment_settings.read_own`, and own dashboard reporting through `report.read_own`.
 - WAITER has catalog read, plan read, order confirm/cancel pending/read, payment create/cash/history, table transfer/status, and service-request handling.
 - CHEF and BARISTA have catalog read, plan read, and KDS queue/update/recall. They do not have `kitchen.set_priority`.
 - `order.cancel_pending` is granted to OWNER, MANAGER, and WAITER; `order.cancel_processing` is restricted to OWNER and MANAGER.
+- `report.read_own` permits the tenant dashboard route family, but tenant report data also requires an active subscription and the relevant SaaS plan feature. Current tenant report routes require `analytics_basic`.
+- `report.read_any` permits Super Admin platform analytics and explicit tenant drilldown. It is not gated by the selected tenant's SaaS plan.
 
 ## 8. CUSTOMER Actor
 
@@ -249,13 +254,13 @@ node tools/seed.js apps/user-access/src/seeder prune
 
 `tools/verify-permission-matrix.sh` is an integration smoke test. It requires BFF/Authorizer and seeded MongoDB to be running, and it checks representative permissions rather than parsing this markdown file.
 
-> **2026-05-31 verification note, updated after Phase 4C scope reduction:** Static code/seed verification confirms 65 enum permissions and role seed counts `SUPER_ADMIN=65`, `OWNER=37`, `MANAGER=34`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. The integration smoke script depends on live seeded credentials and resolves username/password from `tools/auth-bootstrap-users.json`, checks `/authorizer/me` role identity, and asserts exact permission counts to avoid drift from the dev seed. Run Keycloak bootstrap, sync Mongo users, then rerun `bash tools/verify-permission-matrix.sh` before marking live RBAC smoke fully green.
+> **2026-06-01 verification note, updated after Phase 4D.1 dashboard reporting:** Static code/seed verification confirms 67 enum permissions and role seed counts `SUPER_ADMIN=67`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. The integration smoke script depends on live seeded credentials and resolves username/password from `tools/auth-bootstrap-users.json`, checks `/authorizer/me` role identity, and asserts exact permission counts to avoid drift from the dev seed. Run Keycloak bootstrap, sync Mongo users, then rerun `bash tools/verify-permission-matrix.sh` before marking live RBAC smoke fully green.
 
 ## 10. Frontend Navigation Vs API Enforcement
 
-| Layer               | Responsibility                                                                      | Source of truth                                         |
-| ------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| BFF / microservices | Enforce `UserGuard` → `TenantGuard` → `PermissionGuard` on protected API endpoints. | `role.json`, controller `@Permissions`, and this matrix |
-| `management-app`    | Hide or redirect role-inappropriate navigation as UX only.                          | Role-routing and sidebar configuration in the frontend  |
+| Layer               | Responsibility                                                                                                                                                                        | Source of truth                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| BFF / microservices | Enforce `UserGuard` → `TenantGuard` → `PermissionGuard` on protected API endpoints; feature-gated tenant dashboard routes additionally use subscription context + `PlanFeatureGuard`. | `role.json`, controller `@Permissions`, `@RequiresPlanFeature`, and this matrix        |
+| `management-app`    | Hide or redirect role-inappropriate navigation as UX only; render package-locked dashboard widgets from subscription entitlements.                                                    | Role-routing, sidebar configuration, and dashboard entitlement helpers in the frontend |
 
 Frontend navigation does not replace backend authorization. A hidden menu is only convenience; an API call outside the role's permissions must still return 403.

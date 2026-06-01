@@ -1,7 +1,7 @@
 # Source backbone cho Chương 1 và Chương 2
 
-> Phase 2B - Source Backbone & Initial References.  
-> Cập nhật: 2026-05-29.  
+> Phase 2B - Source Backbone & Initial References.
+> Cập nhật: 2026-05-29. Addendum note: 2026-06-01.
 > Phạm vi: chỉ chuẩn bị nguồn và ma trận citation cho Chương 1-2; chưa viết nội dung dài vào LaTeX.
 
 ## 1. Mục tiêu và phạm vi âm
@@ -10,6 +10,8 @@ Tài liệu này là xương sống nguồn ngoài cho hai chương nền của 
 
 - Chương 1: bối cảnh F&B, POS, QR ordering, thanh toán QR/VietQR, lý do chọn đề tài và phạm vi nghiên cứu.
 - Chương 2: cơ sở lý thuyết về SaaS, multi-tenancy, microservices, event-driven architecture, consistency/idempotency, WebSocket/realtime và security.
+
+Addendum 2026-06-01: technical Phase 4D Dashboard & Reporting là nguồn nội bộ cho Chương 3-6, không làm thay đổi source backbone học thuật cho Chương 1-2. Nếu Chương 1/2 nhắc reporting/analytics ở mức bối cảnh thị trường, chỉ dùng nguồn sản phẩm/thị trường đã kiểm chứng; chi tiết QRTable dashboard/reporting phải lấy từ `docs/phases/phase-4d-dashboard-reporting.md` và các canonical technical docs khi backfill report.
 
 Không làm trong Phase 2B:
 

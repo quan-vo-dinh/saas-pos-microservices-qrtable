@@ -1,7 +1,7 @@
 # Backlog artifact cho khóa luận QRTable
 
 > Tài liệu sống dùng để quản lý diagram, bảng, screenshot, demo evidence và phụ lục.
-> Cập nhật gần nhất: 2026-05-31.
+> Cập nhật gần nhất: 2026-06-01.
 
 ## 1. Mục đích
 
@@ -14,6 +14,7 @@ Nguồn nền:
 - `docs/graduation-thesis-resources/presentation-format-graduation-thesis.md`
 - `docs/technical-architecture.md`
 - `docs/business-logic.md`
+- `docs/phases/phase-4d-dashboard-reporting.md`
 - `docs/testing/phase-5/traceability-matrix.md`
 - `docs/testing/phase-5/saga-validation-strategy.md`
 - `docs/architecture/erd.png`
@@ -47,6 +48,18 @@ Không chọn diagram chỉ để tạo cảm giác đa dạng. Mỗi artifact p
 - Chương 5 ưu tiên sequence/runtime flow, implemented evidence table và screenshot/demo artifact đại diện để chứng minh implementation đã hiện thực các flow chính.
 - Chương 6 ưu tiên traceability/evaluation/limitation table; chỉ dùng screenshot test output hoặc health check khi có artifact thật.
 - Chương 1-2 có thể dùng conceptual diagram/comparison table nhưng phải bám nguồn học thuật hoặc nguồn chính thức, không bám implementation QRTable để định nghĩa khái niệm phổ quát.
+
+## 2.2. Ghi chú backfill technical Phase 4D Dashboard & Reporting
+
+Ngày 2026-06-01, canonical technical docs đã bổ sung Phase 4D kỹ thuật về Dashboard & Reporting và Phase 4D.1 về dashboard entitlement/UI polish. Backlog khóa luận hiện vẫn phản ánh bản draft trước lần bổ sung này, nên cần một lượt backfill riêng trước khi polish/nộp bản cuối.
+
+Phạm vi backfill tối thiểu:
+
+1. Chương 3: bổ sung requirement cho Owner/Manager dashboard reporting, Super Admin analytics và plan feature entitlement.
+2. Chương 4: bổ sung mô tả BFF reporting route, permission guard và `PlanFeatureGuard`/`RequiresPlanFeature` ở mức architecture/security.
+3. Chương 5: bổ sung implemented evidence cho reporting APIs, frontend reports feature, dashboard feature locks và analytics UI.
+4. Chương 6: bổ sung claim/evaluation ở mức test/guard/UI evidence; không claim dashboard đã có benchmark hoặc browser proof nếu chưa capture.
+5. Screenshot: bổ sung Owner dashboard reporting ở trạng thái locked/full theo plan và Super Admin analytics dashboard. Placeholder không được tính là evidence thật.
 
 ## 3. Artifact tối thiểu trong chương chính
 
@@ -86,6 +99,7 @@ Không chọn diagram chỉ để tạo cảm giác đa dạng. Mỗi artifact p
 | Hình 5.5 | Sequence | Chương 5 | SaaS onboarding sequence                            | Minh họa SaaS Onboarding Mini-Saga với provisioning tenant, owner/subscription/payment settings và compensation  | SaaS docs/code, phase 4B docs                       | verified   | P0      |
 | Bảng 5.1 | Bảng     | Chương 5 | Implemented evidence table                          | Map feature -> code/docs/tests/screenshot để tránh viết mơ hồ                                                    | Source code, docs, tests                            | verified   | P0      |
 | Bảng 5.2 | Bảng     | Chương 5 | Shared libraries và vai trò trong consistency       | Chứng minh maintainability qua DTO/constants/providers/guards/shared types                                       | `libs/`, `docs/DOC-CODE-ANCHORS.md`                 | verified   | P1      |
+| Bảng 5.x | Bảng     | Chương 5 | Dashboard/reporting evidence addendum               | Backfill technical Phase 4D vào Chương 5: API, guard, entitlement, frontend reports UI và test evidence          | Phase 4D technical docs, source code, tests         | planned    | P1      |
 | Bảng 6.1 | Bảng     | Chương 6 | Evaluation claim policy                             | Chặn overclaim trong performance/scalability/observability                                                       | `thesis-evidence-map.md`                            | verified   | P0      |
 | Bảng 6.2 | Bảng     | Chương 6 | Requirement traceability summary                    | Chứng minh yêu cầu được đánh giá bằng test/demo/evidence                                                         | `docs/testing/phase-5/traceability-matrix.md`       | verified   | P0      |
 | Bảng 6.3 | Bảng     | Chương 6 | Functional validation result theo cụm use case      | Tóm tắt kết quả kiểm chứng chức năng, gồm Order Confirm Saga và SaaS Onboarding Mini-Saga                        | Traceability matrix, Saga validation strategy       | verified   | P0      |
@@ -95,32 +109,33 @@ Không chọn diagram chỉ để tạo cảm giác đa dạng. Mỗi artifact p
 
 ## 4. Artifact mở rộng nên cân nhắc
 
-| ID        | Loại          | Vị trí             | Artifact                                          | Khi nào nên dùng                                                              | Nguồn chính                          | Trạng thái    | Ưu tiên |
-| --------- | ------------- | ------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------ | ------------- | ------- |
-| Hình 1.2  | Diagram       | Chương 1           | Pain point của quy trình phục vụ thủ công         | Nếu Chương 1 cần làm rõ vấn đề trước khi giới thiệu QRTable                   | Research survey, proposal            | planned       | P1      |
-| Bảng 1.2  | Bảng          | Chương 1           | Mapping pain point -> yêu cầu hệ thống            | Nếu muốn nối Chương 1 sang Chương 3 mượt hơn                                  | Research survey, business logic      | planned       | P1      |
-| Bảng 2.5  | Bảng          | Chương 2           | SaaS vs on-premise trong bối cảnh POS             | Nếu phần SaaS cần sâu hơn Bảng 2.1                                            | NIST, SaaS guidance                  | planned       | P1      |
-| Hình 2.2  | Diagram       | Chương 2           | Event-driven architecture khái niệm               | Đã cover bởi Hình 2.5 (Kafka) trong bản nháp hiện tại                         | Kafka docs                           | cancelled     | P1      |
-| Bảng 2.6  | Bảng          | Chương 2           | Quality attributes theo ISO/IEC 25010             | Nếu Chương 6 cần nền lý thuyết đánh giá NFR rõ hơn                            | ISO/IEC 25010                        | planned       | P1      |
-| Hình 3.3  | State machine | Chương 3           | Session state machine                             | Nếu flow QR/session có nhiều trạng thái cần làm rõ                            | `docs/business-logic.md`             | planned       | P1      |
-| Hình 3.4  | State machine | Chương 3           | Order/payment state machine                       | Nếu cần chuẩn bị cho Chương 5 và Chương 6                                     | `docs/business-logic.md`             | planned       | P1      |
-| Bảng 3.5  | Bảng          | Chương 3           | P0/P1/P2 requirements                             | Nếu cần phân cấp phạm vi chức năng trong bản nháp dài                         | Specs, traceability matrix           | planned       | P1      |
-| Bảng 3.6  | Bảng          | Chương 3           | Abuse case/threat ở mức yêu cầu                   | Nếu muốn làm phần security/tenant isolation chặt hơn                          | OWASP, permission matrix             | planned       | P2      |
-| Hình 4.5  | Diagram       | Chương 4           | ERD rút gọn theo service                          | Nếu cần minh họa data ownership mà không đưa ERD đầy đủ                       | `docs/architecture/erd.*`            | source-exists | P1      |
-| Hình 4.6  | Diagram       | Chương 4           | Nx dependency graph hoặc module boundary          | Nếu cần chứng minh monorepo/shared libs hỗ trợ maintainability                | Nx project graph, source tree        | planned       | P2      |
-| Hình 4.7  | Diagram       | Chương 4           | Redis key/domain ownership                        | Nếu cần giải thích cache/session/KDS queue boundary                           | `libs/common`, Redis policy/tests    | planned       | P1      |
-| Hình 4.8  | Diagram       | Chương 4           | WebSocket room và hint/refetch model              | Nếu cần tránh hiểu nhầm WebSocket là source of truth                          | BFF realtime code, evidence map      | planned       | P1      |
-| Hình 4.9  | Diagram       | Chương 4           | Deployment topology                               | Chỉ đưa vào chương chính nếu có deployment evidence đủ rõ                     | Docker/provider docs                 | planned       | P2      |
-| Hình 4.10 | Diagram       | Chương 4           | Observability design                              | Chỉ dùng như thiết kế/hướng vận hành nếu chưa có dashboard thật               | Observability docs/design            | planned       | P2      |
-| Hình 5.6  | Sequence      | Chương 5           | Shared cart mutation/version/idempotency          | Nếu cần chứng minh xử lý concurrency ở cart/session                           | Order/session code                   | planned       | P1      |
-| Hình 5.7  | Sequence      | Chương 5           | Table transfer/safe empty-session release         | Nếu flow table/session lifecycle là điểm hội đồng dễ hỏi                      | Business logic, Order code           | planned       | P1      |
-| Hình 5.8  | Sequence      | Chương 5           | Subscription checkout                             | Nếu SaaS subscription/payment cần minh họa sâu                                | SaaS/Payment docs/code               | planned       | P1      |
-| Hình 5.9  | Sequence      | Chương 5           | Tenant suspend/activate behavior                  | Nếu cần làm rõ tenant lifecycle và access restriction                         | SaaS/User-Access/Authorizer docs     | planned       | P1      |
-| Bảng 5.3  | Bảng          | Chương 5           | API/route groups theo domain                      | Nếu Chương 5 cần tóm tắt implementation surface mà không liệt kê endpoint dài | BFF controllers, docs anchors        | planned       | P2      |
-| Bảng 6.x  | Bảng          | Chương 6/Phụ lục D | Test coverage chi tiết theo requirement           | Nếu cần trình bày traceability chi tiết hơn Bảng 6.2                          | Traceability matrix                  | planned       | P1      |
-| Bảng 6.x  | Bảng          | Chương 6           | Scenario analysis cho scalability/maintainability | Nếu đánh giá NFR bằng architecture/code evidence                              | Evidence map, technical architecture | planned       | P1      |
-| Bảng 6.x  | Bảng          | Chương 6           | Limitation vs future work mở rộng                 | Nếu cần chuyển từ đánh giá sang kết luận mượt hơn ngoài Bảng 6.5              | Evidence map                         | planned       | P1      |
-| Hình 6.1  | Screenshot    | Chương 6           | Test run summary hoặc health check                | Chỉ đưa nếu có artifact thật                                                  | Test output, local/demo environment  | planned       | P1      |
+| ID        | Loại          | Vị trí             | Artifact                                          | Khi nào nên dùng                                                                                                | Nguồn chính                                    | Trạng thái    | Ưu tiên |
+| --------- | ------------- | ------------------ | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------- | ------- |
+| Hình 1.2  | Diagram       | Chương 1           | Pain point của quy trình phục vụ thủ công         | Nếu Chương 1 cần làm rõ vấn đề trước khi giới thiệu QRTable                                                     | Research survey, proposal                      | planned       | P1      |
+| Bảng 1.2  | Bảng          | Chương 1           | Mapping pain point -> yêu cầu hệ thống            | Nếu muốn nối Chương 1 sang Chương 3 mượt hơn                                                                    | Research survey, business logic                | planned       | P1      |
+| Bảng 2.5  | Bảng          | Chương 2           | SaaS vs on-premise trong bối cảnh POS             | Nếu phần SaaS cần sâu hơn Bảng 2.1                                                                              | NIST, SaaS guidance                            | planned       | P1      |
+| Hình 2.2  | Diagram       | Chương 2           | Event-driven architecture khái niệm               | Đã cover bởi Hình 2.5 (Kafka) trong bản nháp hiện tại                                                           | Kafka docs                                     | cancelled     | P1      |
+| Bảng 2.6  | Bảng          | Chương 2           | Quality attributes theo ISO/IEC 25010             | Nếu Chương 6 cần nền lý thuyết đánh giá NFR rõ hơn                                                              | ISO/IEC 25010                                  | planned       | P1      |
+| Hình 3.3  | State machine | Chương 3           | Session state machine                             | Nếu flow QR/session có nhiều trạng thái cần làm rõ                                                              | `docs/business-logic.md`                       | planned       | P1      |
+| Hình 3.4  | State machine | Chương 3           | Order/payment state machine                       | Nếu cần chuẩn bị cho Chương 5 và Chương 6                                                                       | `docs/business-logic.md`                       | planned       | P1      |
+| Bảng 3.5  | Bảng          | Chương 3           | P0/P1/P2 requirements                             | Nếu cần phân cấp phạm vi chức năng trong bản nháp dài                                                           | Specs, traceability matrix                     | planned       | P1      |
+| Bảng 3.6  | Bảng          | Chương 3           | Abuse case/threat ở mức yêu cầu                   | Nếu muốn làm phần security/tenant isolation chặt hơn                                                            | OWASP, permission matrix                       | planned       | P2      |
+| Hình 4.5  | Diagram       | Chương 4           | ERD rút gọn theo service                          | Nếu cần minh họa data ownership mà không đưa ERD đầy đủ                                                         | `docs/architecture/erd.*`                      | source-exists | P1      |
+| Hình 4.6  | Diagram       | Chương 4           | Nx dependency graph hoặc module boundary          | Nếu cần chứng minh monorepo/shared libs hỗ trợ maintainability                                                  | Nx project graph, source tree                  | planned       | P2      |
+| Hình 4.7  | Diagram       | Chương 4           | Redis key/domain ownership                        | Nếu cần giải thích cache/session/KDS queue boundary                                                             | `libs/common`, Redis policy/tests              | planned       | P1      |
+| Hình 4.8  | Diagram       | Chương 4           | WebSocket room và hint/refetch model              | Nếu cần tránh hiểu nhầm WebSocket là source of truth                                                            | BFF realtime code, evidence map                | planned       | P1      |
+| Hình 4.9  | Diagram       | Chương 4           | Deployment topology                               | Chỉ đưa vào chương chính nếu có deployment evidence đủ rõ                                                       | Docker/provider docs                           | planned       | P2      |
+| Hình 4.10 | Diagram       | Chương 4           | Observability design                              | Chỉ dùng như thiết kế/hướng vận hành nếu chưa có dashboard thật                                                 | Observability docs/design                      | planned       | P2      |
+| Hình 5.6  | Sequence      | Chương 5           | Shared cart mutation/version/idempotency          | Nếu cần chứng minh xử lý concurrency ở cart/session                                                             | Order/session code                             | planned       | P1      |
+| Hình 5.7  | Sequence      | Chương 5           | Table transfer/safe empty-session release         | Nếu flow table/session lifecycle là điểm hội đồng dễ hỏi                                                        | Business logic, Order code                     | planned       | P1      |
+| Hình 5.8  | Sequence      | Chương 5           | Subscription checkout                             | Nếu SaaS subscription/payment cần minh họa sâu                                                                  | SaaS/Payment docs/code                         | planned       | P1      |
+| Hình 5.9  | Sequence      | Chương 5           | Tenant suspend/activate behavior                  | Nếu cần làm rõ tenant lifecycle và access restriction                                                           | SaaS/User-Access/Authorizer docs               | planned       | P1      |
+| Bảng 5.3  | Bảng          | Chương 5           | API/route groups theo domain                      | Nếu Chương 5 cần tóm tắt implementation surface mà không liệt kê endpoint dài                                   | BFF controllers, docs anchors                  | planned       | P2      |
+| Bảng 5.x  | Bảng          | Chương 5/Phụ lục D | Dashboard/reporting route và entitlement matrix   | Khi backfill technical Phase 4D vào report, cần tách Owner tenant reports, Super Admin analytics và plan gating | `phase-4d-dashboard-reporting.md`, BFF/FE code | planned       | P1      |
+| Bảng 6.x  | Bảng          | Chương 6/Phụ lục D | Test coverage chi tiết theo requirement           | Nếu cần trình bày traceability chi tiết hơn Bảng 6.2                                                            | Traceability matrix                            | planned       | P1      |
+| Bảng 6.x  | Bảng          | Chương 6           | Scenario analysis cho scalability/maintainability | Nếu đánh giá NFR bằng architecture/code evidence                                                                | Evidence map, technical architecture           | planned       | P1      |
+| Bảng 6.x  | Bảng          | Chương 6           | Limitation vs future work mở rộng                 | Nếu cần chuyển từ đánh giá sang kết luận mượt hơn ngoài Bảng 6.5                                                | Evidence map                                   | planned       | P1      |
+| Hình 6.1  | Screenshot    | Chương 6           | Test run summary hoặc health check                | Chỉ đưa nếu có artifact thật                                                                                    | Test output, local/demo environment            | planned       | P1      |
 
 ## 5. Screenshot/UI gallery backlog
 
@@ -142,11 +157,13 @@ Phase 5D dùng chế độ scaffold/manual capture handoff: agent không mở Br
 | Ảnh 5.10      | Owner dashboard          | Chương 5           | Table/QR management                                                         | Minh họa tạo bàn/QR theo tenant                                       | planned    | P0      |
 | Ảnh 5.11      | Owner dashboard          | Chương 5           | Payment settings/subscription                                               | Minh họa kết quả SaaS onboarding ở payment settings/subscription      | planned    | P1      |
 | Ảnh 5.12      | Super Admin              | Chương 5           | Tenant onboarding/lifecycle                                                 | Minh họa happy path SaaS Onboarding Mini-Saga                         | planned    | P1      |
+| Ảnh 5.x       | Owner dashboard          | Chương 5/Phụ lục A | Dashboard reporting plan-aware: locked/basic/full analytics                 | Backfill technical Phase 4D; minh họa dashboard theo entitlement      | planned    | P1      |
+| Ảnh 5.x       | Super Admin              | Chương 5/Phụ lục A | Platform analytics dashboard                                                | Backfill technical Phase 4D; minh họa analytics cross-tenant          | planned    | P1      |
 | Ảnh A.1-A.8   | Customer PWA             | Phụ lục A          | Toàn bộ journey customer                                                    | Lưu bằng chứng UI đầy đủ hơn Chương 5                                 | planned    | P1      |
 | Ảnh A.9-A.18  | Staff POS                | Phụ lục A          | Table/session/order/bill lifecycle                                          | Lưu bằng chứng UI staff workflow                                      | planned    | P1      |
 | Ảnh A.19-A.26 | KDS                      | Phụ lục A          | Queue, ticket, status, empty state, realtime refresh                        | Lưu bằng chứng UI bếp/bar                                             | planned    | P1      |
-| Ảnh A.27-A.38 | Owner dashboard          | Phụ lục A          | Menu, table, QR, payment, staff, subscription                               | Lưu bằng chứng owner workflow                                         | planned    | P1      |
-| Ảnh A.39-A.48 | Super Admin              | Phụ lục A          | Tenant, plan, subscription, invoice                                         | Lưu bằng chứng admin/SaaS workflow                                    | planned    | P1      |
+| Ảnh A.27-A.38 | Owner dashboard          | Phụ lục A          | Menu, table, QR, payment, staff, subscription, dashboard reporting          | Lưu bằng chứng owner workflow và Phase 4D reporting backfill          | planned    | P1      |
+| Ảnh A.39-A.48 | Super Admin              | Phụ lục A          | Tenant, plan, subscription, invoice, platform analytics                     | Lưu bằng chứng admin/SaaS workflow và Phase 4D analytics backfill     | planned    | P1      |
 | Ảnh A.49-A.54 | Auth/security            | Phụ lục A          | Keycloak login, role-based blocked route, suspended tenant warning nếu có   | Minh họa security/access control, chỉ dùng nếu có evidence thật       | planned    | P2      |
 | Ảnh A.55-A.60 | Evaluation/demo          | Phụ lục D          | Test run, traceability summary, Saga evidence, health check, demo checklist | Bằng chứng đánh giá, kiểm chứng Saga và reproducibility               | planned    | P1      |
 | Ảnh A.61-A.70 | Observability/deployment | Phụ lục D/E        | Grafana/log/trace/deployment screen                                         | Chỉ dùng nếu Phase 6/7 hoặc dashboard thật được backfill              | deferred   | P2      |
@@ -225,3 +242,5 @@ Phase 4B đã tạo và verify nhóm diagram/table P0 của Chương 4; Phase 4C
 **Phase 5C đã hoàn tất:** Chương 5 đã được viết prose vào `thesis-report/chapters/05-trien-khai-he-thong.tex`, giữ nguyên Hình 5.1-Hình 5.5 đã verify, chèn Bảng 5.1 implemented evidence và Bảng 5.2 shared libraries, sau đó build LaTeX và kiểm tra `.lof`/`.lot`.
 
 **Bước tiếp theo là Phase 5D scaffold/manual capture handoff:** không dùng Browser để chụp UI. Agent cần tạo `thesis-phase5d-screenshot-scaffold.md`, tạo placeholder trắng theo mapping §5.1, chèn khung LaTeX vào Chương 5/Phụ lục A, cập nhật trạng thái screenshot sang `placeholder` và build PDF để kiểm tra ref/caption/path. Với Saga, Phase 5D nên ưu tiên Ảnh 5.6, Ảnh 5.7, Ảnh 5.11 và Ảnh 5.12 cho UI happy path, đồng thời chuẩn bị checklist Phụ lục D cho terminal output và DB/outbox snapshot theo §5.2. Người viết sẽ thay các file placeholder bằng screenshot thật sau.
+
+Trước Phase 8 polish cuối, cần thêm một lượt backfill technical Phase 4D Dashboard & Reporting vào Chương 3-6 và screenshot plan. Lượt này không thay thế Phase 5D; nó bổ sung artifact/reporting evidence cho các màn hình và API mới đã được canonical technical docs ghi nhận ngày 2026-06-01.

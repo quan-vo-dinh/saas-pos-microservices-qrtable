@@ -1,7 +1,7 @@
 # PROFESSIONAL DOCUMENTS OF RESTAURANT MANAGEMENT SYSTEM
 
 > **ANALYSIS BASED ON QRTABLE.IO AS A PRINCIPAL**
-> **Current Status:** Living business overview, last aligned with implemented Phase 4B and May 27 session/SaaS stabilization on 2026-05-27.
+> **Current Status:** Living business overview, last aligned with implemented Phase 4D.1 dashboard reporting, entitlement gating, and UI polish on 2026-06-01.
 
 This document describes in detail the core business flows, from initial setup to daily restaurant operations, focusing on the QR-based table ordering (QR-based table ordering) model.
 
@@ -30,6 +30,11 @@ This is the process of creating a restaurant tenant on the platform, attaching O
 3. **Select service Package (Subscription):**
    - Super Admin manages pricing plans; Owners can view plans and create checkout subscriptions for their tenants; Manager only has permission to view subscription/plan.
    - **Rules:** Plans limit features and size (e.g. Free Plan only allows up to 10 tables, no advanced reporting). Record the start and end dates of the package.
+   - Current canonical package features:
+     - `FREE`: `basic_pos`
+     - `BASIC`: `basic_pos`, `analytics_basic`
+     - `PREMIUM`: `basic_pos`, `analytics_basic`, `analytics_advanced`, `priority_support`
+   - Dashboard reports are package-aware. The dashboard shell and usage quotas are visible to Owner/Manager users with report access, but tenant report API data requires an active subscription and the relevant plan feature.
    - Each tenant can only have one `ACTIVE` subscription at a time. New subscriptions may supersede old subscriptions and must invalidate the associated cache/guard.
    - Auto-suspend subscription expires according to Vietnamese time: daily `02:00 Asia/Ho_Chi_Minh`, grace period 24h (`expires_at + 1 day < now()`).
    - Counter `max_orders_per_day` uses timezone `Asia/Ho_Chi_Minh` for the Vietnamese market.
@@ -441,6 +446,14 @@ Webhook SePay → BFF → Payment matches billReference (code or regex on conten
   - At the end of the day/month, the system summarizes revenue by method (Cash, Transfer...).
   - The shop Owner matches the bank balance/cash box data with the report on QRTable.
 
+6. **Dashboard & Reporting:**
+  - Owner and Manager use `/dashboard` for tenant-scoped reporting when they have `report.read_own`.
+  - Tenant report API access also requires the current subscription to be `ACTIVE` and to include `analytics_basic`.
+  - `FREE` tenants still see the dashboard shell, current package, quota usage, and upgrade prompts, but analytics widgets are locked.
+  - `BASIC` tenants see basic revenue/order/table analytics. Advanced dashboard widgets are visually locked.
+  - `PREMIUM` tenants see the full dashboard including advanced insights such as top items and payment-method breakdown.
+  - Super Admin uses `/admin/analytics` for platform subscription analytics and explicit tenant drilldown through `report.read_any`. Super Admin report access is not blocked by the selected tenant's package, but the UI shows the tenant's plan/features for audit context.
+
 ### B. Key Business Rules
 
 - **Immutability:**
@@ -699,7 +712,7 @@ Served → Completed:
 
 Clearly define the authority of each role in the SaaS Multi-tenant system.
 
-> **Actor Architecture:** Described by **role group (business language)**; The actual RBAC matrix (6 roles × 65 permissions) is canonical at [permission matrix](architecture/permission-matrix.md) §6.
+> **Actor Architecture:** Described by **role group (business language)**; The actual RBAC matrix (6 roles × 67 permissions) is canonical at [permission matrix](architecture/permission-matrix.md) §6.
 
 > **Admin app navigation:** `management-app` (Phase 2.x) uses **role → tab/route** for UX; **BFF** still enforces **permission** for each endpoint. See [permission matrix](architecture/permission-matrix.md) §9 (synchronization principle + tech debt).
 
@@ -713,7 +726,8 @@ Clearly define the authority of each role in the SaaS Multi-tenant system.
 - **Main powers:**
   - Tenants management: Approve/Temporarily lock/Delete restaurants
   - Manage Subscription Plans: Create/Edit plans (Lite, Pro, Enterprise)
-  - Monitor Revenue Platform: Revenue from subscription fees
+  - Monitor platform analytics: subscription revenue, tenant status, plan distribution, and invoice status
+  - Inspect explicit tenant report drilldown for support/audit context
   - System configuration: Payment gateways, System settings
   - View all data (for support/debug purposes)
 
@@ -727,7 +741,7 @@ Clearly define the authority of each role in the SaaS Multi-tenant system.
 
 - **Role:** Restaurant Owner — full operational authority + HR (including deleting employees)
 - **Keycloak role:** `Owner`
-- **Permissions:** full operational (CRUD menu, tables, orders, payment, KDS), HR delete (`user.delete`), own-tenant SaaS visibility/checkout (`subscription.checkout`) and update payment settings (`payment_settings.update_own`).
+- **Permissions:** full operational (CRUD menu, tables, orders, payment, KDS), HR delete (`user.delete`), own-tenant SaaS visibility/checkout (`subscription.checkout`), update payment settings (`payment_settings.update_own`), and own tenant reporting (`report.read_own`, gated by package features).
 
 **Microservice mapping:** User-Access service, Catalog service, Order service, Payment service, SaaS service
 
@@ -739,7 +753,7 @@ Clearly define the authority of each role in the SaaS Multi-tenant system.
 
 - **Role:** Shift operations manager — similar to Owner in operations but without the sensitive financial/HR rights.
 - **Keycloak role:** `MANAGER`
-- **Different from Owner:** cannot delete users, create/cancel subscription checkout, or update SePay/payment settings; See tenant/subscription/plan/payment settings for operations.
+- **Different from Owner:** cannot delete users, create/cancel subscription checkout, or update SePay/payment settings; can view tenant subscription/plan/payment settings and own tenant reporting (`report.read_own`, gated by package features).
 
 **Corresponding microservice:** Same as Owner for operations, plus permission to view SaaS/Payment settings within the tenant
 
@@ -791,37 +805,37 @@ Clearly define the authority of each role in the SaaS Multi-tenant system.
 
 ### B. Permission Matrix (Business-Language Summary)
 
-> **Canonical source:** Full details of 6 roles × 65 permissions see [permission matrix](architecture/permission-matrix.md#6-canonical-permission-matrix-6-roles--65-permissions). The table below is the **business-language summary** for the 5 actor groups, NOT the source of truth for the RBAC guard check.
+> **Canonical source:** Full details of 6 roles × 67 permissions see [permission matrix](architecture/permission-matrix.md#6-canonical-permission-matrix-6-roles--67-permissions). The table below is the **business-language summary** for the 5 actor groups, NOT the source of truth for the RBAC guard check.
 
-| Features                             | Super Admin | Restaurant Owner | Staff (Waiter) | Staff (Chef/Bar) | Customers |
-| ------------------------------------ | ----------- | ---------------- | -------------- | ---------------- | --------- |
-| **Platform Management**              |             |                  |                |                  |           |
-| Tenants Management (Approve/Lock)    | ✅          | ❌               | ❌             | ❌               | ❌        |
-| Create Subscription Plans            | ✅          | ❌               | ❌             | ❌               | ❌        |
-| View all Tenants                     | ✅          | ❌               | ❌             | ❌               | ❌        |
-| Configure Payment Gateway            | ✅          | ❌               | ❌             | ❌               | ❌        |
-| Checkout subscription tenant         | ❌          | ✅ (Owner only)  | ❌             | ❌               | ❌        |
-| View tenant packages/subscriptions   | ✅          | ✅               | ❌             | ❌               | ❌        |
-| Update SePay tenant                  | ❌          | ✅ (Owner only)  | ❌             | ❌               | ❌        |
-| **Restaurant Management**            |             |                  |                |                  |           |
-| Menu Management (CRUD)               | ✅ (Debug)  | ✅               | ❌             | ❌               | ❌        |
-| Manage Tables & QR                   | ❌          | ✅               | ⚠️ (View only) | ❌               | ❌        |
-| Staff Management                     | ❌          | ✅               | ❌             | ❌               | ❌        |
-| See Analytics/Revenue                | ✅ (All)    | ✅ (Own only)    | ❌             | ❌               | ❌        |
-| Configure Restaurant Settings        | ❌          | ✅               | ❌             | ❌               | ❌        |
-| **Order Operations**                 |             |                  |                |                  |           |
-| Scan QR & View Menu                  | ❌          | ✅               | ✅             | ❌               | ✅        |
-| Order via QR                         | ❌          | ❌               | ❌             | ❌               | ✅        |
-| Order confirmation (Pending → Proc.) | ❌          | ✅               | ✅             | ❌               | ❌        |
-| Cancel unconfirmed order             | ❌          | ✅               | ✅             | ❌               | ✅ (Own)  |
-| Cancel order already in the kitchen  | ❌          | ✅ (Manager)     | ❌             | ❌               | ❌        |
-| KDS Update (Ready/Processing)        | ❌          | ✅               | ❌             | ✅               | ❌        |
-| View order status                    | ✅ (Debug)  | ✅ (All orders)  | ✅ (All)       | ✅ (KDS only)    | ✅ (Own)  |
-| **Table & Payment**                  |             |                  |                |                  |           |
-| Table Transfer                       | ❌          | ✅               | ✅             | ❌               | ❌        |
-| Payment Processing                   | ❌          | ✅               | ✅             | ❌               | ❌        |
-| Request payment                      | ❌          | ❌               | ❌             | ❌               | ✅        |
-| Mark clean desk                      | ❌          | ✅               | ✅             | ❌               | ❌        |
+| Features                             | Super Admin               | Restaurant Owner             | Staff (Waiter) | Staff (Chef/Bar) | Customers |
+| ------------------------------------ | ------------------------- | ---------------------------- | -------------- | ---------------- | --------- |
+| **Platform Management**              |                           |                              |                |                  |           |
+| Tenants Management (Approve/Lock)    | ✅                        | ❌                           | ❌             | ❌               | ❌        |
+| Create Subscription Plans            | ✅                        | ❌                           | ❌             | ❌               | ❌        |
+| View all Tenants                     | ✅                        | ❌                           | ❌             | ❌               | ❌        |
+| Configure Payment Gateway            | ✅                        | ❌                           | ❌             | ❌               | ❌        |
+| Checkout subscription tenant         | ❌                        | ✅ (Owner only)              | ❌             | ❌               | ❌        |
+| View tenant packages/subscriptions   | ✅                        | ✅                           | ❌             | ❌               | ❌        |
+| Update SePay tenant                  | ❌                        | ✅ (Owner only)              | ❌             | ❌               | ❌        |
+| **Restaurant Management**            |                           |                              |                |                  |           |
+| Menu Management (CRUD)               | ✅ (Debug)                | ✅                           | ❌             | ❌               | ❌        |
+| Manage Tables & QR                   | ❌                        | ✅                           | ⚠️ (View only) | ❌               | ❌        |
+| Staff Management                     | ❌                        | ✅                           | ❌             | ❌               | ❌        |
+| See Analytics/Revenue                | ✅ (Platform + drilldown) | ✅ (Own only, package-gated) | ❌             | ❌               | ❌        |
+| Configure Restaurant Settings        | ❌                        | ✅                           | ❌             | ❌               | ❌        |
+| **Order Operations**                 |                           |                              |                |                  |           |
+| Scan QR & View Menu                  | ❌                        | ✅                           | ✅             | ❌               | ✅        |
+| Order via QR                         | ❌                        | ❌                           | ❌             | ❌               | ✅        |
+| Order confirmation (Pending → Proc.) | ❌                        | ✅                           | ✅             | ❌               | ❌        |
+| Cancel unconfirmed order             | ❌                        | ✅                           | ✅             | ❌               | ✅ (Own)  |
+| Cancel order already in the kitchen  | ❌                        | ✅ (Manager)                 | ❌             | ❌               | ❌        |
+| KDS Update (Ready/Processing)        | ❌                        | ✅                           | ❌             | ✅               | ❌        |
+| View order status                    | ✅ (Debug)                | ✅ (All orders)              | ✅ (All)       | ✅ (KDS only)    | ✅ (Own)  |
+| **Table & Payment**                  |                           |                              |                |                  |           |
+| Table Transfer                       | ❌                        | ✅                           | ✅             | ❌               | ❌        |
+| Payment Processing                   | ❌                        | ✅                           | ✅             | ❌               | ❌        |
+| Request payment                      | ❌                        | ❌                           | ❌             | ❌               | ✅        |
+| Mark clean desk                      | ❌                        | ✅                           | ✅             | ❌               | ❌        |
 
 ---
 

@@ -8,11 +8,11 @@
 
 ## Scope Decision
 
-Phase 4D is inserted after Phase 4C Staff Management and before Phase 5-7 finalization. It closes the current reporting gap in the Management App:
+Phase 4D is inserted after Phase 4C Staff Management and before Phase 5-7 finalization. It closes the reporting gap in the Management App:
 
 - tenant Owners/Managers need business visibility for daily operations.
 - Super Admins need platform-level analytics for SaaS operation and thesis/demo evidence.
-- the current `/dashboard` and `/admin/analytics` routes are placeholder-level and do not yet expose real reporting behavior.
+- `/dashboard` and `/admin/analytics` now expose real reporting behavior instead of placeholder screens.
 
 This phase deliberately avoids creating a standalone Analytics service. The MVP reporting read models stay inside the services that already own the source data. BFF remains the guarded HTTP edge and must not contain report business logic.
 
@@ -36,6 +36,7 @@ This phase deliberately avoids creating a standalone Analytics service. The MVP 
 | Super Admin scope | Platform + audited tenant drilldown  | Super Admin sees SaaS revenue by default and can inspect one tenant's sales reports when support or audit requires it.                |
 | Frontend UI       | shadcn dashboard ecosystem           | Use shadcn `Chart`, `Card`, `Table`, `Tabs`, `Select`, `Skeleton`, `Badge`, `Tooltip`, and dashboard block patterns before custom UI. |
 | Data pipeline     | Direct aggregate reads for MVP       | No Kafka analytics consumer, no materialized reporting DB, no OLAP engine in Phase 4D.                                                |
+| Plan entitlement  | BFF feature guard + locked UI states | Tenant report APIs require active subscription + `analytics_basic`; frontend shows plan/quota and locked upgrade cards.               |
 
 ## Final Scope
 
@@ -52,9 +53,10 @@ Required reporting capabilities:
 - Top selling menu items by quantity and revenue contribution.
 - Table status/utilization summary from Catalog-owned table state.
 - Recent paid payment activity with safe, tenant-scoped fields.
+- Current plan/quota overview and package-aware locked states.
 - Loading, empty, error, partial-data, and success states.
 
-Owner and Manager can access tenant reports through `report.read_own`. Waiter, Chef, and Barista cannot access dashboard reporting by default.
+Owner and Manager can access the dashboard shell through `report.read_own`. Tenant report API data also requires an active subscription and `analytics_basic`. `FREE` tenants see quota and locked analytics; `BASIC` tenants see basic analytics with advanced widgets locked; `PREMIUM` tenants see the full dashboard. Waiter, Chef, and Barista cannot access dashboard reporting by default.
 
 ### Super Admin Analytics
 
@@ -154,7 +156,7 @@ Super Admin tenant drilldown must be explicit. The UI should make the selected t
 
 ### Permissions
 
-Add the following permissions to `PERMISSION`:
+Implemented report permissions:
 
 - `REPORT_READ_OWN = 'report.read_own'`
 - `REPORT_READ_ANY = 'report.read_any'`
@@ -166,17 +168,17 @@ Seed expectations:
 - `MANAGER`: `report.read_own`
 - `WAITER`, `CHEF`, `BARISTA`: no report permissions
 
-Update `docs/architecture/permission-matrix.md` when the implementation lands.
+The canonical matrix is updated in `docs/architecture/permission-matrix.md`.
 
 ### BFF HTTP Routes
 
 Tenant report routes:
 
-| Route                            | Permission        | Target service |
-| -------------------------------- | ----------------- | -------------- |
-| `GET /dashboard/reports/revenue` | `report.read_own` | Payment        |
-| `GET /dashboard/reports/orders`  | `report.read_own` | Order          |
-| `GET /dashboard/reports/tables`  | `report.read_own` | Catalog        |
+| Route                            | Permission        | Plan feature      | Target service |
+| -------------------------------- | ----------------- | ----------------- | -------------- |
+| `GET /dashboard/reports/revenue` | `report.read_own` | `analytics_basic` | Payment        |
+| `GET /dashboard/reports/orders`  | `report.read_own` | `analytics_basic` | Order          |
+| `GET /dashboard/reports/tables`  | `report.read_own` | `analytics_basic` | Catalog        |
 
 Admin analytics routes:
 
@@ -187,20 +189,18 @@ Admin analytics routes:
 | `GET /admin/analytics/tenants/:tenantId/reports/orders`  | `report.read_any` | Order          |
 | `GET /admin/analytics/tenants/:tenantId/reports/tables`  | `report.read_any` | Catalog        |
 
-BFF must validate query shape, apply guards, inject actor context, and forward TCP payloads. The target services must still enforce tenant filtering on their own data reads.
+BFF validates query shape, applies guards, injects actor context, and forwards TCP payloads. Tenant dashboard report routes use `TenantSubscriptionContextGuard` to resolve current subscription/features through SaaS `SUBSCRIPTION.GET_CURRENT`, then `PlanFeatureGuard` enforces active subscription plus `analytics_basic`. The target services must still enforce tenant filtering on their own data reads.
 
 If date-range normalization is needed in more than one runtime boundary, implement it once as a shared pure helper in the existing shared library layer instead of copy-pasting parsers across BFF and source services.
 
 ### TCP Message Additions
 
-Recommended message additions:
+Implemented message additions:
 
 - `TCP_REQUEST_MESSAGE.PAYMENT.REPORT_REVENUE = 'payment.report_revenue'`
 - `TCP_REQUEST_MESSAGE.ORDER.REPORT_ORDERS = 'order.report_orders'`
 - `TCP_REQUEST_MESSAGE.CATALOG.REPORT_TABLES = 'catalog.report_tables'`
 - `TCP_REQUEST_MESSAGE.SUBSCRIPTION.REPORT_PLATFORM = 'subscription.report_platform'`
-
-The implementation may choose domain-specific names only if they remain explicit, stable, and documented in the design spec.
 
 ### Frontend Direction
 
@@ -216,26 +216,28 @@ Frontend must not render raw wire enum values. Use existing shared display helpe
 
 ## Acceptance Criteria
 
-- [ ] `report.read_own` and `report.read_any` exist in constants, seed data, and permission matrix.
-- [ ] Owner and Manager can open `/dashboard` and see real tenant-scoped report data.
-- [ ] Waiter, Chef, and Barista cannot access tenant reporting routes.
-- [ ] Super Admin can open `/admin/analytics` and see platform SaaS analytics.
-- [ ] Super Admin can explicitly select a tenant and inspect that tenant's sales/order/table reports.
-- [ ] BFF report controllers only proxy and validate; they do not perform cross-service database reads.
-- [ ] Payment, Order, Catalog, and SaaS report handlers only query their own persistence.
-- [ ] Date range, grain, timezone, and limit validation are covered by tests.
-- [ ] Empty datasets render useful empty states, not broken charts or `NaN`.
-- [ ] Revenue values are VND and respect existing rounding semantics.
-- [ ] Frontend charts use shadcn chart patterns and pass desktop/mobile smoke checks.
+- [x] `report.read_own` and `report.read_any` exist in constants, seed data, and permission matrix.
+- [x] Owner and Manager can open `/dashboard` and see tenant-scoped dashboard behavior according to package entitlements.
+- [x] Waiter, Chef, and Barista do not receive report permissions.
+- [x] Super Admin can open `/admin/analytics` and see platform SaaS analytics.
+- [x] Super Admin can explicitly select a tenant and inspect that tenant's sales/order/table reports.
+- [x] BFF report controllers only proxy and validate; they do not perform cross-service database reads.
+- [x] Payment, Order, Catalog, and SaaS report handlers only query their own persistence.
+- [x] Date range, grain, timezone, and limit validation are covered by focused report tests.
+- [x] Empty datasets render useful empty states, not broken charts or `NaN`.
+- [x] Revenue values are VND and respect existing rounding semantics.
+- [x] Frontend charts use shadcn chart patterns and entitlement-aware dashboard components.
+- [x] Tenant report routes require active subscription and `analytics_basic` through `PlanFeatureGuard`.
 
 ## Acceptance Evidence
 
-Implementation evidence must include:
+Implementation evidence includes:
 
 - focused backend tests for each report owner service.
 - BFF controller tests proving guard metadata, query validation, tenant injection, and TCP forwarding.
 - frontend tests for loading, empty, error, and populated states.
-- at least one browser smoke run for `/dashboard` and `/admin/analytics`.
+- focused frontend entitlement tests proving locked dashboard widgets skip report API calls.
+- browser smoke evidence for `/dashboard` and `/admin/analytics` when live fixtures are available.
 - command output for the relevant Nx/Jest/Playwright checks.
 
 Suggested verification commands are listed in the implementation plan.
@@ -253,7 +255,7 @@ Implemented on top of the Phase 4D MVP:
 
 ## Handoff / Deferred Work
 
-Implementation should follow:
+Implementation was planned from these detailed artifacts:
 
 - [Phase 4D design spec](../superpowers/specs/2026-06-01-phase-4d-dashboard-reporting-design.md)
 - [Phase 4D implementation plan](../superpowers/plans/2026-06-01-phase-4d-dashboard-reporting.md)

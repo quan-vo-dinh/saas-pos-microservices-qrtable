@@ -2,7 +2,7 @@
 
 > **Phase:** Phase 4D.1 - Dashboard Plan Entitlements & UI Polish
 > **Date:** 2026-06-01
-> **Status:** Planned addendum after Phase 4D base reporting implementation
+> **Status:** Accepted and implemented in Phase 4D.1
 > **Purpose:** Extend the completed Phase 4D reporting dashboard with package/plan feature gating and a more polished product-grade dashboard UI. This addendum does not replace the Phase 4D base spec or implementation plan.
 
 ## 0. Context

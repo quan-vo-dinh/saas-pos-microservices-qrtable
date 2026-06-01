@@ -1,7 +1,7 @@
 # Phase 5D - Screenshot/demo scaffold
 
 > Tài liệu điều phối cho Phase 5D. Mục tiêu là dựng khung screenshot/demo artifact để người viết thay ảnh thật thủ công, không phải capture UI tự động.
-> Cập nhật: 2026-05-31.
+> Cập nhật: 2026-06-01.
 
 ## 1. Nguyên tắc
 
@@ -11,22 +11,26 @@ File placeholder trắng không phải demo evidence. Trạng thái đúng trong
 
 Với Saga, Phase 5D chỉ dựng bằng chứng nhìn thấy được của happy path. Các nhánh compensation như Catalog release stock hoặc SaaS rollback không nên chứng minh bằng screenshot UI; phần đó phải dựa vào test output, log và snapshot DB/outbox theo `docs/testing/phase-5/saga-validation-strategy.md`.
 
+Addendum 2026-06-01: technical Phase 4D Dashboard & Reporting được bổ sung sau khi scaffold 12 ảnh ban đầu được lập. Nếu dùng file này cho bản cuối, cần bổ sung screenshot Owner dashboard reporting theo entitlement và Super Admin platform analytics; placeholder không được tính là demo evidence.
+
 ## 2. Mapping screenshot Chương 5
 
-| ID       | Filename                                     | LaTeX label                                       | Caption dự kiến                                                                       | Flow/evidence liên quan                 |
-| -------- | -------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------- |
-| Ảnh 5.1  | `chapter5-01-customer-qr-session.png`        | `fig:chapter5-screenshot-customer-qr-session`     | Màn hình Customer PWA khi khách vào phiên gọi món từ QR.                              | Hình 5.1; QR session                    |
-| Ảnh 5.2  | `chapter5-02-customer-menu-browsing.png`     | `fig:chapter5-screenshot-customer-menu`           | Màn hình Customer PWA hiển thị menu điện tử theo tenant và bàn.                       | Hình 5.1; Catalog/menu                  |
-| Ảnh 5.3  | `chapter5-03-customer-cart-submit.png`       | `fig:chapter5-screenshot-customer-cart-submit`    | Màn hình giỏ hàng và thao tác gửi order của Customer PWA.                             | Hình 5.1/5.2; shared cart/order submit  |
-| Ảnh 5.4  | `chapter5-04-customer-order-payment.png`     | `fig:chapter5-screenshot-customer-payment`        | Màn hình theo dõi order và yêu cầu thanh toán/VietQR của khách.                       | Hình 5.4; payment settlement            |
-| Ảnh 5.5  | `chapter5-05-staff-pos-table-map.png`        | `fig:chapter5-screenshot-staff-table-map`         | Màn hình Staff POS hiển thị sơ đồ bàn hoặc danh sách order đang hoạt động.            | Hình 5.2; staff POS                     |
-| Ảnh 5.6  | `chapter5-06-staff-order-confirm.png`        | `fig:chapter5-screenshot-staff-order-confirm`     | Màn hình chi tiết order và thao tác xác nhận order của staff.                         | Hình 5.2; Order Confirm Saga happy path |
-| Ảnh 5.7  | `chapter5-07-kds-queue.png`                  | `fig:chapter5-screenshot-kds-queue`               | Màn hình KDS queue sau khi order được xác nhận và phát sinh `order.confirmed`.        | Hình 5.3; KDS queue/outbox              |
-| Ảnh 5.8  | `chapter5-08-kds-ticket-status.png`          | `fig:chapter5-screenshot-kds-ticket-status`       | Màn hình chi tiết ticket hoặc thao tác cập nhật trạng thái trong KDS.                 | Hình 5.3; KDS lifecycle                 |
-| Ảnh 5.9  | `chapter5-09-owner-menu-management.png`      | `fig:chapter5-screenshot-owner-menu-management`   | Màn hình Owner dashboard quản lý menu/category/menu item.                             | Catalog implementation                  |
-| Ảnh 5.10 | `chapter5-10-owner-table-qr-management.png`  | `fig:chapter5-screenshot-owner-table-qr`          | Màn hình Owner dashboard quản lý bàn và QR theo tenant.                               | Catalog/table/QR                        |
-| Ảnh 5.11 | `chapter5-11-owner-payment-subscription.png` | `fig:chapter5-screenshot-owner-payment-settings`  | Màn hình Owner dashboard sau onboarding, thể hiện payment settings hoặc subscription. | Hình 5.4/5.5; Payment/SaaS              |
-| Ảnh 5.12 | `chapter5-12-admin-tenant-onboarding.png`    | `fig:chapter5-screenshot-admin-tenant-onboarding` | Màn hình Super Admin onboarding hoặc quản lý lifecycle tenant.                        | Hình 5.5; SaaS Onboarding Mini-Saga     |
+| ID       | Filename                                     | LaTeX label                                         | Caption dự kiến                                                                       | Flow/evidence liên quan                 |
+| -------- | -------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------- |
+| Ảnh 5.1  | `chapter5-01-customer-qr-session.png`        | `fig:chapter5-screenshot-customer-qr-session`       | Màn hình Customer PWA khi khách vào phiên gọi món từ QR.                              | Hình 5.1; QR session                    |
+| Ảnh 5.2  | `chapter5-02-customer-menu-browsing.png`     | `fig:chapter5-screenshot-customer-menu`             | Màn hình Customer PWA hiển thị menu điện tử theo tenant và bàn.                       | Hình 5.1; Catalog/menu                  |
+| Ảnh 5.3  | `chapter5-03-customer-cart-submit.png`       | `fig:chapter5-screenshot-customer-cart-submit`      | Màn hình giỏ hàng và thao tác gửi order của Customer PWA.                             | Hình 5.1/5.2; shared cart/order submit  |
+| Ảnh 5.4  | `chapter5-04-customer-order-payment.png`     | `fig:chapter5-screenshot-customer-payment`          | Màn hình theo dõi order và yêu cầu thanh toán/VietQR của khách.                       | Hình 5.4; payment settlement            |
+| Ảnh 5.5  | `chapter5-05-staff-pos-table-map.png`        | `fig:chapter5-screenshot-staff-table-map`           | Màn hình Staff POS hiển thị sơ đồ bàn hoặc danh sách order đang hoạt động.            | Hình 5.2; staff POS                     |
+| Ảnh 5.6  | `chapter5-06-staff-order-confirm.png`        | `fig:chapter5-screenshot-staff-order-confirm`       | Màn hình chi tiết order và thao tác xác nhận order của staff.                         | Hình 5.2; Order Confirm Saga happy path |
+| Ảnh 5.7  | `chapter5-07-kds-queue.png`                  | `fig:chapter5-screenshot-kds-queue`                 | Màn hình KDS queue sau khi order được xác nhận và phát sinh `order.confirmed`.        | Hình 5.3; KDS queue/outbox              |
+| Ảnh 5.8  | `chapter5-08-kds-ticket-status.png`          | `fig:chapter5-screenshot-kds-ticket-status`         | Màn hình chi tiết ticket hoặc thao tác cập nhật trạng thái trong KDS.                 | Hình 5.3; KDS lifecycle                 |
+| Ảnh 5.9  | `chapter5-09-owner-menu-management.png`      | `fig:chapter5-screenshot-owner-menu-management`     | Màn hình Owner dashboard quản lý menu/category/menu item.                             | Catalog implementation                  |
+| Ảnh 5.10 | `chapter5-10-owner-table-qr-management.png`  | `fig:chapter5-screenshot-owner-table-qr`            | Màn hình Owner dashboard quản lý bàn và QR theo tenant.                               | Catalog/table/QR                        |
+| Ảnh 5.11 | `chapter5-11-owner-payment-subscription.png` | `fig:chapter5-screenshot-owner-payment-settings`    | Màn hình Owner dashboard sau onboarding, thể hiện payment settings hoặc subscription. | Hình 5.4/5.5; Payment/SaaS              |
+| Ảnh 5.12 | `chapter5-12-admin-tenant-onboarding.png`    | `fig:chapter5-screenshot-admin-tenant-onboarding`   | Màn hình Super Admin onboarding hoặc quản lý lifecycle tenant.                        | Hình 5.5; SaaS Onboarding Mini-Saga     |
+| Ảnh 5.x  | `chapter5-owner-dashboard-reporting.png`     | `fig:chapter5-screenshot-owner-dashboard-reporting` | Màn hình Owner dashboard reporting, thể hiện trạng thái locked/basic/full theo gói.   | Technical Phase 4D; plan entitlement    |
+| Ảnh 5.x  | `chapter5-admin-platform-analytics.png`      | `fig:chapter5-screenshot-admin-platform-analytics`  | Màn hình Super Admin platform analytics/dashboard tổng hợp.                           | Technical Phase 4D; `report.read_any`   |
 
 ## 2.1. Trọng tâm Saga khi thay screenshot thật
 
@@ -70,6 +74,7 @@ Sau khi thay bằng screenshot thật, bỏ chữ `Placeholder` khỏi caption v
 5. Build LaTeX bằng `tectonic --keep-logs --keep-intermediates undergraduate-theses-report.tex`.
 6. Kiểm tra `.lof` và PDF text để đảm bảo label/caption/path không gãy.
 7. Nếu đồng thời chuẩn bị Phụ lục D, chỉ lưu test output/log/DB snapshot thật; không tạo artifact giả để thay thế evidence.
+8. Nếu backfill technical Phase 4D, tạo thêm placeholder/screenshot thật cho Owner dashboard reporting và Super Admin platform analytics, đồng thời cập nhật Chương 5/Phụ lục A và `thesis-artifact-backlog.md`.
 
 ## 6. Artifact ngoài UI cho Phụ lục D
 

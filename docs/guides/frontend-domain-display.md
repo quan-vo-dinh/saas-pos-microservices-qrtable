@@ -44,6 +44,8 @@ SaaS plan `features` are persisted as backend/API codes. Subscription screens, p
 
 The current-plan usage bars are not frontend defaults. They should display service-provided usage values: tables from Catalog, staff from User-Access, and today's orders from Order using the Ho Chi Minh day boundary. If a counter is unavailable, the SaaS backend owns the fallback policy; UI components should not invent usage numbers.
 
+Dashboard reporting uses the same rule. `SAAS_PLAN_FEATURE` values from `saas-wire-types.ts` drive entitlement checks, and user-facing locked cards or plan overview surfaces must display `planFeatureVi(code)`, not `analytics_basic`, `analytics_advanced`, or other raw feature codes. The Management App derives dashboard entitlement state from the subscription dashboard response and should avoid calling report APIs for locked widgets.
+
 ## SaaS Feature Layout (management-app)
 
 See `apps/management-app/src/features/saas/README.md`:

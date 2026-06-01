@@ -2,9 +2,21 @@
 
 > Tài liệu này là kết quả của Phase 5A: kiểm kê bằng chứng triển khai thực tế từ source code và docs.
 > Mục tiêu: xây dựng nền cho nội dung Chương 5 (Cài đặt hệ thống) — không draft chương, chỉ lập bảng evidence và plan diagram.
-> Cập nhật: 2026-05-29.
+> Cập nhật: 2026-05-29. Addendum note: 2026-06-01.
 
 ---
+
+## Addendum 2026-06-01 - Technical Phase 4D backfill
+
+Phase 5A audit này được lập trước khi technical docs bổ sung Phase 4D Dashboard & Reporting và Phase 4D.1 entitlement/UI polish. Vì vậy Bảng 5.1, kế hoạch sequence diagram và screenshot plan hiện chưa cover đầy đủ dashboard/reporting.
+
+Khi backfill Chương 5, không sửa các evidence đã verify như thể chúng sai; thêm một addendum riêng cho:
+
+- BFF reporting controllers: tenant dashboard reports bị gate bởi `report.read_own` và plan feature; Super Admin analytics dùng `report.read_any`.
+- Backend guard/contracts: `PlanFeatureGuard`, `RequiresPlanFeature`, tenant subscription context/resolver và specs tương ứng.
+- Frontend reports feature: dashboard entitlements, feature lock card, plan overview card, advanced insights section, tenant dashboard client và admin analytics client.
+- Screenshot/demo: Owner dashboard locked/basic/full analytics theo FREE/BASIC/PREMIUM; Super Admin platform analytics dashboard.
+- Evaluation: chỉ claim theo test/guard/UI evidence đã có; không claim browser proof hoặc benchmark nếu chưa capture/chạy thật.
 
 ## 1. Ma trận Evidence theo Flow chính
 
@@ -113,6 +125,21 @@
 **Đánh giá P0:** ✅ Evidence đủ để vẽ Hình 5.5 sequence (SaaS onboarding).
 
 **Code anchor:** `apps/saas/src/services/onboarding-saga.service.ts`
+
+---
+
+### 1.7 Planned backfill: Dashboard & Reporting entitlement
+
+| Evidence item                                                                                         | File / Path                                                                                                                                                             | Dòng / Method                        | Claim được hỗ trợ                                          |
+| ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| Tenant report routes yêu cầu `report.read_own` và feature `analytics_basic`                           | `apps/bff/src/app/modules/reporting/controllers/dashboard-report.controller.ts`                                                                                         | Controller decorators/route handlers | Owner/Manager dashboard reports bị plan-gated              |
+| Super Admin analytics route dùng permission cross-tenant, không bị giới hạn bởi plan tenant được chọn | `apps/bff/src/app/modules/reporting/controllers/admin-analytics.controller.ts`                                                                                          | Controller decorators/route handlers | Platform analytics thuộc Super Admin/admin scope           |
+| Guard kiểm tra feature code từ subscription context                                                   | `libs/guards/src/lib/plan-feature.guard.ts`; `libs/decorators/src/lib/requires-plan-feature.decorator.ts`                                                               | Guard/decorator                      | Package feature limit enforced ở backend                   |
+| Tenant subscription resolver/context cho BFF reporting                                                | `apps/bff/src/app/modules/reporting/services/tenant-subscription-resolver.service.ts`; `apps/bff/src/app/modules/reporting/guards/tenant-subscription-context.guard.ts` | Resolver/guard                       | BFF lấy entitlement theo tenant trước khi phục vụ report   |
+| Frontend dashboard entitlements và lock UI                                                            | `apps/management-app/src/features/reports/hooks/use-dashboard-entitlements.ts`; `apps/management-app/src/features/reports/components/report-feature-gate.tsx`           | Hook/component                       | UI phản ánh plan entitlement, không thay thế backend guard |
+| Dashboard UI polish components                                                                        | `dashboard-plan-overview-card.tsx`; `dashboard-feature-lock-card.tsx`; `insight-metric-card.tsx`; `advanced-insights-section.tsx`                                       | Reports components                   | Chương 5 có thể minh họa dashboard/reporting UI            |
+
+**Trạng thái:** planned/backfill cho khóa luận. Technical docs/source đã có evidence nền, nhưng Chương 5 LaTeX, Bảng 5.1 và screenshot plan chưa được cập nhật/verify sau Phase 4D kỹ thuật.
 
 ---
 

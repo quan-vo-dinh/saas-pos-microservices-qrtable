@@ -1,11 +1,13 @@
 # Prompt bank cho AI agent viết khóa luận QRTable
 
 > Tài liệu sống chứa prompt mẫu để khởi động các session mới mà không phụ thuộc vào trí nhớ của thread chat hiện tại.
-> Cập nhật gần nhất: 2026-05-31.
+> Cập nhật gần nhất: 2026-06-01.
 
 ## 1. Mục đích
 
 File này giúp người dùng mở một session AI mới và giao đúng phase con mà không cần viết lại toàn bộ bối cảnh. Mỗi prompt dưới đây cố tình ngắn hơn các prompt trao đổi ban đầu, vì agent mới phải đọc `thesis-workflow-plan.md` và các tài liệu liên quan trong repo để lấy context chi tiết.
+
+Ghi chú 2026-06-01: prompt bank có "Phase 4D" thuộc workflow khóa luận, nghĩa là artifact coverage cho Chương 3. Không nhầm với **technical Phase 4D Dashboard & Reporting** trong `docs/phases/phase-4d-dashboard-reporting.md`. Khi cần backfill dashboard/reporting vào report, tạo session riêng dựa trên note trong `thesis-workflow-plan.md`, không dùng prompt Phase 4D Chương 3 bên dưới.
 
 Nguyên tắc:
 

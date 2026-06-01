@@ -4,7 +4,7 @@
 
 > **Topic (English):** Design and Implementation of a SaaS-Based POS Platform with Integrated QR Code Ordering Using a Microservices Architecture
 
-> **Version:** 1.0  |  **Update:** 2026-05-30
+> **Version:** 1.1  |  **Update:** 2026-06-01
 
 ---
 
@@ -248,15 +248,15 @@ Diagram §4.2 above describes the **objective** of “FE & BE joint contract”.
 
 **2-app strategy:** Instead of 4 separate apps, the frontend system is organized into **2 independent apps** in Nx Monorepo — optimizing development volume, sharing shared libraries, while still clearly separating Customer (anonymous) and Internal (authenticated).
 
-| Ingredients               | Technology                               | Reason for choosing                                                            |
-| ------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------ |
-| **App 1: Customer PWA**   | React + Vite, TypeScript, service Worker | Fast download, offline-first, mobile-first, lightweight build, no need for SSR |
-| **App 2: Management App** | Next.js (App Router) + React 19          | Role-based routing, auth middleware, flexible SSR/CSR, complex layout          |
-| **State/Data**            | React Query + Zustand                    | Server-state is clear, local state is light, cache & refetch are good          |
-| **Real-time**             | Socket.io client                         | Reconnect, room-based updates by tenant/session                                |
-| **Form & Validation**     | React Hook Form + Zod                    | Validation schema-based, good UX                                               |
-| **UI System**             | Tailwind CSS + Shadcn UI + Lucide React  | Standardized component library, easy to expand, ecosystem-synchronized icon    |
-| **Charts/Analytics**      | Shadcn/UI Charts + Chart.js              | Visualize revenue reports, SLA, order throughput                               |
+| Ingredients               | Technology                               | Reason for choosing                                                               |
+| ------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
+| **App 1: Customer PWA**   | React + Vite, TypeScript, service Worker | Fast download, offline-first, mobile-first, lightweight build, no need for SSR    |
+| **App 2: Management App** | Next.js (App Router) + React 19          | Role-based routing, auth middleware, flexible SSR/CSR, complex layout             |
+| **State/Data**            | React Query + Zustand                    | Server-state is clear, local state is light, cache & refetch are good             |
+| **Real-time**             | Socket.io client                         | Reconnect, room-based updates by tenant/session                                   |
+| **Form & Validation**     | React Hook Form + Zod                    | Validation schema-based, good UX                                                  |
+| **UI System**             | Tailwind CSS + Shadcn UI + Lucide React  | Standardized component library, easy to expand, ecosystem-synchronized icon       |
+| **Charts/Analytics**      | shadcn/ui Charts + Recharts              | Visualize revenue reports, SLA, order throughput with shared dashboard primitives |
 
 ### 4.4 Frontend Application Architecture (2-App Architecture)
 
@@ -365,7 +365,7 @@ const ROLE_ROUTES = {
 
 ```
 Dashboard
-├── / (Revenue overview: daily/weekly/monthly)
+├── / (Plan-aware revenue/reporting dashboard: quota, locked states, daily/weekly/monthly)
   ├── /menu (Menu Management: Category, Item, Stock)
   ├── /tables (Table & Area Management, QR export)
   ├── /staff (Staff & Role Management)
@@ -384,7 +384,7 @@ Platform Ops
   ├── /tenants (Tenant Directory: onboard, search, suspend, activate, close, assign plan)
   ├── /plans (Pricing Plan Management)
   ├── /billing (Subscription invoices reconciliation)
-  ├── /analytics (Usage & Revenue Analytics)
+  ├── /analytics (Platform subscription analytics + explicit tenant drilldown)
   ├── /health (System Health: services, Kafka lag, error rate)
   └── /support (Support Tools: impersonate tenant, audit logs)
 ```
@@ -569,7 +569,7 @@ File Storage Level:
 | 7   | **Payment service**     | TCP + Webhook | PG: `qrtable_payment` | Customer bill payments, tenant payment settings, SePay OAuth/settings, reconciliation                            |
 | 8   | **User-Access service** | TCP           | Mongo: `qrtable_auth` | User profile, Role mapping, Staff management, tenant staff counts                                                |
 | 9   | **Customer PWA**        | HTTP + WS     | —                     | Anonymous customer ordering UI, suspended-tenant read-only/payment behavior                                      |
-| 10  | **Management App**      | HTTP + WS     | —                     | POS/KDS/Dashboard/Admin UI, Phase 4B subscription/payment settings/admin pages                                   |
+| 10  | **Management App**      | HTTP + WS     | —                     | POS/KDS/Dashboard/Admin UI, subscription/payment settings, package-aware reporting dashboards                    |
 | 11  | **Keycloak Theme**      | Static assets | —                     | Keycloak login/theme customization                                                                               |
 | 12  | **Product App**         | TBD           | TBD                   | Present in `apps/product`; no current architecture ownership verified in Phase 4B anchors                        |
 
@@ -580,7 +580,8 @@ File Storage Level:
 ```
 Responsibility:
 - Single entry point for every client (REST + WebSocket)
-  - Guard chain: UserGuard → SessionGuard → TenantGuard → PermissionGuard
+  - Guard chain: UserGuard → SessionGuard → TenantGuard → CustomerTenantLifecycleGuard → PermissionGuard
+  - Feature-gated tenant report routes add TenantSubscriptionContextGuard → PlanFeatureGuard
   - Swagger API documentation
   - Rate limiting (NestJS Throttler + Redis)
 - Global Exception Interceptor (standardize error response)
@@ -595,6 +596,7 @@ after TCP response for UI-layer events (see §7.3)
 Communicate:
   - → Authorizer Service (gRPC): verify token
   - → Catalog/Order/Payment/SaaS Service (TCP): business operations
+  - → SaaS Service (TCP): current subscription/features for plan-gated dashboard report routes
   - → Redis: token cache, rate limit counter
   - → Kafka: subscribe domain events that BFF may bridge (`kitchen.sla_warning`, `payment.completed`); order tracking uses BFF Direct after Order TCP response, and BFF must not emit KDS queue changes directly from `order.confirmed`
   - → Cloudinary: stream image upload (menu items)
@@ -632,7 +634,7 @@ Responsibility:
   - Pricing Plans management (FREE/BASIC/PREMIUM seed; public list + admin CRUD)
   - Subscription lifecycle: assign, checkout invoice, activate, cancel, expire, history
   - Subscription invoices (`subscription_invoices`): Tier 2 tenant → platform VietQR, status, manual confirm, SePay webhook handling
-  - Feature gating support: current subscription cache + target-service backup checks for limits
+  - Feature gating support: canonical plan feature codes, current subscription cache, dashboard entitlement data, and target-service backup checks for limits
   - Subscription usage dashboard: resolve live table/staff/order counters through Catalog, User-Access and Order TCP; daily order usage uses `Asia/Ho_Chi_Minh`
   - Slug/Subdomain generation & uniqueness validation; reserved words are blocked in shared SaaS constants
   - Onboarding mini-saga: create tenant owner via Authorizer/User-Access and initialize Payment settings row; rollback/cleanup handles partial failure and orphan Keycloak users
@@ -660,6 +662,30 @@ Events emitted (Kafka):
   - subscription.activated / subscription invoice events use SaaS outbox where implemented/accepted;
     UI-only suspend notifications remain BFF/WebSocket side effects, not Kafka business events.
 ```
+
+#### 6.2.3A Dashboard Reporting Read Models
+
+Phase 4D reporting uses source-owner read models instead of a separate Analytics service.
+
+| Surface            | BFF route family                                                         | RBAC permission   | Plan feature gate                   | Source service        |
+| ------------------ | ------------------------------------------------------------------------ | ----------------- | ----------------------------------- | --------------------- |
+| Tenant revenue     | `GET /dashboard/reports/revenue`                                         | `report.read_own` | `analytics_basic`                   | Payment               |
+| Tenant orders      | `GET /dashboard/reports/orders`                                          | `report.read_own` | `analytics_basic`                   | Order                 |
+| Tenant tables/menu | `GET /dashboard/reports/tables`                                          | `report.read_own` | `analytics_basic`                   | Catalog               |
+| Platform analytics | `GET /admin/analytics/platform`                                          | `report.read_any` | none                                | SaaS                  |
+| Tenant drilldown   | `GET /admin/analytics/tenants/:tenantId/reports/{revenue,orders,tables}` | `report.read_any` | none; selected tenant plan is shown | Payment/Order/Catalog |
+
+Implementation rules:
+
+- BFF controllers validate query shape, apply guards, inject tenant/actor context, and forward typed TCP payloads.
+- BFF does not join databases and does not aggregate cross-service report data.
+- Payment owns paid restaurant-bill revenue, method breakdown, and recent paid payments.
+- Order owns order/bill status, average bill value, and top item aggregation.
+- Catalog owns table status and catalog availability summaries.
+- SaaS owns platform subscription revenue, tenant status counts, invoice status, and plan distribution.
+- Tenant dashboard routes use `TenantSubscriptionContextGuard` to resolve `SUBSCRIPTION.GET_CURRENT`, then `PlanFeatureGuard` checks active subscription plus `PLAN_FEATURE_CODES.ANALYTICS_BASIC`.
+- Management App derives `DashboardEntitlements` from `/dashboard/subscription`; locked widgets skip report API calls and render upgrade states.
+- Super Admin platform analytics and tenant drilldown are not blocked by the selected tenant's plan features.
 
 #### 6.2.4 Catalog Service
 
@@ -1086,6 +1112,10 @@ For consistent telemetry and debugging, prioritize using 3 error groups:
 
 - Authenticated and has a profile, but does not have enough rights to perform actions.
 
+4. 403 plan_feature_required
+
+- Authenticated, permission check passed, but the active tenant subscription does not include the required SaaS plan feature for a feature-gated endpoint.
+
 ```
 Request
   │
@@ -1097,6 +1127,12 @@ Request
   │
   ▼
 [PermissionGuard] ← Permission: "Do you have the necessary permission?"
+  │
+  ▼
+[TenantSubscriptionContextGuard] ← Entitlement context: "Which active plan/features apply?"
+  │
+  ▼
+[PlanFeatureGuard] ← Package feature: "Does the plan unlock this feature?"
   │
   ▼
 Controller → Service → Repository (auto-filtered by tenant_id)
@@ -1122,18 +1158,19 @@ Configure via Keycloak **Protocol Mapper** (type: User Attribute → Token Claim
 
 ### 8.4 Summary Authorization Table
 
-| Endpoint Pattern             | Super Admin | Owner/Manager | Waiter | Chef/Bar | Customer |
-| ---------------------------- | ----------- | ------------- | ------ | -------- | -------- |
-| `POST /admin/tenants`        | ✅          | ❌            | ❌     | ❌       | ❌       |
-| `GET /admin/analytics`       | ✅          | ❌            | ❌     | ❌       | ❌       |
-| `CRUD /restaurant/menu`      | 🔍 Debug    | ✅            | ❌     | ❌       | ❌       |
-| `CRUD /restaurant/tables`    | ❌          | ✅            | 👁️     | ❌       | ❌       |
-| `POST /orders/confirm`       | ❌          | ✅            | ✅     | ❌       | ❌       |
-| `PATCH /kds/tickets/:id`     | ❌          | ✅            | ❌     | ✅       | ❌       |
-| `POST /orders` (submit)      | ❌          | ❌            | ❌     | ❌       | ✅       |
-| `POST /payment/request-bill` | ❌          | ❌            | ❌     | ❌       | ✅       |
-| `POST /payment/confirm-cash` | ❌          | ✅            | ✅     | ❌       | ❌       |
-| `GET /menu` (public)         | ❌          | ✅            | ✅     | ❌       | ✅       |
+| Endpoint Pattern             | Super Admin | Owner/Manager    | Waiter | Chef/Bar | Customer |
+| ---------------------------- | ----------- | ---------------- | ------ | -------- | -------- |
+| `POST /admin/tenants`        | ✅          | ❌               | ❌     | ❌       | ❌       |
+| `GET /admin/analytics`       | ✅          | ❌               | ❌     | ❌       | ❌       |
+| `GET /dashboard/reports/*`   | ❌          | ✅ package-gated | ❌     | ❌       | ❌       |
+| `CRUD /restaurant/menu`      | 🔍 Debug    | ✅               | ❌     | ❌       | ❌       |
+| `CRUD /restaurant/tables`    | ❌          | ✅               | 👁️     | ❌       | ❌       |
+| `POST /orders/confirm`       | ❌          | ✅               | ✅     | ❌       | ❌       |
+| `PATCH /kds/tickets/:id`     | ❌          | ✅               | ❌     | ✅       | ❌       |
+| `POST /orders` (submit)      | ❌          | ❌               | ❌     | ❌       | ✅       |
+| `POST /payment/request-bill` | ❌          | ❌               | ❌     | ❌       | ✅       |
+| `POST /payment/confirm-cash` | ❌          | ✅               | ✅     | ❌       | ❌       |
+| `GET /menu` (public)         | ❌          | ✅               | ✅     | ❌       | ✅       |
 
 ---
 
@@ -1298,18 +1335,18 @@ QR URL Format:
 
 ### 11.1 Cache Layers
 
-| Layer                    | Key Pattern                           | Data                               | TTL                | Invalidation                                                              |
-| ------------------------ | ------------------------------------- | ---------------------------------- | ------------------ | ------------------------------------------------------------------------- |
-| **Token Cache**          | `user-token:{sha256(jwt)}`            | User data + permissions            | 30 min             | Token expiry / logout                                                     |
-| **Menu Cache**           | `menu:{tenant_id}`                    | Full menu JSON                     | 10 min             | Explicit invalidation on menu write                                       |
-| **Table Status**         | `table:{tenant_id}:{table_id}:status` | Status enum                        | No expire          | Explicit update on change                                                 |
-| **Session**              | `session:{tenant_id}:{session_id}`    | Session metadata + last_activity   | 2 hours (lifetime) | On session close, idle empty-session close, or safe empty-session release |
-| **Cart**                 | `cart:{tenant_id}:{session_id}`       | Hash of cart items                 | 2 hours            | Bound to session TTL; delete on close/release                             |
-| **Rate Limit**           | `rl:{endpoint}:{ip/token}`            | Request count                      | Window (s)         | Auto-expire                                                               |
-| **KDS Queue**            | `kds:{tenant_id}:{station}`           | Sorted Set of tickets              | No expire          | On ticket complete/remove                                                 |
-| **Tenant Suspend**       | `tenant:{tenantId}:suspended`         | Suspend edge flag                  | No expire          | SaaS lifecycle activate/close                                             |
-| **Current Subscription** | `subscription:{tenantId}`             | Current plan/subscription snapshot | 5 min              | SaaS subscription changes                                                 |
-| **Payment OAuth State**  | `oauth_state:{state}`                 | SePay OAuth CSRF/tenant binding    | 5 min              | Callback consumes key                                                     |
+| Layer                    | Key Pattern                           | Data                                        | TTL                | Invalidation                                                              |
+| ------------------------ | ------------------------------------- | ------------------------------------------- | ------------------ | ------------------------------------------------------------------------- |
+| **Token Cache**          | `user-token:{sha256(jwt)}`            | User data + permissions                     | 30 min             | Token expiry / logout                                                     |
+| **Menu Cache**           | `menu:{tenant_id}`                    | Full menu JSON                              | 10 min             | Explicit invalidation on menu write                                       |
+| **Table Status**         | `table:{tenant_id}:{table_id}:status` | Status enum                                 | No expire          | Explicit update on change                                                 |
+| **Session**              | `session:{tenant_id}:{session_id}`    | Session metadata + last_activity            | 2 hours (lifetime) | On session close, idle empty-session close, or safe empty-session release |
+| **Cart**                 | `cart:{tenant_id}:{session_id}`       | Hash of cart items                          | 2 hours            | Bound to session TTL; delete on close/release                             |
+| **Rate Limit**           | `rl:{endpoint}:{ip/token}`            | Request count                               | Window (s)         | Auto-expire                                                               |
+| **KDS Queue**            | `kds:{tenant_id}:{station}`           | Sorted Set of tickets                       | No expire          | On ticket complete/remove                                                 |
+| **Tenant Suspend**       | `tenant:{tenantId}:suspended`         | Suspend edge flag                           | No expire          | SaaS lifecycle activate/close                                             |
+| **Current Subscription** | `subscription:{tenantId}`             | Current plan/subscription/features snapshot | 5 min              | SaaS subscription changes                                                 |
+| **Payment OAuth State**  | `oauth_state:{state}`                 | SePay OAuth CSRF/tenant binding             | 5 min              | Callback consumes key                                                     |
 
 ### 11.2 Redis Access Policy
 
@@ -1544,11 +1581,11 @@ docker compose -f docker-compose.prod.yaml up -d    # Full stack
 | 7   | **Session lifecycle** (dual timeout, multi-device)                          | Session lifetime = 2h (Redis TTL), idle timeout = 30min (cron check `last_activity`) + cart sync via WebSocket                                   | Medium     |
 | 8   | **Offline resilience** (PWA for customer & POS)                             | service Worker + IndexedDB queue + idempotency key + exponential backoff retry                                                                   | Cao        |
 | 9   | **Distributed transaction** (order confirm saga)                            | Saga Orchestration pattern + compensation steps + idempotent operations                                                                          | Medium     |
-| 10  | **Subscription feature gating**                                             | SaaS service + feature flag in tenant context + middleware check limits                                                                          | Small      |
+| 10  | **Subscription feature gating**                                             | SaaS plan features + subscription cache + BFF `PlanFeatureGuard` for package-gated routes                                                        | Small      |
 
 ### 15.2 Deployment Priorities (Phased)
 
-The order below is the canonical roadmap after closing Phase 4B; When detailed status is needed, use `docs/implementation_plan.md` as the truth source.
+The order below is the canonical roadmap after closing Phase 4D.1; When detailed status is needed, use `docs/implementation_plan.md` as the truth source.
 
 ```txt
 Phase 0 — Foundation / setup:
@@ -1574,6 +1611,9 @@ Phase 4B — SaaS + Tenant Onboarding:
 
 Phase 4C — Staff Management:
 └── Not started yet. Former Step 4.5 Notification Service is removed from current scope.
+
+Phase 4D — Dashboard + Reporting:
+└── Completed. Includes report permissions, source-owner reporting read models, package feature gating, and dashboard UI polish.
 
 Phase 5-7 — Testing + Observability + Deploy:
 └── Not started yet; Phase 5 = testing, Phase 6 = observability, Phase 7 = deployment/demo.

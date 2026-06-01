@@ -11,6 +11,8 @@ Tài liệu này là bản khung chính thức để chuyển từ bản đồ b
 
 Tài liệu này không phải bản khóa luận hoàn chỉnh. Khi bắt đầu viết từng chương, cần quay lại `thesis-evidence-map.md` để kiểm tra nguồn bằng chứng, trạng thái implementation nội bộ và chính sách tránh overclaim.
 
+Ghi chú cập nhật 2026-06-01: technical docs đã bổ sung Phase 4D kỹ thuật về Dashboard & Reporting và Phase 4D.1 về dashboard entitlement/UI polish. Outline này giữ vai trò chỉ dẫn report, nên cần backfill phần này vào Chương 3-6 trước bản nộp cuối: yêu cầu dashboard/reporting, kiến trúc BFF/guard/entitlement, implementation evidence, evaluation và screenshot/demo thật.
+
 ## 2. Nguyên tắc viết khóa luận
 
 1. Viết bằng tiếng Việt học thuật, rõ ràng và mạch lạc; giữ các thuật ngữ kỹ thuật tiếng Anh khi thuật ngữ đó là chuẩn ngành hoặc giúp diễn đạt chính xác hơn, ví dụ `SaaS`, `POS`, `microservices`, `service boundary`, `Kafka`, `WebSocket`, `tenant isolation`, `idempotency`.
@@ -104,7 +106,7 @@ Vai trò: Thiết lập bối cảnh, bài toán, mục tiêu và phạm vi củ
 
 - Xây dựng nền tảng POS theo mô hình SaaS cho F&B.
 - Tích hợp đặt món qua mã QR tại bàn.
-- Điều phối order, bếp, thanh toán và quản trị tenant theo kiến trúc microservices.
+- Điều phối order, bếp, thanh toán, dashboard/reporting và quản trị tenant theo kiến trúc microservices.
 
 #### 1.4. Mục tiêu nghiên cứu và mục tiêu xây dựng hệ thống
 
@@ -238,6 +240,7 @@ Vai trò: Chuyển bối cảnh và lý thuyết thành yêu cầu cụ thể ch
 - Customer session/shared cart/order.
 - Staff POS và KDS.
 - Payment settlement.
+- Dashboard/reporting cho Owner/Manager và platform analytics cho Super Admin, có plan feature entitlement theo gói.
 - Auth/RBAC và tenant isolation.
 
 #### 3.4. Non-functional requirements
@@ -262,7 +265,7 @@ Vai trò: Chuyển bối cảnh và lý thuyết thành yêu cầu cụ thể ch
 
 - Không claim benchmark tải lớn nếu chưa đo.
 - Không claim production-grade observability/deployment nếu chỉ có thiết kế hoặc demo giới hạn.
-- Không đưa các module mở rộng như HRM, CRM, BI/AI, native mobile, advanced inventory/BOM vào phạm vi kết quả chính nếu chưa có evidence.
+- Không đưa các module mở rộng như HRM, CRM, BI/AI nâng cao ngoài dashboard/reporting Phase 4D kỹ thuật, native mobile, advanced inventory/BOM vào phạm vi kết quả chính nếu chưa có evidence.
 
 Nguồn chính: `docs/business-logic.md`, `docs/architecture/permission-matrix.md`, phase records, `docs/specs/*`.
 
@@ -307,6 +310,7 @@ Vai trò: Giải thích QRTable được thiết kế như thế nào và vì sa
 - Kitchen sở hữu KDS queue runtime bằng Redis.
 - Payment sở hữu transaction/payment settings/webhook settlement.
 - SaaS sở hữu tenant, plan, subscription, tenant lifecycle.
+- Reporting/dashboard APIs tổng hợp read model qua BFF và service owners hiện có; không tạo service mới trong report nếu technical docs/source không có service tương ứng.
 - User-Access và Authorizer xử lý profile/role/JWT/Keycloak.
 
 #### 4.5. Multi-tenancy strategy
@@ -343,6 +347,7 @@ Vai trò: Giải thích QRTable được thiết kế như thế nào và vì sa
 - Keycloak/JWT cho staff/owner/admin.
 - Customer anonymous QR/session flow.
 - Guard chain, tenant guard, permission matrix.
+- Dashboard/reporting cần phân biệt permission `report.read_own`, `report.read_any` và plan feature entitlement; Super Admin analytics không bị giới hạn bởi gói của tenant được chọn.
 - Webhook verification và security gaps cần viết cẩn trọng theo evidence.
 
 #### 4.10. Payment architecture với SePay/VietQR
@@ -395,7 +400,7 @@ Vai trò: Chứng minh hệ thống đã được hiện thực hóa, nhưng kh�
 #### 5.3. Triển khai frontend
 
 - Customer PWA: QR entry, menu, cart, order tracking, payment request.
-- Management App: POS, KDS, Owner dashboard, Super Admin.
+- Management App: POS, KDS, Owner dashboard/reporting, Super Admin analytics.
 - UI labels tiếng Việt, enum wire mapping và role-based routing nếu có evidence.
 
 #### 5.4. QR session và shared cart
@@ -428,6 +433,7 @@ Vai trò: Chứng minh hệ thống đã được hiện thực hóa, nhưng kh�
 - Super Admin onboarding.
 - Tenant/subscription/plan.
 - Payment settings.
+- Dashboard/reporting entitlement liên quan tới pricing plan/package feature limit.
 - Tenant status: active/suspended/closed theo evidence.
 
 #### 5.9. Shared libraries và contracts
@@ -450,6 +456,7 @@ Artifact nên có:
 - Hình 5.4. Sequence SePay/VietQR settlement.
 - Hình 5.5. Sequence SaaS onboarding.
 - Bảng 5.1. Implemented evidence table.
+- Bảng 5.x. Dashboard/reporting implementation addendum nếu backfill technical Phase 4D vào report.
 - Screenshot 5.x. Customer PWA, Staff POS, KDS, Owner dashboard, Super Admin.
 
 ### Chương 6. Đánh giá
@@ -636,15 +643,15 @@ Chương 5 chỉ nên dùng screenshot đại diện. Phụ lục chứa gallery
 
 Phase 5D có thể dựng trước scaffold screenshot bằng placeholder trắng, filename ổn định, caption và LaTeX label để người viết thay ảnh thật thủ công. Placeholder không được tính là screenshot thật hoặc demo evidence trong bản nộp.
 
-| Nhóm màn hình   | Screenshot đại diện trong Chương 5                                                                   | UI gallery/phụ lục nên có                                                                                             |
-| --------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Customer PWA    | QR join/session, menu, cart, order tracking, request payment/VietQR.                                 | Toàn bộ journey: vào bàn, xem menu, lọc/chọn món, chi tiết món, giỏ hàng, gửi order, theo dõi trạng thái, thanh toán. |
-| Staff POS       | Table map/live orders, order detail, confirm/cancel, bill settlement.                                | Table/session lifecycle, order queue, xử lý gọi thêm món, cập nhật bàn, thu ngân, trạng thái thanh toán.              |
-| KDS             | Kitchen/bar queue, ticket detail, status update.                                                     | Ticket mới, đang xử lý, hoàn tất, priority/SLA nếu có, empty state và realtime refresh.                               |
-| Owner dashboard | Menu/category management, table/QR management, payment settings, subscription.                       | CRUD menu/table/area/QR, cấu hình thanh toán, nhân viên/quyền, thông tin tenant, subscription/billing.                |
-| Super Admin     | Tenant onboarding, tenant lifecycle, pricing plan, subscription invoice.                             | Tạo tenant, gán owner, kích hoạt/tạm ngưng tenant, quản lý gói, invoice/subscription, trạng thái thanh toán.          |
-| Auth/security   | Keycloak login hoặc role-based routing nếu cần minh họa security flow.                               | Login/logout, route bị chặn theo role, tenant suspended warning nếu có, màn hình lỗi quyền truy cập.                  |
-| Evaluation/demo | Test run summary, traceability summary, health check hoặc observability screen nếu có artifact thật. | Command output, demo checklist, release/tag/commit hash, video demo link, log/metric/trace screenshot nếu có thật.    |
+| Nhóm màn hình   | Screenshot đại diện trong Chương 5                                                                   | UI gallery/phụ lục nên có                                                                                                               |
+| --------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Customer PWA    | QR join/session, menu, cart, order tracking, request payment/VietQR.                                 | Toàn bộ journey: vào bàn, xem menu, lọc/chọn món, chi tiết món, giỏ hàng, gửi order, theo dõi trạng thái, thanh toán.                   |
+| Staff POS       | Table map/live orders, order detail, confirm/cancel, bill settlement.                                | Table/session lifecycle, order queue, xử lý gọi thêm món, cập nhật bàn, thu ngân, trạng thái thanh toán.                                |
+| KDS             | Kitchen/bar queue, ticket detail, status update.                                                     | Ticket mới, đang xử lý, hoàn tất, priority/SLA nếu có, empty state và realtime refresh.                                                 |
+| Owner dashboard | Menu/category management, table/QR management, payment settings, subscription, dashboard reporting.  | CRUD menu/table/area/QR, cấu hình thanh toán, nhân viên/quyền, thông tin tenant, subscription/billing, reporting theo plan entitlement. |
+| Super Admin     | Tenant onboarding, tenant lifecycle, pricing plan, subscription invoice, platform analytics.         | Tạo tenant, gán owner, kích hoạt/tạm ngưng tenant, quản lý gói, invoice/subscription, trạng thái thanh toán, analytics cross-tenant.    |
+| Auth/security   | Keycloak login hoặc role-based routing nếu cần minh họa security flow.                               | Login/logout, route bị chặn theo role, tenant suspended warning nếu có, màn hình lỗi quyền truy cập.                                    |
+| Evaluation/demo | Test run summary, traceability summary, health check hoặc observability screen nếu có artifact thật. | Command output, demo checklist, release/tag/commit hash, video demo link, log/metric/trace screenshot nếu có thật.                      |
 
 Lưu ý: screenshot observability/deployment chỉ đưa khi có artifact thật. Nếu chưa có dashboard/log/trace được triển khai và chụp lại, phần này chỉ nên xuất hiện trong thiết kế hoặc hướng phát triển, không dùng screenshot minh họa giả.
 
