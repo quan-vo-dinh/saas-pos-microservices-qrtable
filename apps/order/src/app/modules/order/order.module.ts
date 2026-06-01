@@ -22,6 +22,7 @@ import { CatalogStockGatewayService } from './services/catalog-stock-gateway.ser
 import { OrderConfirmSagaService } from './services/order-confirm-saga.service';
 import { OrderKdsEventService } from './services/order-kds-event.service';
 import { OrderStateTransitionService } from './services/order-state-transition.service';
+import { OrderReportService } from './services/order-report.service';
 import { OrderService } from './services/order.service';
 import { OrderSubmitService } from './services/order-submit.service';
 import { OutboxPublisherService } from './services/outbox-publisher.service';
@@ -40,6 +41,7 @@ import { TransferService } from './services/transfer.service';
   controllers: [OrderController],
   providers: [
     OrderService,
+    OrderReportService,
     OrderSubmitService,
     OrderConfirmSagaService,
     OrderStateTransitionService,

@@ -55,6 +55,7 @@ describe('SaasController Phase 4B TCP contracts', () => {
       onboardingSagaService as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await controller.onboard(

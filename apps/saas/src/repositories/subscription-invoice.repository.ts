@@ -4,6 +4,8 @@ import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import type { ReportGrain } from '@common/utils/report-range.util';
+import { pgBucketExpression } from '@common/utils/report-bucket.util';
 import { In, LessThan, Repository } from 'typeorm';
 
 @Injectable()
@@ -110,5 +112,77 @@ export class SubscriptionInvoiceRepository {
       },
     );
     return result.affected ?? 0;
+  }
+
+  async aggregatePlatformRevenueSummary(
+    fromUtc: Date,
+    toUtc: Date,
+  ): Promise<{ platformRevenueVnd: number; paidInvoiceCount: number; pendingInvoiceCount: number }> {
+    const paidRow = await this.repo
+      .createQueryBuilder('invoice')
+      .select('COALESCE(SUM(invoice.paidAmountVnd), 0)', 'platformRevenueVnd')
+      .addSelect('COUNT(*)', 'paidInvoiceCount')
+      .where('invoice.status = :paidStatus', { paidStatus: SubscriptionInvoiceStatus.PAID })
+      .andWhere('invoice.paidAt >= :fromUtc', { fromUtc })
+      .andWhere('invoice.paidAt <= :toUtc', { toUtc })
+      .getRawOne<{ platformRevenueVnd: string; paidInvoiceCount: string }>();
+
+    const pendingInvoiceCount = await this.repo.count({
+      where: { status: SubscriptionInvoiceStatus.PENDING },
+    });
+
+    return {
+      platformRevenueVnd: Number(paidRow?.platformRevenueVnd) || 0,
+      paidInvoiceCount: Number(paidRow?.paidInvoiceCount) || 0,
+      pendingInvoiceCount,
+    };
+  }
+
+  async aggregatePlatformRevenueSeries(
+    fromUtc: Date,
+    toUtc: Date,
+    grain: ReportGrain,
+    timezone: string,
+  ): Promise<Array<{ bucket: string; platformRevenueVnd: number; paidInvoiceCount: number }>> {
+    const bucketExpr = pgBucketExpression('invoice.paid_at', grain, timezone);
+    const rows = await this.repo
+      .createQueryBuilder('invoice')
+      .select(bucketExpr, 'bucket')
+      .addSelect('COALESCE(SUM(invoice.paidAmountVnd), 0)', 'platformRevenueVnd')
+      .addSelect('COUNT(*)', 'paidInvoiceCount')
+      .where('invoice.status = :paidStatus', { paidStatus: SubscriptionInvoiceStatus.PAID })
+      .andWhere('invoice.paidAt IS NOT NULL')
+      .andWhere('invoice.paidAt >= :fromUtc', { fromUtc })
+      .andWhere('invoice.paidAt <= :toUtc', { toUtc })
+      .groupBy('bucket')
+      .orderBy('bucket', 'ASC')
+      .getRawMany<{ bucket: string; platformRevenueVnd: string; paidInvoiceCount: string }>();
+
+    return rows.map((row) => ({
+      bucket: row.bucket,
+      platformRevenueVnd: Number(row.platformRevenueVnd) || 0,
+      paidInvoiceCount: Number(row.paidInvoiceCount) || 0,
+    }));
+  }
+
+  async aggregateInvoiceStatusBreakdown(
+    fromUtc: Date,
+    toUtc: Date,
+  ): Promise<Array<{ status: string; count: number; totalVnd: number }>> {
+    const rows = await this.repo
+      .createQueryBuilder('invoice')
+      .select('invoice.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('COALESCE(SUM(invoice.amountVnd), 0)', 'totalVnd')
+      .where('invoice.createdAt >= :fromUtc', { fromUtc })
+      .andWhere('invoice.createdAt <= :toUtc', { toUtc })
+      .groupBy('invoice.status')
+      .getRawMany<{ status: string; count: string; totalVnd: string }>();
+
+    return rows.map((row) => ({
+      status: row.status,
+      count: Number(row.count) || 0,
+      totalVnd: Number(row.totalVnd) || 0,
+    }));
   }
 }

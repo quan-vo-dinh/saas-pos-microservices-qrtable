@@ -107,4 +107,8 @@ export enum PERMISSION {
   SERVICE_REQUEST_CREATE = 'service_request.create',
   SERVICE_REQUEST_ACKNOWLEDGE = 'service_request.acknowledge',
   SERVICE_REQUEST_RESOLVE = 'service_request.resolve',
+
+  /* REPORT (Phase 4D) */
+  REPORT_READ_OWN = 'report.read_own',
+  REPORT_READ_ANY = 'report.read_any',
 }

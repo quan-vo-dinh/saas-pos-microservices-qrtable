@@ -2,6 +2,8 @@ import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message'
 import { RequestParams } from '@common/decorators/request-param.decorator';
 import { TcpLoggingInterceptor } from '@common/interceptors/tcpLogging.interceptor';
 import { Response } from '@common/interfaces/tcp/common/response.interface';
+import type { OrderReportRequest } from '@common/interfaces/tcp/order/order-report.interface';
+import type { OrderReportResponse } from '@common/interfaces/tcp/order/order-report.interface';
 import type {
   BillMarkPaidTcpRequest,
   BillPaymentSnapshotTcpRequest,
@@ -51,6 +53,7 @@ import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { BillService } from '../services/bill.service';
 import { CartService } from '../services/cart.service';
+import { OrderReportService } from '../services/order-report.service';
 import { OrderService } from '../services/order.service';
 import { ServiceRequestService } from '../services/service-request.service';
 import { TransferService } from '../services/transfer.service';
@@ -60,6 +63,7 @@ import { TransferService } from '../services/transfer.service';
 export class OrderController {
   constructor(
     private readonly orderService: OrderService,
+    private readonly orderReportService: OrderReportService,
     private readonly billService: BillService,
     private readonly cartService: CartService,
     private readonly serviceRequestService: ServiceRequestService,
@@ -279,5 +283,10 @@ export class OrderController {
   ): Promise<Response<RevertOrderItemsProcessingTcpResponse>> {
     const data = await this.orderService.revertOrderItemsProcessing(body);
     return Response.success(data);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.ORDER.REPORT_ORDERS)
+  async reportOrders(@RequestParams() body: OrderReportRequest): Promise<Response<OrderReportResponse>> {
+    return Response.success(await this.orderReportService.getOrderReport(body));
   }
 }

@@ -1,11 +1,7 @@
-import { FeaturePlaceholder } from '@einvoice/frontend-ui';
+'use client';
+
+import { AdminAnalyticsClient } from '@/features/reports/admin-analytics-client';
 
 export default function AdminAnalyticsPage() {
-  return (
-    <FeaturePlaceholder
-      section="Admin / Analytics"
-      title="Platform Analytics Skeleton"
-      description="Placeholder for cross-tenant platform metrics and operational health indicators."
-    />
-  );
+  return <AdminAnalyticsClient />;
 }

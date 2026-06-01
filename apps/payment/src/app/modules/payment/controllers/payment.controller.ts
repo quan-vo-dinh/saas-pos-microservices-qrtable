@@ -20,13 +20,16 @@ import type {
   HandlePaymentOAuthCallbackTcpResponse,
   CreateVietQrTcpResponse,
   PaymentHistoryTcpResponse,
+  PaymentRevenueReportResponse,
   PaymentTcpResponse,
   SepayWebhookTcpResponse,
   SelectBankTcpResponse,
   TenantPaymentSettingsTcpResponse,
 } from '@common/interfaces/tcp/payment';
+import type { PaymentRevenueReportRequest } from '@common/interfaces/tcp/payment';
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
+import { PaymentReportService } from '../services/payment-report.service';
 import { PaymentService } from '../services/payment.service';
 import { TenantPaymentSettingsService } from '../services/tenant-payment-settings.service';
 
@@ -35,6 +38,7 @@ import { TenantPaymentSettingsService } from '../services/tenant-payment-setting
 export class PaymentController {
   constructor(
     private readonly paymentService: PaymentService,
+    private readonly paymentReportService: PaymentReportService,
     private readonly tenantPaymentSettingsService: TenantPaymentSettingsService,
   ) {}
 
@@ -63,6 +67,13 @@ export class PaymentController {
   @MessagePattern(TCP_REQUEST_MESSAGE.PAYMENT.GET_STATUS)
   async status(@RequestParams() body: PaymentByIdTcpRequest): Promise<Response<PaymentTcpResponse>> {
     return Response.success(await this.paymentService.getStatus(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.PAYMENT.REPORT_REVENUE)
+  async reportRevenue(
+    @RequestParams() body: PaymentRevenueReportRequest,
+  ): Promise<Response<PaymentRevenueReportResponse>> {
+    return Response.success(await this.paymentReportService.getRevenueReport(body));
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.GET)

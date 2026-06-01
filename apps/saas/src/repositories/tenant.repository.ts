@@ -93,6 +93,20 @@ export class TenantRepository {
     return this.repo.count({ where: { status } });
   }
 
+  async aggregateStatusBreakdown(): Promise<Array<{ status: string; count: number }>> {
+    const rows = await this.repo
+      .createQueryBuilder('tenant')
+      .select('tenant.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('tenant.status')
+      .getRawMany<{ status: string; count: string }>();
+
+    return rows.map((row) => ({
+      status: row.status,
+      count: Number(row.count) || 0,
+    }));
+  }
+
   async deleteById(id: string): Promise<void> {
     await this.repo.delete(id);
   }

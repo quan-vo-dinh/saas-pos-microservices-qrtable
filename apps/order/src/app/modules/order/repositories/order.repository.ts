@@ -4,6 +4,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { PreparationStation } from '@einvoice/types';
 import { OrderStatus } from '@einvoice/types';
 import { EntityManager, In, Repository } from 'typeorm';
+import type { ReportGrain } from '@common/utils/report-range.util';
+import { pgBucketExpression } from '@common/utils/report-bucket.util';
 
 @Injectable()
 export class OrderRepository {
@@ -98,5 +100,63 @@ export class OrderRepository {
       qb.andWhere('o.tableId = :tableId', { tableId: opts.tableId });
     }
     return qb.getMany();
+  }
+
+  async aggregateOrderSummary(
+    tenantId: string,
+    fromUtc: Date,
+    toUtc: Date,
+  ): Promise<{ orderCount: number; completedOrderCount: number; cancelledOrderCount: number } | null> {
+    const row = await this.repo
+      .createQueryBuilder('o')
+      .select('COUNT(*)', 'orderCount')
+      .addSelect(`SUM(CASE WHEN o.status = :completed THEN 1 ELSE 0 END)`, 'completedOrderCount')
+      .addSelect(`SUM(CASE WHEN o.status = :cancelled THEN 1 ELSE 0 END)`, 'cancelledOrderCount')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.createdAt >= :fromUtc', { fromUtc })
+      .andWhere('o.createdAt <= :toUtc', { toUtc })
+      .setParameters({
+        completed: OrderStatus.COMPLETED,
+        cancelled: OrderStatus.CANCELED,
+      })
+      .getRawOne<{ orderCount: string; completedOrderCount: string; cancelledOrderCount: string }>();
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      orderCount: Number(row.orderCount) || 0,
+      completedOrderCount: Number(row.completedOrderCount) || 0,
+      cancelledOrderCount: Number(row.cancelledOrderCount) || 0,
+    };
+  }
+
+  async aggregateOrderSeries(
+    tenantId: string,
+    fromUtc: Date,
+    toUtc: Date,
+    grain: ReportGrain,
+    timezone: string,
+  ): Promise<Array<{ bucket: string; orderCount: number; completedOrderCount: number }>> {
+    const bucketExpr = pgBucketExpression('o.created_at', grain, timezone);
+    const rows = await this.repo
+      .createQueryBuilder('o')
+      .select(bucketExpr, 'bucket')
+      .addSelect('COUNT(*)', 'orderCount')
+      .addSelect(`SUM(CASE WHEN o.status = :completed THEN 1 ELSE 0 END)`, 'completedOrderCount')
+      .where('o.tenantId = :tenantId', { tenantId })
+      .andWhere('o.createdAt >= :fromUtc', { fromUtc })
+      .andWhere('o.createdAt <= :toUtc', { toUtc })
+      .setParameter('completed', OrderStatus.COMPLETED)
+      .groupBy('bucket')
+      .orderBy('bucket', 'ASC')
+      .getRawMany<{ bucket: string; orderCount: string; completedOrderCount: string }>();
+
+    return rows.map((row) => ({
+      bucket: row.bucket,
+      orderCount: Number(row.orderCount) || 0,
+      completedOrderCount: Number(row.completedOrderCount) || 0,
+    }));
   }
 }

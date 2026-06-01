@@ -45,7 +45,7 @@ Design principles:
 | BARISTA     | Single tenant         | Bar staff for KDS drink tickets                                                                | Bound to `tenant_id` claim            |
 | CUSTOMER    | Session scoped        | Anonymous diner using QR session APIs                                                          | Tenant from signed QR/session context |
 
-## 4. Permission Catalog (65 Values)
+## 4. Permission Catalog (67 Values)
 
 | #   | Enum                            | Value                           | Notes                                    |
 | --- | ------------------------------- | ------------------------------- | ---------------------------------------- |
@@ -114,6 +114,8 @@ Design principles:
 | 63  | `SERVICE_REQUEST_CREATE`        | `service_request.create`        | Create service request.                  |
 | 64  | `SERVICE_REQUEST_ACKNOWLEDGE`   | `service_request.acknowledge`   | Acknowledge service request.             |
 | 65  | `SERVICE_REQUEST_RESOLVE`       | `service_request.resolve`       | Resolve service request.                 |
+| 66  | `REPORT_READ_OWN`               | `report.read_own`               | Read tenant-scoped dashboard reports.    |
+| 67  | `REPORT_READ_ANY`               | `report.read_any`               | Read platform analytics and drilldown.   |
 
 ## 5. Removed Or Legacy Items
 

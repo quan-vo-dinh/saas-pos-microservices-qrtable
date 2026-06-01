@@ -61,4 +61,20 @@ export class MenuItemRepository {
   async softDelete(id: string, tenantId: string): Promise<void> {
     await this.repo.softDelete({ id, tenantId });
   }
+
+  async aggregateAvailabilityBreakdown(tenantId: string): Promise<Array<{ status: string; count: number }>> {
+    const rows = await this.repo
+      .createQueryBuilder('m')
+      .select('m.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('m.tenantId = :tenantId', { tenantId })
+      .andWhere('m.deletedAt IS NULL')
+      .groupBy('m.status')
+      .getRawMany<{ status: string; count: string }>();
+
+    return rows.map((row) => ({
+      status: row.status,
+      count: Number(row.count) || 0,
+    }));
+  }
 }

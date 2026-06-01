@@ -8,3 +8,4 @@ export * from './table-request.interface';
 export * from './table-response.interface';
 export * from './menu-request.interface';
 export * from './menu-response.interface';
+export * from './catalog-report.interface';

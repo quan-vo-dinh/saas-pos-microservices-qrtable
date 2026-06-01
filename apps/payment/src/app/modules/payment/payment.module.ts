@@ -20,6 +20,7 @@ import { PaymentQueryService } from './services/payment-query.service';
 import { PaymentReferenceService } from './services/payment-reference.service';
 import { PAYMENT_SECRETS_ENCRYPTION_KEY, PaymentSecretsService } from './services/payment-secrets.service';
 import { PaymentSettlementService } from './services/payment-settlement.service';
+import { PaymentReportService } from './services/payment-report.service';
 import { PaymentService } from './services/payment.service';
 import { PaymentTenantGateway } from './services/payment-tenant.gateway';
 import { SEPAY_OAUTH_CLIENT_CONFIG, SepayOAuthClientService } from './services/sepay-oauth-client.service';
@@ -46,6 +47,7 @@ import { TenantPaymentSettingsService } from './services/tenant-payment-settings
     PaymentTenantGateway,
     SepayWebhookService,
     PaymentService,
+    PaymentReportService,
     {
       provide: PAYMENT_SECRETS_ENCRYPTION_KEY,
       useFactory: () => CONFIGURATION.PAYMENT_SECRETS_CONFIG.ENCRYPTION_KEY,

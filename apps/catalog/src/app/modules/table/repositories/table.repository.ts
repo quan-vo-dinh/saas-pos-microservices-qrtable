@@ -36,6 +36,21 @@ export class TableRepository {
     return this.findByIdAndTenant(id, tenantId);
   }
 
+  async aggregateStatusBreakdown(tenantId: string): Promise<Array<{ status: string; count: number }>> {
+    const rows = await this.repo
+      .createQueryBuilder('t')
+      .select('t.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('t.tenantId = :tenantId', { tenantId })
+      .groupBy('t.status')
+      .getRawMany<{ status: string; count: string }>();
+
+    return rows.map((row) => ({
+      status: row.status,
+      count: Number(row.count) || 0,
+    }));
+  }
+
   async deleteByIdAndTenant(id: string, tenantId: string): Promise<void> {
     await this.repo.delete({ id, tenantId });
   }

@@ -2,8 +2,9 @@
 
 > **Goal:** Add production-ready dashboard and reporting capabilities for restaurant Owners/Managers and Super Admins, covering revenue, order, table, menu, tenant, subscription, and platform analytics.
 > **Estimated:** ~5-7 days
-> **Status:** Planned
+> **Status:** Implemented (MVP)
 > **Primary follow-up docs:** [Phase 4D design spec](../superpowers/specs/2026-06-01-phase-4d-dashboard-reporting-design.md) and [Phase 4D implementation plan](../superpowers/plans/2026-06-01-phase-4d-dashboard-reporting.md).
+> **Phase 4D.1 addendum:** [Dashboard entitlements & UI polish spec](../superpowers/specs/2026-06-01-phase-4d-dashboard-entitlements-ui-addendum.md) and [implementation plan](../superpowers/plans/2026-06-01-phase-4d-dashboard-entitlements-ui-polish.md).
 
 ## Scope Decision
 
@@ -245,6 +246,8 @@ Implementation should follow:
 
 - [Phase 4D design spec](../superpowers/specs/2026-06-01-phase-4d-dashboard-reporting-design.md)
 - [Phase 4D implementation plan](../superpowers/plans/2026-06-01-phase-4d-dashboard-reporting.md)
+- [Phase 4D.1 dashboard entitlements & UI polish spec](../superpowers/specs/2026-06-01-phase-4d-dashboard-entitlements-ui-addendum.md)
+- [Phase 4D.1 implementation plan](../superpowers/plans/2026-06-01-phase-4d-dashboard-entitlements-ui-polish.md)
 
 Deferred candidates after MVP:
 

@@ -32,6 +32,36 @@ Playwright smoke:
 pnpm e2e:phase5:suspended
 ```
 
+## Phase 4D dashboard demo data (Phở Việt)
+
+Sau catalog seed, script `seed-dashboard-demo.js` ghi **dữ liệu cố định** cho tenant `pho-viet`:
+
+- 14 ngày × 2 hóa đơn đã thanh toán (trưa + tối), anchor theo **hôm nay** (`Asia/Ho_Chi_Minh`) → chart 7 ngày mặc định luôn có điểm.
+- Mix **CASH** / **VIETQR**, top món nghiêng về phở/bún/gỏi/trà.
+- 1 bill `PENDING_PAYMENT`, 1 order `CANCELED`, bàn `occupied` / `billing` / `cleaning`, 1 món `out_of_stock`.
+- Subscription invoices platform (admin analytics) với id prefix `d4d0`.
+
+Chạy riêng (PostgreSQL + `phase-4b-saas.sql` đã apply):
+
+```bash
+pnpm dev:seed-dashboard
+```
+
+Hoặc full dev reset (đã gồm SaaS SQL + dashboard demo):
+
+```bash
+pnpm dev:reseed -- --yes
+```
+
+Smoke BFF (cần stack + token Owner):
+
+```bash
+export BFF_BASE_URL=http://localhost:3300/api/v1
+export TENANT_ID=023772bb-391b-401c-936a-ed7034b69cec
+export ACCESS_TOKEN="<owner JWT>"
+bash tools/demo/phase-4d-dashboard-smoke.sh
+```
+
 Ownership seed:
 
 - `postgres/saas`: dòng PostgreSQL thuộc SaaS.

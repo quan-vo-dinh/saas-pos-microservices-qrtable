@@ -17,6 +17,8 @@
     "dev:bff-order": "pnpm dev --projects=bff,order,catalog",
     "dev:bff-payment": "pnpm dev --projects=bff,payment,order,catalog",
     "dev:reseed": "bash tools/dev-reseed.sh",
+    "dev:seed-dashboard": "node tools/dev-seed/postgres/seed-dashboard-demo.js --yes",
+    "demo:phase4d-dashboard": "bash tools/demo/phase-4d-dashboard-smoke.sh",
     "e2e:step2.7": "playwright test tests/e2e/step-2.7-realtime.spec.ts",
     "e2e:phase3": "playwright test tests/e2e/phase-3-payment.spec.ts",
     "e2e:phase4b": "playwright test tests/e2e/phase-5-admin-dashboard-routes.spec.ts",

@@ -4,7 +4,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TCP_SERVICES, TcpProvider } from '@common/configuration/tcp.config';
 import { Table } from '@common/entities/table.entity';
 import { Area } from '@common/entities/area.entity';
+import { MenuItemModule } from '../menu-item/menu-item.module';
 import { TableController } from './controllers/table.controller';
+import { CatalogReportService } from './services/catalog-report.service';
 import { TableService } from './services/table.service';
 import { TableRepository } from './repositories/table.repository';
 
@@ -12,9 +14,10 @@ import { TableRepository } from './repositories/table.repository';
   imports: [
     TypeOrmModule.forFeature([Table, Area]),
     ClientsModule.registerAsync([TcpProvider(TCP_SERVICES.SAAS_SERVICE)]),
+    MenuItemModule,
   ],
   controllers: [TableController],
-  providers: [TableService, TableRepository],
+  providers: [TableService, TableRepository, CatalogReportService],
   exports: [TableService],
 })
 export class TableModule {}

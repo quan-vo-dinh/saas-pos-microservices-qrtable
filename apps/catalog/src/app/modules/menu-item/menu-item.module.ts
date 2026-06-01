@@ -10,6 +10,6 @@ import { MenuItemRepository } from './repositories/menu-item.repository';
   imports: [TypeOrmModule.forFeature([MenuItem, Category])],
   controllers: [MenuItemController],
   providers: [MenuItemService, MenuItemRepository],
-  exports: [MenuItemService],
+  exports: [MenuItemService, MenuItemRepository],
 })
 export class MenuItemModule {}

@@ -38,6 +38,29 @@ export class SubscriptionRepository {
     );
   }
 
+  async aggregatePlanBreakdown(): Promise<
+    Array<{ planCode: string; planName: string; tenantCount: number; activeSubscriptionCount: number }>
+  > {
+    const rows = await this.repo
+      .createQueryBuilder('sub')
+      .select('sub.planCodeSnapshot', 'planCode')
+      .addSelect('COUNT(DISTINCT sub.tenantId)', 'tenantCount')
+      .addSelect(`SUM(CASE WHEN sub.status = :active THEN 1 ELSE 0 END)`, 'activeSubscriptionCount')
+      .where('sub.status IN (:...statuses)', {
+        statuses: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PENDING_PAYMENT],
+      })
+      .setParameter('active', SubscriptionStatus.ACTIVE)
+      .groupBy('sub.planCodeSnapshot')
+      .getRawMany<{ planCode: string; tenantCount: string; activeSubscriptionCount: string }>();
+
+    return rows.map((row) => ({
+      planCode: row.planCode,
+      planName: row.planCode,
+      tenantCount: Number(row.tenantCount) || 0,
+      activeSubscriptionCount: Number(row.activeSubscriptionCount) || 0,
+    }));
+  }
+
   async createActive(params: CreateActiveParams): Promise<Subscription> {
     const row = this.repo.create({
       tenantId: params.tenantId,

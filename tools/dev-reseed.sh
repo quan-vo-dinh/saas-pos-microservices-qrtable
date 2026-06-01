@@ -37,6 +37,17 @@ echo "  Keycloak: ${KEYCLOAK_HOST}/realms/${KEYCLOAK_REALM}"
 echo "  Redis: ${REDIS_HOST:-localhost}:${REDIS_PORT:-6379}"
 
 node tools/dev-seed/postgres/reseed-postgres.js --yes
+if [[ -n "${SAAS_DATABASE_URL:-}" ]]; then
+  psql "$SAAS_DATABASE_URL" -f tools/dev-seed/postgres/phase-4b-saas.sql
+else
+  PGPASSWORD="${TYPEORM_PASSWORD:-postgres}" psql \
+    -h "${TYPEORM_HOST:-localhost}" \
+    -p "${TYPEORM_PORT:-5432}" \
+    -U "${TYPEORM_USERNAME:-postgres}" \
+    -d "${TYPEORM_DATABASE:-qrtable}" \
+    -f tools/dev-seed/postgres/phase-4b-saas.sql
+fi
+node tools/dev-seed/postgres/seed-dashboard-demo.js --yes
 node tools/dev-seed/mongo/reseed-mongo.js --yes
 bash tools/keycloak-bootstrap.sh
 node tools/dev-seed/flush-redis.js --yes

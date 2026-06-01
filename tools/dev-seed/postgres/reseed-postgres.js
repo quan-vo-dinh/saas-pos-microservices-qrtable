@@ -31,6 +31,7 @@ function pgConfig() {
 async function truncateTables(client) {
   await client.query(`
     truncate table
+      payments,
       order_items,
       orders,
       bills,
@@ -40,7 +41,6 @@ async function truncateTables(client) {
       menu_items,
       tables,
       categories,
-      areas,
       tenants
     restart identity cascade
   `);

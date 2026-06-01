@@ -15,7 +15,9 @@ import {
 } from '@common/interfaces/tcp/saas';
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
+import type { PlatformReportRequest, PlatformReportResponse } from '@common/interfaces/tcp/saas';
 import { OnboardingSagaService } from '../services/onboarding-saga.service';
+import { PlatformReportService } from '../services/platform-report.service';
 import { PricingPlanAdminService } from '../services/pricing-plan-admin.service';
 import { SaasService } from '../services/saas.service';
 import { SubscriptionDashboardService } from '../services/subscription-dashboard.service';
@@ -34,6 +36,7 @@ export class SaasController {
     private readonly onboardingSagaService: OnboardingSagaService,
     private readonly tenantLifecycleService: TenantLifecycleService,
     private readonly subscriptionInvoiceService: SubscriptionInvoiceService,
+    private readonly platformReportService: PlatformReportService,
   ) {}
 
   @MessagePattern(TCP_REQUEST_MESSAGE.SAAS.HEALTH)
@@ -239,6 +242,11 @@ export class SaasController {
     @RequestParams() body: { invoiceId: string; confirmedByUserId: string; note?: string | null },
   ): Promise<Response<unknown>> {
     return Response.success(await this.subscriptionDashboardService.manualConfirmInvoice(body));
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.REPORT_PLATFORM)
+  async reportPlatform(@RequestParams() body: PlatformReportRequest): Promise<Response<PlatformReportResponse>> {
+    return Response.success(await this.platformReportService.getPlatformReport(body));
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.SUBSCRIPTION.HANDLE_WEBHOOK)

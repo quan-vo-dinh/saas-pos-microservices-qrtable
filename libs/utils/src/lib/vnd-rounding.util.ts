@@ -34,3 +34,8 @@ function assertNonNegativeIntegerVnd(field: string, value: number): void {
     throw new RangeError(`${field} must be a non-negative integer VND amount`);
   }
 }
+
+/** Rounds VND up to the nearest 1,000 đồng (Principle #9). */
+export function roundVnd(amount: number): number {
+  return buildVndRoundingSnapshot(amount).roundedTotal;
+}

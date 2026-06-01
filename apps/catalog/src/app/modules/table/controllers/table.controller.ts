@@ -17,12 +17,17 @@ import {
 } from '@common/interfaces/tcp/catalog';
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
+import type { CatalogTableReportRequest, CatalogTableReportResponse } from '@common/interfaces/tcp/catalog';
+import { CatalogReportService } from '../services/catalog-report.service';
 import { TableService } from '../services/table.service';
 
 @UseInterceptors(TcpLoggingInterceptor)
 @Controller()
 export class TableController {
-  constructor(private readonly tableService: TableService) {}
+  constructor(
+    private readonly tableService: TableService,
+    private readonly catalogReportService: CatalogReportService,
+  ) {}
 
   @MessagePattern(TCP_REQUEST_MESSAGE.TABLE.CREATE)
   async create(@RequestParams() body: CreateTableTcpRequest): Promise<Response<TableTcpResponse>> {
@@ -84,5 +89,10 @@ export class TableController {
   async countTables(@RequestParams() body: CountTenantTablesRequest): Promise<Response<CountTenantTablesResponse>> {
     const result = await this.tableService.countTablesByTenant(body);
     return Response.success<CountTenantTablesResponse>(result);
+  }
+
+  @MessagePattern(TCP_REQUEST_MESSAGE.CATALOG.REPORT_TABLES)
+  async reportTables(@RequestParams() body: CatalogTableReportRequest): Promise<Response<CatalogTableReportResponse>> {
+    return Response.success(await this.catalogReportService.getTableReport(body));
   }
 }

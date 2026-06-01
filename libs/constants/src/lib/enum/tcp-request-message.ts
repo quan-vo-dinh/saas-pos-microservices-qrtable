@@ -103,6 +103,7 @@ enum CATALOG {
   COUNT_TABLES = 'catalog.count_tables',
   COUNT_TABLES_BY_TENANT = 'catalog.count_tables_by_tenant',
   SEED_DEFAULT_AREA = 'catalog.seed_default_area',
+  REPORT_TABLES = 'catalog.report_tables',
 }
 
 enum SAAS {
@@ -140,6 +141,7 @@ enum SUBSCRIPTION {
   CANCEL_INVOICE = 'subscription.cancel_invoice',
   MANUAL_CONFIRM_INVOICE = 'subscription.manual_confirm_invoice',
   HANDLE_WEBHOOK = 'subscription.handle_webhook',
+  REPORT_PLATFORM = 'subscription.report_platform',
 }
 
 enum PLAN {
@@ -182,6 +184,7 @@ enum ORDER {
   MARK_SERVED = 'order.mark_served',
   BILL_GET_PAYMENT_SNAPSHOT = 'order.bill_get_payment_snapshot',
   BILL_MARK_PAID = 'order.bill_mark_paid',
+  REPORT_ORDERS = 'order.report_orders',
 }
 
 enum PAYMENT {
@@ -190,6 +193,7 @@ enum PAYMENT {
   HANDLE_SEPAY_WEBHOOK = 'payment.handle_sepay_webhook',
   GET_HISTORY = 'payment.get_history',
   GET_STATUS = 'payment.get_status',
+  REPORT_REVENUE = 'payment.report_revenue',
 }
 
 enum PAYMENT_SETTINGS {

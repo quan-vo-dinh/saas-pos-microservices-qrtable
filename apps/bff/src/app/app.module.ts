@@ -14,6 +14,7 @@ import { HealthModule } from './modules/health/health.module';
 import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { OrderModule } from './modules/order/order.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { ReportingModule } from './modules/reporting/reporting.module';
 import { UserGuard } from '@common/guards/user.guard';
 import { PermissionGuard } from '@common/guards/permission.guard';
 import { SessionGuard } from '@common/guards/session.guard';
@@ -32,6 +33,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
     OrderModule,
     PaymentModule,
     SaasModule,
+    ReportingModule,
     HealthModule,
     UserModule,
     AuthorizerModule,

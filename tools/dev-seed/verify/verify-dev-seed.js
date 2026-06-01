@@ -40,7 +40,7 @@ async function verifyPostgres() {
     const expectedCatalogMinimums = {
       areas: 4,
       categories: 4,
-      menu_items: 5,
+      menu_items: 7,
       tables: 5,
     };
 
@@ -66,11 +66,41 @@ async function verifyPostgres() {
       }
     }
 
-    for (const table of ['orders', 'order_items', 'bills', 'service_requests', 'sessions', 'outbox_events']) {
-      const count = await client.query(`select count(*)::int as count from ${table}`);
-      if (count.rows[0].count !== 0) {
-        throw new Error(`PostgreSQL runtime table ${table} is not empty`);
-      }
+    const devRuntimeCounts = await client.query(
+      `select
+        (select count(*)::int from orders where tenant_id = $1) as orders,
+        (select count(*)::int from bills where tenant_id = $1) as bills,
+        (select count(*)::int from payments where tenant_id = $1) as payments,
+        (select count(*)::int from sessions where tenant_id = $1) as sessions`,
+      [DEV_TENANT.id],
+    );
+    const runtime = devRuntimeCounts.rows[0];
+    if (runtime.orders < 30) {
+      throw new Error(`PostgreSQL pho-viet orders too low: ${runtime.orders} (expected dashboard demo >= 30)`);
+    }
+    if (runtime.bills < 29) {
+      throw new Error(`PostgreSQL pho-viet bills too low: ${runtime.bills} (expected dashboard demo >= 29)`);
+    }
+    if (runtime.payments < 28) {
+      throw new Error(`PostgreSQL pho-viet payments too low: ${runtime.payments} (expected dashboard demo >= 28)`);
+    }
+    if (runtime.sessions < 30) {
+      throw new Error(`PostgreSQL pho-viet sessions too low: ${runtime.sessions} (expected dashboard demo >= 30)`);
+    }
+
+    const suspendedRuntime = await client.query(
+      `select
+        (select count(*)::int from orders where tenant_id = $1) +
+        (select count(*)::int from bills where tenant_id = $1) as total`,
+      [SUSPENDED_TENANT.id],
+    );
+    if (suspendedRuntime.rows[0].total !== 0) {
+      throw new Error('PostgreSQL suspended tenant must not have order/bill demo rows');
+    }
+
+    const outbox = await client.query(`select count(*)::int as count from outbox_events`);
+    if (outbox.rows[0].count !== 0) {
+      throw new Error('PostgreSQL outbox_events is not empty');
     }
   } finally {
     await client.end();
