@@ -1,17 +1,41 @@
 {
   "version": 1,
   "skills": {
+    "alerting-irm": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-core/alerting-irm/SKILL.md",
+      "computedHash": "c1d7a3a007a7d31080877c0e764f6364cd8c30633cd5303958eb223d81628cff"
+    },
     "code-review-and-quality": {
       "source": "addyosmani/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/code-review-and-quality/SKILL.md",
       "computedHash": "83931d7416bcff73c24d976c1e45f09f80259541d33e9fdfe3ee521d39b27428"
     },
+    "dashboarding": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-core/dashboarding/SKILL.md",
+      "computedHash": "d8b1a6b7b8e7796fc8fc0eacda974a6c6c61594d848e5b3f30df837112ead839"
+    },
     "doc-coauthoring": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",
       "skillPath": "skills/doc-coauthoring/SKILL.md",
       "computedHash": "b74119d4de2f5c9182d55d52a0e3e3ae01967dce2750e8659d86d4d5f7e2ce91"
+    },
+    "docker-expert": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/docker-expert/SKILL.md",
+      "computedHash": "0974b5f64fcd284c1bd662810e2388f7beb9be6784c597de4d0ad4213ccbd6af"
+    },
+    "docker-patterns": {
+      "source": "affaan-m/ECC",
+      "sourceType": "github",
+      "skillPath": "skills/docker-patterns/SKILL.md",
+      "computedHash": "2750c564c7b600fbbfd44de2c693955c677c18c872d06019fa896ab770c69ed9"
     },
     "docx": {
       "source": "anthropics/skills",
@@ -35,6 +59,12 @@
       "sourceType": "github",
       "computedHash": "b06e633e783acfc364cf08cf44ee0fe48ece7e8c727457b188046e5ece25836f"
     },
+    "grafana-oss": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-core/grafana-oss/SKILL.md",
+      "computedHash": "5c8eea18b8d034bbee78badf8524433106563d124489d06b1ff577df6deacf07"
+    },
     "grill-with-docs": {
       "source": "mattpocock/skills",
       "sourceType": "github",
@@ -52,6 +82,12 @@
       "sourceType": "github",
       "skillPath": "SKILL.md",
       "computedHash": "cc2d8b425f319aad9c2e75a43be4028c32ae5cbc10fb9f2d374395e341b9cd5b"
+    },
+    "loki": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-lgtm/loki/SKILL.md",
+      "computedHash": "0c83822f226a02921e12cecb35f1270d89744a782895690d4a4e8904588fb07c"
     },
     "mermaid-expert": {
       "source": "sickn33/antigravity-awesome-skills",
@@ -83,6 +119,12 @@
       "skillPath": "plugins/developer-essentials/skills/nx-workspace-patterns/SKILL.md",
       "computedHash": "c998c269c46455ad2bd9a1b61fb7db9ced887ddca40c2f3e54a610c6d9f9b09c"
     },
+    "opentelemetry": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-core/opentelemetry/SKILL.md",
+      "computedHash": "7726c7e8b48f15a846f22bf1c8af710095c033cf3f8f5440c2284321ec0fc205"
+    },
     "pandoc-unicode-sanitize": {
       "source": "HKUDS/OpenSpace",
       "sourceType": "github",
@@ -94,6 +136,18 @@
       "sourceType": "github",
       "skillPath": "skills/pptx/SKILL.md",
       "computedHash": "6b8b859d26f93aa059c9870d1ab76b44ab69e3d6757ce4a03cc94cb760888073"
+    },
+    "prometheus": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-lgtm/prometheus/SKILL.md",
+      "computedHash": "af178807f5de588da30af031398753d794ce645b42eb7348567288479aa23d77"
+    },
+    "promql": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-core/promql/SKILL.md",
+      "computedHash": "81d1df0ad4d81f51ef9ac71e4e63e9a67a8423a7cd4fbb73efee25a7a22cb8ba"
     },
     "self-assessment": {
       "source": "FlorianBruniaux/claude-code-ultimate-guide",
@@ -115,6 +169,12 @@
       "source": "mattbx/shadcn-skills",
       "sourceType": "github",
       "computedHash": "49e24a030e85a951fa8bf8f0e45baa2f1ed7ec1cc5e927868164455b55f0aa15"
+    },
+    "tempo": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-lgtm/tempo/SKILL.md",
+      "computedHash": "f5ec29d5ac1bc0118e3d020f51e28c36b9e3fa1f760797d614edfcc333d099b0"
     },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
