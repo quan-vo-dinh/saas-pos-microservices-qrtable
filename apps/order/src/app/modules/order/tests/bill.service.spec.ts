@@ -5,6 +5,7 @@ import { TABLE_STATUS } from '@common/constants/enum/catalog.enum';
 import { TCP_REQUEST_MESSAGE } from '@common/constants/enum/tcp-request-message';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Test, TestingModule } from '@nestjs/testing';
+import { HttpStatus } from '@nestjs/common';
 import {
   BillStatus,
   OrderStatus,
@@ -13,7 +14,7 @@ import {
   ServiceRequestType,
   SessionStatus,
 } from '@einvoice/types';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { DataSource, type EntityManager } from 'typeorm';
 import { BillRepository } from '../repositories/bill.repository';
 import { OrderRepository } from '../repositories/order.repository';
@@ -468,6 +469,90 @@ describe('BillService', () => {
             tenantId: 't1',
             status: TABLE_STATUS.CLEANING,
             sessionId: 'sess-1',
+          }),
+        }),
+      );
+    });
+
+    it('recovers payment finalization when Catalog table is still occupied for the paid session', async () => {
+      const now = new Date('2026-05-08T11:00:00.000Z');
+      const pending = {
+        id: 'bill-1',
+        tenantId: 't1',
+        sessionId: 'sess-1',
+        orderIds: ['order-1'],
+        status: BillStatus.PENDING_PAYMENT,
+        subtotal: 100_000,
+        total: 100_000,
+        roundingAmount: 0,
+        paymentMethod: null,
+        paymentId: null,
+        closedAt: now,
+        paidAt: null,
+        createdAt: now,
+        updatedAt: now,
+      } as Bill;
+      const session = {
+        id: 'sess-1',
+        tenantId: 't1',
+        tableId: 'table-1',
+        tableName: 'Bàn 1',
+        status: SessionStatus.ACTIVE,
+        currentBillId: 'bill-1',
+      } as Session;
+
+      billRepository.findByIdAndTenant.mockResolvedValue(pending);
+      const managerSave = jest.fn().mockImplementation((_entity: unknown, entity: Bill) => Promise.resolve(entity));
+      dataSource.transaction.mockImplementation(async (fn: (manager: EntityManager) => Promise<unknown>) =>
+        fn({ save: managerSave } as unknown as EntityManager),
+      );
+      billRepository.findByIdAndTenantForUpdate.mockResolvedValue(pending);
+      sessionRepository.findByIdAndTenantForUpdate.mockResolvedValue(session);
+      sessionService.closeAfterPayment.mockResolvedValue(undefined);
+
+      const updateResponses = [
+        throwError(() => ({
+          code: HttpStatus.BAD_REQUEST,
+          errorCode: ErrorCode.CATALOG_TABLE_INVALID_TRANSITION,
+          message: 'Invalid status transition: occupied -> cleaning. Allowed: billing',
+        })),
+        of({ statusCode: 200, data: { id: 'table-1', status: TABLE_STATUS.BILLING, sessionId: 'sess-1' } }),
+        of({ statusCode: 200, data: { id: 'table-1', status: TABLE_STATUS.CLEANING, sessionId: 'sess-1' } }),
+      ];
+      catalogClient.send.mockImplementation((pattern: string) => {
+        if (pattern === TCP_REQUEST_MESSAGE.TABLE.GET_BY_ID) {
+          return of({
+            statusCode: 200,
+            data: { id: 'table-1', status: TABLE_STATUS.OCCUPIED, sessionId: 'sess-1' },
+          });
+        }
+        return updateResponses.shift() ?? of({ statusCode: 200, data: { id: 'table-1' } });
+      });
+
+      const result = await service.markPaid({
+        tenantId: 't1',
+        billId: 'bill-1',
+        paymentId: 'pay-1',
+        method: 'VIETQR',
+        paidAt: '2026-05-08T12:00:00.000Z',
+      });
+
+      expect(result.bill.status).toBe(BillStatus.PAID);
+      const updateStatusCalls = catalogClient.send.mock.calls.filter(
+        ([pattern]) => pattern === TCP_REQUEST_MESSAGE.TABLE.UPDATE_STATUS,
+      );
+      expect(updateStatusCalls.map(([, payload]) => payload.data.status)).toEqual([
+        TABLE_STATUS.CLEANING,
+        TABLE_STATUS.BILLING,
+        TABLE_STATUS.CLEANING,
+      ]);
+      expect(catalogClient.send).toHaveBeenCalledWith(
+        TCP_REQUEST_MESSAGE.TABLE.GET_BY_ID,
+        expect.objectContaining({
+          tenantId: 't1',
+          data: expect.objectContaining({
+            id: 'table-1',
+            tenantId: 't1',
           }),
         }),
       );

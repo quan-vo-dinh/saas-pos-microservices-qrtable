@@ -9,7 +9,10 @@ import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Request } from '@common/interfaces/tcp/common/request.interface';
 import type { ResponseType } from '@common/interfaces/tcp/common/response.interface';
 import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
-import type { UpdateTableStatusTcpRequest } from '@common/interfaces/tcp/catalog/table-request.interface';
+import type {
+  GetTableByIdTcpRequest,
+  UpdateTableStatusTcpRequest,
+} from '@common/interfaces/tcp/catalog/table-request.interface';
 import type {
   BillMarkPaidTcpRequest,
   BillPaymentSnapshotTcpRequest,
@@ -34,15 +37,21 @@ import {
   ServiceRequestType,
 } from '@einvoice/types';
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
 import { DataSource } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import { BillRepository } from '../repositories/bill.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { ServiceRequestRepository } from '../repositories/service-request.repository';
 import { SessionRepository } from '../repositories/session.repository';
+import { toBusinessExceptionFromTcpError } from '../utils/tcp-business-error';
 import { CartService } from './cart.service';
 import { SessionService } from './session.service';
+
+type PaymentTableFinalizationRequest = {
+  id: string;
+  tenantId: string;
+  sessionId: string;
+};
 
 @Injectable()
 export class BillService {
@@ -144,10 +153,9 @@ export class BillService {
     }
 
     if (session) {
-      await this.callCatalogUpdateTableStatus({
+      await this.moveCatalogTableToCleaningAfterPayment({
         id: session.tableId,
         tenantId: dto.tenantId,
-        status: TABLE_STATUS.CLEANING,
         sessionId: session.id,
       });
     }
@@ -304,6 +312,65 @@ export class BillService {
     };
   }
 
+  private async moveCatalogTableToCleaningAfterPayment(payload: PaymentTableFinalizationRequest): Promise<void> {
+    const cleaningPayload = {
+      ...payload,
+      status: TABLE_STATUS.CLEANING,
+    };
+
+    let invalidCleaningTransition: unknown;
+    try {
+      await this.callCatalogUpdateTableStatus(cleaningPayload);
+      return;
+    } catch (error) {
+      if (!this.isCatalogInvalidTransition(error)) {
+        throw error;
+      }
+      invalidCleaningTransition = error;
+    }
+
+    const table = await this.callCatalogGetTableById({ id: payload.id, tenantId: payload.tenantId });
+    const canRecoverFromSkippedBilling =
+      table.status === TABLE_STATUS.OCCUPIED && table.sessionId === payload.sessionId;
+    if (!canRecoverFromSkippedBilling) {
+      throw invalidCleaningTransition;
+    }
+
+    await this.callCatalogUpdateTableStatus({
+      ...payload,
+      status: TABLE_STATUS.BILLING,
+    });
+    await this.callCatalogUpdateTableStatus(cleaningPayload);
+  }
+
+  private async callCatalogGetTableById(payload: GetTableByIdTcpRequest): Promise<Table> {
+    try {
+      const response = await firstValueFrom(
+        this.catalogClient.send<ResponseType<Table>, GetTableByIdTcpRequest>(
+          TCP_REQUEST_MESSAGE.TABLE.GET_BY_ID,
+          new Request<GetTableByIdTcpRequest>({ tenantId: payload.tenantId, data: payload }),
+        ),
+      );
+      if (response.statusCode >= HttpStatus.BAD_REQUEST) {
+        const businessError = toBusinessExceptionFromTcpError(response, response.statusCode as HttpStatus);
+        if (businessError) {
+          throw businessError;
+        }
+        throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, response.statusCode as HttpStatus);
+      }
+      if (!response.data) {
+        throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
+      }
+      return response.data as unknown as Table;
+    } catch (e) {
+      const businessError = toBusinessExceptionFromTcpError(e);
+      if (businessError) {
+        throw businessError;
+      }
+      throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
+    }
+  }
+
   private async callCatalogUpdateTableStatus(payload: UpdateTableStatusTcpRequest): Promise<Table> {
     try {
       const response = await firstValueFrom(
@@ -312,7 +379,11 @@ export class BillService {
           new Request<UpdateTableStatusTcpRequest>({ tenantId: payload.tenantId, data: payload }),
         ),
       );
-      if (response.statusCode >= 400) {
+      if (response.statusCode >= HttpStatus.BAD_REQUEST) {
+        const businessError = toBusinessExceptionFromTcpError(response, response.statusCode as HttpStatus);
+        if (businessError) {
+          throw businessError;
+        }
         throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, response.statusCode as HttpStatus);
       }
       if (!response.data) {
@@ -320,17 +391,16 @@ export class BillService {
       }
       return response.data as unknown as Table;
     } catch (e) {
-      if (e instanceof BusinessException) {
-        throw e;
-      }
-      if (e instanceof RpcException) {
-        const err = e.getError() as { code?: number; errorCode?: ErrorCode };
-        if (err?.errorCode) {
-          throw new BusinessException(err.errorCode, (err.code as HttpStatus) ?? HttpStatus.BAD_GATEWAY);
-        }
+      const businessError = toBusinessExceptionFromTcpError(e);
+      if (businessError) {
+        throw businessError;
       }
       throw new BusinessException(ErrorCode.COMMON_INTERNAL_ERROR, HttpStatus.BAD_GATEWAY);
     }
+  }
+
+  private isCatalogInvalidTransition(error: unknown): boolean {
+    return error instanceof BusinessException && error.errorCode === ErrorCode.CATALOG_TABLE_INVALID_TRANSITION;
   }
 
   private toBillDto(entity: Bill): BillDto {
