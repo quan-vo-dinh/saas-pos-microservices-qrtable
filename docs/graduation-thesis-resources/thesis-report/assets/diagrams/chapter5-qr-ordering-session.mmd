@@ -1,60 +1,59 @@
 %%{init: {"theme": "base", "sequence": {"showSequenceNumbers": true, "actorMargin": 90, "messageMargin": 48}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "actorBkg": "#f0fdf4", "actorBorder": "#16a34a", "noteBkgColor": "#fff7ed", "noteBorderColor": "#ea580c", "lineColor": "#475569"}}}%%
 sequenceDiagram
   autonumber
-  actor Customer as Customer<br/>PWA browser
+  actor Customer as Customer<br/>PWA
   participant BFF as BFF<br/>API Gateway
-  participant Order as Order<br/>Session + Cart
+  participant Order as Order<br/>session and cart owner
   participant Catalog as Catalog<br/>Table + Menu
-  participant Redis as Redis<br/>session hash + cart
+  participant Redis as Redis<br/>operational state
   participant ODB as PostgreSQL<br/>Order DB
 
-  Customer->>BFF: Scan QR and open table session
-  BFF->>BFF: Validate QR token/HMAC at edge
-  BFF->>Order: TCP JOIN_SESSION(tenantId, tableId, token)
-  Order->>Catalog: TCP VALIDATE_QR_TOKEN
+  Customer->>BFF: Open table QR link
+  BFF->>BFF: Validate QR and session context
+  BFF->>Order: Join or create table session
+  Order->>Catalog: Validate QR token and table
   Catalog-->>Order: Table snapshot and current status
 
   alt Table is OCCUPIED with active session
-    Order->>Redis: HGET session:{tenantId}:{sessionId}
+    Order->>Redis: Read active session state
     alt Redis hit and not idle
-      Redis-->>Order: Active session hash
-      Order->>Redis: PEXPIRE session/cart TTL
+      Redis-->>Order: Active session snapshot
+      Order->>Redis: Refresh active session lifetime
       Order-->>BFF: Existing active session
     else Redis miss or stale
       Order->>ODB: Find active session by tenant/table
-      Order->>Redis: HSET session hash + PEXPIRE
+      Order->>Redis: Rebuild session snapshot
       Order-->>BFF: Rehydrated active session
     end
   else Table is AVAILABLE
     Order->>ODB: Create ACTIVE session row
-    Order->>Redis: HSET session hash + PEXPIRE
-    Order->>Catalog: TCP UPDATE_TABLE_STATUS(OCCUPIED, sessionId)
+    Order->>Redis: Create session snapshot
+    Order->>Catalog: Mark table occupied for the session
     Catalog-->>Order: Updated table snapshot
     Order-->>BFF: New session
   else Idle empty session found
-    Order->>ODB: Close only if orderCount = 0 and no currentBillId
-    Order->>Redis: DEL stale session/cart
-    Order->>Catalog: TCP UPDATE_TABLE_STATUS(AVAILABLE)
+    Order->>ODB: Close only after durable empty-session checks
+    Order->>Redis: Clear stale session/cart state
+    Order->>Catalog: Mark table available
     Order->>ODB: Create replacement ACTIVE session
-    Order->>Redis: HSET replacement session hash
+    Order->>Redis: Create replacement session snapshot
   end
 
   BFF-->>Customer: Return session context and menu entry data
-  Customer->>BFF: Add/update cart item with expectedCartVersion
-  BFF->>Order: TCP CART_MUTATE
-  Order->>Catalog: TCP VALIDATE_ORDERABLE(menuItemId, quantity)
+  Customer->>BFF: Add or update shared cart item
+  BFF->>Order: Mutate shared cart with expected version
+  Order->>Catalog: Validate item is orderable
   Catalog-->>Order: Menu item snapshot, price, station
-  Order->>Redis: WATCH cart key + compare cartVersion
-  Order->>Redis: HSET cart items, cartVersion++, PEXPIRE
-  Order-->>BFF: CartUpdatedEvent
+  Order->>Redis: Compare version and update cart atomically
+  Order-->>BFF: Updated cart snapshot
   BFF-->>Customer: Updated shared cart
 
-  Customer->>BFF: Submit order(idempotencyKey, expectedCartVersion)
-  BFF->>Order: TCP ORDER.SUBMIT
+  Customer->>BFF: Submit order with idempotency key
+  BFF->>Order: Submit order
   Order->>Redis: Read cart snapshot and validate version
-  Order->>ODB: Transaction: lock session, create Order PENDING, create/reuse Bill OPEN
-  Order->>Redis: Clear cart if cartVersion still matches
-  Order-->>BFF: OrderCreatedEvent + Bill + empty cart
+  Order->>ODB: Lock session, create pending order and open bill
+  Order->>Redis: Clear cart after version check
+  Order-->>BFF: Order and bill snapshot
   BFF-->>Customer: Order submitted, waiting for staff confirmation
 
-  Note over BFF,Redis: WebSocket events in this flow are UI hints, Redis and DB state remain authoritative
+  Note over Order,Redis: Redis supports the hot path and Order DB remains the durable source for session and order decisions

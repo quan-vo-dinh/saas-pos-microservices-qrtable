@@ -1,0 +1,46 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "curve": "basis"}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#f8fafc", "primaryBorderColor": "#cbd5e1", "lineColor": "#475569", "tertiaryColor": "#ffffff"}}}%%
+flowchart TB
+  Staff["Nhân viên / chủ quán / quản trị"]
+  Mgmt["Management App<br/>POS, KDS, báo cáo, admin"]
+  Keycloak@{ icon: "simple-icons:keycloak", form: "rounded", label: "Keycloak - OIDC/JWT, nguồn định danh", pos: "t", h: 60 }
+  StaffBff["BFF guard chain<br/>UserGuard + TenantGuard<br/>PermissionGuard / PlanFeatureGuard"]
+  AuthAccess["Authorizer + User-Access<br/>xác minh token, hồ sơ, vai trò, quyền tenant"]
+  StaffDomain["Dịch vụ miền<br/>Catalog, Order, Kitchen, Payment, SaaS, Reporting"]
+  ReportNote["Báo cáo<br/>Owner/Manager: report.read_own + entitlement gói<br/>Super Admin: report.read_any"]
+
+  Customer["Khách tại bàn"]
+  QR["Mã QR bàn<br/>token theo tenant/bàn"]
+  PWA["Customer PWA<br/>ẩn danh theo phiên"]
+  SessionBff["BFF guard chain<br/>SessionGuard + TenantGuard<br/>giới hạn theo phiên/bàn"]
+  CustomerDomain["Catalog + Order<br/>thực đơn, phiên, giỏ, đơn"]
+  NoKeycloak["Không dùng Keycloak<br/>khách không cần tài khoản"]
+
+  Staff --> Mgmt
+  Mgmt -->|"đăng nhập OIDC"| Keycloak
+  Keycloak -->|"JWT/OIDC token"| Mgmt
+  Mgmt -->|"HTTP/WebSocket + token"| StaffBff
+  StaffBff -->|"verify token + quyền"| AuthAccess
+  AuthAccess -->|"request được phép"| StaffDomain
+  StaffBff --> ReportNote
+
+  Customer --> QR
+  QR -->|"URL chứa QR token"| PWA
+  PWA -->|"join session / đọc menu"| SessionBff
+  SessionBff -->|"tenant + session scope"| CustomerDomain
+  SessionBff -. "không chuyển qua Keycloak" .-> NoKeycloak
+
+  classDef actor fill:#eff6ff,stroke:#2563eb,color:#0f172a;
+  classDef edge fill:#fff7ed,stroke:#ea580c,color:#0f172a;
+  classDef identity fill:#f5f3ff,stroke:#7c3aed,color:#0f172a;
+  classDef identityProvider fill:#f8fafc,stroke:#4b5563,stroke-width:1.2px,color:#4d4d4d;
+  classDef service fill:#f0fdf4,stroke:#16a34a,color:#0f172a;
+  classDef caution fill:#fee2e2,stroke:#dc2626,color:#0f172a;
+  classDef note fill:#f8fafc,stroke:#64748b,color:#0f172a;
+
+  class Staff,Customer,Mgmt,PWA,QR actor;
+  class StaffBff,SessionBff edge;
+  class Keycloak identityProvider;
+  class AuthAccess identity;
+  class StaffDomain,CustomerDomain service;
+  class NoKeycloak caution;
+  class ReportNote note;

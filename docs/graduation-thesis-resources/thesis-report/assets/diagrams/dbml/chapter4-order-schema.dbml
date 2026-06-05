@@ -1,0 +1,143 @@
+Project QRTable_Order_Service {
+  database_type: 'PostgreSQL'
+  Note: 'DBML source for the Order service schema. Generated from TypeORM entities registered by OrderModule. Importable into dbdiagram.io. Catalog and Payment IDs are external references through service contracts/events, not cross-service foreign keys.'
+}
+
+Table sessions {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  table_id uuid [not null, note: 'External Catalog table reference. Not a DB foreign key.']
+  table_name varchar(255) [not null]
+  status varchar(20) [not null]
+  started_at timestamp [not null]
+  last_activity timestamp [not null]
+  closed_at timestamp
+  order_count int [not null, default: 0]
+  current_bill_id uuid [note: 'Internal current bill pointer.']
+  version int [not null, default: 1]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Order owns QR ordering sessions and their lifecycle.'
+
+  indexes {
+    (tenant_id, table_id, status)
+  }
+}
+
+Table orders {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  table_id uuid [not null, note: 'External Catalog table reference. Not a DB foreign key.']
+  table_name varchar(255) [not null]
+  session_id uuid [not null]
+  status varchar(20) [not null, note: 'PENDING, PROCESSING, READY, SERVED, COMPLETED, CANCELED']
+  total_amount int [not null, default: 0]
+  idempotency_key varchar(64) [not null]
+  confirmed_at timestamp
+  confirmed_by_user_id varchar(64)
+  cancelled_at timestamp
+  cancelled_by_user_id varchar(64)
+  cancel_reason varchar(255)
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Order aggregate. Stock updates are requested from Catalog through TCP.'
+
+  indexes {
+    (tenant_id, session_id, idempotency_key) [unique]
+  }
+}
+
+Table order_items {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  order_id uuid [not null]
+  menu_item_id uuid [not null, note: 'External Catalog menu item reference. Not a DB foreign key.']
+  menu_item_name varchar(255) [not null]
+  quantity int [not null, default: 1]
+  unit_price int [not null, default: 0]
+  status varchar(20) [not null, note: 'PROCESSING, READY, SERVED, CANCELED']
+  station varchar(20) [note: 'Catalog station snapshot: KITCHEN or BAR']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Denormalized line item snapshot for POS and KDS.'
+
+  indexes {
+    (tenant_id, order_id)
+  }
+}
+
+Table bills {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  session_id uuid [not null]
+  order_ids text [not null, note: 'TypeORM simple-array of Order IDs. Internal aggregate references.']
+  subtotal int [not null, default: 0]
+  total int [not null, default: 0]
+  rounding_amount int [not null, default: 0]
+  payment_method varchar(20) [note: 'CASH or VIETQR']
+  status varchar(20) [not null, note: 'OPEN, PENDING_PAYMENT, PAID']
+  closed_at timestamp
+  paid_at timestamp
+  payment_id uuid [note: 'External Payment aggregate reference. Not a DB foreign key.']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Order owns bill lifecycle and final bill/session state.'
+
+  indexes {
+    (tenant_id, session_id)
+  }
+}
+
+Table service_requests {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  table_id uuid [not null, note: 'External Catalog table reference. Not a DB foreign key.']
+  table_name varchar(255) [not null]
+  session_id uuid [not null]
+  type varchar(32) [not null]
+  status varchar(20) [not null]
+  acknowledged_at timestamp
+  acknowledged_by_user_id varchar(64)
+  resolved_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Customer service request within an active session.'
+
+  indexes {
+    (tenant_id, session_id)
+  }
+}
+
+Table outbox_events {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  topic varchar(120) [not null]
+  event_type varchar(120) [not null]
+  aggregate_id uuid [not null, note: 'Order aggregate ID for order events.']
+  partition_key varchar(128) [not null]
+  payload jsonb [not null]
+  status varchar(20) [not null, default: 'PENDING']
+  published_at timestamp
+  attempt_count int [not null, default: 0]
+  last_error text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Order outbox for Kafka events such as order.confirmed and order.status_changed.'
+
+  indexes {
+    (status, created_at)
+  }
+}
+
+Ref: orders.session_id > sessions.id
+Ref: order_items.order_id > orders.id
+Ref: bills.session_id > sessions.id
+Ref: service_requests.session_id > sessions.id
+Ref: sessions.current_bill_id > bills.id
+Ref: outbox_events.aggregate_id > orders.id

@@ -1,0 +1,39 @@
+Project QRTable_User_Access_Service {
+  database_type: 'MongoDB'
+  Note: 'DBML approximation for MongoDB collections owned by User-Access. Generated from Mongoose schemas. Importable into dbdiagram.io as a table-like documentation model, not a relational schema.'
+}
+
+Table user {
+  _id object_id [pk]
+  firstName string
+  lastName string
+  email string
+  userId string [note: 'Keycloak user subject / external identity reference.']
+  tenantId string [note: 'Nullable for platform-level users; tenant-scoped for restaurant staff.']
+  isActive boolean [not null, default: true]
+  disabledAt date
+  disabledReason string
+  roles object_id [note: 'Array of ObjectId references to role documents in Mongoose.']
+  createdAt date [not null]
+  updatedAt date [not null]
+
+  Note: 'Application profile and tenant staff mapping. Keycloak remains the identity provider.'
+
+  indexes {
+    tenantId
+    isActive
+  }
+}
+
+Table role {
+  _id object_id [pk]
+  name string [not null, note: 'SUPER_ADMIN, OWNER, MANAGER, WAITER, CHEF, BARISTA']
+  description string
+  permissions string [note: 'Array of permission codes in Mongoose.']
+  createdAt date [not null]
+  updatedAt date [not null]
+
+  Note: 'Business role and permission set used by User-Access and guards.'
+}
+
+Ref: user.roles > role._id

@@ -1,0 +1,106 @@
+Project QRTable_Payment_Service {
+  database_type: 'PostgreSQL'
+  Note: 'DBML source for the Payment service schema. Generated from Payment TypeORM entities. Importable into dbdiagram.io. Order bill IDs and SaaS tenant IDs are external service references, not cross-service foreign keys.'
+}
+
+Table payments {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  bill_id uuid [not null, note: 'External Order bill reference. Not a DB foreign key.']
+  bill_reference varchar(32) [not null]
+  method varchar(20) [note: 'CASH or VIETQR']
+  status varchar(30) [not null, default: 'PENDING', note: 'PENDING, PAID, FAILED']
+  raw_total int [not null]
+  rounded_total int [not null]
+  rounding_delta int [not null]
+  paid_amount int
+  amount_received int
+  change_amount int
+  sepay_transaction_id int
+  sepay_reference_code varchar(120)
+  sepay_gateway varchar(80)
+  sepay_account_number varchar(64)
+  sepay_transaction_date timestamp
+  paid_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Payment owns restaurant bill settlement and payment status.'
+
+  indexes {
+    (tenant_id, bill_id) [unique]
+    bill_reference [unique]
+    sepay_transaction_id [unique]
+    (tenant_id, status, created_at)
+  }
+}
+
+Table audit_payments {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  payment_id uuid
+  refund_id uuid [note: 'Legacy nullable column retained by current entity.']
+  action varchar(60) [not null]
+  actor_type varchar(20) [not null, note: 'USER, SEPAY, SYSTEM']
+  actor_id varchar(128)
+  reason text
+  meta jsonb
+  created_at timestamp [not null]
+
+  Note: 'Append-only audit trail for payment creation, cash confirmation and SePay webhook handling.'
+
+  indexes {
+    (payment_id, created_at)
+    (tenant_id, created_at)
+  }
+}
+
+Table tenant_payment_settings {
+  id uuid [pk]
+  tenant_id uuid [not null, note: 'External SaaS tenant reference. Not a DB foreign key.']
+  cash_enabled boolean [not null, default: true]
+  vietqr_enabled boolean [not null, default: false]
+  vietqr_bank_name varchar(100)
+  vietqr_account_number varchar(64)
+  vietqr_account_holder varchar(160)
+  sepay_bank_account_uuid varchar(120)
+  sepay_token_expires_at timestamptz
+  sepay_webhook_id varchar(120)
+  webhook_verified_at timestamptz
+  connection_status varchar(20) [not null, note: 'NOT_CONNECTED, CONNECTED, TOKEN_EXPIRED, REVOKED, ERROR']
+  last_error text
+  last_error_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'Sensitive token/secret columns exist in code but are omitted from the diagram body and should stay encrypted at rest.'
+
+  indexes {
+    tenant_id [unique]
+  }
+}
+
+Table outbox_events {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  topic varchar(120) [not null]
+  event_type varchar(120) [not null]
+  aggregate_id uuid [not null, note: 'Payment aggregate ID for payment.completed events.']
+  partition_key varchar(128) [not null]
+  payload jsonb [not null]
+  status varchar(20) [not null, default: 'PENDING']
+  published_at timestamp
+  attempt_count int [not null, default: 0]
+  last_error text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Payment outbox for asynchronous payment.completed publication.'
+
+  indexes {
+    (status, created_at)
+  }
+}
+
+Ref: audit_payments.payment_id > payments.id
+Ref: outbox_events.aggregate_id > payments.id

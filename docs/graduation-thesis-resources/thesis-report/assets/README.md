@@ -43,3 +43,56 @@ bash thesis-report/tools/render-chapter2-diagrams.sh
 ```
 
 Pipeline: fetch icons → generate `.excalidraw` → export SVG → `rsvg-convert` PDF.
+
+## Chương 4 — Mermaid source và Iconify icons
+
+- Source chính: `diagrams/chapter4-*.mmd`.
+- Hình cho LaTeX: `figures/chapter4-*.pdf`; PNG cùng tên dùng để preview nhanh.
+- Hình 4.1 `chapter4-technology-integration-map.mmd` dùng Mermaid flowchart icon shape và Iconify packs để người đọc nhận diện nhanh công nghệ chính.
+- Các diagram chuyên đề Chương 4 chỉ gắn logo công nghệ đại diện cho trách nhiệm của mục đó, ví dụ: Nx cho ranh giới monorepo, PostgreSQL/Redis/Kafka/Socket.IO cho tenant isolation, Redis cho key ownership, Kafka cho decision flow, Keycloak cho auth và SePay cho payment. Không copy toàn bộ tech stack từ Hình 4.1 vào từng hình.
+- Các icon pack hiện dùng: `@iconify-json/logos`, `@iconify-json/simple-icons`, `@iconify-json/mdi`.
+- Mermaid CLI 11.15.0 tải icon pack qua `--iconPacks` từ `unpkg.com` khi render; không cần thêm dependency vào `package.json`. Vì vậy bước render icon cần network, nhưng LaTeX build chỉ dùng PDF/PNG đã render trong repo.
+- Node Next.js dùng image node trỏ tới `diagrams/icons/nextjs-black.png` để giữ đúng logo màu đen khi Mermaid export.
+- Node Keycloak dùng Simple Icons dạng monochrome và class riêng `identityProvider` để tránh bị áp màu của nhóm external provider.
+- Node SePay dùng image node trỏ tới `diagrams/icons/sepay-placeholder.png`. Đây là ảnh placeholder nhỏ, không phải logo chính thức; khi có logo đúng, thay file PNG cùng đường dẫn, giữ kích thước file gọn rồi render lại.
+- `render-chapter4-diagrams.sh` tự nhúng các image path dạng `assets/...` thành data URI trong file Mermaid tạm để PDF/PNG không bị mất ảnh khi Mermaid CLI export.
+
+Render một hình:
+
+```bash
+bash thesis-report/tools/render-chapter4-diagrams.sh chapter4-technology-integration-map
+```
+
+Render toàn bộ Mermaid Chương 4:
+
+```bash
+bash thesis-report/tools/render-chapter4-diagrams.sh
+```
+
+Quy tắc: sửa `.mmd` trước, render lại PDF/PNG, rồi build LaTeX. Không sửa trực tiếp file PDF.
+
+## Chương 4 — DBML database/schema per service
+
+**Chính sách cố định:** xem `figures/CHAPTER4-DB-SCHEMA-SVG.md`.
+
+| Vai trò                              | Đường dẫn                                                                        |
+| ------------------------------------ | -------------------------------------------------------------------------------- |
+| Hình trong PDF khóa luận (canonical) | `figures/chapter4-db-*-schema.svg` — export từ **dbdiagram.io**, commit vào repo |
+| Audit schema / import web            | `diagrams/dbml/chapter4-*-schema.dbml` — từ codebase, **không** tự ghi đè `.svg` |
+| Preview IDE                          | `.pdf`/`.png` cùng tên — sinh từ `.svg` bằng script, không dùng trong LaTeX      |
+
+- Chương 4: `\includesvg{chapter4-db-...-schema.svg}`; cache build: `svg-inkscape/`.
+- Script mặc định **chỉ** đọc `.svg` web → cập nhật preview; **không** gọi `dbml-renderer` trừ khi `ALLOW_DBML_SVG_OVERWRITE=1 ... --from-dbml`.
+
+Sau khi export SVG từ web:
+
+```bash
+bash thesis-report/tools/render-chapter4-dbml.sh
+latexmk -xelatex undergraduate-theses-report.tex   # trong thesis-report/
+```
+
+Một service:
+
+```bash
+bash thesis-report/tools/render-chapter4-dbml.sh chapter4-db-order-schema
+```

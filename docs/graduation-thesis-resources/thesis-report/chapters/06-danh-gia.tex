@@ -1,214 +1,200 @@
-\chapter{Đánh giá}
+\chapter{Kiểm chứng và đánh giá hệ thống QRTable}
+\label{chap:danh-gia}
 
-Chương này đánh giá QRTable dựa trên bằng chứng có thể truy vết từ yêu cầu, thiết kế, triển khai và kiểm thử. Mục tiêu của chương không phải là chứng minh hệ thống đã sẵn sàng vận hành production, mà là trả lời ba câu hỏi: các luồng nghiệp vụ chính đã được kiểm chứng ở mức nào; các quyết định kiến trúc có được bảo vệ bằng contract, code và test hay không; và những yêu cầu phi chức năng nào mới được hỗ trợ bởi thiết kế thay vì được đo lường bằng benchmark thực nghiệm.
+Chương này đánh giá QRTable dựa trên bằng chứng có thể truy vết từ yêu cầu, thiết kế, triển khai và kiểm thử. Mục tiêu của chương không phải là chứng minh hệ thống đã sẵn sàng vận hành thực tế, mà là trả lời ba câu hỏi chính: các luồng nghiệp vụ lõi đã được kiểm chứng đến mức nào; các quyết định kiến trúc như ranh giới dịch vụ, quyền sở hữu dữ liệu, cô lập đơn vị thuê bao, RBAC, Saga và tính lũy đẳng có dấu vết trong mã nguồn và kiểm thử hay không; và những phần nào mới là cơ sở thiết kế hoặc hướng củng cố tiếp theo.
 
-Vì QRTable là một hệ thống SaaS POS theo kiến trúc microservices, đánh giá không thể chỉ dựa trên một số test pass/fail đơn lẻ. Một flow như đặt món QR đi qua Customer PWA, BFF, Order, Catalog, Redis và PostgreSQL; một flow như thanh toán VietQR/SePay còn đi qua webhook, Payment, Order và realtime bridge. Do đó, chương này sử dụng kết hợp requirement traceability, unit/contract/integration test, evidence từ source code, kiểm chứng kiến trúc tĩnh và phân tích scenario. Với những khu vực chưa có benchmark, provider thật hoặc full-stack gate ổn định, báo cáo ghi rõ phạm vi giới hạn thay vì suy luận quá mức từ thiết kế.
+Vì QRTable là hệ thống SaaS POS theo kiến trúc microservices, đánh giá không thể chỉ dựa trên số lượng kiểm thử chạy thành công. Một luồng đặt món qua QR đi qua Customer PWA, BFF, Order, Catalog, Redis và PostgreSQL; một luồng thanh toán VietQR/SePay còn liên quan đến webhook, Payment, Order và cầu nối thời gian thực. Do đó, chương này sử dụng kết hợp truy vết yêu cầu, kiểm thử đơn vị/hợp đồng/tích hợp có điều kiện, kiểm chứng kiến trúc tĩnh, phân tích kịch bản và khung minh chứng triển khai thử. Với những khu vực chưa có đo hiệu năng chuẩn, nhà cung cấp thật hoặc cổng kiểm thử toàn ngăn xếp ổn định, báo cáo ghi rõ giới hạn thay vì suy luận quá mức từ thiết kế.
 
-\section{Chiến lược đánh giá}
+Cơ sở đối chiếu trực tiếp của chương này là các minh chứng đã trình bày ở Chương 4 và Chương 5: Bảng~\ref{tab:chapter4-data-ownership-schema} về quyền sở hữu dữ liệu, Bảng~\ref{tab:chapter4-communication-matrix} về giao tiếp liên dịch vụ, Bảng~\ref{tab:chapter4-kafka-topic-registry} về chủ đề Kafka, Bảng~\ref{tab:chapter4-auth-actor-model}--\ref{tab:chapter4-rbac-tenant-entitlement} về mô hình bảo mật/xác thực/quyền theo gói, năm sơ đồ trình tự Hình~\ref{fig:chapter5-qr-ordering-session}--\ref{fig:chapter5-saas-onboarding-saga} và Bảng~\ref{tab:chapter5-implemented-evidence} về minh chứng triển khai. Vì vậy, Chương 6 không lặp lại toàn bộ lược đồ dữ liệu hoặc cấu trúc mã nguồn, mà dùng các minh chứng đó để kiểm chứng mức độ đúng của các kết luận.
 
-Chiến lược đánh giá của khóa luận được tổ chức theo bốn lớp bằng chứng.
+\section{Phương pháp đánh giá và mức bằng chứng}
 
-Lớp thứ nhất là functional validation, tập trung vào các luồng nghiệp vụ cốt lõi: quét QR và tạo session, thao tác shared cart, submit order, staff xác nhận order và trừ stock, KDS nhận ticket, payment settlement, SaaS onboarding, tenant lifecycle và RBAC. Lớp này chủ yếu dựa trên unit test, contract test, integration test có điều kiện và một số browser smoke test đã được ghi nhận trong traceability.
+Phương pháp đánh giá của khóa luận được tổ chức theo bốn lớp bằng chứng. Lớp thứ nhất là kiểm chứng chức năng, tập trung vào các luồng nghiệp vụ cốt lõi: quét QR và tạo phiên, thao tác giỏ món dùng chung, gửi đơn, nhân viên xác nhận đơn và trừ tồn kho, KDS nhận phiếu bếp, ghi nhận thanh toán, khởi tạo đơn vị thuê bao, vòng đời gói thuê bao và bảng điều khiển/báo cáo theo quyền. Lớp này chủ yếu dựa trên kiểm thử đơn vị, kiểm thử hợp đồng, kiểm thử tích hợp có điều kiện và một số kiểm thử khói trên trình duyệt khi có bộ dữ liệu mẫu phù hợp.
 
-Lớp thứ hai là architecture validation. Nhóm bằng chứng này kiểm tra service boundary, data ownership, Kafka topic registry, Redis access policy, WebSocket hint/refetch model và guardrail không truy cập chéo database. Với một hệ thống microservices, đây là lớp đánh giá quan trọng vì code có thể chạy đúng ở từng flow nhỏ nhưng vẫn phá vỡ kiến trúc nếu service import repository của nhau, tự tạo Kafka topic ngoài registry hoặc biến WebSocket event thành nguồn trạng thái nghiệp vụ.
+Lớp thứ hai là kiểm chứng kiến trúc. Nhóm bằng chứng này kiểm tra ranh giới dịch vụ, quyền sở hữu dữ liệu, sổ đăng ký chủ đề Kafka, quyền sở hữu Redis, mô hình WebSocket gợi ý/tải lại và rào cản kiến trúc không truy cập chéo cơ sở dữ liệu. Đây là lớp đánh giá quan trọng với microservices, vì mã nguồn có thể chạy đúng ở từng API nhỏ nhưng vẫn phá vỡ kiến trúc nếu một dịch vụ import trực tiếp repository của dịch vụ khác hoặc tự tạo chủ đề Kafka ngoài sổ đăng ký.
 
-Lớp thứ ba là non-functional evaluation. Các thuộc tính chất lượng như security, reliability, maintainability, modifiability, performance efficiency và scalability được diễn đạt theo mô hình chất lượng phần mềm và bối cảnh SaaS nhiều tenant \cite{iso-iec-25010-2023}. Trong phạm vi hiện tại, security, idempotency, consistency và maintainability có nhiều bằng chứng code/test hơn; performance efficiency và scalability mới được đánh giá ở mức thiết kế vì chưa có benchmark tải lớn.
+Lớp thứ ba là đánh giá yêu cầu phi chức năng. Các thuộc tính như bảo mật, độ tin cậy, khả năng bảo trì, khả năng sửa đổi, hiệu quả hiệu năng và khả năng mở rộng được diễn đạt theo mô hình chất lượng phần mềm và bối cảnh SaaS nhiều đơn vị thuê bao \cite{iso-iec-25010-2023}. Trong phạm vi hiện tại, bảo mật, tính lũy đẳng, tính nhất quán, khả năng bảo trì và phản hồi gần thời gian thực có nhiều bằng chứng mã nguồn/kiểm thử hơn; hiệu năng và khả năng mở rộng mới được đánh giá ở mức thiết kế vì chưa có đo tải lớn.
 
-Lớp thứ tư là demo và artifact validation. Screenshot, video demo, command output hoặc log runtime có thể giúp minh họa hệ thống, nhưng không thay thế kiểm thử chức năng hoặc kiểm chứng kiến trúc. Ở thời điểm bản nháp này, các ảnh giao diện chưa được dùng như bằng chứng demo chính thức nếu mới dừng ở placeholder kỹ thuật. Các artifact giao diện nếu được bổ sung sau nên đặt ở phụ lục và liên kết với flow kiểm thử tương ứng.
+Lớp thứ tư là minh chứng minh họa/triển khai thử. Ảnh chụp giao diện, nhật ký, kết quả lệnh, kiểm tra sức khỏe dịch vụ hoặc URL công khai có thể giúp minh họa hệ thống, nhưng không thay thế kiểm thử chức năng hoặc kiểm chứng kiến trúc. Khi chưa có hiện vật vận hành thật, các nội dung vận hành thực tế/triển khai thử chỉ được viết như khung kiểm chứng cần thu thập thêm.
 
-Phạm vi đánh giá vì vậy được giới hạn rõ ràng: hệ thống có bằng chứng đáng kể cho các P0/P1 flow cốt lõi, nhưng chưa có stress test, chaos engineering, high availability proof, observability dashboard hoàn chỉnh hoặc validation tự động với live SePay provider. Những nội dung này được xem là giới hạn và hướng phát triển.
+\subsection{Chính sách diễn đạt kết luận}
 
-\subsection{Kiểm chứng Saga trong phạm vi khóa luận}
-
-Đối với Saga, khóa luận không chỉ dựa vào tên lớp hoặc sequence diagram. Cách kiểm chứng được tổ chức theo nhiều lớp bằng chứng: unit/contract test để xác minh thứ tự điều phối, replay, xử lý lỗi và compensation; integration test để xác minh ranh giới DB/TCP thật; fault injection ở mức service để ép nhánh bù trừ; và artifact demo/log/DB để minh họa flow runtime.
-
-Order Confirm Saga là luồng đại diện cho POS core. Bằng chứng chính gồm test cho \texttt{OrderConfirmSagaService}, test cho \texttt{CatalogStockGatewayService}, integration opt-in cho ranh giới stock giữa Order và Catalog, cùng artifact từ POS, KDS và outbox. Nhánh compensation quan trọng là tình huống Catalog đã deduct stock nhưng Order commit hoặc ghi outbox thất bại, khi đó Order phải gọi Catalog release stock bằng compensation key. Ở thời điểm đánh giá hiện tại, nhánh này đã có fault injection ở mức service; live fault-injection harness đầy đủ cho lỗi commit/outbox sau deduct thật vẫn là bước hardening tiếp theo.
-
-SaaS Onboarding Mini-Saga là luồng đại diện cho platform provisioning. Bằng chứng chính gồm unit/mocked integration cho rollback, PostgreSQL integration cho success path và compensation trước/sau bước subscription, cùng live Payment TCP integration chứng minh Payment tạo đúng một row \texttt{tenant\_payment\_settings}. Vì Authorizer/Keycloak và User-Access vẫn được đại diện bằng contract double trong các proof tự động hiện tại, báo cáo chỉ kết luận onboarding đã có bằng chứng Saga đáng tin cậy ở mức DB/live Payment một phần, không gọi đây là full live end-to-end validation.
-
-\section{Evaluation claim policy}
-
-Để tránh overclaim, mỗi kết luận trong chương này được gắn với một mức bằng chứng. Bảng~\ref{tab:chapter6-claim-policy} là chính sách diễn đạt được dùng xuyên suốt phần đánh giá.
+Để tránh kết luận quá mức so với bằng chứng, mỗi kết luận trong chương này được gắn với một mức minh chứng. Bảng~\ref{tab:chapter6-claim-policy} là chính sách diễn đạt được dùng xuyên suốt phần đánh giá.
 
 {\footnotesize\sloppy
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.3\textwidth}>{\raggedright\arraybackslash}p{0.26\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}}
-  \caption{Evaluation claim policy cho Chương 6.}
+  \caption{Chính sách diễn đạt kết luận theo mức bằng chứng.}
   \label{tab:chapter6-claim-policy}\\
   \toprule
-  Mức claim & Điều kiện bằng chứng & Cách diễn đạt trong khóa luận & Ví dụ trong QRTable \\
+  Mức kết luận & Điều kiện bằng chứng & Cách diễn đạt trong khóa luận & Ví dụ trong QRTable \\
   \midrule
   \endfirsthead
   \toprule
-  Mức claim & Điều kiện bằng chứng & Cách diễn đạt trong khóa luận & Ví dụ trong QRTable \\
+  Mức kết luận & Điều kiện bằng chứng & Cách diễn đạt trong khóa luận & Ví dụ trong QRTable \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  A -- Đã kiểm chứng tự động & Có unit, contract, integration hoặc E2E test pass; test location hoặc command kiểm chứng rõ ràng. & ``Đã được kiểm chứng bằng test ở phạm vi tương ứng''. & VND rounding, submit idempotency, Order Confirm Saga compensation ở service layer, Kafka topic registry. \\
-  B -- Đã kiểm chứng một phần hoặc opt-in & Có integration/browser smoke cần stack, seed, Redis/Kafka/Keycloak hoặc provider riêng; chưa là default CI gate. & ``Đã được kiểm chứng trong phạm vi opt-in/local stack''. & SaaS live Payment onboarding slice, Order/Catalog stock integration, KDS Redis dedupe opt-in. \\
-  C -- Hỗ trợ bởi thiết kế/code structure & Có source code, docs, architecture contracts hoặc scenario analysis; thiếu full-stack proof hoặc benchmark. & ``Được hỗ trợ bởi thiết kế và cấu trúc triển khai''. & Scalability theo service boundary/Kafka/Redis; maintainability nhờ Nx và shared contracts. \\
-  D -- Demo-limited & Có route smoke, screenshot, demo script hoặc kiểm chứng thủ công đại diện; chưa thành regression gate. & ``Được minh họa bằng demo hoặc smoke test''. & Admin dashboard routes, suspended tenant browser smoke. \\
-  E -- Giới hạn/hướng phát triển & Nằm ngoài phạm vi triển khai chính, chỉ có bằng chứng thiết kế hoặc phụ thuộc provider/full-stack chuyên biệt. & ``Là giới hạn hiện tại hoặc hướng phát triển''. & Full offline queue, notification/email, production observability, load test. \\
+  A -- Đã kiểm chứng tự động & Có kiểm thử đơn vị, hợp đồng, tích hợp hoặc đầu-cuối (E2E) chạy thành công; vị trí kiểm thử hoặc lệnh kiểm chứng rõ ràng. & ``Đã được kiểm chứng bằng kiểm thử ở phạm vi tương ứng''. & Làm tròn VND, tính lũy đẳng gửi đơn, khử trùng KDS, sổ đăng ký chủ đề Kafka. \\
+  B -- Đã kiểm chứng một phần hoặc tùy chọn & Có kiểm thử tích hợp/khói trình duyệt cần ngăn xếp, dữ liệu gieo, Redis/Kafka/Keycloak hoặc nhà cung cấp riêng; chưa là cổng kiểm thử mặc định. & ``Đã được kiểm chứng trong phạm vi tùy chọn/ngăn xếp cục bộ''. & Lát cắt Payment của luồng khởi tạo SaaS trên môi trường thật có điều kiện, tích hợp tồn kho Order--Catalog, tích hợp Redis KDS. \\
+  C -- Hỗ trợ bởi thiết kế/cấu trúc mã nguồn & Có mã nguồn, tài liệu, hợp đồng kiến trúc hoặc phân tích kịch bản; thiếu chứng minh toàn ngăn xếp hoặc đo chuẩn. & ``Được hỗ trợ bởi thiết kế và cấu trúc triển khai''. & Khả năng mở rộng theo ranh giới dịch vụ/Kafka/Redis; khả năng bảo trì nhờ Nx và hợp đồng dùng chung. \\
+  D -- Minh họa bằng kiểm thử khói & Có tuyến kiểm thử khói, ảnh chụp, kịch bản minh họa hoặc kiểm chứng thủ công đại diện; chưa thành cổng hồi quy. & ``Được minh họa bằng minh họa hoặc kiểm thử khói''. & Tuyến bảng điều khiển quản trị, kiểm thử khói trình duyệt cho đơn vị thuê bao tạm ngưng, khung triển khai thử. \\
+  E -- Giới hạn/hướng phát triển & Thiếu minh chứng, phụ thuộc nhà cung cấp thật hoặc nằm ngoài phạm vi triển khai chính. & ``Là giới hạn hiện tại hoặc hướng phát triển''. & Hàng đợi ngoại tuyến đầy đủ, thông báo/email, quan sát vận hành thực tế, kiểm thử tải. \\
 \end{longtable}
 }
 
-Chính sách này cũng xác định những câu không được dùng trong phần kết quả. Báo cáo không viết rằng QRTable đã production-ready, đã chứng minh khả năng chịu tải lớn, đã validate live SePay tự động, hoặc đã chứng minh tenant isolation trên toàn bộ API surface nếu bằng chứng hiện tại chưa đủ. Ngược lại, báo cáo có thể kết luận rằng nhiều invariant cốt lõi đã có unit/contract/integration evidence và kiến trúc hiện tại tạo nền tảng hợp lý cho việc mở rộng, bảo trì và hardening sau này.
+Chính sách này cũng xác định những câu không được dùng trong phần kết quả. Báo cáo không viết rằng QRTable đã sẵn sàng vận hành thực tế, đã chứng minh tính sẵn sàng cao, đã chịu tải lớn, đã kiểm chứng SePay thật một cách tự động, hoặc đã chứng minh cô lập đơn vị thuê bao trên toàn bộ bề mặt API nếu bằng chứng hiện tại chưa đủ. Ngược lại, báo cáo có thể kết luận rằng nhiều bất biến cốt lõi đã có bằng chứng kiểm thử đơn vị/hợp đồng/tích hợp và kiến trúc hiện tại tạo nền tảng hợp lý cho củng cố sau này.
 
-\section{Requirement traceability}
+\section{Truy vết yêu cầu và kết quả kiểm thử}
 
-Ma trận traceability P0/P1 của QRTable ghi nhận 52 dòng yêu cầu hoặc rule quan trọng. Trong đó, 36 dòng đã có bằng chứng kiểm thử đủ mạnh ở lớp tương ứng, 11 dòng mới được kiểm chứng một phần, 1 dòng là khoảng trống triển khai và 4 dòng thuộc phạm vi mở rộng. Bảng~\ref{tab:chapter6-traceability-summary} tóm tắt kết quả theo domain thay vì liệt kê toàn bộ 52 dòng để giữ chương đánh giá tập trung vào kết luận chính.
+Ma trận truy vết P0/P1 của QRTable ghi nhận 52 dòng yêu cầu hoặc quy tắc quan trọng. Trong đó, 36 dòng đã có bằng chứng kiểm thử đủ mạnh ở lớp tương ứng, 11 dòng mới được kiểm chứng một phần, 1 dòng còn thiếu triển khai và 4 dòng thuộc phạm vi mở rộng. Bảng~\ref{tab:chapter6-traceability-summary} tóm tắt kết quả theo nhóm miền thay vì liệt kê toàn bộ 52 dòng để giữ chương đánh giá tập trung vào kết luận chính.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.19\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.35\textwidth}}
-  \caption{Requirement traceability summary của QRTable.}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}}
+  \caption{Tóm tắt truy vết yêu cầu theo nhóm miền.}
   \label{tab:chapter6-traceability-summary}\\
   \toprule
-  Domain & Đã kiểm chứng & Một phần & Khoảng trống / ngoài phạm vi & Kết luận được phép rút ra \\
+  Nhóm miền & Đã kiểm chứng & Một phần & Giới hạn / phạm vi mở rộng & Kết luận được phép rút ra \\
   \midrule
   \endfirsthead
   \toprule
-  Domain & Đã kiểm chứng & Một phần & Khoảng trống / ngoài phạm vi & Kết luận được phép rút ra \\
+  Nhóm miền & Đã kiểm chứng & Một phần & Giới hạn / phạm vi mở rộng & Kết luận được phép rút ra \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  Catalog và QR & 5 & 2 & 1 khoảng trống triển khai & Public menu, QR token và quota table có bằng chứng tốt; tenant A/B live API gate và QR scan rate limit chưa đủ để claim toàn diện. \\
-  Order, session, cart và bill & 7 & 2 & 0 & Đây là cụm evidence mạnh: session join, cart version, submit idempotency, bill request và payment finalization có coverage rõ; Order Confirm Saga còn cần live fault-injection harness để vượt khỏi mức partial. \\
-  Kitchen/KDS realtime & 5 & 0 & 0 & KDS dedupe, station RBAC, FIFO/priority/SLA, refetch hint và Redis-only recovery có thể đánh giá tích cực trong phạm vi test hiện có. \\
-  Payment settlement & 8 & 1 & 1 ngoài phạm vi & Cash, VietQR reference, webhook idempotency, lịch sử thanh toán read-only và payment-to-order bridge có bằng chứng tốt; refund và live provider vẫn manual/ngoài phạm vi chính. \\
-  SaaS lifecycle & 7 & 3 & 0 & Tenant lifecycle, subscription invoice, quota, payment settings và admin routes có evidence; onboarding full live stack còn cần bổ sung. \\
-  RBAC và tenant isolation & 2 & 1 & 0 & Guard chain và permission seed có bằng chứng mạnh; representative cross-tenant API suite chưa phủ rộng. \\
-  Architecture invariants & 2 & 2 & 0 & Kafka topic registry và Redis access policy có contract tests; một số pattern rộng như BFF Direct và TCP coverage còn cần kiểm chứng thêm. \\
-  Phạm vi mở rộng & 0 & 0 & 3 ngoài phạm vi hiện tại & Full offline queue, saga hardening sâu và notification/email được xếp vào phạm vi mở rộng, không thuộc kết quả đánh giá chính. \\
+  Catalog và QR & 5 & 2 & 1 giới hạn triển khai & Thực đơn công khai, token QR và hạn mức bàn có bằng chứng tốt; cổng API A/B đơn vị thuê bao trên môi trường thật và giới hạn tốc độ quét QR chưa đủ để khẳng định toàn diện. \\
+  Order, phiên, giỏ và hóa đơn & 7 & 2 & 0 & Tham gia phiên, phiên bản giỏ, tính lũy đẳng khi gửi đơn, yêu cầu hóa đơn và hoàn tất thanh toán có độ phủ rõ; Order Confirm Saga còn cần bộ tiêm lỗi trên môi trường thật để vượt khỏi mức kiểm chứng một phần. \\
+  Kitchen/KDS gần thời gian thực & 5 & 0 & 0 & KDS khử trùng sự kiện, RBAC theo trạm, FIFO/ưu tiên/SLA, gợi ý tải lại và khôi phục chỉ bằng Redis có thể đánh giá tích cực trong phạm vi kiểm thử hiện có. \\
+  Ghi nhận thanh toán & 8 & 1 & 1 ngoài phạm vi chính & Tiền mặt, tham chiếu VietQR, tính lũy đẳng webhook, lịch sử thanh toán chỉ đọc và cầu nối Payment--Order có bằng chứng tốt; hoàn tiền và nhà cung cấp thật vẫn thủ công/ngoài phạm vi chính. \\
+  Vòng đời SaaS & 7 & 3 & 0 & Vòng đời đơn vị thuê bao, hóa đơn thuê bao, hạn mức, cấu hình thanh toán và tuyến quản trị có minh chứng; khởi tạo toàn ngăn xếp trên môi trường thật còn cần bổ sung. \\
+  Bảng điều khiển/báo cáo & 2 & 1 & 1 minh họa cần bổ sung & Guard báo cáo, quyền theo gói và trạng thái khóa giao diện có bằng chứng kỹ thuật; ảnh chụp/minh chứng trình duyệt cần thu nếu muốn dùng như minh chứng minh họa. \\
+  RBAC và cô lập đơn vị thuê bao & 2 & 1 & 0 & Chuỗi guard và dữ liệu quyền khởi tạo có bằng chứng mạnh; bộ kiểm thử API liên đơn vị thuê bao đại diện chưa phủ rộng. \\
+  Bất biến kiến trúc & 2 & 2 & 0 & Sổ đăng ký chủ đề Kafka và chính sách truy cập Redis có kiểm thử hợp đồng; một số mẫu rộng như BFF Direct và độ phủ TCP còn cần kiểm chứng thêm. \\
+  Phạm vi mở rộng & 0 & 0 & 3 ngoài phạm vi hiện tại & Hàng đợi thao tác ngoại tuyến đầy đủ, củng cố Saga chuyên sâu và thông báo/email được xếp vào hướng phát triển, không thuộc kết quả đánh giá chính. \\
 \end{longtable}
 }
 
-Kết quả này cho thấy hệ thống có mức traceability đáng kể cho các flow trọng yếu, đặc biệt là Order, Kitchen và Payment. Tuy nhiên, không thể kết luận rằng toàn bộ P0 đã hoàn tất tuyệt đối, vì còn năm dòng P0 mới được kiểm chứng một phần: tenant isolation ở Catalog/live API gate, Order Confirm Saga live fault injection, onboarding SaaS full live stack, suspended tenant pending-bill browser path và representative RBAC cross-tenant API gate. Các dòng này không làm mất giá trị của hệ thống, nhưng buộc phần kết luận phải diễn đạt đúng phạm vi: QRTable đã chứng minh nhiều invariant cốt lõi, còn một số acceptance gate full-stack cần hoàn thiện trước khi gọi là kiểm chứng toàn diện.
+Kết quả này cho thấy hệ thống có mức truy vết đáng kể cho các luồng trọng yếu, đặc biệt là Order, Kitchen và Payment. Tuy nhiên, không thể kết luận rằng toàn bộ P0 đã hoàn tất tuyệt đối, vì còn một số dòng P0 mới được kiểm chứng một phần như cổng API cô lập đơn vị thuê bao trên môi trường thật, tiêm lỗi trên môi trường thật cho Order Confirm Saga, khởi tạo SaaS toàn ngăn xếp trên môi trường thật, đường trình duyệt hóa đơn chờ khi đơn vị thuê bao tạm ngưng và cổng API RBAC liên đơn vị thuê bao đại diện. Các dòng này không làm mất giá trị của hệ thống, nhưng buộc phần kết luận phải diễn đạt đúng phạm vi.
 
-Default test baseline quan trọng nhất được ghi nhận là lệnh \texttt{pnpm exec nx run-many -t test --parallel=3} pass cho 23 projects trong workspace. Ngoài baseline này, một số lệnh opt-in đã được chạy cho KDS Redis dedupe, SaaS onboarding PostgreSQL integration và SaaS live Payment onboarding slice. Các gate còn phụ thuộc full stack, seed hoặc provider thật như frontend-utils tenant A/B, browser demo rộng và live SePay được giữ ở mức manual/opt-in. Đây là quyết định hợp lý cho một khóa luận phần mềm: ưu tiên regression deterministic làm baseline, đồng thời ghi rõ nơi nào cần môi trường demo đầy đủ.
+Đường cơ sở kiểm thử mặc định quan trọng nhất được ghi nhận là lệnh \texttt{pnpm exec nx run-many -t test --parallel=3} chạy thành công cho 23 dự án trong workspace. Ngoài đường cơ sở này, một số lệnh tùy chọn đã được chạy cho khử trùng Redis KDS, tích hợp PostgreSQL khi khởi tạo SaaS và lát cắt Payment của luồng khởi tạo SaaS trên môi trường thật có điều kiện. Các cổng còn phụ thuộc toàn ngăn xếp, dữ liệu gieo hoặc nhà cung cấp thật như A/B đơn vị thuê bao, minh họa trình duyệt rộng và SePay thật được giữ ở mức thủ công/tùy chọn.
 
-\section{Functional validation}
+\section{Kiểm chứng các luồng nghiệp vụ cốt lõi}
 
-Functional validation được đánh giá theo các cụm use case chính thay vì theo từng service. Cách nhìn này phù hợp với trải nghiệm người dùng cuối: customer không quan tâm Order hay Catalog xử lý phần nào, mà quan tâm flow quét QR, gọi món, bếp nhận ticket và thanh toán có đúng hay không.
+Kiểm chứng chức năng được đánh giá theo các cụm ca sử dụng chính thay vì theo từng dịch vụ. Cách nhìn này phù hợp với trải nghiệm người dùng cuối: khách không quan tâm Order hay Catalog xử lý phần nào, mà quan tâm luồng quét QR, gọi món, bếp nhận phiếu bếp và thanh toán có đúng hay không.
 
-Với Catalog và QR, hệ thống đã có bằng chứng cho QR/table token, public menu filtering, upload path theo tenant và quota table theo subscription. Token QR được kiểm tra ở mức generation/validation và được dùng trong flow session join. Public menu chỉ trả category/item active, available và không bị xóa. Tuy nhiên, tenant isolation trên live BFF/Keycloak/Catalog stack vẫn chưa đủ rộng để claim toàn bộ API surface đã được chứng minh bằng tenant A/B test. QR scan/order spam limit cũng mới dừng ở throttler/config và chưa có rule table-scoped đầy đủ.
+Với Catalog và QR, hệ thống đã có bằng chứng cho token QR/bàn, lọc thực đơn công khai, đường tải tệp lên theo đơn vị thuê bao và hạn mức bàn theo gói thuê bao. Token QR được kiểm tra ở mức tạo/xác thực và được dùng trong luồng tham gia phiên. Thực đơn công khai chỉ trả danh mục/món đang hoạt động, còn phục vụ và chưa bị xóa. Tuy nhiên, cô lập đơn vị thuê bao trên ngăn xếp BFF/Keycloak/Catalog ở môi trường thật vẫn chưa đủ rộng để kết luận toàn bộ bề mặt API đã được chứng minh bằng kiểm thử A/B đơn vị thuê bao.
 
-Với Order/session/cart/bill, evidence mạnh hơn. Session join xử lý bàn available, occupied active session, stale empty session và các trạng thái không được phép như billing/cleaning. Shared cart dùng Redis và \texttt{cartVersion} để phát hiện stale mutation. Submit order dùng idempotency key, tạo order \texttt{PENDING}, gắn bill \texttt{OPEN} và clear cart một lần. Bill request yêu cầu cart rỗng và các order active đã served trước khi chuyển bill sang \texttt{PENDING\_PAYMENT}. Payment finalization đóng bill/session và chuyển bàn sang cleaning theo hướng idempotent. Các bằng chứng này cho phép kết luận rằng luồng đặt món QR cốt lõi đã được kiểm chứng tốt ở mức unit/contract/integration.
+Với Order/phiên/giỏ/hóa đơn, minh chứng mạnh hơn. Tham gia phiên xử lý bàn trống, bàn đang có phiên hoạt động, phiên trống cũ và các trạng thái không được phép như đang thanh toán/đang dọn. Giỏ dùng chung dùng Redis và \texttt{cartVersion} để phát hiện thay đổi lỗi thời. Gửi đơn dùng khóa tính lũy đẳng, tạo đơn \texttt{PENDING}, gắn hóa đơn \texttt{OPEN} và xóa giỏ một lần. Yêu cầu hóa đơn yêu cầu giỏ rỗng và các đơn đang hoạt động đã phục vụ trước khi chuyển hóa đơn sang \texttt{PENDING\_PAYMENT}. Hoàn tất thanh toán đóng hóa đơn/phiên và chuyển bàn sang dọn theo hướng lũy đẳng.
 
-Với staff confirmation và stock consistency, điểm quan trọng là Order không tự ghi stock. Staff confirm chuyển order từ \texttt{PENDING} sang \texttt{PROCESSING} chỉ sau khi Catalog TCP deduct stock thành công. Nếu Catalog báo thiếu stock hoặc lỗi nghiệp vụ, Order không được chuyển trạng thái. Test ở mức service cũng ép nhánh lỗi sau deduct để kiểm tra compensation release stock và giữ lỗi gốc. Cách kiểm chứng này phù hợp với service ownership đã trình bày ở Chương 4 và Chương 5: Catalog là owner của stock, Order là owner của order lifecycle. Giới hạn còn lại là chưa có harness integration sống ép lỗi Order commit/outbox sau khi Catalog thật đã deduct.
+Với xác nhận của nhân viên và nhất quán tồn kho, điểm quan trọng là Order không tự ghi tồn kho. Thao tác xác nhận của nhân viên chuyển đơn từ \texttt{PENDING} sang \texttt{PROCESSING} chỉ sau khi Catalog trừ tồn kho qua TCP thành công. Nếu Catalog báo thiếu tồn kho hoặc lỗi nghiệp vụ, Order không được chuyển trạng thái. Kiểm thử ở mức dịch vụ cũng ép nhánh lỗi sau khi trừ tồn kho để kiểm tra bù trừ hoàn tồn kho và giữ lỗi gốc.
 
-Với Kitchen/KDS, các test hiện có chứng minh consumer xử lý event order confirmed, tạo ticket theo station, lưu queue bằng Redis, dedupe event trùng và phát realtime hint để UI refetch. KDS là một trong các khu vực có traceability sạch vì không có P0 chưa phủ đầy đủ. Kết luận an toàn là KDS runtime projection đã được kiểm chứng trong phạm vi Redis/Kafka/WebSocket hint model hiện tại; không cần claim Kitchen có database lịch sử hoặc analytics bếp sâu hơn.
+Với Kitchen và KDS, các kiểm thử hiện có chứng minh bộ tiêu thụ xử lý sự kiện xác nhận đơn, tạo phiếu bếp theo trạm, lưu hàng đợi bằng Redis, khử trùng sự kiện và phát gợi ý gần thời gian thực để giao diện tải lại. Kết luận an toàn là bản chiếu KDS khi vận hành đã được kiểm chứng trong phạm vi Redis, Kafka và mô hình gợi ý WebSocket hiện tại; không khẳng định Kitchen có cơ sở dữ liệu lịch sử hoặc phân tích bếp sâu hơn.
 
-Với Payment, hệ thống có evidence cho cash settlement, VietQR reference, SePay webhook verification/idempotency, underpaid handling, duplicate webhook và payment-to-order bridge. Điều này đủ để đánh giá tích cực về consistency và idempotency trong payment flow nội bộ. Tuy nhiên, live SePay provider validation không nằm trong automated baseline vì cần credentials, callback public và dữ liệu provider thật. Vì vậy, báo cáo chỉ kết luận phần code/unit/contract/integration đã được kiểm chứng; production provider validation là checklist riêng trước demo hoặc vận hành thật.
+Với Payment, hệ thống có bằng chứng cho ghi nhận tiền mặt, tham chiếu VietQR, xác minh webhook SePay/tính lũy đẳng, xử lý thanh toán thiếu, webhook trùng và cầu nối Payment--Order. Điều này đủ để đánh giá tích cực về tính nhất quán và tính lũy đẳng trong luồng thanh toán nội bộ. Tuy nhiên, kiểm chứng nhà cung cấp SePay thật không nằm trong đường cơ sở tự động vì cần thông tin xác thực, đường gọi lại công khai và dữ liệu nhà cung cấp thật.
 
-Với SaaS lifecycle, QRTable đã có bằng chứng cho tenant lifecycle, subscription, invoice, quota, payment settings, slug policy và một phần onboarding saga. PostgreSQL integration đã chứng minh success path và rollback của onboarding; live Payment TCP đã chứng minh payment settings được tạo ở service owner. Điểm còn giới hạn là onboarding full live stack vẫn dùng contract doubles cho Authorizer/Keycloak và User-Access ở một số slice, nên chưa đủ để gọi toàn bộ onboarding là end-to-end live proof. Suspended tenant behavior cũng có coverage chính, nhưng pending-bill payment exception trên browser path cần fixture và E2E bổ sung.
+Với vòng đời SaaS, bảng điều khiển và báo cáo, QRTable đã có bằng chứng cho vòng đời đơn vị thuê bao, thuê bao, hóa đơn, hạn mức, cấu hình thanh toán, chính sách slug và một phần Saga khởi tạo. Báo cáo bổ sung góc nhìn vận hành theo gói: Owner và Manager dùng \texttt{report.read\_own} và bị kiểm tra quyền theo gói như \texttt{analytics\_basic}; Super Admin dùng \texttt{report.read\_any} cho phân tích nền tảng và khoan sâu theo đơn vị thuê bao. Cách đánh giá an toàn là báo cáo đã có bằng chứng ở lớp guard và mã nguồn; phần minh chứng trình duyệt chỉ được kết luận khi có hiện vật thật.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.14\textwidth}}
-  \caption{Functional validation result theo cụm use case.}
+  \caption{Kết quả kiểm chứng chức năng theo cụm ca sử dụng.}
   \label{tab:chapter6-functional-validation}\\
   \toprule
-  Cụm use case & Kết quả đánh giá & Bằng chứng chính & Mức claim \\
+  Cụm ca sử dụng & Kết quả đánh giá & Bằng chứng chính & Mức kết luận \\
   \midrule
   \endfirsthead
   \toprule
-  Cụm use case & Kết quả đánh giá & Bằng chứng chính & Mức claim \\
+  Cụm ca sử dụng & Kết quả đánh giá & Bằng chứng chính & Mức kết luận \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  QR/menu/session & Token QR, public menu và session join đã được kiểm chứng; tenant A/B live gate cần chạy ổn định hơn. & Catalog specs, Order session integration, frontend utils opt-in. & A/B \\
-  Shared cart/order submit & Cart version, submit idempotency và no-draft order row có evidence mạnh. & Order service specs, DB/Redis integration. & A \\
-  Stock consistency & Staff confirm deduct stock qua Catalog TCP, có replay và compensation ở service layer; live fault injection còn thiếu. & Order/Catalog stock specs, external-stack integration. & A/B \\
-  KDS realtime & Ticket queue, station routing, dedupe và refetch hint đã được kiểm chứng. & Kitchen specs, Redis integration, realtime E2E. & A/B \\
-  Payment settlement & Cash/VietQR/webhook/idempotency có test; live provider không chạy mặc định. & Payment specs, webhook contract, bridge integration. & A/B \\
-  SaaS lifecycle & Tenant/subscription/quota/payment settings có evidence; onboarding có DB integration và live Payment TCP, nhưng full identity/profile live harness còn một phần. & SaaS specs, onboarding DB integration, live Payment TCP slice. & B/C \\
-  RBAC/session security & Staff/admin guard chain và customer session model có evidence; cross-tenant API proof chưa phủ toàn bộ. & Permission matrix, guard specs, frontend-utils opt-in. & A/B/C \\
+  QR/thực đơn/phiên & Token QR, thực đơn công khai và tham gia phiên đã được kiểm chứng; cổng A/B đơn vị thuê bao trên môi trường thật cần chạy ổn định hơn. & Kiểm thử Catalog, tích hợp phiên Order, tiện ích giao diện tùy chọn. & A/B \\
+  Giỏ chung/gửi đơn & Phiên bản giỏ, tính lũy đẳng gửi đơn và không tạo dòng đơn nháp có minh chứng mạnh. & Spec dịch vụ Order, tích hợp DB/Redis. & A \\
+  Nhất quán tồn kho & Nhân viên xác nhận trừ tồn kho qua Catalog TCP, có phát lại và bù trừ ở lớp dịch vụ; tiêm lỗi trên môi trường thật còn thiếu. & Kiểm thử tồn kho Order/Catalog, tích hợp ngăn xếp ngoài. & A/B \\
+  KDS gần thời gian thực & Hàng đợi phiếu bếp, định tuyến trạm, khử trùng và gợi ý tải lại đã được kiểm chứng. & Kiểm thử Kitchen, tích hợp Redis, kiểm thử đầu-cuối gần thời gian thực. & A/B \\
+  Ghi nhận thanh toán & Tiền mặt/VietQR/webhook/tính lũy đẳng có kiểm thử; nhà cung cấp thật không chạy mặc định. & Kiểm thử Payment, hợp đồng webhook, tích hợp cầu nối. & A/B \\
+  Vòng đời SaaS & Đơn vị thuê bao/thuê bao/hạn mức/cấu hình thanh toán có minh chứng; khởi tạo có tích hợp cơ sở dữ liệu và Payment TCP trên môi trường thật có điều kiện, nhưng bộ kiểm thử định danh/hồ sơ trên môi trường thật đầy đủ còn một phần. & Kiểm thử SaaS, tích hợp cơ sở dữ liệu khi khởi tạo, lát cắt Payment TCP trên môi trường thật có điều kiện. & B/C \\
+  Bảng điều khiển/báo cáo & Báo cáo theo đơn vị thuê bao và phân tích nền tảng có bằng chứng quyền/quyền theo gói; minh chứng trình duyệt cần hiện vật thật. & Kiểm thử báo cáo BFF, PlanFeatureGuard, giao diện báo cáo Management App. & B/C/D \\
+  RBAC/bảo mật phiên & Chuỗi guard nhân viên/quản trị và mô hình phiên khách có minh chứng; chứng minh API liên đơn vị thuê bao chưa phủ toàn bộ. & Ma trận quyền, kiểm thử guard, tiện ích giao diện tùy chọn. & A/B/C \\
 \end{longtable}
 }
 
-\section{Architecture validation}
+\section{Kiểm chứng Saga, tính lũy đẳng và tính nhất quán}
 
-Architecture validation trả lời câu hỏi hệ thống có giữ đúng các guardrail kiến trúc đã thiết kế hay không. Với QRTable, các guardrail quan trọng gồm: BFF là entry point cho client, service owner sở hữu database của mình, shared libraries không được dùng để truy cập chéo dữ liệu, Kafka topic phải đến từ registry, Redis key phải có owner rõ ràng, WebSocket chỉ là hint/refetch và tenant context phải đi qua API/service/cache/event/realtime.
+Đối với Saga, khóa luận không chỉ dựa vào tên lớp hoặc sơ đồ trình tự. Cách kiểm chứng được tổ chức theo nhiều lớp bằng chứng: kiểm thử đơn vị/hợp đồng để xác minh thứ tự điều phối, phát lại, xử lý lỗi và bù trừ; kiểm thử tích hợp để xác minh ranh giới cơ sở dữ liệu/TCP thật; tiêm lỗi có kiểm soát ở mức dịch vụ để ép nhánh bù trừ; và minh chứng minh họa/nhật ký/cơ sở dữ liệu để minh họa luồng khi có môi trường phù hợp.
 
-Ở service boundary và data ownership, bằng chứng mạnh nhất đến từ Chương 4, Chương 5 và source tree. Catalog sở hữu menu, table và stock; Order sở hữu session, cart, order và bill; Payment sở hữu payment record và settings; SaaS sở hữu tenant và subscription; Kitchen sở hữu Redis runtime queue. Các sequence diagram Chương 5 cho thấy các tương tác cross-service đi qua TCP/Kafka thay vì truy cập database trực tiếp. Đây là cơ sở để đánh giá kiến trúc microservices của QRTable là có kiểm soát, không chỉ là chia thư mục theo tên service.
+Order Confirm Saga là luồng đại diện cho lõi POS. Bằng chứng chính gồm kiểm thử điều phối xác nhận đơn, kiểm thử cổng tồn kho Catalog, tích hợp tùy chọn cho ranh giới tồn kho giữa Order và Catalog, cùng minh chứng từ POS, KDS và outbox. Nhánh bù trừ quan trọng là tình huống Catalog đã trừ tồn kho nhưng Order ghi nhận hoặc ghi outbox thất bại; khi đó Order phải gọi Catalog hoàn trả tồn kho bằng khóa bù trừ. Ở thời điểm đánh giá hiện tại, nhánh này đã có tiêm lỗi ở mức dịch vụ; bộ tiêm lỗi đầy đủ trên môi trường thật cho lỗi ghi nhận/outbox sau khi trừ tồn kho thật vẫn là bước củng cố tiếp theo.
 
-Ở Kafka, registry hiện tại công nhận năm topic core đã trình bày trong Bảng~\ref{tab:chapter4-kafka-topic-registry}. Architecture contract tests bảo vệ registry này và ngăn một số event chưa thuộc scope như menu updated bị dùng sai. Điều này giúp QRTable giữ đúng quan điểm event-driven có chọn lọc: Kafka dùng cho domain event bất đồng bộ hoặc fan-out, không dùng thay cho mọi command/query.
+SaaS Onboarding Mini-Saga là luồng đại diện cho cấp phát nền tảng. Bằng chứng chính gồm tích hợp đơn vị/giả lập cho quay lui, tích hợp PostgreSQL cho đường thành công và bù trừ trước/sau bước thuê bao, cùng tích hợp Payment TCP trên môi trường thật có điều kiện chứng minh Payment tạo đúng một bản ghi cấu hình thanh toán cho đơn vị thuê bao. Vì Authorizer/Keycloak và User-Access vẫn được đại diện bằng đối tượng giả lập hợp đồng trong các chứng minh tự động hiện tại, báo cáo chỉ kết luận luồng khởi tạo đã có bằng chứng Saga đáng tin cậy ở mức cơ sở dữ liệu/Payment một phần trên môi trường thật, không gọi đây là kiểm chứng đầu-cuối đầy đủ trên môi trường thật.
 
-Ở Redis, evidence hiện tại cho thấy Redis được dùng với ownership theo domain: Order quản lý session/cart, Kitchen quản lý KDS queue, Catalog/BFF dùng cache menu theo contract, SaaS dùng tenant/subscription cache và Payment dùng OAuth state. Redis không được viết như source of truth chung cho tất cả domain. Với session/order/bill/payment/tenant, state bền vững vẫn nằm ở service database tương ứng.
+Các cơ chế tính lũy đẳng và tính nhất quán xuất hiện ở nhiều luồng khác. Giỏ dùng khóa phiên bản để tránh thay đổi lỗi thời. Gửi đơn dùng khóa tính lũy đẳng để tránh tạo đơn lặp. Webhook thanh toán xử lý trùng/thiếu và không hoàn tất hóa đơn nhiều lần. KDS khử trùng sự kiện trước khi tạo phiếu bếp. Các cơ chế này cho phép đánh giá tốt về tính nhất quán ở luồng lõi, dù hệ thống chưa khẳng định phân phối exactly-once, củng cố Saga đầy đủ hoặc CDC/Debezium.
 
-Ở WebSocket, các test và implementation đều ủng hộ mô hình hint/refetch. Client nhận event để invalidate query hoặc refetch snapshot; payload socket không được xem là state authoritative. Đây là một quyết định kiến trúc an toàn vì realtime channel có thể mất kết nối, nhận event trễ hoặc bỏ lỡ event. WebSocket cải thiện độ trễ nhận biết UI, còn correctness vẫn dựa vào service owner và API snapshot.
+\section{Kiểm chứng phân quyền, cô lập đơn vị thuê bao và quyền theo gói}
 
-Ở tenant isolation, kiến trúc có cơ sở tốt: tenantId nằm trong entity/query, guard chain, Redis key namespace, Kafka payload và WebSocket room. Tuy nhiên, hai P0 liên quan tenant isolation vẫn chưa được phủ đầy đủ ở live API gate. Do đó, kiến trúc được đánh giá là có invariant thiết kế rõ, có unit/contract evidence đáng kể, nhưng cần representative seeded full-stack suite để chứng minh toàn bộ API surface.
+Bảo mật của QRTable có nhiều lớp: JWT/OIDC và RBAC cho nhân viên/chủ/quản trị, truy cập theo phạm vi QR/phiên cho khách, TenantGuard cho ngữ cảnh đơn vị thuê bao trên yêu cầu, ma trận quyền cho vai trò/hành động và xác minh cho webhook/thanh toán. Bảng~\ref{tab:chapter4-auth-actor-model} và Bảng~\ref{tab:chapter4-security-control-layers} là cơ sở thiết kế để đánh giá các lớp này. Kết quả đánh giá tích cực nhất nằm ở chuỗi guard, dữ liệu quyền khởi tạo và hợp đồng webhook thanh toán. Khách không dùng Keycloak, nhưng đây là quyết định phù hợp với bối cảnh khách tại bàn và đã được bù bằng ranh giới QR/phiên.
 
-\section{Non-functional evaluation}
+Cô lập đơn vị thuê bao là yêu cầu quan trọng hơn mức kiểm thử hiện tại. Thiết kế đã đưa ngữ cảnh đơn vị thuê bao vào API, cơ sở dữ liệu, Redis, nội dung sự kiện Kafka và phòng WebSocket. Tuy nhiên, một số cổng kiểm thử toàn ngăn xếp trên môi trường thật đại diện vẫn chưa đủ rộng. Do đó, Chương 6 chỉ kết luận rằng cô lập đơn vị thuê bao đã có cơ sở thiết kế và kiểm thử một phần, chưa kết luận toàn bộ bề mặt API đã được chứng minh dưới ngăn xếp BFF/Keycloak/cơ sở dữ liệu dịch vụ đã có dữ liệu gieo.
 
-Yêu cầu phi chức năng được đánh giá theo mức độ bằng chứng khác nhau. Bảng~\ref{tab:chapter6-nfr-evidence} tóm tắt trạng thái hiện tại.
+Quyền theo gói được thể hiện rõ nhất ở bảng điều khiển và báo cáo. Báo cáo của Owner và Manager phải đi qua quyền \texttt{report.read\_own}, ngữ cảnh đơn vị thuê bao và tính năng trong gói thuê bao. Nếu đơn vị thuê bao không có \texttt{analytics\_basic}, giao diện và API phải thể hiện trạng thái bị khóa hoặc bị từ chối. Super Admin dùng quyền \texttt{report.read\_any} để xem phân tích nền tảng và khoan sâu theo đơn vị thuê bao, không bị giới hạn bởi gói của đơn vị thuê bao đang được quan sát. Điểm này phân biệt RBAC theo vai trò với quyền theo gói dịch vụ.
+
+\section{Đánh giá kiến trúc và khả năng bảo trì}
+
+Kiểm chứng kiến trúc trả lời câu hỏi hệ thống có giữ đúng các rào cản kiến trúc đã thiết kế hay không. Với QRTable, các rào cản quan trọng gồm: BFF là điểm vào cho ứng dụng phía người dùng, chủ dịch vụ sở hữu cơ sở dữ liệu của mình, thư viện dùng chung không được dùng để truy cập chéo dữ liệu, chủ đề Kafka phải đến từ sổ đăng ký, khóa Redis phải có chủ sở hữu rõ ràng, WebSocket chỉ là gợi ý/tải lại và ngữ cảnh đơn vị thuê bao phải đi qua API/dịch vụ/bộ nhớ đệm/sự kiện/thời gian thực.
+
+Ở ranh giới dịch vụ và quyền sở hữu dữ liệu, bằng chứng mạnh nhất đến từ Bảng~\ref{tab:chapter4-data-ownership-schema}, Bảng~\ref{tab:chapter5-implemented-evidence} và cấu trúc mã nguồn. Catalog sở hữu thực đơn, bàn và tồn kho; Order sở hữu phiên, giỏ, đơn và hóa đơn; Payment sở hữu bản ghi thanh toán và cấu hình; SaaS sở hữu đơn vị thuê bao và thuê bao; Kitchen sở hữu hàng đợi Redis khi vận hành. Các sơ đồ trình tự Hình~\ref{fig:chapter5-qr-ordering-session}--\ref{fig:chapter5-saas-onboarding-saga} cho thấy các tương tác liên dịch vụ đi qua TCP/Kafka thay vì truy cập cơ sở dữ liệu trực tiếp. Đây là cơ sở để đánh giá kiến trúc microservices của QRTable là có kiểm soát, không chỉ là chia thư mục theo tên dịch vụ.
+
+Ở giao tiếp liên dịch vụ, Bảng~\ref{tab:chapter4-communication-matrix} cho thấy TCP/gRPC, Kafka, WebSocket và bộ chuyển webhook được dùng theo vai trò khác nhau. Riêng Kafka, sổ đăng ký hiện tại công nhận năm chủ đề lõi đã trình bày trong Bảng~\ref{tab:chapter4-kafka-topic-registry}. Kiểm thử hợp đồng kiến trúc bảo vệ sổ đăng ký này và ngăn một số sự kiện chưa thuộc phạm vi bị dùng sai. Điều này giúp QRTable giữ đúng quan điểm hướng sự kiện có chọn lọc: Kafka dùng cho sự kiện miền nghiệp vụ bất đồng bộ hoặc phát tán, không dùng thay cho mọi lệnh/truy vấn.
+
+Ở Redis, minh chứng hiện tại cho thấy Redis được dùng với quyền sở hữu theo miền: Order quản lý phiên/giỏ, Kitchen quản lý hàng đợi KDS, Catalog/BFF dùng bộ nhớ đệm thực đơn theo hợp đồng, SaaS dùng bộ nhớ đệm đơn vị thuê bao/thuê bao và Payment dùng trạng thái OAuth. Redis không được viết như nguồn sự thật chung cho tất cả miền. Với phiên/đơn/hóa đơn/thanh toán/đơn vị thuê bao, trạng thái bền vững vẫn nằm ở cơ sở dữ liệu dịch vụ tương ứng.
+
+Khả năng bảo trì được đánh giá bằng phân tích kịch bản thay vì số liệu năng suất. Nếu thêm một phương thức thanh toán mới, phần thay đổi chính nằm ở dịch vụ Payment, tuyến/DTO BFF, cấu hình thanh toán theo đơn vị thuê bao và giao diện cấu hình thanh toán; Catalog và Kitchen không cần đổi cơ sở dữ liệu. Nếu thêm bộ tiêu thụ Kafka cho một sự kiện miền đã có, thay đổi nằm ở bộ tiêu thụ mới và hợp đồng chủ đề, không buộc bộ phát chờ tác dụng phụ đồng bộ. Nếu thêm vai trò/quyền mới, thay đổi tập trung ở ma trận quyền, User-Access/guard và bảo vệ tuyến giao diện. Monorepo Nx và hợp đồng dùng chung hỗ trợ bảo trì, nhưng không được dùng như lý do để phá vỡ ranh giới dịch vụ.
+
+\section{Đánh giá hiệu năng và khả năng mở rộng ở mức thiết kế}
+
+QRTable chưa có số liệu định lượng như độ trễ p50/p95/p99, thông lượng, tỉ lệ lỗi hoặc mức sử dụng tài nguyên. Vì vậy, báo cáo không đưa ra bất kỳ con số đo chuẩn nào và không so sánh microservices với monolith giả định. Một so sánh như vậy chỉ có giá trị khi có monolith đường cơ sở tương đương về quy tắc nghiệp vụ, cơ sở dữ liệu, bộ nhớ đệm, xác thực, thanh toán, KDS, tài nguyên triển khai và dữ liệu đo.
+
+Những gì có thể kết luận là thiết kế hỗ trợ các điểm tối ưu hợp lý: BFF có thể mở rộng theo đường biên không trạng thái, Redis hỗ trợ đường xử lý nóng phiên/giỏ/KDS/bộ nhớ đệm thực đơn, Kafka tách tác dụng phụ bất đồng bộ, và ranh giới dịch vụ cho phép mở rộng các ngữ cảnh như Order, Kitchen hoặc Payment theo nhu cầu khác nhau. Phòng Socket.IO theo đơn vị thuê bao/phiên giúp giảm phạm vi phát sự kiện, còn WebSocket chỉ là gợi ý/tải lại nên tính đúng không phụ thuộc vào độ tin cậy tuyệt đối của kênh thời gian thực.
+
+Một kế hoạch đo lường đầy đủ nên bao gồm tải thực đơn QR, thay đổi giỏ, gửi đơn, xác nhận nhân viên/trừ tồn kho, lan truyền KDS, hoàn tất webhook thanh toán, độ trễ gợi ý WebSocket và mức sử dụng tài nguyên PostgreSQL/Redis/Kafka. Nếu có số đo triển khai thử trong tương lai, chúng chỉ nên được trình bày như số đo vận hành thử nghiệm có giới hạn, không dùng để khẳng định microservices nhanh hơn monolith.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.19\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}}
-  \caption{Architecture/NFR evidence status của QRTable.}
+  \caption{Trạng thái bằng chứng kiến trúc và yêu cầu phi chức năng.}
   \label{tab:chapter6-nfr-evidence}\\
   \toprule
-  Thuộc tính / claim & Evidence hiện có & Trạng thái đánh giá & Cách diễn đạt an toàn \\
+  Thuộc tính / kết luận & Bằng chứng hiện có & Trạng thái đánh giá & Cách diễn đạt an toàn \\
   \midrule
   \endfirsthead
   \toprule
-  Thuộc tính / claim & Evidence hiện có & Trạng thái đánh giá & Cách diễn đạt an toàn \\
+  Thuộc tính / kết luận & Bằng chứng hiện có & Trạng thái đánh giá & Cách diễn đạt an toàn \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  Tenant isolation & TenantGuard, \texttt{tenant\_id}, tenant-aware Redis/event/room, một số test tenant. & Một phần & Có invariant thiết kế và test một phần; chưa claim toàn bộ live API surface đã được chứng minh. \\
-  Authentication/RBAC & Keycloak/JWT cho staff/admin, SessionGuard cho customer, six-role permission seed. & Mạnh & Guard chain và permission seed đã được kiểm chứng ở mức unit/contract/smoke. \\
-  Payment security & QR token, webhook secret/HMAC, secret redaction, duplicate/underpaid handling. & Mạnh ở unit/contract & Không claim live SePay production validation nếu chưa chạy provider thật. \\
-  Consistency/idempotency & Cart version, submit idempotency, stock deduct/release, payment finalization, duplicate webhook. & Mạnh cho core flows & Đánh giá tốt cho core flows; không claim exactly-once hoặc CDC hoàn chỉnh. \\
-  Realtime feedback & WebSocket hint/refetch, KDS/customer hooks, realtime E2E. & Mạnh & WebSocket giảm độ trễ nhận biết UI nhưng không là source of truth. \\
-  Maintainability & Nx monorepo, service ownership, shared contracts, architecture tests. & Mạnh ở mức kiến trúc & Đánh giá bằng scenario và code structure, không gán số liệu năng suất. \\
-  Scalability & Service boundaries, Kafka consumer group, Redis cache/queue, Socket.IO room model. & Hỗ trợ bởi thiết kế & Chỉ claim hỗ trợ mở rộng ở mức kiến trúc; chưa có load/stress test. \\
-  Performance efficiency & Chưa có benchmark throughput/latency được ghi nhận. & Chưa đo định lượng & Không tạo số; đề xuất metric và load test cho hướng phát triển. \\
-  Observability/deployment & Docker/Grafana/Loki/Prometheus/Tempo có trong docs/compose, thiếu artifact dashboard/trace đầy đủ. & Giới hạn & Chỉ viết demo-limited hoặc hướng hoàn thiện, không production-grade. \\
-  Offline resilience & Reconnect/refetch UI có evidence, full offline action queue chưa có. & Giới hạn & Đánh giá reconnect/refetch; offline-first write queue là hướng phát triển. \\
+  Cô lập đơn vị thuê bao & TenantGuard, \texttt{tenant\_id}, Redis/sự kiện/phòng nhận biết đơn vị thuê bao, một số kiểm thử đơn vị thuê bao. & Một phần & Có bất biến thiết kế và kiểm thử một phần; chưa khẳng định toàn bộ bề mặt API trên môi trường thật đã được chứng minh. \\
+  Xác thực/RBAC & Keycloak/JWT cho nhân viên/quản trị, SessionGuard cho khách, dữ liệu khởi tạo cho sáu vai trò. & Mạnh & Chuỗi guard và dữ liệu quyền khởi tạo đã được kiểm chứng ở mức đơn vị/hợp đồng/khói. \\
+  Quyền báo cáo theo gói & \texttt{report.read\_own}, \texttt{report.read\_any}, PlanFeatureGuard và trạng thái khóa giao diện. & Mạnh ở mã/kiểm thử & Chỉ gọi đã minh họa trên trình duyệt khi có ảnh chụp hoặc kết quả kiểm thử khói thật. \\
+  Bảo mật thanh toán & Token QR, bí mật webhook/HMAC, che bí mật, xử lý trùng/thiếu. & Mạnh ở đơn vị/hợp đồng & Không khẳng định kiểm chứng SePay thật ở mức vận hành thực tế nếu chưa chạy nhà cung cấp thật. \\
+  Nhất quán/tính lũy đẳng & Phiên bản giỏ, tính lũy đẳng gửi đơn, trừ/hoàn tồn kho, hoàn tất thanh toán, webhook trùng. & Mạnh cho luồng lõi & Đánh giá tốt cho luồng lõi; không khẳng định exactly-once hoặc CDC hoàn chỉnh. \\
+  Phản hồi gần thời gian thực & WebSocket gợi ý/tải lại, cơ chế kết nối giao diện KDS/khách, kiểm thử đầu-cuối gần thời gian thực. & Mạnh & WebSocket giảm độ trễ nhận biết giao diện nhưng không là nguồn sự thật. \\
+  Khả năng bảo trì & Monorepo Nx, quyền sở hữu dịch vụ, hợp đồng dùng chung, kiểm thử kiến trúc. & Mạnh ở mức kiến trúc & Đánh giá bằng kịch bản và cấu trúc mã, không gán số liệu năng suất. \\
+  Khả năng mở rộng & Ranh giới dịch vụ, nhóm bộ tiêu thụ Kafka, bộ nhớ đệm/hàng đợi Redis, mô hình phòng Socket.IO. & Hỗ trợ bởi thiết kế & Chỉ khẳng định hỗ trợ mở rộng ở mức kiến trúc; chưa có kiểm thử tải/áp lực. \\
+  Hiệu quả hiệu năng & Chưa có thông lượng/độ trễ đo chuẩn được ghi nhận. & Chưa đo định lượng & Không tạo số; đề xuất chỉ số và kiểm thử tải cho hướng phát triển. \\
+  Quan sát/đóng gói triển khai & Docker/Grafana/Loki/Prometheus/Tempo có trong tài liệu/compose, thiếu minh chứng bảng điều khiển/truy vết đầy đủ. & Giới hạn & Chỉ viết ở mức minh họa hoặc hướng hoàn thiện, không đạt mức vận hành thực tế. \\
+  Khả năng chịu lỗi ngoại tuyến & Kết nối lại/tải lại giao diện có minh chứng, hàng đợi thao tác ngoại tuyến đầy đủ chưa có. & Giới hạn & Đánh giá kết nối lại/tải lại; hàng đợi ghi ngoại tuyến là hướng phát triển. \\
 \end{longtable}
 }
 
-\subsection{Security và tenant isolation}
+\section{Kiểm chứng triển khai vận hành thực tế/triển khai thử}
 
-Security của QRTable có nhiều lớp: JWT/OIDC và RBAC cho staff/owner/admin, QR/session scoped access cho customer, TenantGuard cho request tenant context, permission matrix cho role/action và verification cho webhook/payment. Kết quả đánh giá tích cực nhất nằm ở guard chain, permission seed và payment webhook contract. Customer không dùng Keycloak, nhưng điều này không phải thiếu sót; đó là quyết định phù hợp với bối cảnh khách tại bàn và đã được bù bằng QR/session boundary.
+Đóng gói và triển khai thử được xem như một lớp minh chứng riêng, không phải bằng chứng tự động thay cho kiểm thử. Khung kiểm chứng tối thiểu gồm: BFF, Customer PWA và Management App truy cập được qua URL/tên miền thật; HTTPS/TLS nếu môi trường hỗ trợ; các dịch vụ chính chạy ngoài môi trường phát triển cục bộ; PostgreSQL, Redis, Kafka và Keycloak được cấu hình; đường gọi lại webhook SePay công khai nếu minh họa thanh toán với nhà cung cấp thật; kiểm tra sức khỏe/kiểm thử khói chạy thành công; và ít nhất một luồng lõi chạy được từ phiên QR đến đơn, KDS và thanh toán.
 
-Tenant isolation là yêu cầu quan trọng hơn mức test hiện tại. Thiết kế đã đưa tenant context vào API, database, Redis, Kafka payload và WebSocket room. Tuy nhiên, hai gate live-stack đại diện vẫn chưa đủ rộng. Do đó, Chương 6 chỉ kết luận rằng tenant isolation đã có cơ sở thiết kế và kiểm thử một phần, chưa kết luận toàn bộ API surface đã được chứng minh dưới seeded BFF/Keycloak/service database stack.
-
-\subsection{Reliability, consistency và idempotency}
-
-Reliability của QRTable được thể hiện rõ ở các flow có nguy cơ duplicate hoặc race condition. Cart dùng version lock để tránh stale mutation. Submit order dùng idempotency key để tránh tạo order lặp. Staff confirm order chỉ deduct stock qua Catalog owner và có rollback khi lỗi. Payment webhook xử lý duplicate/underpaid và không finalize bill nhiều lần. KDS dedupe event trùng trước khi tạo ticket. Các cơ chế này cho phép đánh giá tốt về consistency ở core flows, dù hệ thống chưa claim exactly-once delivery, full saga hardening hoặc CDC/Debezium.
-
-\subsection{Maintainability và modifiability}
-
-Maintainability không nên đo bằng một con số thời gian phản hồi hoặc số dòng code. Với QRTable, cách đánh giá phù hợp hơn là scenario analysis. Nếu thêm một payment method mới, phần thay đổi chính nằm ở Payment service, BFF route/DTO, tenant payment settings và UI payment settings; Catalog và Kitchen không cần đổi database. Nếu thêm Kafka consumer cho một domain event đã có, thay đổi nằm ở consumer mới và topic contract, không buộc producer chờ side effect đồng bộ. Nếu thêm role/permission mới, thay đổi tập trung ở permission matrix, User-Access/guard và UI route protection.
-
-Nx monorepo và shared libraries hỗ trợ modifiability bằng cách gom contract dùng chung như constants, DTO, guard, provider token, shared type và UI utilities. Tuy nhiên, monorepo không được dùng như lý do để import repository giữa service. Chính sự kết hợp giữa shared contract và service boundary mới là điểm mạnh về bảo trì của QRTable.
-
-\subsection{Performance efficiency và scalability}
-
-Performance efficiency hiện chưa có số liệu định lượng như p50/p95/p99 latency, throughput, error rate hoặc resource usage. Vì vậy, báo cáo không đưa ra bất kỳ con số benchmark nào. Những gì có thể kết luận là thiết kế hỗ trợ các điểm tối ưu hợp lý: BFF có thể scale theo stateless edge path, Redis hỗ trợ hot path session/cart/KDS/menu cache, Kafka tách side effect bất đồng bộ, và service boundary cho phép scale các bounded context như Order, Kitchen hoặc Payment theo nhu cầu khác nhau.
-
-Scalability vì vậy chỉ được đánh giá ở mức kiến trúc. QRTable có cơ sở thiết kế cho mở rộng từng phần, nhưng chưa chứng minh chịu tải lớn bằng load test. Một kế hoạch đo lường đầy đủ nên bao gồm QR menu load, cart mutation, order submit, staff confirm/stock deduction, KDS propagation, payment webhook finalization, WebSocket hint latency và resource usage của PostgreSQL/Redis/Kafka.
-
-\subsection{Observability và deployment}
-
-QRTable có tài liệu và compose stack cho Docker, Grafana, Loki, Prometheus và Tempo, nhưng chưa có artifact đầy đủ chứng minh dashboard, trace walkthrough, alert rule hoặc runbook production. Vì vậy, deployment/observability chỉ được đánh giá là nền tảng demo-limited hoặc hướng vận hành cần hoàn thiện. Báo cáo không claim high availability, production-grade monitoring hoặc chaos engineering.
-
-\section{Demo và artifact validation}
-
-Artifact demo hiện có giá trị minh họa nhưng chưa thay thế được traceability/test evidence. Sequence diagram ở Chương 5 đã được render, chèn vào LaTeX và kiểm tra trong PDF; các bảng implementation evidence cũng đã được build. Đây là artifact kỹ thuật phục vụ lập luận của khóa luận.
-
-Đối với UI screenshot, bản nháp hiện tại chỉ xem ảnh giao diện là bằng chứng khi đó là ảnh chụp thật từ môi trường demo hoặc kiểm thử. Placeholder trắng chỉ là khung kỹ thuật để LaTeX build được, không phải demo evidence. Vì vậy, Chương 6 không dùng screenshot placeholder để chứng minh Customer PWA, POS, KDS hoặc dashboard đã được demo đầy đủ. Khi ảnh thật được bổ sung, chúng nên đi kèm caption, source, flow liên quan và nếu có thể là commit/test command hoặc demo script tương ứng.
-
-Đối với command output, baseline đáng tin cậy nhất là default Nx unit/contract gate. Các opt-in command cần Redis, PostgreSQL, Payment TCP, Keycloak, provider credential hoặc browser stack phải được ghi riêng để người đọc không nhầm chúng là CI gate mặc định. Với live SePay, mọi validation phải được guarded bằng credential và public callback; nếu chưa chạy, không đưa vào kết quả.
+Ở thời điểm chưa có hiện vật vận hành thực tế/triển khai thử thật, chương này chỉ ghi phương pháp và loại bằng chứng cần thu thập. Không dùng ảnh chụp cục bộ/môi trường phát triển như minh chứng vận hành thực tế. Khi có hiện vật, có thể cập nhật kết luận an toàn theo hướng: hệ thống đã được triển khai trên môi trường vận hành thực tế/triển khai thử để kiểm chứng khả năng đóng gói, cấu hình và vận hành các dịch vụ chính. Ngay cả khi triển khai thử chạy được, báo cáo vẫn không nên viết rằng hệ thống đã sẵn sàng vận hành thực tế nếu chưa có tính sẵn sàng cao, sao lưu/phục hồi, kiểm thử tải, quy tắc cảnh báo, sổ tay vận hành và tự động hoàn tác.
 
 \section{Giới hạn của quá trình đánh giá}
 
@@ -229,23 +215,24 @@ Những giới hạn hiện tại không làm mất giá trị của hệ thốn
   \endhead
   \bottomrule
   \endfoot
-  Chưa có benchmark throughput/latency/stress test. & Traceability không ghi nhận benchmark được chấp nhận. & Không claim performance/scalability dưới tải lớn. & Thiết kế load test cho QR join, submit order, KDS queue và payment webhook. \\
-  Live tenant A/B API isolation chưa phủ rộng. & Một số P0 tenant/RBAC gate còn cần seeded BFF/Keycloak/service DB stack. & Tenant isolation được đánh giá mạnh ở design/unit, một phần ở live-stack. & Chuẩn hóa fixture và chạy representative cross-tenant API suite. \\
-  SaaS onboarding chưa có full live Authorizer/Keycloak/User-Access harness. & Live Payment TCP slice có bằng chứng, nhưng identity/profile còn dùng contract doubles ở một số flow. & Không gọi onboarding là fully E2E live validated. & Bổ sung full multi-service onboarding test với Keycloak, User-Access, Payment TCP và outbox. \\
-  Pending-bill exception khi tenant suspended chưa có browser proof đầy đủ. & Cần deterministic suspended tenant/session/bill fixture. & Suspended tenant behavior chỉ được đánh giá một phần. & Tạo E2E fixture cho pending-bill payment exception. \\
-  Live SePay provider validation không chạy mặc định. & Cần \texttt{RUN\_LIVE\_SEPAY}, credentials và public callback. & Không claim production live provider validation. & Dùng local mock cho regression và checklist live provider riêng trước demo. \\
-  Full offline action queue chưa implement. & Hiện có reconnect/refetch, chưa có IndexedDB action queue. & Không claim offline-first write queue. & Thiết kế action queue, conflict resolver và background sync. \\
-  Observability/deployment production-grade thiếu artifact runtime. & Thiếu dashboard/trace/log proof và runbook đầy đủ. & Không claim HA hoặc production-ready observability. & Chuẩn hóa deployment package, health-check runbook và dashboard evidence. \\
-  Notification/email nằm ngoài phạm vi đánh giá chính. & Các flow cốt lõi được đánh giá không phụ thuộc email giao dịch. & Không dùng email receipt/welcome email làm kết quả. & Có thể tích hợp Notification service hoặc SMTP/provider nếu phạm vi mở rộng. \\
+  Chưa có đo thông lượng/độ trễ/kiểm thử áp lực. & Truy vết không ghi nhận đo chuẩn được chấp nhận. & Không khẳng định hiệu năng/khả năng mở rộng dưới tải lớn. & Thiết kế kiểm thử tải cho tham gia QR, gửi đơn, hàng đợi KDS và webhook thanh toán. \\
+  Cô lập API A/B đơn vị thuê bao trên môi trường thật chưa phủ rộng. & Một số cổng P0 đơn vị thuê bao/RBAC còn cần ngăn xếp BFF/Keycloak/cơ sở dữ liệu dịch vụ đã có dữ liệu gieo. & Cô lập đơn vị thuê bao mạnh ở thiết kế/đơn vị, một phần ở ngăn xếp thật. & Chuẩn hóa bộ dữ liệu kiểm thử và chạy bộ kiểm thử API liên đơn vị thuê bao đại diện. \\
+  Khởi tạo SaaS chưa có bộ kiểm thử trên môi trường thật đầy đủ Authorizer/Keycloak/User-Access. & Lát cắt Payment TCP trên môi trường thật có bằng chứng, nhưng định danh/hồ sơ còn dùng đối tượng giả lập ở một số luồng. & Không gọi khởi tạo là đã kiểm chứng đầu-cuối đầy đủ trên môi trường thật. & Bổ sung kiểm thử khởi tạo đa dịch vụ với Keycloak, User-Access, Payment TCP và outbox. \\
+  Ngoại lệ hóa đơn chờ khi đơn vị thuê bao tạm ngưng chưa có minh chứng trình duyệt đầy đủ. & Cần bộ dữ liệu xác định cho đơn vị thuê bao/phiên/hóa đơn tạm ngưng. & Hành vi tạm ngưng chỉ được đánh giá một phần. & Tạo bộ dữ liệu kiểm thử đầu-cuối cho ngoại lệ thanh toán hóa đơn chờ. \\
+  Bảng điều khiển/báo cáo còn thiếu minh chứng minh họa thật. & Mã/kiểm thử đã có, nhưng ảnh chụp/kết quả trình duyệt chưa được chốt làm minh chứng. & Chỉ khẳng định quyền/quyền theo gói ở mức mã/kiểm thử; minh họa giao diện cần bổ sung. & Chụp bảng điều khiển Owner/Manager, phân tích Super Admin và trạng thái khóa giao diện bằng môi trường minh họa thật. \\
+  Kiểm chứng nhà cung cấp SePay thật không chạy mặc định. & Cần \texttt{RUN\_LIVE\_SEPAY}, thông tin xác thực và đường gọi lại công khai. & Không khẳng định kiểm chứng nhà cung cấp thật ở mức vận hành thực tế. & Dùng mô phỏng cục bộ cho hồi quy và danh sách kiểm tra nhà cung cấp thật riêng trước minh họa. \\
+  Hàng đợi thao tác ngoại tuyến đầy đủ chưa hiện thực. & Hiện có kết nối lại/tải lại, chưa có hàng đợi IndexedDB. & Không khẳng định hàng đợi ghi ngoại tuyến ưu tiên. & Thiết kế hàng đợi thao tác, bộ giải quyết xung đột và đồng bộ nền. \\
+  Quan sát/đóng gói đạt mức vận hành thực tế thiếu hiện vật khi chạy. & Thiếu minh chứng bảng điều khiển/truy vết/nhật ký và sổ tay đầy đủ. & Không khẳng định tính sẵn sàng cao hoặc quan sát đạt mức vận hành thực tế. & Chuẩn hóa gói triển khai, sổ tay kiểm tra sức khỏe và minh chứng bảng điều khiển. \\
+  Thông báo/email nằm ngoài phạm vi đánh giá chính. & Các luồng cốt lõi được đánh giá không phụ thuộc email giao dịch. & Không dùng email biên nhận hoặc email chào mừng làm kết quả. & Có thể tích hợp dịch vụ thông báo hoặc SMTP/nhà cung cấp nếu phạm vi mở rộng. \\
 \end{longtable}
 }
 
 \section{Thảo luận kết quả}
 
-Kết quả đánh giá cho thấy hướng tiếp cận SaaS POS tích hợp QR ordering theo kiến trúc microservices có chọn lọc là phù hợp với bài toán QRTable. Các flow cốt lõi đã có evidence theo traceability: customer có thể đi từ QR session đến shared cart/order; staff có thể xác nhận order mà vẫn giữ stock consistency ở Catalog; Kitchen có thể nhận ticket qua event và Redis runtime queue; Payment có thể xử lý settlement và duplicate webhook ở mức code/test; SaaS có baseline cho tenant lifecycle, subscription và onboarding.
+Kết quả đánh giá cho thấy hướng tiếp cận SaaS POS tích hợp đặt món qua QR theo kiến trúc microservices có chọn lọc là phù hợp với bài toán QRTable. Các luồng cốt lõi đã có bằng chứng truy vết: khách có thể đi từ phiên QR đến giỏ chung/đơn; nhân viên có thể xác nhận đơn mà vẫn giữ nhất quán tồn kho ở Catalog; Kitchen có thể nhận phiếu bếp qua sự kiện và hàng đợi Redis khi vận hành; Payment có thể xử lý ghi nhận thanh toán và webhook trùng ở mức mã nguồn/kiểm thử; SaaS có đường cơ sở cho vòng đời đơn vị thuê bao, thuê bao và khởi tạo; bảng điều khiển/báo cáo đã phản ánh được quyền, ngữ cảnh đơn vị thuê bao và quyền theo gói.
 
-Về kiến trúc, QRTable giữ được các quyết định quan trọng: BFF là entry point, service owner giữ database/invariant, Kafka chỉ dùng cho domain event bất đồng bộ, Redis có ownership rõ, WebSocket là hint/refetch và customer không bị ép vào Keycloak. Những điểm này không chỉ là mô tả thiết kế ở Chương 4 mà đã có dấu vết triển khai và một số contract/static tests bảo vệ.
+Về kiến trúc, QRTable giữ được các quyết định quan trọng: BFF là điểm vào, chủ dịch vụ giữ cơ sở dữ liệu/bất biến, Kafka chỉ dùng cho sự kiện miền bất đồng bộ, Redis có quyền sở hữu rõ, WebSocket là gợi ý/tải lại và khách không bị ép vào Keycloak. Những điểm này không chỉ là mô tả thiết kế ở Chương 4 mà đã có dấu vết triển khai và một số kiểm thử hợp đồng/tĩnh bảo vệ.
 
-Tuy nhiên, các kết luận về tải lớn, vận hành production, live provider và tenant isolation toàn API surface vẫn phải để ngỏ. Chưa có benchmark định lượng nên không thể kết luận latency/throughput. Chưa có observability artifact đầy đủ nên không thể gọi hệ thống là production-grade. Chưa có live SePay automation nên không thể claim provider thật đã được validate tự động. Một số P0 full-stack gate còn chưa được phủ đầy đủ nên không thể nói toàn bộ P0 đã covered tuyệt đối.
+Tuy nhiên, các kết luận về tải lớn, vận hành thực tế, nhà cung cấp thật và cô lập đơn vị thuê bao trên toàn bộ bề mặt API vẫn phải để ngỏ. Chưa có đo định lượng nên không thể kết luận độ trễ/thông lượng. Chưa có hiện vật quan sát đầy đủ nên không thể gọi hệ thống đạt mức vận hành thực tế. Chưa có tự động hóa SePay trên môi trường thật nên không thể khẳng định nhà cung cấp thật đã được kiểm chứng tự động. Một số cổng P0 toàn ngăn xếp còn chưa được phủ đầy đủ nên không thể nói toàn bộ P0 đã được bao phủ tuyệt đối.
 
-Nhìn tổng thể, Chương 6 xác nhận QRTable đã đạt mức hoàn thiện đáng kể cho một khóa luận software engineering: có yêu cầu, thiết kế, implementation, traceability và evidence cho nhiều invariant quan trọng. Giá trị chính của kết quả không nằm ở việc claim hệ thống đã sẵn sàng production, mà ở việc chứng minh một kiến trúc và implementation có kiểm soát cho bài toán SaaS POS + QR ordering, đồng thời chỉ ra rõ những bước cần làm để chuyển từ prototype/khóa luận có kiểm chứng sang hệ thống vận hành thực tế.
+Nhìn tổng thể, Chương 6 xác nhận QRTable đã đạt mức hoàn thiện đáng kể cho một khóa luận kỹ thuật phần mềm: có yêu cầu, thiết kế, hiện thực, truy vết và bằng chứng cho nhiều bất biến quan trọng. Giá trị chính của kết quả không nằm ở việc khẳng định hệ thống đã sẵn sàng vận hành thực tế, mà ở việc chứng minh một kiến trúc và phần hiện thực có kiểm soát cho bài toán SaaS POS tích hợp đặt món qua QR, đồng thời chỉ ra rõ những bước cần làm để chuyển từ nguyên mẫu/khóa luận có kiểm chứng sang hệ thống vận hành thực tế.

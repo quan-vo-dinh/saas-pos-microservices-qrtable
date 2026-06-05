@@ -1,0 +1,140 @@
+Project QRTable_SaaS_Service {
+  database_type: 'PostgreSQL'
+  Note: 'DBML source for the SaaS service schema. Generated from TypeORM entities registered by the SaaS app. Importable into dbdiagram.io. User and payment provider references are external contracts, not cross-service foreign keys.'
+}
+
+Table tenants {
+  id uuid [pk]
+  name varchar(120) [not null]
+  slug varchar(120) [not null]
+  is_active boolean [not null, default: true]
+  status varchar(20) [not null, note: 'ACTIVE, SUSPENDED, CLOSED']
+  type varchar(30) [not null, note: 'RESTAURANT, CAFE, FOOD_COURT, PUB, OTHER']
+  owner_id uuid [note: 'External identity/profile reference. Not a DB foreign key.']
+  default_currency varchar(10) [not null, default: 'VND']
+  default_locale varchar(20) [not null, default: 'vi-VN']
+  operating_modes text [not null, note: 'PostgreSQL text array in code.']
+  suspended_at timestamptz
+  closed_at timestamptz
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'SaaS owns tenant lifecycle state.'
+
+  indexes {
+    slug [unique]
+    (status, created_at)
+  }
+}
+
+Table pricing_plans {
+  id uuid [pk]
+  code varchar(40) [not null]
+  name varchar(120) [not null]
+  billing_period varchar(20) [not null, default: 'MONTHLY']
+  price_vnd int [not null, default: 0]
+  max_tables int [not null, default: 0]
+  max_staff int [not null, default: 0]
+  max_orders_per_day int [not null, default: 0]
+  features jsonb [not null, note: 'Plan feature codes / entitlements.']
+  is_active boolean [not null, default: true]
+  display_order int [not null, default: 0]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Plan catalog for tenant entitlements and subscription pricing.'
+
+  indexes {
+    code [unique]
+    (is_active, display_order)
+  }
+}
+
+Table subscriptions {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  pricing_plan_id uuid [not null]
+  plan_code_snapshot varchar(40) [not null]
+  price_vnd_snapshot bigint [not null]
+  status varchar(20) [not null, note: 'ACTIVE, PENDING_PAYMENT, EXPIRED, CANCELED, SUPERSEDED']
+  starts_at timestamptz [not null]
+  expires_at timestamptz
+  superseded_by_subscription_id uuid
+  canceled_at timestamptz
+  expired_at timestamptz
+  source varchar(30) [not null, note: 'ADMIN_ASSIGN, INVOICE_PAID, INITIAL_ONBOARDING']
+  source_invoice_id uuid
+  created_by_user_id varchar(64) [note: 'External user reference. Not a DB foreign key.']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Current and historical subscriptions for a tenant.'
+
+  indexes {
+    (tenant_id, status)
+    (expires_at, status)
+  }
+}
+
+Table subscription_invoices {
+  id uuid [pk]
+  tenant_id uuid [not null]
+  pricing_plan_id uuid [not null]
+  plan_code_snapshot varchar(40) [not null]
+  amount_vnd bigint [not null]
+  billing_period varchar(20) [not null]
+  period_starts_at timestamptz [not null]
+  period_ends_at timestamptz [not null]
+  billing_reference varchar(32) [not null]
+  status varchar(20) [not null, note: 'PENDING, PAID, UNDERPAID, EXPIRED, CANCELED']
+  qr_url text
+  qr_expires_at timestamptz [not null]
+  paid_at timestamptz
+  paid_amount_vnd bigint
+  sepay_transaction_id bigint
+  sepay_reference_code varchar(120)
+  requested_by_user_id varchar(64) [not null, note: 'External user reference. Not a DB foreign key.']
+  manually_confirmed_by_user_id varchar(64) [note: 'External user reference. Not a DB foreign key.']
+  expired_at timestamptz
+  canceled_at timestamptz
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'SaaS owns platform subscription invoices with QRSUB payment references.'
+
+  indexes {
+    billing_reference [unique]
+    sepay_transaction_id [unique]
+    (tenant_id, status)
+  }
+}
+
+Table outbox_events {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  topic varchar(120) [not null]
+  event_type varchar(120) [not null]
+  aggregate_id uuid [not null, note: 'Tenant aggregate ID for tenant lifecycle events.']
+  partition_key varchar(128) [not null]
+  payload jsonb [not null]
+  status varchar(20) [not null, default: 'PENDING']
+  published_at timestamptz
+  attempt_count int [not null, default: 0]
+  last_error text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'SaaS outbox for tenant lifecycle and subscription events.'
+
+  indexes {
+    (status, created_at)
+  }
+}
+
+Ref: subscriptions.tenant_id > tenants.id
+Ref: subscriptions.pricing_plan_id > pricing_plans.id
+Ref: subscriptions.superseded_by_subscription_id > subscriptions.id
+Ref: subscriptions.source_invoice_id > subscription_invoices.id
+Ref: subscription_invoices.tenant_id > tenants.id
+Ref: subscription_invoices.pricing_plan_id > pricing_plans.id
+Ref: outbox_events.aggregate_id > tenants.id

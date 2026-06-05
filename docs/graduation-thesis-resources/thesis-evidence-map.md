@@ -228,9 +228,9 @@ Các mục đề xuất:
 4. Business state machines: table, session/order, bill/payment.
 5. Phạm vi loại trừ.
 
-### Chương 4. Thiết kế và kiến trúc hệ thống
+### Chương 4. Thiết kế kiến trúc và quyết định công nghệ cho QRTable
 
-Vai trò: Giải thích vì sao chọn kiến trúc hiện tại và các thành phần phối hợp với nhau như thế nào.
+Vai trò: Giải thích vì sao chọn kiến trúc/công nghệ hiện tại, các thành phần phối hợp với nhau như thế nào và những đánh đổi nào cần trình bày thận trọng.
 
 Nguồn nên dùng:
 
@@ -240,16 +240,19 @@ Nguồn nên dùng:
 
 Các mục đề xuất:
 
-1. Kiến trúc tổng thể.
-2. Tổ chức Nx monorepo.
-3. Service boundaries và data ownership.
-4. Chiến lược multi-tenancy.
-5. Thiết kế giao tiếp: HTTP, TCP, gRPC, Kafka, WebSocket.
-6. Kafka decision framework và topic registry.
-7. Thiết kế Redis/cache/session/KDS.
-8. Thiết kế security và RBAC.
-9. Kiến trúc payment với SePay/VietQR.
-10. Các trade-off kiến trúc quan trọng.
+1. Mục tiêu thiết kế và nguyên tắc kiến trúc.
+2. Lựa chọn công nghệ và vai trò trong QRTable.
+3. Kiến trúc tổng thể và bản đồ tích hợp công nghệ.
+4. Tổ chức Nx monorepo và ranh giới module.
+5. Service boundaries và data ownership.
+6. Chiến lược multi-tenancy.
+7. Thiết kế giao tiếp: HTTP, TCP, gRPC, Kafka, WebSocket và webhook.
+8. Kafka decision framework và topic registry.
+9. Redis/cache/session/KDS ownership.
+10. Security/RBAC và QR session.
+11. SePay/VietQR payment architecture.
+12. Kiến trúc payment với SePay/VietQR.
+13. Các trade-off kiến trúc quan trọng.
 
 ### Chương 5. Triển khai hệ thống
 

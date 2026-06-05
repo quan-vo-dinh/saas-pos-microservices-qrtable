@@ -4,7 +4,7 @@ flowchart TD
   Immediate{"Does the caller need<br/>an immediate domain response?"}
   Sync["Use TCP/gRPC command or query<br/>Examples: BFF to service, Order to Catalog stock,<br/>Payment to Order bill finalization"]
   Durable{"Is it a durable domain event<br/>with fan-out, recovery, or temporal decoupling?"}
-  Kafka["Use Kafka through approved topic registry<br/>order.confirmed, order.status_changed,<br/>payment.completed,<br/>kitchen.sla_warning, tenant.created"]
+  Kafka@{ icon: "logos:kafka-icon", form: "rounded", label: "Use Kafka through approved topic registry - 5 domain topics", pos: "t", h: 64 }
   UiOnly{"Is it only a UI notification,<br/>cache invalidation, or refetch hint?"}
   Direct["Use BFF Direct, Socket.IO,<br/>Redis internal hint, or normal refetch<br/>Do not add a Kafka topic"]
   Provider{"Is it an external provider callback<br/>or provider API operation?"}

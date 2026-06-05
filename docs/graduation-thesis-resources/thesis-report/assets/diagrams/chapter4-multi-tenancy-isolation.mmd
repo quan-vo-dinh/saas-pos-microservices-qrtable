@@ -18,10 +18,10 @@ flowchart TB
   end
 
   subgraph Isolation["Isolation mechanisms"]
-    Pg[("PostgreSQL service DBs<br/>tenant_id discriminator")]
-    RedisKeys[("Redis keys<br/>menu:{tenantId}, session:{tenantId}:{sessionId},<br/>cart:{tenantId}:{sessionId}, kds:{tenantId}:{station}")]
-    KafkaPayload[("Kafka payloads<br/>tenantId in approved domain events")]
-    WsRooms[("WebSocket rooms<br/>tenant:{id}:staff, tenant:{id}:kds:{station},<br/>session:{id}:customer")]
+    Pg@{ icon: "logos:postgresql", form: "rounded", label: "PostgreSQL service DBs - tenant_id discriminator", pos: "t", h: 60 }
+    RedisKeys@{ icon: "logos:redis", form: "rounded", label: "Redis keys - tenant-scoped cache/session/cart/KDS", pos: "t", h: 60 }
+    KafkaPayload@{ icon: "logos:kafka-icon", form: "rounded", label: "Kafka payloads - tenantId in approved events", pos: "t", h: 60 }
+    WsRooms@{ icon: "simple-icons:socketdotio", form: "rounded", label: "Socket.IO rooms - tenant/session scoped", pos: "t", h: 60 }
   end
 
   EventBoundary["Event boundary<br/>Order, Payment, Kitchen, SaaS produce approved events"]

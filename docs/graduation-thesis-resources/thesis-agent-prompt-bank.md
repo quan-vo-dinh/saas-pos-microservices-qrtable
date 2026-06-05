@@ -1,13 +1,13 @@
 # Prompt bank cho AI agent viết khóa luận QRTable
 
 > Tài liệu sống chứa prompt mẫu để khởi động các session mới mà không phụ thuộc vào trí nhớ của thread chat hiện tại.
-> Cập nhật gần nhất: 2026-06-01.
+> Cập nhật gần nhất: 2026-06-04.
 
 ## 1. Mục đích
 
 File này giúp người dùng mở một session AI mới và giao đúng phase con mà không cần viết lại toàn bộ bối cảnh. Mỗi prompt dưới đây cố tình ngắn hơn các prompt trao đổi ban đầu, vì agent mới phải đọc `thesis-workflow-plan.md` và các tài liệu liên quan trong repo để lấy context chi tiết.
 
-Ghi chú 2026-06-01: prompt bank có "Phase 4D" thuộc workflow khóa luận, nghĩa là artifact coverage cho Chương 3. Không nhầm với **technical Phase 4D Dashboard & Reporting** trong `docs/phases/phase-4d-dashboard-reporting.md`. Khi cần backfill dashboard/reporting vào report, tạo session riêng dựa trên note trong `thesis-workflow-plan.md`, không dùng prompt Phase 4D Chương 3 bên dưới.
+Ghi chú 2026-06-04: prompt bank có "Phase 4D" thuộc workflow khóa luận, nghĩa là artifact coverage cho Chương 3. Không nhầm với **technical Phase 4D Dashboard & Reporting** trong `docs/phases/phase-4d-dashboard-reporting.md`. Prompt riêng `docs/graduation-thesis-resources/chapter-03-requirement-sync-prompt.md` đã được dùng để đồng bộ Chương 3 cùng ngày; từ đây xem nó như record/handoff tham khảo, không phải next step mặc định. Lượt polish Chương 4 P0/P1 cũng đã được thực thi; `chapter-04-architecture-polish-spec.md` và `chapter-04-architecture-polish-plan.md` chỉ dùng lại nếu có yêu cầu chỉnh sâu Chương 4.
 
 Nguyên tắc:
 
@@ -172,7 +172,7 @@ Cuối session, cập nhật workflow plan; next step là Phase 4C.
 ## 8. Prompt Phase 4C: Draft Chương 4
 
 ```md
-Tiếp tục Phase 4C: Draft Chương 4 - Thiết kế và kiến trúc hệ thống.
+Tiếp tục Phase 4C: Draft Chương 4 - Thiết kế kiến trúc và quyết định công nghệ cho QRTable.
 
 Mục tiêu duy nhất là viết bản nháp Chương 4 vào `thesis-report/chapters/04-thiet-ke-va-kien-truc-he-thong.tex` dựa trên audit Phase 4A và diagram Phase 4B.
 
@@ -187,6 +187,38 @@ Yêu cầu:
 Verification: build LaTeX từ `thesis-report/`.
 
 Cuối session, cập nhật workflow plan; next step là Phase 4D.
+```
+
+## 8A. Prompt polish Chương 4 theo spec mới
+
+> Trạng thái 2026-06-04: Prompt này đã được thực thi cả P0 và nhóm diagram con P1 đã chốt. Chỉ dùng lại prompt này nếu cần chỉnh sâu Chương 4 sau khi có yêu cầu mới.
+
+```md
+Tiếp tục task polish Chương 4 - Thiết kế kiến trúc và quyết định công nghệ cho QRTable.
+
+Mục tiêu duy nhất là cập nhật Chương 4 theo `docs/graduation-thesis-resources/chapter-04-architecture-polish-spec.md` và `docs/graduation-thesis-resources/chapter-04-architecture-polish-plan.md`. Đây là tài liệu khóa luận, không phải implementation plan trong `docs/superpowers/`.
+
+Trước khi làm:
+
+- Dùng CodeGraph trước để kiểm tra codebase state.
+- Đọc `thesis-workflow-plan.md`, `chapter-04-architecture-polish-spec.md`, `chapter-04-architecture-polish-plan.md`, `chapter-04-architecture-evidence.md`, `thesis-artifact-backlog.md`, `thesis-official-outline.md`, Chương 4 LaTeX hiện tại, `docs/technical-architecture.md`, `docs/business-logic.md`, `docs/architecture/permission-matrix.md`, `docs/phases/phase-4d-dashboard-reporting.md` và SePay guide.
+- Nếu viết claim cụ thể về library/framework/API/cloud, dùng `ctx7` trước.
+
+Output mong muốn:
+
+- Chương 4 có tên chương/tên mục được polish.
+- Có phần lựa chọn công nghệ theo architecture driver và trade-off.
+- Có technology integration map cho QRTable, dùng icon/logo có nguồn hoặc placeholder vector trung tính.
+- Diagram source nằm trong `thesis-report/assets/diagrams/`, rendered figures nằm trong `thesis-report/assets/figures/`.
+- Artifact backlog, evidence/outline/workflow được cập nhật theo trạng thái thật.
+
+Không làm:
+
+- Không sửa Chương 3.
+- Không biến hình thành logo gallery.
+- Không thêm Notification Service, Kafka topic ngoài 5 topic approved, customer Keycloak, production-grade observability/deployment claim hoặc citation giả.
+
+Verification: build LaTeX từ `thesis-report/` bằng XeLaTeX/TeX Live và kiểm tra danh mục hình/bảng nếu có artifact mới.
 ```
 
 ## 9. Prompt Phase 4D: Artifact coverage bổ sung cho Chương 3

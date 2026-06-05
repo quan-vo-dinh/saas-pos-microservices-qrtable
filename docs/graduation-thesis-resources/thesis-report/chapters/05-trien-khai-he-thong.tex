@@ -1,218 +1,153 @@
-\chapter{Triển khai hệ thống}
+\chapter{Hiện thực các luồng vận hành cốt lõi của QRTable}
 
-Chương này trình bày cách QRTable được hiện thực hóa từ thiết kế kiến trúc ở Chương 4 thành các service, ứng dụng frontend và flow runtime cụ thể. Trọng tâm của chương không phải là hướng dẫn sử dụng hệ thống hay liệt kê toàn bộ source code, mà là chứng minh các quyết định kỹ thuật quan trọng đã có dấu vết triển khai trong code, tài liệu và test/evidence hiện có.
+Chương này trình bày cách QRTable được hiện thực từ thiết kế ở Chương 4 thành các luồng vận hành có thể kiểm chứng. Trọng tâm của chương không phải là hướng dẫn sử dụng hệ thống, cũng không phải liệt kê lớp, hàm hoặc cây thư mục mã nguồn. Thay vào đó, chương chọn các luồng đại diện để chứng minh rằng các quyết định về ranh giới dịch vụ, quyền sở hữu dữ liệu, cô lập đơn vị thuê bao (tenant isolation), tính lũy đẳng (idempotency), Saga, Redis, Kafka và WebSocket đã có dấu vết triển khai trong hệ thống.
 
-Các flow được chọn trong chương là những flow đại diện cho giá trị cốt lõi của đề tài: khách quét QR và dùng shared cart, staff xác nhận order và bảo toàn stock, Kitchen Display System nhận ticket theo event, settlement cash/VietQR qua Payment service, và onboarding tenant theo mô hình SaaS. Năm sequence diagram đã được dùng như artifact runtime để nối Chương 4 với implementation thực tế; các bảng cuối chương tổng hợp lại evidence theo feature và theo shared library.
+Các luồng được chọn gồm: khách quét QR và dùng giỏ món chung; nhân viên xác nhận đơn và bảo toàn tồn kho; màn hình bếp Kitchen Display System (KDS) nhận phiếu bếp từ sự kiện; ghi nhận thanh toán tiền mặt/VietQR/SePay; khởi tạo đơn vị thuê bao theo mô hình SaaS; bảng điều khiển và báo cáo theo gói dịch vụ. Mỗi luồng được trình bày theo cùng một mạch: mục tiêu nghiệp vụ, bất biến cần giữ, dịch vụ sở hữu dữ liệu, bằng chứng triển khai và giới hạn cần diễn đạt thận trọng.
 
-\section{Tổng quan môi trường và công nghệ triển khai}
+\section{Mục tiêu triển khai và phạm vi minh chứng}
 
-QRTable được triển khai trong một Nx monorepo, gồm các backend service NestJS, hai frontend application chính và các shared library dùng chung cho contract, configuration, constants, providers, guard và UI. Cách tổ chức này giúp việc triển khai vẫn giữ được service boundary của microservices, đồng thời giảm rủi ro lệch contract giữa BFF, service nội bộ và client.
+Vai trò của Chương 5 là nối Chương 4 với hệ thống đã được xây dựng. Chương 4 đã xác định rằng QRTable không dùng một cơ sở dữ liệu chung cho mọi dịch vụ, không để BFF chứa quy tắc xử lý lõi và không dùng WebSocket làm nguồn trạng thái có thẩm quyền. Vì vậy, khi đi vào triển khai, câu hỏi chính không phải là ``có bao nhiêu dịch vụ'', mà là từng luồng có giữ được ranh giới sở hữu dữ liệu và bất biến nghiệp vụ hay không.
 
-Ở backend, các service nghiệp vụ được viết bằng NestJS và TypeScript. BFF đóng vai trò API Gateway cho HTTP/WebSocket, còn các service Authorizer, User-Access, SaaS, Catalog, Order, Kitchen và Payment triển khai nghiệp vụ theo bounded context. PostgreSQL được dùng cho các service có dữ liệu quan hệ như Catalog, Order, Payment và SaaS; MongoDB được dùng cho User-Access; Redis được dùng cho session/cart, KDS queue, cache và một số runtime flag; Kafka được dùng cho domain event bất đồng bộ; Keycloak xử lý identity của staff/owner/admin; SePay/VietQR xử lý payment integration cho bối cảnh Việt Nam.
+Phạm vi minh chứng trong chương này tập trung vào các bằng chứng nội bộ: cấu trúc dịch vụ, đăng ký mô-đun, thực thể/lược đồ dữ liệu đang được dùng, hợp đồng TCP/Kafka, kiểm thử ở mức đơn vị/hợp đồng/tích hợp có điều kiện, sơ đồ luồng vận hành và các tài liệu kỹ thuật đã được đồng bộ. Các ảnh chụp giao diện nếu có chỉ đóng vai trò minh họa bề mặt vận hành; chúng không thay thế được bằng chứng về ranh giới giao dịch, tính lũy đẳng, lọc theo đơn vị thuê bao hoặc bù trừ (compensation).
 
-Ở frontend, QRTable có Customer PWA và Management App. Customer PWA phục vụ khách tại bàn với luồng QR, menu, cart, order tracking và payment request. Management App gom các mặt vận hành nội bộ gồm POS, KDS, Owner dashboard và Super Admin dashboard. Hai ứng dụng này không gọi trực tiếp domain service; mọi request đi qua BFF để giữ guard chain, tenant context và API contract nhất quán.
+Chương này cũng giữ ranh giới với Chương 6. Những nội dung như kiểm thử tự động đạt đến mức nào, nhà cung cấp SePay thật đã kiểm chứng ra sao, triển khai thử đã có tên miền/HTTPS/kiểm tra sức khỏe dịch vụ hay chưa, hoặc khả năng quan sát hệ thống đã đủ cho vận hành thực tế hay chưa sẽ được đánh giá ở Chương 6 khi có minh chứng tương ứng. Trong Chương 5, các phần này chỉ được dùng để mô tả cách hệ thống được đóng gói hoặc nơi cần thu thập minh chứng tiếp theo.
 
-Một điểm đáng chú ý trong triển khai là nhiều invariant không nằm ở UI hoặc BFF. Ví dụ, stock consistency nằm ở Catalog/Order interaction, payment settlement nằm ở Payment/Order interaction, tenant lifecycle nằm ở SaaS, còn KDS queue nằm ở Kitchen/Redis. Điều này giúp implementation bám sát quyết định data ownership của Chương 4: BFF điều phối request ở edge, nhưng service owner vẫn là nơi giữ business rule.
+\section{Nền tảng triển khai và ranh giới trách nhiệm}
 
-\section{Triển khai backend services}
+QRTable được triển khai trong một Nx monorepo gồm các ứng dụng phía người dùng, BFF và các dịch vụ nghiệp vụ. Customer PWA phục vụ khách tại bàn qua mã QR/phiên gọi món; Management App phục vụ nhân viên, bếp/bar, chủ quán, quản lý và quản trị nền tảng. Hai ứng dụng này không gọi trực tiếp các dịch vụ nghiệp vụ, mà đi qua BFF để giữ chuỗi guard, ngữ cảnh đơn vị thuê bao, phân quyền và cổng WebSocket thống nhất.
 
-Backend của QRTable được chia thành các deployable app trong thư mục \texttt{apps/}. BFF nhận request từ Customer PWA và Management App, áp dụng guard chain, chuyển request đến service nội bộ qua TCP/gRPC, và phát WebSocket event khi cần cập nhật UI. BFF không sở hữu database nghiệp vụ; vai trò chính của nó là edge orchestration, route protection, realtime bridge và chuyển đổi giữa HTTP surface với service contract nội bộ.
+Ở lớp dịch vụ, Authorizer xác minh JWT/OIDC và tích hợp Keycloak; User-Access lưu hồ sơ ứng dụng và vai trò nghiệp vụ; Catalog sở hữu thực đơn, bàn, token QR và tồn kho; Order sở hữu phiên, giỏ, đơn, dòng đơn, hóa đơn và yêu cầu phục vụ; Kitchen sở hữu bản chiếu KDS khi vận hành; Payment sở hữu giao dịch, nhật ký kiểm toán và cấu hình thanh toán; SaaS sở hữu đơn vị thuê bao, gói giá, thuê bao, hóa đơn thuê bao và quyền theo gói. Các bảng/bộ sưu tập tương ứng đã được trình bày ở Bảng~\ref{tab:chapter4-data-ownership-schema}; Chương 5 chỉ nhắc lại dữ liệu khi nó giúp giải thích một luồng cụ thể.
 
-Authorizer và User-Access tách hai trách nhiệm liên quan identity. Authorizer làm việc với Keycloak, xác minh JWT/OIDC và thực hiện một số thao tác identity/admin. User-Access lưu application profile, role/staff mapping và thông tin phân quyền theo tenant. Cách tách này giúp hệ thống không trộn identity provider với dữ liệu nghiệp vụ của ứng dụng.
+Các thư viện dùng chung trong monorepo được dùng như lớp hợp đồng, không phải đường tắt để phá vỡ ranh giới dịch vụ. Dịch vụ có thể dùng chung DTO, enum, provider token, bộ dựng khóa Redis, bộ dựng phòng WebSocket, guard hoặc kiểu phía giao diện. Tuy nhiên, khi cần dữ liệu thuộc ngữ cảnh nghiệp vụ có ranh giới khác, dịch vụ vẫn phải đi qua TCP/gRPC hoặc Kafka. Chính cách dùng này giúp Nx hỗ trợ nhất quán hợp đồng mà không biến hệ thống thành một khối nguyên khối dùng chung kho truy cập dữ liệu.
 
-Catalog triển khai các chức năng menu, category, area, table, QR token và stock. Đây là service duy nhất được phép ghi trạng thái stock và table trong Catalog database. Order service không cập nhật trực tiếp Catalog DB; mọi thao tác như trừ stock, hoàn stock hoặc release table đều đi qua TCP contract đến Catalog. Đây là điểm then chốt để tránh phá vỡ database-per-service.
+\section{Khách quét QR, tạo phiên và giỏ món dùng chung}
 
-Order là service triển khai session, shared cart, order submission, order state machine, bill request và payment finalization. Session và cart active state dùng Redis để đáp ứng hot path của QR ordering; order, bill và session durable state vẫn được lưu trong PostgreSQL. Order cũng là nơi phát outbox \texttt{order.confirmed} sau khi staff confirm order thành công.
+Hình~\ref{fig:chapter5-qr-ordering-session} tóm tắt luồng từ khi khách mở QR tại bàn, tham gia hoặc tạo phiên gọi món, thao tác giỏ chung và gửi đơn đầu tiên.
 
-Kitchen triển khai KDS bằng Kafka consumer, Redis Sorted Set/hash và TCP command cho các thao tác start/ready/recall/priority. Service này không có PostgreSQL/MongoDB riêng trong phạm vi hiện tại. Thay vào đó, Kitchen xây dựng runtime projection từ \texttt{order.confirmed} và có cơ chế rebuild từ active order snapshot khi cần phục hồi projection.
-
-Payment triển khai hai nhánh settlement: cash tại POS và VietQR/SePay webhook. Payment sở hữu payment record, audit payment, tenant payment settings và payment outbox. Khi payment hoàn tất, Payment phối hợp với Order qua TCP hoặc event để mark bill paid, nhưng không tự sở hữu bill/session lifecycle.
-
-SaaS triển khai tenant onboarding, plan, subscription, tenant lifecycle, usage quota, subscription invoice và tenant status cache. Onboarding được triển khai như một mini-saga: SaaS tạo tenant/subscription, gọi Authorizer tạo owner identity, gọi User-Access tạo profile, gọi Payment tạo payment settings và ghi event tenant created vào outbox. Khi một bước phụ thuộc thất bại, service có compensation để tránh dữ liệu mồ côi.
-
-Bảng~\ref{tab:chapter5-implemented-evidence} tóm tắt những bằng chứng triển khai chính được dùng trong Chương 5. Cột ``Mức bằng chứng'' cố ý phân biệt code, test theo contract, integration cần môi trường phụ thuộc và kiểm chứng provider thủ công để tránh diễn đạt quá mức trong phần đánh giá.
-
-{\scriptsize\sloppy
-\setlength{\tabcolsep}{3pt}
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.15\textwidth}}
-  \caption{Implemented evidence table cho các flow chính của QRTable.}
-  \label{tab:chapter5-implemented-evidence}\\
-  \toprule
-  Flow / feature & Claim triển khai & Evidence chính & Mức bằng chứng \\
-  \midrule
-  \endfirsthead
-  \toprule
-  Flow / feature & Claim triển khai & Evidence chính & Mức bằng chứng \\
-  \midrule
-  \endhead
-  \bottomrule
-  \endfoot
-  QR session & Customer scan QR có thể tạo session mới, join active session hoặc recover stale empty session an toàn. & Order session service; order service tests. & Code + integration có điều kiện \\
-  Session cache & Active session được đọc Redis-first, fallback PostgreSQL và idle-close chỉ khi không có order. & Order session service; session unit tests. & Code + unit test \\
-  Shared cart & Shared cart lưu trong Redis theo session, dùng \texttt{cartVersion} để phát hiện stale mutation. & Order cart service; cart concurrency tests. & Code + integration có điều kiện \\
-  Order submit & Submit order tạo order \texttt{PENDING}, tạo hoặc cập nhật bill \texttt{OPEN}, clear cart và dùng idempotency key. & Order submit service; submit/idempotency tests. & Code + integration có điều kiện \\
-  Stock consistency & Staff confirm order gọi Catalog TCP để trừ stock trước khi chuyển order sang \texttt{PROCESSING}. & \texttt{OrderConfirmSagaService}; Catalog stock gateway. & Code + integration có điều kiện \\
-  Outbox order & Sau confirm, Order ghi outbox \texttt{order.confirmed} trong transaction của Order DB. & Order Confirm Saga; Kafka payload spec. & Code + unit/contract \\
-  Stock release & Cancel order đã \texttt{PROCESSING} gọi Catalog TCP để hoàn stock; cancel \texttt{PENDING} không release vì chưa deduct. & Order cancel flow; pending/processing cancel tests. & Code + unit test \\
-  KDS consumer & Kitchen subscribe \texttt{order.confirmed}, validate schema và tạo ticket theo station. & Kitchen consumer service; consumer specs. & Code + unit test \\
-  KDS queue & Ticket KDS lưu trong Redis Sorted Set/hash theo tenant và station, không có DB riêng cho Kitchen. & KDS ticket store; KDS key tests. & Code + Redis integration \\
-  KDS realtime & Sau mutation ticket, Kitchen phát \texttt{kds.queue\_changed}; UI nhận hint rồi refetch queue snapshot. & Kitchen publisher; BFF realtime; KDS hooks. & Code + component/contract \\
-  SLA warning & Worker KDS phát \texttt{kitchen.sla\_warning} có dedupe theo bucket; không tạo grouped-prep contract ngoài scope. & Kitchen SLA worker; SLA tests. & Code + unit test \\
-  VietQR generation & Payment lấy bill snapshot từ Order, kiểm tra rounding VND và tạo \texttt{QRTBL} reference cho QR URL. & Payment settlement and reference services. & Code + unit test \\
-  Cash settlement & Cash confirm ghi payment paid, audit log, outbox và gọi Order mark bill paid. & Payment cash flow; Order bill finalization. & Code + integration có điều kiện \\
-  SePay webhook & Webhook xác minh secret theo tenant, match bill reference, xử lý duplicate/underpaid và mark bill paid khi đủ điều kiện. & SePay webhook service; BFF webhook specs. & Code + unit/contract \\
-  Payment bridge & \texttt{payment.completed} hỗ trợ recovery/fan-out; BFF realtime chỉ là hint để UI refetch. & Payment outbox; Order consumer; BFF bridge. & Code + integration có điều kiện \\
-  SaaS onboarding & SaaS tạo tenant, owner, profile, subscription, payment settings và outbox \texttt{tenant.created}. & SaaS onboarding saga; onboarding DB/live Payment specs. & Code + live stack một phần \\
-  Onboarding compensation & Khi lỗi sau bước tạo owner/subscription, saga disable user và rollback tenant/subscription đã tạo. & SaaS onboarding saga compensation; PostgreSQL integration. & Code + DB integration \\
-  Slug policy & Tenant slug normalize tiếng Việt, kiểm tra unique và chặn reserved words. & SaaS slug service; slug specs. & Code + unit test \\
-  Tenant lifecycle & Tenant có trạng thái \texttt{ACTIVE}, \texttt{SUSPENDED}, \texttt{CLOSED}; Redis cache hỗ trợ guard fast path. & Tenant lifecycle and cache services. & Code + unit test \\
-  Frontend runtime & Customer PWA và Management App dùng React Query/WebSocket hooks để refetch theo tenant/session event. & Customer PWA, POS and KDS hooks. & Code + component test \\
-\end{longtable}
-}
-
-\section{Triển khai frontend}
-
-Customer PWA được triển khai bằng React/Vite, tối ưu cho thiết bị di động tại bàn. Ứng dụng bắt đầu từ màn hình resolve tenant/QR, sau đó lấy session context, gọi public menu, thao tác cart, submit order, theo dõi trạng thái và yêu cầu thanh toán. Customer không có tài khoản Keycloak; tenant/session context được đưa vào API client thông qua QR/session flow và header tenant sau khi join session thành công. Các hook order/realtime của PWA xử lý WebSocket event như tín hiệu invalidation để refetch trạng thái từ API, thay vì xem payload realtime là nguồn sự thật tuyệt đối.
-
-Management App được triển khai bằng Next.js, phục vụ các actor đã đăng nhập như Super Admin, Owner, Manager, Waiter, Chef và Barista. App có các route group cho dashboard, POS, KDS và admin. Lớp auth lấy access token, tenantId và roles từ NextAuth/Keycloak integration; middleware và helper role-routing điều hướng actor về khu vực phù hợp. Ví dụ, Chef được đưa về KDS kitchen, Barista về KDS bar, Waiter về POS, Owner/Manager có quyền vận hành nhiều khu vực tenant, còn Super Admin vào admin dashboard.
-
-Ở UI domain, QRTable không render raw enum wire trực tiếp cho người dùng. Các trạng thái như order, bill, table, tenant, subscription hoặc payment connection được map sang tiếng Việt thông qua shared constants và badge component. Điều này giúp frontend giữ được API contract tiếng Anh ổn định, đồng thời tạo trải nghiệm tiếng Việt nhất quán trong báo cáo/demo.
-
-Phần POS của Management App triển khai table map, live orders, order detail, cancel/confirm action và bill/payment panel. Phần KDS triển khai queue theo station, ticket card, start/done/recall/priority action và realtime invalidation. Phần SaaS/Admin triển khai tenant onboarding, plan management, billing/subscription và payment settings. Chương này chỉ xem frontend như bề mặt tương tác của các flow backend; các screenshot đầy đủ nên được chọn lọc ở phụ lục hoặc artifact demo để tránh biến chương triển khai thành gallery UI.
-
-\section{QR session và shared cart}
-
-Hình~\ref{fig:chapter5-qr-ordering-session} tóm tắt luồng runtime từ khi khách quét QR, tạo hoặc tham gia session tại bàn, thao tác shared cart trên Redis và submit order đầu tiên.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter5-qr-ordering-session.pdf}
-  \caption[Sequence QR ordering, session và shared cart]{Sequence QR ordering, session và shared cart.}
+  \caption{Luồng khách quét QR, tạo phiên và thao tác giỏ món dùng chung.}
   \label{fig:chapter5-qr-ordering-session}
 \end{figure}
 
-Luồng QR/session được triển khai theo nguyên tắc Customer không cần tài khoản nhưng vẫn bị giới hạn trong tenant/table/session. Khi khách mở QR URL, BFF xác thực token/table context và gọi Order để resolve session. Nếu bàn đang available, Order tạo session active, ghi durable state vào Order DB, cache session hash vào Redis và gọi Catalog cập nhật table sang occupied. Nếu bàn đã occupied nhưng còn active session hợp lệ, khách join vào session đó và dùng chung cart. Nếu session cũ đã idle/closed nhưng không có order và không có bill, Order có thể release empty session an toàn trước khi tạo session mới.
+Mục tiêu nghiệp vụ của luồng này là cho phép khách tại cùng một bàn cùng xem thực đơn, thao tác trên một giỏ món chung và gửi đơn mà không cần tài khoản Keycloak. Bất biến quan trọng là khách chỉ được hoạt động trong phạm vi đơn vị thuê bao, bàn và phiên hợp lệ; một bàn không được bị mở lại sai khi phiên đã có đơn; và thao tác giỏ của nhiều thiết bị không được ghi đè lẫn nhau một cách âm thầm.
 
-Điểm implementation quan trọng là session không bị đóng chỉ vì Redis hết hạn hoặc client im lặng. \texttt{SessionService} đọc Redis trước để tối ưu hot path, nhưng fallback về PostgreSQL khi Redis miss. Idle-close chỉ được áp dụng khi session active đã quá thời gian idle và \texttt{orderCount} vẫn bằng 0. Nếu session đã có order, service refresh lại cache từ durable state thay vì release table. Điều này tránh tình huống khách đã submit order nhưng một key Redis cũ làm bàn bị mở lại sai.
+Order là dịch vụ sở hữu phiên và giỏ. Catalog sở hữu token QR, bàn, thực đơn và trạng thái món có thể đặt. Khi khách mở QR, BFF xác thực ngữ cảnh ở lớp biên rồi gọi Order; Order phối hợp với Catalog để xác nhận bàn và cập nhật trạng thái bàn khi cần. PostgreSQL của Order giữ phiên bền vững, còn Redis giúp đọc/ghi nhanh phiên đang hoạt động và giỏ món dùng chung. Nếu Redis mất hoặc hết hạn, Order vẫn có thể dựa vào trạng thái bền vững để quyết định phiên còn hợp lệ hay không.
 
-Shared cart được lưu trong Redis theo key tenant/session và có \texttt{cartVersion}. Mỗi thao tác add/update/clear phải gửi \texttt{expectedCartVersion}; nếu version không khớp, Order trả conflict để client refetch snapshot mới. Cơ chế này phù hợp với bối cảnh nhiều khách cùng bàn cùng mở PWA và thao tác trên một cart. Khi submit order, Order kiểm tra cart version, kiểm tra cart không rỗng, tạo order \texttt{PENDING}, tạo hoặc gắn bill \texttt{OPEN}, tăng \texttt{orderCount} của session và clear cart bằng cùng version đã được xác nhận.
+Giỏ món dùng chung được kiểm soát bằng phiên bản giỏ. Mỗi thao tác thay đổi giỏ yêu cầu thiết bị gửi phiên bản đang thấy; nếu phiên bản không khớp, dịch vụ trả xung đột để giao diện lấy lại bản chụp trạng thái mới. Khi khách gửi đơn, Order tạo đơn ở trạng thái chờ xác nhận, tạo hoặc gắn hóa đơn mở và xóa giỏ sau khi phiên bản đã được xác nhận. Tồn kho chưa bị trừ ở bước này; điểm ghi nhận tồn kho nằm ở luồng nhân viên xác nhận đơn trong mục tiếp theo. Giới hạn của luồng là hàng đợi thao tác ngoại tuyến đầy đủ chưa phải kết luận chính; giao diện có thể kết nối lại và tải lại dữ liệu nhưng không được viết như đã hỗ trợ đặt món ngoại tuyến hoàn chỉnh.
 
-Ở bước submit, Order chưa trừ stock ngay. Quyết định này giữ trải nghiệm khách đơn giản: order được ghi nhận ở trạng thái chờ staff xác nhận, còn invariant stock được xử lý ở bước staff confirm trong mục tiếp theo. Vì vậy, Chương 5 phân biệt rõ hai thời điểm: submit order là tạo order/bill và clear cart; confirm order là thời điểm Catalog thực sự deduct stock.
+\section{Xác nhận đơn hàng và bảo toàn tồn kho}
 
-\section{Order confirmation saga và stock consistency}
+Hình~\ref{fig:chapter5-order-confirm-stock} trình bày luồng nhân viên xác nhận đơn và cách QRTable giữ bất biến tồn kho theo ranh giới Catalog--Order.
 
-Hình~\ref{fig:chapter5-order-confirm-stock} trình bày thời điểm staff xác nhận order và cơ chế bảo toàn stock. Đây là một saga điều phối tập trung ở mức ứng dụng: \texttt{OrderConfirmSagaService} trong Order đóng vai trò bộ điều phối, còn Catalog là service duy nhất sở hữu stock và cập nhật Catalog DB.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter5-order-confirm-stock.pdf}
-  \caption[Sequence xác nhận order và bảo toàn stock]{Sequence xác nhận order và bảo toàn stock.}
+  \caption{Luồng xác nhận đơn hàng và bảo toàn tồn kho qua ranh giới Order--Catalog.}
   \label{fig:chapter5-order-confirm-stock}
 \end{figure}
 
-Khi staff bấm xác nhận order ở POS, BFF kiểm tra JWT/permission/tenant context rồi gọi Order qua TCP. Trong Order, \texttt{OrderConfirmSagaService} lock order theo tenant bằng pessimistic write trước khi xử lý. Nếu order đã ở \texttt{PROCESSING}, service trả lại kết quả theo hướng replay idempotent, không trừ stock lần nữa. Nếu order không còn \texttt{PENDING}, service trả lỗi state conflict.
+Mục tiêu nghiệp vụ của luồng này là chỉ chuyển đơn sang trạng thái chế biến khi nhân viên đã xác nhận và tồn kho còn đủ. Bất biến cần giữ là Catalog là chủ sở hữu duy nhất của tồn kho, Order là chủ sở hữu vòng đời đơn/hóa đơn, và việc xác nhận lặp lại không được trừ tồn kho hai lần. Đây là Saga đại diện thứ nhất của đề tài.
 
-Trước khi cập nhật trạng thái order, Order gọi Catalog TCP với pattern deduct stock cho order, kèm \texttt{idempotencyKey} dạng \texttt{confirm-order:orderId}. Catalog là nơi lock và cập nhật stock trong database của chính nó. Nếu Catalog báo thiếu stock hoặc lỗi nghiệp vụ, Order không được chuyển order sang \texttt{PROCESSING}. Cách này giữ invariant stock ở service owner và tránh cross-service database access.
+Khi nhân viên xác nhận đơn từ POS, BFF kiểm tra JWT, ngữ cảnh đơn vị thuê bao và quyền thao tác trước khi gọi Order. Order khóa đơn trong phạm vi đơn vị thuê bao, kiểm tra trạng thái đơn/hóa đơn, rồi gọi Catalog qua hợp đồng để trừ tồn kho. Catalog thực hiện phần cập nhật tồn kho trong cơ sở dữ liệu của chính Catalog. Nếu thiếu tồn kho, Order không được chuyển trạng thái đơn sang chế biến. Nếu Catalog trừ thành công nhưng bước cập nhật Order hoặc ghi outbox thất bại, Order gọi lại Catalog để bù trừ bằng đường hoàn tồn kho tương ứng.
 
-Sau khi Catalog deduct thành công, Order cập nhật order sang \texttt{PROCESSING}, cập nhật item state và ghi outbox event \texttt{order.confirmed} trong cùng transaction của Order DB. Nếu bước cập nhật Order hoặc ghi outbox thất bại sau khi Catalog đã trừ stock, bộ điều phối gọi Catalog release stock bằng compensation key của order confirm. Outbox publisher sau đó publish event sang Kafka để Kitchen xử lý khi Order commit thành công. Việc trả response cho staff không phụ thuộc Kitchen đã dựng ticket xong hay chưa; KDS là side effect bất đồng bộ sau điểm commit của saga.
+Sau khi Order ghi nhận thành công, outbox \texttt{order.confirmed} trở thành bằng chứng của điểm ghi nhận nghiệp vụ và được thành phần xuất bản phát sang Kafka để Kitchen dựng phiếu bếp. Việc phản hồi cho nhân viên không phụ thuộc vào Kitchen đã xử lý xong phiếu bếp hay chưa, vì KDS là tác dụng phụ bất đồng bộ sau bước xác nhận. Giới hạn cần giữ trong diễn đạt là QRTable áp dụng Saga có kiểm soát ở luồng đại diện này; chưa khẳng định khung Saga đầy đủ với trạng thái saga bền vững, CDC hay phân phối exactly-once ở mức vận hành thực tế.
 
-Flow cancel cũng tuân theo cùng ownership. Nếu order còn \texttt{PENDING}, cancel không hoàn stock vì stock chưa từng bị trừ. Nếu order đã \texttt{PROCESSING}, cancel processing yêu cầu lý do và gọi Catalog TCP để release stock bằng idempotency key riêng. Đây là cách implementation giữ cho các state transition của order và inventory không bị trộn vào một transaction phân tán giả tạo.
+\section{Điều phối bếp/KDS và cập nhật thời gian thực}
 
-\section{KDS realtime flow}
+Hình~\ref{fig:chapter5-kds-ticket-lifecycle} mô tả cách Kitchen nhận sự kiện \texttt{order.confirmed}, tạo phiếu KDS, phát gợi ý thời gian thực và để giao diện lấy lại bản chụp trạng thái.
 
-Hình~\ref{fig:chapter5-kds-ticket-lifecycle} mô tả lifecycle của KDS ticket sau event \texttt{order.confirmed}: Kitchen tạo ticket trong Redis, phát realtime hint và UI refetch queue trước khi chef cập nhật trạng thái ticket.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter5-kds-ticket-lifecycle.pdf}
-  \caption[Sequence lifecycle của KDS ticket]{Sequence lifecycle của KDS ticket.}
+  \caption{Luồng điều phối KDS từ sự kiện Order đến gợi ý WebSocket và tải lại dữ liệu.}
   \label{fig:chapter5-kds-ticket-lifecycle}
 \end{figure}
 
-Kitchen tiêu thụ Kafka topic \texttt{order.confirmed} bằng consumer riêng. Consumer parse JSON, validate schema version, event type, tenantId, orderId, sessionId, tableId, item list và các timestamp cần thiết trước khi tạo ticket. Những payload malformed hoặc thiếu field bắt buộc không được đưa vào KDS queue. Đây là lớp bảo vệ quan trọng vì Kafka event là contract giữa bounded contexts.
+Mục tiêu nghiệp vụ của luồng này là đưa món đã xác nhận đến đúng trạm bếp/bar, hỗ trợ cập nhật trạng thái phiếu bếp và phản ánh thay đổi cho màn hình KDS gần thời gian thực. Bất biến cần giữ là Kitchen sở hữu hàng đợi KDS khi vận hành, nhưng Order vẫn sở hữu vòng đời đơn và dòng đơn. Kitchen không có cơ sở dữ liệu nghiệp vụ bền vững riêng trong phạm vi hiện tại; Redis là bản chiếu khi vận hành để phục vụ hàng đợi, phiên bản, SLA và khôi phục.
 
-KDS ticket được chia theo station như \texttt{KITCHEN} hoặc \texttt{BAR}. Với mỗi station, Kitchen lưu active queue và ready queue bằng Redis Sorted Set, lưu ticket detail bằng hash và dùng revision key để UI biết queue đã thay đổi. Score của queue kết hợp FIFO, priority và SLA behavior. Khi nhận event trùng, repository có dedupe theo event/order/station để tránh tạo ticket lặp.
+Kitchen tiêu thụ chủ đề Kafka \texttt{order.confirmed}, kiểm tra nội dung sự kiện theo hợp đồng rồi tách phiếu bếp theo trạm. Phiếu được lưu trong Redis theo cấu trúc phù hợp với hàng đợi, ưu tiên và SLA. Sau mỗi thay đổi, Kitchen phát sự kiện \texttt{kds.queue\_changed} cho BFF qua kênh nội bộ; BFF gửi gợi ý WebSocket đến giao diện KDS; giao diện làm mới truy vấn và gọi lại API để lấy bản chụp trạng thái mới. Cách làm này giữ đúng nguyên tắc WebSocket là tín hiệu làm mới, không phải nguồn trạng thái có thẩm quyền.
 
-Sau khi tạo hoặc mutate ticket, Kitchen phát \texttt{kds.queue\_changed} thông qua publisher/realtime bridge. Management App KDS hook không tin rằng event đó chứa toàn bộ state mới; hook invalidate query theo tenant/station và gọi lại API để lấy snapshot. Thiết kế này thể hiện nguyên tắc WebSocket là hint/refetch: nếu socket mất event, UI vẫn có thể đồng bộ lại qua REST/TCP path.
+Khi đầu bếp bắt đầu hoặc hoàn tất phiếu bếp, thao tác đi qua BFF đến Kitchen. Nếu phiếu đã sẵn sàng làm thay đổi trạng thái dòng món, Kitchen phối hợp với Order qua hợp đồng để Order cập nhật vòng đời dòng món/đơn tương ứng. Giới hạn của luồng là bản chiếu KDS khi vận hành chưa thay thế được lịch sử nghiệp vụ dài hạn; nếu cần báo cáo lịch sử bếp chuyên sâu, hệ thống cần bản chiếu bền vững hoặc kho phân tích riêng trong tương lai.
 
-Các thao tác của chef như start, done/ready, recall hoặc set priority đi qua KDS service. Khi ticket được mark ready, Kitchen phối hợp với Order để cập nhật trạng thái order item tương ứng; nếu tất cả item cần chuẩn bị đã ready, Order có thể chuyển order sang trạng thái sẵn sàng phục vụ. Như vậy Kitchen sở hữu queue runtime, còn Order vẫn sở hữu lifecycle cuối cùng của order/item.
+\section{Ghi nhận thanh toán tiền mặt, VietQR và SePay}
 
-\section{Payment settlement flow}
+Hình~\ref{fig:chapter5-payment-settlement} gom hai nhánh thanh toán chính: tiền mặt tại POS và VietQR/SePay qua webhook.
 
-Hình~\ref{fig:chapter5-payment-settlement} gom hai nhánh settlement P0: cash tại POS và VietQR/SePay webhook. Sơ đồ nhấn mạnh boundary giữa Payment record và Bill/Session finalization do Order sở hữu.
-
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter5-payment-settlement.pdf}
-  \caption[Sequence payment settlement với cash và VietQR/SePay]{Sequence payment settlement với cash và VietQR/SePay.}
+  \caption{Luồng ghi nhận thanh toán tiền mặt, VietQR và SePay.}
   \label{fig:chapter5-payment-settlement}
 \end{figure}
 
-Trước khi thanh toán, Order sở hữu bill và cung cấp bill payment snapshot cho Payment. Snapshot gồm raw total, rounded total, rounding delta và trạng thái bill. Payment kiểm tra bill phải ở \texttt{PENDING\_PAYMENT} và validate rounding VND trước khi tạo QR hoặc xác nhận cash. Việc dùng snapshot giúp Payment không cần đọc trực tiếp Order DB, nhưng vẫn có đủ dữ liệu để ghi payment record chính xác.
+Mục tiêu nghiệp vụ của luồng này là ghi nhận thanh toán đúng hóa đơn, đúng đơn vị thuê bao, đúng số tiền đã làm tròn VND và không hoàn tất hóa đơn nhiều lần khi có yêu cầu hoặc webhook lặp. Bất biến dữ liệu là Payment sở hữu bản ghi thanh toán, nhật ký thanh toán, cấu hình thanh toán và outbox thanh toán; Order sở hữu việc hoàn tất hóa đơn/phiên; Catalog sở hữu trạng thái bàn sau khi phiên kết thúc.
 
-Với cash flow, staff nhập số tiền nhận tại POS. Payment kiểm tra số tiền nhận không nhỏ hơn tổng đã làm tròn, ghi payment \texttt{PAID}, audit log và outbox payment completed trong transaction của Payment DB. Sau commit, Payment gọi Order theo fast path để mark bill paid. Order finalizes bill, đóng session, xóa Redis session/cart key và chuyển table sang trạng thái cleaning thông qua Catalog path phù hợp. Nếu replay cùng payment, phần finalization ở Order được thiết kế idempotent để không tạo settlement lặp.
+Với tiền mặt, Payment lấy bản chụp hóa đơn từ Order qua hợp đồng, kiểm tra số tiền và ghi thanh toán, nhật ký kiểm toán và outbox trong cơ sở dữ liệu Payment. Sau đó Payment phối hợp với Order để đánh dấu hóa đơn đã thanh toán, đóng phiên, xóa trạng thái phiên/giỏ khi vận hành và chuyển bàn sang trạng thái phù hợp. Nếu cùng một giao dịch thanh toán được phát lại, phần hoàn tất hóa đơn phải đi theo hướng lũy đẳng để không tạo kết quả trùng.
 
-Với VietQR/SePay flow, Payment tạo bill reference dạng \texttt{QRTBL} và QR URL dựa trên tenant payment settings. Khi ngân hàng gửi webhook về BFF, route tenant webhook chuyển payload sang Payment. Payment giải mã/so sánh secret theo tenant bằng constant-time comparison, extract bill reference từ code/content, kiểm tra route tenant có khớp payment tenant hay không, và lock payment record trước khi cập nhật. Webhook duplicate, webhook sau khi payment đã paid hoặc underpaid đều được audit nhưng không finalize bill lần nữa.
+Với VietQR/SePay, Payment tạo tham chiếu hóa đơn nhà hàng theo dòng tiền \texttt{QRTBL}. Webhook từ SePay đi vào BFF, được định tuyến và chuyển cho Payment. Payment kiểm tra bí mật của đơn vị thuê bao, khớp tham chiếu từ nội dung chuyển khoản, khóa bản ghi thanh toán, ghi nhật ký cho giao dịch trùng hoặc thanh toán thiếu, và chỉ gọi Order hoàn tất hóa đơn khi đủ điều kiện. Cấu hình tài khoản và trạng thái OAuth ngắn hạn thuộc Payment; hóa đơn gói nền tảng \texttt{QRSUB} thuộc SaaS, không bị trộn với bản ghi thanh toán của hóa đơn nhà hàng.
 
-Phần này chỉ chứng minh implementation baseline cho settlement và idempotency ở mức code/test của hệ thống. Live-provider validation với SePay thật cần credential, public callback và dữ liệu provider thật; vì vậy các kết luận về môi trường production hoặc live provider phải để sang Chương 6 và chỉ viết khi có artifact kiểm chứng tương ứng.
+Giới hạn cần nhấn mạnh là mã nguồn và kiểm thử có thể chứng minh đường cơ sở cho ghi nhận thanh toán, webhook trùng và thanh toán thiếu, nhưng kiểm chứng nhà cung cấp thật phụ thuộc thông tin xác thực, đường gọi lại công khai và dữ liệu thật của SePay. Vì vậy, nếu chưa có minh chứng nhà cung cấp thật, Chương 6 không được khẳng định luồng SePay đã được kiểm chứng ở môi trường vận hành thực tế.
 
-\section{SaaS onboarding và tenant lifecycle}
+\section{Khởi tạo đơn vị thuê bao và vòng đời gói dịch vụ}
 
-Hình~\ref{fig:chapter5-saas-onboarding-saga} trình bày onboarding tenant như một mini-saga: SaaS tạo tenant và subscription, gọi Authorizer và User-Access để tạo owner, tạo payment settings và có nhánh compensation khi một bước phụ thuộc thất bại.
+Hình~\ref{fig:chapter5-saas-onboarding-saga} trình bày luồng Super Admin khởi tạo đơn vị thuê bao và các tác dụng phụ cần bù trừ khi một bước phụ thuộc thất bại.
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter5-saas-onboarding-saga.pdf}
-  \caption[Sequence SaaS onboarding saga với compensation]{Sequence SaaS onboarding saga với compensation.}
+  \caption{Luồng khởi tạo đơn vị thuê bao theo SaaS Onboarding Mini-Saga.}
   \label{fig:chapter5-saas-onboarding-saga}
 \end{figure}
 
-Onboarding bắt đầu từ Super Admin trong Management App. BFF kiểm tra quyền platform, sau đó gọi SaaS. SaaS yêu cầu plan code hợp lệ, tạo slug duy nhất từ tên tenant hoặc slug người dùng nhập, chặn reserved slug như route nội bộ, rồi tạo tenant ở trạng thái \texttt{ACTIVE} với locale/currency mặc định cho thị trường Việt Nam. Sau đó SaaS gọi Authorizer tạo owner trong Keycloak, gọi User-Access upsert profile/role theo tenant và cập nhật ownerId vào tenant record.
+Mục tiêu nghiệp vụ của luồng này là tạo một đơn vị thuê bao có thể vận hành: có thông tin đơn vị thuê bao, chủ sở hữu, hồ sơ/vai trò, gói thuê bao ban đầu và cấu hình thanh toán tương ứng. Bất biến cần giữ là SaaS sở hữu đơn vị thuê bao, gói, thuê bao và hóa đơn thuê bao; Authorizer/Keycloak sở hữu định danh; User-Access sở hữu hồ sơ ứng dụng và vai trò; Payment sở hữu cấu hình thanh toán. SaaS không tự ghi dữ liệu của User-Access hoặc Payment.
 
-Subscription ban đầu được assign trong cùng saga với source onboarding ban đầu. Tiếp theo, SaaS gọi Payment để tạo empty payment settings row cho tenant. Bước này quan trọng vì Payment sở hữu tenant payment settings; SaaS không tự ghi bảng của Payment. Cuối flow, SaaS ghi outbox \texttt{tenant.created} để các side effect downstream có thể xử lý bất đồng bộ.
+Luồng bắt đầu từ Super Admin trong Management App. BFF kiểm tra quyền quản trị nền tảng trước khi gọi SaaS. SaaS chuẩn hóa slug, kiểm tra trùng lặp và tạo đơn vị thuê bao cùng thuê bao gói trong cơ sở dữ liệu của SaaS. Sau đó, SaaS gọi Authorizer để tạo định danh chủ sở hữu, gọi User-Access để tạo hồ sơ và vai trò ứng dụng, gọi Payment để tạo cấu hình thanh toán rỗng, rồi ghi outbox \texttt{tenant.created}. Nếu lỗi xảy ra sau khi đã có tác dụng phụ, SaaS thực hiện bù trừ như vô hiệu hóa chủ sở hữu đã tạo, hủy thuê bao khởi tạo hoặc xóa đơn vị thuê bao chưa hoàn tất.
 
-Nhánh compensation xử lý các lỗi sau khi đã có side effect ở service khác. Nếu owner đã được tạo nhưng saga thất bại, SaaS gọi Authorizer disable user để tránh orphan user còn đăng nhập được. Nếu subscription đã được assign, SaaS gọi compensation cho initial onboarding subscription rồi xóa tenant record. Cùng với Order Confirm Saga, luồng này là saga đại diện thứ hai của đề tài ở nhóm platform/SaaS; các cơ chế vận hành sâu hơn như lưu trạng thái saga bền vững, retry worker hoặc quan sát compensation riêng được xem là hướng mở rộng.
+Vòng đời đơn vị thuê bao sau khi khởi tạo gồm hoạt động, tạm ngưng và đóng. SaaS giữ trạng thái bền vững, Redis hỗ trợ đường đọc nhanh cho guard và quyền theo gói thuê bao. Khi đơn vị thuê bao bị tạm ngưng, hệ thống cần phân biệt các thao tác còn được phép, chẳng hạn đọc một số thông tin hoặc xử lý thanh toán đang chờ, với các thao tác tạo đơn mới hoặc thay đổi dữ liệu không phù hợp. Đây là Saga đại diện thứ hai của đề tài; giống luồng xác nhận đơn, chương này không khẳng định củng cố đầy đủ như trạng thái saga bền vững hoặc tiến trình thử lại vận hành độc lập nếu chưa có bằng chứng tương ứng.
 
-Tenant lifecycle sau onboarding gồm \texttt{ACTIVE}, \texttt{SUSPENDED} và \texttt{CLOSED}. Tenant suspend/activate dùng Redis cache để hỗ trợ guard fast path, trong khi SaaS database vẫn là nơi lưu trạng thái bền vững. Với tenant suspended, một số flow đọc hoặc payment cho bill đang chờ có thể vẫn được cho phép tùy business rule; các flow tạo order mới hoặc mutation không phù hợp phải bị chặn ở guard/service layer. Chương 6 sẽ là nơi đánh giá mức test/demo của các ngoại lệ tenant lifecycle này.
+\section{Bảng điều khiển và báo cáo theo gói dịch vụ}
 
-\section{Shared libraries và contracts}
+Phần bảng điều khiển và báo cáo bổ sung lớp đọc tổng hợp cho QRTable mà không tạo thêm một dịch vụ phân tích độc lập. Mục tiêu nghiệp vụ là cho Owner/Manager thấy tình hình vận hành của đơn vị thuê bao như doanh thu, đơn hàng, phương thức thanh toán, món bán chạy và trạng thái bàn; đồng thời cho Super Admin thấy số liệu nền tảng như đơn vị thuê bao, thuê bao gói, hóa đơn và doanh thu gói dịch vụ.
 
-Shared libraries giúp QRTable giữ contract nhất quán trong một monorepo nhưng không làm mờ service boundary. Trong codebase hiện tại, backend chủ yếu import qua các alias \texttt{@common/*}; frontend/cross-platform import qua \texttt{@einvoice/*}. Bảng~\ref{tab:chapter5-shared-libraries} tóm tắt vai trò của các nhóm thư viện được dùng trực tiếp trong implementation.
+Về ranh giới dữ liệu, BFF chỉ là lớp HTTP được bảo vệ bằng guard. BFF kiểm tra quyền \texttt{report.read\_own} hoặc \texttt{report.read\_any}, chuẩn hóa truy vấn và chuyển yêu cầu đến dịch vụ sở hữu dữ liệu. Payment cung cấp số liệu doanh thu và phương thức thanh toán; Order cung cấp số liệu đơn/hóa đơn/món bán chạy; Catalog cung cấp trạng thái bàn/thực đơn; SaaS cung cấp số liệu nền tảng. Cách làm này giữ nguyên quyền sở hữu dữ liệu đã trình bày ở Chương 4, không tạo đường xử lý phân tích Kafka hoặc kho OLAP trong phạm vi hiện tại.
+
+Điểm khác biệt giữa bảng điều khiển theo đơn vị thuê bao và phân tích nền tảng nằm ở quyền theo gói. Owner/Manager dùng \texttt{report.read\_own} và API báo cáo theo đơn vị thuê bao còn bị kiểm tra thuê bao đang hoạt động cùng tính năng \texttt{analytics\_basic}; giao diện hiển thị trạng thái khóa hoặc mở theo gói. Super Admin dùng \texttt{report.read\_any} cho phân tích nền tảng và thao tác khoan sâu theo đơn vị thuê bao, không bị khóa bởi gói của đơn vị thuê bao đang được xem. Giới hạn của phần này là báo cáo hiện là mô hình đọc tối thiểu trực tiếp; chưa khẳng định dự báo, phân tích hiệu suất nhân viên, kênh bảng điều khiển thời gian thực hoặc kho dữ liệu phân tích.
+
+\section{Đóng gói triển khai và khung minh chứng triển khai thử}
+
+QRTable có nền tảng đóng gói bằng Docker/Docker Compose và các thành phần phụ thuộc như PostgreSQL, MongoDB, Redis, Kafka, Keycloak, BFF và các ứng dụng phía người dùng. Trong phạm vi chương này, đóng gói triển khai được trình bày như khung vận hành cần minh chứng, không phải khẳng định hệ thống đã sẵn sàng vận hành thực tế. Khung minh chứng tối thiểu cho triển khai thử gồm: tên miền hoặc URL công khai, HTTPS/TLS nếu có, cấu hình BFF và ứng dụng phía người dùng, kết nối PostgreSQL/Redis/Kafka/Keycloak, đường gọi lại webhook SePay công khai, kiểm tra sức khỏe/sẵn sàng, kiểm thử khói các luồng phiên QR, xác nhận đơn, KDS, thanh toán và khởi tạo đơn vị thuê bao.
+
+Khi có triển khai thật, các minh chứng nên được đưa vào Chương 6 hoặc phụ lục: ảnh kiểm tra sức khỏe, nhật ký rút gọn, kết quả kiểm thử khói, cấu hình đường gọi lại công khai, phiên bản/phát hành/mã commit và danh sách kiểm tra hoàn tác cơ bản. Trước khi có các minh chứng đó, khóa luận chỉ nên viết rằng hệ thống có khả năng đóng gói và có khung kiểm chứng triển khai thử. Không nên dùng các cụm như tính sẵn sàng cao, khả năng quan sát đạt mức vận hành thực tế, kiểm thử tải hoặc hoàn tác đầy đủ nếu chưa có bằng chứng thực tế.
+
+\section{Tổng hợp minh chứng triển khai}
+
+Bảng~\ref{tab:chapter5-implemented-evidence} tóm tắt các luồng chính theo mục tiêu, bất biến, bằng chứng và giới hạn. Bảng này thay thế cách liệt kê cây mã nguồn hoặc thư viện dùng chung dài; mỗi dòng chỉ giữ thông tin cần thiết để người đọc thấy luồng đã được hiện thực và vẫn còn ranh giới đánh giá rõ ràng.
 
 {\scriptsize\sloppy
-\setlength{\tabcolsep}{3pt}
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}>{\raggedright\arraybackslash}p{0.16\textwidth}}
-  \caption[Shared libraries và vai trò trong consistency của QRTable.]{Shared libraries và vai trò trong consistency của QRTable.}
-  \label{tab:chapter5-shared-libraries}\\
+\setlength{\tabcolsep}{2pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.1\textwidth}}
+  \caption{Tổng hợp minh chứng triển khai các luồng cốt lõi của QRTable.}
+  \label{tab:chapter5-implemented-evidence}\\
   \toprule
-  Nhóm library & Alias chính & Vai trò consistency & Ví dụ sử dụng \\
+  Luồng & Mục tiêu nghiệp vụ & Bất biến / ranh giới chính & Bằng chứng chính & Giới hạn \\
   \midrule
   \endfirsthead
   \toprule
-  Nhóm library & Alias chính & Vai trò consistency & Ví dụ sử dụng \\
+  Luồng & Mục tiêu nghiệp vụ & Bất biến / ranh giới chính & Bằng chứng chính & Giới hạn \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  Configuration & backend config & Cấu hình TCP providers, Kafka, Redis, PostgreSQL, MongoDB, Keycloak và throttler theo một contract dùng chung. & TCP token, provider \\
-  Constants & backend constants & Redis key builder, WebSocket room builder, SaaS constants và enum giúp tránh magic string phân tán. & Redis key, WS room \\
-  Entities / schemas & backend models & Chia sẻ TypeORM/Mongoose model theo convention của repo; service vẫn phải giữ data ownership. & Order, Bill, Session \\
-  Interfaces / DTO contracts & TCP contracts & Định nghĩa request/response cho TCP boundary giữa BFF và service hoặc giữa service với service. & Stock, submit, webhook \\
-  Providers & backend providers & Đóng gói Redis client, Cloudinary provider và các dependency dùng chung để service không tự cấu hình rời rạc. & Redis, Cloudinary \\
-  Guards / interceptors / errors & backend cross-cutting & Chuẩn hóa auth/tenant/session guard, exception shape, logging và business error code. & Guard, error code \\
-  Cross-platform types & shared types & Chia sẻ type trạng thái, event payload và DTO frontend/backend ở các flow cần cùng contract. & Order state, event type \\
-  Shared constants frontend & shared constants & Map enum wire sang nhãn tiếng Việt và giữ SaaS wire types đồng bộ với backend constants. & Status label maps \\
-  Frontend UI/hooks/utils & frontend libs & Dùng lại UI component, hook và utility giữa Customer PWA/Management App khi phù hợp. & Badge, hook, formatter \\
-  Utilities & shared utils & Chuẩn hóa helper thuần như làm tròn tiền VND hoặc formatter dùng lại. & VND rounding \\
+  Phiên QR và giỏ chung & Khách vào phiên từ QR, dùng chung giỏ và gửi đơn. & Order sở hữu phiên/giỏ/đơn; Catalog sở hữu bàn/thực đơn; Redis chỉ hỗ trợ đường xử lý nóng. & Hình~\ref{fig:chapter5-qr-ordering-session}; kiểm thử phiên/giỏ/gửi đơn của Order. & Chưa khẳng định hàng đợi thao tác ngoại tuyến đầy đủ. \\
+  Xác nhận đơn và tồn kho & Nhân viên xác nhận đơn khi đủ tồn kho. & Catalog là chủ tồn kho; Order là chủ đơn; xác nhận lặp không trừ tồn kho lần hai. & Hình~\ref{fig:chapter5-order-confirm-stock}; Saga đơn vị/hợp đồng và tích hợp tồn kho có điều kiện. & Chưa khẳng định củng cố Saga đầy đủ. \\
+  KDS & Phiếu bếp/bar xuất hiện sau khi đơn được xác nhận và giao diện cập nhật gần thời gian thực. & Kitchen sở hữu bản chiếu Redis; Order vẫn sở hữu vòng đời đơn/dòng đơn; WebSocket là gợi ý/tải lại. & Hình~\ref{fig:chapter5-kds-ticket-lifecycle}; kiểm thử bộ tiêu thụ Kitchen/KDS. & Chưa có kho lịch sử KDS riêng. \\
+  Thanh toán & Ghi nhận tiền mặt hoặc VietQR/SePay và hoàn tất hóa đơn/phiên. & Payment sở hữu bản ghi thanh toán; Order sở hữu hóa đơn/phiên; webhook trùng/thiếu phải lũy đẳng. & Hình~\ref{fig:chapter5-payment-settlement}; kiểm thử ghi nhận thanh toán/webhook. & SePay thật phụ thuộc minh chứng nhà cung cấp. \\
+  Khởi tạo SaaS & Tạo đơn vị thuê bao, chủ sở hữu, thuê bao và cấu hình thanh toán. & SaaS sở hữu đơn vị thuê bao/thuê bao; Authorizer/User-Access/Payment chỉ qua hợp đồng; có bù trừ. & Hình~\ref{fig:chapter5-saas-onboarding-saga}; kiểm thử khởi tạo với cơ sở dữ liệu/Payment có điều kiện. & Chưa khẳng định kiểm chứng đầu-cuối trên môi trường thật qua mọi phụ thuộc. \\
+  Bảng điều khiển/báo cáo & Owner/Manager và Super Admin xem báo cáo đúng quyền/gói. & BFF không truy vấn kết hợp trực tiếp cơ sở dữ liệu; Payment/Order/Catalog/SaaS giữ mô hình đọc của dữ liệu mình sở hữu. & Controller báo cáo BFF; dịch vụ báo cáo; kiểm thử báo cáo Management App. & Mô hình đọc tối thiểu, chưa có kho phân tích hoặc bảng điều khiển thời gian thực. \\
+  Đóng gói/triển khai thử & Có khung kiểm chứng môi trường chạy thử. & Chỉ khẳng định khi có URL, kiểm tra sức khỏe, kiểm thử khói và đường gọi lại webhook thật. & Docker, compose và cấu hình hiện có; danh sách kiểm tra triển khai thử cần bổ sung minh chứng. & Chưa khẳng định sẵn sàng vận hành thực tế/tính sẵn sàng cao. \\
 \end{longtable}
 }
 
-Điểm cần nhấn mạnh là shared library không được dùng như đường tắt để truy cập data của service khác. Một service có thể import interface, DTO, enum hoặc provider token dùng chung; nhưng nếu cần dữ liệu thuộc bounded context khác, nó vẫn phải đi qua TCP/gRPC hoặc Kafka event. Nhờ vậy, monorepo giúp giảm duplication ở contract layer mà không biến hệ thống thành một monolith dùng chung repository.
-
-\section{Tổng hợp implementation evidence và artifact demo}
-
-Các sequence diagram và Bảng~\ref{tab:chapter5-implemented-evidence} cho thấy QRTable đã có dấu vết triển khai cho các flow chính của đề tài. Với QR/session/cart, evidence nằm ở Order service, Redis key builder, cart versioning và submit idempotency. Với stock consistency, evidence nằm ở interaction Order--Catalog và outbox \texttt{order.confirmed}. Với KDS, evidence nằm ở Kafka consumer, Redis queue và realtime refetch model. Với Payment, evidence nằm ở VND rounding, cash/VietQR settlement, SePay webhook idempotency và payment-to-order bridge. Với SaaS, evidence nằm ở onboarding saga, slug policy, subscription/payment settings và compensation baseline.
-
-Ảnh chụp giao diện có vai trò minh họa bề mặt sử dụng của các flow trên, nhưng không thay thế evidence code/test. Vì vậy, bản báo cáo nên chỉ chọn một số screenshot đại diện trong chương chính, chẳng hạn Customer PWA ở màn hình menu/cart, POS xác nhận order, KDS queue và Super Admin onboarding tenant. Bộ ảnh đầy đủ nên đặt ở phụ lục UI gallery để người đọc có thể kiểm tra hành trình demo mà không làm loãng lập luận kỹ thuật của Chương 5.
-
-Kết luận của chương là QRTable không chỉ dừng ở thiết kế kiến trúc. Các bounded context chính đã có implementation cụ thể, contract giữa service được thể hiện qua TCP/Kafka/WebSocket, và nhiều invariant quan trọng đã có test hoặc traceability evidence. Đồng thời, chương này cũng giữ ranh giới với Chương 6: những nội dung như live SePay validation, browser demo đầy đủ, observability production-grade hoặc benchmark tải lớn chỉ được đánh giá khi có artifact kiểm chứng, không được suy ra từ việc code đã tồn tại.
+Từ các luồng trên, có thể thấy QRTable không chỉ tồn tại ở mức thiết kế kiến trúc. Các ngữ cảnh nghiệp vụ chính đã có phần hiện thực tương ứng, các luồng liên dịch vụ đi qua hợp đồng thay vì truy cập chéo cơ sở dữ liệu, và những bất biến quan trọng như cô lập đơn vị thuê bao, quyền sở hữu tồn kho, tính lũy đẳng thanh toán, bù trừ Saga và WebSocket gợi ý/tải lại đã được thể hiện trong mã nguồn, kiểm thử và sơ đồ. Phần đánh giá ở Chương 6 sẽ dùng các bằng chứng này để phân loại kết luận nào đã được kiểm chứng tự động, kết luận nào mới được hỗ trợ bởi thiết kế và kết luận nào cần minh chứng triển khai thử trước khi diễn đạt mạnh hơn.

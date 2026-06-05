@@ -3,7 +3,7 @@ sequenceDiagram
   autonumber
   actor Staff as Staff/Customer
   participant BFF as BFF<br/>Payment API + webhook edge
-  participant Payment as Payment<br/>settlement services
+  participant Payment as Payment<br/>payment owner
   participant PDB as PostgreSQL<br/>Payment DB
   participant Order as Order<br/>bill/session owner
   participant ODB as PostgreSQL<br/>Order DB
@@ -14,17 +14,17 @@ sequenceDiagram
   rect rgb(240, 249, 255)
     Note over Staff,Kafka: Cash branch
     Staff->>BFF: Confirm cash payment
-    BFF->>Payment: TCP PAYMENT.CONFIRM_CASH(billId, amountReceived)
-    Payment->>Order: TCP BILL_GET_PAYMENT_SNAPSHOT
-    Order->>ODB: Read bill status and rounded total
+    BFF->>Payment: Confirm cash settlement
+    Payment->>Order: Request bill payment snapshot
+    Order->>ODB: Read bill status and payable total
     Order-->>Payment: PENDING_PAYMENT bill snapshot
-    Payment->>Payment: Validate VND rounding snapshot
-    Payment->>PDB: Transaction: lock/create payment
-    Payment->>PDB: Save PAID CASH + audit logs
+    Payment->>Payment: Validate amount and VND rounding
+    Payment->>PDB: Lock or create payment record
+    Payment->>PDB: Save PAID CASH and audit log
     Payment->>PDB: Insert outbox payment.completed
-    Payment->>Order: TCP BILL_MARK_PAID(paymentId, method=CASH)
+    Payment->>Order: Mark bill paid idempotently
     Order->>ODB: Lock bill/session, mark bill PAID
-    Order->>ODB: Close session and clear session/cart via SessionService
+    Order->>ODB: Close session and update table flow
     Order-->>Payment: Bill marked paid
     Payment-->>BFF: Payment response
     BFF-->>Staff: Settlement completed
@@ -35,19 +35,19 @@ sequenceDiagram
   rect rgb(240, 253, 244)
     Note over Staff,Kafka: VietQR / SePay branch
     Staff->>BFF: Request VietQR for bill
-    BFF->>Payment: TCP PAYMENT.CREATE_VIETQR(billId)
-    Payment->>Order: TCP BILL_GET_PAYMENT_SNAPSHOT
+    BFF->>Payment: Create VietQR payment request
+    Payment->>Order: Request bill payment snapshot
     Order-->>Payment: PENDING_PAYMENT bill snapshot
-    Payment->>Payment: billReference = QRTBL + bill id prefix
+    Payment->>Payment: Generate QRTBL bill reference
     Payment->>PDB: Create/reuse PENDING payment
     Payment-->>BFF: qrUrl, bank account, roundedTotal
     BFF-->>Staff: Display VietQR
     Staff->>Sepay: Bank transfer with billReference
     Sepay->>BFF: POST /webhooks/sepay/{tenantSlug}
-    BFF->>Payment: TCP PAYMENT.HANDLE_SEPAY_WEBHOOK
-    Payment->>Payment: Verify tenant secret with timingSafeEqual
-    Payment->>Payment: Extract billReference from code/content
-    Payment->>PDB: Transaction: lock payment by billReference
+    BFF->>Payment: Handle SePay webhook
+    Payment->>Payment: Verify tenant webhook secret
+    Payment->>Payment: Match bill reference from payload
+    Payment->>PDB: Lock payment by reference
     alt Duplicate webhook
       Payment->>PDB: Audit SEPAY_WEBHOOK_DUPLICATE
       Payment-->>BFF: success
@@ -57,7 +57,7 @@ sequenceDiagram
     else Amount is sufficient
       Payment->>PDB: Save PAID VIETQR + sepayTransactionId
       Payment->>PDB: Insert outbox payment.completed
-      Payment->>Order: TCP BILL_MARK_PAID(paymentId, method=VIETQR)
+      Payment->>Order: Mark bill paid idempotently
       Order->>ODB: Mark bill PAID, close session, table CLEANING
       Payment-->>BFF: success
       Outbox->>Kafka: Publish payment.completed

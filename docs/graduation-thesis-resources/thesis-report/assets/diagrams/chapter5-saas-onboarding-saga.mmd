@@ -2,28 +2,28 @@
 sequenceDiagram
   autonumber
   actor Admin as Super Admin<br/>Management App
-  participant BFF as BFF / SaaS controller
-  participant SaaS as SaaS<br/>OnboardingSagaService
+  participant BFF as BFF<br/>Platform API
+  participant SaaS as SaaS<br/>tenant owner
   participant SDB as PostgreSQL<br/>SaaS DB
-  participant Authz as Authorizer<br/>Keycloak TCP
-  participant UserAccess as User-Access<br/>profile TCP
-  participant Payment as Payment<br/>settings TCP
+  participant Authz as Authorizer<br/>identity contract
+  participant UserAccess as User-Access<br/>profile contract
+  participant Payment as Payment<br/>settings contract
   participant Outbox as SaaS<br/>Outbox relay
   participant Kafka as Kafka<br/>tenant.created
 
   Admin->>BFF: POST tenant onboarding
   BFF->>BFF: Verify SUPER_ADMIN permission
-  BFF->>SaaS: TCP TENANT.ONBOARD
-  SaaS->>SaaS: Normalize slug, check uniqueness and reserved words
+  BFF->>SaaS: Start tenant onboarding
+  SaaS->>SaaS: Validate slug and onboarding request
   SaaS->>SDB: Create tenant ACTIVE
-  SaaS->>Authz: TCP CREATE_TENANT_OWNER(email, tenantId, role OWNER)
+  SaaS->>Authz: Create tenant owner identity
   Authz-->>SaaS: ownerUserId from Keycloak
-  SaaS->>UserAccess: TCP UPSERT_WITH_TENANT(owner profile, OWNER role)
+  SaaS->>UserAccess: Create owner profile and role mapping
   UserAccess-->>SaaS: Profile upserted
   SaaS->>SDB: Update tenant.ownerId
-  SaaS->>SDB: assignPlan(source=INITIAL_ONBOARDING)
-  SaaS->>Payment: TCP PAYMENT_SETTINGS.CREATE_EMPTY(tenantId)
-  Payment-->>SaaS: Empty settings idempotently created
+  SaaS->>SDB: Assign initial subscription
+  SaaS->>Payment: Create tenant payment settings
+  Payment-->>SaaS: Payment settings created idempotently
   SaaS->>SDB: Insert outbox tenant.created
   SaaS-->>BFF: {tenant, ownerUserId}
   BFF-->>Admin: Onboarding success
@@ -31,13 +31,13 @@ sequenceDiagram
   Outbox->>Kafka: Publish tenant.created
 
   alt Failure after owner user was created
-    SaaS->>Authz: TCP DISABLE_USER(reason=TENANT_ONBOARDING_FAILED)
+    SaaS->>Authz: Disable owner identity
     Authz-->>SaaS: User disabled or ignored
     opt Initial subscription was assigned
-      SaaS->>SDB: compensateInitialOnboarding(tenantId)
+      SaaS->>SDB: Compensate initial subscription
     end
     SaaS->>SDB: Delete partially created tenant
-    SaaS-->>BFF: TENANT_ONBOARDING_FAILED
+    SaaS-->>BFF: Onboarding failed
     BFF-->>Admin: Show onboarding failure
   else Failure before owner user creation
     SaaS->>SDB: Delete tenant if it exists
@@ -45,4 +45,4 @@ sequenceDiagram
     BFF-->>Admin: Show failure reason
   end
 
-  Note over SaaS,Payment: The saga coordinates services by TCP and keeps tenant ownership in SaaS DB
+  Note over SaaS,Payment: SaaS coordinates by contract and tenant/subscription data remain in SaaS DB

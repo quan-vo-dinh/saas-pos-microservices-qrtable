@@ -1,0 +1,85 @@
+Project QRTable_Catalog_Service {
+  database_type: 'PostgreSQL'
+  Note: 'DBML source for the Catalog service schema. Generated from TypeORM entities registered by the Catalog modules. Importable into dbdiagram.io. Cross-service references are notes, not foreign keys.'
+}
+
+Table areas {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  name varchar(120) [not null]
+  sort_order int [not null, default: 0]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Tenant-scoped area group for restaurant tables.'
+
+  indexes {
+    (tenant_id, name) [unique]
+    (tenant_id, sort_order)
+  }
+}
+
+Table tables {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  area_id uuid [not null]
+  name varchar(120) [not null]
+  capacity int [not null, default: 1]
+  status varchar(20) [not null, note: 'available, occupied, billing, cleaning']
+  qr_token varchar(255) [not null]
+  session_id varchar(255) [note: 'Runtime/session reference owned by Order service. Not a DB foreign key.']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Catalog owns table identity, QR token, area assignment and table status.'
+
+  indexes {
+    (tenant_id, name) [unique]
+    (tenant_id, qr_token) [unique]
+    (tenant_id, area_id)
+    (tenant_id, status)
+  }
+}
+
+Table categories {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  name varchar(120) [not null]
+  sort_order int [not null, default: 0]
+  status varchar(20) [not null, note: 'active, inactive']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Tenant-scoped menu category.'
+
+  indexes {
+    (tenant_id, name) [unique]
+    (tenant_id, sort_order)
+  }
+}
+
+Table menu_items {
+  id uuid [pk]
+  tenant_id varchar(64) [not null]
+  category_id uuid [not null]
+  name varchar(255) [not null]
+  price decimal(12,2) [not null]
+  stock int [not null, default: 0]
+  status varchar(20) [not null, note: 'available, out_of_stock']
+  station varchar(20) [not null, note: 'KITCHEN or BAR']
+  image_url varchar(500)
+  sort_order int [not null, default: 0]
+  deleted_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  Note: 'Catalog is the only service that writes menu item availability and stock.'
+
+  indexes {
+    (tenant_id, category_id)
+    (tenant_id, status)
+  }
+}
+
+Ref: tables.area_id > areas.id
+Ref: menu_items.category_id > categories.id

@@ -1,0 +1,35 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "curve": "basis"}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#f8fafc", "primaryBorderColor": "#cbd5e1", "lineColor": "#475569", "tertiaryColor": "#ffffff"}}}%%
+flowchart TB
+  Title["Ranh giới module trong Nx monorepo QRTable"]
+
+  Apps["apps/<br/>bff, authorizer, user-access, saas<br/>catalog, order, kitchen, payment<br/>management-app, customer-pwa"]
+  Libs["libs/<br/>configuration, constants, dtos, schemas<br/>guards, providers, queue<br/>shared types, UI, hooks, utils"]
+  Nx@{ icon: "logos:nx", form: "rounded", label: "Nx workspace - project graph, task cache, affected build/test", pos: "t", h: 64 }
+  Allowed["Được phép<br/>app import shared contract<br/>DTO, KafkaTopic, RedisKey, WsRoom"]
+  Runtime["Truy cập chéo miền<br/>qua TCP/gRPC hoặc Kafka event"]
+  Forbidden["Không được phép<br/>import repository/entity nội bộ<br/>hoặc ghi CSDL của service khác"]
+
+  Title --> Apps
+  Title --> Libs
+  Apps -->|"import hợp đồng dùng chung"| Allowed
+  Libs -->|"cung cấp hợp đồng và helper"| Allowed
+  Allowed --> Runtime
+  Runtime --> Forbidden
+  Apps -->|"được phân tích bởi"| Nx
+  Libs -->|"được phân tích bởi"| Nx
+  Nx -->|"xác định phần bị ảnh hưởng"| Runtime
+
+  classDef title fill:#eff6ff,stroke:#2563eb,color:#0f172a,font-weight:bold;
+  classDef apps fill:#e0f2fe,stroke:#0284c7,color:#0f172a;
+  classDef libs fill:#dcfce7,stroke:#16a34a,color:#0f172a;
+  classDef nx fill:#f5f3ff,stroke:#7c3aed,color:#0f172a;
+  classDef good fill:#ecfdf5,stroke:#059669,color:#0f172a;
+  classDef bad fill:#fee2e2,stroke:#dc2626,color:#0f172a;
+  classDef neutral fill:#f8fafc,stroke:#64748b,color:#0f172a;
+
+  class Title title;
+  class Apps apps;
+  class Libs libs;
+  class Nx nx;
+  class Allowed,Runtime good;
+  class Forbidden bad;

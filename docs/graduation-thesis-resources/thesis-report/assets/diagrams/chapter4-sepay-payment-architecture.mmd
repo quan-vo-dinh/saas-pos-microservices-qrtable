@@ -1,0 +1,55 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "curve": "basis"}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#f8fafc", "primaryBorderColor": "#cbd5e1", "lineColor": "#475569", "tertiaryColor": "#ffffff"}}}%%
+flowchart TB
+  subgraph BillLane["Dòng tiền hóa đơn nhà hàng - QRTBL"]
+    direction TB
+    Customer["Khách / POS<br/>yêu cầu thanh toán hóa đơn"]
+    BillBff["BFF<br/>điều phối yêu cầu thanh toán"]
+    Order["Order<br/>ảnh chụp hóa đơn, phiên, bill"]
+    Payment["Payment<br/>tạo VietQR ref QRTBL<br/>sở hữu payment/settings/audit"]
+    SepayBill@{ img: "assets/diagrams/icons/sepay-placeholder.png", label: "SePay/VietQR - webhook QRTBL", pos: "t", h: 58, constraint: "on" }
+    PaymentSettle["Payment<br/>idempotent settle + audit"]
+    OrderPaid["Order<br/>đánh dấu hóa đơn đã thanh toán"]
+    Kafka@{ icon: "logos:kafka-icon", form: "rounded", label: "Kafka - payment.completed", pos: "t", h: 58 }
+  end
+
+  subgraph SubscriptionLane["Dòng tiền gói thuê bao nền tảng - QRSUB"]
+    direction TB
+    Owner["Owner / Admin<br/>mua hoặc gia hạn gói"]
+    SubBff["BFF<br/>điều phối checkout gói"]
+    SaasInvoice["SaaS<br/>tạo hóa đơn gói"]
+    SepaySub@{ img: "assets/diagrams/icons/sepay-placeholder.png", label: "SePay/VietQR - webhook QRSUB", pos: "t", h: 58, constraint: "on" }
+    SaasSettle["SaaS<br/>idempotent settle subscription invoice"]
+    Entitlement["Subscription / entitlement<br/>cập nhật quyền gói"]
+  end
+
+  Customer --> BillBff
+  BillBff -->|"lấy bill snapshot"| Order
+  BillBff -->|"tạo payment"| Payment
+  Payment -->|"VietQR QRTBL"| SepayBill
+  SepayBill -->|"webhook qua BFF"| PaymentSettle
+  PaymentSettle --> OrderPaid
+  PaymentSettle --> Kafka
+
+  Owner --> SubBff
+  SubBff --> SaasInvoice
+  SaasInvoice -->|"VietQR QRSUB"| SepaySub
+  SepaySub -->|"webhook qua BFF"| SaasSettle
+  SaasSettle --> Entitlement
+
+  Boundary["Ranh giới trách nhiệm<br/>Payment không sở hữu gói thuê bao.<br/>SaaS không sở hữu hóa đơn nhà hàng.<br/>BFF xác thực và định tuyến webhook."]
+  PaymentSettle --> Boundary
+  SaasSettle --> Boundary
+
+  classDef actor fill:#eff6ff,stroke:#2563eb,color:#0f172a;
+  classDef edge fill:#fff7ed,stroke:#ea580c,color:#0f172a;
+  classDef payment fill:#f0fdf4,stroke:#16a34a,color:#0f172a;
+  classDef provider fill:#fee2e2,stroke:#dc2626,color:#0f172a;
+  classDef event fill:#f5f3ff,stroke:#7c3aed,color:#0f172a;
+  classDef note fill:#f8fafc,stroke:#64748b,color:#0f172a;
+
+  class Customer,Owner actor;
+  class BillBff,SubBff edge;
+  class Order,Payment,PaymentSettle,OrderPaid,SaasInvoice,SaasSettle,Entitlement payment;
+  class SepayBill,SepaySub provider;
+  class Kafka event;
+  class Boundary note;

@@ -11,7 +11,9 @@ Tài liệu này là bản khung chính thức để chuyển từ bản đồ b
 
 Tài liệu này không phải bản khóa luận hoàn chỉnh. Khi bắt đầu viết từng chương, cần quay lại `thesis-evidence-map.md` để kiểm tra nguồn bằng chứng, trạng thái implementation nội bộ và chính sách tránh overclaim.
 
-Ghi chú cập nhật 2026-06-01: technical docs đã bổ sung Phase 4D kỹ thuật về Dashboard & Reporting và Phase 4D.1 về dashboard entitlement/UI polish. Outline này giữ vai trò chỉ dẫn report, nên cần backfill phần này vào Chương 3-6 trước bản nộp cuối: yêu cầu dashboard/reporting, kiến trúc BFF/guard/entitlement, implementation evidence, evaluation và screenshot/demo thật.
+Ghi chú cập nhật 2026-06-01: technical docs đã bổ sung Phase 4D kỹ thuật về Dashboard & Reporting và Phase 4D.1 về dashboard entitlement/UI polish. Outline này giữ vai trò chỉ dẫn report; sau Plan A và Plan B ngày 2026-06-04, phần còn lại trước bản nộp cuối tập trung vào Chương 1, Abstract/phụ lục, screenshot/demo thật và artifact production/pilot nếu có.
+
+Ghi chú sync 2026-06-04: Chương 3 đã backfill yêu cầu Dashboard/Reporting và staff management, đổi tên thành `Từ vận hành F&B đến yêu cầu hệ thống QRTable`, cập nhật Hình 3.1 và build LaTeX pass. Chương 4 đã được polish theo hướng `Thiết kế kiến trúc và quyết định công nghệ cho QRTable`, bổ sung bảng quyết định công nghệ, bảng thiết kế dữ liệu theo ranh giới dịch vụ và Hình 4.1-4.10. Chương 5 đã đổi hướng thành `Hiện thực các luồng vận hành cốt lõi của QRTable`, gộp evidence theo luồng ở Bảng 5.1 và bỏ bảng shared libraries độc lập. Plan B/Chương 6-7 đã được audit/rerun sau Plan A: Chương 6 đổi thành `Kiểm chứng và đánh giá hệ thống QRTable`, phản ánh Dashboard/Reporting, entitlement, production/pilot claim policy và tham chiếu trực tiếp tới Bảng 4.3/4.4/4.5, Hình 5.1-Hình 5.5, Bảng 5.1; Chương 7 đã có nội dung kết luận/hướng phát triển thật. Phần còn lại trước bản nộp cuối là Chương 1, Abstract/phụ lục, screenshot/demo thật và artifact production/pilot nếu có.
 
 ## 2. Nguyên tắc viết khóa luận
 
@@ -70,16 +72,16 @@ Mục tiêu thực tế cho bản nháp đầu: khoảng 105-130 trang nội dun
 
 ## 5. Page budget dự kiến
 
-| Phần                                              | Số trang gợi ý | Vai trò                                                                        |
-| ------------------------------------------------- | -------------- | ------------------------------------------------------------------------------ |
-| Tóm tắt khóa luận / Abstract                      | 1-2            | Tóm tắt vấn đề, hướng tiếp cận, giải pháp và kết quả.                          |
-| Chương 1. Mở đầu                                  | 8-10           | Đặt vấn đề, mục tiêu, phạm vi và đóng góp.                                     |
-| Chương 2. Cơ sở lý thuyết và công trình liên quan | 18-24          | Tạo nền tảng học thuật và khoảng trống nghiên cứu.                             |
-| Chương 3. Phân tích yêu cầu                       | 12-16          | Chuyển bài toán thành yêu cầu hệ thống và ràng buộc chất lượng.                |
-| Chương 4. Thiết kế và kiến trúc hệ thống          | 20-26          | Giải thích kiến trúc, service boundaries, giao tiếp và trade-off.              |
-| Chương 5. Triển khai hệ thống                     | 24-32          | Chứng minh hệ thống đã được hiện thực hóa bằng code evidence và flow đại diện. |
-| Chương 6. Đánh giá                                | 14-20          | Đánh giá chức năng, kiến trúc và NFR với claim policy an toàn.                 |
-| Chương 7. Kết luận và hướng phát triển            | 5-7            | Tổng kết đóng góp, hạn chế và hướng phát triển.                                |
+| Phần                                                             | Số trang gợi ý | Vai trò                                                                                 |
+| ---------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------- |
+| Tóm tắt khóa luận / Abstract                                     | 1-2            | Tóm tắt vấn đề, hướng tiếp cận, giải pháp và kết quả.                                   |
+| Chương 1. Mở đầu                                                 | 8-10           | Đặt vấn đề, mục tiêu, phạm vi và đóng góp.                                              |
+| Chương 2. Cơ sở lý thuyết và công trình liên quan                | 18-24          | Tạo nền tảng học thuật và khoảng trống nghiên cứu.                                      |
+| Chương 3. Từ vận hành F&B đến yêu cầu hệ thống QRTable           | 12-16          | Chuyển bài toán thành yêu cầu hệ thống và ràng buộc chất lượng.                         |
+| Chương 4. Thiết kế kiến trúc và quyết định công nghệ cho QRTable | 20-26          | Giải thích kiến trúc, quyết định công nghệ, service boundaries, giao tiếp và trade-off. |
+| Chương 5. Hiện thực các luồng vận hành cốt lõi của QRTable       | 24-32          | Chứng minh hệ thống đã được hiện thực hóa bằng code evidence và các luồng đại diện.     |
+| Chương 6. Đánh giá                                               | 14-20          | Đánh giá chức năng, kiến trúc và NFR với claim policy an toàn.                          |
+| Chương 7. Kết luận và hướng phát triển                           | 5-7            | Tổng kết đóng góp, hạn chế và hướng phát triển.                                         |
 
 Tổng mục tiêu cho nội dung chính: khoảng 102-137 trang tùy mức chi tiết. Bản nháp nên hướng tới 105-130 trang để có dáng của một báo cáo khóa luận đầy đủ; các phần mở rộng nên tập trung vào Chương 2, Chương 4, Chương 5 và Chương 6 thay vì kéo dài phần mở đầu hoặc kết luận.
 
@@ -216,26 +218,27 @@ Artifact nên có:
 - Bảng 2.3. So sánh giao tiếp đồng bộ và bất đồng bộ trong microservices.
 - Hình 2.1. Mô hình khái niệm SaaS multi-tenancy.
 
-### Chương 3. Phân tích yêu cầu
+### Chương 3. Từ vận hành F&B đến yêu cầu hệ thống QRTable
 
 Vai trò: Chuyển bối cảnh và lý thuyết thành yêu cầu cụ thể cho hệ thống QRTable.
 
-#### 3.1. Tổng quan nghiệp vụ QRTable
+#### 3.1. Bối cảnh vận hành và phạm vi nghiệp vụ của QRTable
 
 - Các nhóm người dùng: Super Admin, Restaurant Owner, Manager/Staff, Chef/Barista, Customer.
-- Ngữ cảnh vận hành: tenant onboarding, quản lý menu/bàn, quét QR, gọi món, bếp xử lý, thanh toán, quản trị gói dịch vụ.
+- Ngữ cảnh vận hành: tenant onboarding, quản lý menu/bàn/staff, quét QR, gọi món, bếp xử lý, thanh toán, dashboard/reporting tenant và quản trị gói dịch vụ.
 
-#### 3.2. Actor và use case chính
+#### 3.2. Bản đồ tác nhân, phạm vi truy cập và use case cốt lõi
 
-- Super Admin: tenant onboarding, lifecycle, plan/subscription.
-- Owner/Manager: menu, table/QR, staff, payment settings, subscription.
+- Super Admin: tenant onboarding, lifecycle, plan/subscription, platform analytics và tenant drilldown qua `report.read_any`.
+- Owner/Manager: menu, table/QR, staff, payment settings, subscription, dashboard/reporting tenant qua `report.read_own` và plan feature entitlement.
 - Staff/POS: xem order, xác nhận order, xử lý bill/payment, quản lý bàn.
 - Kitchen/Bar: xem queue, cập nhật trạng thái món.
 - Customer: quét QR, xem menu, đặt món, theo dõi trạng thái, yêu cầu thanh toán.
 
-#### 3.3. Functional requirements theo domain
+#### 3.3. Năng lực hệ thống theo các miền vận hành
 
 - SaaS management.
+- Staff management tenant ở mức Owner/Manager, không mở rộng thành HRM/payroll/shift scheduling.
 - Catalog/menu/table/QR.
 - Customer session/shared cart/order.
 - Staff POS và KDS.
@@ -243,7 +246,7 @@ Vai trò: Chuyển bối cảnh và lý thuyết thành yêu cầu cụ thể ch
 - Dashboard/reporting cho Owner/Manager và platform analytics cho Super Admin, có plan feature entitlement theo gói.
 - Auth/RBAC và tenant isolation.
 
-#### 3.4. Non-functional requirements
+#### 3.4. Ràng buộc chất lượng và tiêu chí kiểm chứng
 
 - Tenant isolation.
 - Security và authorization.
@@ -253,7 +256,7 @@ Vai trò: Chuyển bối cảnh và lý thuyết thành yêu cầu cụ thể ch
 - Scalability ở mức thiết kế.
 - Testability và reproducible demo.
 
-#### 3.5. Business state machines
+#### 3.5. Các vòng đời trạng thái chi phối nghiệp vụ
 
 - Table/session lifecycle.
 - Cart/order lifecycle.
@@ -261,11 +264,11 @@ Vai trò: Chuyển bối cảnh và lý thuyết thành yêu cầu cụ thể ch
 - Bill/payment lifecycle.
 - Tenant/subscription lifecycle.
 
-#### 3.6. Phạm vi loại trừ và giới hạn đánh giá
+#### 3.6. Ranh giới phạm vi và giới hạn của các claim đánh giá
 
 - Không claim benchmark tải lớn nếu chưa đo.
 - Không claim production-grade observability/deployment nếu chỉ có thiết kế hoặc demo giới hạn.
-- Không đưa các module mở rộng như HRM, CRM, BI/AI nâng cao ngoài dashboard/reporting Phase 4D kỹ thuật, native mobile, advanced inventory/BOM vào phạm vi kết quả chính nếu chưa có evidence.
+- Không đưa các module mở rộng như HRM/payroll/shift scheduling, CRM, BI/AI nâng cao, warehouse/OLAP, scheduled export, staff performance analytics, forecasting/anomaly, native mobile hoặc advanced inventory/BOM vào phạm vi kết quả chính nếu chưa có evidence.
 
 Nguồn chính: `docs/business-logic.md`, `docs/architecture/permission-matrix.md`, phase records, `docs/specs/*`.
 
@@ -276,175 +279,191 @@ Artifact nên có:
 - Bảng 3.2. Non-functional requirements và tiêu chí đánh giá.
 - Hình 3.2. State machine của table/session/order/payment.
 
-### Chương 4. Thiết kế và kiến trúc hệ thống
+### Chương 4. Thiết kế kiến trúc và quyết định công nghệ cho QRTable
 
-Vai trò: Giải thích QRTable được thiết kế như thế nào và vì sao các quyết định kỹ thuật phù hợp với bài toán.
+Vai trò: Giải thích QRTable được thiết kế như thế nào, vì sao chọn các công nghệ chính và các quyết định đó tạo ra đánh đổi gì trong phạm vi khóa luận.
 
-#### 4.1. Nguyên tắc thiết kế kiến trúc
+#### 4.1. Mục tiêu thiết kế và nguyên tắc kiến trúc
 
-- Database per service.
-- Tenant isolation by default.
-- API Gateway/BFF as single entry.
-- Selective event-driven communication.
-- Cache-first cho hot data.
-- Idempotency và server-side timestamp.
+- Tách trách nhiệm theo miền nghiệp vụ và cơ sở dữ liệu riêng theo dịch vụ.
+- Cô lập tenant theo mặc định bằng ngữ cảnh `tenant_id`.
+- BFF là điểm vào duy nhất của ứng dụng người dùng.
+- Giao tiếp hướng sự kiện có chọn lọc, không dùng Kafka cho mọi thứ.
+- Redis là bộ nhớ đệm/trạng thái chạy có chủ sở hữu, không là nguồn sự thật chung.
+- Idempotency, bù trừ có kiểm soát và dấu thời gian phía máy chủ.
 
-#### 4.2. Kiến trúc tổng thể
+#### 4.2. Lựa chọn công nghệ và vai trò trong QRTable
 
-- Client layer: Customer PWA, Management App/POS/KDS/Admin.
-- BFF layer: HTTP API, guard chain, WebSocket gateway, TCP/gRPC clients.
-- Service layer: Authorizer, User-Access, SaaS, Catalog, Order, Kitchen, Payment.
-- Infrastructure layer: PostgreSQL, MongoDB, Redis, Kafka, Keycloak, SePay/VietQR, Cloudinary, Docker.
+- Nx monorepo cho quản lý `apps/`, `libs/`, hợp đồng dùng chung và đồ thị phụ thuộc.
+- NestJS/TypeScript cho BFF và các dịch vụ phía máy chủ.
+- Next.js/React và React/Vite PWA cho hai ứng dụng người dùng.
+- PostgreSQL, MongoDB, Redis, Kafka, Keycloak, Socket.IO/WebSocket, SePay/VietQR, Cloudinary và Docker/Docker Compose.
+- Luôn nêu lý do chọn và giới hạn claim, không viết như danh sách công nghệ.
 
-#### 4.3. Tổ chức Nx monorepo
+#### 4.3. Kiến trúc tổng thể và bản đồ tích hợp công nghệ
 
-- `apps/` cho deployable apps.
-- `libs/` cho shared DTOs, constants, schemas, providers, guards, queue, frontend UI/hooks/utils.
-- Lợi ích với maintainability: shared contracts, affected tests/builds, module boundary rõ hơn.
+- Hình bản đồ tích hợp công nghệ: ứng dụng người dùng -> BFF -> dịch vụ miền nghiệp vụ -> dữ liệu/sự kiện -> nhà cung cấp ngoài.
+- Hình kiến trúc tổng thể và C4/container để giữ góc nhìn hệ thống.
+- Bản đồ công nghệ không phải logo gallery; mỗi công nghệ phải gắn với lớp kiến trúc hoặc luồng sử dụng cụ thể.
 
-#### 4.4. Service boundaries và data ownership
+#### 4.4. Tổ chức Nx monorepo và ranh giới module
 
-- BFF không chứa business logic.
-- Catalog sở hữu menu, category, area, table, QR token và stock.
-- Order sở hữu session, cart/order lifecycle, bill request và order state machine.
-- Kitchen sở hữu KDS queue runtime bằng Redis.
-- Payment sở hữu transaction/payment settings/webhook settlement.
-- SaaS sở hữu tenant, plan, subscription, tenant lifecycle.
-- Reporting/dashboard APIs tổng hợp read model qua BFF và service owners hiện có; không tạo service mới trong report nếu technical docs/source không có service tương ứng.
-- User-Access và Authorizer xử lý profile/role/JWT/Keycloak.
+- `apps/` cho các ứng dụng/dịch vụ triển khai được.
+- `libs/` cho DTO, constants, schemas, providers, guards, queue, UI/hook/utility dùng chung.
+- Monorepo giúp giữ hợp đồng dùng chung nhưng không cho phép import repository/entity của dịch vụ khác.
 
-#### 4.5. Multi-tenancy strategy
+#### 4.5. Ranh giới dịch vụ và trách nhiệm dữ liệu
 
-- Database-per-service kết hợp discriminator column `tenant_id`.
-- Tenant context qua guard/middleware.
-- Cache/event/file boundary cần giữ tenant-aware.
-- Cách trình bày: đây là thiết kế/implementation hiện tại, không nói là mô hình duy nhất hoặc production tối ưu cho mọi quy mô.
+- BFF không chứa nghiệp vụ lõi và không có CSDL nghiệp vụ riêng.
+- Catalog sở hữu thực đơn, danh mục, khu vực, bàn, token QR và tồn kho.
+- Order sở hữu phiên, giỏ, vòng đời đơn, yêu cầu hóa đơn và hóa đơn.
+- Kitchen sở hữu hàng đợi KDS ở trạng thái chạy bằng Redis.
+- Payment sở hữu thanh toán, cấu hình thanh toán và quyết toán webhook.
+- SaaS sở hữu tenant, gói giá, gói thuê bao, hóa đơn gói và quyền gói.
+- Reporting/dashboard là mô hình đọc tổng hợp qua BFF và service owners hiện có; không tạo Analytics Service nếu source không có.
+- User-Access và Authorizer xử lý hồ sơ ứng dụng, vai trò, JWT/OIDC và Keycloak.
 
-#### 4.6. Inter-service communication
+#### 4.6. Chiến lược đa tenant
 
-- HTTP/WebSocket từ client đến BFF.
-- TCP từ BFF đến business services.
+- Cơ sở dữ liệu riêng theo dịch vụ kết hợp cột `tenant_id`.
+- Ngữ cảnh tenant đi qua guard/middleware, truy vấn CSDL, Redis key, Kafka payload và WebSocket room.
+- Viết như thiết kế hiện tại, không nói đây là mô hình duy nhất hoặc tối ưu cho mọi quy mô.
+
+#### 4.7. Kiến trúc giao tiếp giữa các dịch vụ
+
+- HTTP/WebSocket từ ứng dụng người dùng đến BFF.
+- TCP từ BFF đến dịch vụ nghiệp vụ.
 - gRPC đến Authorizer.
-- Kafka cho approved domain events.
-- Webhook cho SePay.
-- BFF Direct cho UI side effects khi không cần Kafka.
+- Kafka cho sự kiện miền đã được chấp nhận.
+- Webhook cho SePay/VietQR.
+- BFF Direct cho tác dụng phụ giao diện khi không cần Kafka.
 
-#### 4.7. Kafka decision framework và topic registry
+#### 4.8. Thiết kế hướng sự kiện và sổ đăng ký Kafka topic
 
-- Giải thích selective event-driven architecture.
-- Approved topics: `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, `tenant.created`.
-- Không invent topics như `menu.updated` nếu chưa có contract.
+- Giải thích kiến trúc hướng sự kiện có chọn lọc.
+- Topic được chấp nhận: `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, `tenant.created`.
+- Không thêm topic như `menu.updated`, `cart.updated` hoặc `tenant.suspended` nếu chưa có hợp đồng.
 
-#### 4.8. Redis/cache/session/KDS strategy
+#### 4.9. Redis cho bộ nhớ đệm, phiên, giỏ và KDS
 
-- Menu cache.
-- Session/cart state.
-- KDS queue bằng Sorted Set.
-- OAuth/session/rate-limit cache khi có evidence.
+- Bộ nhớ đệm thực đơn.
+- Phiên và giỏ theo tenant/session.
+- Hàng đợi KDS bằng Redis Sorted Set/hash.
+- Cờ tenant, cache gói thuê bao và trạng thái OAuth khi có evidence.
 
-#### 4.9. Security, authentication và authorization
+#### 4.10. Kiến trúc bảo mật, xác thực và phân quyền
 
-- Keycloak/JWT cho staff/owner/admin.
-- Customer anonymous QR/session flow.
-- Guard chain, tenant guard, permission matrix.
-- Dashboard/reporting cần phân biệt permission `report.read_own`, `report.read_any` và plan feature entitlement; Super Admin analytics không bị giới hạn bởi gói của tenant được chọn.
-- Webhook verification và security gaps cần viết cẩn trọng theo evidence.
+- Keycloak/JWT/OIDC cho nhân viên, chủ quán và quản trị.
+- Khách dùng QR/session ẩn danh, không dùng Keycloak.
+- Chuỗi guard, tenant guard, permission matrix.
+- Báo cáo cần phân biệt `report.read_own`, `report.read_any` và quyền tính năng theo gói; Super Admin analytics không bị giới hạn bởi gói của tenant đang xem.
+- Webhook verification và security gaps cần viết theo evidence.
 
-#### 4.10. Payment architecture với SePay/VietQR
+#### 4.11. Thiết kế tích hợp thanh toán SePay/VietQR
 
-- Phân biệt bill payment `QRTBL` và subscription invoice `QRSUB`.
-- Payment service sở hữu payment data; Order sở hữu bill state.
+- Phân biệt thanh toán hóa đơn nhà hàng `QRTBL` và hóa đơn gói nền tảng `QRSUB`.
+- Payment sở hữu thanh toán; Order sở hữu hóa đơn/phiên; SaaS sở hữu hóa đơn gói.
 - Webhook settlement và idempotency.
 
-#### 4.11. Deployment và observability design
+#### 4.12. Thiết kế triển khai, quan sát và giới hạn khẳng định
 
-- Docker/Docker Compose và provider stack nếu có bằng chứng.
-- Observability chỉ viết như thiết kế hoặc demo-limited nếu chưa có dashboard/trace/log evidence đầy đủ.
+- Docker/Docker Compose và stack phụ thuộc nếu có bằng chứng.
+- Quan sát hệ thống chỉ viết như thiết kế hoặc demo-limited nếu chưa có dashboard/trace/log evidence đầy đủ.
 
-#### 4.12. Trade-off kiến trúc
+#### 4.13. Tổng hợp đánh đổi kiến trúc
 
-- Microservices vs monolith.
-- Sync RPC vs Kafka.
-- Redis cache vs source of truth.
-- Shared tenant database model vs dedicated tenant database.
-- WebSocket hint vs authoritative state.
+- Vi dịch vụ so với kiến trúc nguyên khối.
+- RPC đồng bộ so với Kafka.
+- Redis cache/trạng thái chạy so với nguồn sự thật bền vững.
+- Mô hình `tenant_id` chia sẻ theo dịch vụ so với CSDL riêng cho từng tenant.
+- WebSocket gợi ý/làm mới so với trạng thái có thẩm quyền.
 
 Nguồn chính: `docs/technical-architecture.md`, `docs/guides/codebase-reading-map.md`, `docs/DOC-CODE-ANCHORS.md`, source code paths trong `apps/` và `libs/`.
 
 Artifact nên có:
 
-- Hình 4.1. Kiến trúc tổng thể QRTable.
-- Hình 4.2. C4/container diagram.
-- Bảng 4.1. Service ownership và data ownership.
-- Bảng 4.2. Communication matrix.
-- Bảng 4.3. Kafka topic registry.
-- Hình 4.3. Multi-tenancy isolation diagram.
-- Hình 4.4. Kafka decision flow.
+- Hình 4.1. Bản đồ tích hợp công nghệ QRTable.
+- Hình 4.2. Kiến trúc tổng thể QRTable.
+- Hình 4.3. C4/container diagram.
+- Hình 4.4. Ranh giới module trong Nx monorepo.
+- Bảng 4.1. Quyết định công nghệ và vai trò trong QRTable.
+- Bảng 4.2. Service ownership và data ownership.
+- Bảng 4.3. Database/schema ownership theo service.
+- Bảng 4.4. Communication matrix.
+- Bảng 4.5. Kafka topic registry.
+- Hình 4.5. Multi-tenancy isolation diagram.
+- Hình 4.6. Communication topology.
+- Hình 4.7. Kafka decision flow.
+- Hình 4.8. Redis ownership/keyspace.
+- Hình 4.9. Security/auth architecture.
+- Hình 4.10. SePay/VietQR payment architecture.
 
-### Chương 5. Triển khai hệ thống
+### Chương 5. Hiện thực các luồng vận hành cốt lõi của QRTable
 
 Vai trò: Chứng minh hệ thống đã được hiện thực hóa, nhưng không biến chương này thành walkthrough source code.
 
-#### 5.1. Tổng quan môi trường và công nghệ triển khai
+#### 5.1. Mục tiêu triển khai và phạm vi minh chứng
 
-- Backend: NestJS + TypeScript microservices.
-- Frontend: Management App và Customer PWA.
-- Data/infrastructure: PostgreSQL, MongoDB, Redis, Kafka, Keycloak, SePay/VietQR, Docker.
-- Monorepo: Nx và shared libraries.
+- Nối Chương 4 với hệ thống đã xây dựng.
+- Chỉ đưa chi tiết nội bộ khi phục vụ bất biến, service boundary hoặc bằng chứng.
+- Phân biệt code/test/diagram với live provider, pilot deployment và screenshot minh họa.
 
-#### 5.2. Triển khai backend services
+#### 5.2. Nền tảng triển khai và ranh giới trách nhiệm
 
-- BFF, Authorizer, User-Access, SaaS, Catalog, Order, Kitchen, Payment.
-- Mỗi service chỉ nêu vai trò, input/output chính, data ownership và cơ chế nổi bật.
+- Nx monorepo, Customer PWA, Management App, BFF và các dịch vụ nghiệp vụ.
+- Nhắc lại data ownership từ Chương 4 khi cần giải thích luồng.
+- Các thư viện dùng chung là lớp hợp đồng, không phải đường tắt để truy cập database chéo service.
 
-#### 5.3. Triển khai frontend
+#### 5.3. Khách quét QR, tạo phiên và giỏ món dùng chung
 
-- Customer PWA: QR entry, menu, cart, order tracking, payment request.
-- Management App: POS, KDS, Owner dashboard/reporting, Super Admin analytics.
-- UI labels tiếng Việt, enum wire mapping và role-based routing nếu có evidence.
-
-#### 5.4. QR session và shared cart
-
-- QR token/session creation.
-- Redis-backed cart/session.
+- QR/session theo tenant/table/session.
+- Order sở hữu session/cart/order; Catalog sở hữu bàn/menu/QR token.
+- Redis hỗ trợ hot path; durable state vẫn ở Order DB.
 - Cart version/idempotency/concurrent mutation handling.
 
-#### 5.5. Order confirmation và stock consistency
+#### 5.4. Xác nhận đơn hàng và bảo toàn tồn kho
 
-- Submit order.
-- Staff confirmation.
-- Catalog-owned stock deduction.
-- Không viết Order trực tiếp update stock DB.
+- Staff confirmation là điểm commit nghiệp vụ của stock.
+- Catalog-owned stock deduction; Order-owned order lifecycle.
+- Saga/compensation ở mức đại diện, không claim full hardening.
 
-#### 5.6. KDS realtime flow
+#### 5.5. Điều phối bếp/KDS và cập nhật thời gian thực
 
-- `order.confirmed` -> Kitchen consumer -> Redis KDS queue -> BFF/WebSocket hint -> KDS UI.
+- `order.confirmed` -> Kitchen consumer -> Redis KDS projection -> BFF/WebSocket hint -> KDS UI refetch.
+- Kitchen sở hữu KDS projection khi vận hành; Order vẫn sở hữu order/item lifecycle.
 - WebSocket là hint/refetch, không phải source of truth.
 
-#### 5.7. Payment settlement flow
+#### 5.6. Ghi nhận thanh toán tiền mặt, VietQR và SePay
 
 - Cash và SePay/VietQR.
-- Webhook settlement.
-- Payment-to-order finalization.
-- Idempotent replay/duplicate webhook nếu có evidence.
+- Payment owns payment record; Order owns bill/session finalization.
+- Webhook settlement, duplicate/underpaid và idempotent replay nếu có evidence.
+- Không claim live-provider validation nếu chưa có artifact provider thật.
 
-#### 5.8. SaaS onboarding và tenant lifecycle
+#### 5.7. Khởi tạo đơn vị thuê bao và vòng đời gói dịch vụ
 
 - Super Admin onboarding.
-- Tenant/subscription/plan.
-- Payment settings.
-- Dashboard/reporting entitlement liên quan tới pricing plan/package feature limit.
+- Tenant/subscription/plan/payment settings.
+- SaaS Onboarding Mini-Saga và compensation.
 - Tenant status: active/suspended/closed theo evidence.
 
-#### 5.9. Shared libraries và contracts
+#### 5.8. Bảng điều khiển và báo cáo theo gói dịch vụ
 
-- Constants, DTOs, schemas, guards, providers, queue, frontend shared types/constants/utils.
-- Vai trò trong maintainability và consistency.
+- Owner/Manager dashboard theo `report.read_own`, subscription active và `analytics_basic`.
+- Super Admin analytics theo `report.read_any`, không bị khóa bởi plan của tenant đang xem.
+- Payment/Order/Catalog/SaaS giữ read model của dữ liệu mình sở hữu.
+- Không tạo standalone Analytics Service, data warehouse hoặc realtime dashboard socket nếu source không có.
 
-#### 5.10. Screenshot và implementation evidence
+#### 5.9. Đóng gói triển khai và khung minh chứng pilot
 
-- Chỉ đưa screenshot đại diện cho flow chính.
-- Source-code evidence table: feature, source path, docs/tests liên quan.
+- Docker/Docker Compose và dependencies.
+- Khung kiểm chứng URL/domain, HTTPS/TLS, health check, smoke test, webhook callback.
+- Không claim production-ready, high availability hoặc stress test nếu chưa có artifact.
+
+#### 5.10. Tổng hợp minh chứng triển khai
+
+- Bảng evidence ngắn theo luồng: mục tiêu, bất biến/ranh giới, bằng chứng và giới hạn.
+- Chỉ đưa screenshot đại diện cho luồng chính; gallery đầy đủ để phụ lục.
 
 Nguồn chính: source code trong `apps/`, `libs/`, phase records, `docs/guides/*`, `docs/testing/phase-5/*`.
 
@@ -455,7 +474,7 @@ Artifact nên có:
 - Hình 5.3. Sequence KDS ticket lifecycle.
 - Hình 5.4. Sequence SePay/VietQR settlement.
 - Hình 5.5. Sequence SaaS onboarding.
-- Bảng 5.1. Implemented evidence table.
+- Bảng 5.1. Tổng hợp minh chứng triển khai các luồng cốt lõi.
 - Bảng 5.x. Dashboard/reporting implementation addendum nếu backfill technical Phase 4D vào report.
 - Screenshot 5.x. Customer PWA, Staff POS, KDS, Owner dashboard, Super Admin.
 
@@ -589,39 +608,46 @@ Nguyên tắc chọn artifact cho chương chính: mỗi hình, bảng hoặc sc
 
 ### 7.1 Artifact tối thiểu trong chương chính
 
-| Mã gợi ý | Artifact                                            | Chương | Nguồn/caption gợi ý                                                  |
-| -------- | --------------------------------------------------- | ------ | -------------------------------------------------------------------- |
-| Hình 1.1 | Luồng tổng quát từ QR ordering đến POS/KDS/payment  | 1      | Tác giả xây dựng từ phân tích nghiệp vụ QRTable.                     |
-| Bảng 1.1 | Vấn đề, nguyên nhân và hướng giải quyết             | 1      | Tác giả tổng hợp từ bối cảnh đề tài và research survey.              |
-| Bảng 2.1 | So sánh SaaS POS và POS truyền thống                | 2      | Tác giả tổng hợp từ nguồn học thuật/thị trường được trích dẫn.       |
-| Bảng 2.2 | So sánh multi-tenancy models                        | 2      | Tác giả tổng hợp từ NIST/AWS/Microsoft và tài liệu liên quan.        |
-| Bảng 2.3 | So sánh monolith, modular monolith và microservices | 2      | Tác giả tổng hợp từ nguồn kiến trúc phần mềm được trích dẫn.         |
-| Bảng 2.4 | So sánh giao tiếp đồng bộ và bất đồng bộ            | 2      | Tác giả tổng hợp từ tài liệu microservices/event-driven.             |
-| Hình 2.1 | Mô hình khái niệm SaaS multi-tenancy                | 2      | Tác giả xây dựng từ cơ sở lý thuyết multi-tenancy.                   |
-| Hình 3.1 | Actor/use-case overview                             | 3      | Tác giả xây dựng từ `docs/business-logic.md`.                        |
-| Bảng 3.1 | Functional requirements theo domain                 | 3      | Tác giả xây dựng từ business logic và phase records.                 |
-| Bảng 3.2 | Non-functional requirements và tiêu chí đánh giá    | 3      | Tác giả xây dựng từ ISO/IEC 25010 và yêu cầu QRTable.                |
-| Hình 3.2 | Business flow từ khách hàng đến bếp và thanh toán   | 3      | Tác giả xây dựng từ phân tích nghiệp vụ QRTable.                     |
-| Bảng 3.3 | Actor, vai trò và quyền truy cập chính              | 3      | Tác giả xây dựng từ permission matrix và yêu cầu RBAC.               |
-| Hình 4.1 | Overall architecture                                | 4      | Tác giả xây dựng từ `docs/technical-architecture.md` và source code. |
-| Hình 4.2 | C4/container diagram                                | 4      | Tác giả xây dựng từ cấu trúc `apps/`, `libs/` và tài liệu kiến trúc. |
-| Bảng 4.1 | Service ownership/data ownership                    | 4      | Tác giả xây dựng từ canonical docs và `apps/*`.                      |
-| Bảng 4.2 | Communication matrix                                | 4      | Tác giả xây dựng từ `technical-architecture.md`.                     |
-| Bảng 4.3 | Kafka topic registry                                | 4      | Tác giả xây dựng từ constants, queue docs và source code.            |
-| Hình 4.3 | Multi-tenancy isolation diagram                     | 4      | Tác giả xây dựng từ thiết kế tenant isolation QRTable.               |
-| Hình 4.4 | Kafka decision flow                                 | 4      | Tác giả xây dựng từ quyết định sync/async communication.             |
-| Hình 5.1 | QR ordering sequence                                | 5      | Tác giả xây dựng từ implementation flow.                             |
-| Hình 5.2 | Order confirm và stock consistency sequence         | 5      | Tác giả xây dựng từ Order/Catalog evidence.                          |
-| Hình 5.3 | KDS ticket lifecycle                                | 5      | Tác giả xây dựng từ Kitchen/KDS evidence.                            |
-| Hình 5.4 | Payment settlement sequence                         | 5      | Tác giả xây dựng từ Payment/BFF/Order evidence.                      |
-| Hình 5.5 | SaaS onboarding sequence                            | 5      | Tác giả xây dựng từ SaaS/User-Access/Authorizer evidence.            |
-| Bảng 5.1 | Implemented evidence table                          | 5      | Tác giả tổng hợp từ source code, docs và tests.                      |
-| Bảng 5.2 | Shared libraries và vai trò trong consistency       | 5      | Tác giả tổng hợp từ `libs/` và import boundaries.                    |
-| Bảng 6.1 | Evaluation claim policy                             | 6      | Tác giả xây dựng từ evidence map.                                    |
-| Bảng 6.2 | Requirement traceability summary                    | 6      | Tác giả tổng hợp từ traceability matrix.                             |
-| Bảng 6.3 | Architecture/NFR evidence status                    | 6      | Tác giả tổng hợp từ code/docs/tests.                                 |
-| Bảng 6.4 | Demo evidence checklist                             | 6      | Tác giả tổng hợp từ screenshot, test output và demo artifact.        |
-| Bảng 7.1 | Đóng góp, hạn chế và hướng phát triển               | 7      | Tác giả tổng hợp từ kết quả khóa luận.                               |
+| Mã gợi ý  | Artifact                                            | Chương | Nguồn/caption gợi ý                                                      |
+| --------- | --------------------------------------------------- | ------ | ------------------------------------------------------------------------ |
+| Hình 1.1  | Luồng tổng quát từ QR ordering đến POS/KDS/payment  | 1      | Tác giả xây dựng từ phân tích nghiệp vụ QRTable.                         |
+| Bảng 1.1  | Vấn đề, nguyên nhân và hướng giải quyết             | 1      | Tác giả tổng hợp từ bối cảnh đề tài và research survey.                  |
+| Bảng 2.1  | So sánh SaaS POS và POS truyền thống                | 2      | Tác giả tổng hợp từ nguồn học thuật/thị trường được trích dẫn.           |
+| Bảng 2.2  | So sánh multi-tenancy models                        | 2      | Tác giả tổng hợp từ NIST/AWS/Microsoft và tài liệu liên quan.            |
+| Bảng 2.3  | So sánh monolith, modular monolith và microservices | 2      | Tác giả tổng hợp từ nguồn kiến trúc phần mềm được trích dẫn.             |
+| Bảng 2.4  | So sánh giao tiếp đồng bộ và bất đồng bộ            | 2      | Tác giả tổng hợp từ tài liệu microservices/event-driven.                 |
+| Hình 2.1  | Mô hình khái niệm SaaS multi-tenancy                | 2      | Tác giả xây dựng từ cơ sở lý thuyết multi-tenancy.                       |
+| Hình 3.1  | Actor/use-case overview                             | 3      | Tác giả xây dựng từ `docs/business-logic.md`.                            |
+| Bảng 3.1  | Functional requirements theo domain                 | 3      | Tác giả xây dựng từ business logic và phase records.                     |
+| Bảng 3.2  | Non-functional requirements và tiêu chí đánh giá    | 3      | Tác giả xây dựng từ ISO/IEC 25010 và yêu cầu QRTable.                    |
+| Hình 3.2  | Business flow từ khách hàng đến bếp và thanh toán   | 3      | Tác giả xây dựng từ phân tích nghiệp vụ QRTable.                         |
+| Bảng 3.3  | Actor, vai trò và quyền truy cập chính              | 3      | Tác giả xây dựng từ permission matrix và yêu cầu RBAC.                   |
+| Hình 4.1  | Bản đồ tích hợp công nghệ QRTable                   | 4      | Tác giả xây dựng từ Ch4 evidence, source tree và tài liệu Nx chính thức. |
+| Hình 4.2  | Overall architecture                                | 4      | Tác giả xây dựng từ `docs/technical-architecture.md` và source code.     |
+| Hình 4.3  | C4/container diagram                                | 4      | Tác giả xây dựng từ cấu trúc `apps/`, `libs/` và tài liệu kiến trúc.     |
+| Hình 4.4  | Nx monorepo/module boundary                         | 4      | Tác giả xây dựng từ source tree, Nx workspace và rule service boundary.  |
+| Bảng 4.1  | Technology decision matrix                          | 4      | Tác giả xây dựng từ Chương 4, source tree và tài liệu Nx chính thức.     |
+| Bảng 4.2  | Service ownership/data ownership                    | 4      | Tác giả xây dựng từ canonical docs và `apps/*`.                          |
+| Bảng 4.3  | Database/schema ownership theo service              | 4      | Tác giả xây dựng từ TypeORM/Mongoose registration và entity/schema code. |
+| Bảng 4.4  | Communication matrix                                | 4      | Tác giả xây dựng từ `technical-architecture.md`.                         |
+| Bảng 4.5  | Kafka topic registry                                | 4      | Tác giả xây dựng từ constants, queue docs và source code.                |
+| Hình 4.5  | Multi-tenancy isolation diagram                     | 4      | Tác giả xây dựng từ thiết kế tenant isolation QRTable.                   |
+| Hình 4.6  | Communication topology                              | 4      | Tác giả xây dựng từ Ch4 evidence và communication matrix.                |
+| Hình 4.7  | Kafka decision flow                                 | 4      | Tác giả xây dựng từ quyết định sync/async communication.                 |
+| Hình 4.8  | Redis key/domain ownership                          | 4      | Tác giả xây dựng từ Redis ownership evidence và source code.             |
+| Hình 4.9  | Security/auth architecture                          | 4      | Tác giả xây dựng từ permission matrix, guard và auth evidence.           |
+| Hình 4.10 | SePay/VietQR payment architecture                   | 4      | Tác giả xây dựng từ SePay guide, Payment/SaaS/Order evidence.            |
+| Hình 5.1  | QR ordering sequence                                | 5      | Tác giả xây dựng từ implementation flow.                                 |
+| Hình 5.2  | Order confirm và stock consistency sequence         | 5      | Tác giả xây dựng từ Order/Catalog evidence.                              |
+| Hình 5.3  | KDS ticket lifecycle                                | 5      | Tác giả xây dựng từ Kitchen/KDS evidence.                                |
+| Hình 5.4  | Payment settlement sequence                         | 5      | Tác giả xây dựng từ Payment/BFF/Order evidence.                          |
+| Hình 5.5  | SaaS onboarding sequence                            | 5      | Tác giả xây dựng từ SaaS/User-Access/Authorizer evidence.                |
+| Bảng 5.1  | Tổng hợp minh chứng triển khai các luồng cốt lõi    | 5      | Tác giả tổng hợp từ source code, docs, tests và diagram.                 |
+| Bảng 6.1  | Evaluation claim policy                             | 6      | Tác giả xây dựng từ evidence map.                                        |
+| Bảng 6.2  | Requirement traceability summary                    | 6      | Tác giả tổng hợp từ traceability matrix.                                 |
+| Bảng 6.3  | Architecture/NFR evidence status                    | 6      | Tác giả tổng hợp từ code/docs/tests.                                     |
+| Bảng 6.4  | Demo evidence checklist                             | 6      | Tác giả tổng hợp từ screenshot, test output và demo artifact.            |
+| Bảng 7.1  | Đóng góp, hạn chế và hướng phát triển               | 7      | Tác giả tổng hợp từ kết quả khóa luận.                                   |
 
 ### 7.2 Artifact mở rộng nên cân nhắc
 
@@ -720,8 +746,8 @@ Chỉ đưa vào bản chính thức những từ xuất hiện nhiều. Danh s�
 5. Draft Chương 4 từ `technical-architecture.md`, nhưng viết lại theo văn phong khóa luận, không copy tài liệu kỹ thuật.
 6. Draft Chương 5 từ source code/phase records, chỉ chọn implementation details có giá trị chứng minh.
 7. Chuẩn bị screenshot/UI gallery và demo evidence song song với Chương 5.
-8. Draft Chương 6 sau khi có traceability summary, test results và danh sách giới hạn đánh giá.
-9. Draft Chương 7 và Abstract sau cùng.
+8. Chương 6-7 đã audit/rerun theo Plan B sau Plan A; chỉ cập nhật thêm nếu có artifact production/pilot thật.
+9. Draft Chương 1, Abstract và phụ lục còn lại sau cùng.
 10. Rà soát hình thức: đánh số chương/mục, hình/bảng, caption, nguồn, danh mục từ viết tắt, References IEEE và phụ lục.
 
 ## 12. Checkpoint trước khi viết từng chương

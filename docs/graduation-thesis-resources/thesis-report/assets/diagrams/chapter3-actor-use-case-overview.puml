@@ -1,5 +1,5 @@
 @startuml chapter3-actor-use-case-overview
-' Hình 3.1 — Actor và nhóm use case chính (UML use case diagram)
+' Hình 3.1 — Tác nhân và nhóm trường hợp sử dụng chính (sơ đồ UML)
 ' Render: java -jar tools/plantuml.jar -charset UTF-8 -tpdf -o assets/figures assets/diagrams/chapter3-actor-use-case-overview.puml
 ' (chạy từ thư mục thesis-report)
 
@@ -22,37 +22,41 @@ skinparam rectangle {
 
 left to right direction
 
-actor "Super Admin\n<<cross-tenant>>" as SuperAdmin
-actor "Restaurant Owner\n<<một tenant>>" as Owner
-actor "Manager\n<<một tenant>>" as Manager
-actor "Waiter / Staff POS\n<<vận hành sàn>>" as Waiter
-actor "Chef / Barista\n<<station bếp/bar>>" as KitchenStaff
+actor "Quản trị nền tảng\n(Super Admin)\n<<chéo tenant>>" as SuperAdmin
+actor "Chủ nhà hàng\n(Owner)\n<<một tenant>>" as Owner
+actor "Quản lý\n(Manager)\n<<một tenant>>" as Manager
+actor "Phục vụ / POS\n(Waiter)\n<<vận hành sàn>>" as Waiter
+actor "Bếp / pha chế\n(Chef / Barista)\n<<trạm bếp/bar>>" as KitchenStaff
 
-rectangle "«system» QRTable" as QRTable {
-  usecase "Quản lý SaaS lifecycle\ntenant · plan · subscription · quota" as UC_Platform
-  usecase "Quản lý catalog, bàn và QR\nmenu · khu vực · bàn · QR token" as UC_Catalog
-  usecase "Session, cart và order khách\njoin session · shared cart · submit order" as UC_Ordering
-  usecase "Vận hành POS\nconfirm order · bill · chuyển bàn · service request" as UC_Pos
-  usecase "Kitchen / KDS\nqueue station · ticket · recall · SLA" as UC_Kds
-  usecase "Thanh toán và đối soát\ncash · VietQR/SePay · lịch sử" as UC_Payment
+rectangle "«hệ thống» QRTable" as QRTable {
+  usecase "Quản lý vòng đời SaaS\ntenant · gói · thuê bao · hạn mức" as UC_Platform
+  usecase "Bảng điều khiển và báo cáo\nreport.read_own · report.read_any · analytics_basic" as UC_Reporting
+  usecase "Quản lý thực đơn, bàn và QR\nthực đơn · khu vực · bàn · QR token" as UC_Catalog
+  usecase "Vận hành POS\nxác nhận đơn · hóa đơn · chuyển bàn · yêu cầu hỗ trợ" as UC_Pos
+  usecase "Bếp / KDS\nhàng đợi theo trạm · phiếu · thu hồi · SLA" as UC_Kds
+  usecase "Thanh toán và đối soát\ntiền mặt · VietQR/SePay · lịch sử" as UC_Payment
+  usecase "Phiên, giỏ và đơn của khách\ntham gia phiên · giỏ chung · gửi đơn" as UC_Ordering
 }
 
-actor "Customer / Guest\n<<session QR — không RBAC DB>>" as Customer
-actor "Webhook SePay\n<<external>>\nQRTBL · QRSUB" as Sepay <<External>>
+actor "Khách hàng\n<<phiên QR — không thuộc RBAC DB>>" as Customer
+actor "Webhook SePay\n<<hệ thống ngoài>>\nQRTBL · QRSUB" as Sepay
 
 SuperAdmin --> UC_Platform
+SuperAdmin --> UC_Reporting
 
 Owner --> UC_Platform
 Owner --> UC_Catalog
 Owner --> UC_Pos
 Owner --> UC_Kds
 Owner --> UC_Payment
+Owner --> UC_Reporting
 
-Manager --> UC_Platform : <<xem subscription/settings>>
+Manager --> UC_Platform : <<xem thuê bao/cài đặt>>
 Manager --> UC_Catalog
 Manager --> UC_Pos
 Manager --> UC_Kds
 Manager --> UC_Payment
+Manager --> UC_Reporting
 
 Waiter --> UC_Pos
 Waiter --> UC_Payment
@@ -60,13 +64,13 @@ Waiter --> UC_Payment
 KitchenStaff --> UC_Kds
 
 Customer --> UC_Ordering
-Customer --> UC_Payment : <<request bill · thanh toán bill>>
+Customer --> UC_Payment : <<yêu cầu hóa đơn · thanh toán>>
 
 Sepay --> UC_Payment : <<webhook đối soát>>
 
 note bottom of QRTable
-  **«note»** Tenant isolation
-  RBAC · session ownership
+  **«note»** Cô lập tenant
+  RBAC · quyền sở hữu phiên
 end note
 
 @enduml

@@ -1,11 +1,63 @@
 \chapter{Kết luận và hướng phát triển}
 
-\section{Tóm tắt vấn đề và hướng tiếp cận}
+\section{Tóm tắt bài toán và hướng tiếp cận}
 
-\section{Kết quả đạt được}
+Đề tài xuất phát từ nhu cầu chuyển đổi số trong mô hình nhà hàng/quán cà phê, nơi quy trình gọi món, xác nhận đơn, điều phối bếp, thanh toán và quản lý vận hành thường bị tách rời giữa giấy tờ, phần mềm POS cục bộ và các kênh liên lạc thủ công. QRTable được xây dựng như một nền tảng POS theo mô hình SaaS, tích hợp đặt món qua mã QR và hướng đến khả năng phục vụ nhiều đơn vị thuê bao trong cùng một hệ thống.
+
+Hướng tiếp cận chính của đề tài là dùng kiến trúc microservices có kiểm soát. Hệ thống không chỉ chia mã nguồn thành nhiều ứng dụng, mà xác định rõ ranh giới dịch vụ và quyền sở hữu dữ liệu: Catalog sở hữu thực đơn, bàn và tồn kho; Order sở hữu phiên, đơn và hóa đơn; Kitchen sở hữu bản chiếu KDS khi vận hành; Payment sở hữu giao dịch và cấu hình thanh toán; SaaS sở hữu đơn vị thuê bao và gói thuê bao; User-Access sở hữu hồ sơ ứng dụng và vai trò; còn BFF giữ vai trò điểm vào cho HTTP/WebSocket. Các luồng liên dịch vụ đi qua TCP/gRPC hoặc Kafka, không truy cập chéo cơ sở dữ liệu.
+
+Trong phạm vi khóa luận, QRTable được xem như một sản phẩm phần mềm có bằng chứng kỹ thuật thay vì một bản mô tả ý tưởng. Các chương trước đã lần lượt phân tích bối cảnh và yêu cầu, trình bày cơ sở lý thuyết, thiết kế kiến trúc, hiện thực các luồng nghiệp vụ lõi và đánh giá mức bằng chứng cho từng nhóm kết luận. Vì vậy, kết luận của chương này tập trung vào mức độ đạt được so với mục tiêu đề tài, đóng góp, giới hạn còn lại và hướng phát triển tiếp theo.
+
+\section{Kết quả đạt được theo mục tiêu đề tài}
+
+Về luồng đặt món qua QR, hệ thống đã hiện thực được quy trình khách quét mã QR, tham gia hoặc tạo phiên gọi món, xem thực đơn theo đơn vị thuê bao, thao tác giỏ món dùng chung và gửi đơn chờ nhân viên xác nhận. Các bất biến quan trọng như phạm vi phiên, ngữ cảnh đơn vị thuê bao, phiên bản giỏ và tính lũy đẳng khi gửi đơn đã có bằng chứng kiểm thử ở mức phù hợp. Đây là kết quả trực tiếp gắn với mục tiêu giảm thao tác thủ công trong quá trình gọi món tại bàn.
+
+Về POS và vận hành nhà hàng, QRTable đã hiện thực các luồng nhân viên xác nhận đơn, bảo toàn tồn kho qua ranh giới Catalog--Order, tạo phiếu KDS từ sự kiện \texttt{order.confirmed}, cập nhật màn hình bếp/bar theo mô hình WebSocket gợi ý/tải lại và ghi nhận trạng thái món/đơn. Hai điểm then chốt là Catalog vẫn là chủ sở hữu tồn kho, còn Kitchen không thay thế nguồn trạng thái có thẩm quyền của Order. Cách hiện thực này giúp luồng vận hành có cơ sở tính nhất quán mà vẫn giữ được ranh giới microservices.
+
+Về thanh toán, hệ thống đã hỗ trợ ghi nhận tiền mặt và VietQR/SePay ở mức mã nguồn/kiểm thử nội bộ, bao gồm bản ghi thanh toán, nhật ký kiểm toán, webhook trùng, xử lý thanh toán thiếu và cầu nối sang Order để hoàn tất hóa đơn/phiên. Payment sở hữu dữ liệu giao dịch và cấu hình thanh toán, trong khi Order vẫn sở hữu hóa đơn/phiên. Kết quả này chứng minh đường ghi nhận thanh toán cốt lõi đã được thiết kế và kiểm chứng ở mức phù hợp với khóa luận; phần đường gọi lại công khai của nhà cung cấp thật cần hiện vật thật trước khi kết luận mạnh hơn.
+
+Về SaaS, QRTable đã có mô hình đơn vị thuê bao, gói giá, thuê bao, hóa đơn thuê bao, quyền theo gói và luồng khởi tạo đơn vị thuê bao. SaaS Onboarding Mini-Saga cho thấy cách hệ thống phối hợp SaaS, Authorizer, Keycloak, User-Access và Payment bằng hợp đồng thay vì ghi dữ liệu chéo. Báo cáo/bảng điều khiển cũng đã phản ánh được phân quyền theo đơn vị thuê bao và quyền theo gói: Owner và Manager xem báo cáo vận hành của đơn vị thuê bao, còn Super Admin xem phân tích nền tảng theo quyền quản trị nền tảng.
+
+Về kiểm chứng, hệ thống có truy vết đáng kể cho các luồng P0/P1 chính, có chính sách diễn đạt kết luận để phân loại mức bằng chứng và có các bảng đánh giá riêng cho kiểm chứng chức năng, bằng chứng kiến trúc/yêu cầu phi chức năng, giới hạn và hướng phát triển. Đây là kết quả quan trọng vì khóa luận không chỉ trình bày hệ thống chạy được, mà còn chỉ ra hệ thống đã được chứng minh đến mức nào và phần nào chưa đủ bằng chứng để kết luận mạnh.
+
+Về đóng gói triển khai/triển khai thử, đề tài đã xác định khung minh chứng cần thu thập cho môi trường chạy thử: tên miền/URL, HTTPS nếu có, kiểm tra sức khỏe, cấu hình dịch vụ, đường gọi lại webhook công khai, kiểm thử khói, nhật ký rút gọn và ít nhất một luồng lõi chạy được ngoài môi trường phát triển cục bộ. Khi chưa có hiện vật thật, nội dung khóa luận chỉ giữ ở mức khung kiểm chứng, không viết như hệ thống đã sẵn sàng vận hành thực tế.
 
 \section{Đóng góp của đề tài}
 
-\section{Hạn chế}
+Đóng góp thứ nhất là mô hình nghiệp vụ QRTable cho bài toán F\&B/POS có tích hợp đặt món qua QR. Mô hình này kết nối phiên QR của khách, giỏ món dùng chung, POS của nhân viên, KDS, thanh toán, vòng đời đơn vị thuê bao và báo cáo trong cùng một luồng vận hành, thay vì chỉ dừng ở một ứng dụng gọi món hoặc một màn hình quản lý thực đơn đơn lẻ.
+
+Đóng góp thứ hai là thiết kế microservices có ranh giới dịch vụ và quyền sở hữu dữ liệu rõ ràng trong một Nx monorepo. Việc dùng monorepo giúp chia sẻ DTO, hằng số, provider token, guard và kiểu dữ liệu một cách nhất quán, nhưng không làm mất ranh giới dữ liệu giữa các dịch vụ. Đây là điểm cân bằng quan trọng giữa tốc độ phát triển của đồ án và nguyên tắc kiến trúc.
+
+Đóng góp thứ ba là hai Saga đại diện cho tính nhất quán liên dịch vụ: Order Confirm Saga cho luồng xác nhận đơn/trừ tồn kho và SaaS Onboarding Mini-Saga cho luồng khởi tạo đơn vị thuê bao. Hai Saga này thể hiện cách hệ thống xử lý tác dụng phụ, phát lại, bù trừ và giới hạn kết luận mà không cần khẳng định quá mức về phân phối exactly-once hoặc khung Saga bền vững đạt mức vận hành thực tế.
+
+Đóng góp thứ tư là mô hình phân quyền và quyền theo gói phù hợp SaaS POS. Hệ thống phân biệt nhân viên/chủ/quản lý/quản trị nền tảng, tác nhân phiên khách, cô lập đơn vị thuê bao và quyền tính năng theo gói. Báo cáo/bảng điều khiển được dùng như ví dụ cụ thể cho sự khác biệt giữa quyền trong đơn vị thuê bao và quyền nền tảng.
+
+Đóng góp thứ năm là bộ minh chứng phục vụ lập luận khóa luận: bảng yêu cầu, bảng ranh giới dịch vụ/quyền sở hữu dữ liệu, sơ đồ kiến trúc, sơ đồ trình tự Chương 5, bảng bằng chứng triển khai và bảng đánh giá Chương 6. Đặc biệt, Bảng~\ref{tab:chapter4-data-ownership-schema}, Bảng~\ref{tab:chapter4-communication-matrix}, Hình~\ref{fig:chapter5-qr-ordering-session}--\ref{fig:chapter5-saas-onboarding-saga} và Bảng~\ref{tab:chapter5-implemented-evidence} giúp người đọc truy vết từ yêu cầu đến thiết kế, từ thiết kế đến hiện thực và từ hiện thực đến đánh giá.
+
+\section{Hạn chế còn lại}
+
+Hạn chế đầu tiên là hệ thống chưa có đo định lượng về thông lượng, độ trễ, p95/p99 hoặc mức sử dụng tài nguyên. Vì vậy, khóa luận chỉ đánh giá hiệu năng và khả năng mở rộng ở mức thiết kế, dựa trên ranh giới dịch vụ, Redis, Kafka và mô hình phòng Socket.IO; không kết luận hệ thống đã chịu tải lớn hoặc nhanh hơn một monolith tương đương.
+
+Hạn chế thứ hai là cô lập đơn vị thuê bao và RBAC vẫn cần thêm cổng kiểm thử toàn ngăn xếp đại diện trên BFF/Keycloak/ngăn xếp cơ sở dữ liệu dịch vụ. Thiết kế và kiểm thử hiện tại đã có cơ sở tốt, nhưng chưa đủ để kết luận toàn bộ bề mặt API đã được chứng minh bằng bộ kiểm thử liên đơn vị thuê bao có dữ liệu gieo.
+
+Hạn chế thứ ba là kiểm chứng nhà cung cấp SePay thật chưa phải đường cơ sở tự động. Các kiểm thử nội bộ cho ghi nhận thanh toán, webhook trùng và thanh toán thiếu có giá trị, nhưng đường gọi lại công khai, thông tin xác thực thật và dữ liệu nhà cung cấp thật vẫn cần danh sách kiểm tra riêng trước minh họa hoặc vận hành thử.
+
+Hạn chế thứ tư là khởi tạo SaaS chưa có bộ kiểm thử trên môi trường thật đầy đủ qua toàn bộ Authorizer, Keycloak, User-Access, Payment TCP và outbox. Phần cơ sở dữ liệu, Payment và bù trừ đã có bằng chứng tốt, nhưng chưa nên gọi toàn bộ luồng khởi tạo là chứng minh đầu-cuối trên môi trường thật.
+
+Hạn chế thứ năm là phần củng cố cho vận hành thực tế còn thiếu các hiện vật quan trọng như tính sẵn sàng cao, sao lưu/phục hồi, quy tắc cảnh báo, sổ tay vận hành, tự động hoàn tác, phần minh họa bảng điều khiển/truy vết và kiểm thử tải. Khả năng quan sát hệ thống đã có nền tảng công nghệ, nhưng chưa đủ bằng chứng để gọi là đạt mức vận hành thực tế.
+
+Ngoài ra, một số khả năng như hàng đợi thao tác ngoại tuyến đầy đủ, thông báo/email, phân tích nâng cao, kho dữ liệu phân tích, phân tích hiệu suất nhân viên và lịch sử KDS chuyên sâu vẫn nằm ngoài phạm vi kết quả chính của đề tài.
 
 \section{Hướng phát triển}
+
+Hướng phát triển gần nhất là hoàn tất môi trường vận hành thực tế/triển khai thử có hiện vật thật. Công việc này cần đóng gói phát hành, cấu hình tên miền/HTTPS, kiểm tra sức khỏe, kiểm thử khói, đường gọi lại webhook SePay công khai nếu có minh họa với nhà cung cấp thật, nhật ký rút gọn và một luồng lõi chạy được từ phiên QR đến đơn, KDS và thanh toán. Sau khi có bằng chứng, Chương 6 và phụ lục có thể cập nhật kết luận an toàn về khả năng đóng gói và vận hành các dịch vụ chính.
+
+Hướng phát triển thứ hai là xây dựng bộ kiểm thử toàn ngăn xếp đại diện cho cô lập đơn vị thuê bao, RBAC và quyền theo gói. Bộ này nên gieo dữ liệu cho nhiều đơn vị thuê bao, nhiều vai trò, nhiều trạng thái thuê bao và chạy qua BFF/Keycloak/cơ sở dữ liệu dịch vụ thật để kiểm tra các API nhạy cảm như thực đơn, đơn, thanh toán, báo cáo và vòng đời đơn vị thuê bao.
+
+Hướng phát triển thứ ba là củng cố thanh toán và Saga. Với thanh toán, hệ thống cần đường kiểm chứng nhà cung cấp thật/mô phỏng rõ ràng, phát lại webhook có kiểm soát, nhật ký kiểm toán dễ truy vết và danh sách kiểm tra hoàn tiền nếu mở rộng phạm vi. Với Saga, hệ thống có thể bổ sung trạng thái Saga bền vững, tiến trình thử lại, xử lý thư chết, xuất bản outbox mạnh hơn và bộ tiêm lỗi trên môi trường thật cho các lỗi sau khi tác dụng phụ đã xảy ra.
+
+Hướng phát triển thứ tư là đo lường hiệu năng và khả năng mở rộng bằng số liệu thật. Các kịch bản cần đo gồm tải thực đơn QR, thay đổi giỏ, gửi đơn, xác nhận nhân viên/trừ tồn kho, lan truyền KDS, hoàn tất webhook thanh toán và độ trễ gợi ý WebSocket. Kết quả đo nên đi kèm môi trường, dữ liệu, cấu hình dịch vụ và giới hạn để tránh diễn giải sai.
+
+Hướng phát triển thứ năm là hoàn thiện vận hành thực tế: bảng điều khiển quan sát, truy vết phân tán, cảnh báo, sao lưu/phục hồi, hoàn tác, quản lý bí mật, củng cố bảo mật và sổ tay xử lý sự cố. Đây là bước cần thiết nếu QRTable chuyển từ phạm vi khóa luận/minh họa sang hệ thống vận hành thực tế cho nhà hàng.
+
+Cuối cùng, hệ thống có thể mở rộng về mặt sản phẩm bằng hàng đợi thao tác ngoại tuyến ưu tiên cho Customer PWA, dịch vụ thông báo cho hóa đơn/nhắc việc, phân tích nâng cao cho chủ và nền tảng, lịch sử KDS bền vững, tính năng khách hàng thân thiết hoặc tích hợp thêm nhà cung cấp thanh toán. Các hướng này nên được ưu tiên sau khi luồng lõi, cô lập đơn vị thuê bao, thanh toán và vận hành thử đã có bằng chứng đủ chắc.

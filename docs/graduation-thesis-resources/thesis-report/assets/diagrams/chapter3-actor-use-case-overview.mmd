@@ -1,51 +1,55 @@
 %% DEPRECATED: Hình 3.1 dùng PlantUML — xem chapter3-actor-use-case-overview.puml
-%% Hình 3.1 — use case overview (bản Mermaid cũ, không còn render vào PDF)
-%% Quy ước: ([...]) = ellipse use case; subgraph = system boundary; [[...]] = external system; -.-> = note/constraint
+%% Hình 3.1 — tổng quan trường hợp sử dụng (bản Mermaid cũ, không còn render vào PDF)
+%% Quy ước: ([...]) = hình ellipse của trường hợp sử dụng; subgraph = ranh giới hệ thống; [[...]] = hệ thống ngoài; -.-> = ghi chú/ràng buộc
 %%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#ffffff", "primaryBorderColor": "#334155", "lineColor": "#475569", "tertiaryColor": "#ffffff"}, "flowchart": {"curve": "basis", "htmlLabels": true}}}%%
 flowchart LR
-  subgraph RBAC["Actor — tài khoản & RBAC"]
+  subgraph RBAC["Tác nhân — tài khoản & RBAC"]
     direction TB
-    SuperAdmin["«actor»<br/><b>Super Admin</b><br/>cross-tenant"]
-    Owner["«actor»<br/><b>Restaurant Owner</b><br/>một tenant"]
-    Manager["«actor»<br/><b>Manager</b><br/>một tenant"]
-    Waiter["«actor»<br/><b>Waiter / Staff POS</b><br/>vận hành sàn"]
-    KitchenStaff["«actor»<br/><b>Chef / Barista</b><br/>station bếp/bar"]
+    SuperAdmin["«tác nhân»<br/><b>Quản trị nền tảng</b><br/>(Super Admin)<br/>chéo tenant"]
+    Owner["«tác nhân»<br/><b>Chủ nhà hàng</b><br/>(Owner)<br/>một tenant"]
+    Manager["«tác nhân»<br/><b>Quản lý</b><br/>(Manager)<br/>một tenant"]
+    Waiter["«tác nhân»<br/><b>Phục vụ / POS</b><br/>(Waiter)<br/>vận hành sàn"]
+    KitchenStaff["«tác nhân»<br/><b>Bếp / pha chế</b><br/>(Chef / Barista)<br/>trạm bếp/bar"]
   end
 
-  subgraph SYS["«system» QRTable"]
+  subgraph SYS["«hệ thống» QRTable"]
     direction TB
-    UC_Platform(["Quản lý SaaS lifecycle<br/>tenant · plan · subscription · quota"])
-    UC_Catalog(["Quản lý catalog, bàn và QR<br/>menu · khu vực · bàn · QR token"])
-    UC_Ordering(["Session, cart và order khách<br/>join session · shared cart · submit order"])
-    UC_Pos(["Vận hành POS<br/>confirm order · bill · chuyển bàn · service request"])
-    UC_Kds(["Kitchen / KDS<br/>queue station · ticket · recall · SLA"])
-    UC_Payment(["Thanh toán và đối soát<br/>cash · VietQR/SePay · lịch sử"])
+    UC_Platform(["Quản lý vòng đời SaaS<br/>tenant · gói · thuê bao · hạn mức"])
+    UC_Reporting(["Bảng điều khiển và báo cáo<br/>report.read_own · report.read_any · analytics_basic"])
+    UC_Catalog(["Quản lý thực đơn, bàn và QR<br/>thực đơn · khu vực · bàn · QR token"])
+    UC_Pos(["Vận hành POS<br/>xác nhận đơn · hóa đơn · chuyển bàn · yêu cầu hỗ trợ"])
+    UC_Kds(["Bếp / KDS<br/>hàng đợi theo trạm · phiếu · thu hồi · SLA"])
+    UC_Payment(["Thanh toán và đối soát<br/>tiền mặt · VietQR/SePay · lịch sử"])
+    UC_Ordering(["Phiên, giỏ và đơn của khách<br/>tham gia phiên · giỏ chung · gửi đơn"])
   end
 
-  Customer["«actor»<br/><b>Customer / Guest</b><br/>session QR — không RBAC DB"]
-  Sepay[["«external»<br/><b>Webhook SePay</b><br/>QRTBL · QRSUB"]]
+  Customer["«tác nhân»<br/><b>Khách hàng</b><br/>phiên QR — không thuộc RBAC DB"]
+  Sepay[["«hệ thống ngoài»<br/><b>Webhook SePay</b><br/>QRTBL · QRSUB"]]
 
-  CrossCut["«note»<br/>Tenant isolation<br/>RBAC · session ownership"]
+  CrossCut["«ghi chú»<br/>Cô lập tenant<br/>RBAC · quyền sở hữu phiên"]
 
   SuperAdmin --> UC_Platform
+  SuperAdmin --> UC_Reporting
   Owner --> UC_Platform
   Owner --> UC_Catalog
   Owner --> UC_Pos
   Owner --> UC_Kds
   Owner --> UC_Payment
+  Owner --> UC_Reporting
 
-  Manager -->|"xem subscription/settings"| UC_Platform
+  Manager -->|"xem thuê bao/cài đặt"| UC_Platform
   Manager --> UC_Catalog
   Manager --> UC_Pos
   Manager --> UC_Kds
   Manager --> UC_Payment
+  Manager --> UC_Reporting
 
   Waiter --> UC_Pos
   Waiter --> UC_Payment
   KitchenStaff --> UC_Kds
 
   Customer --> UC_Ordering
-  Customer -->|"request bill · thanh toán bill"| UC_Payment
+  Customer -->|"yêu cầu hóa đơn · thanh toán"| UC_Payment
   Sepay -->|"webhook đối soát"| UC_Payment
 
   CrossCut -.-> SYS
@@ -58,6 +62,6 @@ flowchart LR
 
   class SuperAdmin,Owner,Manager,Waiter,KitchenStaff actor;
   class Customer session;
-  class UC_Platform,UC_Catalog,UC_Ordering,UC_Pos,UC_Kds,UC_Payment usecase;
+  class UC_Platform,UC_Catalog,UC_Ordering,UC_Pos,UC_Kds,UC_Payment,UC_Reporting usecase;
   class Sepay external;
   class CrossCut note;

@@ -30,6 +30,14 @@
 \usepackage{csquotes}
 \usepackage{xcolor}
 \usepackage{graphicx}
+\usepackage{svg}
+\svgsetup{
+  inkscapeversion=1.2.0,
+  inkscapelatex=false,
+  inkscapeexe={./tools/inkscape-rsvg-shim.sh},
+}
+\usepackage{float}
+\usepackage[section]{placeins}
 \usepackage{xurl}
 \usepackage{hyperref}
 \usepackage[
@@ -139,6 +147,7 @@
 \chapter*{TÀI LIỆU THAM KHẢO}
 \begingroup
 \setlength{\emergencystretch}{3em}
+\raggedright
 \section*{Tài liệu tiếng Việt}
 \printbibliography[heading=none,keyword=vietnamese]
 \section*{Tài liệu tiếng Anh}
