@@ -182,7 +182,7 @@ export function QrLandingCard() {
           <p className="text-center text-sm text-destructive">{joinBlockedMessage(joinMutation.error)}</p>
         ) : null}
         <Button className="w-full" size="lg" disabled={joinMutation.isPending} onClick={() => handleEnterMenu()}>
-          {joinMutation.isPending ? 'Đang vào phiên…' : 'Vào Menu'}
+          {joinMutation.isPending ? 'Đang vào phiên…' : 'Vào thực đơn'}
         </Button>
       </CardContent>
     </Card>

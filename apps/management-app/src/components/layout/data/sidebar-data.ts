@@ -25,31 +25,31 @@ const SUPER = ['SUPER_ADMIN'] as const;
 
 export const sidebarData: SidebarData = {
   appName: 'QRTable Management',
-  appSubtitle: 'SaaS POS Control Center',
+  appSubtitle: 'Trung tâm điều hành POS SaaS',
   navGroups: [
     {
-      title: 'Dashboard',
+      title: 'Bảng điều khiển',
       items: [
         {
-          title: 'Overview',
+          title: 'Tổng quan',
           url: ROUTES.DASHBOARD,
           icon: LayoutDashboard,
           roles: OM,
         },
         {
-          title: 'Menu',
+          title: 'Thực đơn',
           url: ROUTES.MENU,
           icon: Store,
           roles: OM,
         },
         {
-          title: 'Tables',
+          title: 'Bàn',
           url: ROUTES.TABLES,
           icon: Table,
           roles: OM,
         },
         {
-          title: 'Staff',
+          title: 'Nhân sự',
           url: ROUTES.STAFF,
           icon: Users,
           roles: OM,
@@ -61,14 +61,14 @@ export const sidebarData: SidebarData = {
           roles: OM,
         },
         {
-          title: 'Subscription',
+          title: 'Gói đăng ký',
           url: ROUTES.SUBSCRIPTION,
           icon: CreditCard,
           roles: OM,
           permissions: [phase4bPermissions.subscriptionReadOwn],
         },
         {
-          title: 'Payment settings',
+          title: 'Cài đặt thanh toán',
           url: ROUTES.DASHBOARD_PAYMENT_SETTINGS,
           icon: Landmark,
           roles: OM,
@@ -77,45 +77,45 @@ export const sidebarData: SidebarData = {
       ],
     },
     {
-      title: 'Operations',
+      title: 'Vận hành',
       items: [
         {
           title: 'POS',
           icon: CreditCard,
           items: [
             {
-              title: 'Live Orders',
+              title: 'Đơn trực tiếp',
               url: ROUTES.POS,
               roles: POS_STAFF,
             },
             {
-              title: 'POS Tables',
+              title: 'Sơ đồ bàn POS',
               url: ROUTES.POS_TABLES,
               roles: POS_STAFF,
             },
             {
-              title: 'Service Requests',
+              title: 'Yêu cầu phục vụ',
               url: ROUTES.POS_SERVICE_REQUESTS,
               roles: POS_STAFF,
             },
             {
-              title: 'Bills',
+              title: 'Hóa đơn',
               url: ROUTES.POS_BILLS,
               roles: POS_STAFF,
             },
           ],
         },
         {
-          title: 'Kitchen Display',
+          title: 'Màn hình bếp (KDS)',
           icon: ChefHat,
           items: [
             {
-              title: 'Kitchen Board',
+              title: 'Bảng bếp',
               url: ROUTES.KDS_KITCHEN,
               roles: KITCHEN_BOARD,
             },
             {
-              title: 'Bar Board',
+              title: 'Bảng bar',
               url: ROUTES.KDS_BAR,
               roles: BAR_BOARD,
             },
@@ -124,40 +124,40 @@ export const sidebarData: SidebarData = {
       ],
     },
     {
-      title: 'Platform',
+      title: 'Nền tảng',
       items: [
         {
-          title: 'Admin',
+          title: 'Quản trị',
           icon: Shield,
           items: [
             {
-              title: 'Admin Home',
+              title: 'Trang quản trị',
               url: ROUTES.ADMIN,
               roles: SUPER,
             },
             {
-              title: 'Tenants',
+              title: 'Đơn vị thuê bao',
               url: ROUTES.ADMIN_TENANTS,
               icon: Building2,
               roles: SUPER,
               permissions: [phase4bPermissions.tenantListAll],
             },
             {
-              title: 'Plans',
+              title: 'Gói cước',
               url: ROUTES.ADMIN_PLANS,
               icon: Package,
               roles: SUPER,
               permissions: [phase4bPermissions.planRead],
             },
             {
-              title: 'Billing',
+              title: 'Hóa đơn gói',
               url: ROUTES.ADMIN_BILLING,
               icon: Receipt,
               roles: SUPER,
               permissions: [phase4bPermissions.subscriptionListAny],
             },
             {
-              title: 'Analytics',
+              title: 'Phân tích nền tảng',
               url: ROUTES.ADMIN_ANALYTICS,
               roles: SUPER,
             },

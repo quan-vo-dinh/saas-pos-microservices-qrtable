@@ -69,7 +69,7 @@ export function MenuPage(): React.ReactElement {
 
       {menuError && (
         <Alert variant="destructive">
-          <AlertTitle>Không tải được menu</AlertTitle>
+          <AlertTitle>Không tải được thực đơn</AlertTitle>
           <AlertDescription>
             <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => void refetchMenu()}>
               Thử lại

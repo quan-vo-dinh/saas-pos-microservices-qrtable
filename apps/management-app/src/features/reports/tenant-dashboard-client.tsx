@@ -49,7 +49,7 @@ export function TenantDashboardClient() {
     <div className="flex flex-1 flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Tổng quan</h2>
           <p className="text-muted-foreground">Tổng quan gói, hạn mức và báo cáo vận hành</p>
         </div>
         {reportEnabled ? (

@@ -1,5 +1,6 @@
 'use client';
 
+import { categoryStatusVi } from '@einvoice/shared-constants';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@einvoice/frontend-ui';
 import { DataTableColumnHeader } from '@/components/data-table';
@@ -10,7 +11,7 @@ export const categoriesColumns: ColumnDef<Category>[] = [
   {
     accessorKey: 'name',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Name" />
+      <DataTableColumnHeader column={column} title="Tên" />
     ),
     cell: ({ row }) => (
       <span className="font-medium">{row.getValue('name')}</span>
@@ -19,7 +20,7 @@ export const categoriesColumns: ColumnDef<Category>[] = [
   {
     accessorKey: 'sortOrder',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Order" />
+      <DataTableColumnHeader column={column} title="Thứ tự" />
     ),
     cell: ({ row }) => (
       <span className="text-muted-foreground">{row.getValue('sortOrder')}</span>
@@ -27,11 +28,11 @@ export const categoriesColumns: ColumnDef<Category>[] = [
   },
   {
     id: 'timeRange',
-    header: 'Time Range',
+    header: 'Khung giờ',
     cell: ({ row }) => {
       const start = row.original.timeStart;
       const end = row.original.timeEnd;
-      if (!start && !end) return <span className="text-muted-foreground">All day</span>;
+      if (!start && !end) return <span className="text-muted-foreground">Cả ngày</span>;
       return (
         <span className="text-sm">
           {start ?? '--'} → {end ?? '--'}
@@ -42,13 +43,13 @@ export const categoriesColumns: ColumnDef<Category>[] = [
   {
     accessorKey: 'status',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Status" />
+      <DataTableColumnHeader column={column} title="Trạng thái" />
     ),
     cell: ({ row }) => {
       const status = row.getValue('status') as string;
       return (
         <Badge variant={status === 'active' ? 'default' : 'secondary'}>
-          {status === 'active' ? 'Active' : 'Inactive'}
+          {categoryStatusVi(status)}
         </Badge>
       );
     },
@@ -57,7 +58,7 @@ export const categoriesColumns: ColumnDef<Category>[] = [
   {
     accessorKey: 'itemCount',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Items" />
+      <DataTableColumnHeader column={column} title="Số món" />
     ),
     cell: ({ row }) => (
       <span className="text-muted-foreground">{row.getValue('itemCount')}</span>

@@ -60,7 +60,7 @@ export default function DashboardSubscriptionPage() {
   return (
     <div className="flex flex-col gap-8 p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight">Subscription</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Gói đăng ký</h1>
         <p className="text-muted-foreground text-sm">Gói cước tenant và thanh toán Tier 2.</p>
       </div>
 

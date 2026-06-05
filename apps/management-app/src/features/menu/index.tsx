@@ -17,9 +17,9 @@ export function MenuPage() {
       <div className="flex flex-1 flex-col gap-4 sm:gap-6">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Menu Management</h2>
+            <h2 className="text-2xl font-bold tracking-tight">Quản lý thực đơn</h2>
             <p className="text-muted-foreground">
-              Manage your menu categories and items.
+              Quản lý danh mục và món ăn.
             </p>
           </div>
           <MenuPrimaryButtons />
@@ -27,8 +27,8 @@ export function MenuPage() {
 
         <Tabs defaultValue="categories" className="flex flex-1 flex-col">
           <TabsList>
-            <TabsTrigger value="categories">Categories</TabsTrigger>
-            <TabsTrigger value="items">Menu Items</TabsTrigger>
+            <TabsTrigger value="categories">Danh mục</TabsTrigger>
+            <TabsTrigger value="items">Món ăn</TabsTrigger>
           </TabsList>
           <TabsContent value="categories" className="flex flex-1 flex-col mt-4">
             {catPending ? (

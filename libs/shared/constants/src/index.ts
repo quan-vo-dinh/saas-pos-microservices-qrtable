@@ -16,6 +16,8 @@ export {
   orderStatusVi,
   orderItemStatusVi,
   tableStatusVi,
+  categoryStatusVi,
+  menuItemStatusVi,
   billStatusVi,
   serviceRequestStatusVi,
   serviceRequestTypeVi,

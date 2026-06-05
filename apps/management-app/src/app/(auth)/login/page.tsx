@@ -36,10 +36,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
       <section className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-sm">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Authentication</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Sign in to QRTable Management</h1>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Xác thực</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Đăng nhập QRTable Management</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Redirect authentication is handled by Keycloak. After login, you will return to the correct role route.
+          Đăng nhập qua Keycloak. Sau khi xác thực, bạn sẽ được chuyển tới trang phù hợp với vai trò của mình.
         </p>
         <div className="mt-6 flex gap-3">
           <form
@@ -50,7 +50,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           >
             <Button type="submit">
               <KeyRound data-icon="inline-start" />
-              Continue with Keycloak
+              Tiếp tục với Keycloak
             </Button>
           </form>
         </div>

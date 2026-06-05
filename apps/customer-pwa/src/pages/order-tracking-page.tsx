@@ -47,7 +47,7 @@ export function OrderTrackingPage(): React.ReactElement {
     return (
       <div className="flex flex-col items-center justify-center gap-4 px-4 py-16">
         <p className="text-center text-muted-foreground">Chưa có phiên đặt món</p>
-        <Button onClick={() => navigate(ROUTES.MENU)}>Vào menu</Button>
+        <Button onClick={() => navigate(ROUTES.MENU)}>Vào thực đơn</Button>
         <Button variant="outline" onClick={() => navigate(ROUTES.LANDING)}>
           Quét mã QR để bắt đầu
         </Button>
@@ -70,7 +70,7 @@ export function OrderTrackingPage(): React.ReactElement {
           <p className="text-center text-muted-foreground">Không thể tải các đơn trong phiên.</p>
           <Button onClick={() => void refetchOrders()}>Thử lại</Button>
           <Button variant="outline" onClick={() => navigate(ROUTES.MENU)}>
-            Về menu
+            Về thực đơn
           </Button>
         </div>
       );
@@ -111,8 +111,8 @@ export function OrderTrackingPage(): React.ReactElement {
 
     return (
       <div className="flex flex-col items-center justify-center gap-4 px-4 py-16">
-        <p className="text-center text-muted-foreground">Chưa có đơn nào trong phiên này — hãy đặt món từ menu.</p>
-        <Button onClick={() => navigate(ROUTES.MENU)}>Vào menu</Button>
+        <p className="text-center text-muted-foreground">Chưa có đơn nào trong phiên này — hãy đặt món từ thực đơn.</p>
+        <Button onClick={() => navigate(ROUTES.MENU)}>Vào thực đơn</Button>
       </div>
     );
   }
@@ -133,7 +133,7 @@ export function OrderTrackingPage(): React.ReactElement {
         </p>
         <Button onClick={() => void refetch()}>Thử lại</Button>
         <Button variant="outline" onClick={() => navigate(ROUTES.MENU)}>
-          Về menu
+          Về thực đơn
         </Button>
       </div>
     );
@@ -143,7 +143,7 @@ export function OrderTrackingPage(): React.ReactElement {
     return (
       <div className="flex flex-col items-center justify-center gap-4 px-4 py-16">
         <p className="text-center text-muted-foreground">Không tìm thấy đơn hàng.</p>
-        <Button onClick={() => navigate(ROUTES.MENU)}>Về menu</Button>
+        <Button onClick={() => navigate(ROUTES.MENU)}>Về thực đơn</Button>
       </div>
     );
   }

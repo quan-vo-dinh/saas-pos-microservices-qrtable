@@ -11,11 +11,11 @@ export function MenuPrimaryButtons() {
     <div className="flex gap-2">
       <Button variant="outline" size="sm" onClick={() => setOpen('add-category')}>
         <Plus className="mr-2 size-4" />
-        Add Category
+        Thêm danh mục
       </Button>
       <Button size="sm" onClick={() => setOpen('add-item')}>
         <Plus className="mr-2 size-4" />
-        Add Item
+        Thêm món
       </Button>
     </div>
   );

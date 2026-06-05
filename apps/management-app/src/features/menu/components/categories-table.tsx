@@ -57,15 +57,15 @@ export function CategoriesTable({ data }: CategoriesTableProps) {
     <div className="flex flex-1 flex-col gap-4">
       <DataTableToolbar
         table={table}
-        searchPlaceholder="Filter categories..."
+        searchPlaceholder="Lọc danh mục..."
         searchKey="name"
         filters={[
           {
             columnId: 'status',
-            title: 'Status',
+            title: 'Trạng thái',
             options: [
-              { label: 'Active', value: 'active' },
-              { label: 'Inactive', value: 'inactive' },
+              { label: 'Đang hiển thị', value: 'active' },
+              { label: 'Ẩn', value: 'inactive' },
             ],
           },
         ]}

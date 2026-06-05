@@ -10,6 +10,8 @@ import {
 import type { TableStatus } from '@einvoice/types';
 import {
   BILL_STATUSES,
+  CATEGORY_STATUSES,
+  MENU_ITEM_STATUSES,
   ORDER_ITEM_STATUSES,
   ORDER_STATUSES,
   PAYMENT_METHODS,
@@ -27,6 +29,8 @@ import {
   serviceRequestTypeVi,
   sessionStatusVi,
   tableStatusVi,
+  categoryStatusVi,
+  menuItemStatusVi,
   billingPeriodVi,
   displayDomainLabel,
   invoiceStatusVi,
@@ -54,6 +58,17 @@ describe('vi-domain-labels', () => {
   it('covers every TableStatus', () => {
     for (const s of TABLE_STATUSES) {
       expect(tableStatusVi(s as TableStatus).trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it('covers every CategoryStatus and MenuItemStatus', () => {
+    for (const s of CATEGORY_STATUSES) {
+      expect(categoryStatusVi(s).trim().length).toBeGreaterThan(0);
+      expect(categoryStatusVi(s)).not.toMatch(/^active$|^inactive$/i);
+    }
+    for (const s of MENU_ITEM_STATUSES) {
+      expect(menuItemStatusVi(s).trim().length).toBeGreaterThan(0);
+      expect(menuItemStatusVi(s)).not.toMatch(/^available$|^out_of_stock$/i);
     }
   });
 

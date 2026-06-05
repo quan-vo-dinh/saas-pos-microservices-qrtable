@@ -9,10 +9,10 @@ import { useBillsQuery } from '@/features/order/hooks/use-bill-query';
 import { useServiceRequestsQuery } from '@/features/service-requests/hooks/use-service-request-query';
 
 const links = [
-  { href: ROUTES.POS, label: 'Live Orders' },
-  { href: ROUTES.POS_TABLES, label: 'Tables' },
-  { href: ROUTES.POS_SERVICE_REQUESTS, label: 'Service' },
-  { href: ROUTES.POS_BILLS, label: 'Bills' },
+  { href: ROUTES.POS, label: 'Đơn trực tiếp' },
+  { href: ROUTES.POS_TABLES, label: 'Bàn' },
+  { href: ROUTES.POS_SERVICE_REQUESTS, label: 'Yêu cầu' },
+  { href: ROUTES.POS_BILLS, label: 'Hóa đơn' },
 ] as const;
 
 export function PosSubNav() {
@@ -29,7 +29,7 @@ export function PosSubNav() {
   return (
     <nav
       className="inline-flex w-fit max-w-full flex-wrap items-center gap-1 self-start rounded-lg border border-border/50 bg-card/30 p-1"
-      aria-label="POS sections"
+      aria-label="Các mục POS"
     >
       {links.map((l) => {
         const active = pathname === l.href || (l.href !== ROUTES.POS && pathname.startsWith(l.href));

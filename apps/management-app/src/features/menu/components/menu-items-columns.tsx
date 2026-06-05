@@ -1,5 +1,6 @@
 'use client';
 
+import { categoryStatusVi, menuItemStatusVi } from '@einvoice/shared-constants';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@einvoice/frontend-ui';
 import { ImageIcon } from 'lucide-react';
@@ -37,7 +38,7 @@ export const menuItemsColumns: ColumnDef<MenuItem>[] = [
   {
     accessorKey: 'name',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Name" />
+      <DataTableColumnHeader column={column} title="Tên" />
     ),
     cell: ({ row }) => (
       <div className="flex flex-col">
@@ -55,7 +56,7 @@ export const menuItemsColumns: ColumnDef<MenuItem>[] = [
     accessorFn: (row: MenuItem & { category?: { name: string }; categoryName?: string }) =>
       row.category?.name || row.categoryName,
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Category" />
+      <DataTableColumnHeader column={column} title="Danh mục" />
     ),
     cell: ({ row }) => (
       <Badge variant="outline">{row.getValue('categoryName') || '---'}</Badge>
@@ -67,7 +68,7 @@ export const menuItemsColumns: ColumnDef<MenuItem>[] = [
   {
     accessorKey: 'price',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Price" />
+      <DataTableColumnHeader column={column} title="Giá" />
     ),
     cell: ({ row }) => (
       <span className="font-medium">{formatVND(row.getValue('price'))}</span>
@@ -76,7 +77,7 @@ export const menuItemsColumns: ColumnDef<MenuItem>[] = [
   {
     accessorKey: 'stock',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Stock" />
+      <DataTableColumnHeader column={column} title="Tồn kho" />
     ),
     cell: ({ row }) => {
       const stock = row.getValue('stock') as number;
@@ -90,13 +91,13 @@ export const menuItemsColumns: ColumnDef<MenuItem>[] = [
   {
     accessorKey: 'status',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Status" />
+      <DataTableColumnHeader column={column} title="Trạng thái" />
     ),
     cell: ({ row }) => {
       const status = row.getValue('status') as string;
       return (
         <Badge variant={status === 'available' ? 'default' : 'destructive'}>
-          {status === 'available' ? 'Available' : 'Out of stock'}
+          {menuItemStatusVi(status)}
         </Badge>
       );
     },

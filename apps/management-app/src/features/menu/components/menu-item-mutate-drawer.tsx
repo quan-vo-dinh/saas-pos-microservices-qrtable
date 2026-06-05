@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { menuItemStatusVi } from '@einvoice/shared-constants';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
 import { Upload, X } from 'lucide-react';
@@ -163,14 +164,14 @@ export function MenuItemMutateDrawer() {
     >
       <SheetContent className="sm:max-w-[480px]">
         <SheetHeader>
-          <SheetTitle>{isEdit ? 'Edit Menu Item' : 'Add Menu Item'}</SheetTitle>
+          <SheetTitle>{isEdit ? 'Sửa món' : 'Thêm món'}</SheetTitle>
           <SheetDescription>
-            {isEdit ? 'Update the menu item details.' : 'Fill in the details to add a new menu item.'}
+            {isEdit ? 'Cập nhật thông tin món ăn.' : 'Điền thông tin để thêm món mới.'}
           </SheetDescription>
         </SheetHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4 p-4 overflow-y-auto">
           <div className="grid gap-2">
-            <Label htmlFor="item-name">Name *</Label>
+            <Label htmlFor="item-name">Tên *</Label>
             <Input id="item-name" placeholder="e.g. Phở bò tái" {...form.register('name')} />
             {form.formState.errors.name && (
               <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
@@ -178,10 +179,10 @@ export function MenuItemMutateDrawer() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="item-desc">Description</Label>
+            <Label htmlFor="item-desc">Mô tả</Label>
             <Textarea
               id="item-desc"
-              placeholder="Brief description of the dish..."
+              placeholder="Mô tả ngắn về món..."
               rows={3}
               {...form.register('description')}
             />
@@ -189,7 +190,7 @@ export function MenuItemMutateDrawer() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="item-price">Price (VND) *</Label>
+              <Label htmlFor="item-price">Giá (VND) *</Label>
               <Input
                 id="item-price"
                 type="number"
@@ -202,7 +203,7 @@ export function MenuItemMutateDrawer() {
               )}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="item-stock">Stock *</Label>
+              <Label htmlFor="item-stock">Tồn kho *</Label>
               <Input id="item-stock" type="number" min={0} {...form.register('stock', { valueAsNumber: true })} />
               {form.formState.errors.stock && (
                 <p className="text-sm text-destructive">{form.formState.errors.stock.message}</p>
@@ -211,10 +212,10 @@ export function MenuItemMutateDrawer() {
           </div>
 
           <div className="grid gap-2">
-            <Label>Category *</Label>
+            <Label>Danh mục *</Label>
             <Select defaultValue={form.getValues('categoryId')} onValueChange={(v) => form.setValue('categoryId', v)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
+                <SelectValue placeholder="Chọn danh mục" />
               </SelectTrigger>
               <SelectContent>
                 {activeCategories.map((cat) => (
@@ -230,7 +231,7 @@ export function MenuItemMutateDrawer() {
           </div>
 
           <div className="grid gap-2">
-            <Label>Status</Label>
+            <Label>Trạng thái</Label>
             <Select
               defaultValue={form.getValues('status')}
               onValueChange={(v) => form.setValue('status', v as 'available' | 'out_of_stock')}
@@ -239,14 +240,14 @@ export function MenuItemMutateDrawer() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="available">Available</SelectItem>
-                <SelectItem value="out_of_stock">Out of stock</SelectItem>
+                <SelectItem value="available">{menuItemStatusVi('available')}</SelectItem>
+                <SelectItem value="out_of_stock">{menuItemStatusVi('out_of_stock')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid gap-2">
-            <Label>Image</Label>
+            <Label>Hình ảnh</Label>
             {derivedImagePreview ? (
               <div className="grid gap-2">
                 <div className="relative">
@@ -258,11 +259,11 @@ export function MenuItemMutateDrawer() {
                     {/* eslint-disable-next-line @next/next/no-img-element -- Preview may be a blob URL before upload. */}
                     <img
                       src={derivedImagePreview}
-                      alt="Preview"
+                      alt="Xem trước"
                       className="h-full w-full object-cover"
                     />
                     <span className="absolute inset-x-0 bottom-0 bg-black/55 py-1.5 text-center text-xs font-medium text-white">
-                      Click to replace image
+                      Nhấn để đổi ảnh
                     </span>
                   </button>
                   <Button
@@ -274,7 +275,7 @@ export function MenuItemMutateDrawer() {
                       e.stopPropagation();
                       clearImage();
                     }}
-                    title="Remove image"
+                    title="Xoá ảnh"
                   >
                     <X className="size-3" />
                   </Button>
@@ -287,7 +288,7 @@ export function MenuItemMutateDrawer() {
                 className="flex h-32 items-center justify-center gap-2 rounded-md border border-dashed text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors cursor-pointer"
               >
                 <Upload className="size-4" />
-                Click to upload image
+                Nhấn để tải ảnh lên
               </button>
             )}
             <input
@@ -309,10 +310,10 @@ export function MenuItemMutateDrawer() {
 
           <SheetFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
-              Cancel
+              Huỷ
             </Button>
             <Button type="submit" disabled={isPending || uploadMutation.isPending || clearImageMutation.isPending}>
-              {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Item'}
+              {isPending ? 'Đang lưu…' : isEdit ? 'Lưu thay đổi' : 'Thêm món'}
             </Button>
           </SheetFooter>
         </form>

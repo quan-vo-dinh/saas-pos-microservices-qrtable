@@ -2,7 +2,7 @@
  * Nhãn hiển thị tiếng Việt cho các giá trị enum domain (Phase 2A).
  * Wire/API/DB vẫn dùng chuỗi enum tiếng Anh; UI chỉ map qua các hàm dưới đây.
  */
-import type { TableStatus } from '@einvoice/types';
+import type { CategoryStatus, MenuItemStatus, TableStatus } from '@einvoice/types';
 import type { AppRole } from './roles';
 import {
   BillStatus,
@@ -37,6 +37,16 @@ const TABLE_STATUS_VI = {
   billing: 'Thanh toán',
   cleaning: 'Đang dọn',
 } as const satisfies Record<TableStatus, string>;
+
+const CATEGORY_STATUS_VI = {
+  active: 'Đang hiển thị',
+  inactive: 'Ẩn',
+} as const satisfies Record<CategoryStatus, string>;
+
+const MENU_ITEM_STATUS_VI = {
+  available: 'Còn hàng',
+  out_of_stock: 'Hết hàng',
+} as const satisfies Record<MenuItemStatus, string>;
 
 const BILL_STATUS_VI = {
   [BillStatus.OPEN]: 'Mở',
@@ -76,6 +86,14 @@ export function orderItemStatusVi(status: OrderItemStatus): string {
 
 export function tableStatusVi(status: TableStatus): string {
   return TABLE_STATUS_VI[status];
+}
+
+export function categoryStatusVi(status: CategoryStatus | string): string {
+  return displayDomainLabel(CATEGORY_STATUS_VI, status);
+}
+
+export function menuItemStatusVi(status: MenuItemStatus | string): string {
+  return displayDomainLabel(MENU_ITEM_STATUS_VI, status);
 }
 
 export function billStatusVi(status: BillStatus): string {

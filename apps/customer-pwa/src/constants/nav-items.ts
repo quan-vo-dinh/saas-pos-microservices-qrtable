@@ -9,8 +9,8 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { to: ROUTES.LANDING, label: 'Landing', icon: QrCode },
-  { to: ROUTES.MENU, label: 'Menu', icon: Soup },
-  { to: ROUTES.ORDER_TRACKING, label: 'Tracking', icon: ReceiptText },
-  { to: ROUTES.REQUEST_PAYMENT, label: 'Payment', icon: WalletCards },
+  { to: ROUTES.LANDING, label: 'Trang chủ', icon: QrCode },
+  { to: ROUTES.MENU, label: 'Thực đơn', icon: Soup },
+  { to: ROUTES.ORDER_TRACKING, label: 'Theo dõi đơn', icon: ReceiptText },
+  { to: ROUTES.REQUEST_PAYMENT, label: 'Thanh toán', icon: WalletCards },
 ] as const;

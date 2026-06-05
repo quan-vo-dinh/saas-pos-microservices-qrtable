@@ -24,8 +24,8 @@ export function RecallLogSheet({ open, onOpenChange }: Props) {
         data-kds-ignore-shortcuts
       >
         <SheetHeader>
-          <SheetTitle>Recall log</SheetTitle>
-          <SheetDescription>Audit recall trong phiên mock (24h gần nhất).</SheetDescription>
+          <SheetTitle>Nhật ký recall</SheetTitle>
+          <SheetDescription>Ghi nhận recall trong phiên (24 giờ gần nhất).</SheetDescription>
         </SheetHeader>
         <ScrollArea className="mt-4 max-h-[calc(100vh-8rem)]">
           <div className="rounded-lg border border-border pe-2">

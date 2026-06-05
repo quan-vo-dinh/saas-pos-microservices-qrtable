@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { categoryStatusVi } from '@einvoice/shared-constants';
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@einvoice/frontend-ui'
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/form/zod-resolver';
@@ -71,31 +72,31 @@ export function CategoryMutateDialog() {
     >
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Category' : 'Add Category'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Sửa danh mục' : 'Thêm danh mục'}</DialogTitle>
           <DialogDescription>
-            {isEdit ? 'Update the category details below.' : 'Fill in the details to create a new menu category.'}
+            {isEdit ? 'Cập nhật thông tin danh mục bên dưới.' : 'Điền thông tin để tạo danh mục mới.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="cat-name">Name</Label>
-            <Input id="cat-name" placeholder="e.g. Món chính" {...form.register('name')} />
+            <Label htmlFor="cat-name">Tên</Label>
+            <Input id="cat-name" placeholder="vd. Món chính" {...form.register('name')} />
             {form.formState.errors.name && (
               <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
             )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="cat-time-start">Time Start</Label>
+              <Label htmlFor="cat-time-start">Giờ bắt đầu</Label>
               <Input id="cat-time-start" type="time" {...form.register('timeStart')} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="cat-time-end">Time End</Label>
+              <Label htmlFor="cat-time-end">Giờ kết thúc</Label>
               <Input id="cat-time-end" type="time" {...form.register('timeEnd')} />
             </div>
           </div>
           <div className="grid gap-2">
-            <Label>Status</Label>
+            <Label>Trạng thái</Label>
             <Select
               defaultValue={form.getValues('status')}
               onValueChange={(v) => form.setValue('status', v as 'active' | 'inactive')}
@@ -104,17 +105,17 @@ export function CategoryMutateDialog() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="active">{categoryStatusVi('active')}</SelectItem>
+                <SelectItem value="inactive">{categoryStatusVi('inactive')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(null)}>
-              Cancel
+              Huỷ
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Category'}
+              {isPending ? 'Đang lưu…' : isEdit ? 'Lưu thay đổi' : 'Tạo danh mục'}
             </Button>
           </DialogFooter>
         </form>

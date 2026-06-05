@@ -58,20 +58,20 @@ export function MenuItemsTable({ data }: MenuItemsTableProps) {
     <div className="flex flex-1 flex-col gap-4">
       <DataTableToolbar
         table={table}
-        searchPlaceholder="Filter menu items..."
+        searchPlaceholder="Lọc món ăn..."
         searchKey="name"
         filters={[
           {
             columnId: 'categoryName',
-            title: 'Category',
+            title: 'Danh mục',
             options: categories.map((c) => ({ label: c.name, value: c.name })),
           },
           {
             columnId: 'status',
-            title: 'Status',
+            title: 'Trạng thái',
             options: [
-              { label: 'Available', value: 'available' },
-              { label: 'Out of stock', value: 'out_of_stock' },
+              { label: 'Còn hàng', value: 'available' },
+              { label: 'Hết hàng', value: 'out_of_stock' },
             ],
           },
         ]}

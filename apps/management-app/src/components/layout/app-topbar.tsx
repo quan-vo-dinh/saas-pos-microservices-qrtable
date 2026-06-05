@@ -70,11 +70,11 @@ export function AppTopbar({ title, showGlobalSearch = false }: AppTopbarProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel>Tài khoản của tôi</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <UserCircle2 />
-              Profile
+              Hồ sơ
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {
@@ -82,7 +82,7 @@ export function AppTopbar({ title, showGlobalSearch = false }: AppTopbarProps) {
               }}
             >
               <LogOut />
-              Sign out
+              Đăng xuất
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

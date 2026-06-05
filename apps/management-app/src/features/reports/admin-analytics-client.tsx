@@ -31,8 +31,8 @@ export function AdminAnalyticsClient() {
     <div className="flex flex-1 flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Platform Analytics</h2>
-          <p className="text-muted-foreground">Doanh thu subscription SaaS và sức khỏe tenant</p>
+          <h2 className="text-2xl font-bold tracking-tight">Phân tích nền tảng</h2>
+          <p className="text-muted-foreground">Doanh thu subscription SaaS và sức khỏe đơn vị thuê bao</p>
         </div>
         <ReportRangeFilter value={query} onChange={setQuery} />
       </div>
@@ -46,21 +46,21 @@ export function AdminAnalyticsClient() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <ReportMetricCard
-              title="Platform revenue"
-              description="Subscription invoices (paid)"
+              title="Doanh thu nền tảng"
+              description="Hóa đơn gói đã thanh toán"
               value={formatVnd(platform.data.summary.platformRevenueVnd)}
             />
             <ReportMetricCard
-              title="Paid invoices"
+              title="Hóa đơn đã thanh toán"
               value={String(platform.data.summary.paidInvoiceCount)}
             />
-            <ReportMetricCard title="Active tenants" value={String(platform.data.summary.activeTenantCount)} />
-            <ReportMetricCard title="Suspended tenants" value={String(platform.data.summary.suspendedTenantCount)} />
+            <ReportMetricCard title="Đơn vị đang hoạt động" value={String(platform.data.summary.activeTenantCount)} />
+            <ReportMetricCard title="Đơn vị tạm khóa" value={String(platform.data.summary.suspendedTenantCount)} />
           </div>
 
           <RevenueTrendChart
-            title="Platform revenue trend"
-            description="Subscription revenue — not restaurant sales"
+            title="Xu hướng doanh thu nền tảng"
+            description="Doanh thu subscription — không phải doanh thu bán hàng nhà hàng"
             dataKey="platformRevenueVnd"
             series={revenueSeries}
           />
@@ -68,7 +68,7 @@ export function AdminAnalyticsClient() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Tenant status</CardTitle>
+                <CardTitle>Trạng thái đơn vị thuê bao</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 {platform.data.tenantStatusBreakdown.map((row) => (
@@ -81,7 +81,7 @@ export function AdminAnalyticsClient() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Invoice status</CardTitle>
+                <CardTitle>Trạng thái hóa đơn gói</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 {platform.data.invoiceStatusBreakdown.map((row) => (
@@ -96,14 +96,14 @@ export function AdminAnalyticsClient() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Plan distribution</CardTitle>
+              <CardTitle>Phân bổ gói cước</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {platform.data.planBreakdown.map((plan) => (
                 <div key={plan.planCode} className="flex justify-between gap-4">
                   <span>{plan.planName}</span>
                   <span className="text-muted-foreground tabular-nums">
-                    {plan.activeSubscriptionCount} active / {plan.tenantCount} tenants
+                    {plan.activeSubscriptionCount} đang hiệu lực / {plan.tenantCount} đơn vị
                   </span>
                 </div>
               ))}

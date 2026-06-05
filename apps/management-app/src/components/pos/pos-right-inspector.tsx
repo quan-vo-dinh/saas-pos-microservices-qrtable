@@ -24,7 +24,7 @@ export function PosRightInspector() {
 
   if (pathname === ROUTES.POS || pathname === `${ROUTES.POS}/`) {
     if (!selectedRowId) {
-      return <EmptyState message="Chọn một dòng Live Orders để xem chi tiết." />;
+      return <EmptyState message="Chọn một dòng đơn trực tiếp để xem chi tiết." />;
     }
     return <OrderDetailPanel orderId={selectedRowId} />;
   }

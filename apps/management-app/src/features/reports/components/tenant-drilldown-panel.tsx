@@ -1,6 +1,6 @@
 'use client';
 
-import { planFeatureVi, tenantStatusVi } from '@einvoice/shared-constants';
+import { planFeatureVi, subscriptionStatusVi, tenantStatusVi } from '@einvoice/shared-constants';
 import { useMemo, useState } from 'react';
 import { formatVnd } from '@/lib/format-vnd';
 import { saasApi } from '@/features/saas/api';
@@ -56,13 +56,13 @@ export function TenantDrilldownPanel({ query }: Props) {
       <CardHeader>
         <CardTitle>Drilldown doanh thu nhà hàng</CardTitle>
         <CardDescription>
-          Chọn tenant để xem doanh thu bán hàng (sales revenue) — khác với doanh thu subscription ở trên.
+          Chọn đơn vị thuê bao để xem doanh thu bán hàng — khác với doanh thu subscription ở trên.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Select value={tenantId} onValueChange={setTenantId}>
           <SelectTrigger className="max-w-md">
-            <SelectValue placeholder="Chọn tenant" />
+            <SelectValue placeholder="Chọn đơn vị thuê bao" />
           </SelectTrigger>
           <SelectContent>
             {(tenantsQuery.data?.items ?? []).map((tenant) => (
@@ -75,21 +75,21 @@ export function TenantDrilldownPanel({ query }: Props) {
 
         {selectedTenant ? (
           <Alert>
-            <AlertTitle>Tenant đang xem: {selectedTenant.name}</AlertTitle>
+            <AlertTitle>Đang xem: {selectedTenant.name}</AlertTitle>
             <AlertDescription className="space-y-1">
               <span className="block">Slug: {selectedTenant.slug}</span>
               {selectedTenant.planCode ? (
                 <span className="block">
-                  Gói tenant: <strong>{selectedTenant.planCode}</strong>
+                  Gói: <strong>{selectedTenant.planCode}</strong>
                   {selectedTenant.subscriptionStatus
-                    ? ` · ${tenantStatusVi(selectedTenant.subscriptionStatus)}`
+                    ? ` · ${subscriptionStatusVi(selectedTenant.subscriptionStatus)}`
                     : ''}
                 </span>
               ) : null}
               <span className="block text-xs">
-                Trên dashboard của tenant: báo cáo cơ bản{' '}
-                {selectedTenant.planCode === 'FREE' ? 'bị khóa' : 'có thể mở tùy feature gói'} — Super Admin vẫn
-                drilldown được.
+                Trên dashboard của đơn vị: báo cáo cơ bản{' '}
+                {selectedTenant.planCode === 'FREE' ? 'bị khóa' : 'có thể mở tùy tính năng gói'} — Super Admin vẫn
+                xem chi tiết được.
               </span>
               {tenantPlanFeatures.length > 0 ? (
                 <span className="block text-xs">
@@ -105,12 +105,12 @@ export function TenantDrilldownPanel({ query }: Props) {
         {tenantId && revenue.data ? (
           <>
             <div className="grid gap-4 sm:grid-cols-2">
-              <ReportMetricCard title="Sales revenue" value={formatVnd(revenue.data.summary.grossSalesVnd)} />
-              <ReportMetricCard title="Paid payments" value={String(revenue.data.summary.paidPaymentCount)} />
+              <ReportMetricCard title="Doanh thu bán hàng" value={formatVnd(revenue.data.summary.grossSalesVnd)} />
+              <ReportMetricCard title="Thanh toán đã ghi nhận" value={String(revenue.data.summary.paidPaymentCount)} />
             </div>
             <RevenueTrendChart
-              title="Sales revenue trend"
-              description="Restaurant payments for selected tenant"
+              title="Xu hướng doanh thu bán hàng"
+              description="Thanh toán nhà hàng của đơn vị đã chọn"
               dataKey="grossSalesVnd"
               series={revenue.data.revenueSeries}
             />
