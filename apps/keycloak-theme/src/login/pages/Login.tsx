@@ -231,30 +231,31 @@ const buttonOutlineClass = [
 const features = [
     {
         icon: <QrCodeIcon />,
-        title: "QR-based Ordering",
-        desc: "Guests scan, order, and pay — no app required."
+        title: "Đặt món qua QR",
+        desc: "Khách quét, gọi món và thanh toán — không cần cài app."
     },
     {
         icon: <LayoutDashboardIcon />,
-        title: "Real-time Dashboard",
-        desc: "Live KDS, POS, and table management in one view."
+        title: "Bảng điều khiển realtime",
+        desc: "KDS, POS và quản lý bàn trên cùng một giao diện."
     },
     {
         icon: <UsersIcon />,
-        title: "Role-based Access",
-        desc: "Admin, owner, manager, waiter — each routed correctly."
+        title: "Phân quyền theo vai trò",
+        desc: "Admin, chủ quán, quản lý, phục vụ — định tuyến đúng quyền."
     },
     {
         icon: <ShieldIcon />,
-        title: "Keycloak SSO",
-        desc: "Secure, tenant-aware single sign-on powered by Keycloak."
+        title: "Đăng nhập SSO",
+        desc: "Xác thực tập trung, tách tenant, bảo mật qua Keycloak."
     }
 ];
 
 /* ── Main Component ── */
 
 export default function Login(props: { kcContext: LoginContext; i18n: I18n }) {
-    const { kcContext } = props;
+    const { kcContext, i18n } = props;
+    const { msgStr } = i18n;
     const { url, realm, login, messagesPerField, social, message } = kcContext;
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
@@ -287,8 +288,8 @@ export default function Login(props: { kcContext: LoginContext; i18n: I18n }) {
 
                     {/* Heading */}
                     <div className="flex flex-col gap-1">
-                        <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
-                        <p className="text-sm text-muted-foreground">Enter your credentials to access your workspace</p>
+                        <h2 className="text-2xl font-semibold tracking-tight">{msgStr("loginAccountTitle")}</h2>
+                        <p className="text-sm text-muted-foreground">{msgStr("qrSignInSubtitle")}</p>
                     </div>
 
                     {/* Global message */}
@@ -337,7 +338,7 @@ export default function Login(props: { kcContext: LoginContext; i18n: I18n }) {
                             <span className="w-full border-t" />
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
+                            <span className="bg-background px-2 text-muted-foreground">{msgStr("qrOrContinueEmail")}</span>
                         </div>
                     </div>
 
@@ -346,7 +347,7 @@ export default function Login(props: { kcContext: LoginContext; i18n: I18n }) {
                         {/* Username */}
                         <div className="grid gap-1.5">
                             <label htmlFor="username" className="text-sm font-medium leading-none">
-                                Email
+                                {msgStr("username")}
                             </label>
                             <input
                                 id="username"
@@ -357,7 +358,7 @@ export default function Login(props: { kcContext: LoginContext; i18n: I18n }) {
                                 autoFocus
                                 aria-invalid={hasUsernameError || undefined}
                                 className={inputClass}
-                                placeholder="name@example.com"
+                                placeholder="ten@nhahang.vn"
                             />
                             {hasUsernameError && (
                                 <p className="text-xs text-destructive" dangerouslySetInnerHTML={{ __html: messagesPerField.get("username") }} />
@@ -368,11 +369,11 @@ export default function Login(props: { kcContext: LoginContext; i18n: I18n }) {
                         <div className="relative grid gap-1.5">
                             <div className="flex items-center justify-between">
                                 <label htmlFor="password" className="text-sm font-medium leading-none">
-                                    Password
+                                    {msgStr("password")}
                                 </label>
                                 {realm.resetPasswordAllowed && (
                                     <a href={url.loginResetCredentialsUrl} className="text-sm font-medium text-muted-foreground hover:opacity-75">
-                                        Forgot password?
+                                        {msgStr("doForgotPassword")}
                                     </a>
                                 )}
                             </div>
@@ -391,7 +392,7 @@ export default function Login(props: { kcContext: LoginContext; i18n: I18n }) {
                                     onClick={() => setIsPasswordVisible(v => !v)}
                                     className="absolute right-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground"
                                     tabIndex={-1}
-                                    aria-label={isPasswordVisible ? "Hide password" : "Show password"}
+                                    aria-label={isPasswordVisible ? msgStr("qrHidePassword") : msgStr("qrShowPassword")}
                                 >
                                     {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
                                 </button>
@@ -412,23 +413,23 @@ export default function Login(props: { kcContext: LoginContext; i18n: I18n }) {
                                     className="size-4 rounded border border-input accent-primary"
                                 />
                                 <label htmlFor="rememberMe" className="text-sm leading-none text-muted-foreground">
-                                    Remember me
+                                    {msgStr("rememberMe")}
                                 </label>
                             </div>
                         )}
 
                         <button type="submit" name="login" className={buttonPrimaryClass}>
                             <LogInIcon />
-                            Sign in
+                            {msgStr("doLogIn")}
                         </button>
                     </form>
 
                     {/* Registration link */}
                     {realm.registrationAllowed && (
                         <p className="text-center text-sm text-muted-foreground">
-                            Don&apos;t have an account?{" "}
+                            {msgStr("noAccount")}{" "}
                             <a href={url.registrationUrl} className="font-medium text-primary underline underline-offset-4 hover:opacity-75">
-                                Sign up
+                                {msgStr("doRegister")}
                             </a>
                         </p>
                     )}
@@ -445,13 +446,13 @@ export default function Login(props: { kcContext: LoginContext; i18n: I18n }) {
                     </div>
 
                     <p className="text-center text-xs text-muted-foreground">
-                        By signing in, you agree to our{" "}
+                        {msgStr("qrTermsPrefix")}{" "}
                         <a href="/terms" className="underline underline-offset-4 hover:text-primary">
-                            Terms
+                            {msgStr("qrTerms")}
                         </a>{" "}
-                        and{" "}
+                        {msgStr("qrAnd")}{" "}
                         <a href="/privacy" className="underline underline-offset-4 hover:text-primary">
-                            Privacy Policy
+                            {msgStr("qrPrivacy")}
                         </a>
                         .
                     </p>

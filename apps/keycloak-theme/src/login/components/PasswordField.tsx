@@ -10,10 +10,22 @@ type PasswordFieldProps = {
     autoFocus?: boolean;
     errorHtml?: string;
     hasError?: boolean;
+    showPasswordLabel?: string;
+    hidePasswordLabel?: string;
 };
 
 export default function PasswordField(props: PasswordFieldProps) {
-    const { id, name, label, autoComplete = "new-password", autoFocus, errorHtml, hasError } = props;
+    const {
+        id,
+        name,
+        label,
+        autoComplete = "new-password",
+        autoFocus,
+        errorHtml,
+        hasError,
+        showPasswordLabel = "Hiện mật khẩu",
+        hidePasswordLabel = "Ẩn mật khẩu"
+    } = props;
     const [isVisible, setIsVisible] = useState(false);
 
     return (
@@ -37,7 +49,7 @@ export default function PasswordField(props: PasswordFieldProps) {
                     onClick={() => setIsVisible(v => !v)}
                     className="absolute right-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground"
                     tabIndex={-1}
-                    aria-label={isVisible ? "Hide password" : "Show password"}
+                    aria-label={isVisible ? hidePasswordLabel : showPasswordLabel}
                 >
                     {isVisible ? <EyeOffIcon /> : <EyeIcon />}
                 </button>

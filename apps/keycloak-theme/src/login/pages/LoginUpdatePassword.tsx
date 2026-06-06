@@ -20,17 +20,17 @@ export default function LoginUpdatePassword(props: { kcContext: UpdatePasswordCo
 
     return (
         <AuthSplitLayout
-            title="Set your new password"
-            subtitle="Your account uses a temporary password. Choose a new password to continue to QRTable."
+            title={msgStr("updatePasswordTitle")}
+            subtitle={msgStr("updatePasswordMessage")}
             footer={
                 <p className="text-center text-xs text-muted-foreground">
-                    By continuing, you agree to our{" "}
+                    {msgStr("qrTermsPrefix")}{" "}
                     <a href="/terms" className="underline underline-offset-4 hover:text-primary">
-                        Terms
+                        {msgStr("qrTerms")}
                     </a>{" "}
-                    and{" "}
+                    {msgStr("qrAnd")}{" "}
                     <a href="/privacy" className="underline underline-offset-4 hover:text-primary">
-                        Privacy Policy
+                        {msgStr("qrPrivacy")}
                     </a>
                     .
                 </p>
@@ -45,9 +45,7 @@ export default function LoginUpdatePassword(props: { kcContext: UpdatePasswordCo
                     label={msgStr("passwordNew")}
                     autoFocus
                     hasError={hasPasswordError || hasConfirmError}
-                    errorHtml={
-                        hasPasswordError ? kcSanitize(messagesPerField.get("password")) : undefined
-                    }
+                    errorHtml={hasPasswordError ? kcSanitize(messagesPerField.get("password")) : undefined}
                 />
 
                 <PasswordField

@@ -13,23 +13,23 @@ function getPageLabel(pageId: string): PageLabel {
     switch (pageId) {
         case "register.ftl":
             return {
-                title: "Create your QRTable account",
-                subtitle: "Register staff identity and continue to your workspace."
+                title: "Tạo tài khoản QRTable",
+                subtitle: "Đăng ký danh tính nhân viên và tiếp tục vào không gian làm việc."
             };
         case "login-reset-password.ftl":
             return {
-                title: "Reset your password",
-                subtitle: "Enter your account email to recover access securely."
+                title: "Khôi phục mật khẩu",
+                subtitle: "Nhập email tài khoản để nhận hướng dẫn đặt lại mật khẩu."
             };
         case "login-update-password.ftl":
             return {
-                title: "Set your new password",
-                subtitle: "Choose a secure password to continue to your workspace."
+                title: "Đặt mật khẩu mới",
+                subtitle: "Chọn mật khẩu mạnh để tiếp tục vào QRTable."
             };
         default:
             return {
-                title: "Sign in to QRTable Management",
-                subtitle: "Secure POS and dashboard access for your restaurant team."
+                title: "Đăng nhập QRTable Management",
+                subtitle: "Truy cập POS và bảng điều khiển an toàn cho đội ngũ nhà hàng."
             };
     }
 }
@@ -43,9 +43,9 @@ function BrandPanel(props: { pageId: string }): ReactNode {
             <h1>{title}</h1>
             <p>{subtitle}</p>
             <div className="qt-brand-meta">
-                <span>Tenant-aware access</span>
-                <span>Role-based routing</span>
-                <span>Keycloak secured</span>
+                <span>Phân tách tenant</span>
+                <span>Phân quyền theo vai trò</span>
+                <span>Bảo mật Keycloak</span>
             </div>
         </div>
     );
