@@ -1,5 +1,7 @@
 # Phase 7 Docker DigitalOcean Deployment Implementation Plan
 
+> **Vietnamese translation:** [2026-06-06-phase-7-docker-digitalocean-deployment.vi.md](2026-06-06-phase-7-docker-digitalocean-deployment.vi.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Package QRTable into reproducible Docker images and deploy the Phase 7 pilot/production baseline to DigitalOcean under `vodinhquan.dev`.
