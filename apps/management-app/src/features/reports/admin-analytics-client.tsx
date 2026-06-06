@@ -58,12 +58,12 @@ export function AdminAnalyticsClient() {
             <ReportMetricCard title="Đơn vị tạm khóa" value={String(platform.data.summary.suspendedTenantCount)} />
           </div>
 
-          <RevenueTrendChart
+          {/* <RevenueTrendChart
             title="Xu hướng doanh thu nền tảng"
             description="Doanh thu subscription — không phải doanh thu bán hàng nhà hàng"
             dataKey="platformRevenueVnd"
             series={revenueSeries}
-          />
+          /> */}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
