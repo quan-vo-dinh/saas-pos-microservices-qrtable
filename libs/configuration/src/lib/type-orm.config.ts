@@ -1,5 +1,5 @@
 import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
-import { DatabaseType } from 'typeorm';
+import { DataSource, DatabaseType } from 'typeorm';
 import { DynamicModule } from '@nestjs/common';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -11,6 +11,7 @@ type PgTypes = {
 export type TypeOrmEntityTarget = Extract<NonNullable<TypeOrmModuleOptions['entities']>, readonly unknown[]>[number];
 
 const POSTGRES_TIMESTAMP_OID = 1114;
+const DEPLOYED_ENVIRONMENTS = new Set(['production', 'staging']);
 let pgTimestampParserConfigured = false;
 
 export function configurePostgresTimestampParser(): void {
@@ -24,6 +25,40 @@ export function configurePostgresTimestampParser(): void {
 }
 
 configurePostgresTimestampParser();
+
+export function resolveServicePostgresDatabase(dedicatedEnvName: string, defaultDatabase: string): string {
+  const dedicatedDatabase = process.env[dedicatedEnvName]?.trim();
+  const nodeEnv = process.env['NODE_ENV'] || 'development';
+
+  if (DEPLOYED_ENVIRONMENTS.has(nodeEnv) && !dedicatedDatabase) {
+    throw new Error(`${dedicatedEnvName} is required in staging/production`);
+  }
+
+  const sharedFallback =
+    process.env['DATABASE_SHARED_FALLBACK_ENABLED'] === 'true' ? process.env['TYPEORM_DATABASE']?.trim() : undefined;
+
+  return dedicatedDatabase || sharedFallback || defaultDatabase;
+}
+
+export function createServicePostgresDataSource(options: {
+  dedicatedEnvName: string;
+  defaultDatabase: string;
+  entities: TypeOrmEntityTarget[];
+  migrations: string[];
+}): DataSource {
+  return new DataSource({
+    type: 'postgres',
+    host: process.env['TYPEORM_HOST'] || 'localhost',
+    port: Number(process.env['TYPEORM_PORT']) || 5432,
+    username: process.env['TYPEORM_USERNAME'] || 'postgres',
+    password: process.env['TYPEORM_PASSWORD'] || 'postgres',
+    database: resolveServicePostgresDatabase(options.dedicatedEnvName, options.defaultDatabase),
+    entities: options.entities,
+    migrations: options.migrations,
+    migrationsTableName: 'typeorm_migrations',
+    synchronize: false,
+  });
+}
 
 export class TypeOrmConfiguration {
   @IsString()

@@ -1,6 +1,6 @@
 import { BaseEntity } from './base.entity';
 import { Column, Entity, Index } from 'typeorm';
-import { OrderItemStatus, PreparationStation } from '@einvoice/types';
+import type { OrderItemStatus, PreparationStation } from '@einvoice/types';
 
 @Entity({ name: 'order_items' })
 @Index(['tenantId', 'orderId'])

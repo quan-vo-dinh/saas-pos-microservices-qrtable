@@ -41,7 +41,7 @@ Sau catalog seed, script `seed-dashboard-demo.js` ghi **dữ liệu cố định
 - 1 bill `PENDING_PAYMENT`, 1 order `CANCELED`, bàn `occupied` / `billing` / `cleaning`, 1 món `out_of_stock`.
 - Subscription invoices platform (admin analytics) với id prefix `d4d0`.
 
-Chạy riêng (PostgreSQL + `phase-4b-saas.sql` đã apply):
+Chạy riêng sau khi per-service migrations đã apply:
 
 ```bash
 pnpm dev:seed-dashboard
@@ -64,22 +64,29 @@ bash tools/demo/phase-4d-dashboard-smoke.sh
 
 Ownership seed:
 
-- `postgres/saas`: dòng PostgreSQL thuộc SaaS.
-- `postgres/catalog`: dòng PostgreSQL thuộc Catalog.
-- `postgres/order`: dọn dẹp PostgreSQL thuộc Order.
+- `postgres/saas`: `qrtable_saas` tenants, plans, subscriptions.
+- `postgres/catalog`: `qrtable_catalog` areas, categories, menu items, tables.
+- `postgres/order`: `qrtable_order` sessions, orders, bills, service requests.
+- `postgres/payment`: `qrtable_payment` payments and tenant payment settings.
 - `mongo`: role/user User-Access.
 - `keycloak`: realm, clients, roles, mappers, users.
 
-Runtime dev hiện vẫn dùng một database PostgreSQL `qrtable`.
-Bố cục thư mục cố ý sẵn sàng cho tách Database-per-Service sau này.
+Runtime dev dùng database riêng cho từng service và MongoDB `qrtable_auth`.
 
-## Phase 4B SaaS Schema Seed
+## Full Local Reset
 
-Run after PostgreSQL/MongoDB are up:
+Lệnh sau có tính phá hủy: nó drop/recreate bốn target PostgreSQL databases, chạy migrations, seed từng owner, rồi verify PostgreSQL, MongoDB, Redis và Keycloak. Legacy database `qrtable` không bị xóa.
 
 ```bash
-psql "$SAAS_DATABASE_URL" -f tools/dev-seed/postgres/phase-4b-saas.sql
-mongosh "$MONGO_URI" tools/dev-seed/mongo/phase-4b-users-tenantid.js
+pnpm dev:reseed -- --yes
 ```
 
-The scripts are idempotent and can be rerun during local development.
+Các command kiểm tra riêng:
+
+```bash
+pnpm db:migration:show
+pnpm db:verify:ownership
+pnpm dev:verify-seed
+```
+
+Rollback về shared database chỉ dành cho local transition và phải bật rõ `DATABASE_SHARED_FALLBACK_ENABLED=true`.

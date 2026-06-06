@@ -36,6 +36,13 @@ Run `pnpm verify:doc-anchors` after changing docs, routes, enum display labels, 
 | SaaS label tests                  | `libs/shared/constants/src/lib/vi-domain-labels.spec.ts`                         | Regression coverage for label mappings.                        |
 | SaaS wire types                   | `libs/shared/constants/src/lib/saas-wire-types.ts`                               | Frontend-safe SaaS wire enum constants.                        |
 | Backend SaaS constants            | `libs/constants/src/lib/saas.constants.ts`                                       | Backend source constants to keep wire values aligned.          |
+| Catalog database DataSource       | `apps/catalog/src/database/catalog.data-source.ts`                               | Catalog entity ownership and migration entrypoint.             |
+| Order database DataSource         | `apps/order/src/database/order.data-source.ts`                                   | Order entity ownership and migration entrypoint.               |
+| Payment database DataSource       | `apps/payment/src/database/payment.data-source.ts`                               | Payment entity ownership and migration entrypoint.             |
+| SaaS database DataSource          | `apps/saas/src/database/saas.data-source.ts`                                     | SaaS entity ownership and migration entrypoint.                |
+| Database provisioning             | `tools/database/provision-service-databases.js`                                  | Local per-service PostgreSQL creation and guarded reset.       |
+| Database ownership verifier       | `tools/database/verify-service-database-ownership.js`                            | Smoke check for missing or foreign service tables.             |
+| Split database seed guide         | `tools/dev-seed/README.md`                                                       | Destructive local reseed and verification workflow.            |
 | BFF dashboard report routes       | `apps/bff/src/app/modules/reporting/controllers/dashboard-report.controller.ts`  | Tenant report routes and `analytics_basic` feature gate.       |
 | BFF admin analytics routes        | `apps/bff/src/app/modules/reporting/controllers/admin-analytics.controller.ts`   | Super Admin platform analytics and tenant drilldown routes.    |
 | Report subscription context guard | `apps/bff/src/app/modules/reporting/guards/tenant-subscription-context.guard.ts` | Current subscription hydration before feature checks.          |

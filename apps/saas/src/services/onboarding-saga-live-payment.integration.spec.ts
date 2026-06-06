@@ -245,17 +245,16 @@ async function createHarness(): Promise<Harness> {
 }
 
 function createSaasDataSource(): Promise<DataSource> {
-  return createPostgresDataSource(
-    process.env['SAAS_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
-    [Tenant, PricingPlan, Subscription, SaasOutboxEvent],
-  ).initialize();
+  return createPostgresDataSource(process.env['SAAS_TYPEORM_DATABASE'] ?? 'qrtable_saas', [
+    Tenant,
+    PricingPlan,
+    Subscription,
+    SaasOutboxEvent,
+  ]).initialize();
 }
 
 function createPaymentDataSource(): Promise<DataSource> {
-  return createPostgresDataSource(
-    process.env['PAYMENT_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
-    [],
-  ).initialize();
+  return createPostgresDataSource(process.env['PAYMENT_TYPEORM_DATABASE'] ?? 'qrtable_payment', []).initialize();
 }
 
 function createPostgresDataSource(database: string, entities: DataSourceOptions['entities']): DataSource {

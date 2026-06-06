@@ -95,6 +95,17 @@ describe('Payment configuration', () => {
     expect(CONFIGURATION).toHaveProperty('PAYMENT_INTEGRATION_CONFIG.ORDER_TCP_TIMEOUT_MS', 2500);
   });
 
+  it('uses qrtable_payment by default in development', async () => {
+    process.env.NODE_ENV = 'development';
+    delete process.env.PAYMENT_TYPEORM_DATABASE;
+    delete process.env.TYPEORM_DATABASE;
+    jest.resetModules();
+
+    const { CONFIGURATION } = await import('./index');
+
+    expect(CONFIGURATION.TYPEORM_CONFIG.DATABASE).toBe('qrtable_payment');
+  });
+
   it('requires PAYMENT_TYPEORM_DATABASE in production', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.PAYMENT_TYPEORM_DATABASE;

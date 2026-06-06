@@ -65,7 +65,7 @@ Primary sources:
 | Task 5-6: Infra/app Compose                                 | Compose services, internal networks, service discovery, named volumes, health checks, layered compose   |
 | Task 7: Caddy reverse proxy                                 | Reverse proxy role, TLS termination, Let's Encrypt ACME, WebSocket forwarding                           |
 | Task 8: Production env and secrets                          | Secret taxonomy, runtime env files, file permissions, no secret build args                              |
-| Task 9: Schema/migration blocker                            | Why `TYPEORM_SYNCHRONIZE=false` needs migrations or schema bootstrap                                    |
+| Task 9: Schema/migration lifecycle                          | Per-service migrations with `TYPEORM_SYNCHRONIZE=false`                                                 |
 | Task 10: Keycloak public bootstrap                          | Public hostnames, TLS, proxy headers, env separation                                                    |
 | Task 11: SePay production integration                       | HTTPS-only webhook requirement, public API base URL, secret-key verification, CI negative checks        |
 | Task 12: Monitoring rewiring                                | Internal scrape targets, private observability stores, Grafana behind HTTPS/auth                        |
@@ -2009,66 +2009,44 @@ docker pull "registry.digitalocean.com/qrtable/bff:${IMAGE_TAG}"
 
 ## 9. Database and Migration Strategy
 
-### 9.1 Critical Blocker — TypeORM Synchronize Off in Production
+### 9.1 Resolved — Per-Service TypeORM Migrations
 
-This is one of the largest Phase 7 blockers that must be resolved before deploy:
-
-**Development:** `TYPEORM_SYNCHRONIZE=true` → TypeORM automatically creates/modifies tables from entity definitions. Convenient but dangerous in production because it can auto-drop columns when entities change.
-
-**Production:** `TYPEORM_SYNCHRONIZE=false` → No code creates tables. Fresh database = empty = all services fail on boot.
-
-Solution must choose one of two:
-
-**Option A — SQL Schema Bootstrap:**
+Development, staging, and production use `TYPEORM_SYNCHRONIZE=false`. Catalog, Order, Payment, and SaaS each have a service-owned TypeORM DataSource, migration folder, and Nx migration targets.
 
 ```bash
-# Generate schema from TypeORM entities (development environment)
-pnpm nx run order:schema:generate  # produces schema SQL
-
-# Apply to production database before starting app
-psql "postgresql://user:pass@postgres:5432/qrtable_order" -f tools/db/phase7-schema.sql
-```
-
-**Option B — TypeORM Migrations:**
-
-```bash
-# Generate migration files
-pnpm nx run order:migration:generate -- --name=initial_schema
-
-# Run migrations
+pnpm db:migrate
+pnpm db:migration:show
 pnpm nx run order:migration:run
-
-# Migrations are audit trail of database changes — versioned, reversible
+pnpm nx run order:migration:revert
+pnpm db:verify:ownership
 ```
 
-**Recommendation:** Use TypeORM migrations from the start. Migrations enable: rollback database state, audit history of schema changes, CI smoke test migrations on fresh DB.
+Production deploy must run `pnpm db:migrate` before starting app containers. Migration failure blocks deployment.
 
 ### 9.2 Multi-Database Strategy
 
 QRTable uses one PostgreSQL instance but multiple databases (not schemas):
 
 ```sql
--- docker/postgres/init/001-create-databases.sql
+-- docker/postgres/init/001-create-service-databases.sql
 CREATE DATABASE qrtable_catalog;
 CREATE DATABASE qrtable_order;
 CREATE DATABASE qrtable_saas;
 CREATE DATABASE qrtable_payment;
-CREATE DATABASE qrtable_keycloak;
--- Keycloak manages its own database
 ```
 
 **Why multiple databases instead of one?** Better isolation. When hardening after thesis, easier to move each service to separate managed PostgreSQL if needed.
 
 ### 9.3 Seed Data for Demo
 
-Production has no data by default. Seed after migrations run:
+The destructive seed workflow is for local development and demos only:
 
 ```bash
-pnpm dev:reseed -- --yes    # run dev-reseed.sh with production database URL
-pnpm dev:verify-seed        # verify seed data is valid
+pnpm dev:reseed -- --yes
+pnpm dev:verify-seed
 ```
 
-Seed data matters for demo: one tenant with stable slug, categories, menu items, tables, and Keycloak users that can log in.
+It resets only the four target service databases and keeps legacy `qrtable` untouched. Never run `db:reset:dev` or `dev:reseed` against staging/production.
 
 ### 9.4 Backup and Data Rollback — Different from App Rollback
 
@@ -2609,7 +2587,7 @@ Use this checklist to self-verify: if after reading the guide you still cannot e
 - DigitalOcean Cloud Firewall opens only SSH from trusted IP, `80`, and `443`.
 - DNS A records for `api`, `app`, `qr`, `auth`, `grafana` resolve to Droplet IP before starting Caddy.
 - `/opt/qrtable/.env.production` exists on server, permission `0600`, not committed.
-- `TYPEORM_SYNCHRONIZE=false` has corresponding schema strategy: migrations or reviewed SQL bootstrap.
+- `TYPEORM_SYNCHRONIZE=false` is paired with per-service migrations, and deploy runs them before app startup.
 - Keycloak runs production `start`, not `start-dev`.
 - Grafana goes through HTTPS and auth; observability stores are private.
 
@@ -2676,15 +2654,15 @@ mindmap
       Cloud Firewall: only 22/80/443 public
       DNS: A records for 5 subdomains
       Caddy: automatic Let's Encrypt TLS
-    Migration Blocker
-      TYPEORM_SYNCHRONIZE=false in production
-      Must choose: SQL schema or TypeORM migrations
-      Migrations before starting app containers
+    Migration Lifecycle
+      TYPEORM_SYNCHRONIZE=false everywhere
+      Per-service TypeORM migrations
+      Ownership verification before app startup
 ```
 
 After reading the entire document, this is the mental model to remember:
 
-**About Docker:** Image is an immutable template, container is a running instance. Multi-stage build creates a compact runtime image. Layers are cached — rarely changing instructions at top, frequently changing at bottom. `NEXT_PUBLIC_`_ and `VITE\__` are build-time, baked into JS bundle — cannot change at runtime. Secrets must never be Docker build args.
+**About Docker:** Image is an immutable template, container is a running instance. Multi-stage build creates a compact runtime image. Layers are cached — rarely changing instructions at top, frequently changing at bottom. `NEXT_PUBLIC_`\_ and `VITE\__` are build-time, baked into JS bundle — cannot change at runtime. Secrets must never be Docker build args.
 
 **About Docker Compose:** Three network layers (edge, app, infra) reflect defense in depth. Only Caddy exposes ports to the internet. Health checks are prerequisite for `depends_on` to mean something. Layered compose files separate concerns: infra/app/proxy/monitoring restart independently.
 
@@ -2692,6 +2670,6 @@ After reading the entire document, this is the mental model to remember:
 
 **About CI/CD:** Three separate workflows: CI (quality gate), Release (build immutable images), Deploy (approval + remote SSH). Immutable tags with git SHA — never use `:latest` in production. Rollback = redeploy old image tag — not "deploy old code". Schema migration is a hard gate — cannot skip.
 
-**About migration blocker:** `TYPEORM_SYNCHRONIZE=false` in production means fresh database is empty. Must run migrations before starting app containers. This is why Phase 7 plan has "Task 9: Resolve Schema Blocker" as a hard blocker before go-live.
+**About migrations:** `TYPEORM_SYNCHRONIZE=false` is the default. Run the versioned migrations for Catalog, Order, Payment, and SaaS before app startup, then run the ownership smoke check.
 
 **About immutability:** An image with tag `abc123` is immutable — never changes. Knowing which image tag is running = knowing exactly which code. Rollback is an operation you can perform anytime as long as the old image remains in the registry. This is the core strength of container-based deployment.

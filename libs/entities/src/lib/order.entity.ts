@@ -1,6 +1,6 @@
 import { BaseEntity } from './base.entity';
 import { Column, Entity, Index } from 'typeorm';
-import { OrderStatus } from '@einvoice/types';
+import type { OrderStatus } from '@einvoice/types';
 
 @Entity({ name: 'orders' })
 @Index('idx_orders_tenant_session_idempotency', ['tenantId', 'sessionId', 'idempotencyKey'], { unique: true })

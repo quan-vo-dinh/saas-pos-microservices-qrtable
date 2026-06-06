@@ -461,6 +461,8 @@ Removed from current scope:
 
 **Note:** Kitchen service **does not have its own database** — uses Redis only for KDS queue (Sorted Set).
 
+**Implementation status (June 6, 2026):** this database-per-service layout is active in local runtime and migration tooling. PostgreSQL schemas are owned by the service DataSources under `apps/*/src/database/`, and User-Access resolves MongoDB to `qrtable_auth`. The legacy `TYPEORM_DATABASE` / `MONGO_DB_NAME` fallback is disabled by default; local rollback requires the explicit `DATABASE_SHARED_FALLBACK_ENABLED=true` flag.
+
 **Example of data isolation in a database (qrtable_catalog):**
 
 ```
@@ -492,7 +494,13 @@ Removed from current scope:
 
 ```yaml
 Database Level:
-- Each service owns its own database (env: TYPEORM_DATABASE=qrtable_{service})
+- Each service owns its own database:
+  - CATALOG_TYPEORM_DATABASE=qrtable_catalog
+  - ORDER_TYPEORM_DATABASE=qrtable_order
+  - PAYMENT_TYPEORM_DATABASE=qrtable_payment
+  - SAAS_TYPEORM_DATABASE=qrtable_saas
+  - USER_ACCESS_MONGO_DB_NAME=qrtable_auth
+- Schema lifecycle uses per-service TypeORM migrations; TYPEORM_SYNCHRONIZE=false
 - Every tenant-scoped entity: tenant_id UUID NOT NULL
   - Composite indexes: (tenant_id, id), (tenant_id, created_at)
 - Unique constraints include tenant_id: UNIQUE(tenant_id, table_name)
@@ -1303,7 +1311,7 @@ PAYMENT_SEPAY_QR_ACCOUNT: "0010000000355" # Receiving bank account number
 PAYMENT_SEPAY_QR_BANK: "Vietcombank" # SePay-compatible bank name
 PAYMENT_ORDER_TCP_TIMEOUT_MS: 5000         # Payment service waits for Order service qua TCP
 BILL_REF_PREFIX: "QRTBL" # Identification prefix in CK content
-PAYMENT_TYPEORM_DATABASE: "qrtable_payment"  # Required staging/production; dev can fallback TYPEORM_DATABASE (xem decision D6)
+PAYMENT_TYPEORM_DATABASE: "qrtable_payment"  # Required staging/production; dedicated default in development
 
 Webhook URL (configurable in SePay dashboard):
   POST https://{bff-host}/api/v1/payment/sepay/webhook

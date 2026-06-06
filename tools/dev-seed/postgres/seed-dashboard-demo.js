@@ -5,6 +5,7 @@ const {
   buildPhoVietDashboardFixtures,
   buildPlatformInvoiceFixtures,
 } = require('./dashboard-demo-data');
+const { assertSplitDatabaseTargets, buildPostgresServiceConfigs } = require('./database-config');
 
 function requireYes() {
   if (!process.argv.includes('--yes')) {
@@ -12,40 +13,20 @@ function requireYes() {
   }
 }
 
-function assertDevTarget(config) {
-  const nodeEnv = process.env.NODE_ENV || 'development';
-  if (nodeEnv !== 'development') {
-    throw new Error(`Refusing to seed dashboard demo when NODE_ENV=${nodeEnv}`);
-  }
-  if (!['localhost', '127.0.0.1'].includes(config.host)) {
-    throw new Error(`Refusing to seed non-local PostgreSQL host: ${config.host}`);
-  }
-}
-
-function pgConfig() {
-  return {
-    host: process.env.TYPEORM_HOST || 'localhost',
-    port: Number(process.env.TYPEORM_PORT || 5432),
-    user: process.env.TYPEORM_USERNAME || 'postgres',
-    password: process.env.TYPEORM_PASSWORD || 'postgres',
-    database: process.env.TYPEORM_DATABASE || 'qrtable',
-  };
-}
-
-async function clearTenantDashboardData(client, tenantId) {
-  await client.query(`delete from payments where tenant_id = $1`, [tenantId]);
-  await client.query(`delete from order_items where tenant_id = $1`, [tenantId]);
-  await client.query(`delete from orders where tenant_id = $1`, [tenantId]);
-  await client.query(`delete from bills where tenant_id = $1`, [tenantId]);
-  await client.query(`delete from service_requests where tenant_id = $1`, [tenantId]);
-  await client.query(`delete from sessions where tenant_id = $1`, [tenantId]);
-  await client.query(`delete from subscription_invoices where id::text like $1`, [`${DEMO_ID_PREFIX}%`]);
-  await client.query(
+async function clearTenantDashboardData(clients, tenantId) {
+  await clients.payment.query(`delete from payments where tenant_id = $1`, [tenantId]);
+  await clients.order.query(`delete from order_items where tenant_id = $1`, [tenantId]);
+  await clients.order.query(`delete from orders where tenant_id = $1`, [tenantId]);
+  await clients.order.query(`delete from bills where tenant_id = $1`, [tenantId]);
+  await clients.order.query(`delete from service_requests where tenant_id = $1`, [tenantId]);
+  await clients.order.query(`delete from sessions where tenant_id = $1`, [tenantId]);
+  await clients.saas.query(`delete from subscription_invoices where id::text like $1`, [`${DEMO_ID_PREFIX}%`]);
+  await clients.catalog.query(
     `update tables set status = 'available', session_id = null, updated_at = now()
      where tenant_id = $1`,
     [tenantId],
   );
-  await client.query(
+  await clients.catalog.query(
     `update menu_items set status = 'available', updated_at = now()
      where tenant_id = $1 and status = 'out_of_stock'`,
     [tenantId],
@@ -202,12 +183,6 @@ async function applyTablePatches(client, patches) {
 }
 
 async function seedPlatformInvoices(client, rows) {
-  const planTable = await client.query(`select to_regclass('public.pricing_plans') is not null as exists`);
-  if (!planTable.rows[0]?.exists) {
-    console.warn('Skipping platform invoices: pricing_plans table missing (run phase-4b-saas.sql)');
-    return 0;
-  }
-
   let inserted = 0;
   for (const row of rows) {
     const plan = await client.query(`select id from pricing_plans where code = $1 limit 1`, [row.planCode]);
@@ -252,30 +227,30 @@ async function seedPlatformInvoices(client, rows) {
 
 async function main() {
   requireYes();
-  const config = pgConfig();
-  assertDevTarget(config);
-  const client = new Client(config);
+  const configs = buildPostgresServiceConfigs();
+  assertSplitDatabaseTargets(configs);
+  const clients = Object.fromEntries(Object.entries(configs).map(([service, config]) => [service, new Client(config)]));
   const anchorDate = new Date();
   const fixtures = buildPhoVietDashboardFixtures({ anchorDate });
   const platformInvoices = buildPlatformInvoiceFixtures(anchorDate);
 
-  await client.connect();
+  await Promise.all(Object.values(clients).map((client) => client.connect()));
   try {
-    await client.query('begin');
-    const tenant = await client.query('select id from tenants where id = $1', [DEV_TENANT.id]);
+    await Promise.all(Object.values(clients).map((client) => client.query('begin')));
+    const tenant = await clients.saas.query('select id from tenants where id = $1', [DEV_TENANT.id]);
     if (tenant.rowCount !== 1) {
-      throw new Error(`Tenant ${DEV_TENANT.slug} (${DEV_TENANT.id}) not found — run reseed-postgres first`);
+      throw new Error(`Tenant ${DEV_TENANT.slug} (${DEV_TENANT.id}) not found; run reseed-postgres first`);
     }
 
-    await clearTenantDashboardData(client, DEV_TENANT.id);
-    await insertSessions(client, fixtures.sessions);
-    await insertOrders(client, fixtures.orders);
-    await insertOrderItems(client, fixtures.orderItems);
-    await insertBills(client, fixtures.bills);
-    await insertPayments(client, fixtures.payments);
-    await applyTablePatches(client, fixtures.tablePatches);
-    const platformInserted = await seedPlatformInvoices(client, platformInvoices);
-    await client.query('commit');
+    await clearTenantDashboardData(clients, DEV_TENANT.id);
+    await insertSessions(clients.order, fixtures.sessions);
+    await insertOrders(clients.order, fixtures.orders);
+    await insertOrderItems(clients.order, fixtures.orderItems);
+    await insertBills(clients.order, fixtures.bills);
+    await insertPayments(clients.payment, fixtures.payments);
+    await applyTablePatches(clients.catalog, fixtures.tablePatches);
+    const platformInserted = await seedPlatformInvoices(clients.saas, platformInvoices);
+    await Promise.all(Object.values(clients).map((client) => client.query('commit')));
 
     console.log(
       `Dashboard demo seeded for ${DEV_TENANT.name} (${DEV_TENANT.slug}): ` +
@@ -283,14 +258,14 @@ async function main() {
         `${platformInserted}/${platformInvoices.length} platform invoices (anchor ${anchorDate.toISOString()})`,
     );
   } catch (error) {
-    await client.query('rollback');
+    await Promise.allSettled(Object.values(clients).map((client) => client.query('rollback')));
     throw error;
   } finally {
-    await client.end();
+    await Promise.allSettled(Object.values(clients).map((client) => client.end()));
   }
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  console.error(error.stack || error.message);
   process.exit(1);
 });

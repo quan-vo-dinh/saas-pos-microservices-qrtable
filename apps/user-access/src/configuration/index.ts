@@ -3,8 +3,18 @@ import { TcpConfiguration } from '@common/configuration/tcp.config';
 import { AppConfiguration } from '@common/configuration/app.config';
 import { ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MongoConfiguration } from '@common/configuration/mongo.config';
+import { MongoConfiguration, resolveServiceMongoDatabase } from '@common/configuration/mongo.config';
 import { GrpcConfiguration } from '@common/configuration/grpc.config';
+
+const DEFAULT_USER_ACCESS_DATABASE = 'qrtable_auth';
+
+class UserAccessMongoConfiguration extends MongoConfiguration {
+  constructor() {
+    super({
+      DB_NAME: resolveServiceMongoDatabase('USER_ACCESS_MONGO_DB_NAME', DEFAULT_USER_ACCESS_DATABASE),
+    });
+  }
+}
 
 class Configuration extends BaseConfiguration {
   @ValidateNested()
@@ -16,8 +26,8 @@ class Configuration extends BaseConfiguration {
   TCP_SERV = new TcpConfiguration();
 
   @ValidateNested()
-  @Type(() => MongoConfiguration)
-  MONGO_CONFIG = new MongoConfiguration();
+  @Type(() => UserAccessMongoConfiguration)
+  MONGO_CONFIG = new UserAccessMongoConfiguration();
 
   @ValidateNested()
   @Type(() => GrpcConfiguration)

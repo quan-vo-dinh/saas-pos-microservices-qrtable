@@ -167,7 +167,7 @@ function createOrderDataSource(): Promise<DataSource> {
     port: Number(process.env['TYPEORM_PORT'] ?? 5432),
     username: process.env['TYPEORM_USERNAME'] ?? 'postgres',
     password: process.env['TYPEORM_PASSWORD'] ?? 'postgres',
-    database: process.env['ORDER_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
+    database: process.env['ORDER_TYPEORM_DATABASE'] ?? 'qrtable_order',
     synchronize: false,
     entities: [Category, MenuItem, Session, Order, OrderItem, Bill, OutboxEvent],
   });
@@ -181,7 +181,7 @@ function createCatalogDataSource(): Promise<DataSource> {
     port: Number(process.env['TYPEORM_PORT'] ?? 5432),
     username: process.env['TYPEORM_USERNAME'] ?? 'postgres',
     password: process.env['TYPEORM_PASSWORD'] ?? 'postgres',
-    database: process.env['CATALOG_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
+    database: process.env['CATALOG_TYPEORM_DATABASE'] ?? 'qrtable_catalog',
     synchronize: false,
     entities: [Category, MenuItem],
   });

@@ -1,6 +1,6 @@
 import { BaseEntity } from './base.entity';
 import { Column, Entity, Index } from 'typeorm';
-import { SessionStatus } from '@einvoice/types';
+import type { SessionStatus } from '@einvoice/types';
 
 @Entity({ name: 'sessions' })
 @Index(['tenantId', 'tableId', 'status'])

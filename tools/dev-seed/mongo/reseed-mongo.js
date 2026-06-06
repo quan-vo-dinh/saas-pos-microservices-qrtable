@@ -81,7 +81,8 @@ function mapDoc(doc) {
 async function main() {
   requireYes();
   const mongoUri = process.env.MONGODB_URI || 'mongodb://root:password@localhost:27017';
-  const mongoDbName = process.env.MONGODB_DB_NAME || process.env.MONGO_DB_NAME || 'qrtable';
+  const mongoDbName =
+    process.env.USER_ACCESS_MONGO_DB_NAME || process.env.MONGODB_DB_NAME || process.env.MONGO_DB_NAME || 'qrtable_auth';
   assertDevTarget(mongoUri);
 
   const roleSeedPath = path.resolve('apps/user-access/src/seeder/role.json');
@@ -104,6 +105,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  console.error(error.stack || error.message);
   process.exit(1);
 });

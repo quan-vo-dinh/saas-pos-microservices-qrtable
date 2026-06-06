@@ -4,7 +4,7 @@
 
 Move QRTable from the current mostly shared development database layout to the documented database-per-service architecture while keeping the existing service boundaries, tenant isolation rules, and local developer workflow understandable.
 
-## Current State
+## Pre-Implementation State
 
 Conclusion: QRTable is not fully database-per-service yet. It is partially split.
 
@@ -44,7 +44,7 @@ Evidence gathered with CodeGraph first, then verified against docs, source, env,
   - `tools/dev-seed/verify/verify-dev-seed.js`
 - `tools/dev-seed/README.md` explicitly says runtime dev still uses one PostgreSQL database `qrtable` and the folder layout is ready for future database-per-service splitting.
 
-## Target State
+## Implemented Target State
 
 One PostgreSQL instance can still be used, but each service must own a separate database.
 
@@ -63,31 +63,31 @@ Important: `outbox_events` appears in multiple services by design. That is safe 
 
 ## Plan Tasks
 
-- [ ] Task 1: Freeze the database ownership map in docs and config naming.
+- [x] Task 1: Freeze the database ownership map in docs and config naming.
   - Add service-specific env names: `SAAS_TYPEORM_DATABASE`, `CATALOG_TYPEORM_DATABASE`, `ORDER_TYPEORM_DATABASE`, `PAYMENT_TYPEORM_DATABASE`, `USER_ACCESS_MONGO_DB_NAME`.
   - Keep `TYPEORM_DATABASE` and `MONGO_DB_NAME` only as local transition fallbacks.
   - Verify: `rg` shows every service-specific database env in `.env.example`, service configuration, and seed docs.
 
-- [ ] Task 2: Add service-specific configuration classes.
+- [x] Task 2: Add service-specific configuration classes.
   - Create Catalog and SaaS TypeORM configuration classes matching the existing Order and Payment pattern.
   - Update Order default to `qrtable_order` when no shared fallback is intentionally enabled.
   - Keep Payment's staging/production guard and align the other PostgreSQL services with the same rule.
   - Add a User-Access Mongo configuration that resolves `USER_ACCESS_MONGO_DB_NAME` before `MONGO_DB_NAME`.
   - Verify: unit tests cover development fallback plus staging/production required dedicated database names.
 
-- [ ] Task 3: Provision target databases locally.
+- [x] Task 3: Provision target databases locally.
   - Add Postgres init SQL for `qrtable_catalog`, `qrtable_order`, `qrtable_saas`, `qrtable_payment`, and optionally `qrtable_keycloak` if Keycloak moves to PostgreSQL later.
   - Keep one Postgres instance for development, but create separate database names.
   - Decide later whether to add per-service database users in the same release or a follow-up hardening pass.
   - Verify: `psql` lists all target databases after a fresh provider bootstrap.
 
-- [ ] Task 4: Split schema creation and migrations per service.
+- [x] Task 4: Split schema creation and migrations per service.
   - Introduce per-service TypeORM data-source/migration targets instead of relying on `TYPEORM_SYNCHRONIZE` or one shared schema.
   - Keep each service migration folder scoped to its own entities.
   - Ensure `outbox_events` migrations are generated per service database, not as one shared table.
   - Verify: migration run creates only service-owned tables in each target database.
 
-- [ ] Task 5: Migrate existing development data safely.
+- [x] Task 5: Migrate existing development data safely.
   - For local/dev, prefer reseed into target databases rather than preserving all mixed data.
   - For any data worth preserving, copy by ownership:
     - SaaS tables from `qrtable` to `qrtable_saas`.
@@ -98,19 +98,19 @@ Important: `outbox_events` appears in multiple services by design. That is safe 
   - Preserve IDs and `tenant_id` values. Do not create cross-database foreign keys.
   - Verify: row counts and sample tenant rows match between old and new sources before cutting services over.
 
-- [ ] Task 6: Refactor seed and demo tooling.
+- [x] Task 6: Refactor seed and demo tooling.
   - Split PostgreSQL seed scripts by owner: `postgres/saas`, `postgres/catalog`, `postgres/order`, `postgres/payment`.
   - Make dashboard demo seed call each service database explicitly instead of inserting all demo rows through one connection.
   - Update seed verification to check each target database and Mongo `qrtable_auth`.
   - Verify: `pnpm dev:reseed -- --yes` finishes against the split databases and `pnpm dev:verify-seed` checks all services separately.
 
-- [ ] Task 7: Cut runtime services over to dedicated databases.
+- [x] Task 7: Cut runtime services over to dedicated databases.
   - Set local `.env` and `.env.example` to the target database names.
   - Update Docker/app compose examples so each service receives its own database env.
   - Keep BFF, Kitchen, and Authorizer without TypeORM/Mongoose business DB providers.
   - Verify: starting the stack shows each service health check connected to its own target datastore.
 
-- [ ] Task 8: Add regression checks for service ownership.
+- [x] Task 8: Add regression checks for service ownership.
   - Add a script or test that fails when a service registers entities outside its ownership map.
   - Add a database smoke check that fails if target databases are missing expected tables or contain foreign service tables.
   - Add doc-anchor verification if docs/config paths are added.
@@ -164,6 +164,20 @@ Staging/production cutover later:
 | Seed verification        | Checks every service datastore separately.                                                              |
 | Smoke flows              | Menu/table, order submit/confirm, payment completion, SaaS onboarding, and User-Access sync still pass. |
 
+## Implementation Evidence
+
+- A fresh CodeGraph index of the implemented worktree completed with 1,191 source files, 15,568 nodes, and 31,401 edges.
+- `pnpm dev:reseed -- --yes` completed the PostgreSQL reset, all four migrations, split PostgreSQL seeds, MongoDB `qrtable_auth` seed, and dashboard fixtures.
+- `pnpm db:migration:show` reported one applied initial migration for Catalog, Order, Payment, and SaaS.
+- `pnpm db:verify:ownership` passed against the four local target databases.
+- `pnpm dev:verify-seed` passed for PostgreSQL, MongoDB, Redis, and Keycloak.
+- Catalog, Order, Payment, SaaS, and User-Access test targets passed with 328 tests; environment-gated integration tests remained skipped by their existing test conditions.
+- Catalog, Order, Payment, SaaS, and User-Access production builds passed.
+- Lint passed for all changed database-owning service code. User-Access still reports three pre-existing warnings and no errors.
+- `pnpm db:test`, `pnpm verify:doc-anchors`, Prettier checks, shell syntax checks, Node syntax checks, and `git diff --check` passed.
+- Catalog, Order, Payment, SaaS, and User-Access returned HTTP 200 with dependency status `UP` from their readiness endpoints while using dedicated datastore env values.
+- The pre-split local Payment database was backed up before destructive dev reset. The legacy shared `qrtable` database was not deleted.
+
 ## Rollback Plan
 
 - Keep `TYPEORM_DATABASE=qrtable` and `MONGO_DB_NAME=qrtable` as explicit development fallback until split verification passes.
@@ -172,27 +186,27 @@ Staging/production cutover later:
 - For staging/production, rollback by redeploying previous env values and previous app image while keeping old shared database untouched.
 - Remove fallback only after the split databases pass repeated local and staging smoke runs.
 
-## Open Decisions
+## Decisions Applied
 
-- Should development keep a supported shared-database fallback after the split, or should dedicated database names become mandatory everywhere?
-- Should per-service database users be introduced in the first split, or deferred after the physical database split works?
-- Should User-Access rename only the Mongo database to `qrtable_auth`, or also update old scripts/docs that still mention `MONGO_DB_NAME=qrtable`?
-- Should Payment legacy tables inside `qrtable` be dropped after confirming `qrtable_payment` is canonical, or kept for a longer thesis/demo rollback window?
-- Should TypeORM `synchronize` remain allowed in development/test, or should local dev switch fully to migrations for thesis evidence?
+- Dedicated databases are the development default. Shared fallback requires `DATABASE_SHARED_FALLBACK_ENABLED=true`.
+- Per-service database users are deferred to a later hardening pass.
+- User-Access runtime and seed tooling use `qrtable_auth`; legacy Mongo env remains only as an explicit transition fallback.
+- Legacy `qrtable` is retained for rollback and is not deleted by the split workflow.
+- Local development uses migrations with `TYPEORM_SYNCHRONIZE=false`.
 
-## Read The Room
+## Initial Audit Snapshot
 
-Observed patterns to preserve:
+Patterns observed before implementation and preserved:
 
 - DTOs, constants, guards, providers, and shared entities are imported from shared libs.
 - Controllers mostly delegate to services.
 - Cross-service flows already use TCP/Kafka rather than direct repository access.
 - Payment and Order already started the service-specific database env pattern.
-- Seed scripts intentionally separate ownership folders, but still execute against a shared PostgreSQL database today.
+- Seed scripts already suggested ownership folders, which were completed as separate database clients and owner modules.
 
-Quality scan:
+Quality scan at the start of implementation:
 
-- Blocker: runtime local is not database-per-service for SaaS, Catalog, Order, or User-Access.
-- Blocker: shared `outbox_events` table name is only safe once databases are split.
-- Debt flag: seed/demo tooling performs cross-domain writes through one database connection.
+- Resolved blocker: runtime local was not database-per-service for SaaS, Catalog, Order, or User-Access.
+- Resolved blocker: the shared `outbox_events` table name was unsafe while service schemas shared one database.
+- Resolved debt: seed/demo tooling performed cross-domain writes through one database connection.
 - Solid: module-level entity registration mostly respects service boundaries.

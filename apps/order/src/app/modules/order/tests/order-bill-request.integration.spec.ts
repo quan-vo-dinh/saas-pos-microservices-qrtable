@@ -242,10 +242,14 @@ async function createHarness(): Promise<Harness> {
 }
 
 function createDataSource(): Promise<DataSource> {
-  return createPostgresDataSource(
-    process.env['ORDER_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
-    [Area, Table, Session, Order, Bill, ServiceRequest],
-  ).initialize();
+  return createPostgresDataSource(process.env['ORDER_TYPEORM_DATABASE'] ?? 'qrtable_order', [
+    Area,
+    Table,
+    Session,
+    Order,
+    Bill,
+    ServiceRequest,
+  ]).initialize();
 }
 
 function createPostgresDataSource(database: string, entities: DataSourceOptions['entities']): DataSource {

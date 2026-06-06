@@ -305,7 +305,7 @@ function createDataSource(): Promise<DataSource> {
     port: Number(process.env['TYPEORM_PORT'] ?? 5432),
     username: process.env['TYPEORM_USERNAME'] ?? 'postgres',
     password: process.env['TYPEORM_PASSWORD'] ?? 'postgres',
-    database: process.env['ORDER_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
+    database: process.env['ORDER_TYPEORM_DATABASE'] ?? 'qrtable_order',
     synchronize: false,
     entities: [Session, Order, OrderItem, Bill],
   }).initialize();

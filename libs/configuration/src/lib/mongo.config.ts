@@ -4,6 +4,22 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Connection } from 'mongoose';
 
+const DEPLOYED_ENVIRONMENTS = new Set(['production', 'staging']);
+
+export function resolveServiceMongoDatabase(dedicatedEnvName: string, defaultDatabase: string): string {
+  const dedicatedDatabase = process.env[dedicatedEnvName]?.trim();
+  const nodeEnv = process.env['NODE_ENV'] || 'development';
+
+  if (DEPLOYED_ENVIRONMENTS.has(nodeEnv) && !dedicatedDatabase) {
+    throw new Error(`${dedicatedEnvName} is required in staging/production`);
+  }
+
+  const sharedFallback =
+    process.env['DATABASE_SHARED_FALLBACK_ENABLED'] === 'true' ? process.env['MONGO_DB_NAME']?.trim() : undefined;
+
+  return dedicatedDatabase || sharedFallback || defaultDatabase;
+}
+
 export class MongoConfiguration {
   @IsString()
   @IsNotEmpty()

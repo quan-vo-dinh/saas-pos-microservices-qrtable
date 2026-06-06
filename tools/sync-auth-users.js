@@ -79,7 +79,8 @@ async function resolveKeycloakUserId(config, adminToken, username) {
 async function bootstrap() {
   const catalogArg = process.argv[2];
   const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017';
-  const mongoDbName = process.env.MONGODB_DB_NAME || process.env.MONGO_DB_NAME || 'qrtable';
+  const mongoDbName =
+    process.env.USER_ACCESS_MONGO_DB_NAME || process.env.MONGODB_DB_NAME || process.env.MONGO_DB_NAME || 'qrtable_auth';
   const users = readBootstrapUsers(catalogArg);
 
   const keycloakConfig = {

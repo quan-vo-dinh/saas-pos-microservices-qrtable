@@ -248,10 +248,12 @@ async function createHarness(): Promise<Harness> {
 }
 
 function createDataSource(): Promise<DataSource> {
-  return createPostgresDataSource(
-    process.env['SAAS_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
-    [Tenant, PricingPlan, Subscription, SaasOutboxEvent],
-  ).initialize();
+  return createPostgresDataSource(process.env['SAAS_TYPEORM_DATABASE'] ?? 'qrtable_saas', [
+    Tenant,
+    PricingPlan,
+    Subscription,
+    SaasOutboxEvent,
+  ]).initialize();
 }
 
 function createPostgresDataSource(database: string, entities: DataSourceOptions['entities']): DataSource {

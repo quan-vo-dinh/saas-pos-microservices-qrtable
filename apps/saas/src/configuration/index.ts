@@ -4,9 +4,18 @@ import { AppConfiguration } from '@common/configuration/app.config';
 import { KafkaConfiguration } from '@common/configuration/kafka.config';
 import { IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TypeOrmConfiguration } from '@common/configuration/type-orm.config';
+import { resolveServicePostgresDatabase, TypeOrmConfiguration } from '@common/configuration/type-orm.config';
 
 const DEFAULT_SAAS_KAFKA_CLIENT_ID = 'qrtable-saas-service';
+const DEFAULT_SAAS_DATABASE = 'qrtable_saas';
+
+class SaasTypeOrmConfiguration extends TypeOrmConfiguration {
+  constructor() {
+    super({
+      DATABASE: resolveServicePostgresDatabase('SAAS_TYPEORM_DATABASE', DEFAULT_SAAS_DATABASE),
+    });
+  }
+}
 
 class SaasPlatformPaymentConfiguration {
   @IsOptional()
@@ -49,8 +58,8 @@ class Configuration extends BaseConfiguration {
   TCP_SERV = new TcpConfiguration();
 
   @ValidateNested()
-  @Type(() => TypeOrmConfiguration)
-  TYPEORM_CONFIG = new TypeOrmConfiguration();
+  @Type(() => SaasTypeOrmConfiguration)
+  TYPEORM_CONFIG = new SaasTypeOrmConfiguration();
 
   @ValidateNested()
   @Type(() => KafkaConfiguration)

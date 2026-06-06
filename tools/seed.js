@@ -67,7 +67,12 @@ async function bootstrap() {
 
   try {
     await client.connect();
-    const db = client.db(process.env.MONGODB_DB_NAME || process.env.MONGO_DB_NAME || 'qrtable');
+    const db = client.db(
+      process.env.USER_ACCESS_MONGO_DB_NAME ||
+        process.env.MONGODB_DB_NAME ||
+        process.env.MONGO_DB_NAME ||
+        'qrtable_auth',
+    );
 
     const files = fs.readdirSync(absoluteDir).filter((f) => f.endsWith('.json'));
 

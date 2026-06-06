@@ -12,12 +12,16 @@ fi
 
 export NODE_ENV="${NODE_ENV:-development}"
 export MONGODB_URI="${MONGODB_URI:-mongodb://root:password@localhost:27017}"
-export MONGO_DB_NAME="${MONGO_DB_NAME:-qrtable}"
+export USER_ACCESS_MONGO_DB_NAME="${USER_ACCESS_MONGO_DB_NAME:-qrtable_auth}"
+export MONGO_DB_NAME="${MONGO_DB_NAME:-${USER_ACCESS_MONGO_DB_NAME}}"
 export TYPEORM_HOST="${TYPEORM_HOST:-localhost}"
 export TYPEORM_PORT="${TYPEORM_PORT:-5432}"
 export TYPEORM_USERNAME="${TYPEORM_USERNAME:-postgres}"
 export TYPEORM_PASSWORD="${TYPEORM_PASSWORD:-postgres}"
-export TYPEORM_DATABASE="${TYPEORM_DATABASE:-qrtable}"
+export CATALOG_TYPEORM_DATABASE="${CATALOG_TYPEORM_DATABASE:-qrtable_catalog}"
+export ORDER_TYPEORM_DATABASE="${ORDER_TYPEORM_DATABASE:-qrtable_order}"
+export PAYMENT_TYPEORM_DATABASE="${PAYMENT_TYPEORM_DATABASE:-qrtable_payment}"
+export SAAS_TYPEORM_DATABASE="${SAAS_TYPEORM_DATABASE:-qrtable_saas}"
 export KEYCLOAK_HOST="${KEYCLOAK_HOST:-http://localhost:8180}"
 export KEYCLOAK_REALM="${KEYCLOAK_REALM:-qrtable}"
 export KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-qrtable-bff}"
@@ -31,22 +35,17 @@ redact_uri() {
 }
 
 echo "Dev reseed targets:"
-echo "  PostgreSQL: ${TYPEORM_USERNAME}@${TYPEORM_HOST}:${TYPEORM_PORT}/${TYPEORM_DATABASE}"
-echo "  MongoDB: $(redact_uri "${MONGODB_URI}")/${MONGO_DB_NAME}"
+echo "  PostgreSQL Catalog: ${TYPEORM_USERNAME}@${TYPEORM_HOST}:${TYPEORM_PORT}/${CATALOG_TYPEORM_DATABASE}"
+echo "  PostgreSQL Order: ${TYPEORM_USERNAME}@${TYPEORM_HOST}:${TYPEORM_PORT}/${ORDER_TYPEORM_DATABASE}"
+echo "  PostgreSQL Payment: ${TYPEORM_USERNAME}@${TYPEORM_HOST}:${TYPEORM_PORT}/${PAYMENT_TYPEORM_DATABASE}"
+echo "  PostgreSQL SaaS: ${TYPEORM_USERNAME}@${TYPEORM_HOST}:${TYPEORM_PORT}/${SAAS_TYPEORM_DATABASE}"
+echo "  MongoDB User-Access: $(redact_uri "${MONGODB_URI}")/${USER_ACCESS_MONGO_DB_NAME}"
 echo "  Keycloak: ${KEYCLOAK_HOST}/realms/${KEYCLOAK_REALM}"
 echo "  Redis: ${REDIS_HOST:-localhost}:${REDIS_PORT:-6379}"
 
+pnpm db:reset:dev
+pnpm db:migrate
 node tools/dev-seed/postgres/reseed-postgres.js --yes
-if [[ -n "${SAAS_DATABASE_URL:-}" ]]; then
-  psql "$SAAS_DATABASE_URL" -f tools/dev-seed/postgres/phase-4b-saas.sql
-else
-  PGPASSWORD="${TYPEORM_PASSWORD:-postgres}" psql \
-    -h "${TYPEORM_HOST:-localhost}" \
-    -p "${TYPEORM_PORT:-5432}" \
-    -U "${TYPEORM_USERNAME:-postgres}" \
-    -d "${TYPEORM_DATABASE:-qrtable}" \
-    -f tools/dev-seed/postgres/phase-4b-saas.sql
-fi
 node tools/dev-seed/postgres/seed-dashboard-demo.js --yes
 node tools/dev-seed/mongo/reseed-mongo.js --yes
 bash tools/keycloak-bootstrap.sh

@@ -246,24 +246,25 @@ function buildSettlementService(dataSource: DataSource, orderClient: ClientProxy
 }
 
 function createPaymentDataSource(): Promise<DataSource> {
-  return createPostgresDataSource(
-    process.env['PAYMENT_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
-    [PaymentEntity, AuditPaymentEntity, PaymentOutboxEventEntity],
-  ).initialize();
+  return createPostgresDataSource(process.env['PAYMENT_TYPEORM_DATABASE'] ?? 'qrtable_payment', [
+    PaymentEntity,
+    AuditPaymentEntity,
+    PaymentOutboxEventEntity,
+  ]).initialize();
 }
 
 function createOrderDataSource(): Promise<DataSource> {
-  return createPostgresDataSource(
-    process.env['ORDER_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
-    [Session, Bill],
-  ).initialize();
+  return createPostgresDataSource(process.env['ORDER_TYPEORM_DATABASE'] ?? 'qrtable_order', [
+    Session,
+    Bill,
+  ]).initialize();
 }
 
 function createCatalogDataSource(): Promise<DataSource> {
-  return createPostgresDataSource(
-    process.env['CATALOG_TYPEORM_DATABASE'] ?? process.env['TYPEORM_DATABASE'] ?? 'qrtable',
-    [Area, Table],
-  ).initialize();
+  return createPostgresDataSource(process.env['CATALOG_TYPEORM_DATABASE'] ?? 'qrtable_catalog', [
+    Area,
+    Table,
+  ]).initialize();
 }
 
 function createPostgresDataSource(database: string, entities: DataSourceOptions['entities']): DataSource {

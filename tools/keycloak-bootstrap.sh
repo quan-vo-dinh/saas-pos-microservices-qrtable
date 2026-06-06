@@ -61,6 +61,23 @@ fi
 auth_header=(-H "Authorization: Bearer ${ADMIN_TOKEN}")
 json_header=(-H 'Content-Type: application/json')
 
+get_keycloak_json_array() {
+  local url="$1"
+  local response
+
+  for _attempt in {1..10}; do
+    response="$(curl -sS "${url}" "${auth_header[@]}")"
+    if echo "${response}" | jq -e 'type == "array"' >/dev/null 2>&1; then
+      echo "${response}"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "Keycloak API did not return a JSON array after retries: ${url}" >&2
+  return 1
+}
+
 if [[ "${KEYCLOAK_CLEAN_REALM}" == "true" ]]; then
   clean_code="$(curl -sS -o /dev/null -w '%{http_code}' "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}" "${auth_header[@]}")"
   if [[ "${clean_code}" == "200" ]]; then
@@ -226,8 +243,12 @@ ensure_user_attribute_mapper() {
   local user_attribute="$2"
   local claim_name="$3"
 
+  local mapper_models
+  mapper_models="$(get_keycloak_json_array \
+    "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${client_id_internal}/protocol-mappers/models")"
+
   local mapper_exists
-  mapper_exists="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${client_id_internal}/protocol-mappers/models" "${auth_header[@]}" | jq -r ".[] | select(.name == \"${mapper_name}\") | .name")"
+  mapper_exists="$(echo "${mapper_models}" | jq -r --arg name "${mapper_name}" '.[] | select(.name == $name) | .name')"
 
   if [[ -z "${mapper_exists}" ]]; then
     echo "Creating protocol mapper: ${mapper_name}"
@@ -356,11 +377,11 @@ while IFS= read -r user_line; do
 done < <(jq -c '.[]' "${AUTH_BOOTSTRAP_USERS_FILE}")
 
 if command -v node >/dev/null 2>&1; then
-  if [[ -n "${MONGODB_URI:-}" || -n "${MONGO_DB_NAME:-}" || -n "${MONGODB_DB_NAME:-}" ]]; then
+  if [[ -n "${MONGODB_URI:-}" || -n "${USER_ACCESS_MONGO_DB_NAME:-}" || -n "${MONGO_DB_NAME:-}" || -n "${MONGODB_DB_NAME:-}" ]]; then
     echo "Syncing internal users to MongoDB from ${AUTH_BOOTSTRAP_USERS_FILE}"
     node tools/sync-auth-users.js "${AUTH_BOOTSTRAP_USERS_FILE}"
   else
-    echo "Skip MongoDB sync: set MONGODB_URI and MONGO_DB_NAME (or MONGODB_DB_NAME) to enable internal user sync"
+    echo "Skip MongoDB sync: set MONGODB_URI and USER_ACCESS_MONGO_DB_NAME to enable internal user sync"
   fi
 else
   echo "Skip MongoDB sync: node command is not available"

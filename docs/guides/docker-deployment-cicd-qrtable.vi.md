@@ -65,7 +65,7 @@ Nguồn chính:
 | Task 5-6: Infra/app Compose                                 | Compose services, internal networks, service discovery, named volumes, health checks, layered compose   |
 | Task 7: Caddy reverse proxy                                 | Reverse proxy role, TLS termination, Let's Encrypt ACME, WebSocket forwarding                           |
 | Task 8: Production env and secrets                          | Secret taxonomy, runtime env files, file permissions, no secret build args                              |
-| Task 9: Schema/migration blocker                            | Why `TYPEORM_SYNCHRONIZE=false` needs migrations or schema bootstrap                                    |
+| Task 9: Schema/migration lifecycle                          | Per-service migrations với `TYPEORM_SYNCHRONIZE=false`                                                  |
 | Task 10: Keycloak public bootstrap                          | Public hostnames, TLS, proxy headers, env separation                                                    |
 | Task 11: SePay production integration                       | HTTPS-only webhook requirement, public API base URL, secret-key verification, CI negative checks        |
 | Task 12: Monitoring rewiring                                | Internal scrape targets, private observability stores, Grafana behind HTTPS/auth                        |
@@ -2009,66 +2009,44 @@ docker pull "registry.digitalocean.com/qrtable/bff:${IMAGE_TAG}"
 
 ## 9. Database Và Migration Strategy
 
-### 9.1 Blocker Quan Trọng — TypeORM Synchronize Tắt Trong Production
+### 9.1 Đã Giải Quyết — Per-Service TypeORM Migrations
 
-Đây là một trong những blocker lớn nhất của Phase 7 phải giải quyết trước khi deploy:
-
-**Development:** `TYPEORM_SYNCHRONIZE=true` → TypeORM tự động tạo/sửa tables theo entity definitions. Tiện nhưng nguy hiểm trong production vì có thể auto-drop columns khi entity thay đổi.
-
-**Production:** `TYPEORM_SYNCHRONIZE=false` → Không có code nào tạo tables. Fresh database = trống rỗng = tất cả services fail khi boot.
-
-Giải pháp phải chọn một trong hai:
-
-**Option A — SQL Schema Bootstrap:**
+Development, staging và production đều dùng `TYPEORM_SYNCHRONIZE=false`. Catalog, Order, Payment và SaaS có TypeORM DataSource, migration folder và Nx migration targets riêng.
 
 ```bash
-# Generate schema từ TypeORM entities (development environment)
-pnpm nx run order:schema:generate  # tạo ra schema SQL
-
-# Apply lên production database trước khi start app
-psql "postgresql://user:pass@postgres:5432/qrtable_order" -f tools/db/phase7-schema.sql
-```
-
-**Option B — TypeORM Migrations:**
-
-```bash
-# Generate migration files
-pnpm nx run order:migration:generate -- --name=initial_schema
-
-# Run migrations
+pnpm db:migrate
+pnpm db:migration:show
 pnpm nx run order:migration:run
-
-# Migrations là audit trail của database changes — versioned, reversible
+pnpm nx run order:migration:revert
+pnpm db:verify:ownership
 ```
 
-**Recommendation:** Dùng TypeORM migrations từ đầu. Migrations cho phép: rollback database state, audit history of schema changes, CI smoke test migrations on fresh DB.
+Production deploy phải chạy `pnpm db:migrate` trước khi start app containers. Migration fail thì deployment phải dừng.
 
 ### 9.2 Multi-Database Strategy
 
 QRTable dùng một PostgreSQL instance nhưng nhiều databases (không phải schemas):
 
 ```sql
--- docker/postgres/init/001-create-databases.sql
+-- docker/postgres/init/001-create-service-databases.sql
 CREATE DATABASE qrtable_catalog;
 CREATE DATABASE qrtable_order;
 CREATE DATABASE qrtable_saas;
 CREATE DATABASE qrtable_payment;
-CREATE DATABASE qrtable_keycloak;
--- Keycloak tự quản lý database của nó
 ```
 
 **Tại sao nhiều database thay vì một?** Isolation tốt hơn. Khi hardening sau thesis, dễ move từng service sang managed PostgreSQL riêng nếu cần.
 
 ### 9.3 Seed Data Cho Demo
 
-Production không tự có data. Cần seed sau khi migrations chạy:
+Workflow seed phá hủy chỉ dành cho local development và demo:
 
 ```bash
-pnpm dev:reseed -- --yes    # chạy dev-reseed.sh với production database URL
-pnpm dev:verify-seed        # kiểm tra seed data hợp lệ
+pnpm dev:reseed -- --yes
+pnpm dev:verify-seed
 ```
 
-Seed data quan trọng cho demo: một tenant với stable slug, categories, menu items, tables, và Keycloak users có thể login.
+Nó chỉ reset bốn target service databases và giữ nguyên legacy `qrtable`. Không chạy `db:reset:dev` hoặc `dev:reseed` trên staging/production.
 
 ### 9.4 Backup Và Data Rollback — Khác Với App Rollback
 
@@ -2609,7 +2587,7 @@ Checklist này dùng để tự kiểm tra: nếu đọc guide xong vẫn không
 - DigitalOcean Cloud Firewall chỉ mở SSH từ IP tin cậy, `80`, và `443`.
 - DNS A records cho `api`, `app`, `qr`, `auth`, `grafana` đã resolve đúng Droplet IP trước khi start Caddy.
 - `/opt/qrtable/.env.production` tồn tại trên server, permission `0600`, không commit.
-- `TYPEORM_SYNCHRONIZE=false` có schema strategy tương ứng: migrations hoặc reviewed SQL bootstrap.
+- `TYPEORM_SYNCHRONIZE=false` đi cùng per-service migrations, và deploy chạy migrations trước app startup.
 - Keycloak chạy production `start`, không dùng `start-dev`.
 - Grafana đi qua HTTPS và auth; observability stores private.
 
@@ -2676,15 +2654,15 @@ mindmap
       Cloud Firewall: chỉ 22/80/443 public
       DNS: A records cho 5 subdomains
       Caddy: tự động Let's Encrypt TLS
-    Migration Blocker
-      TYPEORM_SYNCHRONIZE=false in production
-      Phải chọn: SQL schema hoặc TypeORM migrations
-      Migrations trước khi start app containers
+    Migration Lifecycle
+      TYPEORM_SYNCHRONIZE=false ở mọi môi trường
+      Per-service TypeORM migrations
+      Ownership verification trước app startup
 ```
 
 Sau khi đọc toàn bộ tài liệu, đây là mental model cần ghi nhớ:
 
-**Về Docker:** Image là template immutable, container là instance đang chạy. Multi-stage build tạo runtime image nhỏ gọn. Layers được cache — instruction ít thay đổi lên trên, hay thay đổi xuống dưới. `NEXT_PUBLIC_`_ và `VITE\__` là build-time, baked vào JS bundle — không thể thay đổi runtime. Secrets không bao giờ là Docker build arg.
+**Về Docker:** Image là template immutable, container là instance đang chạy. Multi-stage build tạo runtime image nhỏ gọn. Layers được cache — instruction ít thay đổi lên trên, hay thay đổi xuống dưới. `NEXT_PUBLIC_`\_ và `VITE\__` là build-time, baked vào JS bundle — không thể thay đổi runtime. Secrets không bao giờ là Docker build arg.
 
 **Về Docker Compose:** Ba network layer (edge, app, infra) là phản ánh của defense in depth. Chỉ Caddy expose port ra internet. Health checks là tiên quyết để `depends_on` có ý nghĩa. Layered compose files tách concerns: infra/app/proxy/monitoring restart độc lập nhau.
 
@@ -2692,6 +2670,6 @@ Sau khi đọc toàn bộ tài liệu, đây là mental model cần ghi nhớ:
 
 **Về CI/CD:** Ba workflow tách biệt: CI (quality gate), Release (build immutable images), Deploy (approval + remote SSH). Immutable tags với git SHA — không bao giờ dùng `:latest` trong production. Rollback = deploy lại tag cũ của image — không phải "deploy code cũ". Schema migration là hard gate — không thể skip.
 
-**Về migration blocker:** `TYPEORM_SYNCHRONIZE=false` trong production nghĩa là fresh database trống rỗng. Phải chạy migrations trước khi start app containers. Đây là lý do Phase 7 plan có "Task 9: Resolve Schema Blocker" là blocker cứng trước khi go-live.
+**Về migrations:** `TYPEORM_SYNCHRONIZE=false` là mặc định. Chạy versioned migrations cho Catalog, Order, Payment và SaaS trước app startup, sau đó chạy ownership smoke check.
 
 **Về immutability:** Một image với tag `abc123` là immutable — không bao giờ thay đổi. Biết image tag nào đang chạy = biết chính xác code nào. Rollback là operation có thể thực hiện bất kỳ lúc nào miễn là image cũ còn trong registry. Đây là sức mạnh cốt lõi của container-based deployment.

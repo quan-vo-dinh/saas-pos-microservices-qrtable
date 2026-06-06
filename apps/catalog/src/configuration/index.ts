@@ -3,11 +3,20 @@ import { TcpConfiguration } from '@common/configuration/tcp.config';
 import { AppConfiguration } from '@common/configuration/app.config';
 import { IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TypeOrmConfiguration } from '@common/configuration/type-orm.config';
+import { resolveServicePostgresDatabase, TypeOrmConfiguration } from '@common/configuration/type-orm.config';
 import { KafkaConfiguration } from '@common/configuration/kafka.config';
 
 const DEFAULT_CATALOG_KAFKA_CLIENT_ID = 'qrtable-catalog-service';
 const DEFAULT_CATALOG_TENANT_CONSUMER_GROUP = 'catalog-tenant-created-consumer-group';
+const DEFAULT_CATALOG_DATABASE = 'qrtable_catalog';
+
+class CatalogTypeOrmConfiguration extends TypeOrmConfiguration {
+  constructor() {
+    super({
+      DATABASE: resolveServicePostgresDatabase('CATALOG_TYPEORM_DATABASE', DEFAULT_CATALOG_DATABASE),
+    });
+  }
+}
 
 class CatalogTenantEventsConfiguration {
   @IsString()
@@ -33,8 +42,8 @@ class Configuration extends BaseConfiguration {
   TCP_SERV = new TcpConfiguration();
 
   @ValidateNested()
-  @Type(() => TypeOrmConfiguration)
-  TYPEORM_CONFIG = new TypeOrmConfiguration();
+  @Type(() => CatalogTypeOrmConfiguration)
+  TYPEORM_CONFIG = new CatalogTypeOrmConfiguration();
 
   @ValidateNested()
   @Type(() => KafkaConfiguration)

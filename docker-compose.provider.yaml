@@ -43,6 +43,7 @@ services:
       start_period: 20s
     volumes:
       - ./docker/docker_data/postgres_data:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
 
   pgadmin:
     image: dpage/pgadmin4

@@ -3,11 +3,12 @@ import { BaseConfiguration } from '@common/configuration/base.config';
 import { KafkaConfiguration } from '@common/configuration/kafka.config';
 import { RedisConfiguration } from '@common/configuration/redis.config';
 import { TcpConfiguration } from '@common/configuration/tcp.config';
-import { TypeOrmConfiguration } from '@common/configuration/type-orm.config';
+import { resolveServicePostgresDatabase, TypeOrmConfiguration } from '@common/configuration/type-orm.config';
 import { Type } from 'class-transformer';
 import { IsString, ValidateNested } from 'class-validator';
 
 const DEFAULT_ORDER_PAYMENT_CONSUMER_GROUP = 'order-payment-consumer-group';
+const DEFAULT_ORDER_DATABASE = 'qrtable_order';
 
 class OrderAppConfiguration extends AppConfiguration {
   constructor() {
@@ -19,7 +20,7 @@ class OrderAppConfiguration extends AppConfiguration {
 class OrderTypeOrmConfiguration extends TypeOrmConfiguration {
   constructor() {
     super({
-      DATABASE: process.env['ORDER_TYPEORM_DATABASE'] || process.env['TYPEORM_DATABASE'] || 'qrtable',
+      DATABASE: resolveServicePostgresDatabase('ORDER_TYPEORM_DATABASE', DEFAULT_ORDER_DATABASE),
     });
   }
 }
