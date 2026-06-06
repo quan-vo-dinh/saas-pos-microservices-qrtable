@@ -111,6 +111,6 @@ describe('OrderTrackingPage routing behavior', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Chưa có đơn nào trong phiên này — hãy đặt món từ menu.')).toBeTruthy();
+    expect(screen.getByText('Chưa có đơn nào trong phiên này — hãy đặt món từ thực đơn.')).toBeTruthy();
   });
 });
