@@ -143,6 +143,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorization: {
         params: {
           scope: 'openid profile email offline_access',
+          ui_locales: 'vi',
         },
       },
     }),

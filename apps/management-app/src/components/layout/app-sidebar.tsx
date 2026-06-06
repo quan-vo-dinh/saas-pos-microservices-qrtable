@@ -1,7 +1,6 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { useSession } from 'next-auth/react';
 import {
   Avatar,
   AvatarFallback,
@@ -30,10 +29,12 @@ import { TenantSwitcherPopover } from '@/components/layout/tenant-switcher-popov
 import { filterSidebarNavByRoles } from '@/lib/navigation/filter-sidebar-nav';
 import { parseRoles } from '@/lib/auth/role-routing';
 import { LogOut, UserCircle2 } from 'lucide-react';
-import { signOut } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
+import { useAuthStore } from '@/lib/auth/auth-store';
 
 export function AppSidebar() {
   const { data: session, status } = useSession();
+  const profile = useAuthStore((s) => s.profile);
   /** Same first paint as SSR, then true — avoids nav tree size mismatch (Radix useId) without effect setState. */
   const hasClientMounted = useSyncExternalStore(
     () => () => undefined,
@@ -42,6 +43,16 @@ export function AppSidebar() {
   );
 
   const roles = parseRoles(session?.user?.roles);
+  const displayName = session?.user?.name ?? profile?.email ?? 'QRTable User';
+  const displayEmail = profile?.email ?? session?.user?.email ?? '';
+  const avatarFallback =
+    displayName
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'QT';
+
   const navGroups =
     !hasClientMounted || status === 'loading'
       ? sidebarData.navGroups
@@ -69,12 +80,12 @@ export function AppSidebar() {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
                   <Avatar className="size-8 shrink-0 rounded-md">
-                    <AvatarImage src="https://github.com/shadcn.png" alt="User avatar" />
-                    <AvatarFallback>QT</AvatarFallback>
+                    <AvatarImage src={undefined} alt="" />
+                    <AvatarFallback>{avatarFallback}</AvatarFallback>
                   </Avatar>
                   <div className="grid min-w-0 flex-1 text-start text-sm leading-tight">
-                    <span className="truncate font-medium">QRTable User</span>
-                    <span className="truncate text-xs text-muted-foreground">management@qrtable.local</span>
+                    <span className="truncate font-medium">{displayName}</span>
+                    <span className="truncate text-xs text-muted-foreground">{displayEmail || '—'}</span>
                   </div>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>

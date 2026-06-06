@@ -47,7 +47,8 @@ export function KdsBoard({ station }: { station: KDSStation }) {
   const USE_KDS_MOCK = process.env.NEXT_PUBLIC_KDS_MOCK === '1';
 
   const { data: session, status } = useSession();
-  const tenantId = useAuthStore((s) => s.profile?.tenantId);
+  const profile = useAuthStore((s) => s.profile);
+  const tenantId = profile?.tenantId;
   const accessToken = useAuthStore((s) => s.accessToken);
   const authHydrated = useAuthStore((s) => s.hydrated);
   const queryClient = useQueryClient();
@@ -67,7 +68,7 @@ export function KdsBoard({ station }: { station: KDSStation }) {
 
   const allowed = roles.length === 0 || roleAllowed(station, roles);
   const userId = session?.user?.id ?? 'staff-chef-1';
-  const userName = session?.user?.name ?? 'Đầu bếp mock';
+  const userName = session?.user?.name ?? profile?.email ?? 'Nhân viên KDS';
 
   const mockTickets = useMockStore((s) => s.kdsTickets);
   const mockSelectedTicketId = useMockStore((s) => s.kdsSelectedTicketId);
@@ -348,7 +349,7 @@ export function KdsBoard({ station }: { station: KDSStation }) {
           <CardHeader>
             <CardTitle>Không có quyền KDS</CardTitle>
             <CardDescription>
-              Trạm {station === 'KITCHEN' ? 'bếp' : 'bar'} yêu cầu vai phù hợp (mock RBAC theo role-routing).
+              Trạm {station === 'KITCHEN' ? 'bếp' : 'bar'} yêu cầu vai Chef hoặc Barista (hoặc quản lý).
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
