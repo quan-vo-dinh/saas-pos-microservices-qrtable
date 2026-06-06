@@ -5,7 +5,6 @@ import { LoggerMiddleware } from '@common/middlewares/logger.middleware';
 import { TenantMiddleware } from '@common/middlewares/tenant.middleware';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ExceptionInterceptor } from '@common/interceptors/exception.interceptor';
-import { ProductModule } from './modules/product/product.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthorizerModule } from './modules/authorizer/authorizer.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
@@ -30,7 +29,6 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [() => CONFIGURATION] }),
-    ProductModule,
     CatalogModule,
     KitchenModule,
     OrderModule,

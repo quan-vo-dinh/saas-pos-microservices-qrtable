@@ -58,7 +58,6 @@ export const ERROR_MESSAGES_EN: Record<ErrorCode, string> = {
   [ErrorCode.CATALOG_MENU_ITEM_NOT_ORDERABLE]: 'Menu item is not available for ordering',
   [ErrorCode.CATALOG_STOCK_INSUFFICIENT]: 'Insufficient stock for menu item {{menuItemId}}',
   [ErrorCode.CATALOG_STOCK_LOCK_TIMEOUT]: 'Stock update timed out, please retry',
-  [ErrorCode.PRODUCT_ALREADY_EXISTS]: 'Product already exists',
   [ErrorCode.USER_ALREADY_EXISTS]: 'User already exists',
   [ErrorCode.USER_ID_REQUIRED]: 'User id is required',
   [ErrorCode.USER_NOT_FOUND]: 'Staff user not found in this tenant',

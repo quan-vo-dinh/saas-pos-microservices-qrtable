@@ -1,11 +1,3 @@
-enum PRODUCT {
-  CREATE = 'product.create',
-  GET_BY_ID = 'product.get_by_id',
-  GET_LIST = 'product.get_list',
-  UPDATE = 'product.update',
-  DELETE = 'product.delete',
-}
-
 enum USER {
   CREATE = 'user_access.create',
   GET_BY_ID = 'user_access.get_by_id',
@@ -217,7 +209,6 @@ enum KITCHEN {
 }
 
 export const TCP_REQUEST_MESSAGE = {
-  PRODUCT,
   USER,
   KEYCLOAK,
   AUTHORIZER,

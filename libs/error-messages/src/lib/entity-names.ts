@@ -1,6 +1,6 @@
 import type { SupportedLocale } from './success-messages';
 
-export type EntityKey = 'category' | 'area' | 'table' | 'menuItem' | 'product' | 'tenant' | 'user';
+export type EntityKey = 'category' | 'area' | 'table' | 'menuItem' | 'tenant' | 'user';
 
 const ENTITY_NAMES: Record<SupportedLocale, Record<EntityKey, string>> = {
   vi: {
@@ -8,7 +8,6 @@ const ENTITY_NAMES: Record<SupportedLocale, Record<EntityKey, string>> = {
     area: 'Khu vực',
     table: 'Bàn',
     menuItem: 'Món ăn',
-    product: 'Sản phẩm',
     tenant: 'Cửa hàng',
     user: 'Tài khoản',
   },
@@ -17,7 +16,6 @@ const ENTITY_NAMES: Record<SupportedLocale, Record<EntityKey, string>> = {
     area: 'Area',
     table: 'Table',
     menuItem: 'Menu item',
-    product: 'Product',
     tenant: 'Tenant',
     user: 'User',
   },

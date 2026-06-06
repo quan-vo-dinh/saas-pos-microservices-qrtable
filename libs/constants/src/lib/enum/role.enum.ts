@@ -68,13 +68,6 @@ export enum PERMISSION {
   ROLE_UPDATE = 'role.update',
   ROLE_DELETE = 'role.delete',
 
-  /* PRODUCT (legacy template — kept for SUPER_ADMIN backward compat) */
-  PRODUCT_CREATE = 'product.create',
-  PRODUCT_GET_BY_ID = 'product.get_by_id',
-  PRODUCT_GET_ALL = 'product.get_all',
-  PRODUCT_UPDATE = 'product.update',
-  PRODUCT_DELETE = 'product.delete',
-
   /* ORDER (Phase 2A) — cancel split Step 2.4 (Q7-C) */
   ORDER_CREATE = 'order.create',
   ORDER_CONFIRM = 'order.confirm',

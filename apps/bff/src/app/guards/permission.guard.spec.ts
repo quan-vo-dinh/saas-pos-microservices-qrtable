@@ -296,12 +296,6 @@ describe('PermissionGuard', () => {
         shouldAllow: true,
       },
       {
-        label: 'SUPER_ADMIN allowed PRODUCT_DELETE (legacy)',
-        userPerms: SUPER_ADMIN_PERMS,
-        requiredPerm: PERMISSION.PRODUCT_DELETE,
-        shouldAllow: true,
-      },
-      {
         label: 'SUPER_ADMIN allowed ORDER_CONFIRM',
         userPerms: SUPER_ADMIN_PERMS,
         requiredPerm: PERMISSION.ORDER_CONFIRM,

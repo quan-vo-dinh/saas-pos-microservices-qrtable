@@ -7,7 +7,6 @@ export * from './lib/order.entity';
 export * from './lib/order-item.entity';
 export * from './lib/outbox-event.entity';
 export * from './lib/pricing-plan.entity';
-export * from './lib/product.entity';
 export * from './lib/saas-outbox-event.entity';
 export * from './lib/service-request.entity';
 export * from './lib/session.entity';

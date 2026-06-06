@@ -3,7 +3,6 @@ import { ClientsProviderAsyncOptions, TcpClientOptions, Transport } from '@nestj
 import { IsNotEmpty, IsObject } from 'class-validator';
 
 export enum TCP_SERVICES {
-  PRODUCT_SERVICE = 'TCP_PRODUCT_SERVICE',
   USER_ACCESS_SERVICE = 'TCP_USER_ACCESS_SERVICE',
   AUTHORIZER_SERVICE = 'TCP_AUTHORIZER_SERVICE',
   CATALOG_SERVICE = 'TCP_CATALOG_SERVICE',
@@ -14,7 +13,6 @@ export enum TCP_SERVICES {
 }
 
 const DEFAULT_TCP_SERVICE_PORTS: Record<TCP_SERVICES, number> = {
-  [TCP_SERVICES.PRODUCT_SERVICE]: 3202,
   [TCP_SERVICES.USER_ACCESS_SERVICE]: 3203,
   [TCP_SERVICES.AUTHORIZER_SERVICE]: 3204,
   [TCP_SERVICES.CATALOG_SERVICE]: 3205,
@@ -25,10 +23,6 @@ const DEFAULT_TCP_SERVICE_PORTS: Record<TCP_SERVICES, number> = {
 };
 
 export class TcpConfiguration {
-  @IsNotEmpty()
-  @IsObject()
-  TCP_PRODUCT_SERVICE: TcpClientOptions;
-
   @IsNotEmpty()
   @IsObject()
   TCP_USER_ACCESS_SERVICE: TcpClientOptions;

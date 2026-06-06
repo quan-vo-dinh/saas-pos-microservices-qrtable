@@ -60,7 +60,7 @@ echo "  ✓ mock-data OK (only pre-existing categories.ts errors)"
 echo ""
 echo "→ Layer 2.2: BE services tsc (expect PASS, zero refs)..."
 
-BE_SERVICES=("bff" "catalog" "user-access" "authorizer" "invoice" "product" "saas")
+BE_SERVICES=("bff" "catalog" "user-access" "authorizer" "saas")
 for svc in "${BE_SERVICES[@]}"; do
   echo "  • Building $svc..."
   if ! npx nx build "$svc" > /tmp/step-2.3-build-"$svc".log 2>&1; then
