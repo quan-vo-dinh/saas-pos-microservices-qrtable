@@ -1,0 +1,111 @@
+% Screenshot helpers for compact multi-column UI flows.
+\newif\ifscreenshotplaceholder
+\screenshotplaceholderfalse
+
+\newcommand{\screenshotcaptionprefix}{%
+  \ifscreenshotplaceholder
+    [Minh họa tạm] %
+  \fi
+}
+\newcommand{\screenshotcaptionsuffix}{%
+  \ifscreenshotplaceholder
+    \ Ảnh minh họa cần được thay bằng ảnh chụp client QRTable trước khi dùng làm hiện vật.%
+  \fi
+}
+
+% Extra \label in same figure (shared figure number) — PWA grouped figures only
+\newcommand{\screenshotgridanchor}[1]{\label{#1}}
+
+% Management App — one screen per figure, full text width
+\newcommand{\screenshotmgmtmaxheight}{0.62\textheight}
+\newcommand{\screenshotfiguremgmt}[3]{%
+  \begin{figure}[htbp]%
+    \centering%
+    \includegraphics[width=\textwidth,height=\screenshotmgmtmaxheight,keepaspectratio]{#1}%
+    \caption{\screenshotcaptionprefix #2\screenshotcaptionsuffix}%
+    \label{#3}%
+  \end{figure}%
+}
+
+% Customer PWA — minimal gutter; duo = 2 cols/row, triple = 3 cols/one row
+\newlength{\screenshotpwathreecolwidth}
+\newcommand{\screenshotpwagutterduo}{2pt}
+\newcommand{\screenshotpwagutterthree}{0.5pt}
+\newcommand{\screenshotpwacolwidthduo}{0.495\linewidth}
+\newcommand{\screenshotpwaheightduo}{0.72\textheight}
+\newcommand{\screenshotpwaheightthree}{0.78\textheight}
+\newcommand{\screenshotpwacellduo}[1]{%
+  \begin{minipage}[t]{\screenshotpwacolwidthduo}%
+    \centering%
+    \includegraphics[width=\linewidth,height=\screenshotpwaheightduo,keepaspectratio]{#1}%
+  \end{minipage}%
+}
+\newcommand{\screenshotpwacellthree}[1]{%
+  \begin{minipage}[t]{\screenshotpwathreecolwidth}%
+    \centering%
+    \includegraphics[width=\linewidth,height=\screenshotpwaheightthree,keepaspectratio]{#1}%
+  \end{minipage}%
+}
+\newcommand{\screenshotpwafiguretwo}[4]{%
+  \begin{figure}[H]%
+    \centering%
+    \setlength{\tabcolsep}{\screenshotpwagutterduo}%
+    \renewcommand{\arraystretch}{1.0}%
+    \begin{tabular}{@{}cc@{}}%
+      \screenshotpwacellduo{#3} & \screenshotpwacellduo{#4} \\
+    \end{tabular}%
+    \caption{\screenshotcaptionprefix #1\screenshotcaptionsuffix}%
+    \label{#2}%
+  \end{figure}%
+}
+\newcommand{\screenshotpwafigurethree}[5]{%
+  \begin{figure}[H]%
+    \centering%
+    \setlength{\tabcolsep}{\screenshotpwagutterthree}%
+    \setlength{\screenshotpwathreecolwidth}{\dimexpr(\linewidth-4pt)/3\relax}%
+    \renewcommand{\arraystretch}{1.0}%
+    \begin{tabular}{@{}ccc@{}}%
+      \screenshotpwacellthree{#3} & \screenshotpwacellthree{#4} & \screenshotpwacellthree{#5} \\
+    \end{tabular}%
+    \caption{\screenshotcaptionprefix #1\screenshotcaptionsuffix}%
+    \label{#2}%
+  \end{figure}%
+}
+
+% Legacy helpers (appendix generator / old drafts)
+\newcommand{\screenshotgridcell}[3]{%
+  \begin{minipage}[t]{#1}%
+    \centering%
+    \includegraphics[width=\linewidth,height=#2,keepaspectratio]{#3}%
+  \end{minipage}%
+}
+\newcommand{\chapterscreenshot}[3]{%
+  \screenshotfiguremgmt{#1}{#2}{#3}%
+}
+
+\newcommand{\appendixscreenshot}[3]{%
+  \begin{figure}[htbp]%
+    \centering%
+    \includegraphics[width=0.92\textwidth,height=0.38\textheight,keepaspectratio]{#1}%
+    \caption{\screenshotcaptionprefix #2\screenshotcaptionsuffix}%
+    \label{#3}%
+  \end{figure}%
+}
+
+% --- Capture guide, hidden when \screenshotplaceholderfalse ---
+\newcommand{\screenshotcaptureguide}[1]{%
+  \ifscreenshotplaceholder
+  \par\small
+  \noindent\fbox{\begin{minipage}{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}
+  \textbf{Ghi chú hiện vật minh họa.}
+  Lưu vào \texttt{thesis-report/assets/screenshots/} (đúng tên file, không đổi).
+  Khi đã có ảnh thật, giữ \texttt{\textbackslash screenshotplaceholderfalse} trong \texttt{screenshot-scaffold.tex} để ẩn khối ghi chú này.
+  \begin{itemize}\setlength{\itemsep}{2pt}\setlength{\parsep}{0pt}
+  #1%
+  \end{itemize}
+  \end{minipage}}\par
+  \fi
+}
+\newcommand{\screenshotcapturerow}[3]{%
+  \item[\textbf{#1}] \texttt{#2} --- #3%
+}

@@ -26,7 +26,7 @@ flowchart TB
 
   EventBoundary["Event boundary<br/>Order, Payment, Kitchen, SaaS produce approved events"]
   TenantConsumers["Tenant-aware consumers<br/>Kitchen, BFF bridge, Catalog, Order"]
-  Guardrails["Guardrails<br/>No cross-service DB writes<br/>No database-per-tenant claim<br/>WebSocket is hint/refetch, not source of truth"]
+  Guardrails["Guardrails<br/>No cross-service DB writes<br/>No database-per-tenant assertion<br/>WebSocket is hint/refetch, not source of truth"]
 
   TenantA -->|"HTTP / WebSocket"| Bff
   TenantB -->|"HTTP / WebSocket"| Bff

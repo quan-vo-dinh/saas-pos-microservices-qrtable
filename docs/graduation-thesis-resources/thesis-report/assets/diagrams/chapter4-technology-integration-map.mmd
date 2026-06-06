@@ -19,7 +19,6 @@ flowchart LR
     Nx@{ icon: "logos:nx", form: "rounded", label: "Nx monorepo", pos: "t", h: 58 }
     TS@{ icon: "logos:typescript-icon", form: "rounded", label: "TypeScript contracts", pos: "t", h: 58 }
     Docker@{ icon: "logos:docker-icon", form: "rounded", label: "Docker Compose", pos: "t", h: 58 }
-    Observability@{ icon: "logos:grafana", form: "rounded", label: "Grafana stack", pos: "t", h: 58 }
   end
 
   subgraph Clients["Ứng dụng người dùng"]
@@ -54,7 +53,6 @@ flowchart LR
   TS -. "DTO/types dùng chung" .-> Services
   Docker -. "đóng gói demo" .-> BFF
   Docker -. "đóng gói demo" .-> Services
-  Observability -. "Prometheus, Loki, Tempo ở mức thiết kế/demo" .-> Kafka
 
   PWA -- "REST / WebSocket" --> BFF
   Management -- "REST / WebSocket" --> BFF
@@ -80,7 +78,7 @@ flowchart LR
   classDef external fill:#fdf2f8,stroke:#db2777,stroke-width:1.2px,color:#111827;
   classDef identityProvider fill:#f8fafc,stroke:#4b5563,stroke-width:1.2px,color:#4d4d4d;
 
-  class Nx,TS,Docker,Observability platform;
+  class Nx,TS,Docker platform;
   class PWA client;
   class Management nextjsClient;
   class BFF edge;

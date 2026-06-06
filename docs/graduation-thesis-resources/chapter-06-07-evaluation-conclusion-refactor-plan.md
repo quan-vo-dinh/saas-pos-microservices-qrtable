@@ -104,7 +104,7 @@ Luận điểm chính nên được chứng minh bằng:
 - **Tenant/RBAC/entitlement:** tenant isolation, guard/permission, reporting theo gói dịch vụ, phân biệt Owner/Manager với Super Admin.
 - **Production/pilot evidence:** domain/HTTPS, service health, smoke test, public webhook callback, log tối thiểu, trạng thái dữ liệu sau một flow demo.
 
-Nếu có số đo runtime, chỉ dùng như số đo vận hành thử nghiệm/pilot evidence:
+Nếu có số đo runtime, chỉ dùng như số đo từ môi trường Phase 7/pilot evidence có bối cảnh:
 
 - thời gian staff confirm -> KDS nhận ticket,
 - thời gian webhook -> bill paid,
@@ -407,7 +407,7 @@ Verification:
 
 2. Nếu có số đo hiệu năng thì đưa vào đâu?
 
-- Đưa vào Chương 6 như số đo vận hành thử nghiệm/pilot evidence, không dùng để claim microservices nhanh hơn monolith.
+- Đưa vào Chương 6 như số đo từ môi trường Phase 7/pilot evidence có bối cảnh, không dùng để claim microservices nhanh hơn monolith.
 
 3. Phase 6 Observability có nên đưa vào trọng tâm không?
 

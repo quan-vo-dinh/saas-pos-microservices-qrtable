@@ -91,7 +91,7 @@ if [[ "${realm_exists_code}" == "404" ]]; then
     --arg realm "${KEYCLOAK_REALM}" \
     --arg sslRequired "${KEYCLOAK_REALM_SSL_REQUIRED}" \
     --arg loginTheme "${KEYCLOAK_LOGIN_THEME}" \
-    '{realm:$realm,enabled:true,sslRequired:$sslRequired,loginTheme:$loginTheme}')"
+    '{realm:$realm,enabled:true,sslRequired:$sslRequired,loginTheme:$loginTheme,internationalizationEnabled:true,defaultLocale:"vi",supportedLocales:["vi","en"]}')"
   curl -sS -X POST "${KEYCLOAK_HOST}/admin/realms" \
     "${auth_header[@]}" "${json_header[@]}" \
     -d "${realm_create_payload}" >/dev/null
@@ -104,7 +104,7 @@ realm_current="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}" "${a
 realm_update_merged="$(echo "${realm_current}" | jq \
   --arg ssl "${KEYCLOAK_REALM_SSL_REQUIRED}" \
   --arg loginTheme "${KEYCLOAK_LOGIN_THEME}" \
-  '.sslRequired = $ssl | .loginTheme = $loginTheme')"
+  '.sslRequired = $ssl | .loginTheme = $loginTheme | .internationalizationEnabled = true | .defaultLocale = "vi" | .supportedLocales = ["vi", "en"]')"
 curl -sS -X PUT "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}" \
   "${auth_header[@]}" "${json_header[@]}" \
   -d "${realm_update_merged}" >/dev/null

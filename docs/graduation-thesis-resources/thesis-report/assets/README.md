@@ -17,7 +17,8 @@ Quy tắc:
 
 - Placeholder trắng chỉ là scaffold để LaTeX build được, không phải demo evidence.
 - Không đổi filename khi thay ảnh thật, để các `\includegraphics` và `\label` trong LaTeX không phải sửa lại.
-- Mapping chính nằm tại `../../thesis-phase5d-screenshot-scaffold.md`.
+- Mapping chi tiết: `../../chapter-05-ui-gallery-scaffold-plan.md`; checklist ngắn: `../../thesis-phase5d-screenshot-scaffold.md`.
+- Tạo placeholder: `bash thesis-report/tools/generate-screenshot-placeholders.sh` hoặc `python3 thesis-report/tools/generate-screenshot-placeholders.py`.
 - Trạng thái backlog đúng cho placeholder là `placeholder`; chỉ dùng `captured`/`verified` sau khi thay ảnh thật và build kiểm tra.
 
 ## Hình 3.1 — use case UML (PlantUML)

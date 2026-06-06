@@ -2,7 +2,7 @@
 
 Chương này trình bày cách QRTable chuyển các yêu cầu ở Chương 3 thành ranh giới kiến trúc, trách nhiệm dịch vụ, trách nhiệm dữ liệu, cơ chế giao tiếp và lựa chọn công nghệ cụ thể. Trọng tâm của chương không phải là liệt kê công nghệ, mà là giải thích vì sao từng quyết định phù hợp với bài toán nền tảng POS theo mô hình SaaS cho F\&B, có đặt món qua mã QR, màn hình bếp KDS, thanh toán VietQR/SePay và quản trị nhiều đơn vị thuê bao.
 
-QRTable được thiết kế theo hướng vi dịch vụ (microservices) có kiểm soát. Các tài liệu về microservices nhấn mạnh việc tách hệ thống theo năng lực nghiệp vụ, sở hữu dữ liệu riêng và giao tiếp qua hợp đồng rõ ràng \cite{lewis-fowler-microservices-2014}. Tuy nhiên, trong phạm vi khóa luận, vi dịch vụ cũng tạo thêm chi phí về giao tiếp mạng, tính nhất quán dữ liệu (consistency), kiểm thử tích hợp và quan sát lỗi phân tán. Vì vậy, QRTable không dùng Kafka cho mọi tương tác, không xem WebSocket là nguồn trạng thái nghiệp vụ, và không tách dịch vụ chỉ vì lý do kỹ thuật. Ranh giới được chọn dựa trên tác nhân, ngữ cảnh giới hạn, trách nhiệm dữ liệu và luồng nghiệp vụ thật của hệ thống.
+QRTable được thiết kế theo hướng vi dịch vụ (microservices) có kiểm soát. Các tài liệu về microservices nhấn mạnh việc tách hệ thống theo năng lực nghiệp vụ, sở hữu dữ liệu riêng và giao tiếp qua hợp đồng rõ ràng \cite{lewis-fowler-microservices-2014}. Tuy nhiên, trong phạm vi khóa luận, vi dịch vụ cũng tạo thêm chi phí về giao tiếp mạng, tính nhất quán dữ liệu (consistency), kiểm thử tích hợp và chẩn đoán lỗi phân tán. Vì vậy, QRTable không dùng Kafka cho mọi tương tác, không xem WebSocket là nguồn trạng thái nghiệp vụ, và không tách dịch vụ chỉ vì lý do kỹ thuật. Ranh giới được chọn dựa trên tác nhân, ngữ cảnh giới hạn, trách nhiệm dữ liệu và luồng nghiệp vụ thật của hệ thống.
 
 \section{Mục tiêu thiết kế và nguyên tắc kiến trúc}
 
@@ -18,7 +18,7 @@ Thứ tư, QRTable dùng giao tiếp hướng sự kiện có chọn lọc. TCP/
 
 Thứ năm, Redis là bộ nhớ đệm (cache) và vùng trạng thái khi vận hành cho dữ liệu tần suất cao, không phải nguồn sự thật (source of truth) chung của hệ thống. Bộ nhớ đệm thực đơn công khai, phiên/giỏ khi vận hành, hàng đợi KDS, cờ tạm ngưng đơn vị thuê bao và trạng thái OAuth đều dùng Redis với chủ sở hữu rõ ràng. Với đơn, hóa đơn, thanh toán, đơn vị thuê bao và thực đơn, nguồn dữ liệu có thẩm quyền vẫn nằm ở dịch vụ sở hữu tương ứng.
 
-Thứ sáu, các thao tác ghi ảnh hưởng đến trạng thái bên ngoài phải hướng tới idempotency (tính lũy đẳng), bù trừ có kiểm soát và dấu thời gian phía máy chủ. Điều này đặc biệt quan trọng ở webhook thanh toán, xác nhận đơn, xuất bản outbox và gửi đơn của khách. Trong phạm vi hiện tại, khóa luận chỉ xem saga pattern như thiết kế đại diện ở hai luồng: xác nhận đơn và khởi tạo đơn vị thuê bao (onboarding). Các tăng cường sâu hơn như trạng thái saga bền vững, tiến trình nền retry đầy đủ, CDC hoặc bảo đảm phân phối exactly-once được xem là hướng phát triển, không phải kết quả đã chứng minh ở mức vận hành thực tế.
+Thứ sáu, các thao tác ghi ảnh hưởng đến trạng thái bên ngoài phải hướng tới idempotency (tính lũy đẳng), bù trừ có kiểm soát và dấu thời gian phía máy chủ. Điều này đặc biệt quan trọng ở webhook thanh toán, xác nhận đơn, xuất bản outbox và gửi đơn của khách. Trong phạm vi hiện tại, khóa luận xem saga pattern như thiết kế đại diện ở hai luồng: Order Confirm Saga cho xác nhận đơn/trừ tồn kho và SaaS Onboarding Mini-Saga cho khởi tạo đơn vị thuê bao (onboarding). Các tăng cường sâu hơn như trạng thái saga bền vững, tiến trình nền retry đầy đủ, CDC hoặc bảo đảm phân phối exactly-once được xem là hướng phát triển, không phải kết quả vận hành thực tế đã hoàn thiện.
 
 \section{Lựa chọn công nghệ và vai trò trong QRTable}
 
@@ -49,7 +49,7 @@ Lựa chọn công nghệ trong QRTable xuất phát từ các mục tiêu thi�
   Kafka & Sự kiện miền bất đồng bộ & Tách thời gian giữa Order, Kitchen, Payment, SaaS và Catalog cho các tác dụng phụ không cần phản hồi ngay. & Chỉ dùng 5 topic được chấp nhận; không dùng Kafka cho mọi cập nhật phía client. \\
   Keycloak và JWT/OIDC & Xác thực nhân viên, chủ quán và quản trị & Tách nguồn định danh khỏi hồ sơ ứng dụng; BFF/Authorizer xác minh token, User-Access giữ thông tin ứng dụng. & Khách đặt món qua QR không đi qua Keycloak. \\
   Socket.IO\slash WebSocket & Gợi ý thời gian thực cho khách, nhân viên và KDS & Cải thiện trải nghiệm bằng thông báo, làm mất hiệu lực và gợi ý làm mới dữ liệu. & Không là nguồn trạng thái có thẩm quyền. \\
-  SePay\slash VietQR và Cloudinary & Thanh toán chuyển khoản và ảnh thực đơn & SePay\slash VietQR phục vụ thanh toán hóa đơn/gói thuê bao; Cloudinary phục vụ tệp ảnh thực đơn. & Chỉ khẳng định mức kiểm chứng nhà cung cấp hoặc vận hành thực tế khi có bằng chứng tương ứng. \\
+  SePay\slash VietQR và Cloudinary & Thanh toán chuyển khoản và ảnh thực đơn & SePay\slash VietQR phục vụ thanh toán hóa đơn/gói thuê bao; Cloudinary phục vụ tệp ảnh thực đơn. & Chỉ khẳng định kiểm chứng nhà cung cấp hoặc vận hành thực tế khi có bằng chứng tương ứng. \\
 \end{longtable}
 }
 
@@ -72,7 +72,7 @@ Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng th�
 
 Ở lớp dịch vụ miền nghiệp vụ, hệ thống gồm Authorizer, User-Access, SaaS, Catalog, Order, Kitchen và Payment. Mỗi dịch vụ đại diện cho một ngữ cảnh giới hạn: xác minh danh tính, hồ sơ ứng dụng/RBAC, vòng đời đơn vị thuê bao, thực đơn/bàn/tồn kho, đơn/phiên/hóa đơn, hàng đợi KDS và quyết toán thanh toán. Module \texttt{product} trong monorepo chỉ là phần mẫu do Nx sinh ra, không thuộc kiến trúc lõi QRTable vì không gánh trách nhiệm nghiệp vụ của hệ thống.
 
-Ở lớp hạ tầng, QRTable dùng PostgreSQL cho dữ liệu nghiệp vụ quan hệ, MongoDB cho User-Access, Redis cho bộ nhớ đệm/phiên/hàng đợi KDS/cờ trạng thái chạy, Kafka cho sự kiện miền nghiệp vụ, Keycloak cho định danh nhân viên, SePay\slash VietQR cho thanh toán chuyển khoản, Cloudinary cho ảnh thực đơn và Docker\slash Docker Compose cho môi trường chạy. Grafana, Loki, Prometheus và Tempo được trình bày như hướng thiết kế quan sát hệ thống; các khẳng định về vận hành đầy đủ chỉ nên nêu khi có bằng chứng chạy thật.
+Ở lớp hạ tầng, QRTable dùng PostgreSQL cho dữ liệu nghiệp vụ quan hệ, MongoDB cho User-Access, Redis cho bộ nhớ đệm/phiên/hàng đợi KDS/cờ trạng thái chạy, Kafka cho sự kiện miền nghiệp vụ, Keycloak cho định danh nhân viên, SePay\slash VietQR cho thanh toán chuyển khoản, Cloudinary cho ảnh thực đơn và Docker\slash Docker Compose cho môi trường chạy.
 
 \begin{figure}[H]
   \centering
@@ -309,7 +309,7 @@ Do đó, Kafka trong QRTable không phải lớp trung gian cho mọi lời gọ
 
 \subsection{Sổ đăng ký topic và hợp đồng sự kiện}
 
-Bảng~\ref{tab:chapter4-kafka-topic-registry} liệt kê năm topic được chấp nhận trong sổ đăng ký hiện tại. Mỗi dòng trình bày topic như một hợp đồng (contract) kiến trúc: bên phát, bên tiêu thụ, khóa phân vùng, payload chính và cơ chế độ tin cậy/idempotency ở mức thiết kế. Payload trong bảng chỉ nêu các trường đại diện để người đọc hiểu ý nghĩa sự kiện, không thay thế định nghĩa DTO đầy đủ trong triển khai.
+Bảng~\ref{tab:chapter4-kafka-topic-registry} liệt kê năm topic được chấp nhận trong sổ đăng ký hiện tại. Mỗi dòng trình bày topic như một hợp đồng (contract) kiến trúc: bên phát, bên tiêu thụ, khóa phân vùng, payload chính và cơ chế độ tin cậy/idempotency theo quyết định thiết kế. Payload trong bảng chỉ nêu các trường đại diện để người đọc hiểu ý nghĩa sự kiện, không thay thế định nghĩa DTO đầy đủ trong triển khai.
 
 {\scriptsize
 \setlength{\tabcolsep}{1pt}
@@ -560,11 +560,11 @@ Ba khái niệm trong mục này dễ bị trộn lẫn nếu chỉ nhìn qua t�
   \caption{Phân biệt RBAC, cô lập đơn vị thuê bao và quyền theo gói dịch vụ.}
   \label{tab:chapter4-rbac-tenant-entitlement}\\
   \toprule
-  Cơ chế & Trả lời câu hỏi & Ví dụ trong QRTable & Không nên hiểu là \\
+  Cơ chế & Trả lời câu hỏi & Ví dụ trong QRTable & Giới hạn diễn giải \\
   \midrule
   \endfirsthead
   \toprule
-  Cơ chế & Trả lời câu hỏi & Ví dụ trong QRTable & Không nên hiểu là \\
+  Cơ chế & Trả lời câu hỏi & Ví dụ trong QRTable & Giới hạn diễn giải \\
   \midrule
   \endhead
   RBAC & Người dùng có quyền làm hành động này không? & Waiter được xác nhận đơn; Chef/Barista xem và cập nhật KDS; Owner quản lý menu/staff. & Không tự quyết định đơn vị thuê bao hoặc gói dịch vụ. \\
@@ -575,7 +575,7 @@ Ba khái niệm trong mục này dễ bị trộn lẫn nếu chỉ nhìn qua t�
 \end{longtable}
 }
 
-Ma trận permission đầy đủ của QRTable nằm ở tài liệu kiến trúc RBAC, không được lặp toàn bộ trong chương chính. Ở mức thiết kế, điểm cần nhấn mạnh là Customer không nằm trong \texttt{role.json}; khách được bảo vệ bằng session/ownership. Ngược lại, staff/owner/manager/super admin dùng role/permission do Keycloak và User-Access phối hợp cung cấp cho BFF.
+Ma trận permission đầy đủ của QRTable nằm ở tài liệu kiến trúc RBAC, không được lặp toàn bộ trong chương chính. Về thiết kế, điểm cần nhấn mạnh là Customer không nằm trong \texttt{role.json}; khách được bảo vệ bằng session/ownership. Ngược lại, staff/owner/manager/super admin dùng role/permission do Keycloak và User-Access phối hợp cung cấp cho BFF.
 
 \subsection{WebSocket và webhook trong mô hình bảo mật}
 
@@ -583,9 +583,9 @@ WebSocket trong QRTable không phải nguồn quyền và cũng không phải ng
 
 Bảo mật cũng xuất hiện ở webhook thanh toán. QRTable phân biệt các tuyến webhook của SePay theo tầng: tuyến HMAC tương thích, tuyến hóa đơn nhà hàng và tuyến hóa đơn gói nền tảng. Hóa đơn nhà hàng dùng tiền tố \texttt{QRTBL}, hóa đơn gói dùng tiền tố \texttt{QRSUB}. BFF xác thực tuyến và header phù hợp trước khi chuyển payload đến Payment hoặc SaaS. OAuth callback được ràng buộc bằng state ngắn hạn để gắn quá trình kết nối SePay với đúng đơn vị thuê bao/chủ sở hữu.
 
-\subsection{Giới hạn thiết kế và các claim không mở rộng}
+\subsection{Giới hạn thiết kế và phạm vi khẳng định}
 
-Phần bảo mật của Chương 4 trình bày thiết kế và ranh giới kiểm soát, không thay thế đánh giá kiểm thử ở Chương 6. QRTable có cơ sở để nói rằng kiến trúc đã tách hai luồng xác thực, có guard chain cho nhân viên/khách, có permission matrix cho sáu role staff/admin, có session-scoped customer actor, có entitlement cho dashboard/reporting và có contract webhook theo tuyến. Tuy nhiên, chương này không khẳng định đã có kiểm thử xâm nhập chính thức, tự động xoay vòng bí mật, mTLS nội bộ, service mesh, WAF hoặc bằng chứng phủ toàn bộ bề mặt API liên đơn vị thuê bao. Mức kiểm chứng các điểm này được trình bày thận trọng trong Chương~\ref{chap:danh-gia}.
+Phần bảo mật của Chương 4 trình bày thiết kế và ranh giới kiểm soát, không thay thế đánh giá kiểm thử ở Chương 6. QRTable có cơ sở để nói rằng kiến trúc đã tách hai luồng xác thực, có guard chain cho nhân viên/khách, có permission matrix cho sáu role staff/admin, có session-scoped customer actor, có entitlement cho dashboard/reporting và có contract webhook theo tuyến. Tuy nhiên, chương này không khẳng định đã có kiểm thử xâm nhập chính thức, tự động xoay vòng bí mật, mTLS nội bộ, service mesh, WAF hoặc bằng chứng phủ toàn bộ bề mặt API liên đơn vị thuê bao. Kết quả kiểm chứng các điểm này được trình bày thận trọng trong Chương~\ref{chap:danh-gia}.
 
 \section{Thiết kế tích hợp thanh toán SePay/VietQR}
 
@@ -602,13 +602,13 @@ Hình~\ref{fig:chapter4-sepay-payment-architecture} minh họa hai dòng tiền 
 
 Việc tách hai tầng giúp tránh nhầm lẫn trách nhiệm. Payment không sở hữu vòng đời gói thuê bao của đơn vị thuê bao, còn SaaS không sở hữu từng bản ghi thanh toán của hóa đơn nhà hàng. BFF định tuyến webhook dựa trên tuyến và mã thanh toán để chuyển đúng bộ xử lý. Với hóa đơn của khách, Payment xử lý quyết toán và sau đó phối hợp với Order để đánh dấu hóa đơn đã thanh toán. Với hóa đơn gói, SaaS xử lý việc kích hoạt/cập nhật gói sau khi xác nhận thanh toán.
 
-Luồng VietQR cũng phải giữ nguyên tắc idempotency. Một webhook từ nhà cung cấp có thể đến trễ, đến nhiều lần hoặc thiếu trường nhận dạng trong một số tình huống. Payment/SaaS cần khớp tham chiếu trong \texttt{code}, \texttt{content} hoặc dữ liệu liên quan, kiểm tra số tiền, ghi kiểm toán và chỉ chuyển trạng thái khi đủ điều kiện. Phần này mô tả thiết kế tích hợp và ranh giới kiểm soát; mức độ kiểm chứng nhà cung cấp thật, webhook giả lập hoặc kiểm thử thủ công sẽ thuộc Chương 6.
+Luồng VietQR cũng phải giữ nguyên tắc idempotency. Một webhook từ nhà cung cấp có thể đến trễ, đến nhiều lần hoặc thiếu trường nhận dạng trong một số tình huống. Payment/SaaS cần khớp tham chiếu trong \texttt{code}, \texttt{content} hoặc dữ liệu liên quan, kiểm tra số tiền, ghi kiểm toán và chỉ chuyển trạng thái khi đủ điều kiện. Phần này mô tả thiết kế tích hợp và ranh giới kiểm soát; kết quả kiểm chứng nhà cung cấp thật, webhook giả lập hoặc kiểm thử thủ công sẽ thuộc Chương 6.
 
-\section{Thiết kế triển khai, quan sát và giới hạn khẳng định}
+\section{Thiết kế triển khai và giới hạn khẳng định}
 
-QRTable có thiết kế chạy bằng Docker/Docker Compose cùng các thành phần phụ thuộc như PostgreSQL, MongoDB, Redis, Kafka và Keycloak. Nhóm công cụ quan sát gồm Grafana, Loki, Prometheus và Tempo. Thiết kế này giúp gom môi trường phát triển/trình diễn vào một bộ môi trường có thể tái lập, giảm chênh lệch giữa máy phát triển và môi trường trình diễn.
+QRTable có thiết kế chạy bằng Docker/Docker Compose cùng các thành phần phụ thuộc như PostgreSQL, MongoDB, Redis, Kafka và Keycloak. Thiết kế này giúp gom môi trường phát triển/trình diễn vào một bộ môi trường có thể tái lập, giảm chênh lệch giữa máy phát triển và môi trường trình diễn.
 
-Tuy nhiên, triển khai và quan sát vận hành là khu vực cần diễn đạt thận trọng. Có cấu trúc Docker và bộ công cụ giám sát trong thiết kế không đồng nghĩa hệ thống đã đạt sẵn sàng cao, quan sát sẵn sàng vận hành thực tế, kiểm thử áp lực dưới tải lớn hoặc kiểm thử gây lỗi có chủ đích. Trong phạm vi Chương 4, triển khai/quan sát được trình bày như hướng thiết kế vận hành và nền tảng cho trình diễn/đánh giá. Các khẳng định về bảng điều khiển vận hành thật, độ phủ truy vết/nhật ký, thời gian hoạt động, thông lượng hoặc khả năng phục hồi chỉ nên đưa vào Chương 6 nếu có minh chứng kiểm chứng.
+Tuy nhiên, thiết kế triển khai không đồng nghĩa hệ thống đã đạt sẵn sàng cao, kiểm thử áp lực dưới tải lớn hoặc kiểm thử gây lỗi có chủ đích. Trong phạm vi Chương 4, triển khai được trình bày như nền tảng cho trình diễn và thu thập hiện vật production. Các khẳng định về thời gian hoạt động, thông lượng, khả năng phục hồi hoặc vận hành cấp doanh nghiệp chỉ phù hợp khi có minh chứng kiểm chứng riêng.
 
 \section{Tổng hợp đánh đổi kiến trúc}
 

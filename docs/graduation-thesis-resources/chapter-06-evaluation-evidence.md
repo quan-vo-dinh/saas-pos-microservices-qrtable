@@ -155,13 +155,13 @@ Chương 6 nên chứng minh Saga bằng chuỗi bằng chứng nhiều lớp, k
 
 ## 8. Bảng đề xuất đưa vào Chương 6
 
-| Artifact dự kiến                                                   | Nội dung             | Nguồn                                   | Ghi chú cho Phase 6B                                                  |
-| ------------------------------------------------------------------ | -------------------- | --------------------------------------- | --------------------------------------------------------------------- |
-| Bảng 6.1. Chính sách diễn đạt kết luận theo mức bằng chứng         | Mức A-E từ §5        | Evidence map + traceability             | Đặt sớm ở Chương 6 để kiểm soát ngôn ngữ đánh giá.                    |
-| Bảng 6.2. Tóm tắt truy vết yêu cầu theo domain                     | Rút gọn từ §3.1-§3.2 | Traceability matrix + handoff           | Dùng bảng tổng hợp, không liệt kê toàn bộ 52 dòng trong chương chính. |
-| Bảng 6.3. Kết quả kiểm chứng chức năng theo cụm use case           | Rút gọn từ §2-§3     | Traceability matrix + Chương 5 evidence | Có Dashboard/Reporting và mức kết luận A/B/C/D.                       |
-| Bảng 6.4. Trạng thái bằng chứng kiến trúc và yêu cầu phi chức năng | Rút gọn từ §4        | Chapter 3/4 audit + traceability        | Dùng cho mục architecture/NFR evidence, có reporting entitlement.     |
-| Bảng 6.5. Giới hạn đánh giá và hướng phát triển tương ứng          | Rút gọn từ §6        | Handoff + evidence map + Plan B         | Đặt cuối Chương 6; phần dài hạn có thể nối sang Chương 7.             |
+| Artifact dự kiến                                                   | Nội dung             | Nguồn                                             | Ghi chú cho Phase 6B                                                                         |
+| ------------------------------------------------------------------ | -------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Bảng 6.1. Chính sách diễn đạt kết luận theo mức bằng chứng         | Mức A-E từ §5        | Evidence map + traceability                       | Đặt sớm ở Chương 6 để kiểm soát ngôn ngữ đánh giá.                                           |
+| Bảng 6.2. Tóm tắt truy vết yêu cầu theo domain                     | Rút gọn từ §3.1-§3.2 | Traceability matrix + handoff                     | Dùng bảng tổng hợp, không liệt kê toàn bộ 52 dòng trong chương chính.                        |
+| Bảng 6.3. Ma trận kiểm chứng chức năng và hiện vật đối chiếu       | Rút gọn từ §2-§3     | Traceability matrix + Chương 5/Phụ lục D evidence | Map kết luận -> phương pháp kiểm chứng -> file/hiện vật; không đưa log dài vào chương chính. |
+| Bảng 6.4. Trạng thái bằng chứng kiến trúc và yêu cầu phi chức năng | Rút gọn từ §4        | Chapter 3/4 audit + traceability                  | Dùng cho mục architecture/NFR evidence, có reporting entitlement.                            |
+| Bảng 6.5. Giới hạn đánh giá và hướng phát triển tương ứng          | Rút gọn từ §6        | Handoff + evidence map + Plan B                   | Đặt cuối Chương 6; phần dài hạn có thể nối sang Chương 7.                                    |
 
 Không cần tạo thêm diagram cho Phase 6A. Nếu Phase 6B cần artifact đánh giá bổ sung, ưu tiên bảng ngắn trong chương chính và đưa log/test output dài xuống phụ lục.
 

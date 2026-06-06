@@ -1,8 +1,8 @@
 \chapter{Từ vận hành F\&B đến yêu cầu hệ thống QRTable}
 
-Chương này chuyển bài toán SaaS POS tích hợp đặt món qua mã QR thành tập yêu cầu cụ thể cho hệ thống QRTable. Trọng tâm của chương không phải là mô tả cách cài đặt từng dịch vụ, mà là làm rõ hệ thống cần phục vụ những nhóm người dùng nào, mỗi nhóm thực hiện nghiệp vụ gì, dữ liệu và trạng thái nào cần được kiểm soát, cũng như những yêu cầu chất lượng nào phải được xét đến khi thiết kế và đánh giá hệ thống.
+Chương này chuyển bài toán SaaS POS tích hợp đặt món qua mã QR thành tập yêu cầu cụ thể cho hệ thống QRTable. Nội dung chương làm rõ hệ thống cần phục vụ những nhóm người dùng nào, mỗi nhóm thực hiện nghiệp vụ gì, dữ liệu và trạng thái nào cần được kiểm soát, cũng như những yêu cầu chất lượng nào phải được xét đến khi thiết kế và đánh giá hệ thống.
 
-Các yêu cầu trong chương được tổng hợp từ tài liệu nghiệp vụ, ma trận phân quyền, ma trận truy vết yêu cầu–kiểm thử và các tài liệu ghi nhận phạm vi triển khai của dự án. Vì QRTable là hệ thống đa tenant, nhiều vai trò và có các luồng trạng thái liên quan đến đơn hàng, bếp và thanh toán, phần phân tích yêu cầu cần giữ ba nguyên tắc: tác nhân phải được phân biệt rõ, nguồn trạng thái đáng tin phải ổn định, và các yêu cầu phi chức năng chỉ được diễn đạt trong phạm vi có thể kiểm chứng ở các chương sau.
+Các yêu cầu trong chương được tổng hợp từ tài liệu nghiệp vụ, ma trận phân quyền, ma trận truy vết yêu cầu–kiểm thử và các tài liệu ghi nhận phạm vi triển khai của dự án. Vì QRTable là hệ thống đa tenant, nhiều vai trò và có các luồng trạng thái liên quan đến đơn hàng, bếp và thanh toán, phần phân tích yêu cầu cần giữ ba nguyên tắc: tác nhân phải được phân biệt rõ, nguồn trạng thái đáng tin phải ổn định, và các yêu cầu phi chức năng phải gắn với tiêu chí kiểm chứng ở các chương sau.
 
 \section{Bối cảnh vận hành và phạm vi nghiệp vụ của QRTable}
 
@@ -10,7 +10,7 @@ QRTable được định vị là nền tảng POS theo mô hình SaaS dành cho
 
 Luồng nghiệp vụ điển hình bắt đầu từ khâu khởi tạo tenant. Quản trị nền tảng tạo tenant, gán chủ nhà hàng, chọn gói dịch vụ ban đầu và khởi tạo cấu hình thanh toán. Chủ quán sau đó quản lý nhân sự, thực đơn, bàn và mã QR. Khi khách đến nhà hàng, khách quét mã QR tại bàn để tham gia một phiên gọi món. Nhiều khách cùng bàn có thể thao tác trên cùng một giỏ hàng chung. Sau khi khách gửi đơn, nhân viên xác nhận đơn trước khi món được chuyển vào màn hình bếp (KDS). Bếp hoặc bar xử lý phiếu theo trạm, cập nhật trạng thái món, trong khi nhân viên phục vụ theo dõi trạng thái đơn và xử lý hóa đơn. Khi khách yêu cầu thanh toán, hệ thống khóa phiên gọi món, tổng hợp hóa đơn, hỗ trợ thanh toán tiền mặt hoặc VietQR/SePay, sau đó chuyển bàn sang trạng thái cần dọn dẹp trước khi sẵn sàng phục vụ lượt khách tiếp theo.
 
-Từ góc nhìn yêu cầu, QRTable không chỉ là một thực đơn điện tử. Hệ thống phải đồng bộ nhiều luồng nghiệp vụ có ràng buộc trạng thái: bàn không thể vừa đang thanh toán vừa nhận thêm món; đơn chưa được xác nhận không được trừ tồn kho; khách không được nhìn thấy đơn của bàn khác; quản lý không được thực hiện các thao tác tài chính nhạy cảm dành riêng cho chủ quán; webhook thanh toán có thể đến trùng lặp nhưng không được làm hóa đơn bị đóng nhiều lần. Vì vậy, phần phân tích yêu cầu cần mô tả QRTable như một hệ thống vận hành nhà hàng có kiểm soát trạng thái và phân quyền, thay vì chỉ là giao diện đặt món.
+Từ góc nhìn yêu cầu, QRTable là một hệ thống vận hành nhà hàng có kiểm soát trạng thái và phân quyền, vượt ra ngoài phạm vi một thực đơn điện tử đơn lẻ. Hệ thống phải đồng bộ nhiều luồng nghiệp vụ có ràng buộc trạng thái: bàn không thể vừa đang thanh toán vừa nhận thêm món; đơn chưa được xác nhận không được trừ tồn kho; khách không được nhìn thấy đơn của bàn khác; quản lý không được thực hiện các thao tác tài chính nhạy cảm dành riêng cho chủ quán; webhook thanh toán có thể đến trùng lặp nhưng không được làm hóa đơn bị đóng nhiều lần.
 
 Về phạm vi nghiệp vụ, hệ thống tập trung vào các miền chính sau:
 
@@ -74,7 +74,7 @@ Khách hàng là tác nhân theo phạm vi phiên. Khách không đăng nhập b
 
 \section{Năng lực hệ thống theo các miền vận hành}
 
-Các yêu cầu chức năng được nhóm theo miền nghiệp vụ để giữ ranh giới phân tích rõ ràng. Cách nhóm này giúp tránh mô tả yêu cầu theo màn hình giao diện hoặc theo triển khai dịch vụ quá sớm. Trong Chương 4 và Chương 5, các miền này sẽ được ánh xạ sang ranh giới dịch vụ, trách nhiệm dữ liệu và bằng chứng triển khai.
+Các yêu cầu chức năng được nhóm theo miền nghiệp vụ để giữ ranh giới phân tích rõ ràng. Cách nhóm này giúp tránh mô tả yêu cầu theo màn hình client hoặc theo triển khai dịch vụ quá sớm. Trong Chương 4 và Chương 5, các miền này được ánh xạ sang ranh giới dịch vụ, trách nhiệm dữ liệu và bằng chứng triển khai.
 
 \begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.10\textwidth}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.43\textwidth}>{\raggedright\arraybackslash}p{0.21\textwidth}@{}}
 \caption{Yêu cầu chức năng theo miền nghiệp vụ.}
@@ -97,7 +97,7 @@ FR-CAT-01 & Thực đơn & Chủ quán và quản lý phải quản lý danh m�
 \addlinespace
 FR-CAT-02 & Bàn và QR & Hệ thống phải quản lý khu vực, bàn, trạng thái bàn và token QR theo phạm vi tenant/bàn để khách vào đúng phiên. & Token QR không hợp lệ hoặc không khớp tenant/bàn phải bị từ chối. \\
 \addlinespace
-FR-ORD-01 & Phiên và giỏ chung & Khách cùng bàn phải dùng chung phiên/giỏ; các thao tác giỏ hàng phải kiểm soát phiên bản để tránh ghi đè khi nhiều thiết bị cùng thao tác. & Cập nhật giỏ lỗi thời bị từ chối và phía giao diện phải lấy lại ảnh chụp trạng thái từ máy chủ. \\
+FR-ORD-01 & Phiên và giỏ chung & Khách cùng bàn phải dùng chung phiên/giỏ; các thao tác giỏ hàng phải kiểm soát phiên bản để tránh ghi đè khi nhiều thiết bị cùng thao tác. & Cập nhật giỏ lỗi thời bị từ chối và phía client phải lấy lại ảnh chụp trạng thái từ máy chủ. \\
 \addlinespace
 FR-ORD-02 & Gửi đơn & Gửi đơn phải tạo đơn chờ xử lý một lần theo khóa idempotency, không tạo bản nháp đơn trong cơ sở dữ liệu và xóa giỏ sau khi gửi thành công. & Gửi lặp cùng khóa idempotency không tạo đơn trùng. \\
 \addlinespace
@@ -113,19 +113,19 @@ FR-KDS-02 & Thao tác KDS & Bếp/bar phải xem hàng đợi FIFO, cập nhật
 \addlinespace
 FR-PAY-01 & Quyết toán thanh toán & Hệ thống phải hỗ trợ thanh toán tiền mặt và VietQR/SePay cho hóa đơn nhà hàng, dùng mã thanh toán ổn định và quy tắc làm tròn VND. & Webhook thiếu tiền không đóng hóa đơn; webhook trùng không làm thanh toán bị ghi nhận nhiều lần. \\
 \addlinespace
-FR-PAY-02 & Lịch sử thanh toán và đối soát & Chủ quán/quản lý xem lịch sử thanh toán theo tenant ở chế độ chỉ đọc để đối soát vận hành; điều chỉnh sau thanh toán không thuộc phạm vi luận văn. & Dữ liệu lịch sử phải được lọc theo tenant; không cho phép sửa trạng thái thanh toán qua giao diện lịch sử. \\
+FR-PAY-02 & Lịch sử thanh toán và đối soát & Chủ quán/quản lý xem lịch sử thanh toán theo tenant ở chế độ chỉ đọc để đối soát vận hành; điều chỉnh sau thanh toán không thuộc phạm vi luận văn. & Dữ liệu lịch sử phải được lọc theo tenant; không cho phép sửa trạng thái thanh toán từ màn hình lịch sử. \\
 \addlinespace
 FR-DASH-01 & Báo cáo tenant & Chủ quán và quản lý phải xem được báo cáo tenant cho doanh thu, đơn hàng, bàn, thực đơn và thanh toán ở mức tổng hợp. & Yêu cầu {\scriptsize\texttt{report.read\_own}}, gói thuê bao ở trạng thái {\scriptsize\texttt{ACTIVE}} và mã tính năng {\scriptsize\texttt{analytics\_basic}}; thành phần báo cáo bị khóa theo gói không được gọi API báo cáo. \\
 \addlinespace
 FR-DASH-02 & Phân tích số liệu nền tảng & Quản trị nền tảng phải xem được số liệu tổng hợp của nền tảng và xem chi tiết báo cáo tenant khi cần hỗ trợ/đối soát. & Yêu cầu {\scriptsize\texttt{report.read\_any}}; kết quả của quản trị nền tảng không bị khóa bởi gói dịch vụ của tenant được chọn. \\
 \addlinespace
-FR-RBAC-01 & Xác thực/RBAC & API được bảo vệ phải được kiểm soát bằng chuỗi guard, ngữ cảnh tenant và ma trận quyền; điều hướng giao diện chỉ hỗ trợ trải nghiệm người dùng, không thay thế kiểm soát ở phía máy chủ. & API phải từ chối tác nhân thiếu quyền hoặc sai tenant ngay cả khi giao diện bị bỏ qua. \\
+FR-RBAC-01 & Xác thực/RBAC & API được bảo vệ phải được kiểm soát bằng chuỗi guard, ngữ cảnh tenant và ma trận quyền; điều hướng client chỉ hỗ trợ trải nghiệm người dùng, không thay thế kiểm soát ở phía máy chủ. & API phải từ chối tác nhân thiếu quyền hoặc sai tenant ngay cả khi client bị bỏ qua. \\
 \bottomrule
 \end{longtable}
 
 Nhóm yêu cầu SaaS xác định QRTable là nền tảng nhiều nhà hàng, không phải phần mềm cài riêng cho từng nhà hàng. Do đó, việc tạo tenant, gắn chủ quán, quản lý gói thuê bao và hạn mức là yêu cầu nền tảng. Trạng thái tenant cũng ảnh hưởng trực tiếp tới luồng khách: tenant bị tạm ngưng không nên tiếp nhận thao tác mới tùy tiện, nhưng các luồng thanh toán đã tạo trước đó cần được xử lý an toàn để không làm thất thoát giao dịch.
 
-Nhóm yêu cầu nhân sự chỉ được trình bày ở mức quản lý nhân sự trong tenant. Chủ quán và quản lý có thể quản lý nhân sự theo ma trận phân quyền, trong đó chủ quán có quyền thao tác nhạy hơn như xóa người dùng hoặc cập nhật vai trò, còn quản lý bị giới hạn ở các thao tác vận hành được cấp. Phạm vi này không bao gồm quy trình quản trị nhân sự nâng cao (HRM) như bảng lương, ca làm, chấm công hoặc phụ thuộc vào dịch vụ email/thông báo.
+Nhóm yêu cầu nhân sự được giới hạn ở quản lý nhân sự trong tenant. Chủ quán và quản lý có thể quản lý nhân sự theo ma trận phân quyền, trong đó chủ quán có quyền thao tác nhạy hơn như xóa người dùng hoặc cập nhật vai trò, còn quản lý bị giới hạn ở các thao tác vận hành được cấp. Phạm vi này không bao gồm quy trình quản trị nhân sự nâng cao (HRM) như bảng lương, ca làm, chấm công hoặc phụ thuộc vào dịch vụ email/thông báo.
 
 Nhóm thực đơn, bàn và QR xác định điểm vào vật lý của khách hàng. Mỗi mã QR phải gắn với đúng tenant và bàn. Thực đơn công khai cần tôn trọng trạng thái danh mục/món để khách chỉ thấy các món đang được phép bán. Các thao tác thay đổi thực đơn hoặc bàn thuộc chủ quán/quản lý, trong khi khách không có quyền quản lý thực đơn. Đây là nền cho yêu cầu cô lập tenant: cùng một hệ thống có nhiều tenant nhưng thực đơn, bàn và QR của tenant này không được lẫn với tenant khác.
 
@@ -133,9 +133,9 @@ Nhóm phiên, giỏ và đơn là lõi của đặt món qua QR. Một bàn có 
 
 Nhóm KDS và thanh toán hoàn tất vòng đời vận hành. KDS cần ưu tiên tính đúng đắn của hàng đợi và trạm hơn là chỉ hiển thị thời gian thực. Thanh toán cần xử lý cả giao dịch do nhân viên xác nhận trực tiếp và giao dịch do webhook từ hệ thống ngoài gửi về. Vì webhook có thể đến trễ hoặc đến nhiều lần, yêu cầu idempotency là bắt buộc trong luồng thanh toán.
 
-Nhóm bảng điều khiển và báo cáo bổ sung khả năng đọc hiểu vận hành sau khi dữ liệu giao dịch đã phát sinh. Ở mức yêu cầu, báo cáo của QRTable là mô hình dữ liệu đọc chỉ đọc do các miền sở hữu dữ liệu cung cấp, ví dụ miền Thanh toán cho doanh thu đã thanh toán, miền Đơn cho đơn/hóa đơn, miền Thực đơn cho bàn/thực đơn và miền SaaS cho số liệu nền tảng. Điều này không đồng nghĩa hệ thống có dịch vụ phân tích số liệu riêng, kho dữ liệu OLAP hoặc quy trình phân tích nghiệp vụ riêng trong phạm vi Chương 3.
+Nhóm bảng điều khiển và báo cáo bổ sung khả năng đọc hiểu vận hành sau khi dữ liệu giao dịch đã phát sinh. Trong phạm vi yêu cầu của QRTable, báo cáo là mô hình dữ liệu đọc chỉ đọc do các miền sở hữu dữ liệu cung cấp, ví dụ miền Thanh toán cho doanh thu đã thanh toán, miền Đơn cho đơn/hóa đơn, miền Thực đơn cho bàn/thực đơn và miền SaaS cho số liệu nền tảng. Chương 3 vì vậy xác định nhu cầu đọc tổng hợp và quyền truy cập báo cáo, còn dịch vụ phân tích riêng, kho dữ liệu OLAP hoặc quy trình phân tích nghiệp vụ chuyên sâu thuộc nhóm mở rộng sản phẩm.
 
-Hình~\ref{fig:chapter3-business-flow} gom các yêu cầu chức năng trên thành một luồng nghiệp vụ xuyên suốt từ lúc khách quét QR cho đến khi bàn được dọn và sẵn sàng phục vụ lượt tiếp theo. Ở mức Chương 3, luồng này chỉ thể hiện trình tự nghiệp vụ và điều kiện kiểm soát chính; trình tự chi tiết giữa các dịch vụ được dành cho Chương 5.
+Hình~\ref{fig:chapter3-business-flow} gom các yêu cầu chức năng trên thành một luồng nghiệp vụ xuyên suốt từ lúc khách quét QR cho đến khi bàn được dọn và sẵn sàng phục vụ lượt tiếp theo. Trong Chương 3, luồng này thể hiện trình tự nghiệp vụ và điều kiện kiểm soát chính; trình tự chi tiết giữa các dịch vụ được trình bày ở Chương 5.
 
 \begin{figure}[htbp]
   \centering
@@ -146,7 +146,7 @@ Hình~\ref{fig:chapter3-business-flow} gom các yêu cầu chức năng trên th
 
 \section{Ràng buộc chất lượng và tiêu chí kiểm chứng}
 
-Các yêu cầu phi chức năng của QRTable được diễn đạt dựa trên đặc thù hệ thống SaaS nhiều tenant và các thuộc tính chất lượng thường dùng trong đánh giá hệ thống phần mềm như bảo mật, độ tin cậy, khả năng bảo trì và hiệu năng \cite{iso-iec-25010-2023}. Trong phạm vi khóa luận, các yêu cầu này không được viết như cam kết sẵn sàng vận hành thực tế tuyệt đối; chúng là tiêu chí để thiết kế và đánh giá có kiểm soát ở Chương 4, Chương 5 và Chương 6.
+Các yêu cầu phi chức năng của QRTable được diễn đạt dựa trên đặc thù hệ thống SaaS nhiều tenant và các thuộc tính chất lượng thường dùng trong đánh giá hệ thống phần mềm như bảo mật, độ tin cậy, khả năng bảo trì và hiệu năng \cite{iso-iec-25010-2023}. Trong phạm vi khóa luận, các yêu cầu này đóng vai trò tiêu chí thiết kế và đánh giá có kiểm soát ở Chương 4, Chương 5 và Chương 6.
 
 \begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.44\textwidth}>{\raggedright\arraybackslash}p{0.34\textwidth}@{}}
 \caption{Yêu cầu phi chức năng và tiêu chí đánh giá.}
@@ -159,31 +159,29 @@ Các yêu cầu phi chức năng của QRTable được diễn đạt dựa trê
 \textbf{YC phi chức năng} & \textbf{Yêu cầu} & \textbf{Cách đánh giá an toàn} \\
 \midrule
 \endhead
-Cô lập tenant & Dữ liệu, API, khóa cache, tải trọng sự kiện và tệp tải lên liên quan tenant phải luôn được ràng buộc bởi ngữ cảnh tenant. & Đánh giá bằng kiểm thử dịch vụ, kiểm thử guard, ma trận truy vết và kịch bản tenant A/B khi có môi trường chạy thật phù hợp. \\
+Cô lập tenant & Dữ liệu, API, khóa cache, tải trọng sự kiện và tệp tải lên liên quan tenant phải luôn được ràng buộc bởi ngữ cảnh tenant. & Đánh giá bằng kiểm thử dịch vụ, kiểm thử guard, ma trận truy vết và kịch bản tenant A/B đại diện. \\
 \addlinespace
 Bảo mật và phân quyền & Nhân viên/chủ quán/quản trị dùng JWT/OIDC và RBAC; khách dùng xác thực theo phạm vi QR/phiên; cấu hình webhook/thanh toán không được lộ khóa bí mật hoặc token ra trình duyệt. & Đánh giá bằng ma trận quyền, chuỗi guard, hợp đồng tuyến API và kịch bản bảo mật cho QR/webhook. \\
 \addlinespace
 Nhất quán và idempotency & Các luồng ghi ảnh hưởng trạng thái tiền hoặc đơn phải có idempotency và nguồn trạng thái đáng tin rõ ràng: gửi đơn, xác nhận tồn kho, quyết toán webhook, đánh dấu hóa đơn đã thanh toán. & Đánh giá bằng kiểm thử máy trạng thái, kiểm thử tích hợp và kịch bản phát lại/trùng lặp. \\
 \addlinespace
-Phản hồi thời gian thực & Hệ thống cần phản hồi kịp thời cho POS, KDS và PWA khách, nhưng sự kiện thời gian thực chỉ đóng vai trò gợi ý hoặc làm mất hiệu lực bộ nhớ đệm. & Kiểm tra giao diện nhận gợi ý rồi lấy lại ảnh chụp trạng thái; không xem WebSocket là nguồn trạng thái nghiệp vụ cuối cùng. \\
+Phản hồi thời gian thực & Hệ thống cần phản hồi kịp thời cho POS, KDS và PWA khách, trong đó sự kiện thời gian thực đóng vai trò gợi ý hoặc làm mất hiệu lực bộ nhớ đệm. & Kiểm tra client nhận gợi ý rồi lấy lại ảnh chụp trạng thái; nguồn trạng thái nghiệp vụ cuối cùng vẫn nằm ở phía máy chủ. \\
 \addlinespace
 Khả năng bảo trì & Hệ thống cần có ranh giới miền rõ, hợp đồng dùng chung ổn định và cấu trúc monorepo hỗ trợ thay đổi có kiểm soát. & Đánh giá bằng trách nhiệm dịch vụ, thư viện dùng chung, hợp đồng kiến trúc và khả năng truy vết yêu cầu sang module liên quan. \\
 \addlinespace
-Khả mở rộng ở mức thiết kế & Kiến trúc cần cho phép mở rộng theo ranh giới dịch vụ, cache, nhóm consumer hoặc bộ chuyển đổi thời gian thực khi cần. & Chỉ phân tích ở mức thiết kế nếu chưa có đo lường tải lớn; không tự khẳng định thông lượng hoặc độ trễ. \\
+Khả năng mở rộng & Kiến trúc cần cho phép mở rộng theo ranh giới dịch vụ, bộ nhớ đệm, nhóm consumer hoặc bộ chuyển đổi thời gian thực khi cần. & Đánh giá bằng lập luận kiến trúc và bằng chứng ranh giới dịch vụ; phép đo tải lớn thuộc lớp kiểm chứng thực nghiệm với môi trường và dữ liệu riêng. \\
 \addlinespace
 Khả kiểm thử và minh họa tái lập được & Yêu cầu ưu tiên cao cần có ánh xạ sang kiểm thử, kịch bản minh họa hoặc tư liệu bằng chứng để người đọc kiểm tra được luận điểm. & Đánh giá bằng ma trận truy vết, kết quả kiểm thử, ảnh chụp/tư liệu minh họa và danh sách kiểm tra quá trình build. \\
-\addlinespace
-Khả năng quan sát vận hành & Hệ thống nên có định hướng ghi nhật ký, số liệu và truy vết để phục vụ vận hành. & Nếu chưa có bảng điều khiển/bằng chứng truy vết ổn định, chỉ viết như giới hạn hoặc hướng phát triển, không khẳng định khả năng quan sát cấp vận hành thực tế. \\
 \bottomrule
 \end{longtable}
 
 Cô lập tenant là yêu cầu phi chức năng trung tâm vì QRTable phục vụ nhiều nhà hàng trên cùng nền tảng. Cô lập không chỉ nằm ở truy vấn cơ sở dữ liệu mà còn ở khóa cache, phòng WebSocket, token QR, tệp tải lên, mã thanh toán và guard phân quyền. Nếu một API hoặc khóa cache bỏ qua ngữ cảnh tenant, dữ liệu của tenant này có thể bị lộ sang tenant khác. Vì vậy, mọi yêu cầu chức năng ở trên đều phải được đọc cùng yêu cầu cô lập.
 
-Bảo mật của QRTable có hai mặt khác nhau. Với nhân viên, chủ quán, quản lý và quản trị nền tảng, hệ thống cần xác thực bằng JWT/OIDC và ủy quyền bằng RBAC. Với khách, hệ thống cần tối ưu trải nghiệm quét QR nên không yêu cầu tài khoản Keycloak; thay vào đó, quyền truy cập được giới hạn bằng quyền sở hữu QR/phiên/bàn. Với webhook thanh toán, yêu cầu bảo mật nằm ở xác minh tuyến, khóa bí mật/HMAC, mã thanh toán và idempotency. Ba nhóm cơ chế này không nên bị trộn lẫn khi thiết kế hoặc đánh giá.
+Bảo mật của QRTable có hai mặt khác nhau. Với nhân viên, chủ quán, quản lý và quản trị nền tảng, hệ thống cần xác thực bằng JWT/OIDC và ủy quyền bằng RBAC. Với khách, hệ thống cần tối ưu trải nghiệm quét QR nên không yêu cầu tài khoản Keycloak; thay vào đó, quyền truy cập được giới hạn bằng quyền sở hữu QR/phiên/bàn. Với webhook thanh toán, yêu cầu bảo mật nằm ở xác minh tuyến, khóa bí mật/HMAC, mã thanh toán và idempotency. Ba nhóm cơ chế này được tách biệt khi thiết kế và đánh giá.
 
-Nhất quán và idempotency xuất hiện ở các điểm có rủi ro cao: nhiều khách cùng sửa giỏ chung, khách gửi đơn nhiều lần do thử lại, nhân viên xác nhận đơn trong khi tồn kho thay đổi, webhook SePay gửi lặp, hoặc sự kiện thanh toán được phát lại để đồng bộ sang miền Đơn. Yêu cầu hệ thống không phải là loại bỏ hoàn toàn tính phân tán, mà là xác định rõ mỗi trạng thái do miền nào sở hữu và thao tác lặp có tạo tác dụng phụ trùng lặp hay không.
+Nhất quán và idempotency xuất hiện ở các điểm có rủi ro cao: nhiều khách cùng sửa giỏ chung, khách gửi đơn nhiều lần do thử lại, nhân viên xác nhận đơn trong khi tồn kho thay đổi, webhook SePay gửi lặp, hoặc sự kiện thanh toán được phát lại để đồng bộ sang miền Đơn. Yêu cầu hệ thống là xác định rõ mỗi trạng thái do miền nào sở hữu, thao tác nào cần idempotency và thao tác lặp có tạo tác dụng phụ trùng lặp hay không.
 
-Phản hồi thời gian thực giúp trải nghiệm vận hành mượt hơn nhưng không được dùng thay thế nguồn trạng thái có thẩm quyền. POS, KDS và PWA khách có thể nhận gợi ý WebSocket để biết cần làm mới dữ liệu. Trạng thái cuối cùng vẫn phải được lấy từ ảnh chụp trạng thái phía máy chủ. Cách diễn đạt này giúp tránh phóng đại rằng giao diện thời gian thực tự nó đảm bảo tính đúng đắn của đơn, phiếu bếp hoặc thanh toán.
+Phản hồi thời gian thực giúp trải nghiệm vận hành mượt hơn trong khi nguồn trạng thái có thẩm quyền vẫn nằm ở phía máy chủ. POS, KDS và PWA khách nhận gợi ý WebSocket để biết thời điểm làm mới dữ liệu; trạng thái cuối cùng được lấy từ ảnh chụp trạng thái phía máy chủ. Cách diễn đạt này giữ rõ vai trò của WebSocket mà không phóng đại tính đúng đắn của đơn, phiếu bếp hoặc thanh toán.
 
 \section{Các vòng đời trạng thái chi phối nghiệp vụ}
 
@@ -222,18 +220,12 @@ Vòng đời KDS bắt đầu sau khi đơn được xác nhận. Phiếu cần 
 
 Vòng đời hóa đơn/thanh toán kết thúc phiên bàn. Hóa đơn chỉ nên vào chờ thanh toán khi không còn giỏ đang mở và các đơn cần thanh toán đã sẵn sàng. Thanh toán tiền mặt do nhân viên xác nhận trực tiếp, còn VietQR/SePay được xác nhận qua webhook. Vì thanh toán liên quan tiền và đối soát, các trường hợp thiếu tiền, trùng lặp hoặc webhook sau khi đã thanh toán phải được xử lý idempotent. Sau khi hóa đơn đã thanh toán, phiên được đóng, dữ liệu giỏ/phiên tạm được dọn và bàn chuyển sang dọn dẹp.
 
-\section{Ranh giới phạm vi và giới hạn của các khẳng định đánh giá}
+\section{Phạm vi yêu cầu của QRTable}
 
-Phân tích yêu cầu cần xác định rõ phạm vi để các chương sau không đánh giá vượt quá bằng chứng. Trong phạm vi chính của khóa luận, QRTable tập trung vào POS SaaS cho F\&B, đặt món qua QR tại bàn, quản lý tenant/gói thuê bao, quản lý nhân sự trong tenant, thực đơn/bàn/QR, giỏ chung/đơn, KDS, quyết toán thanh toán, bản MVP của bảng điều khiển và báo cáo, RBAC và cô lập tenant. Các yêu cầu này có đủ cơ sở để tiếp tục thiết kế kiến trúc, trình bày triển khai và đánh giá bằng ma trận truy vết, kiểm thử và kịch bản minh họa ở các chương sau.
+Phạm vi yêu cầu của QRTable tập trung vào các năng lực cần thiết để một đơn vị thuê bao F\&B vận hành quy trình đặt món tại bàn: quản lý tenant và gói thuê bao, thực đơn, bàn và mã QR, phiên khách, giỏ món dùng chung, đơn hàng, KDS, thanh toán, phân quyền và báo cáo vận hành mức MVP. Các yêu cầu này là cơ sở để Chương 4 thiết kế ranh giới dịch vụ, Chương 5 trình bày các luồng triển khai và Chương 6 đánh giá mức đáp ứng.
 
-Một số nội dung được xem là ngoài phạm vi kết quả chính hoặc chỉ nên trình bày như hướng phát triển. Thứ nhất, khóa luận không khẳng định đo lường tải lớn, thông lượng, độ trễ hoặc khả năng chịu tải vận hành thực tế nếu chưa có phép đo thực nghiệm tương ứng. Khả mở rộng có thể được phân tích ở mức thiết kế dựa trên ranh giới dịch vụ, cache, hàng đợi và nhóm consumer, nhưng không được diễn đạt như kết quả đã chứng minh bằng kiểm thử áp lực.
+Các năng lực mở rộng như quản trị nhân sự nâng cao, CRM/loyalty, kho dữ liệu phân tích, BI/AI, ứng dụng di động gốc, hàng đợi thao tác ngoại tuyến đầy đủ, tích hợp sâu với nền tảng giao đồ ăn, hoàn tiền phức tạp hoặc nhiều ngân hàng thanh toán đồng thời được tách khỏi phạm vi yêu cầu chính. Việc đặt ranh giới này giúp phần đánh giá tập trung vào các luồng cốt lõi thay vì mở rộng sang những miền sản phẩm cần thiết kế, triển khai và kiểm chứng riêng.
 
-Thứ hai, khả năng quan sát vận hành và triển khai chỉ nên được viết ở mức thiết kế hoặc phạm vi minh họa có giới hạn nếu chưa có bảng điều khiển, truy vết, quy trình thu thập nhật ký và quy trình triển khai được kiểm chứng đầy đủ. Các cụm như sẵn sàng cao, kỹ thuật chaos hoặc giám sát cấp vận hành thực tế không phù hợp nếu không có bằng chứng độc lập.
-
-Thứ ba, hành vi ngoại tuyến trong phạm vi hiện tại chỉ nên hiểu là suy giảm chức năng, kết nối lại và làm mới giao diện. Hàng đợi thao tác ngoại tuyến đầy đủ, đồng bộ nền và bộ giải xung đột cho mọi thao tác khách, POS hoặc KDS là hướng phát triển, không thuộc yêu cầu đánh giá chính của đề tài. Tương tự, các nội dung như giới hạn tốc độ quét QR theo bàn, dịch vụ thông báo, email biên lai, email chào mừng/tạm ngưng/đặt lại mật khẩu, nhiều ngân hàng thanh toán đồng thời, hoàn một phần gói thuê bao, tồn kho/BOM nâng cao, thuế/kế toán, quản trị nhân sự nâng cao (HRM), bảng lương, lập ca, quản trị quan hệ khách hàng (CRM), ứng dụng di động gốc và tích hợp sâu với nền tảng giao đồ ăn bên thứ ba không thuộc phạm vi kết quả chính của Chương 3.
-
-Thứ tư, bảng điều khiển và báo cáo trong phạm vi hiện tại chỉ là bản MVP cho báo cáo vận hành và phân tích số liệu nền tảng, dựa trên mô hình dữ liệu đọc của các dịch vụ sở hữu dữ liệu. Các năng lực như phân tích nghiệp vụ hoặc trí tuệ nhân tạo nâng cao (BI/AI), kho dữ liệu phân tích, OLAP, xuất báo cáo theo lịch, phân tích hiệu suất nhân sự, dự báo hoặc phát hiện bất thường, phân tích nhóm tenant/khách hàng nâng cao, kênh thời gian thực cho bảng điều khiển hoặc dòng doanh thu thời gian thực là ngoài phạm vi đánh giá chính nếu chưa có bằng chứng tương ứng.
-
-Cuối cùng, SePay/VietQR là yêu cầu thanh toán trọng tâm của hệ thống, nhưng kiểm chứng với nhà cung cấp thật cần được tách khỏi bằng chứng kiểm thử đơn vị, hợp đồng và giả lập. Chương 3 có thể nêu yêu cầu xử lý webhook, mã tham chiếu, thiếu tiền và trùng lặp, còn Chương 6 phải phân biệt rõ phần đã kiểm chứng bằng kiểm thử nội bộ với phần cần xác nhận thêm khi chạy với nhà cung cấp thật.
+Đối với hiệu năng, khả năng mở rộng và kiểm chứng nhà cung cấp thanh toán, Chương 3 xác định tiêu chí yêu cầu để Chương 4, Chương 5 và Chương 6 lần lượt thiết kế, hiện thực và phân loại bằng chứng tương ứng. Các kết luận về tải lớn, độ trễ, thông lượng hoặc callback SePay/VietQR với nhà cung cấp thật được đặt trong lớp đánh giá bằng chứng ở Chương 6. Nhờ đó, yêu cầu thanh toán vẫn bao gồm webhook, mã tham chiếu, xử lý thiếu tiền và trùng lặp, nhưng không trộn lẫn kiểm thử nội bộ với minh chứng vận hành thật.
 
 Tóm lại, Chương 3 đã xác định tác nhân, trường hợp sử dụng, yêu cầu chức năng, yêu cầu phi chức năng và các máy trạng thái chính của QRTable. Đây là cơ sở để Chương 4 giải thích thiết kế kiến trúc và ranh giới dịch vụ, Chương 5 chứng minh quá trình triển khai, và Chương 6 đánh giá mức độ đáp ứng yêu cầu mà không phóng đại kết quả.

@@ -9,6 +9,8 @@ File này giúp người dùng mở một session AI mới và giao đúng phase
 
 Ghi chú 2026-06-04: prompt bank có "Phase 4D" thuộc workflow khóa luận, nghĩa là artifact coverage cho Chương 3. Không nhầm với **technical Phase 4D Dashboard & Reporting** trong `docs/phases/phase-4d-dashboard-reporting.md`. Prompt riêng `docs/graduation-thesis-resources/chapter-03-requirement-sync-prompt.md` đã được dùng để đồng bộ Chương 3 cùng ngày; từ đây xem nó như record/handoff tham khảo, không phải next step mặc định. Lượt polish Chương 4 P0/P1 cũng đã được thực thi; `chapter-04-architecture-polish-spec.md` và `chapter-04-architecture-polish-plan.md` chỉ dùng lại nếu có yêu cầu chỉnh sâu Chương 4.
 
+Ghi chú 2026-06-05: prompt handoff riêng cho session mới thực thi Plan 2 scope/tone refactor Chương 3/5/7 nằm tại `docs/graduation-thesis-resources/chapter-03-05-07-scope-tone-refactor-prompt.md`. Prompt đó đã nhúng chiến lược dùng skills, CodeGraph, Context7, browser/web search và các ràng buộc mới: Phase 7 deployment chắc chắn triển khai; Technical Phase 6/observability không đưa vào nội dung khóa luận.
+
 Nguyên tắc:
 
 1. Mỗi session chỉ làm một phase con và một output chính.

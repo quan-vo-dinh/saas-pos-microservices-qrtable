@@ -1,0 +1,8 @@
+PASS order apps/order/src/app/modules/order/tests/catalog-stock-gateway.service.spec.ts (6.29 s)
+PASS order apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts
+
+Test Suites: 2 passed, 2 total
+Tests:       8 passed, 8 total
+Snapshots:   0 total
+Time:        7.869 s
+Ran all test suites matching apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts|apps/order/src/app/modules/order/tests/catalog-stock-gateway.service.spec.ts.
