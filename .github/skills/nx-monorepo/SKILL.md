@@ -11,7 +11,6 @@ description: Nx monorepo management for QRTable. Use when running tasks, generat
 # Serve
 npx nx serve <project>                     # Single service dev server
 pnpm dev:bff-auth                          # BFF + Authorizer
-pnpm dev:bff-product                       # BFF + Product
 pnpm dev:some --projects=bff,catalog       # Custom combo
 
 # Test

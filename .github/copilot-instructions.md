@@ -27,7 +27,6 @@ You are operating in an integrated environment combining the **Superpower Framew
 | ----------- | ---- | ---- | ---- | ----------- | ----------------------------------------- |
 | BFF         | 3300 | —    | —    | Redis/Kafka | API gateway, sole HTTP entry for web apps |
 | Order       | 3301 | 3201 | —    | PostgreSQL  | Orders / bills                            |
-| Product     | 3302 | 3202 | —    | PostgreSQL  | Product CRUD                              |
 | User-Access | 3303 | 3203 | 5200 | MongoDB     | User management                           |
 | Authorizer  | 3304 | 3204 | 5100 | —           | JWT verification, Keycloak integration    |
 | Catalog     | 3305 | 3205 | —    | PostgreSQL  | Menu catalog                              |
@@ -61,7 +60,6 @@ pnpm dev
 
 # Dev — selective
 pnpm dev:bff-auth          # BFF + Authorizer
-pnpm dev:bff-product       # BFF + Product
 pnpm dev:bff-invoice       # BFF + Invoice
 pnpm dev-lite              # BFF only
 pnpm dev:some --projects=bff,catalog  # Custom combo

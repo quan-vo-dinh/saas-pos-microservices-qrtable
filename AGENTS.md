@@ -82,7 +82,7 @@ If the ambiguity is minor and does not affect implementation correctness:
 | Aspect     | Decision                                                               |
 | ---------- | ---------------------------------------------------------------------- |
 | Monorepo   | Nx — tất cả apps và libs trong 1 repo                                  |
-| Backend    | NestJS + TypeScript — 8 microservices                                  |
+| Backend    | NestJS + TypeScript — 7 microservices                                  |
 | Frontend   | Next.js (Management App) + React/Vite (Customer PWA)                   |
 | Database   | PostgreSQL + TypeORM (per-service) · MongoDB + Mongoose (user-access)  |
 | Cache      | Redis — session store, menu cache, KDS queue (Sorted Set), rate limit  |

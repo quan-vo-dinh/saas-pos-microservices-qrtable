@@ -1,5 +1,5 @@
 ---
-applyTo: 'apps/bff/**,apps/authorizer/**,apps/user-access/**,apps/product/**,apps/invoice/**,apps/catalog/**,apps/saas/**,libs/**'
+applyTo: 'apps/bff/**,apps/authorizer/**,apps/user-access/**,apps/invoice/**,apps/catalog/**,apps/saas/**,libs/**'
 ---
 
 # NestJS Microservices — Backend Conventions

@@ -16,7 +16,6 @@ This is an Nx monorepo with NestJS hybrid apps (HTTP + TCP). Each service runs b
 
 - **BFF** (HTTP 3300, `PORT`): API gateway — sole HTTP entry for web apps
 - **Order** (HTTP 3301, TCP 3201): Orders / bills (PostgreSQL)
-- **Product** (HTTP 3302, TCP 3202): Product management (PostgreSQL)
 - **User-Access** (HTTP 3303, TCP 3203, gRPC 5200): User CRUD (MongoDB)
 - **Authorizer** (HTTP 3304, TCP 3204, gRPC 5100): JWT validation + Keycloak integration
 - **Catalog** (HTTP 3305, TCP 3205): Menu catalog (PostgreSQL)
