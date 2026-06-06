@@ -10,6 +10,15 @@
 
 - Các phase lõi đã đóng trên đường critical/demo: **0, 1, 2A, 2B, 3**, phần SaaS hoàn thành ở **4B**, và lát cắt đại diện **4A Order Confirm Saga** đã triển khai. Full hardening vận hành của Phase 4A và Phase 4C Quản lý nhân sự chưa bắt đầu; không chặn Phase 5–7 trừ khi demo bắt buộc hardening kiểu Saga state bền vững/CDC/retry worker hoặc quản lý nhân sự. Notification/email nằm ngoài phạm vi triển khai hiện tại.
 
+## Snapshot trạng thái hiện tại (2026-06-01)
+
+- **Tiến độ Phase 5 Testing:** ~75-80% cho workstream testing, dựa trên traceability coverage, inventory test đã có và bằng chứng integration M2 local mới nhất. Dòng roadmap gộp Phase 5-7 đang tính **25%** vì Observability và Deployment chưa bắt đầu.
+- **Traceability matrix:** 52 dòng P0/P1: 38 covered, 9 partial, 1 implementation gap và 4 deferred by phase. Các P0 còn partial là Order state/stock live compensation fault injection, SaaS onboarding saga live Authorizer/User-Access proof, và suspended Customer PWA pending-bill browser exception.
+- **Gate deterministic mới:** `pnpm nx test frontend-utils` pass ngày 2026-06-01 với 36 test passed và 36 runtime-dependent integration tests skip có chủ đích.
+- **Gate unit/contract đầy đủ mới:** `pnpm exec nx run-many -t test --parallel=3` đã pass toàn bộ 23 projects sau khi cập nhật expectation cũ ở `guards:test` và `management-app:test` theo contract hiện tại.
+- **Gate integration M2 mới:** các lệnh seeded Order, Payment, Kitchen, SaaS, frontend-utils live BFF/Keycloak và permission-matrix smoke đã pass ngày 2026-06-01. Frontend-utils integration pass `72/72` tests và permission smoke verify đủ 6 role seeded với exact counts `62/38/35/15/6/6`.
+- **Bằng chứng Browser E2E:** Playwright hiện list 15 test trong 5 spec file. Artifact lưu gần nhất là run Step 2.7 fail vì Customer PWA tại `localhost:5173` không chạy; phải rerun với full app stack trước khi dùng E2E làm bằng chứng green.
+
 ## Tài liệu tham chiếu
 
 | Tài liệu                                    | Phần liên quan                                                                                                                                       |
@@ -140,7 +149,7 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 - **Component/hook frontend:** control disabled tenant suspended, ngoại lệ payment cho bill pending, hook refetch realtime POS/KDS, auth readiness dashboard, điều hướng theo role.
 - **Test kiến trúc tĩnh:** route constant unique, pattern TCP message exposed, đếm enum/seed/matrix permission, topic Kafka giới hạn registry, không vô tình có contract event `menu.updated`.
 
-**Ghi chú RBAC:** `permission-matrix.md` hiện có 65 permission và đếm role seed đã verify tĩnh, nhưng smoke live còn phụ thuộc seed/credential `SUPER_ADMIN` và `MANAGER`. Phase 5 ghi trạng thái `partial` cho đến khi smoke login seeded live hoặc integration auth API-level ổn định.
+**Ghi chú RBAC:** `permission-matrix.md` hiện có 62 permission và role seed counts đã verify live: `SUPER_ADMIN=62`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6` (đã gỡ `PRODUCT_*` cùng `apps/product`). Smoke M2 seeded đã đi qua Keycloak login, BFF `/authorizer/me`, và Mongo-backed role permissions.
 
 **verify:** `pnpm nx affected -t test` hoặc `pnpm nx test <project>` pass cho project chạm; báo coverage là tín hiệu phụ, không thay ma trận traceability.
 

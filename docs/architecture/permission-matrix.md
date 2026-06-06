@@ -46,7 +46,7 @@ Design principles:
 | BARISTA     | Single tenant         | Bar staff for KDS drink tickets                                                                | Bound to `tenant_id` claim            |
 | CUSTOMER    | Session scoped        | Anonymous diner using QR session APIs                                                          | Tenant from signed QR/session context |
 
-## 4. Permission Catalog (67 Values)
+## 4. Permission Catalog (62 Values)
 
 | #   | Enum                            | Value                           | Notes                                    |
 | --- | ------------------------------- | ------------------------------- | ---------------------------------------- |
@@ -89,34 +89,29 @@ Design principles:
 | 37  | `ROLE_GET_ALL`                  | `role.get_all`                  | List roles.                              |
 | 38  | `ROLE_UPDATE`                   | `role.update`                   | Update role.                             |
 | 39  | `ROLE_DELETE`                   | `role.delete`                   | Delete role.                             |
-| 40  | `PRODUCT_CREATE`                | `product.create`                | Legacy template permission.              |
-| 41  | `PRODUCT_GET_BY_ID`             | `product.get_by_id`             | Legacy template permission.              |
-| 42  | `PRODUCT_GET_ALL`               | `product.get_all`               | Legacy template permission.              |
-| 43  | `PRODUCT_UPDATE`                | `product.update`                | Legacy template permission.              |
-| 44  | `PRODUCT_DELETE`                | `product.delete`                | Legacy template permission.              |
-| 45  | `ORDER_CREATE`                  | `order.create`                  | Create order.                            |
-| 46  | `ORDER_CONFIRM`                 | `order.confirm`                 | Confirm pending order.                   |
-| 47  | `ORDER_CANCEL_PENDING`          | `order.cancel_pending`          | Reject/cancel pending order.             |
-| 48  | `ORDER_CANCEL_PROCESSING`       | `order.cancel_processing`       | Cancel confirmed or processing order.    |
-| 49  | `ORDER_GET_LIST`                | `order.get_list`                | List orders.                             |
-| 50  | `ORDER_GET_BY_ID`               | `order.get_by_id`               | Read order detail.                       |
-| 51  | `KITCHEN_GET_QUEUE`             | `kitchen.get_queue`             | Read KDS queue.                          |
-| 52  | `KITCHEN_UPDATE_TICKET`         | `kitchen.update_ticket`         | Update KDS ticket status.                |
-| 53  | `KITCHEN_RECALL`                | `kitchen.recall`                | Recall completed KDS ticket.             |
-| 54  | `KITCHEN_SET_PRIORITY`          | `kitchen.set_priority`          | Set or clear KDS ticket priority.        |
-| 55  | `PAYMENT_CREATE`                | `payment.create`                | Create payment.                          |
-| 56  | `PAYMENT_CONFIRM_CASH`          | `payment.confirm_cash`          | Confirm cash payment.                    |
-| 57  | `PAYMENT_GET_HISTORY`           | `payment.get_history`           | Read payment history.                    |
-| 58  | `TABLE_CREATE`                  | `table.create`                  | Create table.                            |
-| 59  | `TABLE_UPDATE`                  | `table.update`                  | Update table.                            |
-| 60  | `TABLE_DELETE`                  | `table.delete`                  | Delete table.                            |
-| 61  | `TABLE_TRANSFER`                | `table.transfer`                | Transfer session/order between tables.   |
-| 62  | `TABLE_UPDATE_STATUS`           | `table.update_status`           | Update table status.                     |
-| 63  | `SERVICE_REQUEST_CREATE`        | `service_request.create`        | Create service request.                  |
-| 64  | `SERVICE_REQUEST_ACKNOWLEDGE`   | `service_request.acknowledge`   | Acknowledge service request.             |
-| 65  | `SERVICE_REQUEST_RESOLVE`       | `service_request.resolve`       | Resolve service request.                 |
-| 66  | `REPORT_READ_OWN`               | `report.read_own`               | Read tenant-scoped dashboard reports.    |
-| 67  | `REPORT_READ_ANY`               | `report.read_any`               | Read platform analytics and drilldown.   |
+| 40  | `ORDER_CREATE`                  | `order.create`                  | Create order.                            |
+| 41  | `ORDER_CONFIRM`                 | `order.confirm`                 | Confirm pending order.                   |
+| 42  | `ORDER_CANCEL_PENDING`          | `order.cancel_pending`          | Reject/cancel pending order.             |
+| 43  | `ORDER_CANCEL_PROCESSING`       | `order.cancel_processing`       | Cancel confirmed or processing order.    |
+| 44  | `ORDER_GET_LIST`                | `order.get_list`                | List orders.                             |
+| 45  | `ORDER_GET_BY_ID`               | `order.get_by_id`               | Read order detail.                       |
+| 46  | `KITCHEN_GET_QUEUE`             | `kitchen.get_queue`             | Read KDS queue.                          |
+| 47  | `KITCHEN_UPDATE_TICKET`         | `kitchen.update_ticket`         | Update KDS ticket status.                |
+| 48  | `KITCHEN_RECALL`                | `kitchen.recall`                | Recall completed KDS ticket.             |
+| 49  | `KITCHEN_SET_PRIORITY`          | `kitchen.set_priority`          | Set or clear KDS ticket priority.        |
+| 50  | `PAYMENT_CREATE`                | `payment.create`                | Create payment.                          |
+| 51  | `PAYMENT_CONFIRM_CASH`          | `payment.confirm_cash`          | Confirm cash payment.                    |
+| 52  | `PAYMENT_GET_HISTORY`           | `payment.get_history`           | Read payment history.                    |
+| 53  | `TABLE_CREATE`                  | `table.create`                  | Create table.                            |
+| 54  | `TABLE_UPDATE`                  | `table.update`                  | Update table.                            |
+| 55  | `TABLE_DELETE`                  | `table.delete`                  | Delete table.                            |
+| 56  | `TABLE_TRANSFER`                | `table.transfer`                | Transfer session/order between tables.   |
+| 57  | `TABLE_UPDATE_STATUS`           | `table.update_status`           | Update table status.                     |
+| 58  | `SERVICE_REQUEST_CREATE`        | `service_request.create`        | Create service request.                  |
+| 59  | `SERVICE_REQUEST_ACKNOWLEDGE`   | `service_request.acknowledge`   | Acknowledge service request.             |
+| 60  | `SERVICE_REQUEST_RESOLVE`       | `service_request.resolve`       | Resolve service request.                 |
+| 61  | `REPORT_READ_OWN`               | `report.read_own`               | Read tenant-scoped dashboard reports.    |
+| 62  | `REPORT_READ_ANY`               | `report.read_any`               | Read platform analytics and drilldown.   |
 
 ## 5. Removed Or Legacy Items
 
@@ -125,9 +120,9 @@ Design principles:
 | `INVOICE_*` permissions                                        | Not present in current `PERMISSION` enum or `role.json`; bills/payment history use payment/order permissions.             |
 | Legacy template roles such as `administrator` and `accountant` | Not active RBAC roles.                                                                                                    |
 | `SAAS_*` permissions                                           | Still present in code for SUPER*ADMIN backward compatibility; use Phase 4B `TENANT*\*` permissions for new SaaS behavior. |
-| `PRODUCT_*` permissions                                        | Still present for SUPER_ADMIN backward compatibility with template code.                                                  |
+| `PRODUCT_*` permissions                                        | Removed with legacy course-template `apps/product` cleanup; menu items use `catalog.*` permissions.                       |
 
-## 6. Canonical Permission Matrix (6 Roles × 67 Permissions)
+## 6. Canonical Permission Matrix (6 Roles × 62 Permissions)
 
 Legend: `✅` = granted; blank = not granted.
 
@@ -172,39 +167,34 @@ Legend: `✅` = granted; blank = not granted.
 | 37        | `role.get_all`                  |     ✅      |        |         |        |       |         |
 | 38        | `role.update`                   |     ✅      |        |         |        |       |         |
 | 39        | `role.delete`                   |     ✅      |        |         |        |       |         |
-| 40        | `product.create`                |     ✅      |        |         |        |       |         |
-| 41        | `product.get_by_id`             |     ✅      |        |         |        |       |         |
-| 42        | `product.get_all`               |     ✅      |        |         |        |       |         |
-| 43        | `product.update`                |     ✅      |        |         |        |       |         |
-| 44        | `product.delete`                |     ✅      |        |         |        |       |         |
-| 45        | `order.create`                  |     ✅      |   ✅   |   ✅    |        |       |         |
-| 46        | `order.confirm`                 |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 47        | `order.cancel_pending`          |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 48        | `order.cancel_processing`       |     ✅      |   ✅   |   ✅    |        |       |         |
-| 49        | `order.get_list`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 50        | `order.get_by_id`               |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 51        | `kitchen.get_queue`             |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 52        | `kitchen.update_ticket`         |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 53        | `kitchen.recall`                |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
-| 54        | `kitchen.set_priority`          |     ✅      |   ✅   |   ✅    |        |       |         |
-| 55        | `payment.create`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 56        | `payment.confirm_cash`          |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 57        | `payment.get_history`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 58        | `table.create`                  |     ✅      |   ✅   |   ✅    |        |       |         |
-| 59        | `table.update`                  |     ✅      |   ✅   |   ✅    |        |       |         |
-| 60        | `table.delete`                  |     ✅      |   ✅   |   ✅    |        |       |         |
-| 61        | `table.transfer`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 62        | `table.update_status`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 63        | `service_request.create`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 64        | `service_request.acknowledge`   |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 65        | `service_request.resolve`       |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
-| 66        | `report.read_own`               |     ✅      |   ✅   |   ✅    |        |       |         |
-| 67        | `report.read_any`               |     ✅      |        |         |        |       |         |
-| **Total** |                                 |   **67**    | **38** | **35**  | **15** | **6** |  **6**  |
+| 40        | `order.create`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 41        | `order.confirm`                 |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 42        | `order.cancel_pending`          |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 43        | `order.cancel_processing`       |     ✅      |   ✅   |   ✅    |        |       |         |
+| 44        | `order.get_list`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 45        | `order.get_by_id`               |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 46        | `kitchen.get_queue`             |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
+| 47        | `kitchen.update_ticket`         |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
+| 48        | `kitchen.recall`                |     ✅      |   ✅   |   ✅    |        |  ✅   |   ✅    |
+| 49        | `kitchen.set_priority`          |     ✅      |   ✅   |   ✅    |        |       |         |
+| 50        | `payment.create`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 51        | `payment.confirm_cash`          |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 52        | `payment.get_history`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 53        | `table.create`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 54        | `table.update`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 55        | `table.delete`                  |     ✅      |   ✅   |   ✅    |        |       |         |
+| 56        | `table.transfer`                |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 57        | `table.update_status`           |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 58        | `service_request.create`        |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 59        | `service_request.acknowledge`   |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 60        | `service_request.resolve`       |     ✅      |   ✅   |   ✅    |   ✅   |       |         |
+| 61        | `report.read_own`               |     ✅      |   ✅   |   ✅    |        |       |         |
+| 62        | `report.read_any`               |     ✅      |        |         |        |       |         |
+| **Total** |                                 |   **62**    | **38** | **35**  | **15** | **6** |  **6**  |
 
 ## 7. Assignment Notes
 
-- SUPER_ADMIN has every enum permission: 67/67, including platform analytics and tenant report drilldown through `report.read_any`.
+- SUPER_ADMIN has every enum permission: 62/62, including platform analytics and tenant report drilldown through `report.read_any`.
 - OWNER has full tenant operations plus own-tenant SaaS self-service: `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, own payment-settings read/update, and own dashboard reporting through `report.read_own`.
 - MANAGER has operational permissions plus own-tenant SaaS visibility: `tenant.read_own`, `subscription.read_own`, `plan.read`, `payment_settings.read_own`, and own dashboard reporting through `report.read_own`.
 - WAITER has catalog read, plan read, order confirm/cancel pending/read, payment create/cash/history, table transfer/status, and service-request handling.
@@ -254,7 +244,7 @@ node tools/seed.js apps/user-access/src/seeder prune
 
 `tools/verify-permission-matrix.sh` is an integration smoke test. It requires BFF/Authorizer and seeded MongoDB to be running, and it checks representative permissions rather than parsing this markdown file.
 
-> **2026-06-01 verification note, updated after Phase 4D.1 dashboard reporting:** Static code/seed verification confirms 67 enum permissions and role seed counts `SUPER_ADMIN=67`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`. The integration smoke script depends on live seeded credentials and resolves username/password from `tools/auth-bootstrap-users.json`, checks `/authorizer/me` role identity, and asserts exact permission counts to avoid drift from the dev seed. Run Keycloak bootstrap, sync Mongo users, then rerun `bash tools/verify-permission-matrix.sh` before marking live RBAC smoke fully green.
+> **2026-06-06 verification note:** Static code/seed verification confirms 62 enum permissions and role seed counts `SUPER_ADMIN=62`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6` after removing legacy course-template `PRODUCT_*` permissions. The integration smoke script depends on live seeded credentials and resolves username/password from `tools/auth-bootstrap-users.json`, checks `/authorizer/me` role identity, and asserts exact permission counts to avoid drift from the dev seed. Run Keycloak bootstrap, sync Mongo users, then rerun `bash tools/verify-permission-matrix.sh` before marking live RBAC smoke fully green.
 
 ## 10. Frontend Navigation Vs API Enforcement
 

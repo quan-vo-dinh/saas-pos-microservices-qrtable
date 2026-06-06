@@ -10,6 +10,15 @@
 
 - Completed core phases closed on critical/demo path: **0, 1, 2A, 2B, 3**, SaaS part completed at **4B**, and the representative **4A Order Confirm Saga** slice has been implemented. Full Phase 4A operational hardening and Phase 4C Staff Management have not started; they do not block Phase 5-7 unless the demo requires durable saga-state/CDC/retry-worker hardening or staff management. Notification/email is outside the current implementation scope.
 
+## Current Status Snapshot (2026-06-01)
+
+- **Phase 5 Testing progress:** ~75-80% for the testing workstream, based on traceability coverage, implemented test inventory, and the latest M2 local integration evidence. The combined Phase 5-7 roadmap row is tracked at **25%** because Observability and Deployment have not started.
+- **Traceability matrix:** 52 P0/P1 rows: 38 covered, 9 partial, 1 implementation gap, and 4 deferred by phase. Remaining P0 partial rows are Order state/stock live compensation fault injection, SaaS onboarding saga live Authorizer/User-Access proof, and suspended Customer PWA pending-bill browser exception.
+- **Fresh deterministic gate:** `pnpm nx test frontend-utils` passed on 2026-06-01 with 36 tests passed and 36 runtime-dependent integration tests skipped by design.
+- **Fresh full unit/contract gate:** `pnpm exec nx run-many -t test --parallel=3` passed for all 23 projects after updating the stale `guards:test` and `management-app:test` expectations to the current contracts.
+- **Fresh M2 integration gate:** seeded Order, Payment, Kitchen, SaaS, frontend-utils live BFF/Keycloak, and permission-matrix smoke commands passed on 2026-06-01. The frontend-utils integration gate passed `72/72` tests and the permission smoke verified all six seeded roles with exact counts `62/38/35/15/6/6`.
+- **Browser E2E evidence:** Playwright currently lists 15 tests across 5 spec files. The latest saved artifact is a failed Step 2.7 run because the Customer PWA at `localhost:5173` was not running; rerun with the full app stack before using E2E as green evidence.
+
 ## Reference
 
 | Documents                                   | Related Sections                                                                                                                                                    |
@@ -140,7 +149,7 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 - **Frontend components/hooks:** disabled controls for suspended tenant, payment exception for pending bills, POS/KDS realtime refetch hooks, dashboard auth readiness, role-based navigation.
 - **Static architecture tests:** route constants unique, TCP message patterns exposed, permission enum/seed/matrix counts, Kafka topics restricted to registry, no accidental `menu.updated` event contract.
 
-**RBAC note:** `permission-matrix.md` now has static-verified 65 permissions and role seed counts, but live smoke also depends on seed/credentials for `SUPER_ADMIN` and `MANAGER`. Phase 5 must record this state as `partial` until the live seeded login smoke or equivalent API-level auth integration is stable.
+**RBAC note:** `permission-matrix.md` now has 62 permissions and live-verified role seed counts `SUPER_ADMIN=62`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6` (legacy `PRODUCT_*` permissions removed with `apps/product` cleanup). The seeded M2 smoke passed through Keycloak login, BFF `/authorizer/me`, and Mongo-backed role permissions.
 
 **verify:** `pnpm nx affected -t test` or project-specific `pnpm nx test <project>` pass for touched projects; coverage report is used as an additional signal, not as a substitute for traceability.
 

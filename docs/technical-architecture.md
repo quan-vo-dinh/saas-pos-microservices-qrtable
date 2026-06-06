@@ -108,11 +108,11 @@ QRTable is a SaaS (Software as a service) platform serving the F&B industry, all
 │  │ (gRPC)     │  │ (TCP)      │  │ (TCP)      │  │ (TCP)            │  │
 │  └────────────┘  └────────────┘  └────────────┘  └──────────────────┘  │
 │                                                                         │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────────────────┐  │
-│  │ 💳 Payment │  │ 👨‍🍳 Kitchen │  │ 👥 User-   │  │ 🧪 Product       │  │
-│  │ Service    │  │ (KDS) Svc  │  │ Access Svc │  │ App (legacy)     │  │
-│  │ (TCP)      │  │ (TCP)      │  │ (TCP+Mongo)│  │ (template)       │  │
-│  └────────────┘  └────────────┘  └────────────┘  └──────────────────┘  │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐                        │
+│  │ 💳 Payment │  │ 👨‍🍳 Kitchen │  │ 👥 User-   │                        │
+│  │ Service    │  │ (KDS) Svc  │  │ Access Svc │                        │
+│  │ (TCP)      │  │ (TCP)      │  │ (TCP+Mongo)│                        │
+│  └────────────┘  └────────────┘  └────────────┘                        │
 │                                                                         │
 └────────┬───────────────┬──────────────┬──────────────────┬──────────────┘
          │               │              │                  │
@@ -204,7 +204,6 @@ qrtable/
 │   ├── kitchen/                # KDS Service (TCP + Kafka Consumer)
 │   ├── order/                  # Order Processing (TCP)
 │   ├── payment/                # Payment Service (TCP + Webhook)
-│   ├── product/                # Product/Nx generated app placeholder
 │   ├── saas/                   # SaaS Management Service (TCP + Redis + outbox)
 │   ├── user-access/            # User profile, roles, staff access (TCP + Mongo)
 │   ├── # ── Frontend Apps ─────────────────────
@@ -571,7 +570,6 @@ File Storage Level:
 | 9   | **Customer PWA**        | HTTP + WS     | —                     | Anonymous customer ordering UI, suspended-tenant read-only/payment behavior                                      |
 | 10  | **Management App**      | HTTP + WS     | —                     | POS/KDS/Dashboard/Admin UI, subscription/payment settings, package-aware reporting dashboards                    |
 | 11  | **Keycloak Theme**      | Static assets | —                     | Keycloak login/theme customization                                                                               |
-| 12  | **Product App**         | TBD           | TBD                   | Present in `apps/product`; no current architecture ownership verified in Phase 4B anchors                        |
 
 ### 6.2 Details by Domain
 

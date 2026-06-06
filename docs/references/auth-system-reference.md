@@ -1211,13 +1211,6 @@ export enum PERMISSION {
   ROLE_UPDATE = 'role.update',
   ROLE_DELETE = 'role.delete',
 
-  /* PRODUCT (legacy) */
-  PRODUCT_CREATE = 'product.create',
-  PRODUCT_GET_BY_ID = 'product.get_by_id',
-  PRODUCT_GET_ALL = 'product.get_all',
-  PRODUCT_UPDATE = 'product.update',
-  PRODUCT_DELETE = 'product.delete',
-
   /* ORDER (Phase 2A) — cancel split Step 2.4 */
   ORDER_CREATE = 'order.create',
   ORDER_CONFIRM = 'order.confirm',
@@ -1258,8 +1251,8 @@ export enum PERMISSION {
 
 | **Role**               | **Platform / SaaS domains**                                                                                                                        | **Operational domains**                                                                                                       | **Permission count** |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| **SUPER_ADMIN**        | All legacy `saas.*`, `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`                                                                  | All catalog/user/role/product/order/kitchen/payment/table/service-request permissions                                         | 65                   |
-| **OWNER**              | `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, `payment_settings.read_own`, `payment_settings.update_own`       | Full tenant operations except platform-only role/product/SaaS admin permissions                                               | 37                   |
+| **SUPER_ADMIN**        | All legacy `saas.*`, `tenant.*`, `subscription.*`, `plan.*`, `payment_settings.*`                                                                  | All catalog/user/role/order/kitchen/payment/table/service-request permissions                                                 | 62                   |
+| **OWNER**              | `tenant.read_own`, `subscription.read_own`, `subscription.checkout`, `plan.read`, `payment_settings.read_own`, `payment_settings.update_own`       | Full tenant operations except platform-only role/SaaS admin permissions                                                       | 38                   |
 | **MANAGER**            | `tenant.read_own`, `subscription.read_own`, `plan.read`, `payment_settings.read_own`; no `subscription.checkout`, no `payment_settings.update_own` | Operational permissions similar to OWNER, but no `user.delete`                                                                | 34                   |
 | **WAITER**             | `plan.read`                                                                                                                                        | Catalog read, order confirm/cancel pending/read, payment create/cash/history, table transfer/status, service-request handling | 15                   |
 | **CHEF**               | `plan.read`                                                                                                                                        | Catalog read plus KDS `get_queue`, `update_ticket`, `recall`; no `kitchen.set_priority`                                       | 6                    |
@@ -1268,7 +1261,7 @@ export enum PERMISSION {
 
 **Note:**
 
-- `SAAS_*` and `PRODUCT_*` are legacy/backward-compat; Phase 4B uses `TENANT_*`, `SUBSCRIPTION_*`, `PLAN_*`, `PAYMENT_SETTINGS_*`.
+- `SAAS_*` permissions are legacy/backward-compat; Phase 4B uses `TENANT_*`, `SUBSCRIPTION_*`, `PLAN_*`, `PAYMENT_SETTINGS_*`. Legacy course-template `PRODUCT_*` permissions were removed with `apps/product`.
 - CUSTOMER has no real "role", only session → access is enforced by customer/session guards and ownership checks.
 - **MANAGER does not have `user.delete`, `subscription.checkout`, or `payment_settings.update_own`**.
 - **WAITER has `payment.get_history`** — for "last bill" queries from customer.

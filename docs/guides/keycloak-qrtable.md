@@ -714,7 +714,7 @@ Keycloak should be considered an identity provider, not a QRTable business servi
 
 | Scope                                  | True source                                                |
 | -------------------------------------- | ---------------------------------------------------------- |
-| Menus, catalogs, products              | Catalog/Product service + PostgreSQL.                      |
+| Menus, catalogs, menu items            | Catalog service + PostgreSQL.                              |
 | Order, bill, payment                   | Order/Payment service + PostgreSQL.                        |
 | tenant lifecycle, subscription, plan   | SaaS services.                                             |
 | Payment settings and SePay OAuth state | Payment service + contextual Redis/PostgreSQL.             |
