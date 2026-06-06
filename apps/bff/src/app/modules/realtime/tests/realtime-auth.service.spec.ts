@@ -4,9 +4,12 @@ jest.mock('uuid', () => ({
 
 import { GRPC_SERVICES } from '@common/configuration/grpc.config';
 import { ROLE } from '@common/constants/enum/role.enum';
+import { RedisKey } from '@common/constants/redis-key.constants';
+import { RedisClientService } from '@common/providers/redis-client/redis-client.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { SessionStatus } from '@einvoice/types';
 import { getSessionCacheKey } from '@common/utils/request.util';
 import { of } from 'rxjs';
 import type { Socket } from 'socket.io';
@@ -16,12 +19,14 @@ describe('RealtimeAuthService', () => {
   let service: RealtimeAuthService;
   let cache: { get: jest.Mock; set: jest.Mock };
   let authorizer: { verifyUserToken: jest.Mock };
+  let redisHget: jest.Mock;
 
   beforeEach(async () => {
     cache = {
       get: jest.fn().mockResolvedValue(undefined),
       set: jest.fn().mockResolvedValue(undefined),
     };
+    redisHget = jest.fn().mockResolvedValue(null);
     authorizer = {
       verifyUserToken: jest.fn().mockReturnValue(
         of({
@@ -43,6 +48,12 @@ describe('RealtimeAuthService', () => {
       providers: [
         RealtimeAuthService,
         { provide: CACHE_MANAGER, useValue: cache },
+        {
+          provide: RedisClientService,
+          useValue: {
+            getClient: () => ({ hget: redisHget }),
+          },
+        },
         {
           provide: GRPC_SERVICES.AUTHORIZER_SERVICE,
           useValue: {
@@ -190,6 +201,42 @@ describe('RealtimeAuthService', () => {
   it('rejects customer when session cache misses', async () => {
     const socket = {
       handshake: { auth: {}, headers: { 'x-tenant-id': 't1', 'x-session-id': 'sid_x' } },
+    } as unknown as Socket;
+
+    await expect(service.resolveConnectionRooms(socket)).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('accepts customer when Order Redis session is ACTIVE (PWA QR join)', async () => {
+    const orderSessionId = '8f2c0f2e-6f5a-4b2e-9c1d-aaaaaaaaaaaa';
+    redisHget.mockImplementation(async (key: string, field: string) => {
+      if (key === RedisKey.session.data('t1', orderSessionId) && field === 'status') {
+        return SessionStatus.ACTIVE;
+      }
+      return null;
+    });
+
+    const socket = {
+      handshake: {
+        auth: { tenantId: 't1', sessionId: orderSessionId },
+        headers: {},
+      },
+      data: {},
+    } as unknown as Socket;
+
+    const rooms = await service.resolveConnectionRooms(socket);
+    expect(rooms).toEqual(expect.arrayContaining([`session:${orderSessionId}:customer`, 'tenant:t1:customers']));
+    expect(redisHget).toHaveBeenCalledWith(RedisKey.session.data('t1', orderSessionId), 'status');
+  });
+
+  it('rejects customer when Order Redis session is missing or not ACTIVE', async () => {
+    redisHget.mockResolvedValue(null);
+
+    const socket = {
+      handshake: {
+        auth: { tenantId: 't1', sessionId: 'order-session-closed' },
+        headers: {},
+      },
+      data: {},
     } as unknown as Socket;
 
     await expect(service.resolveConnectionRooms(socket)).rejects.toBeInstanceOf(UnauthorizedException);

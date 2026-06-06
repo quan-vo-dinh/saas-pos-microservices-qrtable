@@ -23,6 +23,7 @@ import { TenantGuard } from '@common/guards/tenant.guard';
 import { CustomerTenantLifecycleGuard } from './guards/customer-tenant-lifecycle.guard';
 import { TenantSubscriptionContextGuard } from './modules/reporting/guards/tenant-subscription-context.guard';
 import { RedisProvider } from '@common/configuration/redis.config';
+import { RedisClientModule } from '@common/providers/redis-client/redis-client.module';
 import { ThrottlerProvider } from '@common/configuration/throttler.config';
 import { ThrottlerGuard } from '@nestjs/throttler';
 
@@ -40,6 +41,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
     UserModule,
     AuthorizerModule,
     RedisProvider,
+    RedisClientModule,
     ThrottlerProvider,
   ],
   controllers: [],

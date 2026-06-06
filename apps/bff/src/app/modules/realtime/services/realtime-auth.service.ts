@@ -1,11 +1,14 @@
 import { GRPC_SERVICES } from '@common/configuration/grpc.config';
 import { ROLE } from '@common/constants/enum/role.enum';
+import { RedisKey } from '@common/constants/redis-key.constants';
 import { WsRoom } from '@common/constants/ws-room.constants';
 import { AuthorizeResponse } from '@common/interfaces/tcp/authorizer';
 import { AuthorizerService } from '@common/interfaces/grpc/authorizer';
+import { RedisClientService } from '@common/providers/redis-client/redis-client.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, OnModuleInit, UnauthorizedException } from '@nestjs/common';
 import { ClientGrpc } from '@nestjs/microservices';
+import { SessionStatus } from '@einvoice/types';
 import { Cache } from 'cache-manager';
 import { createHash, randomUUID } from 'crypto';
 import { firstValueFrom } from 'rxjs';
@@ -42,6 +45,7 @@ export class RealtimeAuthService implements OnModuleInit {
   constructor(
     @Inject(GRPC_SERVICES.AUTHORIZER_SERVICE) private readonly grpcAuthorizer: ClientGrpc,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly redisClient: RedisClientService,
   ) {}
 
   onModuleInit(): void {
@@ -141,18 +145,25 @@ export class RealtimeAuthService implements OnModuleInit {
     if (!tenantId?.trim() || !sessionId?.trim()) {
       throw new UnauthorizedException();
     }
-    const key = getSessionCacheKey(sessionId.trim(), tenantId.trim());
-    const session = await this.cacheManager.get(key);
-    if (!session) {
-      throw new UnauthorizedException();
-    }
     const tid = tenantId.trim();
     const sid = sessionId.trim();
+    const hasBffSession = Boolean(await this.cacheManager.get(getSessionCacheKey(sid, tid)));
+    if (!hasBffSession && !(await this.hasActiveOrderSession(tid, sid))) {
+      throw new UnauthorizedException();
+    }
     const rooms: string[] = [WsRoom.customer(sid), WsRoom.customers(tid)];
     const slug = getHandshakeAuthString(socket.handshake.auth as Record<string, unknown> | undefined, 'tenantSlug');
     if (slug?.trim()) {
       rooms.push(WsRoom.tenantSlugCustomers(slug.trim()));
     }
     return rooms;
+  }
+
+  /** Customer PWA uses Order `session:{tenantId}:{sessionId}` (not BFF `bff-session:*`). */
+  private async hasActiveOrderSession(tenantId: string, sessionId: string): Promise<boolean> {
+    const redis = this.redisClient.getClient();
+    const key = RedisKey.session.data(tenantId, sessionId);
+    const status = await redis.hget(key, 'status');
+    return status === SessionStatus.ACTIVE;
   }
 }
