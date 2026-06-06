@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Separator } from '@/components/ui/separator';
-import { useMockStore } from '@/mocks/store';
+import { usePosNotifications } from '@/features/pos/hooks/use-pos-notifications';
 
 function formatRelativeVi(ts: number) {
   const sec = Math.floor((Date.now() - ts) / 1000);
@@ -23,7 +23,7 @@ function formatRelativeVi(ts: number) {
 
 export function NotificationsPopover() {
   const [open, setOpen] = useState(false);
-  const notifications = useMockStore((s) => s.notifications);
+  const notifications = usePosNotifications();
   const unread = notifications.length;
 
   const { all, orders, services } = useMemo(() => {
@@ -60,7 +60,9 @@ export function NotificationsPopover() {
       >
         <div className="flex flex-col gap-1 border-b border-border/60 px-3 py-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Thông báo</p>
-          <p className="text-[0.7rem] text-muted-foreground">Đồng bộ mock realtime · {unread} sự kiện gần nhất</p>
+          <p className="text-[0.7rem] text-muted-foreground">
+            Đơn chờ xử lý & yêu cầu phục vụ · {unread} mục đang mở
+          </p>
         </div>
         <Tabs defaultValue="all" className="flex min-h-0 flex-1 flex-col gap-2 px-2 pb-2">
           <TabsList className="h-8 w-full shrink-0" variant="line">
@@ -80,7 +82,7 @@ export function NotificationsPopover() {
             <NotificationList items={all} />
           </TabsContent>
           <TabsContent value="order" className="mt-0 min-h-0 flex-1">
-            <NotificationList items={orders} empty="Chưa có thông báo đơn." />
+            <NotificationList items={orders} empty="Chưa có đơn cần xử lý." />
           </TabsContent>
           <TabsContent value="service" className="mt-0 min-h-0 flex-1">
             <NotificationList items={services} empty="Chưa có yêu cầu phục vụ." />
@@ -124,7 +126,7 @@ function NotificationList({
                 </button>
               </HoverCardTrigger>
               <HoverCardContent className="w-72 text-xs" side="left">
-                <p className="font-medium capitalize text-foreground">{n.kind}</p>
+                <p className="font-medium capitalize text-foreground">{n.kind === 'order' ? 'Đơn hàng' : 'Phục vụ'}</p>
                 <p className="mt-1 text-muted-foreground">{n.preview}</p>
                 <p className="mt-2 font-mono text-[0.65rem] text-muted-foreground">
                   {new Date(n.createdAt).toLocaleString('vi-VN')}

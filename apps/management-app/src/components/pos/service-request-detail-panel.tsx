@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CircleHelp, Clock, Receipt, UserRound } from 'lucide-react';
-import { serviceRequestStatusVi } from '@einvoice/shared-constants';
+import { serviceRequestStatusVi, serviceRequestTypeVi } from '@einvoice/shared-constants';
 import { ServiceRequestStatus, ServiceRequestType } from '@einvoice/types';
-import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -15,12 +14,9 @@ import {
 } from '@/features/service-requests/hooks/use-service-request-query';
 import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 
-function hashSeed(id: string) {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) {
-    h = (h + id.charCodeAt(i) * (i + 3)) % 251;
-  }
-  return h;
+function formatViDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('vi-VN');
 }
 
 export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) {
@@ -44,15 +40,6 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
     };
   }, [request]);
 
-  const spark = useMemo(() => {
-    if (!request) return [];
-    const seed = hashSeed(request.id);
-    return Array.from({ length: 10 }, (_, i) => ({
-      t: `${6 + i}h`,
-      v: 12 + ((seed + i * 11) % 28),
-    }));
-  }, [request]);
-
   if (!request) {
     return (
       <p className="p-2 text-sm text-muted-foreground" data-slot="service-detail-missing">
@@ -61,8 +48,6 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
     );
   }
 
-  const fillId = `srfill${hashSeed(request.id)}`;
-
   return (
     <div className="flex min-h-0 flex-col gap-3 text-sm" data-slot="service-request-detail">
       <div className="flex flex-col gap-2">
@@ -70,11 +55,11 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex items-center gap-2">
               {request.type === ServiceRequestType.CALL_STAFF ? (
-                <UserRound className="size-4 shrink-0 text-[var(--accent)]" aria-hidden />
+                <UserRound className="size-4 shrink-0 text-accent" aria-hidden />
               ) : request.type === ServiceRequestType.REQUEST_BILL ? (
-                <Receipt className="size-4 shrink-0 text-[var(--accent)]" aria-hidden />
+                <Receipt className="size-4 shrink-0 text-accent" aria-hidden />
               ) : (
-                <CircleHelp className="size-4 shrink-0 text-[var(--accent)]" aria-hidden />
+                <CircleHelp className="size-4 shrink-0 text-accent" aria-hidden />
               )}
               <span className="truncate font-mono text-xs text-muted-foreground">{request.id}</span>
             </div>
@@ -93,34 +78,30 @@ export function ServiceRequestDetailPanel({ requestId }: { requestId: string }) 
 
       <Separator />
 
+      <dl className="grid gap-2 text-[0.75rem]">
+        <div>
+          <dt className="text-muted-foreground">Loại yêu cầu</dt>
+          <dd className="font-medium">{serviceRequestTypeVi(request.type)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Tạo lúc</dt>
+          <dd className="font-mono tabular-nums">{formatViDateTime(request.createdAt)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Nhận xử lý</dt>
+          <dd className="font-mono tabular-nums">{formatViDateTime(request.acknowledgedAt)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Hoàn tất</dt>
+          <dd className="font-mono tabular-nums">{formatViDateTime(request.resolvedAt)}</dd>
+        </div>
+      </dl>
+
       <div className="flex flex-col gap-1">
         <p className="text-[0.65rem] font-medium uppercase text-muted-foreground">Ghi chú khách</p>
         <p className="rounded-md border border-border/50 bg-muted/20 p-2 text-[0.8rem] leading-relaxed">
           {request.note?.trim() || 'Không có ghi chú.'}
         </p>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <p className="text-[0.65rem] font-medium uppercase text-muted-foreground">Mật độ yêu cầu</p>
-        <div className="h-24 min-h-24 w-full min-w-0 rounded-md border border-border/40 bg-background/40">
-          <ResponsiveContainer width="100%" height={96}>
-            <AreaChart data={spark} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="t" tick={{ fontSize: 9 }} stroke="currentColor" className="text-muted-foreground" />
-              <Tooltip
-                contentStyle={{ fontSize: 11 }}
-                formatter={(v) => [`${typeof v === 'number' ? v : '—'} req/h`, 'ước tính']}
-                labelFormatter={(l) => `${l}`}
-              />
-              <Area type="monotone" dataKey="v" stroke="var(--accent)" fill={`url(#${fillId})`} strokeWidth={1.5} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
       </div>
 
       <Separator />

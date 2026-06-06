@@ -3,7 +3,7 @@
 import { usePathname, useSearchParams } from 'next/navigation';
 import { BillStatus } from '@einvoice/types';
 import { ROUTES } from '@/constants/routes';
-import { useMockStore } from '@/mocks/store';
+import { usePosServiceRequestUiState } from '@/features/tables/hooks/use-pos-service-request-ui-state';
 import { useBillsQuery } from '@/features/order/hooks/use-bill-query';
 import { usePosTableUiState } from '@/features/tables/hooks/use-pos-table-ui-state';
 import { TableDetailPanel } from '@/components/pos/table-detail-panel';
@@ -26,7 +26,7 @@ export function NonOrderRightInspector() {
   const searchParams = useSearchParams();
   const selectedTableId = usePosTableUiState((s) => s.selectedTableId);
   const selectedBillId = searchParams.get('billId');
-  const selectedServiceRequestId = useMockStore((s) => s.selectedServiceRequestId);
+  const selectedServiceRequestId = usePosServiceRequestUiState((s) => s.selectedServiceRequestId);
   const billsQuery = useBillsQuery({ status: BillStatus.PENDING_PAYMENT, limit: 100, offset: 0 });
 
   if (pathname.startsWith(ROUTES.POS_TABLES)) {
@@ -55,7 +55,7 @@ export function NonOrderRightInspector() {
 
   if (pathname.startsWith(ROUTES.POS_SERVICE_REQUESTS)) {
     if (!selectedServiceRequestId) {
-      return <EmptyState message="Chọn một dòng yêu cầu để xem chi tiết và sparkline mật độ." />;
+      return <EmptyState message="Chọn một dòng yêu cầu để xem chi tiết." />;
     }
     return <ServiceRequestDetailPanel requestId={selectedServiceRequestId} />;
   }

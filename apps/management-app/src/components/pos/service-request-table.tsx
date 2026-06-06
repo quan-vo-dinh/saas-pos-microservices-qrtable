@@ -15,12 +15,12 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
-import { useMockStore } from '@/mocks/store';
 import {
   useAcknowledgeServiceRequestMutation,
   useResolveServiceRequestMutation,
   useServiceRequestsQuery,
 } from '@/features/service-requests/hooks/use-service-request-query';
+import { usePosServiceRequestUiState } from '@/features/tables/hooks/use-pos-service-request-ui-state';
 import { useTablesQuery } from '@/features/tables/hooks/use-tables-query';
 
 function typeIcon(t: ServiceRequest['type']) {
@@ -33,16 +33,12 @@ function waitM(iso: string) {
   return (Date.now() - new Date(iso).getTime()) / 60_000;
 }
 
-function sessionMinutes(sessionId: string) {
-  return 37 + (sessionId.length % 20);
-}
-
 export function ServiceRequestTable() {
   'use no memo';
 
   const [tab, setTab] = useState<'PENDING' | 'ACKNOWLEDGED' | 'RESOLVED'>('PENDING');
-  const selectedServiceRequestId = useMockStore((s) => s.selectedServiceRequestId);
-  const selectServiceRequest = useMockStore((s) => s.selectServiceRequest);
+  const selectedServiceRequestId = usePosServiceRequestUiState((s) => s.selectedServiceRequestId);
+  const selectServiceRequest = usePosServiceRequestUiState((s) => s.selectServiceRequest);
   const status = ServiceRequestStatus[tab];
   const requestsQuery = useServiceRequestsQuery({ status, limit: 100, offset: 0 });
   const tablesQuery = useTablesQuery();
@@ -90,7 +86,7 @@ export function ServiceRequestTable() {
               </HoverCardTrigger>
               <HoverCardContent className="w-64 text-xs" side="right">
                 <p>{n || 'Không có'}</p>
-                <p className="mt-1 text-[0.65rem] text-muted-foreground">Đã ngồi ~{sessionMinutes(r.sessionId)} phút</p>
+                <p className="mt-1 font-mono text-[0.65rem] text-muted-foreground">Session {r.sessionId.slice(0, 8)}…</p>
               </HoverCardContent>
             </HoverCard>
           );

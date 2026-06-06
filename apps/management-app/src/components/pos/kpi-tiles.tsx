@@ -63,7 +63,7 @@ export function KpiTiles() {
           cta="Mở danh sách"
         />
         <Kpi
-          label="TB phục vụ (demo)"
+          label="TB chờ xử lý"
           value={avgValue}
           icon={CircleCheckBigIcon}
           active={false}

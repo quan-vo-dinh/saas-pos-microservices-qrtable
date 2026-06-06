@@ -11,7 +11,6 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useMockStore } from '@/mocks/store';
 import { parseRoles } from '@/lib/auth/role-routing';
 
 type Props = {
@@ -24,7 +23,6 @@ export function OrderRowContextMenu({ orderId, onCancelClick, children }: Props)
   const { data: session } = useSession();
   const roles = parseRoles(session?.user?.roles);
   const isManager = roles.includes('MANAGER') || roles.includes('OWNER') || roles.includes('SUPER_ADMIN');
-  const toggleOrderPriority = useMockStore((s) => s.toggleOrderPriority);
 
   return (
     <ContextMenu>
@@ -45,20 +43,9 @@ export function OrderRowContextMenu({ orderId, onCancelClick, children }: Props)
         >
           In KOT
         </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => {
-            toggleOrderPriority(orderId);
-            toast('Ưu tiên (mock)');
-          }}
-        >
-          Ưu tiên
-        </ContextMenuItem>
         <ContextMenuSeparator />
         {isManager ? (
-          <ContextMenuItem
-            onSelect={() => onCancelClick()}
-            className="text-destructive"
-          >
+          <ContextMenuItem onSelect={() => onCancelClick()} className="text-destructive">
             Force-cancel
           </ContextMenuItem>
         ) : (
