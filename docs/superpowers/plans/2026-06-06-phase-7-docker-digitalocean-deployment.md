@@ -1,12 +1,14 @@
 # Phase 7 Docker DigitalOcean Deployment Implementation Plan
 
-> **Vietnamese translation:** [2026-06-06-phase-7-docker-digitalocean-deployment.vi.md](2026-06-06-phase-7-docker-digitalocean-deployment.vi.md)
+> **Vietnamese translation:** [2026-06-06-phase-7-docker-digitalocean-deployment.vi.md](2026-06-06-phase-7-docker-digitalocean-deployment.vi.md) — synchronized with the 2026-06-07 database-per-service revision.
+
+> **Revision 2026-06-07:** Updated the English plan after the database-per-service implementation. This revision fixes production database env names, reuses the implemented migrations and ownership checks, and adds a one-shot migration gate before app boot.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Package QRTable into reproducible Docker images and deploy the Phase 7 pilot/production baseline to DigitalOcean under `vodinhquan.dev`.
 
-**Architecture:** Use a single DigitalOcean Droplet as the Phase 7 production baseline, with Docker Compose split into proxy, app, infra, and monitoring layers. Public traffic terminates at a reverse proxy, while PostgreSQL, MongoDB, Redis, Kafka, Keycloak, Loki, Prometheus, Tempo, and all NestJS TCP ports stay on internal Docker networks. Keep managed DigitalOcean databases as a later hardening option, not the first thesis/pilot dependency.
+**Architecture:** Use a single DigitalOcean Droplet as the Phase 7 production baseline, with Docker Compose split into proxy, app, infra, and monitoring layers plus a one-shot migration job. Public traffic terminates at a reverse proxy, while PostgreSQL, MongoDB, Redis, Kafka, Keycloak, Loki, Prometheus, Tempo, and all NestJS TCP ports stay on internal Docker networks. Keep managed DigitalOcean databases as a later hardening option, not the first thesis/pilot dependency.
 
 **Tech Stack:** DigitalOcean Droplet, Ubuntu, Docker Engine, Docker Compose plugin, Nx, pnpm, NestJS, Next.js, Vite, PostgreSQL, MongoDB, Redis, Kafka KRaft, Keycloak, Caddy or Nginx reverse proxy, Grafana, Loki, Promtail, Prometheus, Tempo, OpenTelemetry.
 
@@ -27,8 +29,16 @@ codegraph context "Understand QRTable current deployment and packaging state for
 Fresh result:
 
 - CodeGraph index is up to date.
-- Indexed scope: 1,182 files, 15,444 nodes, 29,942 edges.
+- Indexed scope: 1,182 files, 15,444 nodes, 29,940 edges.
 - CodeGraph query did not surface application Dockerfiles or app compose files, which matches direct filesystem inspection.
+
+Database-per-service implementation delta verified on 2026-06-07:
+
+- Catalog, Order, Payment, and SaaS now have project-owned TypeORM DataSources and initial migrations.
+- User-Access resolves MongoDB through `USER_ACCESS_MONGO_DB_NAME=qrtable_auth`.
+- Dedicated PostgreSQL database names are the default; the legacy shared fallback requires the explicit `DATABASE_SHARED_FALLBACK_ENABLED=true` flag.
+- `TYPEORM_SYNCHRONIZE=false` is the supported schema lifecycle baseline.
+- Local provisioning, migration, ownership verification, split seed, and reseed workflows have passed against the dedicated databases.
 
 ### 1.2 Canonical docs read
 
@@ -70,7 +80,7 @@ Also checked official DigitalOcean pages for Droplet pricing, managed database p
 - Droplets start at USD 4/month; managed databases start at USD 15/month.
 - Managed PostgreSQL 1 GiB starts around USD 15.15/month; managed Redis-compatible Valkey 1 GiB starts around USD 15/month.
 - DigitalOcean managed Kafka is a 3-node managed database product and starts much higher than the thesis/pilot target.
-- DigitalOcean Container Registry has a free entry tier, but image storage must be checked before relying on it for 10 QRTable images.
+- DigitalOcean Container Registry has a free entry tier, but image storage must be checked before relying on it for 11 QRTable images, including the one-shot migration image.
 - Docker on Ubuntu should be installed from Docker's official repository; modern installs include `docker compose` as a plugin.
 
 SePay provider docs checked through Context7 on 2026-06-06. Key deploy facts:
@@ -125,10 +135,20 @@ Current env/config facts:
 - BFF public API uses `PORT=3300` and `GLOBAL_PREFIX=api/v1`.
 - Service HTTP ports are 3301, 3303, 3304, 3305, 3306, 3307, 3308.
 - TCP ports are 3201, 3203, 3204, 3205, 3206, 3207, 3208.
-- Payment requires `PAYMENT_TYPEORM_DATABASE` in staging/production.
+- Catalog, Order, Payment, and SaaS require `CATALOG_TYPEORM_DATABASE`, `ORDER_TYPEORM_DATABASE`, `PAYMENT_TYPEORM_DATABASE`, and `SAAS_TYPEORM_DATABASE` in staging/production.
+- User-Access requires `USER_ACCESS_MONGO_DB_NAME` in staging/production.
+- Production must keep `DATABASE_SHARED_FALLBACK_ENABLED=false`; `TYPEORM_DATABASE` and `MONGO_DB_NAME` are legacy transition fallbacks only.
 - Payment requires SePay OAuth values, public API base URL, and `PAYMENT_SECRETS_ENCRYPTION_KEY` in staging/production.
 - Management App needs `AUTH_SECRET`, `AUTH_KEYCLOAK_*`, `MANAGEMENT_BFF_BASE_URL`, `NEXT_PUBLIC_BFF_*`, and `NEXT_PUBLIC_CUSTOMER_PWA_URL`.
 - Customer PWA needs build-time `VITE_BFF_URL`; `VITE_TENANT_ID` is only a fallback because QR flow supports `tenant=<slug>`.
+
+Current database lifecycle facts:
+
+- Existing service database bootstrap: `docker/postgres/init/001-create-service-databases.sql`.
+- Existing migration entrypoints: `pnpm db:migrate` and `pnpm db:migration:show`.
+- Existing ownership gate: `pnpm db:verify:ownership`.
+- Existing database tooling tests: `pnpm db:test`.
+- `pnpm dev:reseed -- --yes` is destructive, development-only tooling and must not be used on production data.
 
 ### 2.2 Quick quality scan
 
@@ -136,7 +156,7 @@ Blockers to resolve before public production:
 
 - No application Dockerfiles or app compose layer exist.
 - No `.dockerignore`, so build context would include `node_modules`, `dist`, local env files, and generated data unless fixed.
-- No durable TypeORM migration system is present; staging/production disables `synchronize`, so fresh production databases will not get tables automatically.
+- Per-service TypeORM migrations exist, but Phase 7 does not yet package and run them as a one-shot production migration job before app boot.
 - `docker-compose.provider.yaml` uses dev-friendly defaults: unpinned `mongo`, `postgres`, `redis`, `redisinsight:latest`, `bitnamilegacy/kafka`, dev credentials, and Keycloak `start-dev`.
 - Kafka advertises `localhost`, which works for local host-run apps but not for app containers.
 - Monitoring compose exposes Grafana publicly on `3001` and scrapes host-run apps; production must put Grafana behind HTTPS/access control and scrape internal service names.
@@ -156,7 +176,10 @@ Solid foundations:
 - Backend webpack builds already generate `dist/apps/<service>/package.json` and lockfile artifacts.
 - Observability baseline is implemented enough to preserve in Phase 7.
 - `tools/keycloak-bootstrap.sh` can provision realm, clients, roles, and users if adapted for production hostnames.
-- `tools/dev-reseed.sh` and `tools/dev-seed/*` provide seed/reset foundations for demo data.
+- Per-service DataSources and initial migrations exist for Catalog, Order, Payment, and SaaS.
+- `tools/database/verify-service-database-ownership.js` rejects missing or foreign service tables.
+- `tools/dev-seed/*` now separates PostgreSQL ownership by service and uses MongoDB `qrtable_auth`.
+- `tools/dev-reseed.sh` remains useful for disposable local/demo environments, but its destructive reset path is intentionally not production-safe.
 
 ## 3. Deployment Decisions
 
@@ -239,19 +262,32 @@ Create:
 
 - `.dockerignore`
 - `docker/backend.Dockerfile`
+- `docker/migrations.Dockerfile`
 - `docker/management-app.Dockerfile`
 - `docker/customer-pwa.Dockerfile`
 - `docker/proxy/Caddyfile`
-- `docker/postgres/init/001-create-databases.sql`
+- `docker/postgres/init/002-create-keycloak-database.sql`
 - `docker/env/.env.production.example`
 - `docker-compose.infra.yaml`
+- `docker-compose.migrations.yaml`
 - `docker-compose.app.yaml`
 - `docker-compose.proxy.yaml`
 - `docker-compose.monitoring.prod.yaml`
 - `tools/deploy/phase7-preflight.sh`
 - `tools/deploy/phase7-build-images.sh`
+- `tools/deploy/phase7-migrate.sh`
+- `tools/deploy/phase7-seed-demo.sh`
 - `tools/deploy/phase7-smoke.sh`
 - `docs/guides/phase-7-digitalocean-deployment.md`
+
+Reuse as implemented:
+
+- `docker/postgres/init/001-create-service-databases.sql`
+- `apps/catalog/src/database/`
+- `apps/order/src/database/`
+- `apps/payment/src/database/`
+- `apps/saas/src/database/`
+- `tools/database/verify-service-database-ownership.js`
 
 Modify after implementation:
 
@@ -553,23 +589,41 @@ Expected: build exits 0.
 **Files:**
 
 - Create: `docker-compose.infra.yaml`
-- Create: `docker/postgres/init/001-create-databases.sql`
+- Reuse: `docker/postgres/init/001-create-service-databases.sql`
+- Create: `docker/postgres/init/002-create-keycloak-database.sql`
 
-- [ ] Step 1: Create database init SQL
+- [x] Step 1: Reuse the implemented service database init SQL
 
-Use separate databases on one Postgres instance for the baseline:
+The existing idempotent PostgreSQL init script already creates the four application databases on one PostgreSQL instance:
 
 ```sql
-CREATE DATABASE qrtable_catalog;
-CREATE DATABASE qrtable_order;
-CREATE DATABASE qrtable_saas;
-CREATE DATABASE qrtable_payment;
-CREATE DATABASE qrtable_keycloak;
+SELECT 'CREATE DATABASE qrtable_catalog'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_catalog')\gexec
+
+SELECT 'CREATE DATABASE qrtable_order'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_order')\gexec
+
+SELECT 'CREATE DATABASE qrtable_payment'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_payment')\gexec
+
+SELECT 'CREATE DATABASE qrtable_saas'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_saas')\gexec
 ```
 
-Add additional users later only if the team wants per-service DB credentials in the same release. For the first Phase 7 pilot, one strong Postgres app user is acceptable if network access is internal and credentials are private.
+Do not use `pnpm db:provision` on the Droplet. That command intentionally refuses non-local PostgreSQL hosts and exists for local development.
 
-- [ ] Step 2: Create production infra compose
+- [ ] Step 2: Create the Keycloak database init SQL
+
+Use a separate idempotent init file:
+
+```sql
+SELECT 'CREATE DATABASE qrtable_keycloak'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_keycloak')\gexec
+```
+
+Per-service PostgreSQL users remain a follow-up hardening task. For the first Phase 7 pilot, one strong PostgreSQL app user is acceptable when the database network is internal and credentials remain private.
+
+- [ ] Step 3: Create production infra compose
 
 Key requirements:
 
@@ -698,7 +752,7 @@ services:
       - qrtable-app
 ```
 
-- [ ] Step 3: Verify compose syntax
+- [ ] Step 4: Verify compose syntax
 
 Run:
 
@@ -772,7 +826,8 @@ services:
     environment:
       ORDER_PORT: 3301
       TYPEORM_HOST: postgres
-      TYPEORM_DATABASE: qrtable_order
+      ORDER_TYPEORM_DATABASE: qrtable_order
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
       TCP_ORDER_SERVICE_HOST: order
@@ -791,7 +846,8 @@ services:
     environment:
       CATALOG_PORT: 3305
       TYPEORM_HOST: postgres
-      TYPEORM_DATABASE: qrtable_catalog
+      CATALOG_TYPEORM_DATABASE: qrtable_catalog
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
@@ -823,6 +879,7 @@ services:
       PAYMENT_PORT: 3308
       TYPEORM_HOST: postgres
       PAYMENT_TYPEORM_DATABASE: qrtable_payment
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
       PUBLIC_API_BASE_URL: https://api.qrtable.vodinhquan.dev
@@ -840,7 +897,8 @@ services:
     environment:
       SAAS_PORT: 3306
       TYPEORM_HOST: postgres
-      TYPEORM_DATABASE: qrtable_saas
+      SAAS_TYPEORM_DATABASE: qrtable_saas
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
@@ -871,7 +929,8 @@ services:
     environment:
       USER_ACCESS_PORT: 3303
       MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017
-      MONGO_DB_NAME: qrtable
+      USER_ACCESS_MONGO_DB_NAME: qrtable_auth
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: user-access
@@ -1033,6 +1092,12 @@ TYPEORM_USERNAME=qrtable_app
 TYPEORM_PASSWORD=generate_on_server
 TYPEORM_TYPE=postgres
 TYPEORM_SYNCHRONIZE=false
+DATABASE_SHARED_FALLBACK_ENABLED=false
+CATALOG_TYPEORM_DATABASE=qrtable_catalog
+ORDER_TYPEORM_DATABASE=qrtable_order
+PAYMENT_TYPEORM_DATABASE=qrtable_payment
+SAAS_TYPEORM_DATABASE=qrtable_saas
+USER_ACCESS_MONGO_DB_NAME=qrtable_auth
 
 REDIS_HOST=redis
 REDIS_PORT=6379
@@ -1074,7 +1139,6 @@ NEXT_PUBLIC_CUSTOMER_PWA_URL=https://qr.qrtable.vodinhquan.dev
 VITE_BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1
 VITE_TENANT_ID=seed-tenant-fallback
 
-PAYMENT_TYPEORM_DATABASE=qrtable_payment
 SEPAY_WEBHOOK_SECRET=generate_on_server_or_provider_value
 SEPAY_PLATFORM_WEBHOOK_SECRET=generate_on_server_or_provider_value
 BFF_PAYMENT_TCP_TIMEOUT_MS=5000
@@ -1112,69 +1176,149 @@ openssl rand -base64 32
 
 Expected:
 
+- `CATALOG_TYPEORM_DATABASE`, `ORDER_TYPEORM_DATABASE`, `PAYMENT_TYPEORM_DATABASE`, `SAAS_TYPEORM_DATABASE`, and `USER_ACCESS_MONGO_DB_NAME` are all present.
+- `DATABASE_SHARED_FALLBACK_ENABLED=false`.
+- No service depends on `TYPEORM_DATABASE` or `MONGO_DB_NAME` in production.
 - `PAYMENT_SECRETS_ENCRYPTION_KEY` is exactly 64 hex characters.
 - `AUTH_SECRET`, DB passwords, Keycloak secrets, and Grafana passwords are strong random values.
 - The actual `/opt/qrtable/.env.production` is never committed.
 
-### Task 9: Resolve The Schema And Migration Blocker
+### Task 9: Package And Run Existing Per-Service Migrations
 
 **Files:**
 
-- Create one of these, depending on final choice:
-  - `tools/db/phase7-schema.sql`
-  - or TypeORM migration files under a project-owned migration folder
+- Reuse: `apps/catalog/src/database/`
+- Reuse: `apps/order/src/database/`
+- Reuse: `apps/payment/src/database/`
+- Reuse: `apps/saas/src/database/`
+- Create: `docker/migrations.Dockerfile`
+- Create: `docker-compose.migrations.yaml`
+- Modify: `tools/deploy/phase7-build-images.sh`
+- Create: `tools/deploy/phase7-migrate.sh`
+- Create: `tools/deploy/phase7-seed-demo.sh`
 
-- [ ] Step 1: Choose the schema strategy before public production
+- [x] Step 1: Use the implemented migration strategy
 
-Accepted strategies:
+The schema strategy is no longer an open decision. QRTable uses service-owned TypeORM migrations:
 
-1. Generate and version SQL schema for the current implemented entities.
-2. Add TypeORM migration generation and run migrations per service DB.
-
-Rejected strategies:
-
-- Running the Droplet with `NODE_ENV=development`.
-- Depending on `TYPEORM_SYNCHRONIZE=true` in production. The current code prevents synchronize outside development/test.
-
-- [ ] Step 2: Create schemas/databases before app boot
-
-For SQL strategy:
-
-```bash
-psql "$POSTGRES_URL" -f tools/db/phase7-schema.sql
+```text
+Catalog -> apps/catalog/src/database/migrations
+Order   -> apps/order/src/database/migrations
+Payment -> apps/payment/src/database/migrations
+SaaS    -> apps/saas/src/database/migrations
 ```
 
-For migration strategy:
+The root commands are:
 
 ```bash
-pnpm nx run catalog:migration:run
-pnpm nx run order:migration:run
-pnpm nx run saas:migration:run
-pnpm nx run payment:migration:run
+pnpm db:migrate
+pnpm db:migration:show
+pnpm db:verify:ownership
+```
+
+Rejected production strategies:
+
+- Running the Droplet with `NODE_ENV=development`.
+- Depending on `TYPEORM_SYNCHRONIZE=true`.
+- Maintaining a second hand-written schema SQL that can drift from the project-owned migrations.
+
+- [ ] Step 2: Build a dedicated migration image
+
+The backend runtime images contain compiled app bundles and should remain small. Create a one-shot migration image that includes the TypeScript migration sources, Nx, `ts-node`, `tsconfig-paths`, database verification tools, and production environment contract:
+
+```dockerfile
+# syntax=docker/dockerfile:1.7
+
+FROM node:22.12-alpine3.20
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+RUN apk add --no-cache bash curl jq
+WORKDIR /workspace
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
+COPY apps ./apps
+COPY libs ./libs
+COPY tools ./tools
+
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile --prod=false
+
+ENV NODE_ENV=production
+CMD ["pnpm", "db:migrate"]
+```
+
+Build and push it with the same immutable tag as the app images:
+
+```bash
+docker build -f docker/migrations.Dockerfile -t "${REGISTRY}/qrtable-migrations:${TAG}" .
+```
+
+Append the migration image build to `tools/deploy/phase7-build-images.sh` so a release cannot publish app images without the matching migration artifact.
+
+- [ ] Step 3: Create the one-shot migration compose
+
+```yaml
+name: qrtable-migrations
+
+networks:
+  qrtable-infra:
+    external: true
+    name: qrtable-infra
+
+services:
+  migrations:
+    image: ${REGISTRY}/qrtable-migrations:${TAG}
+    env_file: /opt/qrtable/.env.production
+    networks:
+      - qrtable-infra
+```
+
+The migration service must not expose ports, restart automatically, or stay running after the command exits.
+
+- [ ] Step 4: Run migrations before app containers
+
+`tools/deploy/phase7-migrate.sh` must run:
+
+```bash
+docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:migrate
+docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show
+docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:verify:ownership
 ```
 
 Expected:
 
-- `qrtable_catalog` has Catalog tables.
-- `qrtable_order` has Order tables and outbox.
-- `qrtable_saas` has tenant/subscription tables and outbox.
-- `qrtable_payment` has payment, audit, outbox, and tenant payment settings tables.
+- Catalog, Order, Payment, and SaaS report all expected migrations as applied.
+- `qrtable_catalog` contains only Catalog-owned tables plus `typeorm_migrations`.
+- `qrtable_order` contains only Order-owned tables and its outbox plus `typeorm_migrations`.
+- `qrtable_payment` contains only Payment-owned tables and its outbox plus `typeorm_migrations`.
+- `qrtable_saas` contains only SaaS-owned tables and its outbox plus `typeorm_migrations`.
+- Any migration or ownership failure stops deployment before app replacement.
 
-- [ ] Step 3: Seed data after schema is verified
+- [ ] Step 5: Separate production bootstrap from destructive development reseed
 
-Adapt existing tools:
+Do not run this command on the Droplet:
 
 ```bash
 pnpm dev:reseed -- --yes
-pnpm dev:verify-seed
 ```
 
-Expected:
+It intentionally drops/recreates local service databases, resets deterministic development fixtures, rebuilds the Keycloak realm, and flushes Redis.
 
-- One tenant exists with stable slug.
-- At least 5 categories, 20 items, and 8 tables exist.
-- Seeded Keycloak users can log in.
-- Seed IDs used by E2E are written to a non-secret deployment notes file.
+Production behavior:
+
+- Default production deploy: run migrations and Keycloak bootstrap only; do not seed business demo data.
+- Thesis demo profile: run `tools/deploy/phase7-seed-demo.sh --yes` only when `DEPLOYMENT_PROFILE=demo`.
+- The demo seed script must insert or upsert deterministic demo records without dropping databases, deleting unrelated tenants, rebuilding Keycloak, or flushing shared state.
+- The script must refuse to run when `NODE_ENV` is not `production`, `DEPLOYMENT_PROFILE` is not `demo`, or `--yes` is missing.
+
+After an optional demo seed, run read-only verification:
+
+```bash
+pnpm db:verify:ownership
+./tools/deploy/phase7-smoke.sh --demo-data
+```
+
+Seed IDs used by E2E must be written to a non-secret deployment notes file.
 
 ### Task 10: Bootstrap Keycloak For Public Domains
 
@@ -1193,22 +1337,25 @@ pnpm theme:build
 
 Expected: `apps/keycloak-theme/dist_keycloak` exists and contains the theme provider jar/assets expected by Keycloak.
 
-- [ ] Step 2: Bootstrap realm and clients with production URLs
+- [ ] Step 2: Bootstrap realm, clients, and User-Access sync from the infra network
 
-Run against the public Keycloak URL after Caddy is live:
+Run the bootstrap through the migration/tooling image so `keycloak` and `mongodb` resolve on the internal Docker network. Public redirect URIs still use the production domains:
 
 ```bash
-KEYCLOAK_HOST=https://auth.qrtable.vodinhquan.dev \
-KEYCLOAK_ADMIN_USER="$KEYCLOAK_ADMIN_USER" \
-KEYCLOAK_ADMIN_PASSWORD="$KEYCLOAK_ADMIN_PASSWORD" \
-KEYCLOAK_REALM=qrtable \
-KEYCLOAK_CLIENT_ID=qrtable-bff \
-KEYCLOAK_CLIENT_SECRET="$KEYCLOAK_CLIENT_SECRET" \
-MANAGEMENT_APP_CLIENT_ID=management-app \
-MANAGEMENT_APP_CLIENT_SECRET="$MANAGEMENT_APP_CLIENT_SECRET" \
-KEYCLOAK_MASTER_SSL_REQUIRED=external \
-KEYCLOAK_REALM_SSL_REQUIRED=external \
-bash tools/keycloak-bootstrap.sh
+docker compose -f docker-compose.migrations.yaml run --rm \
+  -e KEYCLOAK_HOST=http://keycloak:8080 \
+  -e MONGODB_URI="mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017" \
+  -e USER_ACCESS_MONGO_DB_NAME=qrtable_auth \
+  -e KEYCLOAK_ADMIN_USER="$KEYCLOAK_ADMIN_USER" \
+  -e KEYCLOAK_ADMIN_PASSWORD="$KEYCLOAK_ADMIN_PASSWORD" \
+  -e KEYCLOAK_REALM=qrtable \
+  -e KEYCLOAK_CLIENT_ID=qrtable-bff \
+  -e KEYCLOAK_CLIENT_SECRET="$KEYCLOAK_CLIENT_SECRET" \
+  -e MANAGEMENT_APP_CLIENT_ID=management-app \
+  -e MANAGEMENT_APP_CLIENT_SECRET="$MANAGEMENT_APP_CLIENT_SECRET" \
+  -e KEYCLOAK_MASTER_SSL_REQUIRED=external \
+  -e KEYCLOAK_REALM_SSL_REQUIRED=external \
+  migrations bash tools/keycloak-bootstrap.sh
 ```
 
 - [ ] Step 3: Update redirect URIs and web origins
@@ -1224,6 +1371,7 @@ Expected:
 
 - Management App login redirects through `auth.qrtable.vodinhquan.dev`.
 - BFF Authorizer can exchange client tokens with Keycloak.
+- Internal users and roles are synchronized into MongoDB `qrtable_auth`, not the legacy `qrtable` database.
 
 ### Task 11: Configure SePay Production Integration
 
@@ -1487,6 +1635,8 @@ Each command returns the Droplet IP.
 **Files:**
 
 - Create: `tools/deploy/phase7-preflight.sh`
+- Create: `tools/deploy/phase7-migrate.sh`
+- Create: `tools/deploy/phase7-seed-demo.sh`
 - Create: `tools/deploy/phase7-smoke.sh`
 
 - [ ] Step 1: Copy repository or release bundle to `/opt/qrtable`
@@ -1510,19 +1660,47 @@ install -m 600 docker/env/.env.production.example /opt/qrtable/.env.production
 
 Then edit `/opt/qrtable/.env.production` on the server and replace generated values using `openssl rand`.
 
-- [ ] Step 3: Start layers in order
+- [ ] Step 3: Start infra and wait for datastore health
 
 ```bash
 docker compose -f docker-compose.infra.yaml up -d
+./tools/deploy/phase7-preflight.sh --wait-infra
+```
+
+- [ ] Step 4: Run the migration and ownership gate
+
+```bash
+docker compose -f docker-compose.migrations.yaml pull
+./tools/deploy/phase7-migrate.sh
+```
+
+Expected: all service migrations are applied and database ownership verification passes before any app container is replaced.
+
+- [ ] Step 5: Bootstrap identity and optional demo data
+
+```bash
+./tools/deploy/phase7-keycloak-bootstrap.sh
+```
+
+For a thesis demo deployment only:
+
+```bash
+DEPLOYMENT_PROFILE=demo ./tools/deploy/phase7-seed-demo.sh --yes
+```
+
+- [ ] Step 6: Start monitoring, app, and proxy layers
+
+```bash
 docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml up -d
 docker compose -f docker-compose.app.yaml up -d
 docker compose -f docker-compose.proxy.yaml up -d
 ```
 
-- [ ] Step 4: Verify running services
+- [ ] Step 7: Verify running services
 
 ```bash
 docker compose -f docker-compose.infra.yaml ps
+docker compose -f docker-compose.migrations.yaml ps -a
 docker compose -f docker-compose.app.yaml ps
 docker compose -f docker-compose.proxy.yaml ps
 docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml ps
@@ -1531,6 +1709,7 @@ docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.pr
 Expected:
 
 - Infra services are healthy or running.
+- The one-shot migration container exited successfully.
 - App containers are running.
 - Caddy has obtained certificates and serves HTTPS.
 
@@ -1570,7 +1749,7 @@ Expected: Prometheus text exposition contains `qrtable_http_requests_total`.
 
 - [ ] Step 3: Browser E2E smoke
 
-Use the existing e2e suite only after seed and Keycloak bootstrap are stable:
+Use the existing e2e suite only after Keycloak bootstrap and the optional non-destructive demo seed are stable:
 
 ```bash
 BASE_URL=https://app.qrtable.vodinhquan.dev \
@@ -1609,6 +1788,10 @@ Use Droplet backups for host-level recovery.
 #!/usr/bin/env bash
 set -euo pipefail
 
+set -a
+source /opt/qrtable/.env.production
+set +a
+
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "/opt/qrtable/backups/${stamp}"
 
@@ -1616,7 +1799,16 @@ docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGR
 docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_order > "/opt/qrtable/backups/${stamp}/qrtable_order.sql"
 docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_saas > "/opt/qrtable/backups/${stamp}/qrtable_saas.sql"
 docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_payment > "/opt/qrtable/backups/${stamp}/qrtable_payment.sql"
-docker compose -f docker-compose.infra.yaml exec -T mongodb mongodump --archive > "/opt/qrtable/backups/${stamp}/mongodb.archive"
+docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_keycloak > "/opt/qrtable/backups/${stamp}/qrtable_keycloak.sql"
+docker compose -f docker-compose.infra.yaml exec -T mongodb \
+  mongodump \
+  --username "$MONGO_ROOT_USERNAME" \
+  --password "$MONGO_ROOT_PASSWORD" \
+  --authenticationDatabase admin \
+  --db qrtable_auth \
+  --archive > "/opt/qrtable/backups/${stamp}/qrtable_auth.archive"
+docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show \
+  > "/opt/qrtable/backups/${stamp}/migration-state.txt"
 ```
 
 - [ ] Step 3: Define rollback
@@ -1631,6 +1823,8 @@ Rollback infra data:
 
 - Stop app layer first.
 - Restore Postgres/Mongo from logical backup or Droplet snapshot.
+- Do not run `migration:revert` automatically. A migration revert must be explicitly reviewed against the target image and backup timestamp.
+- Prefer backward-compatible expand/contract migrations so the previous app image can run during the rollback window.
 - Start app layer.
 - Re-run smoke checks.
 
@@ -1643,11 +1837,12 @@ CI/CD is part of Phase 7, but it must be treated as a separate deployment contro
 - Existing: `.github/workflows/ci.yml`
 - Existing CI trigger: `push` to `main` and `pull_request`
 - Existing CI command: `pnpm exec nx run-many -t lint test build`
+- Existing: per-service TypeORM DataSources, initial migrations, migration commands, and database ownership verification.
 - Missing: Docker image build workflow
 - Missing: registry push workflow
 - Missing: production deploy workflow
 - Missing: rollback-by-tag workflow
-- Missing: migration/schema gate
+- Missing: production migration image/job and deploy gate
 
 **Files:**
 
@@ -1656,6 +1851,7 @@ CI/CD is part of Phase 7, but it must be treated as a separate deployment contro
 - Create: `.github/workflows/deploy-production.yml`
 - Create: `.github/workflows/rollback-production.yml`
 - Create: `tools/deploy/phase7-build-images.sh`
+- Create: `tools/deploy/phase7-migrate.sh`
 - Create: `tools/deploy/phase7-remote-deploy.sh`
 - Create: `tools/deploy/phase7-remote-rollback.sh`
 - Create: `tools/deploy/phase7-preflight.sh`
@@ -1716,16 +1912,17 @@ Workflow responsibilities:
 Expected image names:
 
 ```text
-registry.digitalocean.com/qrtable/bff:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/authorizer:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/catalog:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/order:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/kitchen:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/payment:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/saas:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/user-access:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/management-app:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/customer-pwa:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-bff:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-authorizer:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-catalog:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-order:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-kitchen:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-payment:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-saas:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-user-access:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-migrations:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-management-app:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable-customer-pwa:${GITHUB_SHA}
 ```
 
 Important build rule:
@@ -1776,8 +1973,10 @@ CI green
   -> release-images pushes immutable image tag
   -> deploy-production waits for production approval
   -> remote preflight
-  -> optional backup
-  -> docker compose pull
+  -> pull immutable migration and app images
+  -> backup
+  -> run per-service migrations
+  -> verify migration state and database ownership
   -> docker compose up -d app layer
   -> smoke tests
   -> record deployed tag
@@ -1794,26 +1993,31 @@ The remote deploy script must:
 
 - Refuse to run if `/opt/qrtable/.env.production` is missing or world-readable.
 - Refuse to deploy if `IMAGE_TAG` is empty.
-- Run `docker compose config` for infra, monitoring, app, and proxy layers.
+- Run `docker compose config` for infra, migrations, monitoring, app, and proxy layers.
 - Pull images for the requested immutable tag.
+- Run `tools/deploy/phase7-migrate.sh` and stop immediately on migration or ownership failure.
 - Start app containers without rebuilding on the server.
 - Run health checks after container replacement.
 - Write the successful tag to `/opt/qrtable/releases/current`.
 
 - [ ] Step 5: Add schema/migration gate
 
-Before production deployment, the workflow must verify one of these is true:
+Before production deployment, the workflow must:
 
-1. TypeORM migrations exist and have been applied successfully.
-2. A reviewed production schema SQL bootstrap has already been applied.
-3. The deployment is explicitly marked as demo-only and uses a disposable database.
+1. Verify all five dedicated datastore env names are present and `DATABASE_SHARED_FALLBACK_ENABLED=false`.
+2. Pull the migration image with the same immutable tag as the app images.
+3. Run `pnpm db:migrate`.
+4. Run `pnpm db:migration:show`.
+5. Run `pnpm db:verify:ownership`.
+6. Refuse to replace app containers when any command fails.
 
-This is a hard gate because current production config disables TypeORM synchronize.
+This is a hard gate because production uses service-owned migrations with `TYPEORM_SYNCHRONIZE=false`.
 
 Recommended gate script:
 
 ```bash
-./tools/deploy/phase7-preflight.sh --require-schema-ready
+./tools/deploy/phase7-preflight.sh --require-dedicated-databases
+./tools/deploy/phase7-migrate.sh
 ```
 
 - [ ] Step 6: Add smoke tests to CI/CD
@@ -1863,7 +2067,7 @@ production approval
   -> record rollback event
 ```
 
-Rollback must not restore database automatically unless `restore_data=true` and the operator confirms the exact backup timestamp. App rollback and data rollback are separate operations.
+Rollback must not restore a database or run `migration:revert` automatically unless `restore_data=true` and the operator confirms the exact backup timestamp and compatibility impact. App rollback and data rollback are separate operations.
 
 - [ ] Step 8: Add deployment audit trail
 
@@ -1929,6 +2133,7 @@ Record:
 Make the section match real files:
 
 - `docker-compose.infra.yaml`
+- `docker-compose.migrations.yaml`
 - `docker-compose.app.yaml`
 - `docker-compose.proxy.yaml`
 - `docker-compose.monitoring.yaml`
@@ -1948,7 +2153,12 @@ Expected: anchor verifier exits 0.
 
 Phase 7 is accepted only when all items below are true:
 
-- [ ] `docker compose` can start infra, monitoring, app, and proxy layers from a clean server checkout.
+- [ ] `docker compose` can start infra, run migrations, and start monitoring, app, and proxy layers from a clean server checkout.
+- [ ] Production env defines the four dedicated PostgreSQL database names and MongoDB `qrtable_auth`, with shared fallback disabled.
+- [ ] The one-shot migration image applies all service migrations before app boot.
+- [ ] `pnpm db:migration:show` reports every expected migration as applied.
+- [ ] `pnpm db:verify:ownership` passes against all four PostgreSQL service databases.
+- [ ] User-Access connects to MongoDB `qrtable_auth`, and Keycloak bootstrap synchronizes the required user/role collections there.
 - [ ] Public HTTPS works for `api`, `app`, `qr`, `auth`, and protected `grafana` subdomains.
 - [ ] Only 80/443 and restricted SSH are public.
 - [ ] BFF `/api/v1/health/live` and `/api/v1/health/ready` pass.
@@ -1960,7 +2170,7 @@ Phase 7 is accepted only when all items below are true:
 - [ ] SePay tenant `QRTBL` OAuth Connect flow can create or verify a tenant webhook URL with tenant slug.
 - [ ] SePay API surface mismatch (`/api/v1/webhooks` vs `/v1/webhook`, `Api_Key` vs `SECRET_KEY`) is resolved with evidence from the actual SePay account before live use.
 - [ ] Grafana shows logs, metrics, and traces from real app containers.
-- [ ] Seed/reset strategy can restore the demo dataset.
+- [ ] Optional demo seed is non-destructive, profile-gated, and can restore the thesis demo dataset without calling `dev:reseed`.
 - [ ] Backup and rollback procedure is documented and tested at least once.
 - [ ] CI remains green for `lint`, `test`, and `build`.
 - [ ] Release workflow can build and push immutable Docker image tags.
@@ -1988,25 +2198,28 @@ DigitalOcean product facts verified on 2026-06-06:
 
 ## 8. Risks And Mitigations
 
-| Risk                                     | Impact                                                   | Mitigation                                                                        |
-| ---------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| No TypeORM migrations                    | Fresh production DB has no tables                        | Implement schema SQL or TypeORM migrations before go-live                         |
-| Kafka `localhost` advertised listener    | App containers cannot connect                            | Use `PLAINTEXT://kafka:9092` in production compose                                |
-| Vite public env is build-time            | Customer PWA points to wrong API after image reuse       | Build image with production `VITE_BFF_URL`, or implement runtime config later     |
-| Next public env is partly build-time     | Management App client bundle points to wrong API         | Build with production `NEXT_PUBLIC_*` and also provide runtime env                |
-| Keycloak `start-dev`                     | Insecure production IAM                                  | Use `start`, external hostname, DB-backed Keycloak                                |
-| Public Grafana                           | Observability leaks tenant or system data                | Put behind HTTPS, basic auth, firewall/IP restriction                             |
-| CORS `*`                                 | Browser clients from unwanted origins can call BFF       | Add `CORS_ORIGINS` config before public production                                |
-| Secrets in compose                       | Credential leak                                          | Use `/opt/qrtable/.env.production` with 0600 permissions                          |
-| Single Droplet failure                   | Full outage                                              | Enable backups/snapshots; later move DB to managed service                        |
-| SePay API surface mismatch               | OAuth webhook registration fails after deploy            | Verify current SePay account API shape before live production                     |
-| Wrong SePay webhook route                | Tenant bill or subscription invoice never settles        | Register `QRTBL` tenant route and `QRSUB` platform route separately               |
-| Live payment test mutates external state | Real money movement or incorrect subscription activation | Keep CI negative-only; perform low-value manual live verification with audit logs |
+| Risk                                     | Impact                                                       | Mitigation                                                                                       |
+| ---------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Migration job omitted or run after apps  | New image boots against an incompatible or incomplete schema | Run the immutable migration image and ownership gate before replacing app containers             |
+| Shared database fallback enabled         | Services can reconnect to a mixed legacy database            | Require dedicated env names and `DATABASE_SHARED_FALLBACK_ENABLED=false` in production preflight |
+| `dev:reseed` run on production           | Destructive data loss and identity/cache reset               | Exclude it from deploy scripts; use a non-destructive, profile-gated demo seed                   |
+| Kafka `localhost` advertised listener    | App containers cannot connect                                | Use `PLAINTEXT://kafka:9092` in production compose                                               |
+| Vite public env is build-time            | Customer PWA points to wrong API after image reuse           | Build image with production `VITE_BFF_URL`, or implement runtime config later                    |
+| Next public env is partly build-time     | Management App client bundle points to wrong API             | Build with production `NEXT_PUBLIC_*` and also provide runtime env                               |
+| Keycloak `start-dev`                     | Insecure production IAM                                      | Use `start`, external hostname, DB-backed Keycloak                                               |
+| Public Grafana                           | Observability leaks tenant or system data                    | Put behind HTTPS, basic auth, firewall/IP restriction                                            |
+| CORS `*`                                 | Browser clients from unwanted origins can call BFF           | Add `CORS_ORIGINS` config before public production                                               |
+| Secrets in compose                       | Credential leak                                              | Use `/opt/qrtable/.env.production` with 0600 permissions                                         |
+| Single Droplet failure                   | Full outage                                                  | Enable backups/snapshots; later move DB to managed service                                       |
+| SePay API surface mismatch               | OAuth webhook registration fails after deploy                | Verify current SePay account API shape before live production                                    |
+| Wrong SePay webhook route                | Tenant bill or subscription invoice never settles            | Register `QRTBL` tenant route and `QRSUB` platform route separately                              |
+| Live payment test mutates external state | Real money movement or incorrect subscription activation     | Keep CI negative-only; perform low-value manual live verification with audit logs                |
 
 ## 9. Useful Follow-Up Enhancements
 
 - Add `CORS_ORIGINS` to BFF config and restrict to `app.qrtable.vodinhquan.dev` and `qr.qrtable.vodinhquan.dev`.
-- Add TypeORM migrations per service and CI migration smoke.
+- Add per-service PostgreSQL users after the single-user pilot is stable.
+- Add migration compatibility tests for backward-compatible expand/contract releases.
 - Add a dedicated SePay provider-contract test with mocked provider responses for the selected live API surface.
 - Add `docker compose --profile demo` and `--profile prod` if the team wants one compose entrypoint.
 - Add a server-side runtime config endpoint for Customer PWA to avoid rebuilding static image for API URL changes.
@@ -2021,8 +2234,9 @@ DigitalOcean product facts verified on 2026-06-06:
 
 - Used CodeGraph first before editing.
 - Reconciled current code with canonical docs before writing deployment plan.
-- Kept the output as a new plan artifact instead of rewriting canonical docs prematurely.
+- Updated the English plan artifact and synchronized the Vietnamese translation for the 2026-06-07 database-per-service revision.
 - Preserved QRTable service boundaries and deployment ownership in the plan.
+- Reconciled Phase 7 with the implemented database-per-service configuration, migrations, and ownership verification.
 - Treated secrets as runtime-only values and avoided committing real credentials.
 - Flagged production blockers instead of hiding them behind optimistic deployment steps.
 - Included CI/CD as a first-class Phase 7 task with release, deploy, rollback, approval, and smoke-test gates.
@@ -2033,18 +2247,19 @@ DigitalOcean product facts verified on 2026-06-06:
 - FLAG001 [STRUCT] Phase 7 target compose files are documented but not implemented yet.
 - FLAG002 [PATTERN] Monitoring compose is currently local-host oriented and needs a production override.
 - FLAG003 [PATTERN] SePay webhook upsert API shape in code must be verified against the exact live SePay product/account before production.
-- FLAG003 [ENV_LEAK] Existing provider compose has dev credentials and dev exposure patterns.
-- FLAG004 [STRUCT] `dist/` contains stale app artifacts and should not be trusted for deployment.
+- FLAG004 [ENV_LEAK] Existing provider compose has dev credentials and dev exposure patterns.
+- FLAG005 [STRUCT] `dist/` contains stale app artifacts and should not be trusted for deployment.
+- FLAG006 [PATTERN] Per-service PostgreSQL credentials are deferred until after the single-user pilot.
 
 ### 🔴 Blockers (fixed in output or MUST fix before merge)
 
 - BLOCK001 [STRUCT] Application Dockerfiles and production app compose do not exist yet.
-- BLOCK002 [STRUCT] Production schema/migration strategy is missing while TypeORM synchronize is disabled outside development/test.
+- BLOCK002 [STRUCT] Existing per-service migrations are not yet packaged and integrated as a production one-shot deployment gate.
 - BLOCK003 [ENV_LEAK] Production secrets must be generated and stored outside git.
 - BLOCK004 [PATTERN] Keycloak production must not use `start-dev`.
 
 ### 💡 Suggestions
 
-- Start Phase 7 with the schema/migration gate and Dockerfiles before touching DigitalOcean.
+- Start Phase 7 with Dockerfiles plus the migration image/job before touching DigitalOcean.
 - Use fixed subdomains first, then add wildcard tenant routing only when source code needs it.
 - Treat managed PostgreSQL/Valkey as the first hardening upgrade after the single-Droplet pilot.
