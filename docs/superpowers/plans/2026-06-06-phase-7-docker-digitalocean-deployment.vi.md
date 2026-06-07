@@ -1,14 +1,14 @@
 # Phase 7 — Kế hoạch triển khai Docker trên DigitalOcean
 
-> **Bản tiếng Việt** — đã đồng bộ với revision 2026-06-07 (database-per-service). Bản tiếng Anh canonical: [2026-06-06-phase-7-docker-digitalocean-deployment.md](2026-06-06-phase-7-docker-digitalocean-deployment.md)
+> **Bản tiếng Việt** — đã đồng bộ với revision human-operator runbook (2026-06-07); bản tiếng Anh canonical: [2026-06-06-phase-7-docker-digitalocean-deployment.md](2026-06-06-phase-7-docker-digitalocean-deployment.md)
 
-> **Revision 2026-06-07:** Cập nhật plan tiếng Anh sau khi implement database-per-service. Revision này sửa tên env database production, tái sử dụng migration và ownership check đã implement, và thêm migration gate one-shot trước khi boot app.
+> **Revision 2026-06-07:** Đã xác minh lại với codebase hiện tại và tài liệu provider sau implement database-per-service. Revision này sửa tên env database production, Compose interpolation, binding host TCP/gRPC, Docker networks, quy ước image/tag, đóng gói/bootstrap Keycloak, đường dẫn monitoring, biến E2E, nhất quán backup, gate CI/CD, và runbook human-operator đầy đủ cho các nền tảng bên ngoài.
 
 > **Dành cho agent / dev thực thi:** BẮT BUỘC dùng superpowers:subagent-driven-development hoặc superpowers:executing-plans để implement plan theo từng task. Các bước dùng checkbox (`- [ ]`) để theo dõi tiến độ.
 
 **Mục tiêu:** Đóng gói QRTable thành Docker image tái lập được và triển khai baseline pilot/production Phase 7 lên DigitalOcean dưới domain `vodinhquan.dev`.
 
-**Kiến trúc:** Dùng một DigitalOcean Droplet làm baseline production Phase 7, Docker Compose tách thành các lớp proxy, app, infra và monitoring cộng migration job one-shot. Traffic công khai terminate tại reverse proxy; PostgreSQL, MongoDB, Redis, Kafka, Keycloak, Loki, Prometheus, Tempo và mọi cổng TCP NestJS nằm trên mạng Docker nội bộ. Managed database của DigitalOcean là tùy chọn hardening sau, không phải phụ thuộc đầu tiên cho luận văn/pilot.
+**Kiến trúc:** Dùng một DigitalOcean Droplet làm baseline production Phase 7, Docker Compose tách thành các lớp proxy, app, infra và monitoring cộng migration job one-shot và identity bootstrap job. Traffic công khai terminate tại reverse proxy; PostgreSQL, MongoDB, Redis, Kafka, Loki, Prometheus, Tempo và mọi cổng TCP/gRPC NestJS nằm trên mạng Docker nội bộ. Keycloak và Grafana tham gia cả mạng riêng lẫn mạng edge dùng chung để Caddy reach được chúng mà không publish cổng container. Managed database DigitalOcean là tùy chọn hardening sau, không phải phụ thuộc đầu tiên cho luận văn/pilot.
 
 **Tech stack:** DigitalOcean Droplet, Ubuntu, Docker Engine, Docker Compose plugin, Nx, pnpm, NestJS, Next.js, Vite, PostgreSQL, MongoDB, Redis, Kafka KRaft, Keycloak, reverse proxy Caddy hoặc Nginx, Grafana, Loki, Promtail, Prometheus, Tempo, OpenTelemetry.
 
@@ -53,6 +53,7 @@ Delta implement database-per-service đã verify ngày 2026-06-07:
 - `docs/phases/phase-6-observability-plan.md`
 - `docs/phases/phase-6-observability-plan.vi.md`
 - `docs/guides/sepay-configuration-guide-phase3.md`
+- `docs/guides/cloudinary-setup-and-usage-guide.md`
 - `docs/guides/monitoring-observability-qrtable.md`
 - `docs/guides/observability-qrtable.md`
 - `tools/ngrok/README.md`
@@ -80,8 +81,42 @@ npx ctx7@latest docs /websites/developer_sepay_vn "SePay OAuth2 authentication w
 - Droplet từ USD 4/tháng; managed database từ USD 15/tháng.
 - Managed PostgreSQL 1 GiB khoảng USD 15,15/tháng; managed Valkey (Redis-compatible) 1 GiB khoảng USD 15/tháng.
 - DigitalOcean managed Kafka là sản phẩm cluster 3 node, giá cao hơn nhiều so với mục tiêu luận văn/pilot.
-- DigitalOcean Container Registry có tier miễn phí, nhưng cần kiểm tra dung lượng trước khi dựa vào cho 11 image QRTable, gồm cả image migration one-shot.
+- DigitalOcean Container Registry Starter cho phép một repository và 500 MiB. QRTable vì vậy dùng một repository với tag immutable có prefix service; tier Basic là baseline pilot thực tế nếu mười hai image release vượt dung lượng Starter.
 - Docker trên Ubuntu nên cài từ repository chính thức của Docker; bản hiện đại gồm `docker compose` dạng plugin.
+- Docker Compose interpolation không đọc `env_file` cấp service. Mọi lệnh Compose production phải truyền `--env-file /opt/qrtable/.env.production`. Preflight phải inspect `docker compose config --environment` qua file tạm được bảo vệ vì output đó có thể chứa secret.
+- Tag `bitnami/kafka:3.9.0` đề xuất ban đầu không còn khả dụng. Dùng image JVM được hỗ trợ đã xác minh `apache/kafka:4.3.0` với mapping biến môi trường theo tài liệu Apache Kafka, rồi chạy smoke tương thích KafkaJS trước production.
+- Bản patch Keycloak và Caddy hiện tại phải pin theo digest khi implement. Baseline lập kế hoạch đã xác minh là Keycloak `26.6.2` và Caddy `2.11.3`.
+- Manifest image đã xác minh cho plan gồm Node `22.22.3`, PostgreSQL `16.13`, MongoDB `7.0.31`, Redis `7.4.9`, Nginx `1.30.1`, Kafka `4.3.0`, Keycloak `26.6.2` và Caddy `2.11.3`. CI vẫn phải scan và ghi digest chính xác khi publish hoặc deploy.
+
+Tài liệu tham chiếu chính dùng cho lần xác minh này:
+
+- [Docker Compose variable interpolation](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
+- [Node.js 22.22.3 LTS release](https://nodejs.org/en/blog/release/v22.22.3)
+- [Apache Kafka supported releases](https://kafka.apache.org/community/downloads/)
+- [Apache Kafka official Docker image](https://kafka.apache.org/43/getting-started/docker/)
+- [Keycloak container and optimized image guidance](https://www.keycloak.org/server/containers)
+- [Keycloak reverse proxy guidance](https://www.keycloak.org/server/reverseproxy)
+- [Keycloak releases](https://github.com/keycloak/keycloak/releases)
+- [Caddy `basic_auth`](https://caddyserver.com/docs/caddyfile/directives/basic_auth)
+- [Caddy releases](https://github.com/caddyserver/caddy/releases)
+- [DigitalOcean Container Registry pricing](https://docs.digitalocean.com/products/container-registry/details/pricing/)
+- [DigitalOcean read-only registry login](https://docs.digitalocean.com/reference/doctl/reference/registry/login)
+- [PostgreSQL 16.13 release notes](https://www.postgresql.org/docs/release/16.13/)
+- [MongoDB 7.0 patch release notes](https://www.mongodb.com/docs/current/release-notes/7.0/)
+- [Redis releases](https://github.com/redis/redis/releases)
+- [Nginx official image tags](https://hub.docker.com/_/nginx/tags)
+- [GitHub deployment environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
+- [GitHub Actions secrets](https://docs.github.com/actions/security-guides/using-secrets-in-github-actions)
+- [GitHub repository rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository)
+- [GitHub Actions security hardening](https://docs.github.com/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)
+- [DigitalOcean Droplet creation](https://docs.digitalocean.com/products/droplets/how-to/create/)
+- [DigitalOcean Cloud Firewalls](https://docs.digitalocean.com/products/networking/firewalls/how-to/create/)
+- [DigitalOcean Container Registry creation](https://docs.digitalocean.com/products/container-registry/how-to/create-registry/)
+- [DigitalOcean Spaces access management](https://docs.digitalocean.com/products/spaces/how-to/manage-access/)
+- [Keycloak bootstrap admin recovery](https://www.keycloak.org/server/bootstrap-admin-recovery)
+- [Cloudinary credential management](https://cloudinary.com/documentation/developer_onboarding_faq_find_credentials)
+- [SePay webhook integration](https://developer.sepay.vn/vi/sepay-webhooks/tich-hop-webhook)
+- [SePay OAuth2 configuration](https://developer.sepay.vn/vi/cong-thanh-toan/tich-hop-oauth2/cau-hinh)
 
 Tài liệu SePay qua Context7 ngày 2026-06-06. Sự kiện deploy quan trọng:
 
@@ -160,15 +195,18 @@ Blocker cần xử lý trước production công khai:
 - `docker-compose.provider.yaml` dùng default thân thiện dev: `mongo`, `postgres`, `redis` không pin version, `redisinsight:latest`, `bitnamilegacy/kafka`, credential dev và Keycloak `start-dev`.
 - Kafka advertise `localhost` — ổn cho app chạy trên host local, không ổn cho container app.
 - Compose monitoring expose Grafana công khai trên `3001` và scrape app chạy host; production phải đặt Grafana sau HTTPS/kiểm soát truy cập và scrape theo tên service nội bộ.
-- BFF hiện bật CORS `origin: '*'`; production nên giới hạn origin management và customer.
+- BFF HTTP và Socket.IO hiện bật CORS `origin: '*'`; production công khai bị chặn cho đến khi cả hai dùng cùng allowlist production đã validate.
 - `dist/` còn artifact build cũ `product` và `invoice` dù `apps/` không còn các project đó. Build production phải clean và build lại từ source.
+- `tools/keycloak-bootstrap.sh` hiện tại luôn đọc user demo deterministic, reset mật khẩu đã biết và chỉ áp redirect client localhost lần tạo đầu. Không được chạy nguyên trạng lên production.
+- Bản nháp app compose hiện tại không set biến host listener dùng bởi `TcpConfiguration`/`GrpcConfiguration`; process service sẽ bind `localhost` bên trong container.
+- Caddy không reach Keycloak hoặc Grafana trừ khi các service đó join `qrtable-edge`; Prometheus và Tempo tương tự cần mạng dùng chung rõ ràng với app container.
 
 Debt flags:
 
 - Một số doc vẫn ghi Phase 6/7 là TODO dù code observability và monitoring compose đã có.
 - `technical-architecture.md` mô tả file compose mục tiêu (`docker-compose.infra.yaml`, `docker-compose.app.yaml`) chưa được implement.
 - Global prefix service không thống nhất: một số dùng `api/v1`, `authorizer`, `saas`, `user-access` dùng `api`. Prometheus và rule proxy phải tính đến điều này cho đến khi thống nhất.
-- Hành vi env host `TcpConfiguration` dễ cấu hình sai; compose production nên set cả legacy host keys và TCP-specific host keys khi cần.
+- `TcpConfiguration` dùng legacy `<SERVICE>_SERVICE_HOST` của từng service cho listener, trong khi client `TcpProvider` ưu tiên `TCP_<SERVICE>_SERVICE_HOST`. Compose production phải set listener host thành `0.0.0.0` và client host thành tên service Docker.
 
 Nền tảng vững:
 
@@ -256,13 +294,357 @@ Lý do:
 
 Nginx chấp nhận được nếu team quen reverse proxy đó, nhưng plan phải thêm gia hạn Certbot, mount lưu certificate và verify renewal rõ ràng.
 
-## 4. Cấu trúc file mục tiêu
+## 4. Human Operator Runbook (Runbook vận hành thủ công)
+
+Phần này là bắt buộc. Các task yêu cầu quyền sở hữu tài khoản, chấp nhận thanh toán, xác minh danh tính, kiểm soát DNS, ủy quyền ngân hàng, xem secret, hoặc di chuyển tiền thật không thể hoàn thành tự động bởi AI agent.
+
+### 4.1 Nhãn trách nhiệm và hợp đồng xử lý secret
+
+Dùng các nhãn sau trong suốt quá trình thực thi:
+
+| Label        | Meaning                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `[AGENT]`    | Có thể implement và verify trong repository hoặc trên máy đã được ủy quyền                  |
+| `[HUMAN]`    | Yêu cầu chủ tài khoản dùng web console, chấp nhận điều khoản, nhập secret, hoặc chuyển tiền |
+| `[SHARED]`   | Agent chuẩn bị lệnh/kiểm tra; human phê duyệt hành động hoặc nhập giá trị được bảo vệ       |
+| `HUMAN-GATE` | Deploy phải dừng cho đến khi bằng chứng human được đặt tên được xác nhận                    |
+
+Quy tắc secret:
+
+- Agent không bao giờ yêu cầu người dùng dán API token, mật khẩu, private key, credential ngân hàng, OAuth client secret, hoặc recovery code vào chat.
+- Human nhập secret trực tiếp vào GitHub Environments/Actions, console DigitalOcean, SePay, Cloudinary, hoặc `/opt/qrtable/.env.production` qua shell đã xác thực.
+- Người dùng chỉ trả lời bằng xác nhận không chứa secret, ví dụ `HUMAN-GATE-03 complete`.
+- Bằng chứng ghi tên tài nguyên, ID, URL, fingerprint key, ngày tạo, và bốn ký tự cuối khi hữu ích — không bao giờ ghi toàn bộ giá trị secret.
+- Bước CLI có thể ủy quyền cho agent chỉ sau khi người dùng đã xác thực CLI đó và cho phép hành động rõ ràng.
+
+### 4.2 Ma trận trách nhiệm
+
+| Work item                                    | Owner      | Notes                                                                          |
+| -------------------------------------------- | ---------- | ------------------------------------------------------------------------------ |
+| Dockerfiles, Compose, scripts, tests, docs   | `[AGENT]`  | Công việc trong repository                                                     |
+| Account registration, billing, terms, KYC    | `[HUMAN]`  | GitHub, DigitalOcean, SePay, bank, domain registrar, Cloudinary                |
+| 2FA/passkeys and recovery codes              | `[HUMAN]`  | Lưu tài liệu recovery trong password manager                                   |
+| API/OAuth secret creation and rotation       | `[HUMAN]`  | Agent có thể cung cấp tên field và lệnh validate                               |
+| Droplet/registry/firewall creation           | `[SHARED]` | Human phê duyệt chi phí và quyền sở hữu; agent có thể dùng `doctl` đã xác thực |
+| DNS changes                                  | `[HUMAN]`  | Yêu cầu kiểm soát DNS zone `vodinhquan.dev`                                    |
+| Production env generation                    | `[SHARED]` | Agent sinh lệnh; human nhập secret bên ngoài trực tiếp trên server             |
+| Keycloak realm/client automation             | `[AGENT]`  | Human tạo administrator vĩnh viễn và validate đăng nhập trình duyệt            |
+| SePay OAuth, bank linking, webhook dashboard | `[HUMAN]`  | Ủy quyền ngân hàng và truy cập provider production không thể tự động hóa       |
+| Real payment verification                    | `[HUMAN]`  | Chỉ chuyển khoản giá trị thấp, với phê duyệt rõ ràng                           |
+| Release image build                          | `[AGENT]`  | GitHub Actions sau khi human cấu hình repository secrets                       |
+| First production deploy                      | `[SHARED]` | Human chọn cửa sổ/tag; agent/script thực thi và verify                         |
+| Backup restore rehearsal                     | `[SHARED]` | Human phê duyệt target cô lập và retention; agent chạy kiểm tra                |
+
+### 4.3 Danh mục điều kiện tiên quyết thủ công
+
+Trước khi implement chạm hạ tầng bên ngoài, human phải có:
+
+- [ ] Mục password manager cho QRTable production với owner email, URL tài khoản, resource ID, fingerprint key, và hướng dẫn recovery.
+- [ ] 2FA/passkeys bật trên GitHub, DigitalOcean, domain registrar/DNS provider, SePay, Cloudinary, và tài khoản email owner production.
+- [ ] Quyền administrator repository GitHub.
+- [ ] Team/tài khoản DigitalOcean có phương thức thanh toán hợp lệ và quyền tạo Projects, Droplets, Firewalls, Container Registry, backups, và Spaces.
+- [ ] Quyền quản trị DNS zone `vodinhquan.dev`.
+- [ ] Tài khoản SePay có khả năng production và tài khoản ngân hàng nhận chuyển khoản `QRTBL`/`QRSUB`.
+- [ ] Tài khoản/môi trường sản phẩm Cloudinary nếu upload production QRTable dùng Cloudinary.
+- [ ] Workstation operator có `git`, `ssh`, `docker`, `doctl`, `openssl`, và `dig`.
+- [ ] Key Ed25519 riêng cho mỗi vai trò bắt buộc: workstation human tới Droplet, checkout read-only Droplet-to-GitHub tùy chọn, và kênh deploy CI-to-Droplet tương lai. Không tái sử dụng key ký/xác thực GitHub cá nhân.
+
+### 4.4 Human gate theo thứ tự
+
+| Gate            | Required completion evidence, without secrets                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| `HUMAN-GATE-01` | Accounts, billing, owner email, 2FA/passkeys, and recovery storage confirmed                           |
+| `HUMAN-GATE-02` | GitHub ruleset, Actions permissions, production environment, and release secret names confirmed        |
+| `HUMAN-GATE-03` | DigitalOcean Project, Container Registry, API token, region, and resource naming confirmed             |
+| `HUMAN-GATE-04` | Reserved IP, Droplet, admin SSH, backups, monitoring, tags, and Cloud Firewall confirmed               |
+| `HUMAN-GATE-05` | Five DNS records resolve publicly and CAA/Cloudflare-style proxy settings permit certificate issuance  |
+| `HUMAN-GATE-06` | Cloudinary, SePay, Keycloak client, Grafana, and generated secret inventory entered in approved stores |
+| `HUMAN-GATE-07` | `/opt/qrtable/.env.production` completed with mode `0600`; no values pasted into chat or git           |
+| `HUMAN-GATE-08` | Permanent Keycloak admin and real Management App login verified; temporary bootstrap admin removed     |
+| `HUMAN-GATE-09` | SePay product/API shape, OAuth app, bank link, and platform/tenant webhook configuration proven        |
+| `HUMAN-GATE-10` | First deploy window, immutable image tag, backup, smoke result, and observation window accepted        |
+| `HUMAN-GATE-11` | Encrypted off-Droplet backup and isolated restore rehearsal completed                                  |
+
+Deploy guide do Task 13 tạo phải cung cấp checklist có ngày cho các gate này. Không task nào được im lặng giả định tài khoản hoặc credential bên ngoài đã tồn tại.
+
+### 4.5 Thiết lập web console GitHub
+
+`[HUMAN]` Mở repository trên GitHub:
+
+1. Trong **Settings > Actions > General**, dùng quyền workflow tối thiểu cần thiết. Mặc định read-only repository contents.
+2. Trong **Settings > Rules > Rulesets**, bảo vệ `main`:
+   - require pull requests;
+   - require the CI status checks used by `.github/workflows/ci.yml`;
+   - block force pushes and branch deletion;
+   - restrict bypass permission to the owner/emergency maintainer.
+3. Trong **Settings > Environments**, tạo `production` và hạn chế deployment branches/tags theo chính sách release.
+4. Thêm required reviewers khi gói GitHub hỗ trợ.
+5. Nếu gói GitHub của repository private không hỗ trợ required reviewers, không giả vờ có approval gate. Giữ deploy production do operator điều khiển, ghi người phê duyệt vào deployment log, và nâng cấp gói GitHub trước khi bật deploy production không giám sát.
+6. Trong **production > Environment secrets** hoặc **Settings > Secrets and variables > Actions**, chỉ tạo:
+   - `DIGITALOCEAN_ACCESS_TOKEN` để publish release image, scope hẹp nhất DigitalOcean cho phép;
+   - SSH deploy secrets chỉ sau khi kênh deploy bảo mật ở mục 4.7 được chọn.
+7. Nếu Task 14 clone repository private trên Droplet, thêm deploy key read-only riêng dưới **Settings > Deploy keys**. Không cho phép write access. Ưu tiên release bundle chỉ image sau để host production không cần truy cập repository.
+8. Pin third-party GitHub Actions tới full commit SHA, giữ workflow permissions rõ ràng, và review cập nhật Dependabot trước khi đổi SHA đó.
+
+Không lưu application runtime secrets, database passwords, Keycloak admin passwords, SePay credentials, Cloudinary secrets, hoặc master production env trong GitHub.
+
+Bằng chứng `HUMAN-GATE-02`:
+
+- ruleset name and active state;
+- production environment name and branch policy;
+- whether required reviewers are genuinely enforced by the current GitHub plan;
+- configured secret names only;
+- screenshot or settings URL with all secret values hidden.
+
+### 4.6 Thiết lập web console DigitalOcean
+
+`[HUMAN]` Hoàn thành các bước sau trong control panel DigitalOcean:
+
+1. Tạo/chọn Project tên `qrtable-production`.
+2. Tạo một Container Registry. Tên registry là globally unique và không thể đổi, nên xác nhận tên cuối trước khi tạo. Dùng region gần Droplet nhất và chọn tier trả phí nếu mười hai release image vượt giới hạn Starter.
+3. Tạo DigitalOcean API token riêng dưới **API > Applications & API**. Copy một lần vào password manager và GitHub release secret; không commit.
+4. Thêm public SSH key của operator dưới **Settings > Security > SSH keys**. Chỉ upload file `.pub`.
+5. Reserve địa chỉ IPv4 công khai cho QRTable, rồi gắn vào Droplet production. DNS phải trỏ tới Reserved IP này, không phải địa chỉ Droplet tạm thời.
+6. Tạo Droplet:
+   - Ubuntu 24.04 LTS hoặc Ubuntu LTS được hỗ trợ hiện tại;
+   - `sgp1` khi có sẵn;
+   - 4 vCPU / 8 GiB kích thước pilot khuyến nghị;
+   - VPC cùng region;
+   - chỉ xác thực SSH-key;
+   - enhanced monitoring bật;
+   - backups bật trước live traffic;
+   - tags như `qrtable`, `production`, và `phase7`.
+7. Tạo và gắn Cloud Firewall:
+   - inbound `22/tcp` chỉ từ public IP/CIDR hiện tại của operator;
+   - inbound `80/tcp` và `443/tcp` từ mọi client IPv4/IPv6;
+   - không có rule công khai cho cổng container application, datastore, Kafka, Keycloak, hoặc monitoring;
+   - outbound bình thường cho package download, registry pull, OAuth, webhook, và telemetry.
+8. Thêm block volume chỉ khi yêu cầu disk/retention đo được biện minh. Ghi mount và chính sách backup riêng.
+
+Bằng chứng `HUMAN-GATE-03`/`04`:
+
+- DigitalOcean Project name/ID;
+- registry hostname and tier;
+- API token creation date, scope, and last four characters only;
+- Droplet ID, region, size, image, tags, and Reserved IP;
+- Cloud Firewall ID and rule summary;
+- backup and monitoring enabled state;
+- successful SSH key fingerprint match and `ssh` login.
+
+### 4.7 Kênh điều khiển SSH production và GitHub Actions
+
+Pilot Phase 7 đầu tiên dùng baseline sau:
+
+- GitHub Actions build, scan, và publish immutable release images.
+- Operator production deploy từ trusted workstation qua SSH.
+- Port 22 vẫn hạn chế tới IP đã biết của operator.
+- Operator chạy remote deployment script đã audit với immutable image tag đã chọn.
+
+Lệnh operator ví dụ:
+
+```bash
+ssh -o IdentitiesOnly=yes qrtable-deploy@<reserved-ip> \
+  "cd /opt/qrtable && IMAGE_TAG='<git-sha>' ./tools/deploy/phase7-remote-deploy.sh"
+```
+
+Không mở SSH tới `0.0.0.0/0` chỉ để GitHub-hosted runner kết nối. Địa chỉ egress của GitHub-hosted runner không phải single source IP ổn định phù hợp cho firewall rule này.
+
+Trước khi bật `deploy-production.yml` tùy chọn, `[HUMAN]` phải chọn và ghi tài liệu một kênh bảo mật:
+
+| Option                                       | Phase 7 decision | Notes                                                                       |
+| -------------------------------------------- | ---------------- | --------------------------------------------------------------------------- |
+| Operator workstation deploy                  | Baseline         | Đơn giản nhất; giữ SSH hạn chế; approval rõ ràng                            |
+| Private overlay/VPN such as Tailscale        | Recommended next | Truy cập GitHub runner vẫn cần thiết kế xác thực có chủ đích                |
+| Temporary runner-IP firewall rule via DO API | Conditional      | Workflow phải thêm đúng `/32`, deploy, và luôn gỡ; token cần firewall scope |
+| Isolated self-hosted deployment runner       | Later            | Phải harden, patch, monitor, và không chạy code pull-request không tin cậy  |
+
+`HUMAN-GATE-10` phải ghi kênh đã chọn. Cho đến khi kênh không-baseline được test, `deploy-production.yml` vẫn disabled hoặc chỉ in lệnh operator thay vì khởi tạo SSH.
+
+### 4.8 Quy trình domain, DNS, và TLS
+
+`[HUMAN]` Tại DNS provider có thẩm quyền cho `vodinhquan.dev`, tạo:
+
+| Type | Name              | Value                    | Initial TTL |
+| ---- | ----------------- | ------------------------ | ----------- |
+| A    | `api.qrtable`     | DigitalOcean Reserved IP | 300         |
+| A    | `app.qrtable`     | DigitalOcean Reserved IP | 300         |
+| A    | `qr.qrtable`      | DigitalOcean Reserved IP | 300         |
+| A    | `auth.qrtable`    | DigitalOcean Reserved IP | 300         |
+| A    | `grafana.qrtable` | DigitalOcean Reserved IP | 300         |
+
+Nếu DNS provider có chế độ HTTP proxy/CDN, giữ các bản ghi DNS-only cho đến khi Caddy cấp certificate thành công. Review bản ghi CAA hiện có: phải cho phép Let's Encrypt hoặc gỡ/cập nhật trước khi cấp.
+
+Xác nhận domain không sắp hết hạn, chi tiết auto-renew/thanh toán registrar hợp lệ, và nameserver có thẩm quyền là nơi đang chỉnh sửa.
+
+Verify từ bên ngoài Droplet:
+
+```bash
+for host in api app qr auth grafana; do
+  dig +short "${host}.qrtable.vodinhquan.dev" @1.1.1.1
+  dig +short "${host}.qrtable.vodinhquan.dev" @8.8.8.8
+done
+dig CAA qrtable.vodinhquan.dev +short
+```
+
+Sau khi Caddy start, verify hostname certificate, issuer, expiry, redirect behavior, và log automatic-renewal. DNS propagation đơn thuần không phải `HUMAN-GATE-05`; TLS công khai thành công cũng bắt buộc.
+
+### 4.9 Quy trình credential bên ngoài và production env
+
+`[SHARED]` Sinh secret thuộc QRTable locally hoặc trực tiếp trên server:
+
+```bash
+openssl rand -base64 48
+openssl rand -hex 32
+```
+
+Human nhập secret thuộc provider trực tiếp. Danh mục tối thiểu:
+
+| Secret group           | Required values                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| PostgreSQL/Mongo/Redis | strong root/service passwords and connection values                                            |
+| Keycloak               | temporary bootstrap admin, permanent admin, DB password, BFF and Management App client secrets |
+| Auth.js                | `AUTH_SECRET` and production Keycloak client values                                            |
+| SePay                  | OAuth client ID/secret, platform webhook secret, selected live API/base URLs                   |
+| Payment                | `PAYMENT_SECRETS_ENCRYPTION_KEY`                                                               |
+| Cloudinary             | cloud name, API key, API secret, and any upload preset required by current source              |
+| Grafana/proxy          | Grafana admin password and Caddy-compatible basic-auth hash                                    |
+| Offsite backup         | restricted Spaces access key/secret and bucket/endpoint values                                 |
+
+Kiểm tra repository hiện tại tìm thấy credential development đã điền trong `.env` local bị git-ignore, và Keycloak client secret deterministic vẫn còn trong development tooling. Vì vậy:
+
+- không bao giờ copy `.env` local hiện tại sang production;
+- sinh credential production-only mới cho mọi nhóm secret;
+- rotate credential development/provider đã từng commit, chia sẻ, screenshot, log, hoặc tái sử dụng ngoài trusted workstation hiện tại;
+- chạy secret-history scan trước release đầu và chỉ ghi số lượng phát hiện/remediation, không ghi giá trị secret;
+- đảm bảo script bootstrap/deploy production không fallback về default development deterministic.
+
+`[HUMAN]` Với Cloudinary:
+
+1. Tạo/chọn môi trường sản phẩm production.
+2. Lấy cloud name, API key, và API secret từ trang API Keys của Cloudinary.
+3. Chỉ lưu API secret trong password manager và production server env.
+4. Chạy một smoke upload/read/delete bằng ảnh test không nhạy cảm.
+5. Xác nhận frontend bundle và log không chứa API secret.
+
+Trên server:
+
+```bash
+sudo install -d -m 0750 -o qrtable-deploy -g qrtable-deploy /opt/qrtable
+sudo install -m 0600 -o qrtable-deploy -g qrtable-deploy \
+  docker/env/.env.production.example /opt/qrtable/.env.production
+sudoedit /opt/qrtable/.env.production
+stat -c '%a %U %G %n' /opt/qrtable/.env.production
+```
+
+Mode kỳ vọng là `600`. Chạy preflight redacted và scoped-env renderer; không chạy `cat`, `env`, `docker compose config`, hoặc `config --environment` trực tiếp vào log dùng chung.
+
+### 4.10 Quy trình Keycloak cho human
+
+`[AGENT]` Production bootstrap job tạo/cập nhật realm, roles, protocol mappers, clients, redirect URIs, web origins, và service-account permissions.
+
+`[HUMAN]` Sau bootstrap:
+
+1. Đăng nhập Keycloak Admin Console qua `https://auth.qrtable.vodinhquan.dev`.
+2. Tạo administrator vĩnh viễn có tên cho owner/maintainer.
+3. Bật xác thực mạnh theo chính sách Keycloak đã chọn.
+4. Đăng xuất và đăng nhập lại bằng administrator vĩnh viễn.
+5. Vô hiệu hóa/xóa temporary bootstrap administrator và gỡ giá trị bootstrap tạm khỏi runtime injection bình thường.
+6. Test đăng nhập Management App, logout, token issuer, tenant/role claims, và từ chối role không được phép trong phiên trình duyệt riêng.
+
+Credential bootstrap tạm là tài liệu recovery/bootstrap, không phải danh tính administrator dài hạn.
+
+### 4.11 Quy trình tài khoản SePay, OAuth, webhook, và live test
+
+Hướng dẫn cấp protocol canonical vẫn là `docs/guides/sepay-configuration-guide-phase3.md`; plan này định nghĩa các operator gate bắt buộc.
+
+`[HUMAN]` phải:
+
+1. Đăng ký/đăng nhập SePay, hoàn thành xác minh danh tính/doanh nghiệp nếu yêu cầu, chấp nhận điều khoản provider, và kết nối tài khoản ngân hàng nhận dự định.
+2. Xác nhận tài khoản dùng Bank Hub `/v1/webhook` với `SECRET_KEY` hay bề mặt `/api/v1/webhooks`/`Api_Key` đang được code.
+3. Tạo OAuth application với callback production chính xác:
+
+   ```text
+   https://app.qrtable.vodinhquan.dev/dashboard/payment-settings/sepay-callback
+   ```
+
+4. Nhập OAuth client ID/secret trực tiếp vào `/opt/qrtable/.env.production`.
+5. Cấu hình webhook platform `QRSUB`:
+
+   ```text
+   https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/platform
+   ```
+
+6. Hoàn thành tenant OAuth Connect từ Management App và verify webhook tenant `QRTBL` sinh ra có tenant slug.
+7. Verify secret sai/thiếu bị từ chối và provider call hợp lệ được audit idempotent.
+8. Chỉ sau phê duyệt rõ ràng, thực hiện một chuyển khoản thật giá trị thấp và quan sát BFF, Payment/SaaS, database audit, và bằng chứng Grafana.
+
+AI không thể chấp nhận điều khoản SePay, hoàn thành KYC, ủy quyền tài khoản ngân hàng, phê duyệt OAuth consent với tư cách owner, hoặc khởi tạo chuyển khoản ngân hàng thật.
+
+Bằng chứng `HUMAN-GATE-09`:
+
+- SePay account/product name and verified API surface;
+- OAuth application name and callback URL;
+- connected bank identifier with account number redacted;
+- platform and tenant webhook IDs/URLs with secrets hidden;
+- provider delivery result and QRTable transaction/audit ID;
+- amount/time/result of any approved low-value test.
+
+### 4.12 Thiết lập backup off-Droplet
+
+`[HUMAN]` Tạo DigitalOcean Space riêng hoặc object-storage target độc lập khác:
+
+1. Chọn region gần Droplet.
+2. Giữ bucket private.
+3. Tạo access key riêng hạn chế bucket backup và thao tác bắt buộc khi provider hỗ trợ.
+4. Nhập key/secret trực tiếp vào backup env trên server, không vào GitHub hay chat.
+5. Định nghĩa retention và quyền xóa.
+
+`[AGENT]` upload backup đã mã hóa, download tới target restore cô lập, verify checksum, restore PostgreSQL và MongoDB, và ghi duration/result. Archive hoặc snapshot cùng Droplet đơn thuần không thỏa `HUMAN-GATE-11`.
+
+### 4.13 Cửa sổ deploy production đầu tiên
+
+`[SHARED]` Trước deploy công khai đầu tiên:
+
+- [ ] Human chọn immutable image tag và cửa sổ bảo trì/demo.
+- [ ] Human xác nhận backup và rollback tag hiện tại.
+- [ ] Agent chạy preflight, migrations, ownership verification, deploy, và smoke checks.
+- [ ] Human validate login, luồng QR, POS/KDS, upload Cloudinary, và luồng SePay phía owner.
+- [ ] Agent và human quan sát health, log, metrics, trace, disk, memory, và lỗi webhook ở 5, 15, và 60 phút.
+- [ ] Human ghi `accept`, `rollback app`, hoặc `restore data` như các quyết định riêng.
+
+### 4.14 Bản ghi bằng chứng operator
+
+Implementation guide phải chứa deployment record đã redact với:
+
+```text
+deployment_date
+operator
+approver
+git_sha
+image_tag_and_digests
+github_actions_run_url
+digitalocean_project_registry_droplet_firewall_ids
+reserved_ip
+dns_and_tls_verification
+keycloak_admin_and_login_verification
+sepay_api_surface_oauth_webhook_delivery_ids
+cloudinary_smoke_result
+backup_object_checksum
+restore_rehearsal_result
+smoke_e2e_observation_results
+rollback_tag
+```
+
+Không screenshot, log, hoặc file bằng chứng nào được chứa full token, password, private key, OAuth secret, webhook secret, bank credential, hoặc dữ liệu khách hàng chưa redact.
+
+## 5. Cấu trúc file mục tiêu
 
 Tạo mới:
 
 - `.dockerignore`
 - `docker/backend.Dockerfile`
 - `docker/migrations.Dockerfile`
+- `docker/keycloak.Dockerfile`
 - `docker/management-app.Dockerfile`
 - `docker/customer-pwa.Dockerfile`
 - `docker/proxy/Caddyfile`
@@ -274,10 +656,14 @@ Tạo mới:
 - `docker-compose.proxy.yaml`
 - `docker-compose.monitoring.prod.yaml`
 - `tools/deploy/phase7-preflight.sh`
+- `tools/deploy/phase7-compose-validate.sh`
+- `tools/deploy/phase7-render-service-envs.sh`
 - `tools/deploy/phase7-build-images.sh`
 - `tools/deploy/phase7-migrate.sh`
 - `tools/deploy/phase7-seed-demo.sh`
 - `tools/deploy/phase7-smoke.sh`
+- `tools/deploy/phase7-e2e.sh`
+- `tools/deploy/phase7-keycloak-bootstrap.sh`
 - `docs/guides/phase-7-digitalocean-deployment.md`
 
 Tái sử dụng phần đã implement:
@@ -293,6 +679,8 @@ Sửa sau khi implement:
 
 - `apps/management-app/next.config.ts`
 - `apps/bff/src/bootstrap.ts`
+- `apps/bff/src/app/modules/realtime/gateways/order-events.gateway.ts`
+- `apps/bff/src/configuration/index.ts`
 - `docker-compose.monitoring.yaml` hoặc chỉ tạo production override
 - `docker/monitoring/prometheus/prometheus.yml` hoặc config Prometheus riêng production
 - `docs/technical-architecture.md` mục 14
@@ -303,12 +691,13 @@ Sửa sau khi implement:
 File riêng chỉ tạo trên server:
 
 - `/opt/qrtable/.env.production`
+- `/opt/qrtable/env/*.env`
 - `/opt/qrtable/secrets/*`
 - `/opt/qrtable/backups/*`
 
 Không commit các file riêng đó.
 
-## 5. Tasks (Các task)
+## 6. Tasks (Các task)
 
 ### Task 1: Thêm kiểm soát build context
 
@@ -324,6 +713,7 @@ Dùng nội dung sau:
 .git
 .github
 .vscode
+.codegraph
 .env
 .env.*
 !*.env.example
@@ -331,6 +721,8 @@ node_modules
 **/node_modules
 dist
 coverage
+playwright-report
+test-results
 .nx/cache
 .next
 apps/management-app/.next
@@ -343,13 +735,21 @@ docs/graduation-thesis-resources/thesis-report/build
 
 - [ ] Bước 2: Verify build context nhỏ gọn
 
-Chạy:
+Chạy build BuildKit thật và inspect dòng `load build context`:
 
 ```bash
-docker buildx du --verbose .
+docker buildx build \
+  --platform linux/amd64 \
+  --progress=plain \
+  --no-cache \
+  -f docker/backend.Dockerfile \
+  --build-arg APP_NAME=bff \
+  --load \
+  -t qrtable-bff:context-smoke \
+  .
 ```
 
-Kỳ vọng: không có `node_modules`, không có `docker/docker_data`, không có `.env` riêng.
+Kỳ vọng: context transfer có giới hạn và không chứa `node_modules`, `docker/docker_data`, `.codegraph`, test report hay `.env` riêng. Không dùng `docker buildx du` cho kiểm tra này; lệnh đó báo dung lượng disk builder, không phải kích thước build context.
 
 ### Task 2: Build image backend
 
@@ -357,6 +757,7 @@ Kỳ vọng: không có `node_modules`, không có `docker/docker_data`, không 
 
 - Tạo: `docker/backend.Dockerfile`
 - Tạo: `tools/deploy/phase7-build-images.sh`
+- Tạo: `tools/deploy/phase7-render-service-envs.sh`
 
 - [ ] Bước 1: Tạo Dockerfile backend tham số hóa
 
@@ -365,14 +766,14 @@ Dùng một Dockerfile với `APP_NAME` để cả tám NestJS service dùng chu
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.12-alpine3.20 AS base
+FROM node:22.22.3-alpine3.23 AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
 WORKDIR /workspace
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml nx.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
 COPY apps ./apps
 COPY libs ./libs
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
@@ -383,7 +784,7 @@ RUN test -n "$APP_NAME"
 RUN pnpm nx build "$APP_NAME" --configuration=production
 RUN pnpm --dir "dist/apps/$APP_NAME" install --prod --frozen-lockfile
 
-FROM node:22.12-alpine3.20 AS runtime
+FROM node:22.22.3-alpine3.23 AS runtime
 ARG APP_NAME
 ENV NODE_ENV=production
 ENV APP_NAME=$APP_NAME
@@ -403,25 +804,39 @@ Dùng nội dung sau:
 #!/usr/bin/env bash
 set -euo pipefail
 
-REGISTRY="${REGISTRY:-registry.digitalocean.com/qrtable}"
-TAG="${TAG:-phase7}"
+IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-registry.digitalocean.com/qrtable/qrtable}"
+IMAGE_TAG="${IMAGE_TAG:-phase7}"
+PLATFORM="${PLATFORM:-linux/amd64}"
 BACKEND_APPS=(bff authorizer catalog order kitchen payment saas user-access)
 
+if [[ "${PUSH_IMAGES:-false}" == "true" ]]; then
+  OUTPUT_ARGS=(--push)
+else
+  OUTPUT_ARGS=(--load)
+fi
+
 for app in "${BACKEND_APPS[@]}"; do
-  docker build \
+  docker buildx build \
+    --platform "${PLATFORM}" \
     -f docker/backend.Dockerfile \
     --build-arg APP_NAME="${app}" \
-    -t "${REGISTRY}/qrtable-${app}:${TAG}" \
+    -t "${IMAGE_REPOSITORY}:${app}-${IMAGE_TAG}" \
+    "${OUTPUT_ARGS[@]}" \
     .
 done
 ```
+
+Implementation có thể diễn đạt chọn output khác, nhưng phải chọn đúng một trong `--load` cho verify local hoặc `--push` cho CI. Cả mười hai artifact release dùng chung một repository DOCR và tag có prefix service.
+
+Task 3, 4, 5 và 9 phải append build Management App, Customer PWA, Keycloak và migration vào script này. Script phải fail trừ khi cả mười hai tag kỳ vọng được build hoặc push.
 
 - [ ] Bước 3: Verify một image backend trước khi build hết
 
 Chạy:
 
 ```bash
-docker build -f docker/backend.Dockerfile --build-arg APP_NAME=bff -t qrtable-bff:phase7-smoke .
+docker buildx build --platform linux/amd64 --load \
+  -f docker/backend.Dockerfile --build-arg APP_NAME=bff -t qrtable-bff:phase7-smoke .
 docker run --rm qrtable-bff:phase7-smoke node --version
 ```
 
@@ -470,14 +885,14 @@ Dùng nội dung sau:
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.12-alpine3.20 AS base
+FROM node:22.22.3-alpine3.23 AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
 WORKDIR /workspace
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml nx.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
 COPY apps/management-app/package.json apps/management-app/pnpm-lock.yaml ./apps/management-app/
 COPY apps ./apps
 COPY libs ./libs
@@ -492,7 +907,7 @@ ENV NEXT_PUBLIC_BFF_BASE_URL=$NEXT_PUBLIC_BFF_BASE_URL
 ENV NEXT_PUBLIC_CUSTOMER_PWA_URL=$NEXT_PUBLIC_CUSTOMER_PWA_URL
 RUN pnpm nx build management-app
 
-FROM node:22.12-alpine3.20 AS runtime
+FROM node:22.22.3-alpine3.23 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 RUN addgroup -g 1001 -S qrtable && adduser -S qrtable -u 1001 -G qrtable
@@ -509,7 +924,7 @@ CMD ["node", "apps/management-app/server.js"]
 Chạy:
 
 ```bash
-docker build \
+docker buildx build --platform linux/amd64 --load \
   -f docker/management-app.Dockerfile \
   --build-arg NEXT_PUBLIC_BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1 \
   --build-arg NEXT_PUBLIC_BFF_BASE_URL=https://api.qrtable.vodinhquan.dev/api/v1 \
@@ -532,12 +947,12 @@ Dùng nội dung sau:
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.12-alpine3.20 AS build
+FROM node:22.22.3-alpine3.23 AS build
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
 WORKDIR /workspace
-COPY package.json pnpm-lock.yaml nx.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
 COPY apps ./apps
 COPY libs ./libs
 ARG VITE_BFF_URL
@@ -547,7 +962,7 @@ ENV VITE_TENANT_ID=$VITE_TENANT_ID
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm nx build customer-pwa
 
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.30.1-alpine3.23 AS runtime
 COPY --from=build /workspace/apps/customer-pwa/dist /usr/share/nginx/html
 COPY docker/nginx/customer-pwa.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
@@ -575,7 +990,7 @@ server {
 Chạy:
 
 ```bash
-docker build \
+docker buildx build --platform linux/amd64 --load \
   -f docker/customer-pwa.Dockerfile \
   --build-arg VITE_BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1 \
   --build-arg VITE_TENANT_ID=seed-tenant-fallback \
@@ -589,6 +1004,7 @@ Kỳ vọng: build exit 0.
 **Files:**
 
 - Tạo: `docker-compose.infra.yaml`
+- Tạo: `docker/keycloak.Dockerfile`
 - Tái sử dụng: `docker/postgres/init/001-create-service-databases.sql`
 - Tạo: `docker/postgres/init/002-create-keycloak-database.sql`
 
@@ -623,16 +1039,49 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_keycloak')\ge
 
 User PostgreSQL per-service vẫn là task hardening theo dõi. Pilot Phase 7 đầu tiên, một PostgreSQL app user mạnh là chấp nhận được khi mạng database nội bộ và credential được giữ riêng tư.
 
-- [ ] Bước 3: Tạo compose infra production
+File init entrypoint PostgreSQL chỉ chạy khi `postgres_data` rỗng. Preflight phải verify cả năm database tồn tại. Khi áp dụng plan trên volume đã có, thực thi SQL init idempotent qua `psql` một cách rõ ràng; không giả định thêm file dưới `docker-entrypoint-initdb.d` sẽ mutate cluster đã khởi tạo.
 
-Key requirements:
+- [ ] Bước 3: Build an optimized Keycloak image with the QRTable theme
 
-- Pin version image.
-- Không expose cổng công khai cho database, Redis, Kafka hoặc cổng nội bộ Keycloak.
+Không build theme trên Droplet. Server được cấp phát cố ý có Docker nhưng không yêu cầu Node.js hay pnpm. Đóng gói provider jar vào image Keycloak immutable trong CI:
+
+```dockerfile
+# syntax=docker/dockerfile:1.7
+
+FROM node:22.22.3-alpine3.23 AS theme
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
+WORKDIR /workspace
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/keycloak-theme ./apps/keycloak-theme
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm theme:build
+
+FROM quay.io/keycloak/keycloak:26.6.2 AS builder
+COPY --from=theme /workspace/apps/keycloak-theme/dist_keycloak/keycloak-theme-for-kc-all-other-versions.jar /opt/keycloak/providers/qrtable-theme.jar
+RUN touch -m --date=@1743465600 /opt/keycloak/providers/qrtable-theme.jar
+RUN /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true
+
+FROM quay.io/keycloak/keycloak:26.6.2
+COPY --from=builder /opt/keycloak/ /opt/keycloak/
+ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
+CMD ["start", "--optimized"]
+```
+
+Khi implement, pin base image theo digest sau kiểm tra tương thích và lỗ hổng. Build và publish dưới dạng `${IMAGE_REPOSITORY}:keycloak-${IMAGE_TAG}`.
+
+- [ ] Bước 4: Tạo compose infra production
+
+Yêu cầu chính:
+
+- Pin bản patch được hỗ trợ theo digest.
+- Không publish port công khai cho database, Redis, Kafka hay cổng nội bộ Keycloak.
 - Dùng named volume, không bind-mount `docker/docker_data`.
-- Dùng health check.
-- Đặt Kafka advertised listener là `kafka:9092` cho app container.
-- Chạy Keycloak với `start` production, không `start-dev`.
+- Dùng health check container cho PostgreSQL, MongoDB, Redis và Kafka; poll readiness Keycloak từ tooling image vì image Keycloak chính thức không có `curl`.
+- Set Kafka advertised listener thành `kafka:9092` cho app container.
+- Chạy image Keycloak optimized tùy chỉnh với `start --optimized` production, không `start-dev`.
+- Cho Keycloak join cả `qrtable-infra` và `qrtable-edge` để reach PostgreSQL và Caddy reach Keycloak.
 
 Khung skeleton:
 
@@ -654,13 +1103,11 @@ volumes:
   mongodb_data:
   redis_data:
   kafka_data:
-  keycloak_data:
 
 services:
   postgres:
-    image: postgres:16.6-alpine
+    image: postgres:16.13-alpine
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -677,9 +1124,8 @@ services:
       retries: 10
 
   mongodb:
-    image: mongo:7.0.16
+    image: mongo:7.0.31
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
@@ -694,7 +1140,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7.4.1-alpine
+    image: redis:7.4.9-alpine
     restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
     volumes:
@@ -708,59 +1154,76 @@ services:
       retries: 10
 
   kafka:
-    image: bitnami/kafka:3.9.0
+    image: apache/kafka:4.3.0
+    hostname: kafka
     restart: unless-stopped
     environment:
-      KAFKA_CFG_NODE_ID: 0
-      KAFKA_CFG_PROCESS_ROLES: controller,broker
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
     volumes:
-      - kafka_data:/bitnami/kafka
+      - kafka_data:/var/lib/kafka/data
     networks:
       - qrtable-infra
+    healthcheck:
+      test: ['CMD-SHELL', '/opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1']
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
 
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.0
+    image: ${IMAGE_REPOSITORY}:keycloak-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/qrtable_keycloak
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KC_HOSTNAME: auth.qrtable.vodinhquan.dev
+      KC_HOSTNAME: https://auth.qrtable.vodinhquan.dev
       KC_HOSTNAME_STRICT: 'true'
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: 'true'
       KC_HTTP_ENABLED: 'true'
       KC_PROXY_HEADERS: xforwarded
       KC_HEALTH_ENABLED: 'true'
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-    command: ['start']
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    command: ['start', '--optimized']
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - keycloak_data:/opt/keycloak/data
-      - ./apps/keycloak-theme/dist_keycloak:/opt/keycloak/providers:ro
     networks:
       - qrtable-infra
-      - qrtable-app
+      - qrtable-edge
 ```
 
-- [ ] Bước 4: Verify compose syntax
+- [ ] Bước 5: Verify interpolation, compose syntax, networks, and readiness
 
 Chạy:
 
 ```bash
-docker compose -f docker-compose.infra.yaml config
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.infra.yaml
 ```
 
-Kỳ vọng: compose render không lỗi cú pháp.
+Kỳ vọng:
+
+- Compose render không lỗi cú pháp hay giá trị `${...}` chưa resolve.
+- `keycloak` join `qrtable-edge` và `qrtable-infra`.
+- Không container infra nào publish host port.
+- `phase7-preflight.sh --wait-infra` chờ datastore healthy và poll `http://keycloak:9000/health/ready` từ container migration/tooling trên `qrtable-infra`.
+- Smoke KafkaJS dùng client đã cài trong repo tạo/dùng test topic, produce một event và consume thành công với Kafka `4.3.0`.
 
 ### Task 6: Tạo lớp App Compose
 
@@ -788,20 +1251,15 @@ networks:
 
 services:
   bff:
-    image: ${REGISTRY}/qrtable-bff:${TAG}
+    image: ${IMAGE_REPOSITORY}:bff-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/bff.env
     environment:
       PORT: 3300
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
       KEYCLOAK_HOST: https://auth.qrtable.vodinhquan.dev
       PUBLIC_API_BASE_URL: https://api.qrtable.vodinhquan.dev
-      ORDER_SERVICE_HOST: order
-      CATALOG_SERVICE_HOST: catalog
-      KITCHEN_SERVICE_HOST: kitchen
-      PAYMENT_SERVICE_HOST: payment
-      SAAS_SERVICE_HOST: saas
       AUTHORIZER_SERVICE_HOST: authorizer
       USER_ACCESS_SERVICE_HOST: user-access
       TCP_ORDER_SERVICE_HOST: order
@@ -820,9 +1278,9 @@ services:
       - qrtable-infra
 
   order:
-    image: ${REGISTRY}/qrtable-order:${TAG}
+    image: ${IMAGE_REPOSITORY}:order-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/order.env
     environment:
       ORDER_PORT: 3301
       TYPEORM_HOST: postgres
@@ -830,8 +1288,9 @@ services:
       DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
-      TCP_ORDER_SERVICE_HOST: order
+      ORDER_SERVICE_HOST: 0.0.0.0
       TCP_CATALOG_SERVICE_HOST: catalog
+      TCP_SAAS_SERVICE_HOST: saas
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: order
@@ -840,15 +1299,17 @@ services:
       - qrtable-infra
 
   catalog:
-    image: ${REGISTRY}/qrtable-catalog:${TAG}
+    image: ${IMAGE_REPOSITORY}:catalog-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/catalog.env
     environment:
       CATALOG_PORT: 3305
       TYPEORM_HOST: postgres
       CATALOG_TYPEORM_DATABASE: qrtable_catalog
       DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       KAFKA_BROKERS: kafka:9092
+      CATALOG_SERVICE_HOST: 0.0.0.0
+      TCP_SAAS_SERVICE_HOST: saas
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: catalog
@@ -857,13 +1318,15 @@ services:
       - qrtable-infra
 
   kitchen:
-    image: ${REGISTRY}/qrtable-kitchen:${TAG}
+    image: ${IMAGE_REPOSITORY}:kitchen-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/kitchen.env
     environment:
       KITCHEN_PORT: 3307
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
+      KITCHEN_SERVICE_HOST: 0.0.0.0
+      TCP_ORDER_SERVICE_HOST: order
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: kitchen
@@ -872,9 +1335,9 @@ services:
       - qrtable-infra
 
   payment:
-    image: ${REGISTRY}/qrtable-payment:${TAG}
+    image: ${IMAGE_REPOSITORY}:payment-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/payment.env
     environment:
       PAYMENT_PORT: 3308
       TYPEORM_HOST: postgres
@@ -883,6 +1346,9 @@ services:
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
       PUBLIC_API_BASE_URL: https://api.qrtable.vodinhquan.dev
+      PAYMENT_SERVICE_HOST: 0.0.0.0
+      TCP_ORDER_SERVICE_HOST: order
+      TCP_SAAS_SERVICE_HOST: saas
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: payment
@@ -891,9 +1357,9 @@ services:
       - qrtable-infra
 
   saas:
-    image: ${REGISTRY}/qrtable-saas:${TAG}
+    image: ${IMAGE_REPOSITORY}:saas-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/saas.env
     environment:
       SAAS_PORT: 3306
       TYPEORM_HOST: postgres
@@ -901,6 +1367,12 @@ services:
       DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
+      SAAS_SERVICE_HOST: 0.0.0.0
+      TCP_AUTHORIZER_SERVICE_HOST: authorizer
+      TCP_USER_ACCESS_SERVICE_HOST: user-access
+      TCP_CATALOG_SERVICE_HOST: catalog
+      TCP_ORDER_SERVICE_HOST: order
+      TCP_PAYMENT_SERVICE_HOST: payment
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: saas
@@ -909,12 +1381,15 @@ services:
       - qrtable-infra
 
   authorizer:
-    image: ${REGISTRY}/qrtable-authorizer:${TAG}
+    image: ${IMAGE_REPOSITORY}:authorizer-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/authorizer.env
     environment:
       AUTHORIZER_PORT: 3304
-      KEYCLOAK_HOST: https://auth.qrtable.vodinhquan.dev
+      KEYCLOAK_HOST: http://keycloak:8080
+      AUTHORIZER_SERVICE_HOST: 0.0.0.0
+      USER_ACCESS_SERVICE_HOST: user-access
+      TCP_USER_ACCESS_SERVICE_HOST: user-access
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: authorizer
@@ -923,14 +1398,17 @@ services:
       - qrtable-infra
 
   user-access:
-    image: ${REGISTRY}/qrtable-user-access:${TAG}
+    image: ${IMAGE_REPOSITORY}:user-access-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/user-access.env
     environment:
       USER_ACCESS_PORT: 3303
-      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017
       USER_ACCESS_MONGO_DB_NAME: qrtable_auth
       DATABASE_SHARED_FALLBACK_ENABLED: 'false'
+      USER_ACCESS_SERVICE_HOST: 0.0.0.0
+      AUTHORIZER_SERVICE_HOST: authorizer
+      TCP_AUTHORIZER_SERVICE_HOST: authorizer
+      TCP_SAAS_SERVICE_HOST: saas
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: user-access
@@ -939,9 +1417,9 @@ services:
       - qrtable-infra
 
   management-app:
-    image: ${REGISTRY}/qrtable-management-app:${TAG}
+    image: ${IMAGE_REPOSITORY}:management-app-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/management-app.env
     environment:
       AUTH_URL: https://app.qrtable.vodinhquan.dev
       AUTH_TRUST_HOST: 'true'
@@ -957,7 +1435,7 @@ services:
       - qrtable-app
 
   customer-pwa:
-    image: ${REGISTRY}/qrtable-customer-pwa:${TAG}
+    image: ${IMAGE_REPOSITORY}:customer-pwa-${IMAGE_TAG}
     restart: unless-stopped
     labels:
       app: customer-pwa
@@ -965,7 +1443,7 @@ services:
       - qrtable-edge
 ```
 
-- [ ] Bước 2: Thêm health check app còn thiếu sau lần boot thành công đầu
+- [ ] Bước 2: Thêm app health check như phần của compose production
 
 Dùng HTTP check:
 
@@ -981,15 +1459,40 @@ healthcheck:
 Điều chỉnh path theo prefix từng service:
 
 - BFF: `/api/v1/health/live`
-- Order/Catalog/Kitchen/Payment: `/api/v1/health/live`
-- Authorizer/SaaS/User-Access: `/api/health/live`
+- Order/Catalog/Kitchen/Payment/SaaS: `/api/v1/health/live`
+- Authorizer/User-Access: `/api/health/live`
+
+- [ ] Bước 3: Verify ma trận listener/client host
+
+Môi trường compose phải thỏa contract code hiện tại:
+
+| Container   | Biến listener set `0.0.0.0`                      | Client host TCP/gRPC set tên service                                        |
+| ----------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
+| BFF         | none                                             | all seven `TCP_*`; `AUTHORIZER_SERVICE_HOST`; `USER_ACCESS_SERVICE_HOST`    |
+| Order       | `ORDER_SERVICE_HOST`                             | Catalog, SaaS                                                               |
+| Catalog     | `CATALOG_SERVICE_HOST`                           | SaaS                                                                        |
+| Kitchen     | `KITCHEN_SERVICE_HOST`                           | Order                                                                       |
+| Payment     | `PAYMENT_SERVICE_HOST`                           | Order, SaaS                                                                 |
+| SaaS        | `SAAS_SERVICE_HOST`                              | Authorizer, User-Access, Catalog, Order, Payment                            |
+| Authorizer  | `AUTHORIZER_SERVICE_HOST` for both TCP and gRPC  | User-Access through TCP and `USER_ACCESS_SERVICE_HOST` through gRPC         |
+| User-Access | `USER_ACCESS_SERVICE_HOST` for both TCP and gRPC | Authorizer through TCP and `AUTHORIZER_SERVICE_HOST` through gRPC; SaaS TCP |
+
+Chạy smoke kết nối TCP/gRPC cấp container trước nghiệm thu công khai. Process listen trên `127.0.0.1` bên trong container riêng là lỗi deploy dù HTTP health endpoint vẫn pass.
+
+- [ ] Bước 4: Verify interpolation app compose và network membership
+
+```bash
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.app.yaml
+```
+
+Kỳ vọng: mọi image resolve thành `${IMAGE_REPOSITORY}:<service>-${IMAGE_TAG}`, không còn placeholder `${...}`, chỉ BFF/Management App/Customer PWA join `qrtable-edge`, và không app service nào publish host port.
 
 ### Task 7: Thêm reverse proxy và HTTPS
 
 **Files:**
 
 - Tạo: `docker/proxy/Caddyfile`
-- Create: `docker-compose.proxy.yaml`
+- Tạo: `docker-compose.proxy.yaml`
 
 - [ ] Bước 1: Tạo Caddyfile
 
@@ -1011,7 +1514,7 @@ auth.qrtable.vodinhquan.dev {
 }
 
 grafana.qrtable.vodinhquan.dev {
-  basicauth {
+  basic_auth {
     {$GRAFANA_BASIC_AUTH_USER} {$GRAFANA_BASIC_AUTH_HASH}
   }
   reverse_proxy grafana:3000
@@ -1021,7 +1524,7 @@ grafana.qrtable.vodinhquan.dev {
 Sinh hash basic-auth Caddy trên server:
 
 ```bash
-docker run --rm caddy:2.8.4 caddy hash-password --plaintext "$GRAFANA_BASIC_AUTH_PASSWORD"
+docker run --rm caddy:2.11.3 caddy hash-password --plaintext "$GRAFANA_BASIC_AUTH_PASSWORD"
 ```
 
 - [ ] Bước 2: Tạo compose proxy
@@ -1040,9 +1543,9 @@ volumes:
 
 services:
   caddy:
-    image: caddy:2.8.4
+    image: caddy:2.11.3
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/proxy.env
     ports:
       - '80:80'
       - '443:443'
@@ -1059,24 +1562,27 @@ services:
 Chạy:
 
 ```bash
-docker compose -f docker-compose.proxy.yaml config
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.proxy.yaml
 ```
 
-Kỳ vọng: compose render không lỗi cú pháp.
+Kỳ vọng: compose render không lỗi cú pháp, `basic_auth` được chấp nhận bởi bản Caddy đã pin, và Caddy resolve được `bff`, `management-app`, `customer-pwa`, `keycloak`, `grafana` trên `qrtable-edge`. Caddy tự xử lý WebSocket upgrade cho reverse proxy BFF.
 
 ### Task 8: Chuẩn bị env và secret production
 
 **Files:**
 
 - Tạo: `docker/env/.env.production.example`
+- Tạo: `tools/deploy/phase7-compose-validate.sh`
+- Tạo: `tools/deploy/phase7-render-service-envs.sh`
 
 - [ ] Bước 1: Tạo file mẫu chỉ có key và giá trị mẫu an toàn
 
 Gồm mọi key bắt buộc, không gồm secret thật:
 
 ```dotenv
-REGISTRY=registry.digitalocean.com/qrtable
-TAG=phase7
+IMAGE_REPOSITORY=registry.digitalocean.com/qrtable/qrtable
+IMAGE_TAG=phase7
+DEPLOYMENT_PROFILE=production
 
 NODE_ENV=production
 GLOBAL_PREFIX=api/v1
@@ -1084,7 +1590,7 @@ GLOBAL_PREFIX=api/v1
 POSTGRES_USER=qrtable_app
 POSTGRES_PASSWORD=generate_on_server
 MONGO_ROOT_USERNAME=qrtable_mongo
-MONGO_ROOT_PASSWORD=generate_on_server
+MONGO_ROOT_PASSWORD=generate_url_safe_hex_on_server
 
 TYPEORM_HOST=postgres
 TYPEORM_PORT=5432
@@ -1104,6 +1610,7 @@ REDIS_PORT=6379
 REDIS_TTL=1800000
 
 KAFKA_BROKERS=kafka:9092
+KAFKA_CLUSTER_ID=replace_with_one_stable_kraft_cluster_id
 KAFKA_CLIENT_ID=qrtable-order-service
 KAFKA_ORDER_CONFIRMED_TOPIC=order.confirmed
 KAFKA_ORDER_STATUS_CHANGED_TOPIC=order.status_changed
@@ -1125,6 +1632,7 @@ KEYCLOAK_CLIENT_ID=qrtable-bff
 KEYCLOAK_CLIENT_SECRET=generate_on_server
 MANAGEMENT_APP_CLIENT_ID=management-app
 MANAGEMENT_APP_CLIENT_SECRET=generate_on_server
+AUTH_AUTO_PROVISION_ON_FIRST_LOGIN=false
 
 AUTH_SECRET=generate_on_server
 AUTH_KEYCLOAK_ID=management-app
@@ -1136,14 +1644,19 @@ MANAGEMENT_BFF_BASE_URL=https://api.qrtable.vodinhquan.dev/api/v1
 NEXT_PUBLIC_BFF_BASE_URL=https://api.qrtable.vodinhquan.dev/api/v1
 NEXT_PUBLIC_BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1
 NEXT_PUBLIC_CUSTOMER_PWA_URL=https://qr.qrtable.vodinhquan.dev
+PLATFORM_CONTACT_EMAIL=support@your-domain.example
+NEXT_PUBLIC_PLATFORM_CONTACT_EMAIL=support@your-domain.example
 VITE_BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1
 VITE_TENANT_ID=seed-tenant-fallback
+CORS_ORIGINS=https://app.qrtable.vodinhquan.dev,https://qr.qrtable.vodinhquan.dev
 
 SEPAY_WEBHOOK_SECRET=generate_on_server_or_provider_value
 SEPAY_PLATFORM_WEBHOOK_SECRET=generate_on_server_or_provider_value
 BFF_PAYMENT_TCP_TIMEOUT_MS=5000
 PAYMENT_SEPAY_QR_ACCOUNT=provider_value
 PAYMENT_SEPAY_QR_BANK=provider_value
+SEPAY_PLATFORM_QR_ACCOUNT=provider_value
+SEPAY_PLATFORM_QR_BANK=provider_value
 PAYMENT_ORDER_TCP_TIMEOUT_MS=5000
 PAYMENT_SECRETS_ENCRYPTION_KEY=64_hex_chars
 SEPAY_OAUTH_BASE_URL=https://my.sepay.vn
@@ -1181,7 +1694,84 @@ Kỳ vọng:
 - Không service nào phụ thuộc `TYPEORM_DATABASE` hoặc `MONGO_DB_NAME` ở production.
 - `PAYMENT_SECRETS_ENCRYPTION_KEY` đúng 64 ký tự hex.
 - `AUTH_SECRET`, mật khẩu DB, secret Keycloak và mật khẩu Grafana là giá trị ngẫu nhiên mạnh.
+- MongoDB credentials interpolated into `MONGODB_URI` are URL-safe hex or correctly percent-encoded.
+- The real Caddy bcrypt value is single-quoted in `.env.production` so `$` characters remain literal, for example `GRAFANA_BASIC_AUTH_HASH='$2a$...'`.
+- `IMAGE_REPOSITORY` trỏ tới repository DOCR duy nhất và `IMAGE_TAG` immutable cho mỗi release.
+- `KAFKA_CLUSTER_ID` sinh một lần, lưu trong env production, và tái sử dụng trong vòng đời volume dữ liệu Kafka.
+- `CORS_ORIGINS` chỉ chứa đúng origin Management App và Customer PWA.
+- `AUTH_AUTO_PROVISION_ON_FIRST_LOGIN=false` unless a separately reviewed production onboarding policy intentionally enables it.
 - File `/opt/qrtable/.env.production` thật không bao giờ được commit.
+
+- [ ] Bước 3: Validate Compose không rò giá trị interpolation
+
+Tạo `phase7-compose-validate.sh`:
+
+- Set `umask 077`.
+- Capture cả `docker compose --env-file /opt/qrtable/.env.production ... config` và `config --environment` vào file tạm.
+- Từ chối placeholder `${...}` chưa resolve, biến release bắt buộc rỗng, host port công khai không mong đợi, và tham chiếu trực tiếp master env làm `env_file` cấp service.
+- Không stream file đã capture ra stdout/stderr hay upload làm CI artifact.
+- Xóa chúng qua `trap` khi success, failure hoặc interruption.
+- Chỉ in tóm tắt pass/fail đã redact với tên file compose và tên key fail, không bao giờ in giá trị.
+
+- [ ] Bước 4: Render file env runtime least-privilege
+
+Dùng `/opt/qrtable/.env.production` chỉ làm nguồn master riêng cho Compose interpolation và deployment tooling. Không inject nguyên file đó vào application container.
+
+Tạo `phase7-render-service-envs.sh` với allowlist rõ ràng cho:
+
+```text
+/opt/qrtable/env/bff.env
+/opt/qrtable/env/order.env
+/opt/qrtable/env/catalog.env
+/opt/qrtable/env/kitchen.env
+/opt/qrtable/env/payment.env
+/opt/qrtable/env/saas.env
+/opt/qrtable/env/authorizer.env
+/opt/qrtable/env/user-access.env
+/opt/qrtable/env/management-app.env
+/opt/qrtable/env/migrations.env
+/opt/qrtable/env/identity-bootstrap.env
+/opt/qrtable/env/proxy.env
+```
+
+Yêu cầu:
+
+- Create `/opt/qrtable/env` with mode `0700` and each file atomically with mode `0600`.
+- Duy trì allowlist biến trong source control, nhưng không bao giờ ghi giá trị secret ra log.
+- Fail if a required variable is missing or if an unknown variable is requested by a service mapping.
+- Chỉ derive `MONGODB_URI` bên trong renderer từ credential URL-safe và gồm `authSource=admin`; không duplicate URI đầy đủ trong master env.
+- Copy safe common runtime values such as `NODE_ENV=production`, `GLOBAL_PREFIX`, OTEL endpoint, and log level only to services that consume them.
+- Keep DB credentials out of BFF/frontends, SePay credentials out of unrelated services, Keycloak admin credentials out of app containers, and Grafana basic-auth material only in `proxy.env`.
+- `migrations.env` receives only database/migration variables. `identity-bootstrap.env` separately owns Keycloak admin/client and optional Mongo identity-sync values.
+- Preflight từ chối mọi service có `env_file` trỏ trực tiếp tới master `.env.production`.
+
+Mapping ownership tối thiểu:
+
+| File env                 | Nhóm cấu hình sở hữu                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `bff.env`                | BFF runtime, Redis, BFF Kafka, webhook forwarding secret, Cloudinary, public URLs/contact |
+| `order.env`              | Order PostgreSQL, Redis, Order Kafka                                                      |
+| `catalog.env`            | Catalog PostgreSQL                                                                        |
+| `kitchen.env`            | Redis, Kitchen Kafka                                                                      |
+| `payment.env`            | Payment PostgreSQL, Redis, Payment Kafka, SePay tenant OAuth/webhook encryption           |
+| `saas.env`               | SaaS PostgreSQL, Redis, SaaS Kafka, SePay platform payment configuration                  |
+| `authorizer.env`         | Keycloak realm/client credentials and auth provisioning policy                            |
+| `user-access.env`        | MongoDB/User-Access configuration                                                         |
+| `management-app.env`     | Auth.js secret, Keycloak browser client, public/server BFF and PWA URLs                   |
+| `migrations.env`         | Four PostgreSQL database contracts and ownership-verification values                      |
+| `identity-bootstrap.env` | Keycloak admin/client values; Mongo sync values only for explicitly enabled demo users    |
+| `proxy.env`              | Caddy/Grafana basic-auth values only                                                      |
+
+- [ ] Bước 5: Implement và test allowlist CORS production
+
+Trước deploy công khai:
+
+- Parse `CORS_ORIGINS` once in BFF configuration and reject wildcard `*` when `NODE_ENV=production`.
+- Tái sử dụng cùng allowlist trong `app.enableCors(...)` và `@WebSocketGateway(...)`.
+- Add tests for allowed Management/PWA origins, a rejected unlisted origin, and production startup failure for an empty or wildcard allowlist.
+- Add external preflight checks for both HTTP and Socket.IO handshake origins.
+
+Đây là blocker production, không phải cải tiến theo dõi.
 
 ### Task 9: Đóng gói và chạy migration per-service hiện có
 
@@ -1229,10 +1819,10 @@ Image runtime backend chứa bundle app đã compile và nên giữ nhỏ. Tạo
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.12-alpine3.20
+FROM node:22.22.3-alpine3.23
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
 RUN apk add --no-cache bash curl jq
 WORKDIR /workspace
 
@@ -1250,7 +1840,10 @@ CMD ["pnpm", "db:migrate"]
 Build và push với cùng immutable tag như image app:
 
 ```bash
-docker build -f docker/migrations.Dockerfile -t "${REGISTRY}/qrtable-migrations:${TAG}" .
+docker buildx build --platform linux/amd64 --load \
+  -f docker/migrations.Dockerfile \
+  -t "${IMAGE_REPOSITORY}:migrations-${IMAGE_TAG}" \
+  .
 ```
 
 Thêm build image migration vào `tools/deploy/phase7-build-images.sh` để release không thể publish image app mà thiếu artifact migration khớp.
@@ -1267,22 +1860,29 @@ networks:
 
 services:
   migrations:
-    image: ${REGISTRY}/qrtable-migrations:${TAG}
-    env_file: /opt/qrtable/.env.production
+    image: ${IMAGE_REPOSITORY}:migrations-${IMAGE_TAG}
+    env_file: /opt/qrtable/env/migrations.env
+    networks:
+      - qrtable-infra
+
+  identity-bootstrap:
+    image: ${IMAGE_REPOSITORY}:migrations-${IMAGE_TAG}
+    env_file: /opt/qrtable/env/identity-bootstrap.env
     networks:
       - qrtable-infra
 ```
 
-Service migration không được expose cổng, tự restart, hoặc tiếp tục chạy sau khi lệnh kết thúc.
+Không service one-shot nào expose port, tự restart, hay chạy liên tục sau khi lệnh thoát. Migration database chỉ chạy qua `migrations`; bootstrap Keycloak chỉ qua `identity-bootstrap`.
 
 - [ ] Bước 4: Chạy migration trước app container
 
 `tools/deploy/phase7-migrate.sh` phải chạy:
 
 ```bash
-docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:migrate
-docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show
-docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:verify:ownership
+COMPOSE_ENV=(--env-file /opt/qrtable/.env.production)
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.migrations.yaml run --rm migrations pnpm db:migrate
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.migrations.yaml run --rm migrations pnpm db:verify:ownership
 ```
 
 Kỳ vọng:
@@ -1324,58 +1924,80 @@ Seed ID dùng cho E2E phải ghi vào file ghi chú deploy không chứa secret.
 
 **Files:**
 
+- Tạo: `docker/keycloak.Dockerfile`
 - Sửa hoặc bọc: `tools/keycloak-bootstrap.sh`
-- Create: `tools/deploy/phase7-keycloak-bootstrap.sh`
+- Tạo: `tools/deploy/phase7-keycloak-bootstrap.sh`
 
-- [ ] Bước 1: Build hoặc mount theme Keycloak
+- [ ] Bước 1: Package the Keycloak theme in the immutable image
 
-Chạy trước khi start Keycloak:
+Build image Keycloak optimized tùy chỉnh trong Task 5 và publish cùng release. Droplet không được chạy `pnpm theme:build` và không bind-mount thư mục theme mutable trên host.
 
-```bash
-pnpm theme:build
-```
+- [ ] Bước 2: Split infrastructure bootstrap from demo-user bootstrap
 
-Kỳ vọng: `apps/keycloak-theme/dist_keycloak` tồn tại và chứa jar/asset theme provider mà Keycloak cần.
+`tools/keycloak-bootstrap.sh` hiện tại không an toàn cho production vì yêu cầu `tools/auth-bootstrap-users.json`, reset mọi mật khẩu được liệt kê mỗi lần chạy, và file đã commit chứa mật khẩu demo deterministic.
 
-- [ ] Bước 2: Bootstrap realm, client và đồng bộ User-Access từ mạng infra
+Refactor or wrap it so:
+
+- Realm, roles, protocol mappers, service account permissions, clients, client secrets, redirect URIs, and web origins are idempotently created **and updated** on every run.
+- `qrtable-bff` vẫn là confidential machine/direct-grant client theo hành vi source hiện tại: bật service account và direct grant, tắt browser standard flow, và không có redirect URI/web origin trình duyệt.
+- `management-app` remains a confidential browser client: standard flow enabled, direct grants/service accounts disabled unless source evidence requires them, exact Auth.js callback URI, and exact app web origin.
+- `AUTH_BOOTSTRAP_USERS_ENABLED=false` là hành vi production mặc định.
+- Demo users are only created or updated when `DEPLOYMENT_PROFILE=demo`, `AUTH_BOOTSTRAP_USERS_ENABLED=true`, and an explicit `--yes` flag are all present.
+- Bootstrap production không bao giờ đọc `tools/auth-bootstrap-users.json` và không reset mật khẩu người dùng thật.
+- `KEYCLOAK_CLEAN_REALM=true` remains restricted to local hosts and is never used by Phase 7 deployment.
+- Đồng bộ user MongoDB chỉ chạy cho đường bootstrap user được bật rõ ràng.
+
+- [ ] Bước 3: Bootstrap realm and clients from the infra network
 
 Chạy bootstrap qua image migration/tooling để `keycloak` và `mongodb` resolve trên mạng Docker nội bộ. Redirect URI công khai vẫn dùng domain production:
 
 ```bash
-docker compose -f docker-compose.migrations.yaml run --rm \
+docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.migrations.yaml \
+  run --rm \
   -e KEYCLOAK_HOST=http://keycloak:8080 \
-  -e MONGODB_URI="mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017" \
-  -e USER_ACCESS_MONGO_DB_NAME=qrtable_auth \
-  -e KEYCLOAK_ADMIN_USER="$KEYCLOAK_ADMIN_USER" \
-  -e KEYCLOAK_ADMIN_PASSWORD="$KEYCLOAK_ADMIN_PASSWORD" \
-  -e KEYCLOAK_REALM=qrtable \
-  -e KEYCLOAK_CLIENT_ID=qrtable-bff \
-  -e KEYCLOAK_CLIENT_SECRET="$KEYCLOAK_CLIENT_SECRET" \
-  -e MANAGEMENT_APP_CLIENT_ID=management-app \
-  -e MANAGEMENT_APP_CLIENT_SECRET="$MANAGEMENT_APP_CLIENT_SECRET" \
   -e KEYCLOAK_MASTER_SSL_REQUIRED=external \
   -e KEYCLOAK_REALM_SSL_REQUIRED=external \
-  migrations bash tools/keycloak-bootstrap.sh
+  -e KEYCLOAK_MANAGEMENT_REDIRECT_URIS=https://app.qrtable.vodinhquan.dev/api/auth/callback/keycloak \
+  -e KEYCLOAK_MANAGEMENT_WEB_ORIGINS=https://app.qrtable.vodinhquan.dev \
+  -e AUTH_BOOTSTRAP_USERS_ENABLED=false \
+  identity-bootstrap bash tools/deploy/phase7-keycloak-bootstrap.sh
 ```
 
-- [ ] Bước 3: Cập nhật redirect URI và web origin
+- [ ] Bước 4: Verify redirect URIs, web origins, and public issuer
 
 Ensure Keycloak clients include:
 
 ```text
-https://app.qrtable.vodinhquan.dev/*
-https://api.qrtable.vodinhquan.dev/*
+management-app redirect:
+https://app.qrtable.vodinhquan.dev/api/auth/callback/keycloak
+
+management-app web origin:
+https://app.qrtable.vodinhquan.dev
+
+qrtable-bff redirect/origin:
+none for the current service-account/direct-grant flow
 ```
 
 Kỳ vọng:
 
 - Đăng nhập Management App redirect qua `auth.qrtable.vodinhquan.dev`.
+- Token expose public issuer `https://auth.qrtable.vodinhquan.dev/realms/qrtable`.
+- Authorizer reaches Keycloak internally at `http://keycloak:8080` for token/JWKS/admin calls without exposing Keycloak's container port.
 - BFF Authorizer có thể đổi client token với Keycloak.
-- User và role nội bộ được đồng bộ vào MongoDB `qrtable_auth`, không phải database legacy `qrtable`.
+- Default production bootstrap creates no deterministic demo users and resets no user passwords.
+- User chỉ demo, khi được bật rõ ràng, được đồng bộ vào MongoDB `qrtable_auth`, không phải database legacy `qrtable`.
 
 ### Task 11: Cấu hình tích hợp SePay production
 
 SePay là phụ thuộc production, không chỉ chi tiết biến env. Deploy chưa sẵn sàng cho đến khi cấu hình dashboard/API SePay khớp route công khai của QRTable và code path đang dùng.
+
+Trách nhiệm human:
+
+- `[HUMAN]` Đăng ký tài khoản, verification/KYC, điều khoản, liên kết ngân hàng, phê duyệt OAuth application, cấu hình webhook dashboard, và mọi chuyển khoản thật.
+- `[AGENT]` Verify source, implement route, preflight, negative test, kiểm tra idempotency/audit, và bằng chứng redact.
+- Hoàn thành `HUMAN-GATE-09` ở mục 4.11 trước khi đánh dấu task này production-ready.
 
 **Tài liệu provider đã verify:**
 
@@ -1421,7 +2043,7 @@ Legacy lab route:
 https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook
 ```
 
-- [ ] Bước 2: Cấu hình webhook subscription platform
+- [ ] Bước 2: Cấu hình webhook subscription platform `[HUMAN]`
 
 Trong dashboard/API SePay:
 
@@ -1440,7 +2062,7 @@ Kỳ vọng:
 - Secret platform hợp lệ cho phép BFF forward sang SaaS.
 - SaaS bỏ qua payload `QRTBL` trên route platform và chỉ settle `QRSUB`.
 
-- [ ] Bước 3: Cấu hình tenant OAuth Connect
+- [ ] Bước 3: Cấu hình tenant OAuth Connect `[SHARED]`
 
 Trong app OAuth SePay:
 
@@ -1466,7 +2088,7 @@ Kỳ vọng:
 - Tài khoản ngân hàng được chọn tạo/upsert URL webhook tenant có slug tenant.
 - Secret per-tenant lưu mã hóa, không expose trên frontend.
 
-- [ ] Bước 4: Verify bề mặt API webhook SePay với tài khoản thật
+- [ ] Bước 4: Verify bề mặt API webhook SePay với tài khoản thật `[SHARED]`
 
 Trước deploy live, đối chiếu mismatch source-code/API:
 
@@ -1482,7 +2104,7 @@ Hành động:
 - Nếu API live dùng hình dạng `/api/v1/webhooks` hiện tại, ghi bằng chứng vào `docs/guides/sepay-configuration-guide-phase3.md`.
 - Không gọi production-ready cho đến khi một trong hai path được chứng minh với tài khoản SePay thật.
 
-- [ ] Bước 5: Định nghĩa verify live an toàn
+- [ ] Bước 5: Định nghĩa verify live an toàn `[SHARED]`
 
 Không tự động hóa chuyển khoản ngân hàng thật trong CI.
 
@@ -1524,6 +2146,7 @@ scrape_configs:
           - bff:3300
           - order:3301
           - catalog:3305
+          - saas:3306
           - kitchen:3307
           - payment:3308
 
@@ -1533,10 +2156,23 @@ scrape_configs:
       - targets:
           - authorizer:3304
           - user-access:3303
-          - saas:3306
 ```
 
-- [ ] Bước 2: Giữ kho monitoring riêng tư
+- [ ] Bước 2: Define the production network contract
+
+`docker-compose.monitoring.prod.yaml` phải attach:
+
+| Service    | Mạng                                         | Lý do                                        |
+| ---------- | -------------------------------------------- | -------------------------------------------- |
+| Grafana    | monitoring network + `qrtable-edge`          | private data sources plus Caddy reachability |
+| Prometheus | monitoring network + `qrtable-app`           | scrape backend service names                 |
+| Tempo      | monitoring network + `qrtable-app`           | receive OTLP from app containers             |
+| Loki       | monitoring network                           | internal log store                           |
+| Promtail   | monitoring network plus Docker socket access | ship labeled container logs                  |
+
+Production override phải thay giả định local `qrtable-nw`/`host.docker.internal` bằng external network rõ ràng. Verify bằng `docker network inspect qrtable-edge qrtable-app`.
+
+- [ ] Bước 3: Keep monitoring stores private
 
 Quy tắc production:
 
@@ -1544,41 +2180,55 @@ Quy tắc production:
 - Chỉ publish Grafana qua reverse proxy với HTTPS và basic auth.
 - Dùng Docker label Promtail từ app container: `app=bff`, `app=order`, v.v.
 
-- [ ] Bước 3: Verify Grafana
+- [ ] Bước 4: Verify Grafana
 
 Chạy:
 
 ```bash
-docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml config
+./tools/deploy/phase7-compose-validate.sh \
+  -f docker-compose.monitoring.yaml \
+  -f docker-compose.monitoring.prod.yaml
 ```
 
-Kỳ vọng: compose production không có cổng công khai `3100`, `9090`, `3200` hoặc `4318`.
+Kỳ vọng: compose production không có port công khai `3001`, `3100`, `9090`, `3200` hay `4318`; Grafana chỉ reachable qua Caddy; Prometheus resolve được backend service; app container resolve được `tempo`.
 
-### Task 13: Provision DigitalOcean
+### Task 13: Cấp phát DigitalOcean
 
 **Files:**
 
 - Tạo: `docs/guides/phase-7-digitalocean-deployment.md`
 
-- [ ] Bước 1: Tạo Droplet
+Task này vận hành hóa `HUMAN-GATE-01` đến `HUMAN-GATE-05`. Implementation guide phải gồm hướng dẫn web-console, trường bằng chứng, và quy tắc xử lý secret từ mục 4 — không chỉ lệnh shell.
+
+- [ ] Bước 1: Tạo bảo mật tài khoản, Project, và registry `[HUMAN]`
+
+Trong control panel DigitalOcean:
+
+- Xác nhận owner email, 2FA/passkey, tài liệu recovery, team, và billing.
+- Tạo/chọn Project `qrtable-production`.
+- Tạo Container Registry cuối cùng ở region đã chọn và ghi tên/tier immutable.
+- Tạo API token scope hẹp dùng cho image-release workflow.
+- Hoàn thành `HUMAN-GATE-01` và `HUMAN-GATE-03`.
+
+- [ ] Bước 2: Tạo SSH key, Reserved IP, Droplet, và firewall `[HUMAN]`
 
 Dùng:
 
+- Public key Ed25519 admin và deploy tương lai riêng; không đăng nhập bằng mật khẩu.
 - Ubuntu 24.04 LTS hoặc Ubuntu LTS được DO hỗ trợ hiện tại.
 - Region `sgp1` nếu có.
-- Xác thực SSH key.
-- Không đăng nhập bằng mật khẩu.
-- Gắn Cloud Firewall.
-- Bật backup trước demo công khai đầu tiên.
-
-- [ ] Bước 2: Cấu hình firewall
+- Kích thước pilot khuyến nghị 4 vCPU / 8 GiB.
+- DigitalOcean Reserved IP làm DNS target ổn định.
+- Cloud Firewall đã gắn.
+- Enhanced monitoring và backups bật trước demo công khai đầu tiên.
+- Resource tags `qrtable`, `production`, và `phase7`.
 
 Cho phép:
 
 ```text
-22/tcp chỉ từ IP hiện tại của bạn
-80/tcp từ 0.0.0.0/0
-443/tcp từ 0.0.0.0/0
+22/tcp from your current IP only
+80/tcp from 0.0.0.0/0 and ::/0
+443/tcp from 0.0.0.0/0 and ::/0
 ```
 
 Từ chối truy cập công khai tới:
@@ -1587,7 +2237,11 @@ Từ chối truy cập công khai tới:
 3000, 3001, 3300-3308, 3201-3208, 5432, 6379, 27017, 9092, 9090, 3100, 3200, 4318
 ```
 
-- [ ] Bước 3: Cài Docker Engine
+Không mở rộng SSH cho mọi nguồn vì GitHub-hosted runner. Dùng baseline deploy do operator điều khiển từ mục 4.7 cho đến khi kênh điều khiển tự động bảo mật được chọn.
+
+Hoàn thành `HUMAN-GATE-04` sau khi verify đăng nhập SSH, gắn Reserved IP, firewall rules, backups, và monitoring.
+
+- [ ] Bước 3: Harden host và cài Docker Engine `[SHARED]`
 
 Dùng repository Ubuntu chính thức của Docker, không dùng gói cũ của Ubuntu:
 
@@ -1606,9 +2260,36 @@ docker compose version
 
 Kỳ vọng: Docker Engine và plugin Docker Compose in ra version.
 
-- [ ] Bước 4: Cấu hình DNS
+Ngoài ra:
 
-Tạo bản ghi A trỏ tới IPv4 Droplet:
+- tạo operator `qrtable-deploy` non-root;
+- giữ SSH root trực tiếp disabled;
+- bật unattended security updates;
+- cấu hình đồng bộ thời gian;
+- ghi baseline disk/memory;
+- verify không có port không mong muốn đang listen công khai.
+
+- [ ] Bước 4: Xác thực Droplet cho pull DOCR read-only `[SHARED]`
+
+Cài `doctl` hiện tại, rồi tạo Docker credential mà không ghi DigitalOcean API token nguồn vào repository hay log deploy:
+
+```bash
+read -rsp "DigitalOcean API token: " DIGITALOCEAN_ACCESS_TOKEN
+echo
+doctl registry login \
+  --access-token "$DIGITALOCEAN_ACCESS_TOKEN" \
+  --read-only=true \
+  --never-expire
+unset DIGITALOCEAN_ACCESS_TOKEN
+chmod 600 "$HOME/.docker/config.json"
+docker pull registry.digitalocean.com/qrtable/qrtable:bff-<known-release-tag>
+```
+
+Registry credential sinh ra là read-only. Ghi tài liệu revoke/rotate, bảo vệ Docker config, và ưu tiên credential hạn hữu hạn với gia hạn tự động khi quy trình deploy trưởng thành.
+
+- [ ] Bước 5: Cấu hình DNS và điều kiện TLS công khai `[HUMAN]`
+
+Tạo bản ghi A trỏ tới Reserved IP:
 
 ```text
 api.qrtable.vodinhquan.dev
@@ -1628,7 +2309,7 @@ dig +short auth.qrtable.vodinhquan.dev
 dig +short grafana.qrtable.vodinhquan.dev
 ```
 
-Mỗi lệnh trả về IP Droplet.
+Mỗi lệnh trả về Reserved IP từ ít nhất hai public resolver. Review bản ghi CAA và giữ HTTP proxy của DNS provider tắt cho đến khi Caddy cấp mọi certificate. Chỉ hoàn thành `HUMAN-GATE-05` sau verify TLS công khai — không chỉ DNS propagation.
 
 ### Task 14: Deploy stack
 
@@ -1650,9 +2331,9 @@ sudo chown "$USER:$USER" /opt/qrtable
 git clone "$QRTABLE_REPOSITORY_URL" /opt/qrtable
 ```
 
-Nếu sau này chỉ deploy image, thay bằng release bundle gồm file compose và `.env.production`.
+Nếu sau này dùng deploy chỉ image, thay bằng release bundle chứa file compose/proxy/monitoring/deploy-script. Giữ `/opt/qrtable/.env.production` thuộc server và nằm ngoài release bundle.
 
-- [ ] Bước 2: Đặt env riêng trên server
+- [ ] Bước 2: Đặt env riêng trên server `[SHARED]`
 
 ```bash
 install -m 600 docker/env/.env.production.example /opt/qrtable/.env.production
@@ -1660,23 +2341,48 @@ install -m 600 docker/env/.env.production.example /opt/qrtable/.env.production
 
 Sau đó sửa `/opt/qrtable/.env.production` trên server và thay giá trị đã sinh bằng `openssl rand`.
 
+Human nhập secret Cloudinary, SePay, ngân hàng/provider, và secret bên ngoài khác trực tiếp trên server. Agent chỉ verify presence, format, permissions, và fingerprint redact. Hoàn thành `HUMAN-GATE-06` và `HUMAN-GATE-07`.
+
+Render và kiểm tra quyền file runtime có phạm vi:
+
+```bash
+./tools/deploy/phase7-render-service-envs.sh
+find /opt/qrtable/env -type f ! -perm 0600 -print -quit | grep -q . && exit 1 || true
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.infra.yaml
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.migrations.yaml
+./tools/deploy/phase7-compose-validate.sh \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.app.yaml
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.proxy.yaml
+```
+
 - [ ] Bước 3: Start infra và chờ datastore healthy
 
 ```bash
-docker compose -f docker-compose.infra.yaml up -d
+docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.infra.yaml \
+  pull
+docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.infra.yaml \
+  up -d
 ./tools/deploy/phase7-preflight.sh --wait-infra
 ```
 
 - [ ] Bước 4: Chạy migration gate và ownership gate
 
 ```bash
-docker compose -f docker-compose.migrations.yaml pull
+docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.migrations.yaml \
+  pull
 ./tools/deploy/phase7-migrate.sh
 ```
 
 Kỳ vọng: mọi migration service đã apply và database ownership verification pass trước khi thay app container.
 
-- [ ] Bước 5: Bootstrap identity và dữ liệu demo tùy chọn
+- [ ] Bước 5: Bootstrap identity và dữ liệu demo tùy chọn `[SHARED]`
 
 ```bash
 ./tools/deploy/phase7-keycloak-bootstrap.sh
@@ -1688,37 +2394,44 @@ Chỉ với deploy demo luận văn:
 DEPLOYMENT_PROFILE=demo ./tools/deploy/phase7-seed-demo.sh --yes
 ```
 
+Sau bootstrap, human phải tạo và verify administrator Keycloak vĩnh viễn có tên, gỡ temporary bootstrap administrator, và hoàn thành kiểm tra login/role trong `HUMAN-GATE-08`.
+
 - [ ] Bước 6: Start lớp monitoring, app và proxy
 
 ```bash
-docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml up -d
-docker compose -f docker-compose.app.yaml up -d
-docker compose -f docker-compose.proxy.yaml up -d
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml up -d
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.app.yaml up -d
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.proxy.yaml up -d
 ```
 
 - [ ] Bước 7: Verify service đang chạy
 
 ```bash
-docker compose -f docker-compose.infra.yaml ps
-docker compose -f docker-compose.migrations.yaml ps -a
-docker compose -f docker-compose.app.yaml ps
-docker compose -f docker-compose.proxy.yaml ps
-docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml ps
+docker compose --env-file /opt/qrtable/.env.production -f docker-compose.infra.yaml ps
+docker compose --env-file /opt/qrtable/.env.production -f docker-compose.app.yaml ps
+docker compose --env-file /opt/qrtable/.env.production -f docker-compose.proxy.yaml ps
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml ps
 ```
 
 Kỳ vọng:
 
 - Service infra healthy hoặc đang chạy.
-- Container migration one-shot đã exit thành công.
+- Exit status script migration và bản ghi lịch sử deploy cho thấy cả ba lệnh migration/ownership thành công. Container cố ý bị xóa bởi `run --rm`, nên không dùng `docker compose ps -a` làm bằng chứng.
 - App container đang chạy.
 - Caddy đã lấy certificate và phục vụ HTTPS.
+- `docker network inspect` xác nhận Caddy chia sẻ `qrtable-edge` với mọi target reverse proxy và contract mạng monitoring/app khớp Task 12.
 
 ### Task 15: Chạy smoke test và verify demo
 
 **Files:**
 
 - Tạo: `tools/deploy/phase7-smoke.sh`
-- Update: `docs/guides/phase-7-digitalocean-deployment.md`
+- Tạo: `tools/deploy/phase7-e2e.sh`
+- Cập nhật: `docs/guides/phase-7-digitalocean-deployment.md`
 
 - [ ] Bước 1: HTTP smoke
 
@@ -1741,48 +2454,71 @@ Kỳ vọng:
 Chạy từ trong container Prometheus hoặc mạng app:
 
 ```bash
-docker compose -f docker-compose.monitoring.yaml exec prometheus wget -qO- http://bff:3300/api/v1/metrics
-docker compose -f docker-compose.monitoring.yaml exec prometheus wget -qO- http://order:3301/api/v1/metrics
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml \
+  exec prometheus wget -qO- http://bff:3300/api/v1/metrics
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml \
+  exec prometheus wget -qO- http://order:3301/api/v1/metrics
 ```
 
 Kỳ vọng: Prometheus text exposition contains `qrtable_http_requests_total`.
 
 - [ ] Bước 3: Smoke E2E trình duyệt
 
-Chỉ dùng bộ e2e hiện có sau khi bootstrap Keycloak và seed demo non-destructive tùy chọn ổn định:
+Chỉ dùng bộ E2E hiện có cho deploy demo đã seed rõ ràng. Test không đọc `BASE_URL`, `CUSTOMER_PWA_URL` hay `BFF_URL` generic; tạo `tools/deploy/phase7-e2e.sh` validate `DEPLOYMENT_PROFILE=demo` và map đúng biến mà spec hiện tại tiêu thụ:
 
 ```bash
-BASE_URL=https://app.qrtable.vodinhquan.dev \
-CUSTOMER_PWA_URL=https://qr.qrtable.vodinhquan.dev \
-BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1 \
-pnpm e2e:demo
+export STEPP27_PWA_BASE_URL=https://qr.qrtable.vodinhquan.dev
+export STEPP27_MANAGEMENT_BASE_URL=https://app.qrtable.vodinhquan.dev
+export STEPP27_BFF_HEALTH_URL=https://api.qrtable.vodinhquan.dev/api/v1/health
+
+export PHASE3_PWA_BASE_URL=https://qr.qrtable.vodinhquan.dev
+export PHASE3_MANAGEMENT_BASE_URL=https://app.qrtable.vodinhquan.dev
+
+export PHASE5_SUSPENDED_PWA_BASE_URL=https://qr.qrtable.vodinhquan.dev
+export PHASE5_SUSPENDED_BFF_HEALTH_URL=https://api.qrtable.vodinhquan.dev/api/v1/health
+
+export PHASE5_ADMIN_MANAGEMENT_BASE_URL=https://app.qrtable.vodinhquan.dev
+export PHASE5_ADMIN_BFF_HEALTH_URL=https://api.qrtable.vodinhquan.dev/api/v1/health
+export PHASE5_ADMIN_KEYCLOAK_REALM_URL=https://auth.qrtable.vodinhquan.dev/realms/qrtable
+
+./tools/deploy/phase7-e2e.sh
 ```
 
-Kỳ vọng: các test demo được chọn pass. Nếu suite vẫn giả định localhost, ghi thay đổi config Playwright cần thiết thành task implement riêng trước khi coi Phase 7 xanh.
+Wrapper phải yêu cầu credential demo qua biến môi trường thay vì im lặng dựa vào mật khẩu deterministic đã commit. Sau đó chạy `pnpm e2e:demo`. Kỳ vọng: test demo được chọn pass, không fallback localhost và không in credential production ra log.
 
 - [ ] Bước 4: Smoke route SePay
 
 Verify route công khai đã đăng ký:
 
 ```bash
-curl -i https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/platform
-curl -i https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/demo-tenant
+curl -i -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"QRSUBTEST","content":"QRSUBTEST","transferType":"in","transferAmount":1000}' \
+  https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/platform
+curl -i -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"QRTBLTEST","content":"QRTBLTEST","transferType":"in","transferAmount":1000}' \
+  https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/demo-tenant
 ```
 
-Kỳ vọng: BFF trả lỗi method/auth, chứng minh route công khai reachable mà không chấp nhận payload không xác thực.
+Kỳ vọng: BFF trả lỗi xác thực, chứng minh route công khai reachable mà không chấp nhận payload không ký.
 
 ### Task 16: Backup, rollback và vận hành
 
 **Files:**
 
 - Tạo: `docs/guides/phase-7-digitalocean-deployment.md`
-- Create: `tools/deploy/phase7-backup.sh`
+- Tạo: `tools/deploy/phase7-backup.sh`
 
-- [ ] Bước 1: Bật backup/snapshot DigitalOcean
+- [ ] Bước 1: Bật backup/snapshot DigitalOcean `[HUMAN]`
 
 Dùng Droplet backup cho phục hồi cấp host.
 
 - [ ] Bước 2: Thêm script backup logic
+
+Backup release là điểm phục hồi cross-service. Đưa deploy vào cửa sổ bảo trì ngắn hoặc quiesce write traffic trước backup; nếu không, database PostgreSQL và archive MongoDB hợp lệ riêng lẻ nhưng không phải snapshot phân tán atomic.
 
 ```bash
 #!/usr/bin/env bash
@@ -1794,29 +2530,44 @@ set +a
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "/opt/qrtable/backups/${stamp}"
+COMPOSE_ENV=(--env-file /opt/qrtable/.env.production)
 
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_catalog > "/opt/qrtable/backups/${stamp}/qrtable_catalog.sql"
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_order > "/opt/qrtable/backups/${stamp}/qrtable_order.sql"
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_saas > "/opt/qrtable/backups/${stamp}/qrtable_saas.sql"
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_payment > "/opt/qrtable/backups/${stamp}/qrtable_payment.sql"
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_keycloak > "/opt/qrtable/backups/${stamp}/qrtable_keycloak.sql"
-docker compose -f docker-compose.infra.yaml exec -T mongodb \
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_catalog > "/opt/qrtable/backups/${stamp}/qrtable_catalog.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_order > "/opt/qrtable/backups/${stamp}/qrtable_order.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_saas > "/opt/qrtable/backups/${stamp}/qrtable_saas.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_payment > "/opt/qrtable/backups/${stamp}/qrtable_payment.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_keycloak > "/opt/qrtable/backups/${stamp}/qrtable_keycloak.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T mongodb \
   mongodump \
   --username "$MONGO_ROOT_USERNAME" \
   --password "$MONGO_ROOT_PASSWORD" \
   --authenticationDatabase admin \
   --db qrtable_auth \
   --archive > "/opt/qrtable/backups/${stamp}/qrtable_auth.archive"
-docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show \
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show \
   > "/opt/qrtable/backups/${stamp}/migration-state.txt"
+sha256sum "/opt/qrtable/backups/${stamp}/"* > "/opt/qrtable/backups/${stamp}/SHA256SUMS"
 ```
 
-- [ ] Bước 3: Định nghĩa rollback
+- [ ] Bước 3: Định nghĩa retention và phục hồi off-Droplet `[SHARED]`
+
+- Human tạo Space riêng hoặc object-storage target độc lập và access key hạn chế riêng theo mục 4.12.
+- Mã hóa và copy mỗi backup hoàn tất sang DigitalOcean Space riêng hoặc target off-Droplet khác.
+- Định nghĩa retention, ví dụ daily 7, weekly 4, monthly 3.
+- Verify `SHA256SUMS` sau upload.
+- Thực hiện ít nhất một diễn tập restore vào database cô lập và ghi thời lượng/bằng chứng.
+- Không coi backup chỉ lưu trên cùng Droplet là bản recovery duy nhất.
+- Chỉ hoàn thành `HUMAN-GATE-11` sau khi upload mã hóa, download, checksum, và restore PostgreSQL/MongoDB cô lập đều thành công.
+
+- [ ] Bước 4: Define rollback
 
 Rollback image tag:
 
 ```bash
-TAG=previous-good docker compose -f docker-compose.app.yaml up -d
+IMAGE_TAG=previous-good docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.app.yaml \
+  up -d
 ```
 
 Rollback dữ liệu infra:
@@ -1840,23 +2591,24 @@ CI/CD là phần của Phase 7, nhưng phải coi là mặt phẳng điều khi�
 - Đã có: TypeORM DataSource per-service, migration ban đầu, lệnh migration và database ownership verification.
 - Thiếu: workflow build Docker image
 - Thiếu: workflow push registry
-- Thiếu: workflow deploy production
+- Thiếu: entrypoint deploy production do operator điều khiển và workflow deploy production tùy chọn
 - Thiếu: workflow rollback theo tag
 - Thiếu: image/job migration production và deploy gate
 
 **Files:**
 
 - Sửa: `.github/workflows/ci.yml`
-- Create: `.github/workflows/release-images.yml`
-- Create: `.github/workflows/deploy-production.yml`
-- Create: `.github/workflows/rollback-production.yml`
-- Create: `tools/deploy/phase7-build-images.sh`
-- Create: `tools/deploy/phase7-migrate.sh`
-- Create: `tools/deploy/phase7-remote-deploy.sh`
-- Create: `tools/deploy/phase7-remote-rollback.sh`
-- Create: `tools/deploy/phase7-preflight.sh`
-- Create: `tools/deploy/phase7-smoke.sh`
-- Modify: `docs/guides/phase-7-digitalocean-deployment.md`
+- Tạo: `.github/workflows/release-images.yml`
+- Tạo sau khi phê duyệt secure-channel: `.github/workflows/deploy-production.yml`
+- Tạo sau khi phê duyệt secure-channel: `.github/workflows/rollback-production.yml`
+- Tạo: `tools/deploy/phase7-build-images.sh`
+- Tạo: `tools/deploy/phase7-migrate.sh`
+- Tạo: `tools/deploy/phase7-remote-deploy.sh`
+- Tạo: `tools/deploy/phase7-remote-rollback.sh`
+- Tạo: `tools/deploy/phase7-preflight.sh`
+- Tạo: `tools/deploy/phase7-compose-validate.sh`
+- Tạo: `tools/deploy/phase7-smoke.sh`
+- Sửa: `docs/guides/phase-7-digitalocean-deployment.md`
 
 - [ ] Bước 1: Giữ CI làm quality gate PR
 
@@ -1883,7 +2635,7 @@ Chỉ dùng lệnh affected sau khi pipeline ổn định. Deploy Phase 7 đầu
 Trigger:
 
 - `workflow_dispatch`
-- `push` lên `main` sau khi CI xanh
+- `workflow_run` cho CI workflow hiện có, giới hạn run thành công trên `main`
 
 Quyền:
 
@@ -1892,7 +2644,7 @@ Quyền:
 
 Input:
 
-- `image_tag` mặc định `${{ github.sha }}`
+- `image_tag` tùy chọn; tính `IMAGE_TAG="${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}"`
 - `push_latest` mặc định `false`
 
 Secret:
@@ -1901,35 +2653,41 @@ Secret:
 
 Trách nhiệm workflow:
 
-1. Checkout repository.
-2. Cài Node.js 20 và pnpm 9.8.0.
+1. Checkout repository (clone repo).
+2. Cài Node.js 22.22.3 và pnpm 9.8.0, khớp toolchain build Docker.
 3. Cài dependency với frozen lockfile.
 4. Chạy kiểm tra build CI.
 5. Đăng nhập DigitalOcean Container Registry.
-6. Build và push mọi image Phase 7.
-7. Xuất tóm tắt image digest.
+6. Build mọi image Phase 7 cho `linux/amd64` với Buildx và push tag immutable.
+7. Sinh SBOM và fail theo ngưỡng lỗ hổng critical đã thống nhất.
+8. Emit và giữ tóm tắt image digest.
 
 Tên image kỳ vọng:
 
 ```text
-registry.digitalocean.com/qrtable/qrtable-bff:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-authorizer:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-catalog:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-order:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-kitchen:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-payment:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-saas:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-user-access:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-migrations:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-management-app:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-customer-pwa:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable:bff-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:authorizer-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:catalog-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:order-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:kitchen-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:payment-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:saas-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:user-access-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:migrations-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:management-app-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:customer-pwa-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:keycloak-${IMAGE_TAG}
 ```
+
+Một repository là chủ đích: DOCR Starter hỗ trợ một repository, trong khi repository riêng per-service cần tier cao hơn trước khi xét dung lượng.
 
 Quy tắc build quan trọng:
 
 - Giá trị frontend công khai có thể là build arg: `NEXT_PUBLIC_*`, `VITE_*`.
 - Secret riêng không bao giờ là Docker build arg.
 - Secret production nằm trong `/opt/qrtable/.env.production` hoặc secret manager sau này.
+- Release chưa hoàn tất trừ khi cả mười hai tag và digest có mặt.
+- Workflow phải từ chối ghi đè tag release immutable hiện có; `latest` tùy chọn và không bao giờ dùng bởi compose production.
 
 - [ ] Bước 3: Thêm bảo vệ deployment environment
 
@@ -1947,31 +2705,19 @@ Lý do:
 - Client Keycloak production không được đổi nhầm.
 - Trạng thái schema DB phải được kiểm tra trước khi thay app container.
 
-- [ ] Bước 4: Thêm workflow deploy-production
+`[HUMAN]` Cấu hình phần này trong web console GitHub theo mục 4.5. Required reviewers là kiểm soát cứng chỉ khi visibility repository và gói GitHub thực sự hỗ trợ. Khi không có, giữ gate deploy do operator điều khiển và ghi người phê duyệt vào `/opt/qrtable/releases/history.log`.
 
-Trigger:
+- [ ] Bước 4: Thêm entrypoint deploy production do operator điều khiển
 
-- Chỉ `workflow_dispatch` cho giai đoạn production đầu.
+Pilot Phase 7 đầu tiên không được SSH từ GitHub-hosted runner khi Cloud Firewall chỉ cho phép SSH từ IP operator.
 
-Input:
-
-- `image_tag` bắt buộc
-- `run_smoke` mặc định `true`
-- `run_backup_before_deploy` mặc định `true`
-
-Secret:
-
-- `PRODUCTION_SSH_HOST`
-- `PRODUCTION_SSH_USER`
-- `PRODUCTION_SSH_KEY`
-- `PRODUCTION_SSH_PORT`
-
-Luồng deploy:
+Luồng baseline:
 
 ```text
 CI green
   -> release-images pushes immutable image tag
-  -> deploy-production chờ phê duyệt production
+  -> human chọn tag/cửa sổ và xác nhận backup/rollback
+  -> operator kết nối từ trusted workstation
   -> preflight remote
   -> pull immutable migration và app images
   -> backup
@@ -1982,27 +2728,55 @@ CI green
   -> ghi tag đã deploy
 ```
 
-Dạng lệnh remote:
+Dạng lệnh operator:
 
 ```bash
-ssh "$PRODUCTION_SSH_USER@$PRODUCTION_SSH_HOST" \
+ssh -o IdentitiesOnly=yes "$PRODUCTION_SSH_USER@$PRODUCTION_SSH_HOST" \
   "cd /opt/qrtable && IMAGE_TAG='${IMAGE_TAG}' ./tools/deploy/phase7-remote-deploy.sh"
 ```
+
+GitHub có thể cung cấp job release/audit `workflow_dispatch` validate tag và in lệnh operator redact chính xác, nhưng không được khởi tạo SSH production cho đến khi kênh điều khiển bảo mật ở mục 4.7 được chọn và test.
 
 Script deploy remote phải:
 
 - Từ chối chạy nếu thiếu `/opt/qrtable/.env.production` hoặc world-readable.
 - Từ chối deploy nếu `IMAGE_TAG` rỗng.
-- Chạy `docker compose config` cho lớp infra, migrations, monitoring, app và proxy.
+- Verify Docker có thể xác thực và pull từ repository DOCR riêng.
+- Render file env runtime có phạm vi và từ chối container cấu hình master `.env.production` làm `env_file` cấp service.
+- Chạy `phase7-compose-validate.sh` cho lớp infra, migrations, monitoring, app và proxy.
+- Truyền `--env-file /opt/qrtable/.env.production` cho mọi lệnh Compose bên dưới và fail nếu `config --environment` capture an toàn cho thấy biến release chưa resolve hoặc rỗng.
 - Pull image theo tag immutable yêu cầu.
 - Chạy `tools/deploy/phase7-migrate.sh` và dừng ngay khi migration hoặc ownership fail.
 - Start app container không rebuild trên server.
 - Chạy health check sau khi thay container.
 - Ghi tag thành công vào `/opt/qrtable/releases/current`.
 
+Hoàn thành `HUMAN-GATE-10` cho deploy đầu tiên.
+
+- [ ] Bước 4A: Tùy chọn bật `deploy-production.yml` sau phê duyệt secure-channel
+
+Chỉ sau khi human ghi một trong các kênh điều khiển không-baseline ở mục 4.7, workflow mới nhận:
+
+- `PRODUCTION_SSH_HOST`
+- `PRODUCTION_SSH_USER`
+- `PRODUCTION_SSH_KEY`
+- `PRODUCTION_SSH_PORT`
+- `PRODUCTION_SSH_KNOWN_HOSTS`
+
+Workflow phải:
+
+- dùng environment `production` được bảo vệ;
+- verify server host key với `PRODUCTION_SSH_KNOWN_HOSTS`;
+- không bao giờ tắt strict host-key checking;
+- dùng deploy key non-root riêng;
+- hạn chế key/tài khoản server chỉ cho thao tác deploy;
+- tránh chạy trên code pull-request;
+- gỡ mọi firewall rule tạm trong bước cleanup vô điều kiện;
+- giữ artifact audit redact.
+
 - [ ] Bước 5: Thêm gate schema/migration
 
-Trước deploy production, workflow phải:
+Trước deploy production, quy trình deploy phải:
 
 1. Verify cả năm tên env datastore riêng có mặt và `DATABASE_SHARED_FALLBACK_ENABLED=false`.
 2. Pull image migration với cùng immutable tag như image app.
@@ -2020,9 +2794,9 @@ Script gate khuyến nghị:
 ./tools/deploy/phase7-migrate.sh
 ```
 
-- [ ] Bước 6: Thêm smoke test vào CI/CD
+- [ ] Bước 6: Thêm smoke test vào quy trình deploy
 
-Smoke test nên chạy từ GitHub runner sau deploy vì DNS công khai, TLS, reverse proxy và CORS phải verify bên ngoài.
+Smoke test phải chạy từ máy ngoài Droplet sau deploy vì DNS công khai, TLS, reverse proxy và CORS phải verify bên ngoài. Với baseline, chạy từ trusted operator workstation. Sau khi bật workflow SSH bảo mật, kiểm tra công khai cũng có thể chạy từ GitHub Actions.
 
 Endpoint bắt buộc:
 
@@ -2043,21 +2817,19 @@ curl -fsS -o /dev/null -w "%{http_code}" \
 
 Kỳ vọng: request webhook không hợp lệ hoặc không ký bị từ chối, không được chấp nhận.
 
-- [ ] Bước 7: Thêm workflow rollback-production
+Kiểm tra CORS phải gửi origin được phép và origin bị từ chối tới BFF, và verify handshake Socket.IO theo cùng allowlist.
 
-Trigger:
+- [ ] Bước 7: Thêm rollback do operator và workflow rollback tùy chọn
 
-- `workflow_dispatch`
+Input baseline:
 
-Input:
-
-- `rollback_tag` bắt buộc
-- `restore_data` mặc định `false`
+- `rollback_tag` bắt buộc;
+- `restore_data=false` trừ khi human phê duyệt rõ timestamp backup chính xác và tác động tương thích.
 
 Luồng rollback:
 
 ```text
-production approval
+human rollback approval
   -> preflight remote
   -> backup tùy chọn
   -> set IMAGE_TAG to rollback_tag
@@ -2068,6 +2840,8 @@ production approval
 ```
 
 Rollback không được tự khôi phục database hoặc chạy `migration:revert` trừ khi `restore_data=true` và operator xác nhận timestamp backup chính xác cùng tác động tương thích. Rollback app và rollback dữ liệu là thao tác riêng.
+
+Workflow rollback GitHub tùy chọn tuân cùng yêu cầu secure-channel như `deploy-production.yml`.
 
 - [ ] Bước 8: Thêm audit trail deploy
 
@@ -2096,11 +2870,11 @@ Giữ URL run GitHub Actions làm bản ghi audit bên ngoài.
 
 Chính sách Phase 7 khuyến nghị:
 
-| Giai đoạn         | Release image         | Deploy production            |
-| ----------------- | --------------------- | ---------------------------- |
-| Pilot đầu         | Thủ công              | Thủ công có phê duyệt        |
-| Demo luận văn ổn  | Push main build image | Thủ công có phê duyệt        |
-| Production trưởng | Push main build image | Tùy chọn auto-deploy staging |
+| Giai đoạn         | Release image            | Deploy production                 |
+| ----------------- | ------------------------ | --------------------------------- |
+| Pilot đầu         | Manual workflow dispatch | Operator workstation có phê duyệt |
+| Demo luận văn ổn  | Push main build image    | Operator workstation có phê duyệt |
+| Production trưởng | Push main build image    | Tùy chọn auto-deploy staging      |
 
 Không auto-deploy production mỗi lần merge cho đến khi migration, backup, rollback và smoke test đã được chứng minh.
 
@@ -2109,9 +2883,9 @@ Không auto-deploy production mỗi lần merge cho đến khi migration, backup
 **Files:**
 
 - Sửa: `docs/phases/phase-5-7-finalization.md`
-- Modify: `docs/phases/phase-5-7-finalization.vi.md`
-- Modify: `docs/technical-architecture.md`
-- Modify: `docs/DOC-CODE-ANCHORS.md`
+- Sửa: `docs/phases/phase-5-7-finalization.vi.md`
+- Sửa: `docs/technical-architecture.md`
+- Sửa: `docs/DOC-CODE-ANCHORS.md`
 - Tạo hoặc sửa: `docs/guides/phase-7-digitalocean-deployment.md`
 
 - [ ] Bước 1: Cập nhật bản ghi phase
@@ -2126,6 +2900,8 @@ Ghi lại:
 - Cấu hình URL công khai SePay.
 - Bề mặt API provider SePay đã xác nhận cho tài khoản production thật.
 - Chính sách expose monitoring.
+- Hoàn thành human-gate và bằng chứng tài nguyên nền tảng bên ngoài đã redact.
+- Kênh điều khiển SSH/deploy production đã chọn.
 - Bằng chứng nghiệm thu.
 
 - [ ] Bước 2: Cập nhật mục 14 technical architecture
@@ -2149,18 +2925,33 @@ pnpm verify:doc-anchors
 
 Kỳ vọng: anchor verifier exit 0.
 
-## 6. Tiêu chí nghiệm thu production
+## 7. Tiêu chí nghiệm thu production
 
 Phase 7 chỉ được chấp nhận khi mọi mục dưới đây đúng:
 
-- [ ] `docker compose` có thể start infra, chạy migration, và start monitoring, app và proxy từ checkout server sạch.
+- [ ] `HUMAN-GATE-01` đến `HUMAN-GATE-11` hoàn thành với bằng chứng có ngày, đã redact; không giả định tài khoản, billing, DNS, secret, ngân hàng, hoặc phụ thuộc backup bên ngoài.
+- [ ] GitHub ruleset `main` và production environment đã cấu hình; bản ghi nêu trung thực required reviewers có được enforce bởi gói repository hiện tại hay không.
+- [ ] DigitalOcean Project, registry, Reserved IP, Droplet, Cloud Firewall, backups, và monitoring đã cấu hình và liên kết đúng tài nguyên production.
+- [ ] SSH vẫn hạn chế theo kênh điều khiển đã phê duyệt; không mở globally cho GitHub-hosted runner.
+- [ ] Mọi checkout repository Droplet-to-GitHub dùng deploy key read-only riêng; production không tái sử dụng key GitHub cá nhân.
+- [ ] Production dùng credential sinh mới, không phải giá trị `.env` local đã điền hoặc default development deterministic; phát hiện secret-history scan đã remediation.
+- [ ] Credential Cloudinary production cấu hình ngoài git và smoke upload/read/delete pass mà không expose API secret.
+- [ ] Mọi lệnh Compose production dùng `--env-file /opt/qrtable/.env.production`; helper validate được bảo vệ không tìm thấy biến release chưa resolve và không emit giá trị secret.
+- [ ] Master env production không inject nguyên khối vào container; file env per-service được allowlist, mode `0600`, và chỉ chứa giá trị bắt buộc.
+- [ ] `docker compose` có thể start infra, chạy migration, và start monitoring, app, proxy từ checkout server sạch.
+- [ ] Tám backend container bind listener TCP/gRPC tới `0.0.0.0` khi áp dụng, và mọi kết nối TCP/gRPC inter-service bắt buộc thành công theo tên service Docker.
+- [ ] Caddy chia sẻ `qrtable-edge` với BFF, Management App, Customer PWA, Keycloak và Grafana; Prometheus/Tempo chia sẻ mạng app bắt buộc.
+- [ ] Gate readiness PostgreSQL, MongoDB, Redis, Kafka và Keycloak pass trước migration/identity bootstrap/thay app.
+- [ ] Smoke producer/consumer KafkaJS pass với image Kafka `4.3.0` đã pin.
 - [ ] Env production định nghĩa bốn tên database PostgreSQL riêng và MongoDB `qrtable_auth`, với shared fallback tắt.
-- [ ] Image migration one-shot apply mọi migration service trước khi boot app.
-- [ ] `pnpm db:migration:show` báo mọi migration kỳ vọng đã được apply.
+- [ ] Image migration one-shot apply mọi migration service trước boot app.
+- [ ] `pnpm db:migration:show` báo mọi migration kỳ vọng đã apply.
 - [ ] `pnpm db:verify:ownership` pass trên cả bốn database PostgreSQL service.
-- [ ] User-Access kết nối MongoDB `qrtable_auth`, và bootstrap Keycloak đồng bộ collection user/role cần thiết tại đó.
+- [ ] User-Access kết nối MongoDB `qrtable_auth`; bootstrap Keycloak production bình thường không tạo user demo và không reset mật khẩu người dùng.
+- [ ] Client Keycloak được cập nhật idempotent với redirect URI, web origin, secret và public issuer production chính xác.
 - [ ] HTTPS công khai hoạt động cho subdomain `api`, `app`, `qr`, `auth` và `grafana` được bảo vệ.
 - [ ] Chỉ 80/443 và SSH hạn chế là công khai.
+- [ ] CORS BFF HTTP và Socket.IO chỉ cho phép origin production Management App và Customer PWA.
 - [ ] BFF `/api/v1/health/live` và `/api/v1/health/ready` pass.
 - [ ] Đăng nhập Management App hoạt động với Keycloak qua `auth.qrtable.vodinhquan.dev`.
 - [ ] Luồng QR khách hoạt động qua `qr.qrtable.vodinhquan.dev`.
@@ -2170,15 +2961,17 @@ Phase 7 chỉ được chấp nhận khi mọi mục dưới đây đúng:
 - [ ] Luồng OAuth Connect tenant SePay `QRTBL` có thể tạo hoặc verify URL webhook tenant có slug.
 - [ ] Mismatch bề mặt API SePay (`/api/v1/webhooks` vs `/v1/webhook`, `Api_Key` vs `SECRET_KEY`) được giải quyết có bằng chứng từ tài khoản SePay thật trước khi dùng live.
 - [ ] Grafana hiển thị log, metrics và trace từ app container thật.
-- [ ] Seed demo tùy chọn là non-destructive, profile-gated, và có thể khôi phục dataset demo luận văn mà không gọi `dev:reseed`.
-- [ ] Quy trình backup và rollback được ghi tài liệu và test ít nhất một lần.
+- [ ] Seed demo tùy chọn non-destructive, profile-gated, và khôi phục dataset demo luận văn mà không gọi `dev:reseed`.
+- [ ] E2E production dùng đúng biến `STEPP27_*`, `PHASE3_*` và `PHASE5_*`, không fallback localhost hay mật khẩu demo đã commit.
+- [ ] Quy trình backup và rollback được ghi tài liệu và test ít nhất một lần, gồm verify checksum và diễn tập restore off-Droplet.
 - [ ] CI vẫn xanh cho `lint`, `test` và `build`.
-- [ ] Workflow release có thể build và push tag Docker image immutable.
-- [ ] Workflow deploy production có thể deploy tag image immutable đã chọn có phê duyệt.
-- [ ] Workflow rollback có thể redeploy tag image thành công trước đó.
+- [ ] Workflow release build cả mười hai artifact `linux/amd64` vào một repository DOCR, ghi digest/SBOM và pass gate lỗ hổng.
+- [ ] Deploy production do operator điều khiển có thể deploy tag image immutable đã chọn với phê duyệt rõ ràng.
+- [ ] Nếu workflow deploy/rollback production GitHub được bật, secure control channel, host-key verification, firewall behavior, key riêng, và environment approval được ghi tài liệu và test.
+- [ ] Rollback do operator có thể redeploy tag image thành công trước đó mà không tự revert/restore dữ liệu.
 - [ ] Tài liệu canonical được cập nhật sau implement.
 
-## 7. Ghi chú chi phí và mở rộng
+## 8. Ghi chú chi phí và mở rộng
 
 Dùng deploy nhỏ nhất phù hợp sản phẩm hiện tại:
 
@@ -2187,7 +2980,7 @@ Dùng deploy nhỏ nhất phù hợp sản phẩm hiện tại:
 - Hardening: managed PostgreSQL và Valkey khi an toàn dữ liệu và vận hành quan trọng hơn chi phí tháng.
 - Tránh managed Kafka cho luận văn/pilot trừ khi chủ đích phân bổ ngân sách; managed Kafka DigitalOcean là cluster managed đa node.
 
-Sự kiện sản phẩm DigitalOcean đã verify ngày 2026-06-06:
+Sự kiện sản phẩm DigitalOcean đã verify lại ngày 2026-06-07:
 
 - Droplet từ USD 4/tháng.
 - Managed database từ USD 15/tháng.
@@ -2196,28 +2989,44 @@ Sự kiện sản phẩm DigitalOcean đã verify ngày 2026-06-06:
 - Load Balancer từ USD 12/tháng.
 - Droplet backup tính theo phần trăm chi phí Droplet.
 
-## 8. Rủi ro và biện pháp giảm thiểu
+## 9. Rủi ro và biện pháp giảm thiểu
 
-| Rủi ro                                    | Tác động                                               | Biện pháp giảm thiểu                                                                         |
-| ----------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Bỏ qua migration job hoặc chạy sau app    | Image mới boot với schema không tương thích hoặc thiếu | Chạy image migration immutable và ownership gate trước khi thay app container                |
-| Bật shared database fallback              | Service có thể reconnect database legacy hỗn hợp       | Yêu cầu tên env riêng và `DATABASE_SHARED_FALLBACK_ENABLED=false` trong preflight production |
-| Chạy `dev:reseed` trên production         | Mất dữ liệu destructive và reset identity/cache        | Loại khỏi script deploy; dùng demo seed non-destructive, profile-gated                       |
-| Kafka advertise listener `localhost`      | App container không kết nối được                       | Dùng `PLAINTEXT://kafka:9092` trong compose production                                       |
-| Env công khai Vite là build-time          | Customer PWA trỏ sai API sau khi tái dùng image        | Build image với `VITE_BFF_URL` production, hoặc runtime config sau                           |
-| Env công khai Next một phần build-time    | Bundle client Management App trỏ sai API               | Build với `NEXT_PUBLIC_*` production và cung cấp runtime env                                 |
-| Keycloak `start-dev`                      | IAM production không an toàn                           | Dùng `start`, hostname ngoài, Keycloak backed DB                                             |
-| Grafana công khai                         | Observability lộ dữ liệu tenant hoặc hệ thống          | Đặt sau HTTPS, basic auth, firewall/giới hạn IP                                              |
-| CORS `*`                                  | Client trình duyệt từ origin không mong muốn gọi BFF   | Thêm config `CORS_ORIGINS` trước production công khai                                        |
-| Secret trong compose                      | Rò credential                                          | Dùng `/opt/qrtable/.env.production` với quyền 0600                                           |
-| Lỗi một Droplet                           | Sự cố toàn hệ thống                                    | Bật backup/snapshot; sau chuyển DB sang managed service                                      |
-| Mismatch bề mặt API SePay                 | Đăng ký webhook OAuth fail sau deploy                  | Verify hình dạng API tài khoản SePay hiện tại trước production live                          |
-| Sai route webhook SePay                   | Hóa đơn tenant hoặc subscription không settle          | Đăng ký riêng route tenant `QRTBL` và route platform `QRSUB`                                 |
-| Test thanh toán live đổi trạng thái ngoài | Chuyển tiền thật hoặc kích hoạt subscription sai       | CI chỉ test âm tính; verify live thủ công giá trị thấp có audit log                          |
+| Rủi ro                                        | Tác động                                                            | Biện pháp giảm thiểu                                                                         |
+| --------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Bỏ qua migration job hoặc chạy sau app        | Image mới boot với schema không tương thích hoặc thiếu              | Chạy image migration immutable và ownership gate trước khi thay app container                |
+| Bật shared database fallback                  | Service có thể reconnect database legacy hỗn hợp                    | Yêu cầu tên env riêng và `DATABASE_SHARED_FALLBACK_ENABLED=false` trong preflight production |
+| `dev:reseed` run on production                | Destructive data loss and identity/cache reset                      | Exclude it from deploy scripts; use a non-destructive, profile-gated demo seed               |
+| Nhầm `env_file` Compose với interpolation     | Image/credential render rỗng hoặc default cũ                        | Truyền `--env-file` mọi nơi và inspect qua helper validate được bảo vệ                       |
+| Validate Compose in ra log CI                 | Secret đã interpolate rò vào bản ghi build/deploy                   | Capture `config`/`config --environment` trong file tạm 0600 và chỉ emit kết quả redact       |
+| Listener TCP/gRPC vẫn trên localhost          | HTTP health pass trong khi inter-service call fail                  | Set listener host thành `0.0.0.0`; test toàn bộ ma trận host                                 |
+| Lệch mạng reverse-proxy/monitoring            | Caddy không resolve Keycloak/Grafana hoặc app không reach Tempo     | Enforce và inspect contract mạng dùng chung                                                  |
+| Kafka `localhost` advertised listener         | App containers cannot connect                                       | Use `PLAINTEXT://kafka:9092` in production compose                                           |
+| Tag image Kafka không khả dụng                | Deploy infra không pull hoặc start Kafka                            | Pin image JVM Apache Kafka chính thức đã xác minh và test health command                     |
+| Env công khai Vite là build-time              | Customer PWA trỏ sai API sau khi tái dùng image                     | Build image với `VITE_BFF_URL` production, hoặc runtime config sau                           |
+| Next public env is partly build-time          | Management App client bundle points to wrong API                    | Build with production `NEXT_PUBLIC_*` and also provide runtime env                           |
+| Keycloak `start-dev` hoặc mount theme mutable | IAM production không an toàn/không tái lập                          | Dùng image tùy chỉnh optimized, hostname ngoài và Keycloak backed DB                         |
+| Bootstrap production reset mật khẩu demo      | Credential đã biết thành hợp lệ trên deploy công khai               | Tách bootstrap realm/client khỏi bootstrap user demo được gate rõ ràng                       |
+| Public Grafana                                | Observability leaks tenant or system data                           | Put behind HTTPS, basic auth, firewall/IP restriction                                        |
+| CORS `*`                                      | Client trình duyệt từ origin không mong muốn gọi BFF                | Enforce một allowlist production cho HTTP và Socket.IO trước production công khai            |
+| Secrets in compose                            | Credential leak                                                     | Keep values out of YAML; protect master/scoped env files with 0600 permissions               |
+| Master env inject vào mọi service             | Một container bị xâm phạm lộ credential không liên quan             | Render file env per-service allowlist và từ chối inject master-env trực tiếp                 |
+| External account/manual gate assumed complete | Deploy bị kẹt hoặc dùng sai tài khoản/tài nguyên                    | Dùng `HUMAN-GATE-01` đến `11` với resource ID và bằng chứng redact                           |
+| GitHub runner cannot pass restricted SSH rule | Deploy tự động fail hoặc operator mở SSH globally                   | Giữ deploy đầu do operator; phê duyệt secure control channel trước workflow SSH              |
+| GitHub plan lacks reviewer protection         | UI gợi ý approval nhưng không enforce                               | Ghi khả năng gói và giữ phê duyệt operator cho đến khi có bảo vệ hỗ trợ                      |
+| DNS/CDN/CAA misconfiguration                  | Caddy không thể cấp hoặc gia hạn certificate                        | Dùng Reserved IP, DNS-only khi cấp, kiểm tra public resolver, và review CAA                  |
+| External secret pasted into chat/log          | Tích hợp provider hoặc ngân hàng dài hạn bị xâm phạm                | Human nhập secret trực tiếp; bằng chứng chỉ gồm name/fingerprint/bốn ký tự cuối              |
+| Development credential reused in production   | Giá trị đã biết hoặc từng lộ kiểm soát production                   | Sinh credential production mới, scan history, rotate phát hiện, từ chối default dev          |
+| Private repository checkout uses personal key | Xâm phạm tài khoản cá nhân hoặc truy cập production không kiểm soát | Dùng deploy key read-only riêng hoặc chuyển sang release bundle chỉ image                    |
+| Cloudinary credentials missing or exposed     | Upload production fail hoặc tài khoản media bị xâm phạm             | Cấu hình môi trường sản phẩm thủ công và chạy smoke upload/read/delete không log secret      |
+| Single Droplet failure                        | Full outage                                                         | Enable backups/snapshots; later move DB to managed service                                   |
+| Backup chỉ tồn tại trên Droplet               | Mất host cũng phá hủy dữ liệu phục hồi                              | Mã hóa/copy off-Droplet, checksum, retention và diễn tập restore                             |
+| SePay API surface mismatch                    | OAuth webhook registration fails after deploy                       | Verify current SePay account API shape before live production                                |
+| Wrong SePay webhook route                     | Tenant bill or subscription invoice never settles                   | Register `QRTBL` tenant route and `QRSUB` platform route separately                          |
+| Live payment test mutates external state      | Real money movement or incorrect subscription activation            | Keep CI negative-only; perform low-value manual live verification with audit logs            |
+| Backup exists but restore was never rehearsed | Recovery fail trong sự cố thực tế                                   | Hoàn thành download offsite mã hóa, checksum, và restore cô lập trước nghiệm thu             |
 
-## 9. Cải tiến theo dõi hữu ích
+## 10. Cải tiến theo dõi hữu ích
 
-- Thêm `CORS_ORIGINS` vào config BFF và giới hạn `app.qrtable.vodinhquan.dev` và `qr.qrtable.vodinhquan.dev`.
 - Thêm user PostgreSQL per-service sau khi pilot single-user ổn định.
 - Thêm test tương thích migration cho release expand/contract tương thích ngược.
 - Thêm test provider-contract SePay riêng với response provider mock cho bề mặt API live đã chọn.
@@ -2234,13 +3043,20 @@ Sự kiện sản phẩm DigitalOcean đã verify ngày 2026-06-06:
 
 - Dùng CodeGraph trước khi chỉnh sửa.
 - Đối chiếu code hiện tại với tài liệu canonical trước khi viết plan deploy.
-- Chỉ cập nhật artifact plan tiếng Anh; bản dịch tiếng Việt đã được đồng bộ với revision này.
+- Đồng bộ bản tiếng Việt với revision human-operator runbook EN canonical trong cùng task.
 - Giữ service boundary và ownership deploy QRTable trong plan.
 - Đối chiếu Phase 7 với cấu hình database-per-service, migration và ownership verification đã implement.
+- Sửa Compose interpolation, đặt tên image/tag, listener/client host service và Docker network cross-layer.
+- Thêm validate Compose an toàn secret, không stream môi trường đã resolve ra log.
+- Thay tag Kafka không khả dụng và luồng theme Keycloak mutable bằng kế hoạch image tái lập.
+- Chuyển CORS, identity bootstrap, biến E2E chính xác và restore off-Droplet thành gate production.
 - Coi secret là giá trị runtime-only và tránh commit credential thật.
-- Đánh dấu blocker production thay vì che sau các bước deploy lạc quan.
+- Giới hạn phân phối secret runtime qua allowlist env per-service được sinh.
+- Đánh dấu blocker production thay vì che sau bước deploy lạc quan.
 - Đưa CI/CD vào task Phase 7 hạng nhất với gate release, deploy, rollback, phê duyệt và smoke test.
 - Thêm verify tài liệu provider SePay và đặt thiết lập webhook/OAuth live làm gate deploy production.
+- Thêm ma trận trách nhiệm đầy đủ, mười một human gate, quy trình web-console, hợp đồng bằng chứng redact, và checklist quan sát deploy đầu tiên.
+- Giải quyết xung đột SSH hạn chế versus GitHub-hosted runner bằng cách đặt deploy trusted-workstation làm baseline Phase 7.
 
 ### ⚠️ Debt flags (không chặn — cải thiện khi chạm lại)
 
@@ -2257,6 +3073,13 @@ Sự kiện sản phẩm DigitalOcean đã verify ngày 2026-06-06:
 - BLOCK002 [STRUCT] Migration per-service hiện có chưa được đóng gói và tích hợp thành deployment gate production one-shot.
 - BLOCK003 [ENV_LEAK] Secret production phải sinh và lưu ngoài git.
 - BLOCK004 [PATTERN] Keycloak production không được dùng `start-dev`.
+- BLOCK005 [PATTERN] CORS BFF HTTP và Socket.IO phải ngừng dùng wildcard origin trước deploy công khai.
+- BLOCK006 [ENV_LEAK] Bootstrap Keycloak production không được tạo/reset user demo deterministic.
+- BLOCK007 [STRUCT] Contract host/network/interpolation Compose phải implement chính xác, nếu không container HTTP healthy vẫn fail traffic inter-service.
+- BLOCK008 [ENV_LEAK] Master env production không được truyền nguyên khối cho mọi container.
+- BLOCK009 [PATTERN] Tài khoản bên ngoài, DNS, provider secret, ủy quyền ngân hàng, và backup storage yêu cầu hoàn thành human gate đã ghi tài liệu.
+- BLOCK010 [PATTERN] SSH GitHub-hosted runner phải vẫn disabled cho đến khi secure deployment control channel được chọn và test rõ ràng.
+- BLOCK011 [ENV_LEAK] Credential development local đã điền và default development deterministic không được tái sử dụng trong production; credential bị ảnh hưởng cần audit và rotate.
 
 ### 💡 Đề xuất
 

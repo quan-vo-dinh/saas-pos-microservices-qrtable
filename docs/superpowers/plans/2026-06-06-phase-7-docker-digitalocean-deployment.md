@@ -1,14 +1,14 @@
 # Phase 7 Docker DigitalOcean Deployment Implementation Plan
 
-> **Vietnamese translation:** [2026-06-06-phase-7-docker-digitalocean-deployment.vi.md](2026-06-06-phase-7-docker-digitalocean-deployment.vi.md) — synchronized with the 2026-06-07 database-per-service revision.
+> **Vietnamese translation:** [2026-06-06-phase-7-docker-digitalocean-deployment.vi.md](2026-06-06-phase-7-docker-digitalocean-deployment.vi.md) — synchronized with the 2026-06-07 human-operator runbook revision.
 
-> **Revision 2026-06-07:** Updated the English plan after the database-per-service implementation. This revision fixes production database env names, reuses the implemented migrations and ownership checks, and adds a one-shot migration gate before app boot.
+> **Revision 2026-06-07:** Re-verified against the current codebase and current provider documentation after the database-per-service implementation. This revision fixes production database env names, Compose interpolation, TCP/gRPC host binding, Docker networks, image/tag conventions, Keycloak packaging/bootstrap, monitoring paths, E2E variables, backup consistency, CI/CD gates, and the complete human-operator runbook for external platforms.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Package QRTable into reproducible Docker images and deploy the Phase 7 pilot/production baseline to DigitalOcean under `vodinhquan.dev`.
 
-**Architecture:** Use a single DigitalOcean Droplet as the Phase 7 production baseline, with Docker Compose split into proxy, app, infra, and monitoring layers plus a one-shot migration job. Public traffic terminates at a reverse proxy, while PostgreSQL, MongoDB, Redis, Kafka, Keycloak, Loki, Prometheus, Tempo, and all NestJS TCP ports stay on internal Docker networks. Keep managed DigitalOcean databases as a later hardening option, not the first thesis/pilot dependency.
+**Architecture:** Use a single DigitalOcean Droplet as the Phase 7 production baseline, with Docker Compose split into proxy, app, infra, and monitoring layers plus one-shot migration and identity bootstrap jobs. Public traffic terminates at a reverse proxy, while PostgreSQL, MongoDB, Redis, Kafka, Loki, Prometheus, Tempo, and all NestJS TCP/gRPC ports stay on internal Docker networks. Keycloak and Grafana join both their private network and the shared edge network so Caddy can reach them without publishing their container ports. Keep managed DigitalOcean databases as a later hardening option, not the first thesis/pilot dependency.
 
 **Tech Stack:** DigitalOcean Droplet, Ubuntu, Docker Engine, Docker Compose plugin, Nx, pnpm, NestJS, Next.js, Vite, PostgreSQL, MongoDB, Redis, Kafka KRaft, Keycloak, Caddy or Nginx reverse proxy, Grafana, Loki, Promtail, Prometheus, Tempo, OpenTelemetry.
 
@@ -53,6 +53,7 @@ Read and reconciled:
 - `docs/phases/phase-6-observability-plan.md`
 - `docs/phases/phase-6-observability-plan.vi.md`
 - `docs/guides/sepay-configuration-guide-phase3.md`
+- `docs/guides/cloudinary-setup-and-usage-guide.md`
 - `docs/guides/monitoring-observability-qrtable.md`
 - `docs/guides/observability-qrtable.md`
 - `tools/ngrok/README.md`
@@ -80,8 +81,42 @@ Also checked official DigitalOcean pages for Droplet pricing, managed database p
 - Droplets start at USD 4/month; managed databases start at USD 15/month.
 - Managed PostgreSQL 1 GiB starts around USD 15.15/month; managed Redis-compatible Valkey 1 GiB starts around USD 15/month.
 - DigitalOcean managed Kafka is a 3-node managed database product and starts much higher than the thesis/pilot target.
-- DigitalOcean Container Registry has a free entry tier, but image storage must be checked before relying on it for 11 QRTable images, including the one-shot migration image.
+- DigitalOcean Container Registry Starter allows one repository and 500 MiB. QRTable therefore uses one repository with service-prefixed immutable tags; the Basic tier is the practical pilot baseline if the twelve release images exceed Starter storage.
 - Docker on Ubuntu should be installed from Docker's official repository; modern installs include `docker compose` as a plugin.
+- Docker Compose interpolation does not read service-level `env_file`. Every production Compose command must pass `--env-file /opt/qrtable/.env.production`. Preflight must inspect `docker compose config --environment` through a protected temporary file because that output can contain secrets.
+- The originally proposed `bitnami/kafka:3.9.0` tag is unavailable. Use the verified current supported JVM image `apache/kafka:4.3.0` with Apache Kafka's documented environment-variable mapping, then run a KafkaJS compatibility smoke before production.
+- Current Keycloak and Caddy patch releases must be pinned by digest during implementation. The verified planning baseline is Keycloak `26.6.2` and Caddy `2.11.3`.
+- Current image manifests verified for the plan include Node `22.22.3`, PostgreSQL `16.13`, MongoDB `7.0.31`, Redis `7.4.9`, Nginx `1.30.1`, Kafka `4.3.0`, Keycloak `26.6.2`, and Caddy `2.11.3`. CI must still scan and record the exact digests it publishes or deploys.
+
+Primary references used for this verification:
+
+- [Docker Compose variable interpolation](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
+- [Node.js 22.22.3 LTS release](https://nodejs.org/en/blog/release/v22.22.3)
+- [Apache Kafka supported releases](https://kafka.apache.org/community/downloads/)
+- [Apache Kafka official Docker image](https://kafka.apache.org/43/getting-started/docker/)
+- [Keycloak container and optimized image guidance](https://www.keycloak.org/server/containers)
+- [Keycloak reverse proxy guidance](https://www.keycloak.org/server/reverseproxy)
+- [Keycloak releases](https://github.com/keycloak/keycloak/releases)
+- [Caddy `basic_auth`](https://caddyserver.com/docs/caddyfile/directives/basic_auth)
+- [Caddy releases](https://github.com/caddyserver/caddy/releases)
+- [DigitalOcean Container Registry pricing](https://docs.digitalocean.com/products/container-registry/details/pricing/)
+- [DigitalOcean read-only registry login](https://docs.digitalocean.com/reference/doctl/reference/registry/login)
+- [PostgreSQL 16.13 release notes](https://www.postgresql.org/docs/release/16.13/)
+- [MongoDB 7.0 patch release notes](https://www.mongodb.com/docs/current/release-notes/7.0/)
+- [Redis releases](https://github.com/redis/redis/releases)
+- [Nginx official image tags](https://hub.docker.com/_/nginx/tags)
+- [GitHub deployment environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
+- [GitHub Actions secrets](https://docs.github.com/actions/security-guides/using-secrets-in-github-actions)
+- [GitHub repository rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository)
+- [GitHub Actions security hardening](https://docs.github.com/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)
+- [DigitalOcean Droplet creation](https://docs.digitalocean.com/products/droplets/how-to/create/)
+- [DigitalOcean Cloud Firewalls](https://docs.digitalocean.com/products/networking/firewalls/how-to/create/)
+- [DigitalOcean Container Registry creation](https://docs.digitalocean.com/products/container-registry/how-to/create-registry/)
+- [DigitalOcean Spaces access management](https://docs.digitalocean.com/products/spaces/how-to/manage-access/)
+- [Keycloak bootstrap admin recovery](https://www.keycloak.org/server/bootstrap-admin-recovery)
+- [Cloudinary credential management](https://cloudinary.com/documentation/developer_onboarding_faq_find_credentials)
+- [SePay webhook integration](https://developer.sepay.vn/vi/sepay-webhooks/tich-hop-webhook)
+- [SePay OAuth2 configuration](https://developer.sepay.vn/vi/cong-thanh-toan/tich-hop-oauth2/cau-hinh)
 
 SePay provider docs checked through Context7 on 2026-06-06. Key deploy facts:
 
@@ -160,15 +195,18 @@ Blockers to resolve before public production:
 - `docker-compose.provider.yaml` uses dev-friendly defaults: unpinned `mongo`, `postgres`, `redis`, `redisinsight:latest`, `bitnamilegacy/kafka`, dev credentials, and Keycloak `start-dev`.
 - Kafka advertises `localhost`, which works for local host-run apps but not for app containers.
 - Monitoring compose exposes Grafana publicly on `3001` and scrapes host-run apps; production must put Grafana behind HTTPS/access control and scrape internal service names.
-- BFF currently enables CORS `origin: '*'`; production should restrict it to the management and customer origins.
+- BFF HTTP and Socket.IO currently enable CORS `origin: '*'`; public production is blocked until both use the same validated production allowlist.
 - `dist/` contains stale `product` and `invoice` build artifacts even though current `apps/` no longer contains those projects. Production builds must clean and rebuild from source.
+- Current `tools/keycloak-bootstrap.sh` always reads deterministic demo users, resets known passwords, and only applies localhost client redirects on first creation. It must not be run unchanged against production.
+- The current app compose draft does not set the listener host variables used by `TcpConfiguration`/`GrpcConfiguration`; service processes would bind to `localhost` inside their containers.
+- Caddy cannot reach Keycloak or Grafana unless those services join `qrtable-edge`; Prometheus and Tempo similarly need explicit shared networks with app containers.
 
 Debt flags:
 
 - Some docs still state Phase 6/7 are TODO even though observability code and monitoring compose exist.
 - `technical-architecture.md` describes target compose files (`docker-compose.infra.yaml`, `docker-compose.app.yaml`) that are not yet implemented.
 - Service global prefixes are not uniform: some services use `api/v1`, while `authorizer`, `saas`, and `user-access` use `api`. Prometheus and proxy rules must account for this until unified.
-- `TcpConfiguration` host env behavior is easy to misconfigure; production compose should set both legacy host keys and TCP-specific host keys where needed.
+- `TcpConfiguration` uses each service's legacy `<SERVICE>_SERVICE_HOST` for its listener, while `TcpProvider` clients prefer `TCP_<SERVICE>_SERVICE_HOST`. Production compose must set listener hosts to `0.0.0.0` and client hosts to Docker service names.
 
 Solid foundations:
 
@@ -256,13 +294,357 @@ Reason:
 
 Nginx is acceptable if the team wants a more familiar reverse proxy, but then the plan must add Certbot renewal, mounted certificate storage, and explicit renewal verification.
 
-## 4. Target File Structure
+## 4. Human Operator Runbook
+
+This section is mandatory. Tasks that require account ownership, billing acceptance, identity verification, DNS control, bank authorization, secret viewing, or real-money movement cannot be completed autonomously by an AI agent.
+
+### 4.1 Responsibility labels and secret-handling contract
+
+Use these labels throughout execution:
+
+| Label        | Meaning                                                                                       |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `[AGENT]`    | Can be implemented and verified in the repository or on an already-authorized machine         |
+| `[HUMAN]`    | Requires the account owner to use a web console, approve terms, enter a secret, or move money |
+| `[SHARED]`   | Agent prepares commands/checks; human approves the action or enters protected values          |
+| `HUMAN-GATE` | Deployment must stop until the named human evidence is confirmed                              |
+
+Secret rules:
+
+- The agent must never ask the user to paste API tokens, passwords, private keys, bank credentials, OAuth client secrets, or recovery codes into chat.
+- The human enters secrets directly into GitHub Environments/Actions, the DigitalOcean console, SePay, Cloudinary, or `/opt/qrtable/.env.production` over an authenticated shell.
+- The user replies only with a non-secret confirmation such as `HUMAN-GATE-03 complete`.
+- Evidence records resource names, IDs, URLs, key fingerprints, creation dates, and last four characters where useful, never full secret values.
+- A CLI step may be delegated to the agent only after the user has already authenticated that CLI and explicitly permits the action.
+
+### 4.2 Responsibility matrix
+
+| Work item                                    | Owner      | Notes                                                                          |
+| -------------------------------------------- | ---------- | ------------------------------------------------------------------------------ |
+| Dockerfiles, Compose, scripts, tests, docs   | `[AGENT]`  | Repository work                                                                |
+| Account registration, billing, terms, KYC    | `[HUMAN]`  | GitHub, DigitalOcean, SePay, bank, domain registrar, Cloudinary                |
+| 2FA/passkeys and recovery codes              | `[HUMAN]`  | Store recovery material in a password manager                                  |
+| API/OAuth secret creation and rotation       | `[HUMAN]`  | Agent can provide field names and validation commands                          |
+| Droplet/registry/firewall creation           | `[SHARED]` | Human approves cost and ownership; agent may use an authenticated `doctl`      |
+| DNS changes                                  | `[HUMAN]`  | Requires control of the `vodinhquan.dev` DNS zone                              |
+| Production env generation                    | `[SHARED]` | Agent generates commands; human enters external secrets directly on the server |
+| Keycloak realm/client automation             | `[AGENT]`  | Human creates the permanent administrator and validates browser login          |
+| SePay OAuth, bank linking, webhook dashboard | `[HUMAN]`  | Bank authorization and production provider access cannot be automated          |
+| Real payment verification                    | `[HUMAN]`  | Low-value transfer only, with explicit approval                                |
+| Release image build                          | `[AGENT]`  | GitHub Actions after the human configures repository secrets                   |
+| First production deploy                      | `[SHARED]` | Human selects window/tag; agent/script executes and verifies                   |
+| Backup restore rehearsal                     | `[SHARED]` | Human approves isolated target and retention; agent runs checks                |
+
+### 4.3 Manual prerequisites inventory
+
+Before implementation reaches external infrastructure, the human must have:
+
+- [ ] A password manager entry for QRTable production with owner email, account URLs, resource IDs, key fingerprints, and recovery instructions.
+- [ ] 2FA/passkeys enabled on GitHub, DigitalOcean, domain registrar/DNS provider, SePay, Cloudinary, and the production owner email account.
+- [ ] GitHub repository administrator access.
+- [ ] A DigitalOcean team/account with a valid payment method and permission to create Projects, Droplets, Firewalls, Container Registry, backups, and Spaces.
+- [ ] Administrative control of the `vodinhquan.dev` DNS zone.
+- [ ] A SePay production-capable account and the bank account that will receive `QRTBL`/`QRSUB` transfers.
+- [ ] A Cloudinary account/product environment if QRTable production uploads use Cloudinary.
+- [ ] An operator workstation with `git`, `ssh`, `docker`, `doctl`, `openssl`, and `dig`.
+- [ ] Separate Ed25519 keys for each required role: human workstation to Droplet, optional Droplet-to-GitHub read-only checkout, and any future CI-to-Droplet deploy channel. Never reuse a personal GitHub signing/authentication key.
+
+### 4.4 Ordered human gates
+
+| Gate            | Required completion evidence, without secrets                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| `HUMAN-GATE-01` | Accounts, billing, owner email, 2FA/passkeys, and recovery storage confirmed                           |
+| `HUMAN-GATE-02` | GitHub ruleset, Actions permissions, production environment, and release secret names confirmed        |
+| `HUMAN-GATE-03` | DigitalOcean Project, Container Registry, API token, region, and resource naming confirmed             |
+| `HUMAN-GATE-04` | Reserved IP, Droplet, admin SSH, backups, monitoring, tags, and Cloud Firewall confirmed               |
+| `HUMAN-GATE-05` | Five DNS records resolve publicly and CAA/Cloudflare-style proxy settings permit certificate issuance  |
+| `HUMAN-GATE-06` | Cloudinary, SePay, Keycloak client, Grafana, and generated secret inventory entered in approved stores |
+| `HUMAN-GATE-07` | `/opt/qrtable/.env.production` completed with mode `0600`; no values pasted into chat or git           |
+| `HUMAN-GATE-08` | Permanent Keycloak admin and real Management App login verified; temporary bootstrap admin removed     |
+| `HUMAN-GATE-09` | SePay product/API shape, OAuth app, bank link, and platform/tenant webhook configuration proven        |
+| `HUMAN-GATE-10` | First deploy window, immutable image tag, backup, smoke result, and observation window accepted        |
+| `HUMAN-GATE-11` | Encrypted off-Droplet backup and isolated restore rehearsal completed                                  |
+
+The deploy guide created by Task 13 must provide a dated checklist for these gates. No task may silently assume an external account or credential already exists.
+
+### 4.5 GitHub web-console setup
+
+`[HUMAN]` Open the repository on GitHub:
+
+1. In **Settings > Actions > General**, use the minimum workflow permissions required. Default to read-only repository contents.
+2. In **Settings > Rules > Rulesets**, protect `main`:
+   - require pull requests;
+   - require the CI status checks used by `.github/workflows/ci.yml`;
+   - block force pushes and branch deletion;
+   - restrict bypass permission to the owner/emergency maintainer.
+3. In **Settings > Environments**, create `production` and restrict deployment branches/tags to the release policy.
+4. Add required reviewers when the GitHub plan supports them.
+5. If the private repository's GitHub plan does not support required reviewers, do not pretend an approval gate exists. Keep production deployment operator-driven, record the approver in the deployment log, and upgrade the GitHub plan before enabling unattended production deploys.
+6. In **production > Environment secrets** or **Settings > Secrets and variables > Actions**, create only:
+   - `DIGITALOCEAN_ACCESS_TOKEN` for publishing release images, scoped as narrowly as DigitalOcean permits;
+   - SSH deploy secrets only after the secure deploy channel in section 4.7 has been selected.
+7. If Task 14 clones the private repository on the Droplet, add a dedicated read-only repository deploy key under **Settings > Deploy keys**. Do not allow write access. Prefer an image-only release bundle later so the production host no longer needs repository access.
+8. Pin third-party GitHub Actions to full commit SHAs, keep workflow permissions explicit, and review Dependabot updates before changing those SHAs.
+
+Do not store application runtime secrets, database passwords, Keycloak admin passwords, SePay credentials, Cloudinary secrets, or the master production env in GitHub.
+
+`HUMAN-GATE-02` evidence:
+
+- ruleset name and active state;
+- production environment name and branch policy;
+- whether required reviewers are genuinely enforced by the current GitHub plan;
+- configured secret names only;
+- screenshot or settings URL with all secret values hidden.
+
+### 4.6 DigitalOcean web-console setup
+
+`[HUMAN]` Complete these steps in the DigitalOcean control panel:
+
+1. Create/select a Project named `qrtable-production`.
+2. Create one Container Registry. The registry name is globally unique and cannot be changed, so confirm the final name before creation. Use the region closest to the Droplet and select a paid tier if twelve release images exceed Starter limits.
+3. Create a dedicated DigitalOcean API token under **API > Applications & API**. Copy it once into the password manager and GitHub release secret; never commit it.
+4. Add the operator's public SSH key under **Settings > Security > SSH keys**. Upload only the `.pub` file.
+5. Reserve a public IPv4 address for QRTable, then attach it to the production Droplet. DNS must target this Reserved IP, not an ephemeral Droplet address.
+6. Create the Droplet:
+   - Ubuntu 24.04 LTS or the current supported Ubuntu LTS;
+   - `sgp1` when available;
+   - 4 vCPU / 8 GiB recommended pilot size;
+   - VPC in the same region;
+   - SSH-key authentication only;
+   - enhanced monitoring enabled;
+   - backups enabled before live traffic;
+   - tags such as `qrtable`, `production`, and `phase7`.
+7. Create and attach a Cloud Firewall:
+   - inbound `22/tcp` from the operator's current public IP/CIDR only;
+   - inbound `80/tcp` and `443/tcp` from all IPv4/IPv6 clients;
+   - no public rules for application, datastore, Kafka, Keycloak, or monitoring container ports;
+   - normal outbound traffic allowed for package downloads, registry pulls, OAuth, webhooks, and telemetry.
+8. Add a block volume only when measured disk/retention requirements justify it. Record its mount and backup policy separately.
+
+`HUMAN-GATE-03`/`04` evidence:
+
+- DigitalOcean Project name/ID;
+- registry hostname and tier;
+- API token creation date, scope, and last four characters only;
+- Droplet ID, region, size, image, tags, and Reserved IP;
+- Cloud Firewall ID and rule summary;
+- backup and monitoring enabled state;
+- successful SSH key fingerprint match and `ssh` login.
+
+### 4.7 Production SSH and GitHub Actions control channel
+
+The first Phase 7 pilot uses this baseline:
+
+- GitHub Actions builds, scans, and publishes immutable release images.
+- The production operator deploys from the trusted workstation over SSH.
+- Port 22 remains restricted to the operator's known IP.
+- The operator runs the audited remote deployment script with a selected immutable image tag.
+
+Example operator command:
+
+```bash
+ssh -o IdentitiesOnly=yes qrtable-deploy@<reserved-ip> \
+  "cd /opt/qrtable && IMAGE_TAG='<git-sha>' ./tools/deploy/phase7-remote-deploy.sh"
+```
+
+Do not open SSH to `0.0.0.0/0` merely so a GitHub-hosted runner can connect. GitHub-hosted runner egress addresses are not a stable single source IP suitable for this firewall rule.
+
+Before enabling the optional `deploy-production.yml`, `[HUMAN]` must choose and document one secure channel:
+
+| Option                                       | Phase 7 decision | Notes                                                                                       |
+| -------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------- |
+| Operator workstation deploy                  | Baseline         | Simplest; preserves restricted SSH; approval is explicit                                    |
+| Private overlay/VPN such as Tailscale        | Recommended next | GitHub runner access still needs a deliberate authenticated design                          |
+| Temporary runner-IP firewall rule via DO API | Conditional      | Workflow must add the exact `/32`, deploy, and always remove it; token needs firewall scope |
+| Isolated self-hosted deployment runner       | Later            | Must be hardened, patched, monitored, and must not run untrusted pull-request code          |
+
+`HUMAN-GATE-10` must record the selected channel. Until a non-baseline channel is tested, `deploy-production.yml` remains disabled or produces an operator command instead of initiating SSH.
+
+### 4.8 Domain, DNS, and TLS procedure
+
+`[HUMAN]` At the authoritative DNS provider for `vodinhquan.dev`, create:
+
+| Type | Name              | Value                    | Initial TTL |
+| ---- | ----------------- | ------------------------ | ----------- |
+| A    | `api.qrtable`     | DigitalOcean Reserved IP | 300         |
+| A    | `app.qrtable`     | DigitalOcean Reserved IP | 300         |
+| A    | `qr.qrtable`      | DigitalOcean Reserved IP | 300         |
+| A    | `auth.qrtable`    | DigitalOcean Reserved IP | 300         |
+| A    | `grafana.qrtable` | DigitalOcean Reserved IP | 300         |
+
+If the DNS provider has an HTTP proxy/CDN mode, keep these records DNS-only until Caddy has successfully issued certificates. Review existing CAA records: they must permit Let's Encrypt or be removed/updated before issuance.
+
+Confirm the domain is not close to expiry, registrar auto-renew/payment details are valid, and the authoritative nameservers are the ones being edited.
+
+Verify from outside the Droplet:
+
+```bash
+for host in api app qr auth grafana; do
+  dig +short "${host}.qrtable.vodinhquan.dev" @1.1.1.1
+  dig +short "${host}.qrtable.vodinhquan.dev" @8.8.8.8
+done
+dig CAA qrtable.vodinhquan.dev +short
+```
+
+After Caddy starts, verify each certificate hostname, issuer, expiry, redirect behavior, and automatic-renewal logs. DNS propagation alone is not `HUMAN-GATE-05`; successful public TLS is also required.
+
+### 4.9 External credential and production-env procedure
+
+`[SHARED]` Generate QRTable-owned secrets locally or directly on the server:
+
+```bash
+openssl rand -base64 48
+openssl rand -hex 32
+```
+
+The human enters provider-owned secrets directly. Inventory at minimum:
+
+| Secret group           | Required values                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| PostgreSQL/Mongo/Redis | strong root/service passwords and connection values                                            |
+| Keycloak               | temporary bootstrap admin, permanent admin, DB password, BFF and Management App client secrets |
+| Auth.js                | `AUTH_SECRET` and production Keycloak client values                                            |
+| SePay                  | OAuth client ID/secret, platform webhook secret, selected live API/base URLs                   |
+| Payment                | `PAYMENT_SECRETS_ENCRYPTION_KEY`                                                               |
+| Cloudinary             | cloud name, API key, API secret, and any upload preset required by current source              |
+| Grafana/proxy          | Grafana admin password and Caddy-compatible basic-auth hash                                    |
+| Offsite backup         | restricted Spaces access key/secret and bucket/endpoint values                                 |
+
+Current repository inspection found populated development credentials in the git-ignored local `.env`, and a deterministic development Keycloak client secret remains in development tooling. Therefore:
+
+- never copy the current local `.env` to production;
+- generate fresh production-only credentials for every secret group;
+- rotate any development/provider credential that has ever been committed, shared, screenshotted, logged, or reused outside the current trusted workstation;
+- run a secret-history scan before the first release and document only the finding count/remediation, never the secret value;
+- ensure production bootstrap/deploy scripts do not fall back to deterministic development defaults.
+
+`[HUMAN]` For Cloudinary:
+
+1. Create/select the production product environment.
+2. Obtain the cloud name, API key, and API secret from Cloudinary's API Keys page.
+3. Store the API secret only in the password manager and production server env.
+4. Run one upload/read/delete smoke using a non-sensitive test image.
+5. Confirm frontend bundles and logs never contain the API secret.
+
+On the server:
+
+```bash
+sudo install -d -m 0750 -o qrtable-deploy -g qrtable-deploy /opt/qrtable
+sudo install -m 0600 -o qrtable-deploy -g qrtable-deploy \
+  docker/env/.env.production.example /opt/qrtable/.env.production
+sudoedit /opt/qrtable/.env.production
+stat -c '%a %U %G %n' /opt/qrtable/.env.production
+```
+
+Expected mode is `600`. Run the redacted preflight and scoped-env renderer; never run `cat`, `env`, `docker compose config`, or `config --environment` directly into shared logs.
+
+### 4.10 Keycloak human procedure
+
+`[AGENT]` The production bootstrap job creates/updates the realm, roles, protocol mappers, clients, redirect URIs, web origins, and service-account permissions.
+
+`[HUMAN]` After bootstrap:
+
+1. Sign in to the Keycloak Admin Console over `https://auth.qrtable.vodinhquan.dev`.
+2. Create a named permanent administrator for the owner/maintainer.
+3. Enable strong authentication required by the selected Keycloak policy.
+4. Sign out and sign back in with the permanent administrator.
+5. Disable/delete the temporary bootstrap administrator and remove temporary bootstrap values from normal runtime injection.
+6. Test Management App login, logout, token issuer, tenant/role claims, and unauthorized-role rejection in a private browser session.
+
+Temporary bootstrap credentials are recovery/bootstrap material, not the long-lived administrator identity.
+
+### 4.11 SePay account, OAuth, webhook, and live-test procedure
+
+The canonical protocol-level guide remains `docs/guides/sepay-configuration-guide-phase3.md`; this plan defines the required operator gates.
+
+`[HUMAN]` must:
+
+1. Register/sign in to SePay, complete any required identity/business verification, accept provider terms, and connect the intended receiving bank account.
+2. Confirm whether the account uses Bank Hub `/v1/webhook` with `SECRET_KEY` or the currently coded `/api/v1/webhooks`/`Api_Key` surface.
+3. Create the OAuth application with the exact production callback:
+
+   ```text
+   https://app.qrtable.vodinhquan.dev/dashboard/payment-settings/sepay-callback
+   ```
+
+4. Enter the OAuth client ID/secret directly into `/opt/qrtable/.env.production`.
+5. Configure the platform `QRSUB` webhook:
+
+   ```text
+   https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/platform
+   ```
+
+6. Complete tenant OAuth Connect from Management App and verify the generated `QRTBL` tenant webhook includes the tenant slug.
+7. Verify wrong/missing secrets are rejected and valid provider calls are idempotently audited.
+8. Only after explicit approval, perform one low-value real transfer and observe BFF, Payment/SaaS, database audit, and Grafana evidence.
+
+The AI cannot accept SePay terms, complete KYC, authorize a bank account, approve OAuth consent as the owner, or initiate a real bank transfer.
+
+`HUMAN-GATE-09` evidence:
+
+- SePay account/product name and verified API surface;
+- OAuth application name and callback URL;
+- connected bank identifier with account number redacted;
+- platform and tenant webhook IDs/URLs with secrets hidden;
+- provider delivery result and QRTable transaction/audit ID;
+- amount/time/result of any approved low-value test.
+
+### 4.12 Off-Droplet backup setup
+
+`[HUMAN]` Create a private DigitalOcean Space or another independent object-storage target:
+
+1. Choose a region near the Droplet.
+2. Keep the bucket private.
+3. Create a dedicated access key restricted to the backup bucket and required operations where the provider supports it.
+4. Enter the key/secret directly into the server's backup env, not GitHub or chat.
+5. Define retention and deletion authority.
+
+`[AGENT]` uploads an encrypted backup, downloads it to an isolated restore target, verifies checksums, restores PostgreSQL and MongoDB, and records duration/result. A same-Droplet archive or snapshot alone does not satisfy `HUMAN-GATE-11`.
+
+### 4.13 First production deployment window
+
+`[SHARED]` Before the first public deployment:
+
+- [ ] Human selects the immutable image tag and maintenance/demo window.
+- [ ] Human confirms current backup and rollback tag.
+- [ ] Agent runs preflight, migrations, ownership verification, deploy, and smoke checks.
+- [ ] Human validates login, QR flow, POS/KDS, Cloudinary upload, and SePay owner-facing flows.
+- [ ] Agent and human observe health, logs, metrics, traces, disk, memory, and webhook errors at 5, 15, and 60 minutes.
+- [ ] Human records `accept`, `rollback app`, or `restore data` as separate decisions.
+
+### 4.14 Operator evidence record
+
+The implementation guide must contain a redacted deployment record with:
+
+```text
+deployment_date
+operator
+approver
+git_sha
+image_tag_and_digests
+github_actions_run_url
+digitalocean_project_registry_droplet_firewall_ids
+reserved_ip
+dns_and_tls_verification
+keycloak_admin_and_login_verification
+sepay_api_surface_oauth_webhook_delivery_ids
+cloudinary_smoke_result
+backup_object_checksum
+restore_rehearsal_result
+smoke_e2e_observation_results
+rollback_tag
+```
+
+No screenshot, log, or evidence file may contain a full token, password, private key, OAuth secret, webhook secret, bank credential, or unredacted customer data.
+
+## 5. Target File Structure
 
 Create:
 
 - `.dockerignore`
 - `docker/backend.Dockerfile`
 - `docker/migrations.Dockerfile`
+- `docker/keycloak.Dockerfile`
 - `docker/management-app.Dockerfile`
 - `docker/customer-pwa.Dockerfile`
 - `docker/proxy/Caddyfile`
@@ -274,10 +656,14 @@ Create:
 - `docker-compose.proxy.yaml`
 - `docker-compose.monitoring.prod.yaml`
 - `tools/deploy/phase7-preflight.sh`
+- `tools/deploy/phase7-compose-validate.sh`
+- `tools/deploy/phase7-render-service-envs.sh`
 - `tools/deploy/phase7-build-images.sh`
 - `tools/deploy/phase7-migrate.sh`
 - `tools/deploy/phase7-seed-demo.sh`
 - `tools/deploy/phase7-smoke.sh`
+- `tools/deploy/phase7-e2e.sh`
+- `tools/deploy/phase7-keycloak-bootstrap.sh`
 - `docs/guides/phase-7-digitalocean-deployment.md`
 
 Reuse as implemented:
@@ -293,6 +679,8 @@ Modify after implementation:
 
 - `apps/management-app/next.config.ts`
 - `apps/bff/src/bootstrap.ts`
+- `apps/bff/src/app/modules/realtime/gateways/order-events.gateway.ts`
+- `apps/bff/src/configuration/index.ts`
 - `docker-compose.monitoring.yaml` or create a production override only
 - `docker/monitoring/prometheus/prometheus.yml` or production-specific Prometheus config
 - `docs/technical-architecture.md` section 14
@@ -303,12 +691,13 @@ Modify after implementation:
 Private files to create on the server only:
 
 - `/opt/qrtable/.env.production`
+- `/opt/qrtable/env/*.env`
 - `/opt/qrtable/secrets/*`
 - `/opt/qrtable/backups/*`
 
 Never commit those private files.
 
-## 5. Tasks
+## 6. Tasks
 
 ### Task 1: Add Build Context Controls
 
@@ -324,6 +713,7 @@ Use this content:
 .git
 .github
 .vscode
+.codegraph
 .env
 .env.*
 !*.env.example
@@ -331,6 +721,8 @@ node_modules
 **/node_modules
 dist
 coverage
+playwright-report
+test-results
 .nx/cache
 .next
 apps/management-app/.next
@@ -343,13 +735,21 @@ docs/graduation-thesis-resources/thesis-report/build
 
 - [ ] Step 2: Verify build context stays small
 
-Run:
+Run a real BuildKit build and inspect the `load build context` line:
 
 ```bash
-docker buildx du --verbose .
+docker buildx build \
+  --platform linux/amd64 \
+  --progress=plain \
+  --no-cache \
+  -f docker/backend.Dockerfile \
+  --build-arg APP_NAME=bff \
+  --load \
+  -t qrtable-bff:context-smoke \
+  .
 ```
 
-Expected: no `node_modules`, no `docker/docker_data`, no private `.env`.
+Expected: transferred context stays bounded and contains no `node_modules`, `docker/docker_data`, `.codegraph`, test reports, or private `.env`. Do not use `docker buildx du` for this check; that command reports builder disk usage, not build-context size.
 
 ### Task 2: Build Backend Images
 
@@ -357,6 +757,7 @@ Expected: no `node_modules`, no `docker/docker_data`, no private `.env`.
 
 - Create: `docker/backend.Dockerfile`
 - Create: `tools/deploy/phase7-build-images.sh`
+- Create: `tools/deploy/phase7-render-service-envs.sh`
 
 - [ ] Step 1: Create a parametric backend Dockerfile
 
@@ -365,14 +766,14 @@ Use a single Dockerfile with `APP_NAME` so all eight NestJS services share the s
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.12-alpine3.20 AS base
+FROM node:22.22.3-alpine3.23 AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
 WORKDIR /workspace
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml nx.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
 COPY apps ./apps
 COPY libs ./libs
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
@@ -383,7 +784,7 @@ RUN test -n "$APP_NAME"
 RUN pnpm nx build "$APP_NAME" --configuration=production
 RUN pnpm --dir "dist/apps/$APP_NAME" install --prod --frozen-lockfile
 
-FROM node:22.12-alpine3.20 AS runtime
+FROM node:22.22.3-alpine3.23 AS runtime
 ARG APP_NAME
 ENV NODE_ENV=production
 ENV APP_NAME=$APP_NAME
@@ -403,25 +804,39 @@ Use this content:
 #!/usr/bin/env bash
 set -euo pipefail
 
-REGISTRY="${REGISTRY:-registry.digitalocean.com/qrtable}"
-TAG="${TAG:-phase7}"
+IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-registry.digitalocean.com/qrtable/qrtable}"
+IMAGE_TAG="${IMAGE_TAG:-phase7}"
+PLATFORM="${PLATFORM:-linux/amd64}"
 BACKEND_APPS=(bff authorizer catalog order kitchen payment saas user-access)
 
+if [[ "${PUSH_IMAGES:-false}" == "true" ]]; then
+  OUTPUT_ARGS=(--push)
+else
+  OUTPUT_ARGS=(--load)
+fi
+
 for app in "${BACKEND_APPS[@]}"; do
-  docker build \
+  docker buildx build \
+    --platform "${PLATFORM}" \
     -f docker/backend.Dockerfile \
     --build-arg APP_NAME="${app}" \
-    -t "${REGISTRY}/qrtable-${app}:${TAG}" \
+    -t "${IMAGE_REPOSITORY}:${app}-${IMAGE_TAG}" \
+    "${OUTPUT_ARGS[@]}" \
     .
 done
 ```
+
+The implementation may express the output selection differently, but it must select exactly one of `--load` for local verification or `--push` for CI. All twelve release artifacts share one DOCR repository and use service-prefixed tags.
+
+Tasks 3, 4, 5, and 9 must append the Management App, Customer PWA, Keycloak, and migration builds to this script. The script must fail unless all twelve expected tags are built or pushed.
 
 - [ ] Step 3: Verify one backend image before building all
 
 Run:
 
 ```bash
-docker build -f docker/backend.Dockerfile --build-arg APP_NAME=bff -t qrtable-bff:phase7-smoke .
+docker buildx build --platform linux/amd64 --load \
+  -f docker/backend.Dockerfile --build-arg APP_NAME=bff -t qrtable-bff:phase7-smoke .
 docker run --rm qrtable-bff:phase7-smoke node --version
 ```
 
@@ -470,14 +885,14 @@ Use this content:
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.12-alpine3.20 AS base
+FROM node:22.22.3-alpine3.23 AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
 WORKDIR /workspace
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml nx.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
 COPY apps/management-app/package.json apps/management-app/pnpm-lock.yaml ./apps/management-app/
 COPY apps ./apps
 COPY libs ./libs
@@ -492,7 +907,7 @@ ENV NEXT_PUBLIC_BFF_BASE_URL=$NEXT_PUBLIC_BFF_BASE_URL
 ENV NEXT_PUBLIC_CUSTOMER_PWA_URL=$NEXT_PUBLIC_CUSTOMER_PWA_URL
 RUN pnpm nx build management-app
 
-FROM node:22.12-alpine3.20 AS runtime
+FROM node:22.22.3-alpine3.23 AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 RUN addgroup -g 1001 -S qrtable && adduser -S qrtable -u 1001 -G qrtable
@@ -509,7 +924,7 @@ CMD ["node", "apps/management-app/server.js"]
 Run:
 
 ```bash
-docker build \
+docker buildx build --platform linux/amd64 --load \
   -f docker/management-app.Dockerfile \
   --build-arg NEXT_PUBLIC_BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1 \
   --build-arg NEXT_PUBLIC_BFF_BASE_URL=https://api.qrtable.vodinhquan.dev/api/v1 \
@@ -532,12 +947,12 @@ Use this content:
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.12-alpine3.20 AS build
+FROM node:22.22.3-alpine3.23 AS build
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
 WORKDIR /workspace
-COPY package.json pnpm-lock.yaml nx.json tsconfig.base.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
 COPY apps ./apps
 COPY libs ./libs
 ARG VITE_BFF_URL
@@ -547,7 +962,7 @@ ENV VITE_TENANT_ID=$VITE_TENANT_ID
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm nx build customer-pwa
 
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.30.1-alpine3.23 AS runtime
 COPY --from=build /workspace/apps/customer-pwa/dist /usr/share/nginx/html
 COPY docker/nginx/customer-pwa.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
@@ -575,7 +990,7 @@ server {
 Run:
 
 ```bash
-docker build \
+docker buildx build --platform linux/amd64 --load \
   -f docker/customer-pwa.Dockerfile \
   --build-arg VITE_BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1 \
   --build-arg VITE_TENANT_ID=seed-tenant-fallback \
@@ -589,6 +1004,7 @@ Expected: build exits 0.
 **Files:**
 
 - Create: `docker-compose.infra.yaml`
+- Create: `docker/keycloak.Dockerfile`
 - Reuse: `docker/postgres/init/001-create-service-databases.sql`
 - Create: `docker/postgres/init/002-create-keycloak-database.sql`
 
@@ -623,16 +1039,49 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_keycloak')\ge
 
 Per-service PostgreSQL users remain a follow-up hardening task. For the first Phase 7 pilot, one strong PostgreSQL app user is acceptable when the database network is internal and credentials remain private.
 
-- [ ] Step 3: Create production infra compose
+PostgreSQL entrypoint init files run only when `postgres_data` is empty. Preflight must verify all five databases exist. When adopting this plan on an existing volume, explicitly execute the idempotent init SQL through `psql`; do not assume adding a file under `docker-entrypoint-initdb.d` will mutate an initialized cluster.
+
+- [ ] Step 3: Build an optimized Keycloak image with the QRTable theme
+
+Do not build the theme on the Droplet. The provisioned server intentionally has Docker but does not require Node.js or pnpm. Package the provider jar into an immutable Keycloak image during CI:
+
+```dockerfile
+# syntax=docker/dockerfile:1.7
+
+FROM node:22.22.3-alpine3.23 AS theme
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
+WORKDIR /workspace
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/keycloak-theme ./apps/keycloak-theme
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm theme:build
+
+FROM quay.io/keycloak/keycloak:26.6.2 AS builder
+COPY --from=theme /workspace/apps/keycloak-theme/dist_keycloak/keycloak-theme-for-kc-all-other-versions.jar /opt/keycloak/providers/qrtable-theme.jar
+RUN touch -m --date=@1743465600 /opt/keycloak/providers/qrtable-theme.jar
+RUN /opt/keycloak/bin/kc.sh build --db=postgres --health-enabled=true
+
+FROM quay.io/keycloak/keycloak:26.6.2
+COPY --from=builder /opt/keycloak/ /opt/keycloak/
+ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
+CMD ["start", "--optimized"]
+```
+
+At implementation time, pin the base image by digest after compatibility and vulnerability checks. Build and publish it as `${IMAGE_REPOSITORY}:keycloak-${IMAGE_TAG}`.
+
+- [ ] Step 4: Create production infra compose
 
 Key requirements:
 
-- Pin image versions.
+- Pin supported patch versions by digest.
 - No public ports for databases, Redis, Kafka, or Keycloak internal port.
 - Use named volumes, not bind-mounted `docker/docker_data`.
-- Use health checks.
+- Use container health checks for PostgreSQL, MongoDB, Redis, and Kafka; poll Keycloak readiness from the tooling image because the official Keycloak image does not include `curl`.
 - Set Kafka advertised listener to `kafka:9092` for app containers.
-- Run Keycloak with production `start`, not `start-dev`.
+- Run the custom optimized Keycloak image with production `start --optimized`, not `start-dev`.
+- Join Keycloak to both `qrtable-infra` and `qrtable-edge` so it can reach PostgreSQL and Caddy can reach Keycloak.
 
 Skeleton:
 
@@ -654,13 +1103,11 @@ volumes:
   mongodb_data:
   redis_data:
   kafka_data:
-  keycloak_data:
 
 services:
   postgres:
-    image: postgres:16.6-alpine
+    image: postgres:16.13-alpine
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -677,9 +1124,8 @@ services:
       retries: 10
 
   mongodb:
-    image: mongo:7.0.16
+    image: mongo:7.0.31
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
@@ -694,7 +1140,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7.4.1-alpine
+    image: redis:7.4.9-alpine
     restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
     volumes:
@@ -708,59 +1154,76 @@ services:
       retries: 10
 
   kafka:
-    image: bitnami/kafka:3.9.0
+    image: apache/kafka:4.3.0
+    hostname: kafka
     restart: unless-stopped
     environment:
-      KAFKA_CFG_NODE_ID: 0
-      KAFKA_CFG_PROCESS_ROLES: controller,broker
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENERS: CONTROLLER://:9093,PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
     volumes:
-      - kafka_data:/bitnami/kafka
+      - kafka_data:/var/lib/kafka/data
     networks:
       - qrtable-infra
+    healthcheck:
+      test: ['CMD-SHELL', '/opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --list >/dev/null 2>&1']
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
 
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.0
+    image: ${IMAGE_REPOSITORY}:keycloak-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/qrtable_keycloak
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KC_HOSTNAME: auth.qrtable.vodinhquan.dev
+      KC_HOSTNAME: https://auth.qrtable.vodinhquan.dev
       KC_HOSTNAME_STRICT: 'true'
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: 'true'
       KC_HTTP_ENABLED: 'true'
       KC_PROXY_HEADERS: xforwarded
       KC_HEALTH_ENABLED: 'true'
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-    command: ['start']
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    command: ['start', '--optimized']
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - keycloak_data:/opt/keycloak/data
-      - ./apps/keycloak-theme/dist_keycloak:/opt/keycloak/providers:ro
     networks:
       - qrtable-infra
-      - qrtable-app
+      - qrtable-edge
 ```
 
-- [ ] Step 4: Verify compose syntax
+- [ ] Step 5: Verify interpolation, compose syntax, networks, and readiness
 
 Run:
 
 ```bash
-docker compose -f docker-compose.infra.yaml config
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.infra.yaml
 ```
 
-Expected: compose renders with no syntax error.
+Expected:
+
+- Compose renders with no syntax error or unresolved `${...}` values.
+- `keycloak` joins `qrtable-edge` and `qrtable-infra`.
+- No infra container publishes a host port.
+- `phase7-preflight.sh --wait-infra` waits for datastore health and polls `http://keycloak:9000/health/ready` from the migration/tooling container on `qrtable-infra`.
+- A KafkaJS smoke using the repository's installed client creates/uses a test topic, produces one event, and consumes it successfully against Kafka `4.3.0`.
 
 ### Task 6: Create App Compose Layer
 
@@ -788,20 +1251,15 @@ networks:
 
 services:
   bff:
-    image: ${REGISTRY}/qrtable-bff:${TAG}
+    image: ${IMAGE_REPOSITORY}:bff-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/bff.env
     environment:
       PORT: 3300
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
       KEYCLOAK_HOST: https://auth.qrtable.vodinhquan.dev
       PUBLIC_API_BASE_URL: https://api.qrtable.vodinhquan.dev
-      ORDER_SERVICE_HOST: order
-      CATALOG_SERVICE_HOST: catalog
-      KITCHEN_SERVICE_HOST: kitchen
-      PAYMENT_SERVICE_HOST: payment
-      SAAS_SERVICE_HOST: saas
       AUTHORIZER_SERVICE_HOST: authorizer
       USER_ACCESS_SERVICE_HOST: user-access
       TCP_ORDER_SERVICE_HOST: order
@@ -820,9 +1278,9 @@ services:
       - qrtable-infra
 
   order:
-    image: ${REGISTRY}/qrtable-order:${TAG}
+    image: ${IMAGE_REPOSITORY}:order-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/order.env
     environment:
       ORDER_PORT: 3301
       TYPEORM_HOST: postgres
@@ -830,8 +1288,9 @@ services:
       DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
-      TCP_ORDER_SERVICE_HOST: order
+      ORDER_SERVICE_HOST: 0.0.0.0
       TCP_CATALOG_SERVICE_HOST: catalog
+      TCP_SAAS_SERVICE_HOST: saas
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: order
@@ -840,15 +1299,17 @@ services:
       - qrtable-infra
 
   catalog:
-    image: ${REGISTRY}/qrtable-catalog:${TAG}
+    image: ${IMAGE_REPOSITORY}:catalog-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/catalog.env
     environment:
       CATALOG_PORT: 3305
       TYPEORM_HOST: postgres
       CATALOG_TYPEORM_DATABASE: qrtable_catalog
       DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       KAFKA_BROKERS: kafka:9092
+      CATALOG_SERVICE_HOST: 0.0.0.0
+      TCP_SAAS_SERVICE_HOST: saas
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: catalog
@@ -857,13 +1318,15 @@ services:
       - qrtable-infra
 
   kitchen:
-    image: ${REGISTRY}/qrtable-kitchen:${TAG}
+    image: ${IMAGE_REPOSITORY}:kitchen-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/kitchen.env
     environment:
       KITCHEN_PORT: 3307
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
+      KITCHEN_SERVICE_HOST: 0.0.0.0
+      TCP_ORDER_SERVICE_HOST: order
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: kitchen
@@ -872,9 +1335,9 @@ services:
       - qrtable-infra
 
   payment:
-    image: ${REGISTRY}/qrtable-payment:${TAG}
+    image: ${IMAGE_REPOSITORY}:payment-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/payment.env
     environment:
       PAYMENT_PORT: 3308
       TYPEORM_HOST: postgres
@@ -883,6 +1346,9 @@ services:
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
       PUBLIC_API_BASE_URL: https://api.qrtable.vodinhquan.dev
+      PAYMENT_SERVICE_HOST: 0.0.0.0
+      TCP_ORDER_SERVICE_HOST: order
+      TCP_SAAS_SERVICE_HOST: saas
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: payment
@@ -891,9 +1357,9 @@ services:
       - qrtable-infra
 
   saas:
-    image: ${REGISTRY}/qrtable-saas:${TAG}
+    image: ${IMAGE_REPOSITORY}:saas-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/saas.env
     environment:
       SAAS_PORT: 3306
       TYPEORM_HOST: postgres
@@ -901,6 +1367,12 @@ services:
       DATABASE_SHARED_FALLBACK_ENABLED: 'false'
       REDIS_HOST: redis
       KAFKA_BROKERS: kafka:9092
+      SAAS_SERVICE_HOST: 0.0.0.0
+      TCP_AUTHORIZER_SERVICE_HOST: authorizer
+      TCP_USER_ACCESS_SERVICE_HOST: user-access
+      TCP_CATALOG_SERVICE_HOST: catalog
+      TCP_ORDER_SERVICE_HOST: order
+      TCP_PAYMENT_SERVICE_HOST: payment
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: saas
@@ -909,12 +1381,15 @@ services:
       - qrtable-infra
 
   authorizer:
-    image: ${REGISTRY}/qrtable-authorizer:${TAG}
+    image: ${IMAGE_REPOSITORY}:authorizer-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/authorizer.env
     environment:
       AUTHORIZER_PORT: 3304
-      KEYCLOAK_HOST: https://auth.qrtable.vodinhquan.dev
+      KEYCLOAK_HOST: http://keycloak:8080
+      AUTHORIZER_SERVICE_HOST: 0.0.0.0
+      USER_ACCESS_SERVICE_HOST: user-access
+      TCP_USER_ACCESS_SERVICE_HOST: user-access
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: authorizer
@@ -923,14 +1398,17 @@ services:
       - qrtable-infra
 
   user-access:
-    image: ${REGISTRY}/qrtable-user-access:${TAG}
+    image: ${IMAGE_REPOSITORY}:user-access-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/user-access.env
     environment:
       USER_ACCESS_PORT: 3303
-      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017
       USER_ACCESS_MONGO_DB_NAME: qrtable_auth
       DATABASE_SHARED_FALLBACK_ENABLED: 'false'
+      USER_ACCESS_SERVICE_HOST: 0.0.0.0
+      AUTHORIZER_SERVICE_HOST: authorizer
+      TCP_AUTHORIZER_SERVICE_HOST: authorizer
+      TCP_SAAS_SERVICE_HOST: saas
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     labels:
       app: user-access
@@ -939,9 +1417,9 @@ services:
       - qrtable-infra
 
   management-app:
-    image: ${REGISTRY}/qrtable-management-app:${TAG}
+    image: ${IMAGE_REPOSITORY}:management-app-${IMAGE_TAG}
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/management-app.env
     environment:
       AUTH_URL: https://app.qrtable.vodinhquan.dev
       AUTH_TRUST_HOST: 'true'
@@ -957,7 +1435,7 @@ services:
       - qrtable-app
 
   customer-pwa:
-    image: ${REGISTRY}/qrtable-customer-pwa:${TAG}
+    image: ${IMAGE_REPOSITORY}:customer-pwa-${IMAGE_TAG}
     restart: unless-stopped
     labels:
       app: customer-pwa
@@ -965,7 +1443,7 @@ services:
       - qrtable-edge
 ```
 
-- [ ] Step 2: Add missing app health checks after first successful boot
+- [ ] Step 2: Add app health checks as part of the production compose
 
 Use HTTP checks:
 
@@ -981,8 +1459,33 @@ healthcheck:
 Adjust paths per service prefix:
 
 - BFF: `/api/v1/health/live`
-- Order/Catalog/Kitchen/Payment: `/api/v1/health/live`
-- Authorizer/SaaS/User-Access: `/api/health/live`
+- Order/Catalog/Kitchen/Payment/SaaS: `/api/v1/health/live`
+- Authorizer/User-Access: `/api/health/live`
+
+- [ ] Step 3: Verify the listener/client host matrix
+
+The compose environment must satisfy the current code contract:
+
+| Container   | Listener variables set to `0.0.0.0`              | TCP/gRPC client hosts set to service names                                  |
+| ----------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
+| BFF         | none                                             | all seven `TCP_*`; `AUTHORIZER_SERVICE_HOST`; `USER_ACCESS_SERVICE_HOST`    |
+| Order       | `ORDER_SERVICE_HOST`                             | Catalog, SaaS                                                               |
+| Catalog     | `CATALOG_SERVICE_HOST`                           | SaaS                                                                        |
+| Kitchen     | `KITCHEN_SERVICE_HOST`                           | Order                                                                       |
+| Payment     | `PAYMENT_SERVICE_HOST`                           | Order, SaaS                                                                 |
+| SaaS        | `SAAS_SERVICE_HOST`                              | Authorizer, User-Access, Catalog, Order, Payment                            |
+| Authorizer  | `AUTHORIZER_SERVICE_HOST` for both TCP and gRPC  | User-Access through TCP and `USER_ACCESS_SERVICE_HOST` through gRPC         |
+| User-Access | `USER_ACCESS_SERVICE_HOST` for both TCP and gRPC | Authorizer through TCP and `AUTHORIZER_SERVICE_HOST` through gRPC; SaaS TCP |
+
+Run a container-level TCP/gRPC connectivity smoke before public acceptance. A process listening on `127.0.0.1` inside its own container is a deployment failure even if its HTTP health endpoint passes.
+
+- [ ] Step 4: Verify app compose interpolation and network membership
+
+```bash
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.app.yaml
+```
+
+Expected: every image resolves to `${IMAGE_REPOSITORY}:<service>-${IMAGE_TAG}`, no `${...}` placeholder remains, only BFF/Management App/Customer PWA join `qrtable-edge`, and no app service publishes a host port.
 
 ### Task 7: Add Reverse Proxy And HTTPS
 
@@ -1011,7 +1514,7 @@ auth.qrtable.vodinhquan.dev {
 }
 
 grafana.qrtable.vodinhquan.dev {
-  basicauth {
+  basic_auth {
     {$GRAFANA_BASIC_AUTH_USER} {$GRAFANA_BASIC_AUTH_HASH}
   }
   reverse_proxy grafana:3000
@@ -1021,7 +1524,7 @@ grafana.qrtable.vodinhquan.dev {
 Generate the Caddy basic-auth hash on the server:
 
 ```bash
-docker run --rm caddy:2.8.4 caddy hash-password --plaintext "$GRAFANA_BASIC_AUTH_PASSWORD"
+docker run --rm caddy:2.11.3 caddy hash-password --plaintext "$GRAFANA_BASIC_AUTH_PASSWORD"
 ```
 
 - [ ] Step 2: Create proxy compose
@@ -1040,9 +1543,9 @@ volumes:
 
 services:
   caddy:
-    image: caddy:2.8.4
+    image: caddy:2.11.3
     restart: unless-stopped
-    env_file: /opt/qrtable/.env.production
+    env_file: /opt/qrtable/env/proxy.env
     ports:
       - '80:80'
       - '443:443'
@@ -1059,24 +1562,27 @@ services:
 Run:
 
 ```bash
-docker compose -f docker-compose.proxy.yaml config
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.proxy.yaml
 ```
 
-Expected: compose renders with no syntax error.
+Expected: compose renders with no syntax error, `basic_auth` is accepted by the pinned Caddy release, and Caddy can resolve `bff`, `management-app`, `customer-pwa`, `keycloak`, and `grafana` on `qrtable-edge`. Caddy handles WebSocket upgrades for the BFF reverse proxy automatically.
 
 ### Task 8: Prepare Production Env And Secrets
 
 **Files:**
 
 - Create: `docker/env/.env.production.example`
+- Create: `tools/deploy/phase7-compose-validate.sh`
+- Create: `tools/deploy/phase7-render-service-envs.sh`
 
 - [ ] Step 1: Create example with keys only and safe sample values
 
 Include every required key, but do not include real secrets:
 
 ```dotenv
-REGISTRY=registry.digitalocean.com/qrtable
-TAG=phase7
+IMAGE_REPOSITORY=registry.digitalocean.com/qrtable/qrtable
+IMAGE_TAG=phase7
+DEPLOYMENT_PROFILE=production
 
 NODE_ENV=production
 GLOBAL_PREFIX=api/v1
@@ -1084,7 +1590,7 @@ GLOBAL_PREFIX=api/v1
 POSTGRES_USER=qrtable_app
 POSTGRES_PASSWORD=generate_on_server
 MONGO_ROOT_USERNAME=qrtable_mongo
-MONGO_ROOT_PASSWORD=generate_on_server
+MONGO_ROOT_PASSWORD=generate_url_safe_hex_on_server
 
 TYPEORM_HOST=postgres
 TYPEORM_PORT=5432
@@ -1104,6 +1610,7 @@ REDIS_PORT=6379
 REDIS_TTL=1800000
 
 KAFKA_BROKERS=kafka:9092
+KAFKA_CLUSTER_ID=replace_with_one_stable_kraft_cluster_id
 KAFKA_CLIENT_ID=qrtable-order-service
 KAFKA_ORDER_CONFIRMED_TOPIC=order.confirmed
 KAFKA_ORDER_STATUS_CHANGED_TOPIC=order.status_changed
@@ -1125,6 +1632,7 @@ KEYCLOAK_CLIENT_ID=qrtable-bff
 KEYCLOAK_CLIENT_SECRET=generate_on_server
 MANAGEMENT_APP_CLIENT_ID=management-app
 MANAGEMENT_APP_CLIENT_SECRET=generate_on_server
+AUTH_AUTO_PROVISION_ON_FIRST_LOGIN=false
 
 AUTH_SECRET=generate_on_server
 AUTH_KEYCLOAK_ID=management-app
@@ -1136,14 +1644,19 @@ MANAGEMENT_BFF_BASE_URL=https://api.qrtable.vodinhquan.dev/api/v1
 NEXT_PUBLIC_BFF_BASE_URL=https://api.qrtable.vodinhquan.dev/api/v1
 NEXT_PUBLIC_BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1
 NEXT_PUBLIC_CUSTOMER_PWA_URL=https://qr.qrtable.vodinhquan.dev
+PLATFORM_CONTACT_EMAIL=support@your-domain.example
+NEXT_PUBLIC_PLATFORM_CONTACT_EMAIL=support@your-domain.example
 VITE_BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1
 VITE_TENANT_ID=seed-tenant-fallback
+CORS_ORIGINS=https://app.qrtable.vodinhquan.dev,https://qr.qrtable.vodinhquan.dev
 
 SEPAY_WEBHOOK_SECRET=generate_on_server_or_provider_value
 SEPAY_PLATFORM_WEBHOOK_SECRET=generate_on_server_or_provider_value
 BFF_PAYMENT_TCP_TIMEOUT_MS=5000
 PAYMENT_SEPAY_QR_ACCOUNT=provider_value
 PAYMENT_SEPAY_QR_BANK=provider_value
+SEPAY_PLATFORM_QR_ACCOUNT=provider_value
+SEPAY_PLATFORM_QR_BANK=provider_value
 PAYMENT_ORDER_TCP_TIMEOUT_MS=5000
 PAYMENT_SECRETS_ENCRYPTION_KEY=64_hex_chars
 SEPAY_OAUTH_BASE_URL=https://my.sepay.vn
@@ -1181,7 +1694,84 @@ Expected:
 - No service depends on `TYPEORM_DATABASE` or `MONGO_DB_NAME` in production.
 - `PAYMENT_SECRETS_ENCRYPTION_KEY` is exactly 64 hex characters.
 - `AUTH_SECRET`, DB passwords, Keycloak secrets, and Grafana passwords are strong random values.
+- MongoDB credentials interpolated into `MONGODB_URI` are URL-safe hex or correctly percent-encoded.
+- The real Caddy bcrypt value is single-quoted in `.env.production` so `$` characters remain literal, for example `GRAFANA_BASIC_AUTH_HASH='$2a$...'`.
+- `IMAGE_REPOSITORY` points to the single DOCR repository and `IMAGE_TAG` is immutable for each release.
+- `KAFKA_CLUSTER_ID` is generated once, stored in the production env, and reused for the lifetime of the Kafka data volume.
+- `CORS_ORIGINS` contains only the exact Management App and Customer PWA origins.
+- `AUTH_AUTO_PROVISION_ON_FIRST_LOGIN=false` unless a separately reviewed production onboarding policy intentionally enables it.
 - The actual `/opt/qrtable/.env.production` is never committed.
+
+- [ ] Step 3: Validate Compose without leaking interpolation values
+
+Create `phase7-compose-validate.sh`:
+
+- Set `umask 077`.
+- Capture both `docker compose --env-file /opt/qrtable/.env.production ... config` and `config --environment` into temporary files.
+- Reject unresolved `${...}` placeholders, empty required release variables, unexpected public ports, and direct references to the master env as a service-level `env_file`.
+- Never stream the captured files to stdout/stderr or upload them as CI artifacts.
+- Remove them through a `trap` on success, failure, or interruption.
+- Print only a redacted pass/fail summary with compose filenames and failed key names, never values.
+
+- [ ] Step 4: Render least-privilege runtime env files
+
+Use `/opt/qrtable/.env.production` as the private master source for Compose interpolation and deployment tooling only. Do not inject that file wholesale into application containers.
+
+Create `phase7-render-service-envs.sh` with explicit allowlists for:
+
+```text
+/opt/qrtable/env/bff.env
+/opt/qrtable/env/order.env
+/opt/qrtable/env/catalog.env
+/opt/qrtable/env/kitchen.env
+/opt/qrtable/env/payment.env
+/opt/qrtable/env/saas.env
+/opt/qrtable/env/authorizer.env
+/opt/qrtable/env/user-access.env
+/opt/qrtable/env/management-app.env
+/opt/qrtable/env/migrations.env
+/opt/qrtable/env/identity-bootstrap.env
+/opt/qrtable/env/proxy.env
+```
+
+Requirements:
+
+- Create `/opt/qrtable/env` with mode `0700` and each file atomically with mode `0600`.
+- Maintain the variable allowlist in source control, but never write secret values to logs.
+- Fail if a required variable is missing or if an unknown variable is requested by a service mapping.
+- Derive `MONGODB_URI` only inside the renderer from URL-safe credentials and include `authSource=admin`; do not duplicate the full URI in the master env.
+- Copy safe common runtime values such as `NODE_ENV=production`, `GLOBAL_PREFIX`, OTEL endpoint, and log level only to services that consume them.
+- Keep DB credentials out of BFF/frontends, SePay credentials out of unrelated services, Keycloak admin credentials out of app containers, and Grafana basic-auth material only in `proxy.env`.
+- `migrations.env` receives only database/migration variables. `identity-bootstrap.env` separately owns Keycloak admin/client and optional Mongo identity-sync values.
+- Preflight rejects any service whose `env_file` points directly to the master `.env.production`.
+
+Minimum ownership mapping:
+
+| Env file                 | Owned configuration groups                                                                |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `bff.env`                | BFF runtime, Redis, BFF Kafka, webhook forwarding secret, Cloudinary, public URLs/contact |
+| `order.env`              | Order PostgreSQL, Redis, Order Kafka                                                      |
+| `catalog.env`            | Catalog PostgreSQL                                                                        |
+| `kitchen.env`            | Redis, Kitchen Kafka                                                                      |
+| `payment.env`            | Payment PostgreSQL, Redis, Payment Kafka, SePay tenant OAuth/webhook encryption           |
+| `saas.env`               | SaaS PostgreSQL, Redis, SaaS Kafka, SePay platform payment configuration                  |
+| `authorizer.env`         | Keycloak realm/client credentials and auth provisioning policy                            |
+| `user-access.env`        | MongoDB/User-Access configuration                                                         |
+| `management-app.env`     | Auth.js secret, Keycloak browser client, public/server BFF and PWA URLs                   |
+| `migrations.env`         | Four PostgreSQL database contracts and ownership-verification values                      |
+| `identity-bootstrap.env` | Keycloak admin/client values; Mongo sync values only for explicitly enabled demo users    |
+| `proxy.env`              | Caddy/Grafana basic-auth values only                                                      |
+
+- [ ] Step 5: Implement and test the production CORS allowlist
+
+Before public deployment:
+
+- Parse `CORS_ORIGINS` once in BFF configuration and reject wildcard `*` when `NODE_ENV=production`.
+- Reuse the same allowlist in `app.enableCors(...)` and `@WebSocketGateway(...)`.
+- Add tests for allowed Management/PWA origins, a rejected unlisted origin, and production startup failure for an empty or wildcard allowlist.
+- Add external preflight checks for both HTTP and Socket.IO handshake origins.
+
+This is a production blocker, not a follow-up enhancement.
 
 ### Task 9: Package And Run Existing Per-Service Migrations
 
@@ -1229,10 +1819,10 @@ The backend runtime images contain compiled app bundles and should remain small.
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 
-FROM node:22.12-alpine3.20
+FROM node:22.22.3-alpine3.23
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.8.0 --activate
 RUN apk add --no-cache bash curl jq
 WORKDIR /workspace
 
@@ -1250,7 +1840,10 @@ CMD ["pnpm", "db:migrate"]
 Build and push it with the same immutable tag as the app images:
 
 ```bash
-docker build -f docker/migrations.Dockerfile -t "${REGISTRY}/qrtable-migrations:${TAG}" .
+docker buildx build --platform linux/amd64 --load \
+  -f docker/migrations.Dockerfile \
+  -t "${IMAGE_REPOSITORY}:migrations-${IMAGE_TAG}" \
+  .
 ```
 
 Append the migration image build to `tools/deploy/phase7-build-images.sh` so a release cannot publish app images without the matching migration artifact.
@@ -1267,22 +1860,29 @@ networks:
 
 services:
   migrations:
-    image: ${REGISTRY}/qrtable-migrations:${TAG}
-    env_file: /opt/qrtable/.env.production
+    image: ${IMAGE_REPOSITORY}:migrations-${IMAGE_TAG}
+    env_file: /opt/qrtable/env/migrations.env
+    networks:
+      - qrtable-infra
+
+  identity-bootstrap:
+    image: ${IMAGE_REPOSITORY}:migrations-${IMAGE_TAG}
+    env_file: /opt/qrtable/env/identity-bootstrap.env
     networks:
       - qrtable-infra
 ```
 
-The migration service must not expose ports, restart automatically, or stay running after the command exits.
+Neither one-shot service exposes ports, restarts automatically, or stays running after its command exits. Database migrations run only through `migrations`; Keycloak bootstrap runs only through `identity-bootstrap`.
 
 - [ ] Step 4: Run migrations before app containers
 
 `tools/deploy/phase7-migrate.sh` must run:
 
 ```bash
-docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:migrate
-docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show
-docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:verify:ownership
+COMPOSE_ENV=(--env-file /opt/qrtable/.env.production)
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.migrations.yaml run --rm migrations pnpm db:migrate
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.migrations.yaml run --rm migrations pnpm db:verify:ownership
 ```
 
 Expected:
@@ -1324,58 +1924,80 @@ Seed IDs used by E2E must be written to a non-secret deployment notes file.
 
 **Files:**
 
+- Create: `docker/keycloak.Dockerfile`
 - Modify or wrap: `tools/keycloak-bootstrap.sh`
 - Create: `tools/deploy/phase7-keycloak-bootstrap.sh`
 
-- [ ] Step 1: Build or mount the Keycloak theme
+- [ ] Step 1: Package the Keycloak theme in the immutable image
 
-Run before starting Keycloak:
+Build the custom optimized Keycloak image in Task 5 and publish it with the release. The Droplet must not run `pnpm theme:build` and must not bind-mount a mutable host theme directory.
 
-```bash
-pnpm theme:build
-```
+- [ ] Step 2: Split infrastructure bootstrap from demo-user bootstrap
 
-Expected: `apps/keycloak-theme/dist_keycloak` exists and contains the theme provider jar/assets expected by Keycloak.
+The current `tools/keycloak-bootstrap.sh` is unsafe for production because it requires `tools/auth-bootstrap-users.json`, resets every listed password on each run, and the committed file contains deterministic demo passwords.
 
-- [ ] Step 2: Bootstrap realm, clients, and User-Access sync from the infra network
+Refactor or wrap it so:
+
+- Realm, roles, protocol mappers, service account permissions, clients, client secrets, redirect URIs, and web origins are idempotently created **and updated** on every run.
+- `qrtable-bff` remains a confidential machine/direct-grant client for the current source behavior: service accounts and direct grants enabled, browser standard flow disabled, and no browser redirect URI/web origin.
+- `management-app` remains a confidential browser client: standard flow enabled, direct grants/service accounts disabled unless source evidence requires them, exact Auth.js callback URI, and exact app web origin.
+- `AUTH_BOOTSTRAP_USERS_ENABLED=false` is the default production behavior.
+- Demo users are only created or updated when `DEPLOYMENT_PROFILE=demo`, `AUTH_BOOTSTRAP_USERS_ENABLED=true`, and an explicit `--yes` flag are all present.
+- Production bootstrap never reads `tools/auth-bootstrap-users.json` and never resets a human user's password.
+- `KEYCLOAK_CLEAN_REALM=true` remains restricted to local hosts and is never used by Phase 7 deployment.
+- MongoDB user synchronization runs only for the explicitly enabled user-bootstrap path.
+
+- [ ] Step 3: Bootstrap realm and clients from the infra network
 
 Run the bootstrap through the migration/tooling image so `keycloak` and `mongodb` resolve on the internal Docker network. Public redirect URIs still use the production domains:
 
 ```bash
-docker compose -f docker-compose.migrations.yaml run --rm \
+docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.migrations.yaml \
+  run --rm \
   -e KEYCLOAK_HOST=http://keycloak:8080 \
-  -e MONGODB_URI="mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongodb:27017" \
-  -e USER_ACCESS_MONGO_DB_NAME=qrtable_auth \
-  -e KEYCLOAK_ADMIN_USER="$KEYCLOAK_ADMIN_USER" \
-  -e KEYCLOAK_ADMIN_PASSWORD="$KEYCLOAK_ADMIN_PASSWORD" \
-  -e KEYCLOAK_REALM=qrtable \
-  -e KEYCLOAK_CLIENT_ID=qrtable-bff \
-  -e KEYCLOAK_CLIENT_SECRET="$KEYCLOAK_CLIENT_SECRET" \
-  -e MANAGEMENT_APP_CLIENT_ID=management-app \
-  -e MANAGEMENT_APP_CLIENT_SECRET="$MANAGEMENT_APP_CLIENT_SECRET" \
   -e KEYCLOAK_MASTER_SSL_REQUIRED=external \
   -e KEYCLOAK_REALM_SSL_REQUIRED=external \
-  migrations bash tools/keycloak-bootstrap.sh
+  -e KEYCLOAK_MANAGEMENT_REDIRECT_URIS=https://app.qrtable.vodinhquan.dev/api/auth/callback/keycloak \
+  -e KEYCLOAK_MANAGEMENT_WEB_ORIGINS=https://app.qrtable.vodinhquan.dev \
+  -e AUTH_BOOTSTRAP_USERS_ENABLED=false \
+  identity-bootstrap bash tools/deploy/phase7-keycloak-bootstrap.sh
 ```
 
-- [ ] Step 3: Update redirect URIs and web origins
+- [ ] Step 4: Verify redirect URIs, web origins, and public issuer
 
 Ensure Keycloak clients include:
 
 ```text
-https://app.qrtable.vodinhquan.dev/*
-https://api.qrtable.vodinhquan.dev/*
+management-app redirect:
+https://app.qrtable.vodinhquan.dev/api/auth/callback/keycloak
+
+management-app web origin:
+https://app.qrtable.vodinhquan.dev
+
+qrtable-bff redirect/origin:
+none for the current service-account/direct-grant flow
 ```
 
 Expected:
 
 - Management App login redirects through `auth.qrtable.vodinhquan.dev`.
+- Tokens expose the public issuer `https://auth.qrtable.vodinhquan.dev/realms/qrtable`.
+- Authorizer reaches Keycloak internally at `http://keycloak:8080` for token/JWKS/admin calls without exposing Keycloak's container port.
 - BFF Authorizer can exchange client tokens with Keycloak.
-- Internal users and roles are synchronized into MongoDB `qrtable_auth`, not the legacy `qrtable` database.
+- Default production bootstrap creates no deterministic demo users and resets no user passwords.
+- Demo-only users, when explicitly enabled, are synchronized into MongoDB `qrtable_auth`, not the legacy `qrtable` database.
 
 ### Task 11: Configure SePay Production Integration
 
 SePay is a production dependency, not only an env-var detail. The deployment is not ready until the SePay dashboard/API configuration matches QRTable's public routes and the code path being used.
+
+Human ownership:
+
+- `[HUMAN]` Account registration, verification/KYC, terms, bank linking, OAuth application approval, dashboard webhook configuration, and any real transfer.
+- `[AGENT]` Source verification, route implementation, preflight, negative tests, idempotency/audit checks, and redacted evidence.
+- Complete `HUMAN-GATE-09` in section 4.11 before marking this task production-ready.
 
 **Provider docs verified:**
 
@@ -1421,7 +2043,7 @@ Legacy lab route:
 https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook
 ```
 
-- [ ] Step 2: Configure platform subscription webhook
+- [ ] Step 2: Configure platform subscription webhook `[HUMAN]`
 
 In SePay dashboard/API:
 
@@ -1440,7 +2062,7 @@ Expected:
 - Valid platform secret allows BFF to forward to SaaS.
 - SaaS ignores `QRTBL` payloads on platform route and only settles `QRSUB`.
 
-- [ ] Step 3: Configure tenant OAuth Connect
+- [ ] Step 3: Configure tenant OAuth Connect `[SHARED]`
 
 In SePay OAuth app:
 
@@ -1466,7 +2088,7 @@ Expected:
 - Selected bank account creates/upserts a tenant webhook URL that includes the tenant slug.
 - The per-tenant secret is stored encrypted, never exposed in frontend output.
 
-- [ ] Step 4: Verify SePay webhook API surface against the real account
+- [ ] Step 4: Verify SePay webhook API surface against the real account `[SHARED]`
 
 Before live deployment, reconcile this source-code/API mismatch:
 
@@ -1482,7 +2104,7 @@ Action:
 - If the live API uses the current `/api/v1/webhooks` shape, document that evidence in `docs/guides/sepay-configuration-guide-phase3.md`.
 - Do not call production ready until one of the two paths is proven with the actual SePay account.
 
-- [ ] Step 5: Define safe live verification
+- [ ] Step 5: Define safe live verification `[SHARED]`
 
 Do not automate real bank transfers in CI.
 
@@ -1499,6 +2121,7 @@ Expected: unauthorized because no secret is present.
 Manual live verification:
 
 - Use a low-value transfer only after platform/tenant secrets are configured.
+- The human account owner must explicitly approve and initiate the transfer; the agent must not initiate or authorize real-money movement.
 - Confirm webhook request appears in BFF logs.
 - Confirm the provider transaction id is stored/audited for idempotency.
 - Confirm underpaid and duplicate events do not incorrectly mark payment complete.
@@ -1524,6 +2147,7 @@ scrape_configs:
           - bff:3300
           - order:3301
           - catalog:3305
+          - saas:3306
           - kitchen:3307
           - payment:3308
 
@@ -1533,10 +2157,23 @@ scrape_configs:
       - targets:
           - authorizer:3304
           - user-access:3303
-          - saas:3306
 ```
 
-- [ ] Step 2: Keep monitoring stores private
+- [ ] Step 2: Define the production network contract
+
+`docker-compose.monitoring.prod.yaml` must attach:
+
+| Service    | Networks                                     | Reason                                       |
+| ---------- | -------------------------------------------- | -------------------------------------------- |
+| Grafana    | monitoring network + `qrtable-edge`          | private data sources plus Caddy reachability |
+| Prometheus | monitoring network + `qrtable-app`           | scrape backend service names                 |
+| Tempo      | monitoring network + `qrtable-app`           | receive OTLP from app containers             |
+| Loki       | monitoring network                           | internal log store                           |
+| Promtail   | monitoring network plus Docker socket access | ship labeled container logs                  |
+
+The production override must replace the local `qrtable-nw`/`host.docker.internal` assumptions with explicit external networks. Verify with `docker network inspect qrtable-edge qrtable-app`.
+
+- [ ] Step 3: Keep monitoring stores private
 
 Production rules:
 
@@ -1544,15 +2181,17 @@ Production rules:
 - Publish Grafana only through the reverse proxy with HTTPS and basic auth.
 - Use Promtail Docker labels from app containers: `app=bff`, `app=order`, and so on.
 
-- [ ] Step 3: Verify Grafana
+- [ ] Step 4: Verify Grafana
 
 Run:
 
 ```bash
-docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml config
+./tools/deploy/phase7-compose-validate.sh \
+  -f docker-compose.monitoring.yaml \
+  -f docker-compose.monitoring.prod.yaml
 ```
 
-Expected: production compose has no public `3100`, `9090`, `3200`, or `4318` ports.
+Expected: production compose has no public `3001`, `3100`, `9090`, `3200`, or `4318` ports; Grafana is reachable only through Caddy; Prometheus can resolve backend services; app containers can resolve `tempo`.
 
 ### Task 13: Provision DigitalOcean
 
@@ -1560,25 +2199,37 @@ Expected: production compose has no public `3100`, `9090`, `3200`, or `4318` por
 
 - Create: `docs/guides/phase-7-digitalocean-deployment.md`
 
-- [ ] Step 1: Create Droplet
+This task operationalizes `HUMAN-GATE-01` through `HUMAN-GATE-05`. The implementation guide must include the web-console instructions, evidence fields, and secret-handling rules from section 4, not only shell commands.
+
+- [ ] Step 1: Create account security, Project, and registry `[HUMAN]`
+
+In the DigitalOcean control panel:
+
+- Confirm owner email, 2FA/passkey, recovery material, team, and billing.
+- Create/select Project `qrtable-production`.
+- Create the final Container Registry in the chosen region and record its immutable name/tier.
+- Create the narrowly scoped API token used by the image-release workflow.
+- Complete `HUMAN-GATE-01` and `HUMAN-GATE-03`.
+
+- [ ] Step 2: Create SSH keys, Reserved IP, Droplet, and firewall `[HUMAN]`
 
 Use:
 
+- Separate Ed25519 admin and future deploy public keys; no password login.
 - Ubuntu 24.04 LTS or current DO-supported Ubuntu LTS.
 - Region `sgp1` if available.
-- SSH key auth.
-- No password login.
+- Recommended 4 vCPU / 8 GiB pilot size.
+- DigitalOcean Reserved IP as the stable DNS target.
 - Cloud Firewall attached.
-- Backups enabled before first public demo.
-
-- [ ] Step 2: Configure firewall
+- Enhanced monitoring and backups enabled before first public demo.
+- Resource tags `qrtable`, `production`, and `phase7`.
 
 Allow:
 
 ```text
 22/tcp from your current IP only
-80/tcp from 0.0.0.0/0
-443/tcp from 0.0.0.0/0
+80/tcp from 0.0.0.0/0 and ::/0
+443/tcp from 0.0.0.0/0 and ::/0
 ```
 
 Deny public access to:
@@ -1587,7 +2238,11 @@ Deny public access to:
 3000, 3001, 3300-3308, 3201-3208, 5432, 6379, 27017, 9092, 9090, 3100, 3200, 4318
 ```
 
-- [ ] Step 3: Install Docker Engine
+Do not broaden SSH to all sources for GitHub-hosted runners. Use the operator-driven deploy baseline from section 4.7 until a secure automated control channel is selected.
+
+Complete `HUMAN-GATE-04` after verifying SSH login, Reserved IP attachment, firewall rules, backups, and monitoring.
+
+- [ ] Step 3: Harden the host and install Docker Engine `[SHARED]`
 
 Use Docker's official Ubuntu repository, not Ubuntu's older package:
 
@@ -1606,9 +2261,36 @@ docker compose version
 
 Expected: Docker Engine and Docker Compose plugin print versions.
 
-- [ ] Step 4: Configure DNS
+Also:
 
-Create A records pointing to the Droplet IPv4:
+- create the non-root `qrtable-deploy` operator;
+- keep direct root SSH disabled;
+- enable unattended security updates;
+- configure time synchronization;
+- record disk/memory baseline;
+- verify no unintended port is listening publicly.
+
+- [ ] Step 4: Authenticate the Droplet for read-only DOCR pulls `[SHARED]`
+
+Install current `doctl`, then create Docker credentials without writing the source DigitalOcean API token into the repository or deployment logs:
+
+```bash
+read -rsp "DigitalOcean API token: " DIGITALOCEAN_ACCESS_TOKEN
+echo
+doctl registry login \
+  --access-token "$DIGITALOCEAN_ACCESS_TOKEN" \
+  --read-only=true \
+  --never-expire
+unset DIGITALOCEAN_ACCESS_TOKEN
+chmod 600 "$HOME/.docker/config.json"
+docker pull registry.digitalocean.com/qrtable/qrtable:bff-<known-release-tag>
+```
+
+The generated registry credential is read-only. Document revocation/rotation, protect the Docker config, and prefer finite-lived credentials with automated renewal when the deployment process matures.
+
+- [ ] Step 5: Configure DNS and public TLS prerequisites `[HUMAN]`
+
+Create A records pointing to the Reserved IP:
 
 ```text
 api.qrtable.vodinhquan.dev
@@ -1628,7 +2310,7 @@ dig +short auth.qrtable.vodinhquan.dev
 dig +short grafana.qrtable.vodinhquan.dev
 ```
 
-Each command returns the Droplet IP.
+Each command returns the Reserved IP from at least two public resolvers. Review CAA records and keep any DNS-provider HTTP proxy disabled until Caddy issues all certificates. Complete `HUMAN-GATE-05` only after public TLS verification, not merely DNS propagation.
 
 ### Task 14: Deploy The Stack
 
@@ -1650,9 +2332,9 @@ sudo chown "$USER:$USER" /opt/qrtable
 git clone "$QRTABLE_REPOSITORY_URL" /opt/qrtable
 ```
 
-If using image-only deploy later, replace this with a release bundle containing compose files and `.env.production`.
+If using image-only deploy later, replace this with a release bundle containing compose/proxy/monitoring/deploy-script files. Keep `/opt/qrtable/.env.production` server-owned and outside the release bundle.
 
-- [ ] Step 2: Put private env on server
+- [ ] Step 2: Put private env on server `[SHARED]`
 
 ```bash
 install -m 600 docker/env/.env.production.example /opt/qrtable/.env.production
@@ -1660,23 +2342,48 @@ install -m 600 docker/env/.env.production.example /opt/qrtable/.env.production
 
 Then edit `/opt/qrtable/.env.production` on the server and replace generated values using `openssl rand`.
 
+The human enters Cloudinary, SePay, bank/provider, and other externally issued secrets directly on the server. The agent verifies only presence, format, permissions, and redacted fingerprints. Complete `HUMAN-GATE-06` and `HUMAN-GATE-07`.
+
+Render and permission-check the scoped runtime files:
+
+```bash
+./tools/deploy/phase7-render-service-envs.sh
+find /opt/qrtable/env -type f ! -perm 0600 -print -quit | grep -q . && exit 1 || true
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.infra.yaml
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.migrations.yaml
+./tools/deploy/phase7-compose-validate.sh \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.app.yaml
+./tools/deploy/phase7-compose-validate.sh -f docker-compose.proxy.yaml
+```
+
 - [ ] Step 3: Start infra and wait for datastore health
 
 ```bash
-docker compose -f docker-compose.infra.yaml up -d
+docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.infra.yaml \
+  pull
+docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.infra.yaml \
+  up -d
 ./tools/deploy/phase7-preflight.sh --wait-infra
 ```
 
 - [ ] Step 4: Run the migration and ownership gate
 
 ```bash
-docker compose -f docker-compose.migrations.yaml pull
+docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.migrations.yaml \
+  pull
 ./tools/deploy/phase7-migrate.sh
 ```
 
 Expected: all service migrations are applied and database ownership verification passes before any app container is replaced.
 
-- [ ] Step 5: Bootstrap identity and optional demo data
+- [ ] Step 5: Bootstrap identity and optional demo data `[SHARED]`
 
 ```bash
 ./tools/deploy/phase7-keycloak-bootstrap.sh
@@ -1688,36 +2395,43 @@ For a thesis demo deployment only:
 DEPLOYMENT_PROFILE=demo ./tools/deploy/phase7-seed-demo.sh --yes
 ```
 
+After bootstrap, the human must create and verify a permanent named Keycloak administrator, remove the temporary bootstrap administrator, and complete the login/role checks in `HUMAN-GATE-08`.
+
 - [ ] Step 6: Start monitoring, app, and proxy layers
 
 ```bash
-docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml up -d
-docker compose -f docker-compose.app.yaml up -d
-docker compose -f docker-compose.proxy.yaml up -d
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml up -d
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.app.yaml up -d
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.proxy.yaml up -d
 ```
 
 - [ ] Step 7: Verify running services
 
 ```bash
-docker compose -f docker-compose.infra.yaml ps
-docker compose -f docker-compose.migrations.yaml ps -a
-docker compose -f docker-compose.app.yaml ps
-docker compose -f docker-compose.proxy.yaml ps
-docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml ps
+docker compose --env-file /opt/qrtable/.env.production -f docker-compose.infra.yaml ps
+docker compose --env-file /opt/qrtable/.env.production -f docker-compose.app.yaml ps
+docker compose --env-file /opt/qrtable/.env.production -f docker-compose.proxy.yaml ps
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml ps
 ```
 
 Expected:
 
 - Infra services are healthy or running.
-- The one-shot migration container exited successfully.
+- The migration script exit status and deployment history record show all three migration/ownership commands succeeded. The container is intentionally removed by `run --rm`, so `docker compose ps -a` is not used as evidence.
 - App containers are running.
 - Caddy has obtained certificates and serves HTTPS.
+- `docker network inspect` confirms Caddy shares `qrtable-edge` with every reverse-proxy target and monitoring/app network contracts match Task 12.
 
 ### Task 15: Run Smoke And Demo Verification
 
 **Files:**
 
 - Create: `tools/deploy/phase7-smoke.sh`
+- Create: `tools/deploy/phase7-e2e.sh`
 - Update: `docs/guides/phase-7-digitalocean-deployment.md`
 
 - [ ] Step 1: HTTP smoke
@@ -1741,35 +2455,56 @@ Expected:
 Run from inside Prometheus container or app network:
 
 ```bash
-docker compose -f docker-compose.monitoring.yaml exec prometheus wget -qO- http://bff:3300/api/v1/metrics
-docker compose -f docker-compose.monitoring.yaml exec prometheus wget -qO- http://order:3301/api/v1/metrics
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml \
+  exec prometheus wget -qO- http://bff:3300/api/v1/metrics
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml \
+  exec prometheus wget -qO- http://order:3301/api/v1/metrics
 ```
 
 Expected: Prometheus text exposition contains `qrtable_http_requests_total`.
 
 - [ ] Step 3: Browser E2E smoke
 
-Use the existing e2e suite only after Keycloak bootstrap and the optional non-destructive demo seed are stable:
+Use the existing E2E suite only for an explicitly seeded demo deployment. The tests do not read generic `BASE_URL`, `CUSTOMER_PWA_URL`, or `BFF_URL`; create `tools/deploy/phase7-e2e.sh` that validates `DEPLOYMENT_PROFILE=demo` and maps the exact variables consumed by the current specs:
 
 ```bash
-BASE_URL=https://app.qrtable.vodinhquan.dev \
-CUSTOMER_PWA_URL=https://qr.qrtable.vodinhquan.dev \
-BFF_URL=https://api.qrtable.vodinhquan.dev/api/v1 \
-pnpm e2e:demo
+export STEPP27_PWA_BASE_URL=https://qr.qrtable.vodinhquan.dev
+export STEPP27_MANAGEMENT_BASE_URL=https://app.qrtable.vodinhquan.dev
+export STEPP27_BFF_HEALTH_URL=https://api.qrtable.vodinhquan.dev/api/v1/health
+
+export PHASE3_PWA_BASE_URL=https://qr.qrtable.vodinhquan.dev
+export PHASE3_MANAGEMENT_BASE_URL=https://app.qrtable.vodinhquan.dev
+
+export PHASE5_SUSPENDED_PWA_BASE_URL=https://qr.qrtable.vodinhquan.dev
+export PHASE5_SUSPENDED_BFF_HEALTH_URL=https://api.qrtable.vodinhquan.dev/api/v1/health
+
+export PHASE5_ADMIN_MANAGEMENT_BASE_URL=https://app.qrtable.vodinhquan.dev
+export PHASE5_ADMIN_BFF_HEALTH_URL=https://api.qrtable.vodinhquan.dev/api/v1/health
+export PHASE5_ADMIN_KEYCLOAK_REALM_URL=https://auth.qrtable.vodinhquan.dev/realms/qrtable
+
+./tools/deploy/phase7-e2e.sh
 ```
 
-Expected: selected demo tests pass. If the suite still assumes localhost, record the required Playwright config changes as a separate implementation task before calling Phase 7 green.
+The wrapper must require demo credentials through environment variables rather than silently relying on committed deterministic passwords. It then runs `pnpm e2e:demo`. Expected: selected demo tests pass with no localhost fallback and no production credential printed to logs.
 
 - [ ] Step 4: SePay route smoke
 
 Verify registered public routes:
 
 ```bash
-curl -i https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/platform
-curl -i https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/demo-tenant
+curl -i -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"QRSUBTEST","content":"QRSUBTEST","transferType":"in","transferAmount":1000}' \
+  https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/platform
+curl -i -X POST \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"QRTBLTEST","content":"QRTBLTEST","transferType":"in","transferAmount":1000}' \
+  https://api.qrtable.vodinhquan.dev/api/v1/payment/sepay/webhook/demo-tenant
 ```
 
-Expected: method/auth errors are returned by BFF, proving the public route is reachable without accepting unauthenticated payloads.
+Expected: authentication errors are returned by BFF, proving the public routes are reachable without accepting unsigned payloads.
 
 ### Task 16: Backup, Rollback, And Operations
 
@@ -1778,11 +2513,13 @@ Expected: method/auth errors are returned by BFF, proving the public route is re
 - Create: `docs/guides/phase-7-digitalocean-deployment.md`
 - Create: `tools/deploy/phase7-backup.sh`
 
-- [ ] Step 1: Enable DigitalOcean backup/snapshot
+- [ ] Step 1: Enable DigitalOcean backup/snapshot `[HUMAN]`
 
 Use Droplet backups for host-level recovery.
 
 - [ ] Step 2: Add logical backup script
+
+The release backup is a cross-service recovery point. Put the deployment into a short maintenance window or quiesce write traffic before backup; otherwise the PostgreSQL databases and MongoDB archive are individually valid but not an atomic distributed snapshot.
 
 ```bash
 #!/usr/bin/env bash
@@ -1794,29 +2531,44 @@ set +a
 
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "/opt/qrtable/backups/${stamp}"
+COMPOSE_ENV=(--env-file /opt/qrtable/.env.production)
 
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_catalog > "/opt/qrtable/backups/${stamp}/qrtable_catalog.sql"
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_order > "/opt/qrtable/backups/${stamp}/qrtable_order.sql"
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_saas > "/opt/qrtable/backups/${stamp}/qrtable_saas.sql"
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_payment > "/opt/qrtable/backups/${stamp}/qrtable_payment.sql"
-docker compose -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_keycloak > "/opt/qrtable/backups/${stamp}/qrtable_keycloak.sql"
-docker compose -f docker-compose.infra.yaml exec -T mongodb \
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_catalog > "/opt/qrtable/backups/${stamp}/qrtable_catalog.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_order > "/opt/qrtable/backups/${stamp}/qrtable_order.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_saas > "/opt/qrtable/backups/${stamp}/qrtable_saas.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_payment > "/opt/qrtable/backups/${stamp}/qrtable_payment.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T postgres pg_dump -U "$POSTGRES_USER" qrtable_keycloak > "/opt/qrtable/backups/${stamp}/qrtable_keycloak.sql"
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.infra.yaml exec -T mongodb \
   mongodump \
   --username "$MONGO_ROOT_USERNAME" \
   --password "$MONGO_ROOT_PASSWORD" \
   --authenticationDatabase admin \
   --db qrtable_auth \
   --archive > "/opt/qrtable/backups/${stamp}/qrtable_auth.archive"
-docker compose -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show \
+docker compose "${COMPOSE_ENV[@]}" -f docker-compose.migrations.yaml run --rm migrations pnpm db:migration:show \
   > "/opt/qrtable/backups/${stamp}/migration-state.txt"
+sha256sum "/opt/qrtable/backups/${stamp}/"* > "/opt/qrtable/backups/${stamp}/SHA256SUMS"
 ```
 
-- [ ] Step 3: Define rollback
+- [ ] Step 3: Define retention and off-Droplet recovery `[SHARED]`
+
+- The human creates a private Space or independent object-storage target and a dedicated restricted access key according to section 4.12.
+- Encrypt and copy each completed backup to a separate DigitalOcean Space or another off-Droplet target.
+- Define retention, for example daily 7, weekly 4, monthly 3.
+- Verify `SHA256SUMS` after upload.
+- Perform at least one restore rehearsal into isolated databases and record duration/evidence.
+- Never count a backup stored only on the same Droplet as the sole recovery copy.
+- Complete `HUMAN-GATE-11` only after the encrypted upload, download, checksum, and isolated PostgreSQL/MongoDB restore all succeed.
+
+- [ ] Step 4: Define rollback
 
 Rollback image tag:
 
 ```bash
-TAG=previous-good docker compose -f docker-compose.app.yaml up -d
+IMAGE_TAG=previous-good docker compose \
+  --env-file /opt/qrtable/.env.production \
+  -f docker-compose.app.yaml \
+  up -d
 ```
 
 Rollback infra data:
@@ -1840,7 +2592,7 @@ CI/CD is part of Phase 7, but it must be treated as a separate deployment contro
 - Existing: per-service TypeORM DataSources, initial migrations, migration commands, and database ownership verification.
 - Missing: Docker image build workflow
 - Missing: registry push workflow
-- Missing: production deploy workflow
+- Missing: operator-driven production deploy entrypoint and optional production deploy workflow
 - Missing: rollback-by-tag workflow
 - Missing: production migration image/job and deploy gate
 
@@ -1848,13 +2600,14 @@ CI/CD is part of Phase 7, but it must be treated as a separate deployment contro
 
 - Modify: `.github/workflows/ci.yml`
 - Create: `.github/workflows/release-images.yml`
-- Create: `.github/workflows/deploy-production.yml`
-- Create: `.github/workflows/rollback-production.yml`
+- Create after secure-channel approval: `.github/workflows/deploy-production.yml`
+- Create after secure-channel approval: `.github/workflows/rollback-production.yml`
 - Create: `tools/deploy/phase7-build-images.sh`
 - Create: `tools/deploy/phase7-migrate.sh`
 - Create: `tools/deploy/phase7-remote-deploy.sh`
 - Create: `tools/deploy/phase7-remote-rollback.sh`
 - Create: `tools/deploy/phase7-preflight.sh`
+- Create: `tools/deploy/phase7-compose-validate.sh`
 - Create: `tools/deploy/phase7-smoke.sh`
 - Modify: `docs/guides/phase-7-digitalocean-deployment.md`
 
@@ -1883,7 +2636,7 @@ Use affected commands only after the pipeline is stable. For the first Phase 7 d
 Trigger:
 
 - `workflow_dispatch`
-- `push` to `main` after CI is green
+- `workflow_run` for the existing CI workflow, limited to successful runs on `main`
 
 Permissions:
 
@@ -1892,7 +2645,7 @@ Permissions:
 
 Inputs:
 
-- `image_tag` defaulting to `${{ github.sha }}`
+- optional `image_tag`; compute `IMAGE_TAG="${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}"`
 - `push_latest` defaulting to `false`
 
 Secrets:
@@ -1902,34 +2655,40 @@ Secrets:
 Workflow responsibilities:
 
 1. Checkout repository.
-2. Install Node.js 20 and pnpm 9.8.0.
+2. Install Node.js 22.22.3 and pnpm 9.8.0, matching the Docker build toolchain.
 3. Install dependencies with frozen lockfile.
 4. Run CI build checks.
 5. Login to DigitalOcean Container Registry.
-6. Build and push all Phase 7 images.
-7. Emit image digest summary.
+6. Build all Phase 7 images for `linux/amd64` with Buildx and push immutable tags.
+7. Generate SBOMs and fail on the agreed critical vulnerability threshold.
+8. Emit and retain the image digest summary.
 
 Expected image names:
 
 ```text
-registry.digitalocean.com/qrtable/qrtable-bff:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-authorizer:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-catalog:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-order:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-kitchen:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-payment:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-saas:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-user-access:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-migrations:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-management-app:${GITHUB_SHA}
-registry.digitalocean.com/qrtable/qrtable-customer-pwa:${GITHUB_SHA}
+registry.digitalocean.com/qrtable/qrtable:bff-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:authorizer-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:catalog-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:order-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:kitchen-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:payment-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:saas-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:user-access-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:migrations-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:management-app-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:customer-pwa-${IMAGE_TAG}
+registry.digitalocean.com/qrtable/qrtable:keycloak-${IMAGE_TAG}
 ```
+
+One repository is deliberate: DOCR Starter supports one repository, while separate service repositories would require a higher tier before storage is considered.
 
 Important build rule:
 
 - Public frontend values may be build args: `NEXT_PUBLIC_*`, `VITE_*`.
 - Private secrets must never be Docker build args.
 - Production secrets stay in `/opt/qrtable/.env.production` or a future secret manager.
+- The release is incomplete unless all twelve tags and their digests are present.
+- The workflow must refuse to overwrite an existing immutable release tag; `latest` remains optional and is never used by production compose.
 
 - [ ] Step 3: Add deployment environment protection
 
@@ -1941,37 +2700,27 @@ Required reviewers: owner/deployment maintainer
 Deployment branch: main only
 ```
 
+`[HUMAN]` Configure this in the GitHub web console according to section 4.5. Required reviewers are a hard control only when the repository visibility and GitHub plan actually support them. When they are unavailable, keep the operator-driven deployment gate and record the approver in `/opt/qrtable/releases/history.log`.
+
 Why:
 
 - SePay live webhooks can affect external payment state.
 - Keycloak production clients must not be changed accidentally.
 - DB schema state must be checked before replacing app containers.
 
-- [ ] Step 4: Add deploy-production workflow
+- [ ] Step 4: Add the operator-driven production deployment entrypoint
 
-Trigger:
+The first Phase 7 pilot must not SSH from a GitHub-hosted runner while the Cloud Firewall allows SSH only from the operator's IP.
 
-- `workflow_dispatch` only for the first production phase.
-
-Inputs:
-
-- `image_tag` required
-- `run_smoke` default `true`
-- `run_backup_before_deploy` default `true`
-
-Secrets:
-
-- `PRODUCTION_SSH_HOST`
-- `PRODUCTION_SSH_USER`
-- `PRODUCTION_SSH_KEY`
-- `PRODUCTION_SSH_PORT`
+Baseline flow:
 
 Deployment flow:
 
 ```text
 CI green
   -> release-images pushes immutable image tag
-  -> deploy-production waits for production approval
+  -> human selects tag/window and confirms backup/rollback
+  -> operator connects from the trusted workstation
   -> remote preflight
   -> pull immutable migration and app images
   -> backup
@@ -1982,27 +2731,55 @@ CI green
   -> record deployed tag
 ```
 
-Remote command shape:
+Operator command shape:
 
 ```bash
-ssh "$PRODUCTION_SSH_USER@$PRODUCTION_SSH_HOST" \
+ssh -o IdentitiesOnly=yes "$PRODUCTION_SSH_USER@$PRODUCTION_SSH_HOST" \
   "cd /opt/qrtable && IMAGE_TAG='${IMAGE_TAG}' ./tools/deploy/phase7-remote-deploy.sh"
 ```
+
+GitHub may provide a `workflow_dispatch` release/audit job that validates the tag and prints the exact redacted operator command, but it must not initiate production SSH until section 4.7's secure control channel is selected and tested.
 
 The remote deploy script must:
 
 - Refuse to run if `/opt/qrtable/.env.production` is missing or world-readable.
 - Refuse to deploy if `IMAGE_TAG` is empty.
-- Run `docker compose config` for infra, migrations, monitoring, app, and proxy layers.
+- Verify Docker can authenticate to and pull from the private DOCR repository.
+- Render scoped runtime env files and reject any container configured with the master `.env.production` as its service-level `env_file`.
+- Run `phase7-compose-validate.sh` for infra, migrations, monitoring, app, and proxy layers.
+- Pass `--env-file /opt/qrtable/.env.production` to every underlying Compose invocation and fail if the securely captured `config --environment` shows unresolved or empty release variables.
 - Pull images for the requested immutable tag.
 - Run `tools/deploy/phase7-migrate.sh` and stop immediately on migration or ownership failure.
 - Start app containers without rebuilding on the server.
 - Run health checks after container replacement.
 - Write the successful tag to `/opt/qrtable/releases/current`.
 
+Complete `HUMAN-GATE-10` for the first deployment.
+
+- [ ] Step 4A: Optionally enable `deploy-production.yml` after secure-channel approval
+
+Only after the human records one of section 4.7's non-baseline control channels may the workflow receive:
+
+- `PRODUCTION_SSH_HOST`
+- `PRODUCTION_SSH_USER`
+- `PRODUCTION_SSH_KEY`
+- `PRODUCTION_SSH_PORT`
+- `PRODUCTION_SSH_KNOWN_HOSTS`
+
+The workflow must:
+
+- use the protected `production` environment;
+- verify the server host key against `PRODUCTION_SSH_KNOWN_HOSTS`;
+- never disable strict host-key checking;
+- use a dedicated non-root deploy key;
+- restrict the key/server account to deployment operations;
+- avoid running on pull-request code;
+- remove any temporary firewall rule in an unconditional cleanup step;
+- retain a redacted audit artifact.
+
 - [ ] Step 5: Add schema/migration gate
 
-Before production deployment, the workflow must:
+Before production deployment, the deployment procedure must:
 
 1. Verify all five dedicated datastore env names are present and `DATABASE_SHARED_FALLBACK_ENABLED=false`.
 2. Pull the migration image with the same immutable tag as the app images.
@@ -2020,9 +2797,9 @@ Recommended gate script:
 ./tools/deploy/phase7-migrate.sh
 ```
 
-- [ ] Step 6: Add smoke tests to CI/CD
+- [ ] Step 6: Add smoke tests to the deployment procedure
 
-Smoke tests should run from the GitHub runner after deployment because public DNS, TLS, reverse proxy, and CORS must be verified externally.
+Smoke tests must run from a machine outside the Droplet after deployment because public DNS, TLS, reverse proxy, and CORS must be verified externally. For the baseline, run them from the trusted operator workstation. After secure workflow SSH is enabled, the public checks may also run from GitHub Actions.
 
 Required endpoints:
 
@@ -2043,21 +2820,19 @@ curl -fsS -o /dev/null -w "%{http_code}" \
 
 Expected: invalid or unsigned webhook requests are rejected, not accepted.
 
-- [ ] Step 7: Add rollback-production workflow
+CORS checks must send an allowed origin and a disallowed origin to the BFF, and must verify the Socket.IO handshake follows the same allowlist.
 
-Trigger:
+- [ ] Step 7: Add operator rollback and optional rollback workflow
 
-- `workflow_dispatch`
+Baseline inputs:
 
-Inputs:
-
-- `rollback_tag` required
-- `restore_data` default `false`
+- `rollback_tag` required;
+- `restore_data=false` unless the human explicitly approves an exact backup timestamp and compatibility impact.
 
 Rollback flow:
 
 ```text
-production approval
+human rollback approval
   -> remote preflight
   -> optional backup
   -> set IMAGE_TAG to rollback_tag
@@ -2068,6 +2843,8 @@ production approval
 ```
 
 Rollback must not restore a database or run `migration:revert` automatically unless `restore_data=true` and the operator confirms the exact backup timestamp and compatibility impact. App rollback and data rollback are separate operations.
+
+The optional GitHub rollback workflow follows the same secure-channel requirement as `deploy-production.yml`.
 
 - [ ] Step 8: Add deployment audit trail
 
@@ -2098,8 +2875,8 @@ Recommended Phase 7 policy:
 
 | Stage              | Release images             | Deploy production                    |
 | ------------------ | -------------------------- | ------------------------------------ |
-| First pilot        | Manual                     | Manual with approval                 |
-| Stable thesis demo | Push to main builds images | Manual with approval                 |
+| First pilot        | Manual workflow dispatch   | Operator workstation with approval   |
+| Stable thesis demo | Push to main builds images | Operator workstation with approval   |
 | Mature production  | Push to main builds images | Optional auto-deploy to staging only |
 
 Do not auto-deploy production on every merge until migrations, backups, rollback, and smoke tests are proven.
@@ -2126,6 +2903,8 @@ Record:
 - SePay public URL configuration.
 - SePay provider API surface confirmed for the actual production account.
 - Monitoring exposure policy.
+- Human-gate completion and redacted external-platform resource evidence.
+- Selected production SSH/deployment control channel.
 - Acceptance evidence.
 
 - [ ] Step 2: Update technical architecture section 14
@@ -2149,18 +2928,33 @@ pnpm verify:doc-anchors
 
 Expected: anchor verifier exits 0.
 
-## 6. Production Acceptance Criteria
+## 7. Production Acceptance Criteria
 
 Phase 7 is accepted only when all items below are true:
 
+- [ ] `HUMAN-GATE-01` through `HUMAN-GATE-11` are completed with dated, redacted evidence; no external account, billing, DNS, secret, bank, or backup dependency is assumed.
+- [ ] GitHub `main` ruleset and production environment are configured; the record truthfully states whether required reviewers are enforced by the current repository plan.
+- [ ] DigitalOcean Project, registry, Reserved IP, Droplet, Cloud Firewall, backups, and monitoring are configured and linked to the correct production resources.
+- [ ] SSH remains restricted to an approved control channel; it is not opened globally for GitHub-hosted runners.
+- [ ] Any Droplet-to-GitHub repository checkout uses a dedicated read-only deploy key; production does not reuse a personal GitHub key.
+- [ ] Production uses newly generated credentials, not populated local `.env` values or deterministic development defaults; secret-history scan findings are remediated.
+- [ ] Cloudinary production credentials are configured outside git and upload/read/delete smoke passes without exposing the API secret.
+- [ ] Every production Compose command uses `--env-file /opt/qrtable/.env.production`; the protected validation helper finds no unresolved release variables and emits no secret values.
+- [ ] The master production env is not injected wholesale into containers; per-service env files are allowlisted, mode `0600`, and contain only required values.
 - [ ] `docker compose` can start infra, run migrations, and start monitoring, app, and proxy layers from a clean server checkout.
+- [ ] The eight backend containers bind TCP/gRPC listeners to `0.0.0.0` where applicable, and every required inter-service TCP/gRPC connection succeeds by Docker service name.
+- [ ] Caddy shares `qrtable-edge` with BFF, Management App, Customer PWA, Keycloak, and Grafana; Prometheus/Tempo share the required app networks.
+- [ ] PostgreSQL, MongoDB, Redis, Kafka, and Keycloak readiness gates pass before migrations/identity bootstrap/app replacement.
+- [ ] KafkaJS producer/consumer smoke passes against the pinned Kafka `4.3.0` image.
 - [ ] Production env defines the four dedicated PostgreSQL database names and MongoDB `qrtable_auth`, with shared fallback disabled.
 - [ ] The one-shot migration image applies all service migrations before app boot.
 - [ ] `pnpm db:migration:show` reports every expected migration as applied.
 - [ ] `pnpm db:verify:ownership` passes against all four PostgreSQL service databases.
-- [ ] User-Access connects to MongoDB `qrtable_auth`, and Keycloak bootstrap synchronizes the required user/role collections there.
+- [ ] User-Access connects to MongoDB `qrtable_auth`; normal production Keycloak bootstrap creates no demo users and resets no human password.
+- [ ] Keycloak clients are idempotently updated with exact production redirect URIs, web origins, secrets, and the public issuer.
 - [ ] Public HTTPS works for `api`, `app`, `qr`, `auth`, and protected `grafana` subdomains.
 - [ ] Only 80/443 and restricted SSH are public.
+- [ ] BFF HTTP and Socket.IO CORS allow only the Management App and Customer PWA production origins.
 - [ ] BFF `/api/v1/health/live` and `/api/v1/health/ready` pass.
 - [ ] Management App login works with Keycloak through `auth.qrtable.vodinhquan.dev`.
 - [ ] Customer QR flow works through `qr.qrtable.vodinhquan.dev`.
@@ -2171,14 +2965,16 @@ Phase 7 is accepted only when all items below are true:
 - [ ] SePay API surface mismatch (`/api/v1/webhooks` vs `/v1/webhook`, `Api_Key` vs `SECRET_KEY`) is resolved with evidence from the actual SePay account before live use.
 - [ ] Grafana shows logs, metrics, and traces from real app containers.
 - [ ] Optional demo seed is non-destructive, profile-gated, and can restore the thesis demo dataset without calling `dev:reseed`.
-- [ ] Backup and rollback procedure is documented and tested at least once.
+- [ ] Production E2E uses the exact `STEPP27_*`, `PHASE3_*`, and `PHASE5_*` variables and never falls back to localhost or committed demo passwords.
+- [ ] Backup and rollback procedure is documented and tested at least once, including checksum verification and an off-Droplet restore rehearsal.
 - [ ] CI remains green for `lint`, `test`, and `build`.
-- [ ] Release workflow can build and push immutable Docker image tags.
-- [ ] Production deploy workflow can deploy a selected immutable image tag with approval.
-- [ ] Rollback workflow can redeploy the previous successful image tag.
+- [ ] Release workflow builds all twelve `linux/amd64` artifacts into one DOCR repository, records digests/SBOMs, and passes the vulnerability gate.
+- [ ] The operator-driven production deployment can deploy a selected immutable image tag with explicit approval.
+- [ ] If GitHub production deploy/rollback workflows are enabled, their secure control channel, host-key verification, firewall behavior, dedicated key, and environment approval are documented and tested.
+- [ ] Operator rollback can redeploy the previous successful image tag without automatically reverting/restoring data.
 - [ ] Canonical docs are updated after implementation.
 
-## 7. Cost And Scaling Notes
+## 8. Cost And Scaling Notes
 
 Use the smallest deployment that is honest for the current product:
 
@@ -2187,7 +2983,7 @@ Use the smallest deployment that is honest for the current product:
 - Hardening: managed PostgreSQL and Valkey when data safety and operations matter more than monthly cost.
 - Avoid managed Kafka for thesis/pilot unless budget is intentionally allocated; DigitalOcean managed Kafka is designed as a multi-node managed cluster.
 
-DigitalOcean product facts verified on 2026-06-06:
+DigitalOcean product facts re-verified on 2026-06-07:
 
 - Droplets start at USD 4/month.
 - Managed databases start at USD 15/month.
@@ -2196,28 +2992,44 @@ DigitalOcean product facts verified on 2026-06-06:
 - Load Balancers start at USD 12/month.
 - Droplet backups are percentage-based relative to Droplet cost.
 
-## 8. Risks And Mitigations
+## 9. Risks And Mitigations
 
-| Risk                                     | Impact                                                       | Mitigation                                                                                       |
-| ---------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Migration job omitted or run after apps  | New image boots against an incompatible or incomplete schema | Run the immutable migration image and ownership gate before replacing app containers             |
-| Shared database fallback enabled         | Services can reconnect to a mixed legacy database            | Require dedicated env names and `DATABASE_SHARED_FALLBACK_ENABLED=false` in production preflight |
-| `dev:reseed` run on production           | Destructive data loss and identity/cache reset               | Exclude it from deploy scripts; use a non-destructive, profile-gated demo seed                   |
-| Kafka `localhost` advertised listener    | App containers cannot connect                                | Use `PLAINTEXT://kafka:9092` in production compose                                               |
-| Vite public env is build-time            | Customer PWA points to wrong API after image reuse           | Build image with production `VITE_BFF_URL`, or implement runtime config later                    |
-| Next public env is partly build-time     | Management App client bundle points to wrong API             | Build with production `NEXT_PUBLIC_*` and also provide runtime env                               |
-| Keycloak `start-dev`                     | Insecure production IAM                                      | Use `start`, external hostname, DB-backed Keycloak                                               |
-| Public Grafana                           | Observability leaks tenant or system data                    | Put behind HTTPS, basic auth, firewall/IP restriction                                            |
-| CORS `*`                                 | Browser clients from unwanted origins can call BFF           | Add `CORS_ORIGINS` config before public production                                               |
-| Secrets in compose                       | Credential leak                                              | Use `/opt/qrtable/.env.production` with 0600 permissions                                         |
-| Single Droplet failure                   | Full outage                                                  | Enable backups/snapshots; later move DB to managed service                                       |
-| SePay API surface mismatch               | OAuth webhook registration fails after deploy                | Verify current SePay account API shape before live production                                    |
-| Wrong SePay webhook route                | Tenant bill or subscription invoice never settles            | Register `QRTBL` tenant route and `QRSUB` platform route separately                              |
-| Live payment test mutates external state | Real money movement or incorrect subscription activation     | Keep CI negative-only; perform low-value manual live verification with audit logs                |
+| Risk                                          | Impact                                                           | Mitigation                                                                                       |
+| --------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Migration job omitted or run after apps       | New image boots against an incompatible or incomplete schema     | Run the immutable migration image and ownership gate before replacing app containers             |
+| Shared database fallback enabled              | Services can reconnect to a mixed legacy database                | Require dedicated env names and `DATABASE_SHARED_FALLBACK_ENABLED=false` in production preflight |
+| `dev:reseed` run on production                | Destructive data loss and identity/cache reset                   | Exclude it from deploy scripts; use a non-destructive, profile-gated demo seed                   |
+| Compose `env_file` mistaken for interpolation | Images/credentials render empty or with stale defaults           | Pass `--env-file` everywhere and inspect through the protected validation helper                 |
+| Compose validation printed to CI logs         | Interpolated secrets leak into build/deploy records              | Capture `config`/`config --environment` in 0600 temp files and emit only redacted results        |
+| TCP/gRPC listener remains on localhost        | HTTP health passes while inter-service calls fail                | Set own listener host to `0.0.0.0`; test the full host matrix                                    |
+| Reverse-proxy/monitoring network mismatch     | Caddy cannot resolve Keycloak/Grafana or apps cannot reach Tempo | Enforce and inspect the shared network contract                                                  |
+| Kafka `localhost` advertised listener         | App containers cannot connect                                    | Use `PLAINTEXT://kafka:9092` in production compose                                               |
+| Unavailable Kafka image tag                   | Infra deployment cannot pull or start Kafka                      | Pin the verified official Apache Kafka JVM image and test its health command                     |
+| Vite public env is build-time                 | Customer PWA points to wrong API after image reuse               | Build image with production `VITE_BFF_URL`, or implement runtime config later                    |
+| Next public env is partly build-time          | Management App client bundle points to wrong API                 | Build with production `NEXT_PUBLIC_*` and also provide runtime env                               |
+| Keycloak `start-dev` or mutable theme mount   | Insecure/non-reproducible production IAM                         | Use the optimized custom image, external hostname, and DB-backed Keycloak                        |
+| Production bootstrap resets demo passwords    | Known credentials become valid on the public deployment          | Split realm/client bootstrap from explicitly gated demo-user bootstrap                           |
+| Public Grafana                                | Observability leaks tenant or system data                        | Put behind HTTPS, basic auth, firewall/IP restriction                                            |
+| CORS `*`                                      | Browser clients from unwanted origins can call BFF               | Enforce one production allowlist for HTTP and Socket.IO before public production                 |
+| Secrets in compose                            | Credential leak                                                  | Keep values out of YAML; protect master/scoped env files with 0600 permissions                   |
+| Master env injected into every service        | One compromised container exposes unrelated credentials          | Render allowlisted per-service env files and reject direct master-env injection                  |
+| External account/manual gate assumed complete | Deployment stalls or uses wrong account/resource                 | Use `HUMAN-GATE-01` through `11` with resource IDs and redacted evidence                         |
+| GitHub runner cannot pass restricted SSH rule | Automated deploy fails or operator opens SSH globally            | Keep first deploy operator-driven; approve a secure control channel before workflow SSH          |
+| GitHub plan lacks reviewer protection         | UI suggests approval but does not enforce it                     | Record plan capability and retain operator approval until supported protection is available      |
+| DNS/CDN/CAA misconfiguration                  | Caddy cannot obtain or renew certificates                        | Use Reserved IP, DNS-only during issuance, public resolver checks, and CAA review                |
+| External secret pasted into chat/log          | Long-lived provider or bank integration compromise               | Human enters secrets directly; evidence includes only name/fingerprint/last four                 |
+| Development credential reused in production   | Known or previously exposed value controls production            | Generate fresh production credentials, scan history, rotate findings, reject dev defaults        |
+| Private repository checkout uses personal key | Personal account compromise or uncontrolled production access    | Use a dedicated read-only deploy key or move to an image-only release bundle                     |
+| Cloudinary credentials missing or exposed     | Production uploads fail or media account is compromised          | Configure product environment manually and run upload/read/delete smoke without logging secret   |
+| Single Droplet failure                        | Full outage                                                      | Enable backups/snapshots; later move DB to managed service                                       |
+| Backups exist only on the Droplet             | Host loss also destroys recovery data                            | Encrypt/copy off-Droplet, checksum, retain, and rehearse restore                                 |
+| SePay API surface mismatch                    | OAuth webhook registration fails after deploy                    | Verify current SePay account API shape before live production                                    |
+| Wrong SePay webhook route                     | Tenant bill or subscription invoice never settles                | Register `QRTBL` tenant route and `QRSUB` platform route separately                              |
+| Live payment test mutates external state      | Real money movement or incorrect subscription activation         | Keep CI negative-only; perform low-value manual live verification with audit logs                |
+| Backup exists but restore was never rehearsed | Recovery fails during an actual incident                         | Complete encrypted offsite download, checksum, and isolated restore before acceptance            |
 
-## 9. Useful Follow-Up Enhancements
+## 10. Useful Follow-Up Enhancements
 
-- Add `CORS_ORIGINS` to BFF config and restrict to `app.qrtable.vodinhquan.dev` and `qr.qrtable.vodinhquan.dev`.
 - Add per-service PostgreSQL users after the single-user pilot is stable.
 - Add migration compatibility tests for backward-compatible expand/contract releases.
 - Add a dedicated SePay provider-contract test with mocked provider responses for the selected live API surface.
@@ -2234,13 +3046,20 @@ DigitalOcean product facts verified on 2026-06-06:
 
 - Used CodeGraph first before editing.
 - Reconciled current code with canonical docs before writing deployment plan.
-- Updated the English plan artifact and synchronized the Vietnamese translation for the 2026-06-07 database-per-service revision.
+- Added this human-operator revision to the English canonical plan and synchronized the Vietnamese translation in the same revision.
 - Preserved QRTable service boundaries and deployment ownership in the plan.
 - Reconciled Phase 7 with the implemented database-per-service configuration, migrations, and ownership verification.
+- Corrected Compose interpolation, image/tag naming, service listener/client hosts, and cross-layer Docker networks.
+- Added secret-safe Compose validation that never streams resolved environments to logs.
+- Replaced the unavailable Kafka tag and mutable Keycloak theme flow with reproducible image plans.
+- Converted CORS, identity bootstrap, exact E2E variables, and off-Droplet restore into production gates.
 - Treated secrets as runtime-only values and avoided committing real credentials.
+- Restricted runtime secret distribution through generated per-service env allowlists.
 - Flagged production blockers instead of hiding them behind optimistic deployment steps.
 - Included CI/CD as a first-class Phase 7 task with release, deploy, rollback, approval, and smoke-test gates.
 - Added SePay provider-doc verification and made live webhook/OAuth setup a production deployment gate.
+- Added a complete responsibility matrix, eleven human gates, web-console procedures, redacted evidence contract, and first-deploy observation checklist.
+- Resolved the restricted-SSH versus GitHub-hosted-runner conflict by making trusted-workstation deployment the Phase 7 baseline.
 
 ### ⚠️ Debt Flags (non-blocking — improve when touched again)
 
@@ -2257,6 +3076,13 @@ DigitalOcean product facts verified on 2026-06-06:
 - BLOCK002 [STRUCT] Existing per-service migrations are not yet packaged and integrated as a production one-shot deployment gate.
 - BLOCK003 [ENV_LEAK] Production secrets must be generated and stored outside git.
 - BLOCK004 [PATTERN] Keycloak production must not use `start-dev`.
+- BLOCK005 [PATTERN] BFF HTTP and Socket.IO CORS must stop using wildcard origins before public deployment.
+- BLOCK006 [ENV_LEAK] Production Keycloak bootstrap must not create/reset deterministic demo users.
+- BLOCK007 [STRUCT] Compose host/network/interpolation contracts must be implemented exactly or healthy HTTP containers will still fail inter-service traffic.
+- BLOCK008 [ENV_LEAK] The master production env must not be passed wholesale to every container.
+- BLOCK009 [PATTERN] External accounts, DNS, provider secrets, bank authorization, and backup storage require completion of the documented human gates.
+- BLOCK010 [PATTERN] GitHub-hosted runner SSH must remain disabled until a secure deployment control channel is explicitly selected and tested.
+- BLOCK011 [ENV_LEAK] Populated local development credentials and deterministic development defaults must not be reused in production; affected credentials require audit and rotation.
 
 ### 💡 Suggestions
 
