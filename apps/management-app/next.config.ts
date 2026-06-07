@@ -6,6 +6,7 @@ const appDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(appDir, '../..');
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   images: {
     remotePatterns: [
       {
