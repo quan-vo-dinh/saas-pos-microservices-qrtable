@@ -2,7 +2,7 @@
 
 > **Bản tiếng Việt** — đã đồng bộ với revision human-operator runbook (2026-06-07); bản tiếng Anh canonical: [2026-06-06-phase-7-docker-digitalocean-deployment.md](2026-06-06-phase-7-docker-digitalocean-deployment.md)
 
-> **Revision 2026-06-07:** Đã xác minh lại với codebase hiện tại và tài liệu provider sau implement database-per-service. Revision này sửa tên env database production, Compose interpolation, binding host TCP/gRPC, Docker networks, quy ước image/tag, đóng gói/bootstrap Keycloak, đường dẫn monitoring, biến E2E, nhất quán backup, gate CI/CD, và runbook human-operator đầy đủ cho các nền tảng bên ngoài.
+> **Revision 2026-06-07:** Đã xác minh lại với codebase hiện tại và tài liệu provider sau implement database-per-service. Revision này sửa tên env database production, Compose interpolation, binding host TCP/gRPC, Docker networks, quy ước image/tag, đóng gói/bootstrap Keycloak, đường dẫn monitoring, biến E2E, nhất quán backup, gate CI/CD, runbook human-operator đầy đủ cho các nền tảng bên ngoài, và nhãn quyền sở hữu/handoff theo thứ tự thời gian cho mọi task implement.
 
 > **Dành cho agent / dev thực thi:** BẮT BUỘC dùng superpowers:subagent-driven-development hoặc superpowers:executing-plans để implement plan theo từng task. Các bước dùng checkbox (`- [ ]`) để theo dõi tiến độ.
 
@@ -699,7 +699,43 @@ Không commit các file riêng đó.
 
 ## 6. Tasks (Các task)
 
+### 6.1 Bản đồ quyền sở hữu thực thi
+
+Đọc bản đồ này trước khi bắt đầu bất kỳ task nào. Quyền sở hữu theo thứ tự thời gian: mỗi hàng xác định ai tham gia khi thực thi đến task đó, và phần thân task xác định bước handoff chính xác.
+
+| Task                               | Primary ownership | Human participation / stop condition                                                               |
+| ---------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------- |
+| 1. Kiểm soát build context         | `[AGENT]`         | Không                                                                                              |
+| 2. Image backend                   | `[AGENT]`         | Không, trừ khi truy cập Docker Desktop/daemon yêu cầu user khởi động hoặc ủy quyền                 |
+| 3. Image Management App            | `[AGENT]`         | Không                                                                                              |
+| 4. Image Customer PWA              | `[AGENT]`         | Không                                                                                              |
+| 5. Compose infra production        | `[AGENT]`         | Không; hạ tầng bên ngoài chưa được cấp phát                                                        |
+| 6. Lớp App Compose                 | `[AGENT]`         | Không                                                                                              |
+| 7. Reverse proxy và cấu hình HTTPS | `[AGENT]`         | Không; quyền sở hữu DNS và cấp certificate live diễn ra ở Task 13                                  |
+| 8. Env và secret production        | `[SHARED]`        | Human nhập secret do provider cấp; dừng tại `HUMAN-GATE-06` và `HUMAN-GATE-07` trước deploy live   |
+| 9. Migration                       | `[AGENT]`         | Không cho implement; thực thi production diễn ra dưới phê duyệt Task 14                            |
+| 10. Bootstrap Keycloak             | `[SHARED]`        | Agent tự động hóa bootstrap realm/client; human tạo/verify admin vĩnh viễn tại `HUMAN-GATE-08`     |
+| 11. Tích hợp SePay production      | `[SHARED]`        | Human sở hữu tài khoản/KYC/ngân hàng/OAuth consent/chuyển khoản thật; dừng tại `HUMAN-GATE-09`     |
+| 12. Monitoring                     | `[AGENT]`         | Không                                                                                              |
+| 13. Cấp phát DigitalOcean          | `[SHARED]`        | Human sở hữu tài khoản, billing, console, DNS và phê duyệt chi phí; gate `01`, `03`, `04`, và `05` |
+| 14. Deploy stack                   | `[SHARED]`        | Agent chạy deploy; human cung cấp giá trị được bảo vệ và validate identity; gate `06` đến `08`     |
+| 15. Smoke/demo verification        | `[AGENT]`         | Verify tự động và trình duyệt; không chuyển khoản thật                                             |
+| 16. Backup/rollback/vận hành       | `[SHARED]`        | Human bật backup/storage trả phí và phê duyệt retention/restore target; dừng tại `HUMAN-GATE-11`   |
+| 17. CI/CD và release               | `[SHARED]`        | Human cấu hình kiểm soát GitHub và phê duyệt deploy production; `HUMAN-GATE-02` và `HUMAN-GATE-10` |
+| 18. Tài liệu canonical             | `[AGENT]`         | Human review tùy chọn; không có execution gate                                                     |
+
+Quy tắc thực thi:
+
+1. Task `[AGENT]`: agent implement và verify toàn bộ task mà không yêu cầu xác nhận thường lệ.
+2. Task `[SHARED]`: agent hoàn thành mọi chuẩn bị thuộc agent trước, rồi chỉ dừng tại bước human hoặc `HUMAN-GATE` được đặt tên rõ ràng.
+3. Bước `[HUMAN]`: agent cung cấp hướng dẫn chính xác và bằng chứng redact kỳ vọng; human thực hiện thao tác tài khoản/console/secret/thanh toán.
+4. Human gate chỉ hoàn tất khi bằng chứng được ghi lại. Tạo code phụ thuộc tài nguyên bên ngoài không hoàn tất gate.
+5. Không thực hiện thao tác production sau bằng cách giả định human gate đã bỏ qua là đã hoàn tất.
+6. Gate ID là tham chiếu chéo ổn định tới Mục 4. Vị trí task/bước, không phải gate ID số, quyết định thời điểm handoff khi thực thi plan.
+
 ### Task 1: Thêm kiểm soát build context
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -752,6 +788,8 @@ docker buildx build \
 Kỳ vọng: context transfer có giới hạn và không chứa `node_modules`, `docker/docker_data`, `.codegraph`, test report hay `.env` riêng. Không dùng `docker buildx du` cho kiểm tra này; lệnh đó báo dung lượng disk builder, không phải kích thước build context.
 
 ### Task 2: Build image backend
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -843,6 +881,8 @@ docker run --rm qrtable-bff:phase7-smoke node --version
 Kỳ vọng: build exit 0 và Node in ra version.
 
 ### Task 3: Build image Management App
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -936,6 +976,8 @@ Kỳ vọng: build exit 0.
 
 ### Task 4: Build image Customer PWA
 
+**Ownership:** `[AGENT]`
+
 **Files:**
 
 - Tạo: `docker/customer-pwa.Dockerfile`
@@ -1000,6 +1042,8 @@ docker buildx build --platform linux/amd64 --load \
 Kỳ vọng: build exit 0.
 
 ### Task 5: Thay compose provider dev bằng compose infra production
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -1226,6 +1270,8 @@ Kỳ vọng:
 - Smoke KafkaJS dùng client đã cài trong repo tạo/dùng test topic, produce một event và consume thành công với Kafka `4.3.0`.
 
 ### Task 6: Tạo lớp App Compose
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -1489,6 +1535,8 @@ Kỳ vọng: mọi image resolve thành `${IMAGE_REPOSITORY}:<service>-${IMAGE_T
 
 ### Task 7: Thêm reverse proxy và HTTPS
 
+**Ownership:** `[AGENT]`
+
 **Files:**
 
 - Tạo: `docker/proxy/Caddyfile`
@@ -1569,13 +1617,17 @@ Kỳ vọng: compose render không lỗi cú pháp, `basic_auth` được chấp
 
 ### Task 8: Chuẩn bị env và secret production
 
+**Ownership:** `[SHARED]`
+
+**Handoff:** Agent tạo template, generator, validator, scoped env renderer và triển khai CORS. Human nhập giá trị production do bên ngoài cấp trực tiếp vào secret store đã phê duyệt. Không chặn implement vì thiếu các giá trị đó; chặn deploy live đầu tiên tại `HUMAN-GATE-06` và `HUMAN-GATE-07`.
+
 **Files:**
 
 - Tạo: `docker/env/.env.production.example`
 - Tạo: `tools/deploy/phase7-compose-validate.sh`
 - Tạo: `tools/deploy/phase7-render-service-envs.sh`
 
-- [ ] Bước 1: Tạo file mẫu chỉ có key và giá trị mẫu an toàn
+- [ ] Bước 1: Tạo file mẫu chỉ có key và giá trị mẫu an toàn `[AGENT]`
 
 Gồm mọi key bắt buộc, không gồm secret thật:
 
@@ -1678,7 +1730,7 @@ GRAFANA_BASIC_AUTH_HASH=generate_with_caddy
 GRAFANA_BASIC_AUTH_PASSWORD=not_for_caddyfile
 ```
 
-- [ ] Bước 2: Generate server secrets
+- [ ] Bước 2: Generate server secrets `[SHARED]`
 
 Chạy trên server:
 
@@ -1686,6 +1738,8 @@ Chạy trên server:
 openssl rand -hex 32
 openssl rand -base64 32
 ```
+
+`[AGENT]` cung cấp quy trình sinh/validate. `[HUMAN]` nhập Cloudinary, SePay, ngân hàng và giá trị provider khác do bên ngoài cấp trực tiếp vào env production được bảo vệ mà không expose trong chat, terminal history hay log dùng chung.
 
 Kỳ vọng:
 
@@ -1702,7 +1756,7 @@ Kỳ vọng:
 - `AUTH_AUTO_PROVISION_ON_FIRST_LOGIN=false` unless a separately reviewed production onboarding policy intentionally enables it.
 - File `/opt/qrtable/.env.production` thật không bao giờ được commit.
 
-- [ ] Bước 3: Validate Compose không rò giá trị interpolation
+- [ ] Bước 3: Validate Compose không rò giá trị interpolation `[AGENT]`
 
 Tạo `phase7-compose-validate.sh`:
 
@@ -1713,7 +1767,7 @@ Tạo `phase7-compose-validate.sh`:
 - Xóa chúng qua `trap` khi success, failure hoặc interruption.
 - Chỉ in tóm tắt pass/fail đã redact với tên file compose và tên key fail, không bao giờ in giá trị.
 
-- [ ] Bước 4: Render file env runtime least-privilege
+- [ ] Bước 4: Render file env runtime least-privilege `[AGENT]`
 
 Dùng `/opt/qrtable/.env.production` chỉ làm nguồn master riêng cho Compose interpolation và deployment tooling. Không inject nguyên file đó vào application container.
 
@@ -1762,7 +1816,7 @@ Mapping ownership tối thiểu:
 | `identity-bootstrap.env` | Keycloak admin/client values; Mongo sync values only for explicitly enabled demo users    |
 | `proxy.env`              | Caddy/Grafana basic-auth values only                                                      |
 
-- [ ] Bước 5: Implement và test allowlist CORS production
+- [ ] Bước 5: Implement và test allowlist CORS production `[AGENT]`
 
 Trước deploy công khai:
 
@@ -1774,6 +1828,8 @@ Trước deploy công khai:
 Đây là blocker production, không phải cải tiến theo dõi.
 
 ### Task 9: Đóng gói và chạy migration per-service hiện có
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -1922,17 +1978,21 @@ Seed ID dùng cho E2E phải ghi vào file ghi chú deploy không chứa secret.
 
 ### Task 10: Bootstrap Keycloak cho domain công khai
 
+**Ownership:** `[SHARED]`
+
+**Handoff:** Agent đóng gói theme và tự động hóa bootstrap realm/client. Sau khi dịch vụ identity công khai chạy, human tạo và verify administrator vĩnh viễn, hoàn thành `HUMAN-GATE-08`.
+
 **Files:**
 
 - Tạo: `docker/keycloak.Dockerfile`
 - Sửa hoặc bọc: `tools/keycloak-bootstrap.sh`
 - Tạo: `tools/deploy/phase7-keycloak-bootstrap.sh`
 
-- [ ] Bước 1: Package the Keycloak theme in the immutable image
+- [ ] Bước 1: Package the Keycloak theme in the immutable image `[AGENT]`
 
 Build image Keycloak optimized tùy chỉnh trong Task 5 và publish cùng release. Droplet không được chạy `pnpm theme:build` và không bind-mount thư mục theme mutable trên host.
 
-- [ ] Bước 2: Split infrastructure bootstrap from demo-user bootstrap
+- [ ] Bước 2: Split infrastructure bootstrap from demo-user bootstrap `[AGENT]`
 
 `tools/keycloak-bootstrap.sh` hiện tại không an toàn cho production vì yêu cầu `tools/auth-bootstrap-users.json`, reset mọi mật khẩu được liệt kê mỗi lần chạy, và file đã commit chứa mật khẩu demo deterministic.
 
@@ -1947,7 +2007,7 @@ Refactor or wrap it so:
 - `KEYCLOAK_CLEAN_REALM=true` remains restricted to local hosts and is never used by Phase 7 deployment.
 - Đồng bộ user MongoDB chỉ chạy cho đường bootstrap user được bật rõ ràng.
 
-- [ ] Bước 3: Bootstrap realm and clients from the infra network
+- [ ] Bước 3: Bootstrap realm and clients from the infra network `[AGENT]`
 
 Chạy bootstrap qua image migration/tooling để `keycloak` và `mongodb` resolve trên mạng Docker nội bộ. Redirect URI công khai vẫn dùng domain production:
 
@@ -1965,7 +2025,7 @@ docker compose \
   identity-bootstrap bash tools/deploy/phase7-keycloak-bootstrap.sh
 ```
 
-- [ ] Bước 4: Verify redirect URIs, web origins, and public issuer
+- [ ] Bước 4: Verify redirect URIs, web origins, and public issuer `[SHARED]`
 
 Ensure Keycloak clients include:
 
@@ -1989,7 +2049,11 @@ Kỳ vọng:
 - Default production bootstrap creates no deterministic demo users and resets no user passwords.
 - User chỉ demo, khi được bật rõ ràng, được đồng bộ vào MongoDB `qrtable_auth`, không phải database legacy `qrtable`.
 
+Ở phần production live của bước này, `[HUMAN]` tạo và verify administrator có tên vĩnh viễn, gỡ administrator bootstrap tạm, và ghi `HUMAN-GATE-08`. Agent thực hiện mọi kiểm tra issuer, client, role và login-flow có thể verify bằng máy.
+
 ### Task 11: Cấu hình tích hợp SePay production
+
+**Ownership:** `[SHARED]`
 
 SePay là phụ thuộc production, không chỉ chi tiết biến env. Deploy chưa sẵn sàng cho đến khi cấu hình dashboard/API SePay khớp route công khai của QRTable và code path đang dùng.
 
@@ -2024,7 +2088,7 @@ Trách nhiệm human:
 - Verify và có thể cập nhật: `docs/guides/sepay-configuration-guide-phase3.md`
 - Tạo: `tools/deploy/phase7-sepay-preflight.md` hoặc script nếu tự động hóa provider ổn định
 
-- [ ] Bước 1: Chọn bộ route SePay live
+- [ ] Bước 1: Chọn bộ route SePay live `[SHARED]`
 
 Deploy production đầu tiên ưu tiên route secret-key đã verify với provider:
 
@@ -2128,6 +2192,8 @@ Verify live thủ công:
 
 ### Task 12: Chỉnh monitoring cho app container
 
+**Ownership:** `[AGENT]`
+
 **Files:**
 
 - Tạo: `docker-compose.monitoring.prod.yaml`
@@ -2194,11 +2260,13 @@ Kỳ vọng: compose production không có port công khai `3001`, `3100`, `9090
 
 ### Task 13: Cấp phát DigitalOcean
 
+**Ownership:** `[SHARED]`
+
 **Files:**
 
 - Tạo: `docs/guides/phase-7-digitalocean-deployment.md`
 
-Task này vận hành hóa `HUMAN-GATE-01` đến `HUMAN-GATE-05`. Implementation guide phải gồm hướng dẫn web-console, trường bằng chứng, và quy tắc xử lý secret từ mục 4 — không chỉ lệnh shell.
+Task này vận hành hóa `HUMAN-GATE-01`, `HUMAN-GATE-03`, `HUMAN-GATE-04`, và `HUMAN-GATE-05`. `HUMAN-GATE-02` thuộc cấu hình GitHub trong Task 17. Implementation guide phải gồm hướng dẫn web-console, trường bằng chứng, và quy tắc xử lý secret từ mục 4 — không chỉ lệnh shell.
 
 - [ ] Bước 1: Tạo bảo mật tài khoản, Project, và registry `[HUMAN]`
 
@@ -2313,6 +2381,10 @@ Mỗi lệnh trả về Reserved IP từ ít nhất hai public resolver. Review 
 
 ### Task 14: Deploy stack
 
+**Ownership:** `[SHARED]`
+
+**Handoff:** Agent chuẩn bị và chạy quy trình deploy. Human cung cấp giá trị bên ngoài được bảo vệ, phê duyệt target/cửa sổ, và thực hiện kiểm tra permanent-admin/trình duyệt tại các gate đã đặt tên.
+
 **Files:**
 
 - Tạo: `tools/deploy/phase7-preflight.sh`
@@ -2320,7 +2392,7 @@ Mỗi lệnh trả về Reserved IP từ ít nhất hai public resolver. Review 
 - Tạo: `tools/deploy/phase7-seed-demo.sh`
 - Tạo: `tools/deploy/phase7-smoke.sh`
 
-- [ ] Bước 1: Copy repository hoặc release bundle vào `/opt/qrtable`
+- [ ] Bước 1: Copy repository hoặc release bundle vào `/opt/qrtable` `[AGENT]`
 
 Pilot đầu tiên khuyến nghị:
 
@@ -2356,7 +2428,7 @@ find /opt/qrtable/env -type f ! -perm 0600 -print -quit | grep -q . && exit 1 ||
 ./tools/deploy/phase7-compose-validate.sh -f docker-compose.proxy.yaml
 ```
 
-- [ ] Bước 3: Start infra và chờ datastore healthy
+- [ ] Bước 3: Start infra và chờ datastore healthy `[AGENT]`
 
 ```bash
 docker compose \
@@ -2370,7 +2442,7 @@ docker compose \
 ./tools/deploy/phase7-preflight.sh --wait-infra
 ```
 
-- [ ] Bước 4: Chạy migration gate và ownership gate
+- [ ] Bước 4: Chạy migration gate và ownership gate `[AGENT]`
 
 ```bash
 docker compose \
@@ -2396,7 +2468,7 @@ DEPLOYMENT_PROFILE=demo ./tools/deploy/phase7-seed-demo.sh --yes
 
 Sau bootstrap, human phải tạo và verify administrator Keycloak vĩnh viễn có tên, gỡ temporary bootstrap administrator, và hoàn thành kiểm tra login/role trong `HUMAN-GATE-08`.
 
-- [ ] Bước 6: Start lớp monitoring, app và proxy
+- [ ] Bước 6: Start lớp monitoring, app và proxy `[AGENT]`
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
@@ -2407,7 +2479,7 @@ docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.proxy.yaml up -d
 ```
 
-- [ ] Bước 7: Verify service đang chạy
+- [ ] Bước 7: Verify service đang chạy `[AGENT]`
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production -f docker-compose.infra.yaml ps
@@ -2426,6 +2498,8 @@ Kỳ vọng:
 - `docker network inspect` xác nhận Caddy chia sẻ `qrtable-edge` với mọi target reverse proxy và contract mạng monitoring/app khớp Task 12.
 
 ### Task 15: Chạy smoke test và verify demo
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -2507,6 +2581,10 @@ Kỳ vọng: BFF trả lỗi xác thực, chứng minh route công khai reachabl
 
 ### Task 16: Backup, rollback và vận hành
 
+**Ownership:** `[SHARED]`
+
+**Handoff:** Agent implement tự động hóa backup, checksum, restore và rollback. Human bật tính năng provider trả phí, tạo storage target độc lập, phê duyệt quyền retention/xóa, và hoàn thành `HUMAN-GATE-11`.
+
 **Files:**
 
 - Tạo: `docs/guides/phase-7-digitalocean-deployment.md`
@@ -2516,7 +2594,7 @@ Kỳ vọng: BFF trả lỗi xác thực, chứng minh route công khai reachabl
 
 Dùng Droplet backup cho phục hồi cấp host.
 
-- [ ] Bước 2: Thêm script backup logic
+- [ ] Bước 2: Thêm script backup logic `[AGENT]`
 
 Backup release là điểm phục hồi cross-service. Đưa deploy vào cửa sổ bảo trì ngắn hoặc quiesce write traffic trước backup; nếu không, database PostgreSQL và archive MongoDB hợp lệ riêng lẻ nhưng không phải snapshot phân tán atomic.
 
@@ -2559,7 +2637,7 @@ sha256sum "/opt/qrtable/backups/${stamp}/"* > "/opt/qrtable/backups/${stamp}/SHA
 - Không coi backup chỉ lưu trên cùng Droplet là bản recovery duy nhất.
 - Chỉ hoàn thành `HUMAN-GATE-11` sau khi upload mã hóa, download, checksum, và restore PostgreSQL/MongoDB cô lập đều thành công.
 
-- [ ] Bước 4: Define rollback
+- [ ] Bước 4: Define rollback `[AGENT]`
 
 Rollback image tag:
 
@@ -2580,6 +2658,10 @@ Rollback dữ liệu infra:
 - Chạy lại smoke check.
 
 ### Task 17: Thêm pipeline CI/CD và quy trình release
+
+**Ownership:** `[SHARED]`
+
+**Handoff:** Agent implement workflow và script. Human cấu hình bảo vệ/secret trên web console GitHub và phê duyệt deploy production đầu tiên qua `HUMAN-GATE-02` và `HUMAN-GATE-10`.
 
 CI/CD là phần của Phase 7, nhưng phải coi là mặt phẳng điều khiển deploy riêng, không giấu trong lệnh server thủ công.
 
@@ -2610,7 +2692,7 @@ CI/CD là phần của Phase 7, nhưng phải coi là mặt phẳng điều khi�
 - Tạo: `tools/deploy/phase7-smoke.sh`
 - Sửa: `docs/guides/phase-7-digitalocean-deployment.md`
 
-- [ ] Bước 1: Giữ CI làm quality gate PR
+- [ ] Bước 1: Giữ CI làm quality gate PR `[AGENT]`
 
 CI phải validate chất lượng source trước khi workflow release chạy.
 
@@ -2630,7 +2712,7 @@ pnpm exec nx affected -t lint test build --base=origin/main~1 --head=HEAD
 
 Chỉ dùng lệnh affected sau khi pipeline ổn định. Deploy Phase 7 đầu tiên, `run-many` an toàn hơn vì dễ bắt project boundary cũ hoặc thiếu target.
 
-- [ ] Bước 2: Thêm workflow release-images
+- [ ] Bước 2: Thêm workflow release-images `[SHARED]`
 
 Trigger:
 
@@ -2650,6 +2732,8 @@ Input:
 Secret:
 
 - `DIGITALOCEAN_ACCESS_TOKEN`
+
+`[AGENT]` implement và verify tĩnh workflow. `[HUMAN]` tạo token có phạm vi hẹp và nhập vào GitHub mà không tiết lộ giá trị. Lần push registry live đầu tiên của workflow chờ handoff đó.
 
 Trách nhiệm workflow:
 
@@ -2689,7 +2773,7 @@ Quy tắc build quan trọng:
 - Release chưa hoàn tất trừ khi cả mười hai tag và digest có mặt.
 - Workflow phải từ chối ghi đè tag release immutable hiện có; `latest` tùy chọn và không bao giờ dùng bởi compose production.
 
-- [ ] Bước 3: Thêm bảo vệ deployment environment
+- [ ] Bước 3: Thêm bảo vệ deployment environment `[HUMAN]`
 
 Dùng GitHub Environments:
 
@@ -2707,7 +2791,7 @@ Lý do:
 
 `[HUMAN]` Cấu hình phần này trong web console GitHub theo mục 4.5. Required reviewers là kiểm soát cứng chỉ khi visibility repository và gói GitHub thực sự hỗ trợ. Khi không có, giữ gate deploy do operator điều khiển và ghi người phê duyệt vào `/opt/qrtable/releases/history.log`.
 
-- [ ] Bước 4: Thêm entrypoint deploy production do operator điều khiển
+- [ ] Bước 4: Thêm entrypoint deploy production do operator điều khiển `[SHARED]`
 
 Pilot Phase 7 đầu tiên không được SSH từ GitHub-hosted runner khi Cloud Firewall chỉ cho phép SSH từ IP operator.
 
@@ -2751,9 +2835,9 @@ Script deploy remote phải:
 - Chạy health check sau khi thay container.
 - Ghi tag thành công vào `/opt/qrtable/releases/current`.
 
-Hoàn thành `HUMAN-GATE-10` cho deploy đầu tiên.
+`[AGENT]` chuẩn bị/chạy lệnh và kiểm tra đã audit. `[HUMAN]` chọn tag/cửa sổ immutable, xác nhận backup/rollback sẵn sàng, phê duyệt deploy, và hoàn thành `HUMAN-GATE-10`.
 
-- [ ] Bước 4A: Tùy chọn bật `deploy-production.yml` sau phê duyệt secure-channel
+- [ ] Bước 4A: Tùy chọn bật `deploy-production.yml` sau phê duyệt secure-channel `[SHARED]`
 
 Chỉ sau khi human ghi một trong các kênh điều khiển không-baseline ở mục 4.7, workflow mới nhận:
 
@@ -2774,7 +2858,7 @@ Workflow phải:
 - gỡ mọi firewall rule tạm trong bước cleanup vô điều kiện;
 - giữ artifact audit redact.
 
-- [ ] Bước 5: Thêm gate schema/migration
+- [ ] Bước 5: Thêm gate schema/migration `[AGENT]`
 
 Trước deploy production, quy trình deploy phải:
 
@@ -2794,7 +2878,7 @@ Script gate khuyến nghị:
 ./tools/deploy/phase7-migrate.sh
 ```
 
-- [ ] Bước 6: Thêm smoke test vào quy trình deploy
+- [ ] Bước 6: Thêm smoke test vào quy trình deploy `[AGENT]`
 
 Smoke test phải chạy từ máy ngoài Droplet sau deploy vì DNS công khai, TLS, reverse proxy và CORS phải verify bên ngoài. Với baseline, chạy từ trusted operator workstation. Sau khi bật workflow SSH bảo mật, kiểm tra công khai cũng có thể chạy từ GitHub Actions.
 
@@ -2819,7 +2903,7 @@ Kỳ vọng: request webhook không hợp lệ hoặc không ký bị từ chố
 
 Kiểm tra CORS phải gửi origin được phép và origin bị từ chối tới BFF, và verify handshake Socket.IO theo cùng allowlist.
 
-- [ ] Bước 7: Thêm rollback do operator và workflow rollback tùy chọn
+- [ ] Bước 7: Thêm rollback do operator và workflow rollback tùy chọn `[SHARED]`
 
 Input baseline:
 
@@ -2841,9 +2925,11 @@ human rollback approval
 
 Rollback không được tự khôi phục database hoặc chạy `migration:revert` trừ khi `restore_data=true` và operator xác nhận timestamp backup chính xác cùng tác động tương thích. Rollback app và rollback dữ liệu là thao tác riêng.
 
+`[AGENT]` implement và thực thi tự động hóa rollback app. `[HUMAN]` phê duyệt tag rollback và phê duyệt riêng mọi restore dữ liệu với timestamp backup chính xác.
+
 Workflow rollback GitHub tùy chọn tuân cùng yêu cầu secure-channel như `deploy-production.yml`.
 
-- [ ] Bước 8: Thêm audit trail deploy
+- [ ] Bước 8: Thêm audit trail deploy `[AGENT]`
 
 Mỗi deploy thành công nên ghi:
 
@@ -2866,7 +2952,7 @@ Lưu cục bộ:
 
 Giữ URL run GitHub Actions làm bản ghi audit bên ngoài.
 
-- [ ] Bước 9: Quyết định khi nào tự động deploy khi merge
+- [ ] Bước 9: Quyết định khi nào tự động deploy khi merge `[HUMAN]`
 
 Chính sách Phase 7 khuyến nghị:
 
@@ -2879,6 +2965,8 @@ Chính sách Phase 7 khuyến nghị:
 Không auto-deploy production mỗi lần merge cho đến khi migration, backup, rollback và smoke test đã được chứng minh.
 
 ### Task 18: Cập nhật tài liệu canonical sau implement
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -3057,6 +3145,7 @@ Sự kiện sản phẩm DigitalOcean đã verify lại ngày 2026-06-07:
 - Thêm verify tài liệu provider SePay và đặt thiết lập webhook/OAuth live làm gate deploy production.
 - Thêm ma trận trách nhiệm đầy đủ, mười một human gate, quy trình web-console, hợp đồng bằng chứng redact, và checklist quan sát deploy đầu tiên.
 - Giải quyết xung đột SSH hạn chế versus GitHub-hosted runner bằng cách đặt deploy trusted-workstation làm baseline Phase 7.
+- Thêm bản đồ quyền sở hữu thực thi cho Task 1–18, đánh dấu mọi task là `[AGENT]` hoặc `[SHARED]`, và gán nhãn từng bước mixed-ownership tại điểm handoff thực tế.
 
 ### ⚠️ Debt flags (không chặn — cải thiện khi chạm lại)
 

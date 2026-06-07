@@ -2,7 +2,7 @@
 
 > **Vietnamese translation:** [2026-06-06-phase-7-docker-digitalocean-deployment.vi.md](2026-06-06-phase-7-docker-digitalocean-deployment.vi.md) — synchronized with the 2026-06-07 human-operator runbook revision.
 
-> **Revision 2026-06-07:** Re-verified against the current codebase and current provider documentation after the database-per-service implementation. This revision fixes production database env names, Compose interpolation, TCP/gRPC host binding, Docker networks, image/tag conventions, Keycloak packaging/bootstrap, monitoring paths, E2E variables, backup consistency, CI/CD gates, and the complete human-operator runbook for external platforms.
+> **Revision 2026-06-07:** Re-verified against the current codebase and current provider documentation after the database-per-service implementation. This revision fixes production database env names, Compose interpolation, TCP/gRPC host binding, Docker networks, image/tag conventions, Keycloak packaging/bootstrap, monitoring paths, E2E variables, backup consistency, CI/CD gates, the complete human-operator runbook for external platforms, and chronological ownership/handoff labels for every implementation task.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -699,7 +699,43 @@ Never commit those private files.
 
 ## 6. Tasks
 
+### 6.1 Execution Ownership Map
+
+Read this map before starting any task. Ownership is chronological: the row identifies who participates when execution reaches that task, and the task body identifies the exact handoff step.
+
+| Task                              | Primary ownership | Human participation / stop condition                                                                   |
+| --------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
+| 1. Build context controls         | `[AGENT]`         | None                                                                                                   |
+| 2. Backend images                 | `[AGENT]`         | None, unless Docker Desktop/daemon access requires the user to start or authorize it                   |
+| 3. Management App image           | `[AGENT]`         | None                                                                                                   |
+| 4. Customer PWA image             | `[AGENT]`         | None                                                                                                   |
+| 5. Production infra Compose       | `[AGENT]`         | None; external infrastructure is not provisioned yet                                                   |
+| 6. App Compose layer              | `[AGENT]`         | None                                                                                                   |
+| 7. Reverse proxy and HTTPS config | `[AGENT]`         | None; DNS ownership and live certificate issuance occur at Task 13                                     |
+| 8. Production env and secrets     | `[SHARED]`        | Human enters provider-issued secrets; stop at `HUMAN-GATE-06` and `HUMAN-GATE-07` before live deploy   |
+| 9. Migrations                     | `[AGENT]`         | None for implementation; production execution occurs under Task 14 approval                            |
+| 10. Keycloak bootstrap            | `[SHARED]`        | Agent automates realm/client bootstrap; human creates/verifies permanent admin at `HUMAN-GATE-08`      |
+| 11. SePay production integration  | `[SHARED]`        | Human owns account/KYC/bank/OAuth consent/real transfer; stop at `HUMAN-GATE-09`                       |
+| 12. Monitoring                    | `[AGENT]`         | None                                                                                                   |
+| 13. DigitalOcean provisioning     | `[SHARED]`        | Human owns account, billing, console, DNS, and cost approval; gates `01`, `03`, `04`, and `05`         |
+| 14. Deploy stack                  | `[SHARED]`        | Agent runs deployment; human supplies protected values and validates identity; gates `06` through `08` |
+| 15. Smoke/demo verification       | `[AGENT]`         | Automated and browser verification; no real-money transfer                                             |
+| 16. Backup/rollback/operations    | `[SHARED]`        | Human enables paid backup/storage and approves retention/restore target; stop at `HUMAN-GATE-11`       |
+| 17. CI/CD and release             | `[SHARED]`        | Human configures GitHub controls and approves production deploy; `HUMAN-GATE-02` and `HUMAN-GATE-10`   |
+| 18. Canonical docs                | `[AGENT]`         | Human review is optional; no execution gate                                                            |
+
+Execution rules:
+
+1. `[AGENT]` task: the agent implements and verifies the complete task without requesting routine confirmation.
+2. `[SHARED]` task: the agent completes all agent-owned preparation first, then stops only at the explicitly named human step or `HUMAN-GATE`.
+3. `[HUMAN]` step: the agent provides exact instructions and expected redacted evidence; the human performs the account/console/secret/payment action.
+4. A human gate is complete only when its evidence is recorded. Creating code that depends on the external resource does not complete the gate.
+5. Never perform later production actions by assuming a skipped human gate is complete.
+6. Gate IDs are stable cross-references to Section 4. The task/step location, not the numeric gate ID, determines when the handoff occurs during plan execution.
+
 ### Task 1: Add Build Context Controls
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -752,6 +788,8 @@ docker buildx build \
 Expected: transferred context stays bounded and contains no `node_modules`, `docker/docker_data`, `.codegraph`, test reports, or private `.env`. Do not use `docker buildx du` for this check; that command reports builder disk usage, not build-context size.
 
 ### Task 2: Build Backend Images
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -843,6 +881,8 @@ docker run --rm qrtable-bff:phase7-smoke node --version
 Expected: build exits 0 and Node prints a version.
 
 ### Task 3: Build Management App Image
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -936,6 +976,8 @@ Expected: build exits 0.
 
 ### Task 4: Build Customer PWA Image
 
+**Ownership:** `[AGENT]`
+
 **Files:**
 
 - Create: `docker/customer-pwa.Dockerfile`
@@ -1000,6 +1042,8 @@ docker buildx build --platform linux/amd64 --load \
 Expected: build exits 0.
 
 ### Task 5: Replace Dev Provider Compose With Production Infra Compose
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -1226,6 +1270,8 @@ Expected:
 - A KafkaJS smoke using the repository's installed client creates/uses a test topic, produces one event, and consumes it successfully against Kafka `4.3.0`.
 
 ### Task 6: Create App Compose Layer
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -1489,6 +1535,8 @@ Expected: every image resolves to `${IMAGE_REPOSITORY}:<service>-${IMAGE_TAG}`, 
 
 ### Task 7: Add Reverse Proxy And HTTPS
 
+**Ownership:** `[AGENT]`
+
 **Files:**
 
 - Create: `docker/proxy/Caddyfile`
@@ -1569,13 +1617,17 @@ Expected: compose renders with no syntax error, `basic_auth` is accepted by the 
 
 ### Task 8: Prepare Production Env And Secrets
 
+**Ownership:** `[SHARED]`
+
+**Handoff:** The agent creates the template, generators, validators, scoped env renderer, and CORS implementation. The human enters externally issued production values directly into approved secret stores. Do not block implementation on those values; block the first live deployment at `HUMAN-GATE-06` and `HUMAN-GATE-07`.
+
 **Files:**
 
 - Create: `docker/env/.env.production.example`
 - Create: `tools/deploy/phase7-compose-validate.sh`
 - Create: `tools/deploy/phase7-render-service-envs.sh`
 
-- [ ] Step 1: Create example with keys only and safe sample values
+- [ ] Step 1: Create example with keys only and safe sample values `[AGENT]`
 
 Include every required key, but do not include real secrets:
 
@@ -1678,7 +1730,7 @@ GRAFANA_BASIC_AUTH_HASH=generate_with_caddy
 GRAFANA_BASIC_AUTH_PASSWORD=not_for_caddyfile
 ```
 
-- [ ] Step 2: Generate server secrets
+- [ ] Step 2: Generate server secrets `[SHARED]`
 
 Run on the server:
 
@@ -1686,6 +1738,8 @@ Run on the server:
 openssl rand -hex 32
 openssl rand -base64 32
 ```
+
+`[AGENT]` supplies the generation/validation procedure. `[HUMAN]` enters externally issued Cloudinary, SePay, bank, and other provider values directly into the protected production env without exposing them in chat, terminal history, or shared logs.
 
 Expected:
 
@@ -1702,7 +1756,7 @@ Expected:
 - `AUTH_AUTO_PROVISION_ON_FIRST_LOGIN=false` unless a separately reviewed production onboarding policy intentionally enables it.
 - The actual `/opt/qrtable/.env.production` is never committed.
 
-- [ ] Step 3: Validate Compose without leaking interpolation values
+- [ ] Step 3: Validate Compose without leaking interpolation values `[AGENT]`
 
 Create `phase7-compose-validate.sh`:
 
@@ -1713,7 +1767,7 @@ Create `phase7-compose-validate.sh`:
 - Remove them through a `trap` on success, failure, or interruption.
 - Print only a redacted pass/fail summary with compose filenames and failed key names, never values.
 
-- [ ] Step 4: Render least-privilege runtime env files
+- [ ] Step 4: Render least-privilege runtime env files `[AGENT]`
 
 Use `/opt/qrtable/.env.production` as the private master source for Compose interpolation and deployment tooling only. Do not inject that file wholesale into application containers.
 
@@ -1762,7 +1816,7 @@ Minimum ownership mapping:
 | `identity-bootstrap.env` | Keycloak admin/client values; Mongo sync values only for explicitly enabled demo users    |
 | `proxy.env`              | Caddy/Grafana basic-auth values only                                                      |
 
-- [ ] Step 5: Implement and test the production CORS allowlist
+- [ ] Step 5: Implement and test the production CORS allowlist `[AGENT]`
 
 Before public deployment:
 
@@ -1774,6 +1828,8 @@ Before public deployment:
 This is a production blocker, not a follow-up enhancement.
 
 ### Task 9: Package And Run Existing Per-Service Migrations
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -1922,17 +1978,21 @@ Seed IDs used by E2E must be written to a non-secret deployment notes file.
 
 ### Task 10: Bootstrap Keycloak For Public Domains
 
+**Ownership:** `[SHARED]`
+
+**Handoff:** The agent packages the theme and automates realm/client bootstrap. After the public identity service is running, the human creates and verifies the permanent administrator and completes `HUMAN-GATE-08`.
+
 **Files:**
 
 - Create: `docker/keycloak.Dockerfile`
 - Modify or wrap: `tools/keycloak-bootstrap.sh`
 - Create: `tools/deploy/phase7-keycloak-bootstrap.sh`
 
-- [ ] Step 1: Package the Keycloak theme in the immutable image
+- [ ] Step 1: Package the Keycloak theme in the immutable image `[AGENT]`
 
 Build the custom optimized Keycloak image in Task 5 and publish it with the release. The Droplet must not run `pnpm theme:build` and must not bind-mount a mutable host theme directory.
 
-- [ ] Step 2: Split infrastructure bootstrap from demo-user bootstrap
+- [ ] Step 2: Split infrastructure bootstrap from demo-user bootstrap `[AGENT]`
 
 The current `tools/keycloak-bootstrap.sh` is unsafe for production because it requires `tools/auth-bootstrap-users.json`, resets every listed password on each run, and the committed file contains deterministic demo passwords.
 
@@ -1947,7 +2007,7 @@ Refactor or wrap it so:
 - `KEYCLOAK_CLEAN_REALM=true` remains restricted to local hosts and is never used by Phase 7 deployment.
 - MongoDB user synchronization runs only for the explicitly enabled user-bootstrap path.
 
-- [ ] Step 3: Bootstrap realm and clients from the infra network
+- [ ] Step 3: Bootstrap realm and clients from the infra network `[AGENT]`
 
 Run the bootstrap through the migration/tooling image so `keycloak` and `mongodb` resolve on the internal Docker network. Public redirect URIs still use the production domains:
 
@@ -1965,7 +2025,7 @@ docker compose \
   identity-bootstrap bash tools/deploy/phase7-keycloak-bootstrap.sh
 ```
 
-- [ ] Step 4: Verify redirect URIs, web origins, and public issuer
+- [ ] Step 4: Verify redirect URIs, web origins, and public issuer `[SHARED]`
 
 Ensure Keycloak clients include:
 
@@ -1989,7 +2049,11 @@ Expected:
 - Default production bootstrap creates no deterministic demo users and resets no user passwords.
 - Demo-only users, when explicitly enabled, are synchronized into MongoDB `qrtable_auth`, not the legacy `qrtable` database.
 
+At the live-production portion of this step, `[HUMAN]` creates and verifies the permanent named administrator, removes the temporary bootstrap administrator, and records `HUMAN-GATE-08`. The agent performs all machine-verifiable issuer, client, role, and login-flow checks.
+
 ### Task 11: Configure SePay Production Integration
+
+**Ownership:** `[SHARED]`
 
 SePay is a production dependency, not only an env-var detail. The deployment is not ready until the SePay dashboard/API configuration matches QRTable's public routes and the code path being used.
 
@@ -2024,7 +2088,7 @@ Human ownership:
 - Verify and possibly update: `docs/guides/sepay-configuration-guide-phase3.md`
 - Create: `tools/deploy/phase7-sepay-preflight.md` or a script if provider automation is stable
 
-- [ ] Step 1: Choose the live SePay route set
+- [ ] Step 1: Choose the live SePay route set `[SHARED]`
 
 For the first production deployment, prefer the provider-verified secret-key routes:
 
@@ -2129,6 +2193,8 @@ Manual live verification:
 
 ### Task 12: Rewire Monitoring For App Containers
 
+**Ownership:** `[AGENT]`
+
 **Files:**
 
 - Create: `docker-compose.monitoring.prod.yaml`
@@ -2195,11 +2261,13 @@ Expected: production compose has no public `3001`, `3100`, `9090`, `3200`, or `4
 
 ### Task 13: Provision DigitalOcean
 
+**Ownership:** `[SHARED]`
+
 **Files:**
 
 - Create: `docs/guides/phase-7-digitalocean-deployment.md`
 
-This task operationalizes `HUMAN-GATE-01` through `HUMAN-GATE-05`. The implementation guide must include the web-console instructions, evidence fields, and secret-handling rules from section 4, not only shell commands.
+This task operationalizes `HUMAN-GATE-01`, `HUMAN-GATE-03`, `HUMAN-GATE-04`, and `HUMAN-GATE-05`. `HUMAN-GATE-02` belongs to GitHub configuration in Task 17. The implementation guide must include the web-console instructions, evidence fields, and secret-handling rules from section 4, not only shell commands.
 
 - [ ] Step 1: Create account security, Project, and registry `[HUMAN]`
 
@@ -2314,6 +2382,10 @@ Each command returns the Reserved IP from at least two public resolvers. Review 
 
 ### Task 14: Deploy The Stack
 
+**Ownership:** `[SHARED]`
+
+**Handoff:** The agent prepares and runs the deployment procedure. The human supplies protected external values, approves the target/window, and performs the permanent-admin/browser checks at the named gates.
+
 **Files:**
 
 - Create: `tools/deploy/phase7-preflight.sh`
@@ -2321,7 +2393,7 @@ Each command returns the Reserved IP from at least two public resolvers. Review 
 - Create: `tools/deploy/phase7-seed-demo.sh`
 - Create: `tools/deploy/phase7-smoke.sh`
 
-- [ ] Step 1: Copy repository or release bundle to `/opt/qrtable`
+- [ ] Step 1: Copy repository or release bundle to `/opt/qrtable` `[AGENT]`
 
 Recommended first pilot:
 
@@ -2357,7 +2429,7 @@ find /opt/qrtable/env -type f ! -perm 0600 -print -quit | grep -q . && exit 1 ||
 ./tools/deploy/phase7-compose-validate.sh -f docker-compose.proxy.yaml
 ```
 
-- [ ] Step 3: Start infra and wait for datastore health
+- [ ] Step 3: Start infra and wait for datastore health `[AGENT]`
 
 ```bash
 docker compose \
@@ -2371,7 +2443,7 @@ docker compose \
 ./tools/deploy/phase7-preflight.sh --wait-infra
 ```
 
-- [ ] Step 4: Run the migration and ownership gate
+- [ ] Step 4: Run the migration and ownership gate `[AGENT]`
 
 ```bash
 docker compose \
@@ -2397,7 +2469,7 @@ DEPLOYMENT_PROFILE=demo ./tools/deploy/phase7-seed-demo.sh --yes
 
 After bootstrap, the human must create and verify a permanent named Keycloak administrator, remove the temporary bootstrap administrator, and complete the login/role checks in `HUMAN-GATE-08`.
 
-- [ ] Step 6: Start monitoring, app, and proxy layers
+- [ ] Step 6: Start monitoring, app, and proxy layers `[AGENT]`
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
@@ -2408,7 +2480,7 @@ docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.proxy.yaml up -d
 ```
 
-- [ ] Step 7: Verify running services
+- [ ] Step 7: Verify running services `[AGENT]`
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production -f docker-compose.infra.yaml ps
@@ -2427,6 +2499,8 @@ Expected:
 - `docker network inspect` confirms Caddy shares `qrtable-edge` with every reverse-proxy target and monitoring/app network contracts match Task 12.
 
 ### Task 15: Run Smoke And Demo Verification
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -2508,6 +2582,10 @@ Expected: authentication errors are returned by BFF, proving the public routes a
 
 ### Task 16: Backup, Rollback, And Operations
 
+**Ownership:** `[SHARED]`
+
+**Handoff:** The agent implements backup, checksum, restore, and rollback automation. The human enables paid provider features, creates the independent storage target, approves retention/deletion authority, and completes `HUMAN-GATE-11`.
+
 **Files:**
 
 - Create: `docs/guides/phase-7-digitalocean-deployment.md`
@@ -2517,7 +2595,7 @@ Expected: authentication errors are returned by BFF, proving the public routes a
 
 Use Droplet backups for host-level recovery.
 
-- [ ] Step 2: Add logical backup script
+- [ ] Step 2: Add logical backup script `[AGENT]`
 
 The release backup is a cross-service recovery point. Put the deployment into a short maintenance window or quiesce write traffic before backup; otherwise the PostgreSQL databases and MongoDB archive are individually valid but not an atomic distributed snapshot.
 
@@ -2560,7 +2638,7 @@ sha256sum "/opt/qrtable/backups/${stamp}/"* > "/opt/qrtable/backups/${stamp}/SHA
 - Never count a backup stored only on the same Droplet as the sole recovery copy.
 - Complete `HUMAN-GATE-11` only after the encrypted upload, download, checksum, and isolated PostgreSQL/MongoDB restore all succeed.
 
-- [ ] Step 4: Define rollback
+- [ ] Step 4: Define rollback `[AGENT]`
 
 Rollback image tag:
 
@@ -2581,6 +2659,10 @@ Rollback infra data:
 - Re-run smoke checks.
 
 ### Task 17: Add CI/CD Pipeline And Release Process
+
+**Ownership:** `[SHARED]`
+
+**Handoff:** The agent implements workflows and scripts. The human configures GitHub web-console protections/secrets and approves the first production deployment through `HUMAN-GATE-02` and `HUMAN-GATE-10`.
 
 CI/CD is part of Phase 7, but it must be treated as a separate deployment control plane rather than hidden inside manual server commands.
 
@@ -2611,7 +2693,7 @@ CI/CD is part of Phase 7, but it must be treated as a separate deployment contro
 - Create: `tools/deploy/phase7-smoke.sh`
 - Modify: `docs/guides/phase-7-digitalocean-deployment.md`
 
-- [ ] Step 1: Keep CI as the PR quality gate
+- [ ] Step 1: Keep CI as the PR quality gate `[AGENT]`
 
 CI must validate source quality before any release workflow can run.
 
@@ -2631,7 +2713,7 @@ pnpm exec nx affected -t lint test build --base=origin/main~1 --head=HEAD
 
 Use affected commands only after the pipeline is stable. For the first Phase 7 deploy, `run-many` is safer because stale project boundaries or target omissions are easier to catch.
 
-- [ ] Step 2: Add a release-images workflow
+- [ ] Step 2: Add a release-images workflow `[SHARED]`
 
 Trigger:
 
@@ -2651,6 +2733,8 @@ Inputs:
 Secrets:
 
 - `DIGITALOCEAN_ACCESS_TOKEN`
+
+`[AGENT]` implements and statically verifies the workflow. `[HUMAN]` creates the scoped token and enters it into GitHub without disclosing the value. The workflow's first live registry push waits for that handoff.
 
 Workflow responsibilities:
 
@@ -2690,7 +2774,7 @@ Important build rule:
 - The release is incomplete unless all twelve tags and their digests are present.
 - The workflow must refuse to overwrite an existing immutable release tag; `latest` remains optional and is never used by production compose.
 
-- [ ] Step 3: Add deployment environment protection
+- [ ] Step 3: Add deployment environment protection `[HUMAN]`
 
 Use GitHub Environments:
 
@@ -2708,7 +2792,7 @@ Why:
 - Keycloak production clients must not be changed accidentally.
 - DB schema state must be checked before replacing app containers.
 
-- [ ] Step 4: Add the operator-driven production deployment entrypoint
+- [ ] Step 4: Add the operator-driven production deployment entrypoint `[SHARED]`
 
 The first Phase 7 pilot must not SSH from a GitHub-hosted runner while the Cloud Firewall allows SSH only from the operator's IP.
 
@@ -2754,9 +2838,9 @@ The remote deploy script must:
 - Run health checks after container replacement.
 - Write the successful tag to `/opt/qrtable/releases/current`.
 
-Complete `HUMAN-GATE-10` for the first deployment.
+`[AGENT]` prepares/runs the audited command and checks. `[HUMAN]` selects the immutable tag/window, confirms backup/rollback readiness, approves the deployment, and completes `HUMAN-GATE-10`.
 
-- [ ] Step 4A: Optionally enable `deploy-production.yml` after secure-channel approval
+- [ ] Step 4A: Optionally enable `deploy-production.yml` after secure-channel approval `[SHARED]`
 
 Only after the human records one of section 4.7's non-baseline control channels may the workflow receive:
 
@@ -2777,7 +2861,7 @@ The workflow must:
 - remove any temporary firewall rule in an unconditional cleanup step;
 - retain a redacted audit artifact.
 
-- [ ] Step 5: Add schema/migration gate
+- [ ] Step 5: Add schema/migration gate `[AGENT]`
 
 Before production deployment, the deployment procedure must:
 
@@ -2797,7 +2881,7 @@ Recommended gate script:
 ./tools/deploy/phase7-migrate.sh
 ```
 
-- [ ] Step 6: Add smoke tests to the deployment procedure
+- [ ] Step 6: Add smoke tests to the deployment procedure `[AGENT]`
 
 Smoke tests must run from a machine outside the Droplet after deployment because public DNS, TLS, reverse proxy, and CORS must be verified externally. For the baseline, run them from the trusted operator workstation. After secure workflow SSH is enabled, the public checks may also run from GitHub Actions.
 
@@ -2822,7 +2906,7 @@ Expected: invalid or unsigned webhook requests are rejected, not accepted.
 
 CORS checks must send an allowed origin and a disallowed origin to the BFF, and must verify the Socket.IO handshake follows the same allowlist.
 
-- [ ] Step 7: Add operator rollback and optional rollback workflow
+- [ ] Step 7: Add operator rollback and optional rollback workflow `[SHARED]`
 
 Baseline inputs:
 
@@ -2844,9 +2928,11 @@ human rollback approval
 
 Rollback must not restore a database or run `migration:revert` automatically unless `restore_data=true` and the operator confirms the exact backup timestamp and compatibility impact. App rollback and data rollback are separate operations.
 
+`[AGENT]` implements and executes app rollback automation. `[HUMAN]` approves the rollback tag and separately approves any data restore with an exact backup timestamp.
+
 The optional GitHub rollback workflow follows the same secure-channel requirement as `deploy-production.yml`.
 
-- [ ] Step 8: Add deployment audit trail
+- [ ] Step 8: Add deployment audit trail `[AGENT]`
 
 Each successful deploy should record:
 
@@ -2869,7 +2955,7 @@ Store locally:
 
 Also keep the GitHub Actions run URL as the external audit record.
 
-- [ ] Step 9: Decide when to automate deploy on merge
+- [ ] Step 9: Decide when to automate deploy on merge `[HUMAN]`
 
 Recommended Phase 7 policy:
 
@@ -2882,6 +2968,8 @@ Recommended Phase 7 policy:
 Do not auto-deploy production on every merge until migrations, backups, rollback, and smoke tests are proven.
 
 ### Task 18: Update Canonical Docs After Implementation
+
+**Ownership:** `[AGENT]`
 
 **Files:**
 
@@ -3060,6 +3148,7 @@ DigitalOcean product facts re-verified on 2026-06-07:
 - Added SePay provider-doc verification and made live webhook/OAuth setup a production deployment gate.
 - Added a complete responsibility matrix, eleven human gates, web-console procedures, redacted evidence contract, and first-deploy observation checklist.
 - Resolved the restricted-SSH versus GitHub-hosted-runner conflict by making trusted-workstation deployment the Phase 7 baseline.
+- Added an execution ownership map for Tasks 1-18, marked every task as `[AGENT]` or `[SHARED]`, and labeled each mixed-ownership step at its actual handoff point.
 
 ### ⚠️ Debt Flags (non-blocking — improve when touched again)
 
