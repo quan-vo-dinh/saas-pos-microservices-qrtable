@@ -3,8 +3,9 @@ import { BaseConfiguration } from '@common/configuration/base.config';
 import { TcpConfiguration } from '@common/configuration/tcp.config';
 import { AppConfiguration } from '@common/configuration/app.config';
 import { KafkaConfiguration } from '@common/configuration/kafka.config';
-import { IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { parseCorsOrigins } from './cors-origins';
 import { RedisConfiguration } from '@common/configuration/redis.config';
 
 const DEFAULT_PAYMENT_TCP_TIMEOUT_MS = 5000;
@@ -38,6 +39,18 @@ class BffPlatformConfiguration {
   }
 }
 
+class BffCorsConfiguration {
+  @IsArray()
+  @IsString({ each: true })
+  readonly CORS_ORIGINS: readonly string[];
+
+  constructor() {
+    const raw = process.env['CORS_ORIGINS']?.trim();
+    const nodeEnv = process.env['NODE_ENV']?.trim() || 'development';
+    this.CORS_ORIGINS = parseCorsOrigins(raw, nodeEnv);
+  }
+}
+
 class Configuration extends BaseConfiguration {
   @ValidateNested()
   @Type(() => AppConfiguration)
@@ -66,6 +79,10 @@ class Configuration extends BaseConfiguration {
   @ValidateNested()
   @Type(() => BffPlatformConfiguration)
   BFF_PLATFORM_CONFIG = new BffPlatformConfiguration();
+
+  @ValidateNested()
+  @Type(() => BffCorsConfiguration)
+  BFF_CORS_CONFIG = new BffCorsConfiguration();
 }
 
 export const CONFIGURATION = new Configuration();

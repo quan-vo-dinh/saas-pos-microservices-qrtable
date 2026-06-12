@@ -13,7 +13,7 @@ import { PreparationStation } from '@einvoice/types';
 import { Server, Socket } from 'socket.io';
 import { RealtimeAuthService } from '../services/realtime-auth.service';
 
-@WebSocketGateway({ cors: { origin: '*' }, namespace: '/orders' })
+@WebSocketGateway({ namespace: '/orders' })
 export class OrderEventsGateway implements OnGatewayConnection {
   private readonly logger = new Logger(OrderEventsGateway.name);
 
