@@ -276,6 +276,9 @@ Giữ static Nginx image và SPA fallback. `VITE_BFF_URL` là build-time config.
 
 ### Task 5: Production infrastructure Compose
 
+**Trạng thái:** Đã triển khai trong `docker-compose.infra.yaml`; verify health bằng Docker local còn
+phụ thuộc môi trường.
+
 **Kết quả:** PostgreSQL, MongoDB, Redis, Kafka và Keycloak chạy trên private networks với named
 volumes và health checks.
 
@@ -289,14 +292,15 @@ Scope:
 - không publish datastore hoặc Keycloak container ports;
 - dùng Compose health checks và memory limit phù hợp Droplet.
 
-Verify:
+Đã có target verify syntax:
 
 ```bash
 docker compose --env-file docker/env/.env.production.example \
   -f docker-compose.infra.yaml config -q
 ```
 
-Sau đó start layer với local test values không nhạy cảm và verify health.
+Khi Docker local khả dụng, start layer bằng local test values không nhạy cảm và verify từng health
+state.
 
 ### Task 6: Application Compose và explicit env mapping
 

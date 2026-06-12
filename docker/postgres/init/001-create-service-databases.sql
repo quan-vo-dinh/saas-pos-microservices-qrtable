@@ -9,3 +9,6 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_payment')\gex
 
 SELECT 'CREATE DATABASE qrtable_saas'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_saas')\gexec
+
+SELECT 'CREATE DATABASE qrtable_keycloak'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'qrtable_keycloak')\gexec

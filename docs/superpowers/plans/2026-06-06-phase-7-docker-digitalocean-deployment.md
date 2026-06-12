@@ -278,6 +278,9 @@ Keep the static Nginx image and SPA fallback. `VITE_BFF_URL` is build-time confi
 
 ### Task 5: Production infrastructure Compose
 
+**Status:** Implemented in `docker-compose.infra.yaml`; local Docker health verification remains
+environment-dependent.
+
 **Outcome:** PostgreSQL, MongoDB, Redis, Kafka, and Keycloak run on private networks with named
 volumes and health checks.
 
@@ -291,14 +294,15 @@ Scope:
 - publish no datastore or Keycloak container ports;
 - use Compose health checks and bounded memory settings appropriate to the Droplet.
 
-Verify:
+Verified syntax target:
 
 ```bash
 docker compose --env-file docker/env/.env.production.example \
   -f docker-compose.infra.yaml config -q
 ```
 
-Then start the layer with non-secret local test values and verify each health state.
+When Docker is available locally, start the layer with non-secret local test values and verify each
+health state.
 
 ### Task 6: Application Compose and explicit env mapping
 
