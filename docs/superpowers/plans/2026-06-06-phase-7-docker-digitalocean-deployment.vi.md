@@ -43,17 +43,19 @@ CodeGraph được chạy trước khi đọc file trực tiếp.
 
 ### 2.2 Git
 
-`main` khớp `origin/main`. Bảo toàn các thay đổi đã triển khai:
+Local `main` đang ahead `origin/main` hai commit. Bảo toàn các thay đổi đã triển khai:
 
 | Công việc                                                        | Commit    | Quyết định |
 | ---------------------------------------------------------------- | --------- | ---------- |
 | Prerequisite database-per-service, migrations, ownership tooling | `45a4480` | Giữ        |
 | Task 1 build-context controls và Task 2 backend image            | `a6ce5b6` | Giữ        |
 | Task 3 Management App image và Task 4 Customer PWA image         | `2678f58` | Giữ        |
+| Task 8 production env và BFF CORS                                | `88122dd` | Giữ        |
+| Task 5 production infrastructure Compose                         | `cf6cf7d` | Giữ        |
 
 Không triển khai lại, revert hoặc viết lại Tasks 1-4 nếu không có defect cụ thể.
 
-Task 8 đang chưa commit. Phần được giữ là BFF CORS implementation/tests và production env template.
+Task 8 đã hoàn tất. Phần được giữ là BFF CORS implementation/tests và production env template.
 Scoped-env renderer, Compose validator lớn, shell test suites, CORS fake-transport harness và
 acceptance matrix riêng đã được loại bỏ vì chúng tạo policy trùng lặp trước khi production Compose
 tồn tại.
@@ -276,8 +278,8 @@ Giữ static Nginx image và SPA fallback. `VITE_BFF_URL` là build-time config.
 
 ### Task 5: Production infrastructure Compose
 
-**Trạng thái:** Đã triển khai trong `docker-compose.infra.yaml`; verify health bằng Docker local còn
-phụ thuộc môi trường.
+**Trạng thái:** Đã triển khai trong `cf6cf7d`. Runtime health đã verify thành công bằng
+`docker compose ... up -d --wait --wait-timeout 300`.
 
 **Kết quả:** PostgreSQL, MongoDB, Redis, Kafka và Keycloak chạy trên private networks với named
 volumes và health checks.
@@ -341,7 +343,7 @@ Live certificate issuance nằm ở Task 11 vì phụ thuộc DNS.
 
 ### Task 8: Production env và BFF CORS
 
-**Trạng thái:** Đã triển khai một phần trong worktree hiện tại.
+**Trạng thái:** Hoàn thành trong `88122dd`.
 
 Giữ:
 
@@ -512,13 +514,11 @@ không được tuyên bố live SePay ready.
 
 ## 8. Thứ tự tiếp theo
 
-1. Hoàn thành review và verification phần Task 8 CORS/env được giữ.
-2. Triển khai Task 5 infra Compose.
-3. Triển khai Task 6 app Compose với explicit environment mapping.
-4. Triển khai Task 9 migrations và production-safe Keycloak bootstrap.
-5. Triển khai Task 10 monitoring adaptation.
-6. Triển khai Task 7 proxy configuration.
-7. Provision và deploy theo Task 11.
-8. Hoàn thành Task 12 smoke, recovery, demo và canonical documentation.
+1. Triển khai Task 6 app Compose với explicit environment mapping.
+2. Triển khai Task 9 migrations và production-safe Keycloak bootstrap.
+3. Triển khai Task 10 monitoring adaptation.
+4. Triển khai Task 7 proxy configuration.
+5. Provision và deploy theo Task 11.
+6. Hoàn thành Task 12 smoke, recovery, demo và canonical documentation.
 
-Tasks 5-12 có chủ ý không được triển khai trong session refactor plan hiện tại.
+Tasks 6-12 còn lại sau khi hoàn thành Task 5 và Task 8.

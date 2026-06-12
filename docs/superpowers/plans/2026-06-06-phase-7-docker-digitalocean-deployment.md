@@ -43,20 +43,22 @@ CodeGraph was run before direct file inspection.
 
 ### 2.2 Git
 
-`main` matches `origin/main`. Preserve these implemented changes:
+Local `main` is ahead of `origin/main` by two commits. Preserve these implemented changes:
 
 | Work                                                             | Commit    | Decision |
 | ---------------------------------------------------------------- | --------- | -------- |
 | Database-per-service prerequisite, migrations, ownership tooling | `45a4480` | Keep     |
 | Task 1 build-context controls and Task 2 backend image           | `a6ce5b6` | Keep     |
 | Task 3 Management App image and Task 4 Customer PWA image        | `2678f58` | Keep     |
+| Task 8 production env and BFF CORS                               | `88122dd` | Keep     |
+| Task 5 production infrastructure Compose                         | `cf6cf7d` | Keep     |
 
 Do not reimplement, revert, or rewrite Tasks 1-4 without a concrete defect.
 
-Task 8 is currently uncommitted. The retained part is the BFF CORS implementation/tests and the
-production env template. The scoped-env renderer, large Compose validator, shell test suites, CORS
-fake-transport harness, and separate acceptance matrix were removed because they duplicated policy
-before the production Compose files existed.
+Task 8 is complete. The retained part is the BFF CORS implementation/tests and the production env
+template. The scoped-env renderer, large Compose validator, shell test suites, CORS fake-transport
+harness, and separate acceptance matrix were removed because they duplicated policy before the
+production Compose files existed.
 
 ### 2.3 Documents reviewed
 
@@ -278,8 +280,8 @@ Keep the static Nginx image and SPA fallback. `VITE_BFF_URL` is build-time confi
 
 ### Task 5: Production infrastructure Compose
 
-**Status:** Implemented in `docker-compose.infra.yaml`; local Docker health verification remains
-environment-dependent.
+**Status:** Implemented in `cf6cf7d`. Runtime health was verified successfully with
+`docker compose ... up -d --wait --wait-timeout 300`.
 
 **Outcome:** PostgreSQL, MongoDB, Redis, Kafka, and Keycloak run on private networks with named
 volumes and health checks.
@@ -343,7 +345,7 @@ Live certificate issuance remains part of Task 11 because it depends on DNS.
 
 ### Task 8: Production env and BFF CORS
 
-**Status:** Partially implemented in the current worktree.
+**Status:** Completed in `88122dd`.
 
 Keep:
 
@@ -514,13 +516,11 @@ but documentation and UI must not claim live SePay readiness.
 
 ## 8. Immediate Next Order
 
-1. Finish review and verification of the retained Task 8 CORS/env changes.
-2. Implement Task 5 infra Compose.
-3. Implement Task 6 app Compose with explicit environment mapping.
-4. Implement Task 9 migrations and production-safe Keycloak bootstrap.
-5. Implement Task 10 monitoring adaptation.
-6. Implement Task 7 proxy configuration.
-7. Provision and deploy through Task 11.
-8. Complete Task 12 smoke, recovery, demo, and canonical documentation.
+1. Implement Task 6 app Compose with explicit environment mapping.
+2. Implement Task 9 migrations and production-safe Keycloak bootstrap.
+3. Implement Task 10 monitoring adaptation.
+4. Implement Task 7 proxy configuration.
+5. Provision and deploy through Task 11.
+6. Complete Task 12 smoke, recovery, demo, and canonical documentation.
 
-Tasks 5-12 are intentionally not implemented in the current plan-refactor session.
+Tasks 6-12 remain after the completed Task 5 and Task 8 work.
