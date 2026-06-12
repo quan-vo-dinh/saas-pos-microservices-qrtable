@@ -340,6 +340,24 @@ Không đưa trở lại general-purpose dotenv parser hoặc generated per-serv
 
 ### Task 7: Reverse proxy và HTTPS configuration
 
+**Trạng thái:** Đã triển khai trong `docker-compose.proxy.yaml` và
+`docker/caddy/Caddyfile`.
+
+**Verification ngày 2026-06-12:**
+
+- bốn production Compose layer render thành công cùng nhau;
+- chỉ Caddy publish host ports (`80/tcp`, `443/tcp`, và `443/udp`);
+- Caddy chỉ join `qrtable-edge`, `qrtable-identity`, và `qrtable-observability`;
+- Caddyfile validate bằng image pin `caddy:2.10.2-alpine`;
+- đủ năm public host route dùng Docker service names;
+- BFF route gồm global API prefix đã cấu hình và `/socket.io`;
+- Grafana yêu cầu bcrypt hash lấy từ protected runtime config;
+- Keycloak được proxy qua port `8080`; management port `9000` không được route.
+- HTTP-only local smoke dùng production Caddyfile trả `200` cho Management App, Customer PWA,
+  Keycloak và Grafana có outer credential; Grafana trả `401` khi thiếu credential, còn API prefix
+  match inactive BFF upstream với `502`;
+- BFF HTTP success và Socket.IO handshake còn pending vì app stack không chạy.
+
 **Kết quả:** Caddy route năm public hosts và là public container duy nhất.
 
 Scope:
@@ -350,7 +368,8 @@ Scope:
 - persist certificate data;
 - validate config trước khi provision DigitalOcean.
 
-Live certificate issuance nằm ở Task 11 vì phụ thuộc DNS.
+Live certificate issuance và public HTTPS smoke nằm ở Task 11 vì phụ thuộc DNS, Droplet firewall và
+production runtime secrets.
 
 ### Task 8: Production env và BFF CORS
 
@@ -535,10 +554,10 @@ không được tuyên bố live SePay ready.
 
 ## 8. Thứ tự tiếp theo
 
-1. Triển khai Task 10 monitoring adaptation.
-2. Triển khai Task 7 proxy configuration.
-3. Provision và deploy theo Task 11.
-4. Hoàn thành Task 12 smoke, recovery, demo và canonical documentation.
+1. Provision và deploy theo Task 11.
+2. Hoàn thành Task 12 smoke, recovery, demo và canonical documentation.
 
 Task 6 đã hoàn tất runtime verification. Task 9 bootstrap flow đã implement và static-verified; full
-runtime bootstrap với Docker stack vẫn là deployment check trước Task 11. Tasks 7 và 10-12 còn lại.
+runtime bootstrap với Docker stack vẫn là deployment check trước Task 11. Task 7 proxy configuration
+đã implement và static/runtime-config verified mà không request public certificate. Tasks 11 và 12
+còn lại.

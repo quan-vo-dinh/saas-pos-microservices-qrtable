@@ -4,15 +4,21 @@
 
 > **Mục tiêu:** Khóa chất lượng hệ thống QRTable SaaS POS bằng kiểm thử tự động đa tầng, làm hệ phân tán **có thể quan sát** (health service, log, metrics, trace), và đóng gói **deploy + dữ liệu mẫu + kịch bản demo** để luận văn và hội đồng tái hiện end-to-end — giảm rủi ro hồi quy nghiệp vụ (đơn lẻ, tiền mặt, đa tenant, bếp) và trình diễn luồng QR → bếp → thanh toán.
 > **Ước lượng:** ~3–5 tuần (tổng Phase 5 + 6 + 7)
-> **Trạng thái:** ⬜ TODO
+> **Trạng thái:** ◐ Đang thực hiện — Phase 5 Testing vẫn đang thực hiện. Nền tảng production image,
+> Compose, bootstrap và reverse proxy của Phase 7 đã triển khai; public deployment, HTTPS issuance,
+> smoke, recovery và demo evidence còn lại.
 
 ## Điều kiện tiên quyết
 
 - Các phase lõi đã đóng trên đường critical/demo: **0, 1, 2A, 2B, 3**, phần SaaS hoàn thành ở **4B**, và lát cắt đại diện **4A Order Confirm Saga** đã triển khai. Full hardening vận hành của Phase 4A và Phase 4C Quản lý nhân sự chưa bắt đầu; không chặn Phase 5–7 trừ khi demo bắt buộc hardening kiểu Saga state bền vững/CDC/retry worker hoặc quản lý nhân sự. Notification/email nằm ngoài phạm vi triển khai hiện tại.
 
-## Snapshot trạng thái hiện tại (2026-06-01)
+## Snapshot trạng thái hiện tại (2026-06-12)
 
-- **Tiến độ Phase 5 Testing:** ~75-80% cho workstream testing, dựa trên traceability coverage, inventory test đã có và bằng chứng integration M2 local mới nhất. Dòng roadmap gộp Phase 5-7 đang tính **25%** vì Observability và Deployment chưa bắt đầu.
+- **Tiến độ Phase 5 Testing:** ~75-80% cho workstream testing, dựa trên traceability coverage,
+  inventory test đã có và bằng chứng integration M2 local mới nhất.
+- **Nền tảng Phase 6/7:** Production monitoring và Caddy reverse-proxy layer đã triển khai cùng
+  production images, infra/app Compose và bootstrap gate. DigitalOcean provisioning, public
+  certificates, external smoke, backup/rollback proof và demo evidence còn lại.
 - **Traceability matrix:** 52 dòng P0/P1: 38 covered, 9 partial, 1 implementation gap và 4 deferred by phase. Các P0 còn partial là Order state/stock live compensation fault injection, SaaS onboarding saga live Authorizer/User-Access proof, và suspended Customer PWA pending-bill browser exception.
 - **Gate deterministic mới:** `pnpm nx test frontend-utils` pass ngày 2026-06-01 với 36 test passed và 36 runtime-dependent integration tests skip có chủ đích.
 - **Gate unit/contract đầy đủ mới:** `pnpm exec nx run-many -t test --parallel=3` đã pass toàn bộ 23 projects sau khi cập nhật expectation cũ ở `guards:test` và `management-app:test` theo contract hiện tại.
@@ -332,6 +338,8 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 - **docker-compose.app.yaml** — **8 backend + 2 frontend** (theo kiến trúc cuối).
 - **docker-compose.infra.yaml** — data plane: **PG, Redis, Mongo, Keycloak, Kafka** (theo technical-architecture).
 - **docker-compose.monitoring.yaml** — quan sát (khớp Phase 6).
+- **docker-compose.proxy.yaml** — Caddy là public container duy nhất và route API/Socket.IO,
+  Management App, Customer PWA, Keycloak và protected Grafana.
 - **Seed:** **1 tenant, 5 category, 20 item, 8 bàn** — đủ demo đa bàn, menu có chiều sâu, không nhập tay lâu.
 
 **verify:** `docker compose up` (hoặc bộ lệnh tương đương ghi trong README phase) build full stack; seed chạy idempotent hoặc có chiến lược reset rõ.
@@ -366,7 +374,9 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 - Nền tảng **quan sát** (health, log, metrics, trace, dashboard, alert) **chạy local** và ghi port Grafana/Prometheus — giảm thời gian debug, tăng độ tin cậy demo.
 - **Artifact triển khai** (Dockerfile multi-stage, compose phân lớp, seed, script demo) — tái lập hệ thống QRTable POS trong môi trường chuẩn không phụ thuộc cấu hình máy cá nhân.
 
-**Trạng thái tài liệu:** roadmap/spec đã canonical hóa; bản thân Phase 5–7 vẫn **TODO** theo trạng thái phase.
+**Trạng thái tài liệu:** roadmap/spec đã canonical hóa; Phase 5 Testing vẫn **đang thực hiện**.
+Deployment foundation Phase 7 đã triển khai, còn public deployment, smoke, recovery và demo
+acceptance vẫn mở.
 
 ## Ghi chú lộ trình
 

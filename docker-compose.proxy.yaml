@@ -1,0 +1,56 @@
+name: qrtable-proxy
+
+networks:
+  qrtable-edge:
+    external: true
+    name: qrtable-edge
+  qrtable-identity:
+    external: true
+    name: qrtable-identity
+  qrtable-observability:
+    external: true
+    name: qrtable-observability
+
+volumes:
+  caddy_data:
+    name: qrtable-caddy-data
+  caddy_config:
+    name: qrtable-caddy-config
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    networks:
+      - qrtable-edge
+      - qrtable-identity
+      - qrtable-observability
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?required}
+      GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
+      GRAFANA_BASIC_AUTH_USER: ${GRAFANA_BASIC_AUTH_USER:?required}
+      GRAFANA_BASIC_AUTH_HASH: ${GRAFANA_BASIC_AUTH_HASH:?required}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2019/config/']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    mem_limit: 256m

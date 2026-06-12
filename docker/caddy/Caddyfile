@@ -1,0 +1,50 @@
+{
+	email {$ACME_EMAIL}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+{$CADDY_API_HOST:api.qrtable.vodinhquan.dev} {
+	import security_headers
+
+	@bff path /{$GLOBAL_PREFIX} /{$GLOBAL_PREFIX}/* /socket.io /socket.io/*
+	handle @bff {
+		reverse_proxy bff:3300
+	}
+
+	respond 404
+}
+
+{$CADDY_MANAGEMENT_HOST:app.qrtable.vodinhquan.dev} {
+	import security_headers
+	reverse_proxy management-app:3000
+}
+
+{$CADDY_CUSTOMER_HOST:qr.qrtable.vodinhquan.dev} {
+	import security_headers
+	reverse_proxy customer-pwa:80
+}
+
+{$CADDY_AUTH_HOST:auth.qrtable.vodinhquan.dev} {
+	import security_headers
+	reverse_proxy keycloak:8080
+}
+
+{$CADDY_GRAFANA_HOST:grafana.qrtable.vodinhquan.dev} {
+	import security_headers
+
+	basic_auth bcrypt {
+		{$GRAFANA_BASIC_AUTH_USER} {$GRAFANA_BASIC_AUTH_HASH}
+	}
+
+	reverse_proxy grafana:3000 {
+		header_up -Authorization
+	}
+}

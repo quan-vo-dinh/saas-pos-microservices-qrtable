@@ -1367,23 +1367,20 @@ Docker Compose cung cấp:
 
 ### 4.7 Networks — Cô Lập Và Định Tuyến
 
-Docker network trong QRTable Production có 3 tầng:
+Docker network trong QRTable Production tách public routing, identity, observability và datastore
+traffic:
 
 ```yaml
-networks:
-  qrtable-edge: # Các service cần reach từ internet (BFF, Management App, Customer PWA)
-    name: qrtable-edge
-  qrtable-app: # Các service internal — NestJS microservices giao tiếp nhau
-    name: qrtable-app
-    internal: true # Không có internet access từ các container trong network này
-  qrtable-infra: # Infrastructure — PostgreSQL, Redis, Kafka, MongoDB, Keycloak
-    name: qrtable-infra
-    internal: true
+qrtable-edge: # Caddy, BFF, Management App, Customer PWA
+qrtable-identity: # Caddy, Keycloak, Authorizer/User-Access khi cần
+qrtable-observability: # Caddy và monitoring stack
+qrtable-data: # Datastores, internal services, metrics/traces
 ```
 
 #### Sơ đồ: Network Topology QRTable Production
 
-> Ba network tầng phản ánh nguyên tắc defense in depth. Internet chỉ đến được Caddy (edge). Caddy forward về services trong qrtable-edge. Services trong qrtable-app không thể connect ra internet. Databases trong qrtable-infra chỉ đến được từ qrtable-app.
+> Bốn network theo mục đích áp dụng defense in depth. Internet chỉ đến Caddy. Caddy chỉ reach các
+> upstream edge, identity và observability đã phê duyệt, còn `qrtable-data` nằm ngoài proxy boundary.
 
 ```mermaid
 graph LR
@@ -1398,7 +1395,7 @@ graph LR
         PWA["Customer PWA :80"]
     end
 
-    subgraph "qrtable-app network (internal)"
+    subgraph "qrtable-data network (internal)"
         ORDER["Order :3301"]
         CATALOG["Catalog :3305"]
         KITCHEN["Kitchen :3307"]
@@ -1408,7 +1405,7 @@ graph LR
         UA["User-Access :3303"]
     end
 
-    subgraph "qrtable-infra network (internal)"
+    subgraph "qrtable-data / identity networks"
         PG["PostgreSQL :5432"]
         MONGO["MongoDB :27017"]
         REDIS["Redis :6379"]
@@ -1416,8 +1413,12 @@ graph LR
         KC["Keycloak :8080"]
     end
 
+    subgraph "qrtable-observability network (internal)"
+        GRAFANA["Grafana :3000"]
+    end
+
     USER -->|"HTTPS 443"| CADDY
-    CADDY --> BFF & MGMT & PWA & KC
+    CADDY --> BFF & MGMT & PWA & KC & GRAFANA
     BFF <-->|"TCP"| ORDER & CATALOG & KITCHEN & PAYMENT & SAAS & AUTH & UA
     ORDER & SAAS & PAYMENT & CATALOG --> PG
     UA --> MONGO
@@ -1433,10 +1434,13 @@ graph LR
 
 **Quy tắc network của QRTable:**
 
-- **Chỉ Caddy** join `qrtable-edge` và expose port 80/443 ra host
-- **BFF** join cả `qrtable-edge`, `qrtable-app`, và `qrtable-infra` — nó là gateway
-- **Microservices** chỉ join `qrtable-app` và `qrtable-infra` — không direct internet access
-- **Databases** chỉ join `qrtable-infra` — chỉ services trong `qrtable-app` đến được
+- **Chỉ Caddy** publish host ports 80/443 và UDP 443.
+- **Caddy** join `qrtable-edge`, `qrtable-identity`, và `qrtable-observability`, không join
+  `qrtable-data`.
+- **BFF và frontends** dùng chung `qrtable-edge`; BFF còn join `qrtable-data` cho internal clients.
+- **Keycloak** dùng `qrtable-identity` với Caddy và `qrtable-data` với PostgreSQL.
+- **Grafana** dùng `qrtable-observability` với Caddy; Prometheus, Loki và Tempo vẫn private.
+- **Datastores và internal services** dùng `qrtable-data`; không service nào publish host port.
 
 Mỗi container có loopback riêng. Bên trong BFF container:
 
@@ -1452,7 +1456,9 @@ redis:6379
 
 Docker embedded DNS chỉ resolve service names khi hai containers chia sẻ ít nhất một network.
 
-`internal: true` làm network bị cô lập khỏi external connectivity. Nhưng một container join cả internal network và edge network vẫn có thể có đường ra ngoài qua network còn lại. Network security phải được đánh giá theo toàn bộ networks mà service attach.
+`internal: true` cô lập network khỏi external connectivity. Tuy nhiên Caddy cố ý bridge public edge
+vào identity và observability network. Vì vậy Caddyfile chỉ được proxy Keycloak HTTP port và Grafana
+HTTP port đã phê duyệt, không proxy datastore hoặc management port.
 
 ### 4.8 Volumes — Persistent Storage
 
@@ -1538,28 +1544,27 @@ Healthcheck exit code `0` là success. Non-zero là failure.
 
 QRTable dùng 4 compose files riêng biệt, mỗi file có responsibility rõ ràng:
 
-| File                                                      | Chứa gì                                     | Start bằng cách nào                                 |
-| --------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------- |
-| `docker-compose.infra.yaml`                               | PostgreSQL, MongoDB, Redis, Kafka, Keycloak | `docker compose -f docker-compose.infra.yaml up -d` |
-| `docker-compose.app.yaml`                                 | 8 NestJS services + 2 frontend apps         | `docker compose -f docker-compose.app.yaml up -d`   |
-| `docker-compose.proxy.yaml`                               | Caddy reverse proxy                         | `docker compose -f docker-compose.proxy.yaml up -d` |
-| `docker-compose.monitoring.yaml` + `monitoring.prod.yaml` | Prometheus, Loki, Promtail, Tempo, Grafana  | `docker compose -f ...yaml -f ...prod.yaml up -d`   |
+| File                             | Chứa gì                                     | Start bằng cách nào                                      |
+| -------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
+| `docker-compose.infra.yaml`      | PostgreSQL, MongoDB, Redis, Kafka, Keycloak | `docker compose -f docker-compose.infra.yaml up -d`      |
+| `docker-compose.app.yaml`        | 8 NestJS services + 2 frontend apps         | `docker compose -f docker-compose.app.yaml up -d`        |
+| `docker-compose.proxy.yaml`      | Caddy reverse proxy                         | `docker compose -f docker-compose.proxy.yaml up -d`      |
+| `docker-compose.monitoring.yaml` | Prometheus, Loki, Promtail, Tempo, Grafana  | `docker compose -f docker-compose.monitoring.yaml up -d` |
 
 **Lý do tách:**
 
 - Deploy mới: chỉ cần restart `docker-compose.app.yaml` — infra không cần restart
 - Update config proxy: chỉ restart `docker-compose.proxy.yaml` — apps không downtime
 - Monitoring optional: có thể tắt monitoring layer khi cần tiết kiệm RAM
-- Compose override: `monitoring.prod.yaml` override phần production-specific của `monitoring.yaml`
 
 **External networks:** Các compose file khác nhau communicate qua shared networks:
 
 ```yaml
-# docker-compose.app.yaml
+# docker-compose.proxy.yaml
 networks:
-  qrtable-app:
-    external: true # đã được tạo bởi docker-compose.infra.yaml
-    name: qrtable-app
+  qrtable-edge:
+    external: true # created by docker-compose.app.yaml
+    name: qrtable-edge
 ```
 
 ### 4.11 Compose Validation — Tại Sao `docker compose config` Là Preflight Bắt Buộc
@@ -1574,13 +1579,15 @@ Nó bắt được các lỗi như:
 - Service reference sai tên, ví dụ app trỏ `postgresql` nhưng service thật là `postgres`.
 - Port hoặc volume mapping bị viết sai cú pháp.
 
-Phase 7 preflight nên chạy đủ các layer:
+Phase 7 preflight nên render tất cả layer cùng nhau:
 
 ```bash
-docker compose -f docker-compose.infra.yaml config > /dev/null
-docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml config > /dev/null
-docker compose -f docker-compose.app.yaml config > /dev/null
-docker compose -f docker-compose.proxy.yaml config > /dev/null
+docker compose --env-file docker/env/.env.production \
+  -f docker-compose.infra.yaml \
+  -f docker-compose.app.yaml \
+  -f docker-compose.monitoring.yaml \
+  -f docker-compose.proxy.yaml \
+  config -q
 ```
 
 **Mental model:** `docker compose config` không chứng minh service chạy được. Nó chỉ chứng minh deployment declaration có thể render hợp lệ. Sau đó vẫn cần `docker compose ps`, logs, health checks, và smoke tests.
@@ -1597,12 +1604,12 @@ docker compose -f docker-compose.proxy.yaml config > /dev/null
    → Keycloak connect Postgres để bootstrap database
    → Cần đợi vài phút cho Keycloak init hoàn tất
 
-2. docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml up -d
+2. docker compose -f docker-compose.monitoring.yaml up -d
    → Prometheus, Loki, Promtail, Tempo, Grafana start
    → Promtail bắt đầu collect log từ containers (kể cả infra layer)
 
 3. docker compose -f docker-compose.app.yaml up -d
-   → All NestJS services start với env_file production
+   → All services start với explicit per-service environment mappings
    → BFF đợi tất cả microservices TCP reachable
 
 4. docker compose -f docker-compose.proxy.yaml up -d
@@ -1622,14 +1629,15 @@ Droplet public ports:
   443/tcp → Caddy (HTTPS termination)
   22/tcp  → SSH (restrict đến your IP only)
 
-Tất cả ports sau KHÔNG public (firewall deny):
+Tất cả ports sau KHÔNG được Compose publish:
   3300-3308    NestJS HTTP ports
   3201-3208    NestJS TCP ports
   5432         PostgreSQL
   6379         Redis
   27017        MongoDB
   9092         Kafka
-  8080         Keycloak (đi qua Caddy → auth.domain)
+  8080         Keycloak HTTP (đi qua Caddy → auth.domain)
+  9000         Keycloak management/health (không đi qua Caddy)
   3000         Grafana (đi qua Caddy → grafana.domain)
   3100, 9090, 3200, 4318  Monitoring (không expose ra ngoài)
 ```
@@ -1705,15 +1713,61 @@ Với Caddy làm reverse proxy:
 3. Caddy tự request cert, tự renew
 
 ```caddyfile
-# Caddy tự động HTTPS — đơn giản đến mức gần như magic
 api.qrtable.vodinhquan.dev {
-  reverse_proxy bff:3300
+  @bff path /api/v1 /api/v1/* /socket.io /socket.io/*
+  reverse_proxy @bff bff:3300
 }
 
 app.qrtable.vodinhquan.dev {
   reverse_proxy management-app:3000
 }
+
+qr.qrtable.vodinhquan.dev {
+  reverse_proxy customer-pwa:80
+}
+
+auth.qrtable.vodinhquan.dev {
+  reverse_proxy keycloak:8080
+}
+
+grafana.qrtable.vodinhquan.dev {
+  basic_auth bcrypt {
+    {$GRAFANA_BASIC_AUTH_USER} {$GRAFANA_BASIC_AUTH_HASH}
+  }
+  reverse_proxy grafana:3000 {
+    header_up -Authorization
+  }
+}
 ```
+
+Caddyfile tracked không chứa password. Sinh bcrypt hash trực tiếp vào protected server environment:
+
+```bash
+docker run --rm -it caddy:2.10.2-alpine caddy hash-password
+```
+
+Lưu output thành `GRAFANA_BASIC_AUTH_HASH` trong `/opt/qrtable/.env.production` với mode `0600`.
+Grafana vẫn yêu cầu login riêng sau outer Caddy basic-auth gate.
+
+Validate production file với hash thật trước DNS cutover:
+
+```bash
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.infra.yaml \
+  -f docker-compose.app.yaml \
+  -f docker-compose.monitoring.yaml \
+  -f docker-compose.proxy.yaml \
+  config -q
+
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.proxy.yaml \
+  run --rm --no-deps caddy \
+  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+Config validation không request certificate. Public certificate issuance chỉ được chứng minh ở Task
+11 sau khi năm DNS records trỏ về Droplet, TCP 80/443 và UDP 443 được mở, và Caddy start với
+protected production environment.
 
 Đây là equivalent Nginx config với manual TLS:
 
@@ -1752,7 +1806,9 @@ Let's Encrypt là Certificate Authority miễn phí. Caddy dùng **ACME protocol
 
 ### 6.4 WebSocket Proxying — Đặc Thù Của QRTable
 
-BFF dùng Socket.IO — cần reverse proxy hỗ trợ WebSocket upgrade. Caddy tự động handle WebSocket upgrade khi dùng `reverse_proxy` directive — không cần config thêm.
+BFF dùng Socket.IO tại `/socket.io` với namespace `/orders`. Caddy tự động handle HTTP upgrade và
+bidirectional tunnel bằng `reverse_proxy`; không cần tự đặt `Upgrade` hoặc `Connection` header. CORS
+vẫn do BFF HTTP/Socket.IO allowlist quản lý.
 
 Nếu dùng Nginx, cần explicit:
 
@@ -1975,7 +2031,6 @@ Production server cần một layout ổn định để deploy script không ph�
   docker-compose.app.yaml
   docker-compose.proxy.yaml
   docker-compose.monitoring.yaml
-  docker-compose.monitoring.prod.yaml
   docker/
   tools/deploy/
   releases/
@@ -2664,15 +2719,16 @@ mindmap
       proxy: Caddy HTTPS termination
       monitoring: PLG + Prometheus + Tempo
     Network Topology
-      qrtable-edge: public-facing services
-      qrtable-app: internal microservices
-      qrtable-infra: databases (internal only)
-      Chỉ Caddy expose port 80/443
+      qrtable-edge: Caddy, BFF, frontends
+      qrtable-identity: Caddy, Keycloak
+      qrtable-observability: Caddy, Grafana, monitoring
+      qrtable-data: datastores và internal services
+      Chỉ Caddy publish 80/tcp, 443/tcp, 443/udp
     Secrets Management
       Build-time public: NEXT_PUBLIC VITE
       Runtime secrets: .env.production 0600
       Không bao giờ commit secrets
-      env_file + environment override pattern
+      Explicit per-service environment mappings
     CI/CD Pipeline
       CI = quality gate: lint test build
       Release = build immutable images với git SHA tag
@@ -2694,7 +2750,9 @@ Sau khi đọc toàn bộ tài liệu, đây là mental model cần ghi nhớ:
 
 **Về Docker:** Image là template immutable, container là instance đang chạy. Multi-stage build tạo runtime image nhỏ gọn. Layers được cache — instruction ít thay đổi lên trên, hay thay đổi xuống dưới. `NEXT_PUBLIC_`\_ và `VITE\__` là build-time, baked vào JS bundle — không thể thay đổi runtime. Secrets không bao giờ là Docker build arg.
 
-**Về Docker Compose:** Ba network layer (edge, app, infra) là phản ánh của defense in depth. Chỉ Caddy expose port ra internet. Health checks là tiên quyết để `depends_on` có ý nghĩa. Layered compose files tách concerns: infra/app/proxy/monitoring restart độc lập nhau.
+**Về Docker Compose:** Các network edge, identity, observability và data theo mục đích phản ánh
+defense in depth. Chỉ Caddy publish internet ports. Health checks là tiên quyết để `depends_on` có ý
+nghĩa. Layered compose files tách concerns: infra/app/proxy/monitoring restart độc lập nhau.
 
 **Về deployment flow:** Thứ tự quan trọng: infra healthy → monitoring → app containers → proxy (Caddy cần DNS đã resolve trước khi request cert). Caddy data volume giữ Let's Encrypt cert — không xóa. Secrets trong `/opt/qrtable/.env.production` với permission 0600 — không bao giờ world-readable.
 

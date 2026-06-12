@@ -4,7 +4,7 @@
 
 > **Topic (English):** Design and Implementation of a SaaS-Based POS Platform with Integrated QR Code Ordering Using a Microservices Architecture
 
-> **Version:** 1.1  |  **Update:** 2026-06-01
+> **Version:** 1.1  |  **Update:** 2026-06-12
 
 ---
 
@@ -1519,22 +1519,18 @@ Each service expose health endpoint checks:
 ### 14.1 Docker Compose Architecture
 
 ```yaml
-# docker-compose.infra.yaml — Infrastructure Services
+# docker-compose.infra.yaml — Datastores and identity
 services:
-  postgres:     # Port 5432 — PostgreSQL 16
-  redis:        # Port 6379 — Redis 7
-  kafka:        # Port 9092 — Bitnami Kafka (KRaft mode)
-  keycloak:     # Port 8180 — Keycloak 25
-  grafana:      # Port 3001 — Monitoring dashboard
-  loki:         # Port 3100 — Log aggregation
-  promtail:     # Log collection agent
-  prometheus:   # Port 9090 — Metrics scraper
-  tempo:        # Port 3200 — Distributed tracing
+  postgres:     # PostgreSQL 16, qrtable-data
+  mongodb:      # MongoDB 7, qrtable-data
+  redis:        # Redis 7, qrtable-data
+  kafka:        # Kafka KRaft, qrtable-data
+  keycloak:     # HTTP 8080, management 9000, qrtable-identity + qrtable-data
 
 # docker-compose.app.yaml — Application Services
 services:
   production-bootstrap: # one-shot migrations, ownership, Kafka topics, Keycloak bootstrap
-  bff:          # Port 3000 — API Gateway + WebSocket
+  bff:          # HTTP 3300 — API Gateway + Socket.IO
   authorizer:   # gRPC/TCP — Authorizer
   catalog:      # TCP — Menu & Table
   order:        # TCP — Order processing
@@ -1542,7 +1538,27 @@ services:
   payment:      # TCP — Payment + SePay webhook
   saas:         # TCP — Tenant/subscription management
   user-access:  # TCP — User profiles/roles
+  management-app: # HTTP 3000 — authenticated frontend
+  customer-pwa:   # HTTP 80 — customer frontend
+
+# docker-compose.monitoring.yaml — Private observability
+services:
+  grafana:      # HTTP 3000, qrtable-observability
+  loki:         # HTTP 3100, private
+  promtail:     # Docker log collection
+  prometheus:   # HTTP 9090, private
+  tempo:        # HTTP 3200 / OTLP 4318, private
+
+# docker-compose.proxy.yaml — The only public container
+services:
+  caddy:        # publishes 80/tcp, 443/tcp, 443/udp
 ```
+
+Caddy joins `qrtable-edge`, `qrtable-identity`, and `qrtable-observability`, but not the datastore
+network `qrtable-data`. It routes the API prefix and Socket.IO to `bff:3300`, the two frontends to
+their Docker service names, Keycloak to `keycloak:8080`, and protected Grafana to `grafana:3000`.
+Automatic HTTPS state is persisted in named Caddy data/config volumes. Keycloak management port
+`9000`, Prometheus, Loki, Tempo, and all datastores remain private.
 
 ### 14.2 Build Pipeline
 
@@ -1558,10 +1574,12 @@ pnpm nx affected -t test       # Test only affected by changes
 pnpm nx run-many -t build      # Build all apps
 docker compose -f docker-compose.infra.yaml up -d   # Infra
 docker compose -f docker-compose.app.yaml up -d     # Apps
+docker compose -f docker-compose.monitoring.yaml up -d # Monitoring
 
 # Production Deploy
 pnpm deploy:bootstrap:compose                      # Fail-fast schema/topic/identity bootstrap
 docker compose -f docker-compose.app.yaml up -d    # Apps after bootstrap gate
+docker compose -f docker-compose.proxy.yaml up -d  # Proxy after DNS/firewall readiness
 ```
 
 ### 14.3 Environment Strategy
@@ -1624,7 +1642,7 @@ Phase 4D — Dashboard + Reporting:
 └── Completed. Includes report permissions, source-owner reporting read models, package feature gating, and dashboard UI polish.
 
 Phase 5-7 — Testing + Observability + Deploy:
-└── Not started yet; Phase 5 = testing, Phase 6 = observability, Phase 7 = deployment/demo.
+└── In progress. Phase 7 deployment foundation is implemented; DigitalOcean provisioning, public HTTPS, smoke, recovery, and demo evidence remain.
 ```
 
 ---

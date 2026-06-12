@@ -342,6 +342,23 @@ Do not reintroduce a general-purpose dotenv parser or generated per-service env 
 
 ### Task 7: Reverse proxy and HTTPS configuration
 
+**Status:** Implemented in `docker-compose.proxy.yaml` and `docker/caddy/Caddyfile`.
+
+**Verification on 2026-06-12:**
+
+- the four production Compose layers render successfully together;
+- only Caddy publishes host ports (`80/tcp`, `443/tcp`, and `443/udp`);
+- Caddy joins only `qrtable-edge`, `qrtable-identity`, and `qrtable-observability`;
+- the Caddyfile validates with the pinned `caddy:2.10.2-alpine` image;
+- all five public host routes use Docker service names;
+- BFF routing includes the configured global API prefix and `/socket.io`;
+- Grafana requires a bcrypt hash supplied through protected runtime configuration;
+- Keycloak is proxied on port `8080`; its management port `9000` is not routed.
+- an HTTP-only local smoke using the production Caddyfile returned `200` for the Management App,
+  Customer PWA, Keycloak, and authenticated Grafana; Grafana returned `401` without the outer
+  credential, and the API prefix matched the inactive BFF upstream with `502`;
+- BFF HTTP success and the Socket.IO handshake remain pending because the app stack was not running.
+
 **Outcome:** Caddy routes the five public hosts and is the only public container.
 
 Scope:
@@ -352,7 +369,8 @@ Scope:
 - persist Caddy certificate data;
 - validate configuration before DigitalOcean provisioning.
 
-Live certificate issuance remains part of Task 11 because it depends on DNS.
+Live certificate issuance and public HTTPS smoke remain part of Task 11 because they depend on DNS,
+the Droplet firewall, and production runtime secrets.
 
 ### Task 8: Production env and BFF CORS
 
@@ -537,11 +555,10 @@ but documentation and UI must not claim live SePay readiness.
 
 ## 8. Immediate Next Order
 
-1. Implement Task 10 monitoring adaptation.
-2. Implement Task 7 proxy configuration.
-3. Provision and deploy through Task 11.
-4. Complete Task 12 smoke, recovery, demo, and canonical documentation.
+1. Provision and deploy through Task 11.
+2. Complete Task 12 smoke, recovery, demo, and canonical documentation.
 
 Task 6 runtime verification is complete. Task 9 bootstrap flow is implemented and statically
 verified; full runtime bootstrap against the Docker stack remains a pre-Task 11 deployment check.
-Tasks 7 and 10-12 remain.
+Task 7 proxy configuration is implemented and statically/runtime-config verified without requesting
+public certificates. Tasks 11 and 12 remain.

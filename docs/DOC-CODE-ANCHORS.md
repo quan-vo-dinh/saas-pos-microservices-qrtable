@@ -44,6 +44,8 @@ Run `pnpm verify:doc-anchors` after changing docs, routes, enum display labels, 
 | Database ownership verifier       | `tools/database/verify-service-database-ownership.js`                            | Smoke check for missing or foreign service tables.             |
 | Split database seed guide         | `tools/dev-seed/README.md`                                                       | Destructive local reseed and verification workflow.            |
 | Production app Compose            | `docker-compose.app.yaml`                                                        | App containers and production bootstrap dependency gate.       |
+| Production proxy Compose          | `docker-compose.proxy.yaml`                                                      | Public Caddy entry point and edge network wiring.              |
+| Production Caddy config           | `docker/caddy/Caddyfile`                                                         | Four public hosts, HTTPS, and WebSocket routing.                |
 | Production tooling image          | `docker/tooling.Dockerfile`                                                      | One-shot migration/bootstrap tooling image.                    |
 | Production bootstrap script       | `tools/deploy/production-bootstrap.sh`                                           | Fail-fast migration, ownership, Kafka, and Keycloak sequence.  |
 | Production bootstrap Compose run  | `tools/deploy/phase7-run-production-bootstrap.sh`                                | Operator command for rerunning the one-shot bootstrap job.     |

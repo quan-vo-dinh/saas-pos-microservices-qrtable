@@ -4,15 +4,21 @@
 
 > **Goal:** Lock down the quality of the QRTable SaaS POS system with multi-tier automated testing, make the distributed system **observable** (service health, log, metrics, trace), and package **deploy + sample data + demo script** for end-to-end reproducible thesis and review — reduce business regression risk (single, cash, multi-tenant, kitchen) and demonstrate the QR → kitchen → payment flow to the board.
 > **Estimated:** ~3–5 weeks (total Phase 5 + 6 + 7)
-> **Status:** ⬜ TODO
+> **Status:** ◐ In progress — Phase 5 Testing remains in progress. The Phase 7 production image,
+> Compose, bootstrap, and reverse-proxy foundations are implemented; public deployment, HTTPS
+> issuance, smoke, recovery, and demo evidence remain.
 
 ## Prerequisites
 
 - Completed core phases closed on critical/demo path: **0, 1, 2A, 2B, 3**, SaaS part completed at **4B**, and the representative **4A Order Confirm Saga** slice has been implemented. Full Phase 4A operational hardening and Phase 4C Staff Management have not started; they do not block Phase 5-7 unless the demo requires durable saga-state/CDC/retry-worker hardening or staff management. Notification/email is outside the current implementation scope.
 
-## Current Status Snapshot (2026-06-01)
+## Current Status Snapshot (2026-06-12)
 
-- **Phase 5 Testing progress:** ~75-80% for the testing workstream, based on traceability coverage, implemented test inventory, and the latest M2 local integration evidence. The combined Phase 5-7 roadmap row is tracked at **25%** because Observability and Deployment have not started.
+- **Phase 5 Testing progress:** ~75-80% for the testing workstream, based on traceability coverage,
+  implemented test inventory, and the latest M2 local integration evidence.
+- **Phase 6/7 foundation:** Production monitoring and the Caddy reverse-proxy layer are implemented
+  alongside the production images, infra/app Compose, and bootstrap gate. DigitalOcean provisioning,
+  public certificates, external smoke, backup/rollback proof, and demo evidence remain.
 - **Traceability matrix:** 52 P0/P1 rows: 38 covered, 9 partial, 1 implementation gap, and 4 deferred by phase. Remaining P0 partial rows are Order state/stock live compensation fault injection, SaaS onboarding saga live Authorizer/User-Access proof, and suspended Customer PWA pending-bill browser exception.
 - **Fresh deterministic gate:** `pnpm nx test frontend-utils` passed on 2026-06-01 with 36 tests passed and 36 runtime-dependent integration tests skipped by design.
 - **Fresh full unit/contract gate:** `pnpm exec nx run-many -t test --parallel=3` passed for all 23 projects after updating the stale `guards:test` and `management-app:test` expectations to the current contracts.
@@ -332,6 +338,8 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 - **docker-compose.app.yaml** — **8 backend + 2 frontend** (according to the final architecture).
 - **docker-compose.infra.yaml** — data plane: **PG, Redis, Mongo, Keycloak, Kafka** (according to technical-architecture).
 - **docker-compose.monitoring.yaml** — observe (match Phase 6).
+- **docker-compose.proxy.yaml** — Caddy is the only public container and routes API/Socket.IO,
+  Management App, Customer PWA, Keycloak, and protected Grafana.
 - **Seed:** **1 tenant, 5 categories, 20 items, 8 tables** — enough for multi-table demo, in-depth menu, no time-consuming manual input.
 
 **verify:** `docker compose up` (or equivalent command set noted in README phase) builds full stack; seed runs idempotent or has a clear reset strategy.
@@ -366,7 +374,9 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 - **observation** platform (health, log, metrics, trace, dashboard, alert) **runs locally** and documents Grafana/Prometheus port — reduces debugging time and increases demo reliability.
 - **Deployment Artifact** (Dockerfile multi-stage, layered composition, seed, demo script) — allows re-establishing the QRTable POS system in a standard environment without depending on personal computer configuration.
 
-**Document status:** roadmap/spec canonicalized; Phase 5-7 itself still **TODO** according to the phase state.
+**Document status:** roadmap/spec canonicalized; Phase 5 Testing remains **in progress**. The Phase
+7 deployment foundation is implemented, while public deployment, smoke, recovery, and demo
+acceptance remain open.
 
 ## Note the Roadmap
 

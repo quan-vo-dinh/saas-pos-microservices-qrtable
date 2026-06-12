@@ -1367,23 +1367,21 @@ Docker Compose provides:
 
 ### 4.7 Networks — Isolation and Routing
 
-Docker networks in QRTable Production have 3 tiers:
+Docker networks in QRTable Production separate public routing, identity, observability, and
+datastore traffic:
 
 ```yaml
-networks:
-  qrtable-edge: # Services reachable from the internet (BFF, Management App, Customer PWA)
-    name: qrtable-edge
-  qrtable-app: # Internal services — NestJS microservices communicate with each other
-    name: qrtable-app
-    internal: true # No internet access from containers in this network
-  qrtable-infra: # Infrastructure — PostgreSQL, Redis, Kafka, MongoDB, Keycloak
-    name: qrtable-infra
-    internal: true
+qrtable-edge: # Caddy, BFF, Management App, Customer PWA
+qrtable-identity: # Caddy, Keycloak, Authorizer/User-Access where required
+qrtable-observability: # Caddy and the monitoring stack
+qrtable-data: # Datastores, internal services, metrics/traces
 ```
 
 #### Diagram: QRTable Production Network Topology
 
-> Three network tiers reflect the defense-in-depth principle. Internet reaches only Caddy (edge). Caddy forwards to services in qrtable-edge. Services in qrtable-app cannot connect to the internet. Databases in qrtable-infra are reachable only from qrtable-app.
+> Four purpose-specific networks enforce defense in depth. Internet reaches only Caddy. Caddy can
+> reach approved edge, identity, and observability upstreams, while `qrtable-data` remains outside
+> the proxy boundary.
 
 ```mermaid
 graph LR
@@ -1398,7 +1396,7 @@ graph LR
         PWA["Customer PWA :80"]
     end
 
-    subgraph "qrtable-app network (internal)"
+    subgraph "qrtable-data network (internal)"
         ORDER["Order :3301"]
         CATALOG["Catalog :3305"]
         KITCHEN["Kitchen :3307"]
@@ -1408,7 +1406,7 @@ graph LR
         UA["User-Access :3303"]
     end
 
-    subgraph "qrtable-infra network (internal)"
+    subgraph "qrtable-data / identity networks"
         PG["PostgreSQL :5432"]
         MONGO["MongoDB :27017"]
         REDIS["Redis :6379"]
@@ -1416,8 +1414,12 @@ graph LR
         KC["Keycloak :8080"]
     end
 
+    subgraph "qrtable-observability network (internal)"
+        GRAFANA["Grafana :3000"]
+    end
+
     USER -->|"HTTPS 443"| CADDY
-    CADDY --> BFF & MGMT & PWA & KC
+    CADDY --> BFF & MGMT & PWA & KC & GRAFANA
     BFF <-->|"TCP"| ORDER & CATALOG & KITCHEN & PAYMENT & SAAS & AUTH & UA
     ORDER & SAAS & PAYMENT & CATALOG --> PG
     UA --> MONGO
@@ -1433,10 +1435,13 @@ graph LR
 
 **QRTable network rules:**
 
-- **Only Caddy** joins `qrtable-edge` and exposes ports 80/443 to the host
-- **BFF** joins `qrtable-edge`, `qrtable-app`, and `qrtable-infra` — it is the gateway
-- **Microservices** join only `qrtable-app` and `qrtable-infra` — no direct internet access
-- **Databases** join only `qrtable-infra` — reachable only from services in `qrtable-app`
+- **Only Caddy** publishes host ports 80/443 and UDP 443.
+- **Caddy** joins `qrtable-edge`, `qrtable-identity`, and `qrtable-observability`, but never
+  `qrtable-data`.
+- **BFF and frontends** share `qrtable-edge`; BFF also joins `qrtable-data` for internal clients.
+- **Keycloak** shares `qrtable-identity` with Caddy and `qrtable-data` with PostgreSQL.
+- **Grafana** shares `qrtable-observability` with Caddy; Prometheus, Loki, and Tempo remain private.
+- **Datastores and internal services** use `qrtable-data`; none publish host ports.
 
 Every container has its own loopback interface. Inside the BFF container:
 
@@ -1452,7 +1457,9 @@ redis:6379
 
 Docker's embedded DNS only resolves service names when two containers share at least one network.
 
-`internal: true` isolates a network from external connectivity. However, a container attached to both an internal network and an edge network can still have an external route through the other network. Network security must be evaluated across every network attached to a service.
+`internal: true` isolates a network from external connectivity. However, Caddy deliberately bridges
+the public edge to the identity and observability networks. Its Caddyfile must therefore proxy only
+the approved Keycloak HTTP port and Grafana HTTP port, never datastore or management ports.
 
 ### 4.8 Volumes — Persistent Storage
 
@@ -1574,13 +1581,14 @@ It catches errors such as:
 - Wrong service reference, e.g. app points to `postgresql` but actual service is `postgres`.
 - Port or volume mapping syntax errors.
 
-Phase 7 preflight should run all layers:
+Phase 7 preflight should render all layers together:
 
 ```bash
-docker compose -f docker-compose.infra.yaml config > /dev/null
-docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml config > /dev/null
-docker compose -f docker-compose.app.yaml config > /dev/null
-docker compose -f docker-compose.proxy.yaml config > /dev/null
+docker compose --env-file docker/env/.env.production \
+  -f docker-compose.infra.yaml \
+  -f docker-compose.app.yaml \
+  -f docker-compose.proxy.yaml \
+  config -q
 ```
 
 **Mental model:** `docker compose config` does not prove services run. It only proves the deployment declaration can render validly. You still need `docker compose ps`, logs, health checks, and smoke tests.
@@ -1602,7 +1610,7 @@ docker compose -f docker-compose.proxy.yaml config > /dev/null
    → Promtail begins collecting logs from containers (including infra layer)
 
 3. docker compose -f docker-compose.app.yaml up -d
-   → All NestJS services start with production env_file
+   → All services start with explicit per-service environment mappings
    → BFF waits for all microservices TCP reachable
 
 4. docker compose -f docker-compose.proxy.yaml up -d
@@ -1622,14 +1630,15 @@ Droplet public ports:
   443/tcp → Caddy (HTTPS termination)
   22/tcp  → SSH (restrict to your IP only)
 
-All ports below are NOT public (firewall deny):
+All ports below are NOT published by Compose:
   3300-3308    NestJS HTTP ports
   3201-3208    NestJS TCP ports
   5432         PostgreSQL
   6379         Redis
   27017        MongoDB
   9092         Kafka
-  8080         Keycloak (via Caddy → auth.domain)
+  8080         Keycloak HTTP (via Caddy → auth.domain)
+  9000         Keycloak management/health (never via Caddy)
   3000         Grafana (via Caddy → grafana.domain)
   3100, 9090, 3200, 4318  Monitoring (not exposed externally)
 ```
@@ -1705,15 +1714,62 @@ With Caddy as reverse proxy:
 3. Caddy requests cert and renews automatically
 
 ```caddyfile
-# Caddy automatic HTTPS — simple enough to feel like magic
 api.qrtable.vodinhquan.dev {
-  reverse_proxy bff:3300
+  @bff path /api/v1 /api/v1/* /socket.io /socket.io/*
+  reverse_proxy @bff bff:3300
 }
 
 app.qrtable.vodinhquan.dev {
   reverse_proxy management-app:3000
 }
+
+qr.qrtable.vodinhquan.dev {
+  reverse_proxy customer-pwa:80
+}
+
+auth.qrtable.vodinhquan.dev {
+  reverse_proxy keycloak:8080
+}
+
+grafana.qrtable.vodinhquan.dev {
+  basic_auth bcrypt {
+    {$GRAFANA_BASIC_AUTH_USER} {$GRAFANA_BASIC_AUTH_HASH}
+  }
+  reverse_proxy grafana:3000 {
+    header_up -Authorization
+  }
+}
 ```
+
+The tracked Caddyfile contains no password. Generate the bcrypt hash directly into the protected
+server environment:
+
+```bash
+docker run --rm -it caddy:2.10.2-alpine caddy hash-password
+```
+
+Store the output as `GRAFANA_BASIC_AUTH_HASH` in `/opt/qrtable/.env.production` with mode `0600`.
+Grafana still requires its own login after the outer Caddy basic-auth gate.
+
+Validate the production file with a real generated hash before DNS cutover:
+
+```bash
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.infra.yaml \
+  -f docker-compose.app.yaml \
+  -f docker-compose.monitoring.yaml \
+  -f docker-compose.proxy.yaml \
+  config -q
+
+docker compose --env-file /opt/qrtable/.env.production \
+  -f docker-compose.proxy.yaml \
+  run --rm --no-deps caddy \
+  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+```
+
+Configuration validation does not request a certificate. Public certificate issuance is not proven
+until Task 11 points all five DNS records at the Droplet, opens TCP 80/443 and UDP 443, and starts
+Caddy with the protected production environment.
 
 This is the equivalent Nginx config with manual TLS:
 
@@ -1752,7 +1808,9 @@ Let's Encrypt is a free Certificate Authority. Caddy uses the **ACME protocol** 
 
 ### 6.4 WebSocket Proxying — QRTable Specific
 
-BFF uses Socket.IO — reverse proxy must support WebSocket upgrade. Caddy automatically handles WebSocket upgrade with the `reverse_proxy` directive — no extra config needed.
+BFF uses Socket.IO at `/socket.io` with the `/orders` namespace. Caddy automatically handles the
+HTTP upgrade and bidirectional tunnel with `reverse_proxy`; no manual `Upgrade` or `Connection`
+header policy is needed. CORS remains owned by the BFF HTTP/Socket.IO allowlist.
 
 If using Nginx, you need explicit config:
 
@@ -2665,15 +2723,16 @@ mindmap
       proxy: Caddy HTTPS termination
       monitoring: PLG + Prometheus + Tempo
     Network Topology
-      qrtable-edge: public-facing services
-      qrtable-app: internal microservices
-      qrtable-infra: databases (internal only)
-      Only Caddy exposes port 80/443
+      qrtable-edge: Caddy, BFF, frontends
+      qrtable-identity: Caddy, Keycloak
+      qrtable-observability: Caddy, Grafana, monitoring
+      qrtable-data: datastores and internal services
+      Only Caddy publishes 80/tcp, 443/tcp, 443/udp
     Secrets Management
       Build-time public: NEXT_PUBLIC VITE
       Runtime secrets: .env.production 0600
       Never commit secrets
-      env_file + environment override pattern
+      Explicit per-service environment mappings
     CI/CD Pipeline
       CI = quality gate: lint test build
       Release = build immutable images with git SHA tag
@@ -2695,7 +2754,10 @@ After reading the entire document, this is the mental model to remember:
 
 **About Docker:** Image is an immutable template, container is a running instance. Multi-stage build creates a compact runtime image. Layers are cached — rarely changing instructions at top, frequently changing at bottom. `NEXT_PUBLIC_`\_ and `VITE\__` are build-time, baked into JS bundle — cannot change at runtime. Secrets must never be Docker build args.
 
-**About Docker Compose:** Three network layers (edge, app, infra) reflect defense in depth. Only Caddy exposes ports to the internet. Health checks are prerequisite for `depends_on` to mean something. Layered compose files separate concerns: infra/app/proxy/monitoring restart independently.
+**About Docker Compose:** Purpose-specific edge, identity, observability, and data networks reflect
+defense in depth. Only Caddy publishes internet ports. Health checks are prerequisite for
+`depends_on` to mean something. Layered compose files separate concerns:
+infra/app/proxy/monitoring restart independently.
 
 **About deployment flow:** Order matters: infra healthy → monitoring → app containers → proxy (Caddy needs DNS resolved before requesting cert). Caddy data volume holds Let's Encrypt cert — do not delete. Secrets in `/opt/qrtable/.env.production` with permission 0600 — never world-readable.
 
