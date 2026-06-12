@@ -308,11 +308,16 @@ health state.
 
 ### Task 6: Application Compose and explicit env mapping
 
-**Status:** Implemented in `docker-compose.app.yaml`. Compose syntax, required-variable
-interpolation, rendered network membership, and the no-ports/no-`env_file` rules were verified
-locally. Management App and Customer PWA reached healthy state. Backend runtime verification is
-blocked by the existing backend release images, which omit runtime `node_modules` while the bundle
-requires `@opentelemetry/exporter-trace-otlp-http`.
+**Status:** Implemented in `docker-compose.app.yaml`. The backend release image now installs an
+isolated production dependency tree, including `@opentelemetry/exporter-trace-otlp-http` and
+`tslib`. Compose syntax, required-variable interpolation, rendered network membership,
+no-ports/no-`env_file` rules, private listener connectivity, and runtime health were verified
+locally. All eight backend services and both frontends reached healthy state.
+
+On a completely fresh Kafka data volume, canonical topics must exist before the BFF starts. During
+local verification, Kafka auto-created the topics concurrently with the first BFF subscription, so
+the BFF required one restart; subsequent startup passed. Provision these topics explicitly as part
+of the production bootstrap sequence.
 
 **Outcome:** Eight backend services and two frontends communicate by Docker service name.
 
@@ -522,11 +527,11 @@ but documentation and UI must not claim live SePay readiness.
 
 ## 8. Immediate Next Order
 
-1. Repair and rebuild the backend release images so external runtime dependencies are installed.
-2. Implement Task 9 migrations and production-safe Keycloak bootstrap.
-3. Implement Task 10 monitoring adaptation.
-4. Implement Task 7 proxy configuration.
-5. Provision and deploy through Task 11.
-6. Complete Task 12 smoke, recovery, demo, and canonical documentation.
+1. Implement Task 9 migrations, canonical Kafka topic provisioning, and production-safe Keycloak
+   bootstrap.
+2. Implement Task 10 monitoring adaptation.
+3. Implement Task 7 proxy configuration.
+4. Provision and deploy through Task 11.
+5. Complete Task 12 smoke, recovery, demo, and canonical documentation.
 
-Task 6 is implemented with the runtime blocker recorded above. Tasks 7 and 9-12 remain.
+Task 6 runtime verification is complete. Tasks 7 and 9-12 remain.

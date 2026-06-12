@@ -23,7 +23,7 @@ FROM deps AS build
 ARG APP_NAME
 RUN test -n "$APP_NAME"
 RUN pnpm nx build "$APP_NAME" --configuration=production
-RUN pnpm --dir "dist/apps/$APP_NAME" install --prod --frozen-lockfile
+RUN pnpm --dir "dist/apps/$APP_NAME" install --prod --frozen-lockfile --ignore-workspace
 
 # Stage 4: Production Runtime
 FROM node:22.22.3-alpine3.23 AS runtime
