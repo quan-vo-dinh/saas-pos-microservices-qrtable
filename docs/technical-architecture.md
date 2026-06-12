@@ -1533,6 +1533,7 @@ services:
 
 # docker-compose.app.yaml — Application Services
 services:
+  production-bootstrap: # one-shot migrations, ownership, Kafka topics, Keycloak bootstrap
   bff:          # Port 3000 — API Gateway + WebSocket
   authorizer:   # gRPC/TCP — Authorizer
   catalog:      # TCP — Menu & Table
@@ -1559,7 +1560,8 @@ docker compose -f docker-compose.infra.yaml up -d   # Infra
 docker compose -f docker-compose.app.yaml up -d     # Apps
 
 # Production Deploy
-docker compose -f docker-compose.prod.yaml up -d    # Full stack
+pnpm deploy:bootstrap:compose                      # Fail-fast schema/topic/identity bootstrap
+docker compose -f docker-compose.app.yaml up -d    # Apps after bootstrap gate
 ```
 
 ### 14.3 Environment Strategy

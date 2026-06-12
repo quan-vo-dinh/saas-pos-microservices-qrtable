@@ -14,7 +14,19 @@ KEYCLOAK_LOGIN_THEME="${KEYCLOAK_LOGIN_THEME:-keycloak-theme}"
 KEYCLOAK_CLEAN_REALM="${KEYCLOAK_CLEAN_REALM:-false}"
 MANAGEMENT_APP_CLIENT_ID="${MANAGEMENT_APP_CLIENT_ID:-management-app}"
 MANAGEMENT_APP_CLIENT_SECRET="${MANAGEMENT_APP_CLIENT_SECRET:-RHRjKOPDywQxSG7qjcGM1XsfmE6ikR8B}"
+KEYCLOAK_CLIENT_REDIRECT_URIS="${KEYCLOAK_CLIENT_REDIRECT_URIS:-http://localhost:3000/*}"
+KEYCLOAK_CLIENT_WEB_ORIGINS="${KEYCLOAK_CLIENT_WEB_ORIGINS:-http://localhost:3000}"
+MANAGEMENT_APP_REDIRECT_URIS="${MANAGEMENT_APP_REDIRECT_URIS:-http://localhost:3000/*}"
+MANAGEMENT_APP_WEB_ORIGINS="${MANAGEMENT_APP_WEB_ORIGINS:-http://localhost:3000}"
 AUTH_BOOTSTRAP_USERS_FILE="${AUTH_BOOTSTRAP_USERS_FILE:-tools/auth-bootstrap-users.json}"
+
+if [[ -z "${AUTH_BOOTSTRAP_DEMO_USERS:-}" ]]; then
+  if [[ "${NODE_ENV:-development}" == "production" ]]; then
+    AUTH_BOOTSTRAP_DEMO_USERS=false
+  else
+    AUTH_BOOTSTRAP_DEMO_USERS=true
+  fi
+fi
 
 required_cmds=(curl jq)
 for cmd in "${required_cmds[@]}"; do
@@ -38,6 +50,30 @@ if [[ "${KEYCLOAK_CLEAN_REALM}" == "true" ]]; then
   assert_local_keycloak_host
 fi
 
+if [[ "${NODE_ENV:-development}" == "production" && "${AUTH_BOOTSTRAP_DEMO_USERS}" == "true" ]]; then
+  echo "Refusing to create or reset demo users when NODE_ENV=production"
+  exit 1
+fi
+
+assert_not_placeholder_secret() {
+  local name="$1"
+  local value="$2"
+
+  if [[ "${NODE_ENV:-development}" != "production" ]]; then
+    return 0
+  fi
+
+  case "${value}" in
+    "" | "change-me" | "generate_on_server" | "RHRjKOPDywQxSG7qjcGM1XsfmE6ikR8B")
+      echo "Refusing production Keycloak bootstrap with placeholder ${name}"
+      exit 1
+      ;;
+  esac
+}
+
+assert_not_placeholder_secret "KEYCLOAK_CLIENT_SECRET" "${KEYCLOAK_CLIENT_SECRET}"
+assert_not_placeholder_secret "MANAGEMENT_APP_CLIENT_SECRET" "${MANAGEMENT_APP_CLIENT_SECRET}"
+
 get_admin_token() {
   curl -sS -X POST "${KEYCLOAK_HOST}/realms/master/protocol/openid-connect/token" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
@@ -53,7 +89,7 @@ if [[ -z "${ADMIN_TOKEN}" || "${ADMIN_TOKEN}" == "null" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${AUTH_BOOTSTRAP_USERS_FILE}" ]]; then
+if [[ "${AUTH_BOOTSTRAP_DEMO_USERS}" == "true" && ! -f "${AUTH_BOOTSTRAP_USERS_FILE}" ]]; then
   echo "Auth bootstrap users file not found: ${AUTH_BOOTSTRAP_USERS_FILE}"
   exit 1
 fi
@@ -158,6 +194,8 @@ ensure_oidc_client() {
   local client_id="$1"
   local client_secret="$2"
   local public_client="$3"
+  local redirect_uris="$4"
+  local web_origins="$5"
 
   local internal_id
   internal_id="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${client_id}" "${auth_header[@]}" | jq -r '.[0].id // empty')"
@@ -178,8 +216,8 @@ ensure_oidc_client() {
         directAccessGrantsEnabled: true,
         standardFlowEnabled: true,
         secret: $secret,
-        redirectUris: ["http://localhost:3000/*"],
-        webOrigins: ["http://localhost:3000"]
+        redirectUris: [],
+        webOrigins: []
       }')"
 
     curl -sS -X POST "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients" \
@@ -189,11 +227,51 @@ ensure_oidc_client() {
     internal_id="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients?clientId=${client_id}" "${auth_header[@]}" | jq -r '.[0].id // empty')"
   fi
 
+  if [[ -z "${internal_id}" ]]; then
+    echo "Unable to resolve client after create: ${client_id}" >&2
+    return 1
+  fi
+
+  local redirect_uris_json
+  local web_origins_json
+  redirect_uris_json="$(csv_to_json_array "${redirect_uris}")"
+  web_origins_json="$(csv_to_json_array "${web_origins}")"
+
+  local client_current
+  client_current="$(curl -sS "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${internal_id}" "${auth_header[@]}")"
+
+  local client_update_merged
+  client_update_merged="$(echo "${client_current}" | jq \
+    --arg clientId "${client_id}" \
+    --arg secret "${client_secret}" \
+    --argjson publicClient "${public_client}" \
+    --argjson redirectUris "${redirect_uris_json}" \
+    --argjson webOrigins "${web_origins_json}" \
+    '.clientId = $clientId
+      | .enabled = true
+      | .publicClient = $publicClient
+      | .protocol = "openid-connect"
+      | .serviceAccountsEnabled = true
+      | .directAccessGrantsEnabled = true
+      | .standardFlowEnabled = true
+      | .redirectUris = $redirectUris
+      | .webOrigins = $webOrigins
+      | if $publicClient then del(.secret) else .secret = $secret end')"
+
+  curl -sS -X PUT "${KEYCLOAK_HOST}/admin/realms/${KEYCLOAK_REALM}/clients/${internal_id}" \
+    "${auth_header[@]}" "${json_header[@]}" \
+    -d "${client_update_merged}" >/dev/null
+
   echo "${internal_id}"
 }
 
-client_id_internal="$(ensure_oidc_client "${KEYCLOAK_CLIENT_ID}" "${KEYCLOAK_CLIENT_SECRET}" "false")"
-mgmt_client_internal="$(ensure_oidc_client "${MANAGEMENT_APP_CLIENT_ID}" "${MANAGEMENT_APP_CLIENT_SECRET}" "false")"
+csv_to_json_array() {
+  local csv_value="$1"
+  jq -Rn --arg value "${csv_value}" '$value | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))'
+}
+
+client_id_internal="$(ensure_oidc_client "${KEYCLOAK_CLIENT_ID}" "${KEYCLOAK_CLIENT_SECRET}" "false" "${KEYCLOAK_CLIENT_REDIRECT_URIS}" "${KEYCLOAK_CLIENT_WEB_ORIGINS}")"
+mgmt_client_internal="$(ensure_oidc_client "${MANAGEMENT_APP_CLIENT_ID}" "${MANAGEMENT_APP_CLIENT_SECRET}" "false" "${MANAGEMENT_APP_REDIRECT_URIS}" "${MANAGEMENT_APP_WEB_ORIGINS}")"
 
 if [[ -z "${client_id_internal}" ]]; then
   echo "Unable to resolve Keycloak internal client id"
@@ -288,6 +366,7 @@ ensure_user_attribute_mapper "tenant_id-claim" "tenant_id" "tenant_id"
 ensure_user_attribute_mapper "sub_role-claim" "sub_role" "sub_role"
 client_id_internal="${saved_client_id}"
 
+if [[ "${AUTH_BOOTSTRAP_DEMO_USERS}" == "true" ]]; then
 ensure_user_for_role() {
   local user_id="$1"
   local username="$2"
@@ -385,6 +464,9 @@ if command -v node >/dev/null 2>&1; then
   fi
 else
   echo "Skip MongoDB sync: node command is not available"
+fi
+else
+  echo "Skipping demo user creation/reset; set AUTH_BOOTSTRAP_DEMO_USERS=true outside production to opt in."
 fi
 
 echo "Keycloak bootstrap completed for realm ${KEYCLOAK_REALM}."

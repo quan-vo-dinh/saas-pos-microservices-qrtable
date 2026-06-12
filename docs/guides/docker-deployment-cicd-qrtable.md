@@ -2023,6 +2023,34 @@ pnpm db:verify:ownership
 
 Production deploy must run `pnpm db:migrate` before starting app containers. Migration failure blocks deployment.
 
+Task 9 packages this rule into a rerunnable one-shot Compose job:
+
+```bash
+pnpm deploy:bootstrap:compose
+docker compose --env-file /opt/qrtable/.env.production -f docker-compose.app.yaml up -d --wait
+```
+
+The `production-bootstrap` service uses the `tooling-${IMAGE_TAG}` image and runs, in order:
+
+1. `pnpm db:migrate`
+2. `pnpm db:migration:show`
+3. `pnpm db:verify:ownership`
+4. `pnpm kafka:provision:topics`
+5. `pnpm auth:bootstrap:keycloak`
+
+The script uses `set -euo pipefail`, and the Compose helper uses
+`--exit-code-from production-bootstrap`, so any migration, ownership, Kafka, or Keycloak failure
+stops the deployment. App containers in `docker-compose.app.yaml` also depend on
+`production-bootstrap` with `service_completed_successfully`; a clean app startup cannot bypass the
+bootstrap gate.
+
+Kafka topic provisioning is idempotent and uses the canonical topic registry in
+`libs/constants/src/lib/kafka-topic.constants.ts`.
+
+Keycloak production bootstrap is also idempotent. It updates realm settings, clients, redirect URIs,
+web origins, roles, service-account permissions, and protocol mappers. Demo-user creation is split
+into `pnpm auth:bootstrap:demo-users` and is refused when `NODE_ENV=production`.
+
 ### 9.2 Multi-Database Strategy
 
 QRTable uses one PostgreSQL instance but multiple databases (not schemas):
@@ -2047,6 +2075,9 @@ pnpm dev:verify-seed
 ```
 
 It resets only the four target service databases and keeps legacy `qrtable` untouched. Never run `db:reset:dev` or `dev:reseed` against staging/production.
+
+Production demo data must be introduced by a separate opt-in, non-destructive, idempotent path.
+The default production bootstrap does not seed demo users and does not reset passwords.
 
 ### 9.4 Backup and Data Rollback — Different from App Rollback
 

@@ -1,3 +1,5 @@
+import { KafkaTopic } from './kafka-topic.constants';
+
 export enum TenantStatus {
   ACTIVE = 'ACTIVE',
   SUSPENDED = 'SUSPENDED',
@@ -64,7 +66,7 @@ export function hasPlanFeature(features: string[] | null | undefined, required: 
 }
 
 export const SAAS_EVENTS = {
-  TENANT_CREATED: 'tenant.created',
+  TENANT_CREATED: KafkaTopic.TenantCreated,
   TENANT_SUSPENDED: 'tenant.suspended',
   TENANT_ACTIVATED: 'tenant.activated',
   TENANT_CLOSED: 'tenant.closed',

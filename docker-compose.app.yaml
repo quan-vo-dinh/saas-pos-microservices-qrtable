@@ -11,11 +11,57 @@ networks:
     name: qrtable-identity
     external: true
 
+x-production-bootstrap-depends: &production-bootstrap-depends
+  production-bootstrap:
+    condition: service_completed_successfully
+
 services:
+  production-bootstrap:
+    image: ${IMAGE_REPOSITORY:?required}:tooling-${IMAGE_TAG:?required}
+    restart: 'no'
+    init: true
+    networks:
+      - qrtable-data
+      - qrtable-identity
+    environment:
+      NODE_ENV: production
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
+      TYPEORM_HOST: postgres
+      TYPEORM_PORT: 5432
+      TYPEORM_USERNAME: ${TYPEORM_USERNAME:?required}
+      TYPEORM_PASSWORD: ${TYPEORM_PASSWORD:?required}
+      TYPEORM_TYPE: postgres
+      TYPEORM_SYNCHRONIZE: 'false'
+      CATALOG_TYPEORM_DATABASE: ${CATALOG_TYPEORM_DATABASE:?required}
+      ORDER_TYPEORM_DATABASE: ${ORDER_TYPEORM_DATABASE:?required}
+      PAYMENT_TYPEORM_DATABASE: ${PAYMENT_TYPEORM_DATABASE:?required}
+      SAAS_TYPEORM_DATABASE: ${SAAS_TYPEORM_DATABASE:?required}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC_PARTITIONS: ${KAFKA_TOPIC_PARTITIONS:-1}
+      KAFKA_TOPIC_REPLICATION_FACTOR: ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+      KEYCLOAK_HOST: http://keycloak:8080
+      KEYCLOAK_ADMIN_USER: ${KEYCLOAK_ADMIN_USER:?required}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?required}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:?required}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:?required}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?required}
+      KEYCLOAK_MASTER_SSL_REQUIRED: ${KEYCLOAK_MASTER_SSL_REQUIRED:-external}
+      KEYCLOAK_REALM_SSL_REQUIRED: ${KEYCLOAK_REALM_SSL_REQUIRED:-external}
+      KEYCLOAK_LOGIN_THEME: ${KEYCLOAK_LOGIN_THEME:-keycloak-theme}
+      KEYCLOAK_CLIENT_REDIRECT_URIS: ${KEYCLOAK_CLIENT_REDIRECT_URIS:?required}
+      KEYCLOAK_CLIENT_WEB_ORIGINS: ${KEYCLOAK_CLIENT_WEB_ORIGINS:?required}
+      MANAGEMENT_APP_CLIENT_ID: ${MANAGEMENT_APP_CLIENT_ID:?required}
+      MANAGEMENT_APP_CLIENT_SECRET: ${MANAGEMENT_APP_CLIENT_SECRET:?required}
+      MANAGEMENT_APP_REDIRECT_URIS: ${MANAGEMENT_APP_REDIRECT_URIS:?required}
+      MANAGEMENT_APP_WEB_ORIGINS: ${MANAGEMENT_APP_WEB_ORIGINS:?required}
+      AUTH_BOOTSTRAP_DEMO_USERS: 'false'
+    command: ['pnpm', 'deploy:bootstrap:production']
+
   bff:
     image: ${IMAGE_REPOSITORY:?required}:bff-${IMAGE_TAG:?required}
     restart: unless-stopped
     init: true
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-edge
       - qrtable-data
@@ -68,6 +114,7 @@ services:
     image: ${IMAGE_REPOSITORY:?required}:authorizer-${IMAGE_TAG:?required}
     restart: unless-stopped
     init: true
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-data
       - qrtable-identity
@@ -101,6 +148,7 @@ services:
     image: ${IMAGE_REPOSITORY:?required}:catalog-${IMAGE_TAG:?required}
     restart: unless-stopped
     init: true
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-data
     environment:
@@ -137,6 +185,7 @@ services:
     image: ${IMAGE_REPOSITORY:?required}:order-${IMAGE_TAG:?required}
     restart: unless-stopped
     init: true
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-data
     environment:
@@ -179,6 +228,7 @@ services:
     image: ${IMAGE_REPOSITORY:?required}:kitchen-${IMAGE_TAG:?required}
     restart: unless-stopped
     init: true
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-data
     environment:
@@ -216,6 +266,7 @@ services:
     image: ${IMAGE_REPOSITORY:?required}:payment-${IMAGE_TAG:?required}
     restart: unless-stopped
     init: true
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-data
     environment:
@@ -264,6 +315,7 @@ services:
     image: ${IMAGE_REPOSITORY:?required}:saas-${IMAGE_TAG:?required}
     restart: unless-stopped
     init: true
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-data
     environment:
@@ -312,6 +364,7 @@ services:
     image: ${IMAGE_REPOSITORY:?required}:user-access-${IMAGE_TAG:?required}
     restart: unless-stopped
     init: true
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-data
       - qrtable-identity
@@ -343,6 +396,7 @@ services:
     image: ${IMAGE_REPOSITORY:?required}:management-app-${IMAGE_TAG:?required}
     restart: unless-stopped
     init: true
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-edge
     environment:
@@ -365,6 +419,7 @@ services:
   customer-pwa:
     image: ${IMAGE_REPOSITORY:?required}:customer-pwa-${IMAGE_TAG:?required}
     restart: unless-stopped
+    depends_on: *production-bootstrap-depends
     networks:
       - qrtable-edge
     healthcheck:

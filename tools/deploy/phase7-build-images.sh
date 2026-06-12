@@ -28,7 +28,25 @@ echo "Platform:   ${PLATFORM:-native (host)}"
 echo "Action:     ${OUTPUT_ARGS[*]}"
 echo "===================================="
 
-# 1. Build Backend Apps
+# 1. Build Production Tooling Image
+echo "Building production tooling image: [tooling]..."
+if [[ -n "${PLATFORM}" ]]; then
+  docker buildx build \
+    --platform "${PLATFORM}" \
+    -f docker/tooling.Dockerfile \
+    -t "${IMAGE_REPOSITORY}:tooling-${IMAGE_TAG}" \
+    "${OUTPUT_ARGS[@]}" \
+    .
+else
+  docker buildx build \
+    -f docker/tooling.Dockerfile \
+    -t "${IMAGE_REPOSITORY}:tooling-${IMAGE_TAG}" \
+    "${OUTPUT_ARGS[@]}" \
+    .
+fi
+echo "Successfully built [tooling]"
+
+# 2. Build Backend Apps
 for app in "${BACKEND_APPS[@]}"; do
   echo "Building backend image for service: [${app}]..."
   if [[ -n "${PLATFORM}" ]]; then
@@ -50,7 +68,7 @@ for app in "${BACKEND_APPS[@]}"; do
   echo "Successfully built [${app}]"
 done
 
-# 2. Build Management App
+# 3. Build Management App
 echo "Building frontend image: [management-app]..."
 if [[ -n "${PLATFORM}" ]]; then
   docker buildx build \
@@ -74,7 +92,7 @@ else
 fi
 echo "Successfully built [management-app]"
 
-# 3. Build Customer PWA
+# 4. Build Customer PWA
 echo "Building frontend image: [customer-pwa]..."
 if [[ -n "${PLATFORM}" ]]; then
   docker buildx build \

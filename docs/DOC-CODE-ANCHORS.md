@@ -43,6 +43,13 @@ Run `pnpm verify:doc-anchors` after changing docs, routes, enum display labels, 
 | Database provisioning             | `tools/database/provision-service-databases.js`                                  | Local per-service PostgreSQL creation and guarded reset.       |
 | Database ownership verifier       | `tools/database/verify-service-database-ownership.js`                            | Smoke check for missing or foreign service tables.             |
 | Split database seed guide         | `tools/dev-seed/README.md`                                                       | Destructive local reseed and verification workflow.            |
+| Production app Compose            | `docker-compose.app.yaml`                                                        | App containers and production bootstrap dependency gate.       |
+| Production tooling image          | `docker/tooling.Dockerfile`                                                      | One-shot migration/bootstrap tooling image.                    |
+| Production bootstrap script       | `tools/deploy/production-bootstrap.sh`                                           | Fail-fast migration, ownership, Kafka, and Keycloak sequence.  |
+| Production bootstrap Compose run  | `tools/deploy/phase7-run-production-bootstrap.sh`                                | Operator command for rerunning the one-shot bootstrap job.     |
+| Keycloak bootstrap                | `tools/keycloak-bootstrap.sh`                                                    | Realm/client/role bootstrap separated from demo-user creation. |
+| Kafka topic provisioning          | `tools/kafka/provision-topics.ts`                                                | Idempotent canonical topic provisioning.                       |
+| Canonical Kafka topics            | `libs/constants/src/lib/kafka-topic.constants.ts`                                | Shared durable Kafka topic registry.                           |
 | BFF dashboard report routes       | `apps/bff/src/app/modules/reporting/controllers/dashboard-report.controller.ts`  | Tenant report routes and `analytics_basic` feature gate.       |
 | BFF admin analytics routes        | `apps/bff/src/app/modules/reporting/controllers/admin-analytics.controller.ts`   | Super Admin platform analytics and tenant drilldown routes.    |
 | Report subscription context guard | `apps/bff/src/app/modules/reporting/guards/tenant-subscription-context.guard.ts` | Current subscription hydration before feature checks.          |

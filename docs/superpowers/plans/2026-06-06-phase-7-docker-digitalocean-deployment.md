@@ -386,18 +386,28 @@ Public allowed/disallowed-origin checks move to Task 12 smoke after DNS and HTTP
 
 ### Task 9: Migrations and production-safe Keycloak bootstrap
 
-**Outcome:** Schema and identity configuration are applied before app startup without destructive
-development behavior.
+**Status:** Implemented in the production app Compose and bootstrap tooling.
+
+**Outcome:** Schema, canonical Kafka topics, and identity configuration are applied before app
+startup without destructive development behavior.
 
 Scope:
 
-- package a one-shot migration/tooling image or use an equally reproducible one-shot job;
-- run `pnpm db:migrate`, `pnpm db:migration:show`, and `pnpm db:verify:ownership`;
-- stop deployment on any failure;
-- split realm/client/role bootstrap from demo-user creation;
-- update production redirect URIs and web origins idempotently;
-- never run `pnpm dev:reseed -- --yes` in production;
-- make demo data opt-in, non-destructive, and idempotent.
+- `docker/tooling.Dockerfile` packages the one-shot production tooling image.
+- `docker-compose.app.yaml` defines `production-bootstrap`; all app/frontend services depend on
+  `service_completed_successfully`.
+- `tools/deploy/production-bootstrap.sh` runs `pnpm db:migrate`, `pnpm db:migration:show`,
+  `pnpm db:verify:ownership`, `pnpm kafka:provision:topics`, and `pnpm auth:bootstrap:keycloak`
+  with `set -euo pipefail`.
+- `tools/deploy/phase7-run-production-bootstrap.sh` reruns the job with Compose
+  `--exit-code-from production-bootstrap`.
+- Keycloak realm/client/role/protocol mapper bootstrap is split from demo-user creation. Production
+  sets `AUTH_BOOTSTRAP_DEMO_USERS=false`, refuses placeholder client secrets, updates redirect URIs
+  and web origins idempotently, and refuses demo-user creation when `NODE_ENV=production`.
+- Kafka provisioning uses `KafkaTopicValues` from `libs/constants/src/lib/kafka-topic.constants.ts`;
+  topic creation is idempotent and rerunnable.
+- Production bootstrap does not call `pnpm dev:reseed -- --yes`, `db:reset:dev`, or deterministic
+  demo-password reset behavior.
 
 ### Task 10: Production monitoring baseline
 
@@ -527,11 +537,11 @@ but documentation and UI must not claim live SePay readiness.
 
 ## 8. Immediate Next Order
 
-1. Implement Task 9 migrations, canonical Kafka topic provisioning, and production-safe Keycloak
-   bootstrap.
-2. Implement Task 10 monitoring adaptation.
-3. Implement Task 7 proxy configuration.
-4. Provision and deploy through Task 11.
-5. Complete Task 12 smoke, recovery, demo, and canonical documentation.
+1. Implement Task 10 monitoring adaptation.
+2. Implement Task 7 proxy configuration.
+3. Provision and deploy through Task 11.
+4. Complete Task 12 smoke, recovery, demo, and canonical documentation.
 
-Task 6 runtime verification is complete. Tasks 7 and 9-12 remain.
+Task 6 runtime verification is complete. Task 9 bootstrap flow is implemented and statically
+verified; full runtime bootstrap against the Docker stack remains a pre-Task 11 deployment check.
+Tasks 7 and 10-12 remain.

@@ -2023,6 +2023,33 @@ pnpm db:verify:ownership
 
 Production deploy phải chạy `pnpm db:migrate` trước khi start app containers. Migration fail thì deployment phải dừng.
 
+Task 9 đóng gói rule này vào one-shot Compose job có thể rerun:
+
+```bash
+pnpm deploy:bootstrap:compose
+docker compose --env-file /opt/qrtable/.env.production -f docker-compose.app.yaml up -d --wait
+```
+
+Service `production-bootstrap` dùng image `tooling-${IMAGE_TAG}` và chạy theo đúng thứ tự:
+
+1. `pnpm db:migrate`
+2. `pnpm db:migration:show`
+3. `pnpm db:verify:ownership`
+4. `pnpm kafka:provision:topics`
+5. `pnpm auth:bootstrap:keycloak`
+
+Script dùng `set -euo pipefail`, còn Compose helper dùng `--exit-code-from production-bootstrap`,
+nên bất kỳ lỗi migration, ownership, Kafka hoặc Keycloak nào cũng dừng deployment. App containers
+trong `docker-compose.app.yaml` cũng phụ thuộc `production-bootstrap` với
+`service_completed_successfully`; clean app startup không thể bypass bootstrap gate.
+
+Kafka topic provisioning là idempotent và dùng canonical topic registry trong
+`libs/constants/src/lib/kafka-topic.constants.ts`.
+
+Keycloak production bootstrap cũng idempotent. Nó update realm settings, clients, redirect URIs, web
+origins, roles, service-account permissions và protocol mappers. Demo-user creation được tách sang
+`pnpm auth:bootstrap:demo-users` và bị từ chối khi `NODE_ENV=production`.
+
 ### 9.2 Multi-Database Strategy
 
 QRTable dùng một PostgreSQL instance nhưng nhiều databases (không phải schemas):
@@ -2047,6 +2074,9 @@ pnpm dev:verify-seed
 ```
 
 Nó chỉ reset bốn target service databases và giữ nguyên legacy `qrtable`. Không chạy `db:reset:dev` hoặc `dev:reseed` trên staging/production.
+
+Production demo data phải đi qua path riêng, opt-in, non-destructive và idempotent. Default
+production bootstrap không seed demo users và không reset passwords.
 
 ### 9.4 Backup Và Data Rollback — Khác Với App Rollback
 

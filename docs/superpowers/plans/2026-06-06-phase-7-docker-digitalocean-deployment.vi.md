@@ -384,18 +384,28 @@ Public allowed/disallowed-origin checks chuyển sang Task 12 sau khi DNS và HT
 
 ### Task 9: Migrations và production-safe Keycloak bootstrap
 
-**Kết quả:** Schema và identity config được áp dụng trước app startup mà không có development
-behavior destructive.
+**Trạng thái:** Đã triển khai trong production app Compose và bootstrap tooling.
+
+**Kết quả:** Schema, Kafka topics canonical và identity config được áp dụng trước app startup mà
+không có development behavior destructive.
 
 Scope:
 
-- package one-shot migration/tooling image hoặc job có khả năng tái lập tương đương;
-- chạy `pnpm db:migrate`, `pnpm db:migration:show`, `pnpm db:verify:ownership`;
-- dừng deployment nếu bất kỳ lệnh nào fail;
-- tách realm/client/role bootstrap khỏi demo-user creation;
-- update production redirect URI và web origin idempotently;
-- không chạy `pnpm dev:reseed -- --yes` trong production;
-- demo data là opt-in, non-destructive và idempotent.
+- `docker/tooling.Dockerfile` đóng gói one-shot production tooling image.
+- `docker-compose.app.yaml` định nghĩa `production-bootstrap`; tất cả app/frontend services
+  phụ thuộc `service_completed_successfully`.
+- `tools/deploy/production-bootstrap.sh` chạy `pnpm db:migrate`, `pnpm db:migration:show`,
+  `pnpm db:verify:ownership`, `pnpm kafka:provision:topics`, và `pnpm auth:bootstrap:keycloak`
+  với `set -euo pipefail`.
+- `tools/deploy/phase7-run-production-bootstrap.sh` rerun job bằng Compose
+  `--exit-code-from production-bootstrap`.
+- Keycloak realm/client/role/protocol mapper bootstrap đã tách khỏi demo-user creation. Production
+  đặt `AUTH_BOOTSTRAP_DEMO_USERS=false`, từ chối placeholder client secrets, update redirect URIs
+  và web origins idempotently, và từ chối tạo demo users khi `NODE_ENV=production`.
+- Kafka provisioning dùng `KafkaTopicValues` từ `libs/constants/src/lib/kafka-topic.constants.ts`;
+  topic creation idempotent và rerunnable.
+- Production bootstrap không gọi `pnpm dev:reseed -- --yes`, `db:reset:dev`, hoặc deterministic
+  demo-password reset behavior.
 
 ### Task 10: Production monitoring baseline
 
@@ -525,11 +535,10 @@ không được tuyên bố live SePay ready.
 
 ## 8. Thứ tự tiếp theo
 
-1. Triển khai Task 9 migrations, canonical Kafka topic provisioning và production-safe Keycloak
-   bootstrap.
-2. Triển khai Task 10 monitoring adaptation.
-3. Triển khai Task 7 proxy configuration.
-4. Provision và deploy theo Task 11.
-5. Hoàn thành Task 12 smoke, recovery, demo và canonical documentation.
+1. Triển khai Task 10 monitoring adaptation.
+2. Triển khai Task 7 proxy configuration.
+3. Provision và deploy theo Task 11.
+4. Hoàn thành Task 12 smoke, recovery, demo và canonical documentation.
 
-Task 6 đã hoàn tất runtime verification. Tasks 7 và 9-12 còn lại.
+Task 6 đã hoàn tất runtime verification. Task 9 bootstrap flow đã implement và static-verified; full
+runtime bootstrap với Docker stack vẫn là deployment check trước Task 11. Tasks 7 và 10-12 còn lại.
