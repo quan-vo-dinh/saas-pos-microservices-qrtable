@@ -306,6 +306,12 @@ state.
 
 ### Task 6: Application Compose và explicit env mapping
 
+**Trạng thái:** Đã triển khai trong `docker-compose.app.yaml`. Đã verify local Compose syntax,
+required-variable interpolation, rendered network membership và quy tắc không có ports/`env_file`.
+Management App và Customer PWA đạt healthy. Backend runtime verification đang bị chặn bởi backend
+release images hiện có: image không chứa runtime `node_modules` trong khi bundle cần
+`@opentelemetry/exporter-trace-otlp-http`.
+
 **Kết quả:** Tám backend service và hai frontend giao tiếp qua Docker service name.
 
 Scope:
@@ -514,11 +520,11 @@ không được tuyên bố live SePay ready.
 
 ## 8. Thứ tự tiếp theo
 
-1. Triển khai Task 6 app Compose với explicit environment mapping.
+1. Sửa và rebuild backend release images để cài đủ external runtime dependencies.
 2. Triển khai Task 9 migrations và production-safe Keycloak bootstrap.
 3. Triển khai Task 10 monitoring adaptation.
 4. Triển khai Task 7 proxy configuration.
 5. Provision và deploy theo Task 11.
 6. Hoàn thành Task 12 smoke, recovery, demo và canonical documentation.
 
-Tasks 6-12 còn lại sau khi hoàn thành Task 5 và Task 8.
+Task 6 đã triển khai với runtime blocker được ghi ở trên. Tasks 7 và 9-12 còn lại.

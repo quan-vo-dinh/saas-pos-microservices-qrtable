@@ -1,0 +1,370 @@
+name: qrtable-app
+
+networks:
+  qrtable-edge:
+    name: qrtable-edge
+    driver: bridge
+  qrtable-data:
+    name: qrtable-data
+    external: true
+  qrtable-identity:
+    name: qrtable-identity
+    external: true
+
+services:
+  bff:
+    image: ${IMAGE_REPOSITORY:?required}:bff-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    init: true
+    networks:
+      - qrtable-edge
+      - qrtable-data
+    environment:
+      NODE_ENV: production
+      GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
+      PORT: 3300
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_TTL: ${REDIS_TTL:-1800000}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_KITCHEN_SLA_WARNING_TOPIC: ${KAFKA_KITCHEN_SLA_WARNING_TOPIC:-kitchen.sla_warning}
+      KAFKA_PAYMENT_COMPLETED_TOPIC: ${KAFKA_PAYMENT_COMPLETED_TOPIC:-payment.completed}
+      KAFKA_BFF_CLIENT_ID: ${KAFKA_BFF_CLIENT_ID:-qrtable-bff-bridge}
+      KAFKA_BFF_CONSUMER_GROUP: ${KAFKA_BFF_CONSUMER_GROUP:-bff-kafka-bridge}
+      TCP_AUTHORIZER_SERVICE_HOST: authorizer
+      TCP_AUTHORIZER_SERVICE_PORT: 3204
+      TCP_CATALOG_SERVICE_HOST: catalog
+      TCP_CATALOG_SERVICE_PORT: 3205
+      TCP_ORDER_SERVICE_HOST: order
+      TCP_ORDER_SERVICE_PORT: 3201
+      TCP_KITCHEN_SERVICE_HOST: kitchen
+      TCP_KITCHEN_SERVICE_PORT: 3207
+      TCP_PAYMENT_SERVICE_HOST: payment
+      TCP_PAYMENT_SERVICE_PORT: 3208
+      TCP_SAAS_SERVICE_HOST: saas
+      TCP_SAAS_SERVICE_PORT: 3206
+      TCP_USER_ACCESS_SERVICE_HOST: user-access
+      TCP_USER_ACCESS_SERVICE_PORT: 3203
+      AUTHORIZER_SERVICE_HOST: authorizer
+      AUTHORIZER_SERVICE_PORT: 5100
+      CORS_ORIGINS: ${CORS_ORIGINS:?required}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?required}
+      PLATFORM_CONTACT_EMAIL: ${PLATFORM_CONTACT_EMAIL:-support@qrtable.local}
+      BFF_PAYMENT_TCP_TIMEOUT_MS: ${BFF_PAYMENT_TCP_TIMEOUT_MS:-5000}
+      SEPAY_WEBHOOK_SECRET: ${SEPAY_WEBHOOK_SECRET:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null "http://127.0.0.1:3300/$$GLOBAL_PREFIX/health/live"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  authorizer:
+    image: ${IMAGE_REPOSITORY:?required}:authorizer-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    init: true
+    networks:
+      - qrtable-data
+      - qrtable-identity
+    environment:
+      NODE_ENV: production
+      GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
+      AUTHORIZER_PORT: 3304
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
+      TCP_AUTHORIZER_SERVICE_HOST: 0.0.0.0
+      TCP_AUTHORIZER_SERVICE_PORT: 3204
+      TCP_USER_ACCESS_SERVICE_HOST: user-access
+      TCP_USER_ACCESS_SERVICE_PORT: 3203
+      AUTHORIZER_SERVICE_HOST: 0.0.0.0
+      AUTHORIZER_SERVICE_PORT: 5100
+      USER_ACCESS_SERVICE_HOST: user-access
+      USER_ACCESS_SERVICE_PORT: 5200
+      KEYCLOAK_HOST: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:?required}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:?required}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?required}
+      AUTH_AUTO_PROVISION_ON_FIRST_LOGIN: ${AUTH_AUTO_PROVISION_ON_FIRST_LOGIN:-false}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3304/api/health/live']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  catalog:
+    image: ${IMAGE_REPOSITORY:?required}:catalog-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    init: true
+    networks:
+      - qrtable-data
+    environment:
+      NODE_ENV: production
+      GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
+      CATALOG_PORT: 3305
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
+      TCP_CATALOG_SERVICE_HOST: 0.0.0.0
+      TCP_CATALOG_SERVICE_PORT: 3205
+      TCP_SAAS_SERVICE_HOST: saas
+      TCP_SAAS_SERVICE_PORT: 3206
+      TYPEORM_HOST: postgres
+      TYPEORM_PORT: 5432
+      TYPEORM_USERNAME: ${TYPEORM_USERNAME:?required}
+      TYPEORM_PASSWORD: ${TYPEORM_PASSWORD:?required}
+      TYPEORM_TYPE: postgres
+      TYPEORM_SYNCHRONIZE: 'false'
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
+      CATALOG_TYPEORM_DATABASE: ${CATALOG_TYPEORM_DATABASE:?required}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TENANT_CREATED_TOPIC: ${KAFKA_TENANT_CREATED_TOPIC:-tenant.created}
+      KAFKA_CATALOG_CLIENT_ID: ${KAFKA_CATALOG_CLIENT_ID:-qrtable-catalog-service}
+      KAFKA_CATALOG_TENANT_CONSUMER_GROUP: ${KAFKA_CATALOG_TENANT_CONSUMER_GROUP:-catalog-tenant-created-consumer-group}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null "http://127.0.0.1:3305/$$GLOBAL_PREFIX/health/live"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  order:
+    image: ${IMAGE_REPOSITORY:?required}:order-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    init: true
+    networks:
+      - qrtable-data
+    environment:
+      NODE_ENV: production
+      GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
+      ORDER_PORT: 3301
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
+      TCP_ORDER_SERVICE_HOST: 0.0.0.0
+      TCP_ORDER_SERVICE_PORT: 3201
+      TCP_CATALOG_SERVICE_HOST: catalog
+      TCP_CATALOG_SERVICE_PORT: 3205
+      TCP_SAAS_SERVICE_HOST: saas
+      TCP_SAAS_SERVICE_PORT: 3206
+      TYPEORM_HOST: postgres
+      TYPEORM_PORT: 5432
+      TYPEORM_USERNAME: ${TYPEORM_USERNAME:?required}
+      TYPEORM_PASSWORD: ${TYPEORM_PASSWORD:?required}
+      TYPEORM_TYPE: postgres
+      TYPEORM_SYNCHRONIZE: 'false'
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
+      ORDER_TYPEORM_DATABASE: ${ORDER_TYPEORM_DATABASE:?required}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-qrtable-order-service}
+      KAFKA_ORDER_CONFIRMED_TOPIC: ${KAFKA_ORDER_CONFIRMED_TOPIC:-order.confirmed}
+      KAFKA_ORDER_STATUS_CHANGED_TOPIC: ${KAFKA_ORDER_STATUS_CHANGED_TOPIC:-order.status_changed}
+      KAFKA_PAYMENT_COMPLETED_TOPIC: ${KAFKA_PAYMENT_COMPLETED_TOPIC:-payment.completed}
+      KAFKA_ORDER_PAYMENT_CONSUMER_GROUP: ${KAFKA_ORDER_PAYMENT_CONSUMER_GROUP:-order-payment-consumer-group}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null "http://127.0.0.1:3301/$$GLOBAL_PREFIX/health/live"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  kitchen:
+    image: ${IMAGE_REPOSITORY:?required}:kitchen-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    init: true
+    networks:
+      - qrtable-data
+    environment:
+      NODE_ENV: production
+      GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
+      KITCHEN_PORT: 3307
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
+      TCP_KITCHEN_SERVICE_HOST: 0.0.0.0
+      TCP_KITCHEN_SERVICE_PORT: 3207
+      TCP_ORDER_SERVICE_HOST: order
+      TCP_ORDER_SERVICE_PORT: 3201
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_ORDER_CONFIRMED_TOPIC: ${KAFKA_ORDER_CONFIRMED_TOPIC:-order.confirmed}
+      KAFKA_KITCHEN_SLA_WARNING_TOPIC: ${KAFKA_KITCHEN_SLA_WARNING_TOPIC:-kitchen.sla_warning}
+      KAFKA_KITCHEN_CLIENT_ID: ${KAFKA_KITCHEN_CLIENT_ID:-qrtable-kitchen-service}
+      KAFKA_KITCHEN_CONSUMER_GROUP: ${KAFKA_KITCHEN_CONSUMER_GROUP:-kitchen-service-group}
+      KDS_DEFAULT_SLA_SECONDS: ${KDS_DEFAULT_SLA_SECONDS:-900}
+      KDS_BREACH_GRACE_SECONDS: ${KDS_BREACH_GRACE_SECONDS:-300}
+      KDS_SLA_WORKER_INTERVAL_MS: ${KDS_SLA_WORKER_INTERVAL_MS:-5000}
+      KDS_RECALL_WINDOW_SECONDS: ${KDS_RECALL_WINDOW_SECONDS:-300}
+      KDS_READY_RETENTION_SECONDS: ${KDS_READY_RETENTION_SECONDS:-3600}
+      KDS_ARCHIVED_TTL_SECONDS: ${KDS_ARCHIVED_TTL_SECONDS:-86400}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null "http://127.0.0.1:3307/$$GLOBAL_PREFIX/health/live"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  payment:
+    image: ${IMAGE_REPOSITORY:?required}:payment-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    init: true
+    networks:
+      - qrtable-data
+    environment:
+      NODE_ENV: production
+      GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
+      PAYMENT_PORT: 3308
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
+      TCP_PAYMENT_SERVICE_HOST: 0.0.0.0
+      TCP_PAYMENT_SERVICE_PORT: 3208
+      TCP_ORDER_SERVICE_HOST: order
+      TCP_ORDER_SERVICE_PORT: 3201
+      TCP_SAAS_SERVICE_HOST: saas
+      TCP_SAAS_SERVICE_PORT: 3206
+      TYPEORM_HOST: postgres
+      TYPEORM_PORT: 5432
+      TYPEORM_USERNAME: ${TYPEORM_USERNAME:?required}
+      TYPEORM_PASSWORD: ${TYPEORM_PASSWORD:?required}
+      TYPEORM_TYPE: postgres
+      TYPEORM_SYNCHRONIZE: 'false'
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
+      PAYMENT_TYPEORM_DATABASE: ${PAYMENT_TYPEORM_DATABASE:?required}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_PAYMENT_COMPLETED_TOPIC: ${KAFKA_PAYMENT_COMPLETED_TOPIC:-payment.completed}
+      KAFKA_PAYMENT_CLIENT_ID: ${KAFKA_PAYMENT_CLIENT_ID:-qrtable-payment-service}
+      PAYMENT_SEPAY_QR_ACCOUNT: ${PAYMENT_SEPAY_QR_ACCOUNT:-}
+      PAYMENT_SEPAY_QR_BANK: ${PAYMENT_SEPAY_QR_BANK:-}
+      PAYMENT_ORDER_TCP_TIMEOUT_MS: ${PAYMENT_ORDER_TCP_TIMEOUT_MS:-5000}
+      PAYMENT_SECRETS_ENCRYPTION_KEY: ${PAYMENT_SECRETS_ENCRYPTION_KEY:?required}
+      SEPAY_OAUTH_BASE_URL: ${SEPAY_OAUTH_BASE_URL:-https://my.sepay.vn}
+      SEPAY_OAUTH_CLIENT_ID: ${SEPAY_OAUTH_CLIENT_ID:?required}
+      SEPAY_OAUTH_CLIENT_SECRET: ${SEPAY_OAUTH_CLIENT_SECRET:?required}
+      SEPAY_OAUTH_REDIRECT_URI: ${SEPAY_OAUTH_REDIRECT_URI:?required}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?required}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null "http://127.0.0.1:3308/$$GLOBAL_PREFIX/health/live"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  saas:
+    image: ${IMAGE_REPOSITORY:?required}:saas-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    init: true
+    networks:
+      - qrtable-data
+    environment:
+      NODE_ENV: production
+      GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
+      SAAS_PORT: 3306
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
+      TCP_SAAS_SERVICE_HOST: 0.0.0.0
+      TCP_SAAS_SERVICE_PORT: 3206
+      TCP_AUTHORIZER_SERVICE_HOST: authorizer
+      TCP_AUTHORIZER_SERVICE_PORT: 3204
+      TCP_USER_ACCESS_SERVICE_HOST: user-access
+      TCP_USER_ACCESS_SERVICE_PORT: 3203
+      TCP_CATALOG_SERVICE_HOST: catalog
+      TCP_CATALOG_SERVICE_PORT: 3205
+      TCP_ORDER_SERVICE_HOST: order
+      TCP_ORDER_SERVICE_PORT: 3201
+      TCP_PAYMENT_SERVICE_HOST: payment
+      TCP_PAYMENT_SERVICE_PORT: 3208
+      TYPEORM_HOST: postgres
+      TYPEORM_PORT: 5432
+      TYPEORM_USERNAME: ${TYPEORM_USERNAME:?required}
+      TYPEORM_PASSWORD: ${TYPEORM_PASSWORD:?required}
+      TYPEORM_TYPE: postgres
+      TYPEORM_SYNCHRONIZE: 'false'
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
+      SAAS_TYPEORM_DATABASE: ${SAAS_TYPEORM_DATABASE:?required}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TENANT_CREATED_TOPIC: ${KAFKA_TENANT_CREATED_TOPIC:-tenant.created}
+      KAFKA_SAAS_CLIENT_ID: ${KAFKA_SAAS_CLIENT_ID:-qrtable-saas-service}
+      SEPAY_PLATFORM_QR_ACCOUNT: ${SEPAY_PLATFORM_QR_ACCOUNT:-}
+      SEPAY_PLATFORM_QR_BANK: ${SEPAY_PLATFORM_QR_BANK:-}
+      SEPAY_PLATFORM_WEBHOOK_SECRET: ${SEPAY_PLATFORM_WEBHOOK_SECRET:-}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null "http://127.0.0.1:3306/$$GLOBAL_PREFIX/health/live"']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  user-access:
+    image: ${IMAGE_REPOSITORY:?required}:user-access-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    init: true
+    networks:
+      - qrtable-data
+      - qrtable-identity
+    environment:
+      NODE_ENV: production
+      GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
+      USER_ACCESS_PORT: 3303
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://tempo:4318}
+      TCP_USER_ACCESS_SERVICE_HOST: 0.0.0.0
+      TCP_USER_ACCESS_SERVICE_PORT: 3203
+      TCP_AUTHORIZER_SERVICE_HOST: authorizer
+      TCP_AUTHORIZER_SERVICE_PORT: 3204
+      TCP_SAAS_SERVICE_HOST: saas
+      TCP_SAAS_SERVICE_PORT: 3206
+      USER_ACCESS_SERVICE_HOST: 0.0.0.0
+      USER_ACCESS_SERVICE_PORT: 5200
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:?required}:${MONGO_ROOT_PASSWORD:?required}@mongodb:27017/?authSource=admin
+      USER_ACCESS_MONGO_DB_NAME: ${USER_ACCESS_MONGO_DB_NAME:?required}
+      DATABASE_SHARED_FALLBACK_ENABLED: 'false'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3303/api/health/live']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  management-app:
+    image: ${IMAGE_REPOSITORY:?required}:management-app-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    init: true
+    networks:
+      - qrtable-edge
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      AUTH_SECRET: ${AUTH_SECRET:?required}
+      AUTH_KEYCLOAK_ID: ${AUTH_KEYCLOAK_ID:?required}
+      AUTH_KEYCLOAK_SECRET: ${AUTH_KEYCLOAK_SECRET:?required}
+      AUTH_KEYCLOAK_ISSUER: ${AUTH_KEYCLOAK_ISSUER:?required}
+      AUTH_TRUST_HOST: 'true'
+      MANAGEMENT_BFF_BASE_URL: ${MANAGEMENT_BFF_BASE_URL:?required}
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3000/']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  customer-pwa:
+    image: ${IMAGE_REPOSITORY:?required}:customer-pwa-${IMAGE_TAG:?required}
+    restart: unless-stopped
+    networks:
+      - qrtable-edge
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1/']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
