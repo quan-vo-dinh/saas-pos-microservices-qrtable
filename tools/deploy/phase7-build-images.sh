@@ -2,7 +2,7 @@
 set -euo pipefail
 
 IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-registry.digitalocean.com/qrtable/qrtable}"
-IMAGE_TAG="${IMAGE_TAG:-phase7}"
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse HEAD)}"
 PLATFORM="${PLATFORM:-}" # Empty for native (fast local builds)
 BACKEND_APPS=(bff authorizer catalog order kitchen payment saas user-access)
 

@@ -49,6 +49,9 @@ Run `pnpm verify:doc-anchors` after changing docs, routes, enum display labels, 
 | Production tooling image          | `docker/tooling.Dockerfile`                                                      | One-shot migration/bootstrap tooling image.                    |
 | Production bootstrap script       | `tools/deploy/production-bootstrap.sh`                                           | Fail-fast migration, ownership, Kafka, and Keycloak sequence.  |
 | Production bootstrap Compose run  | `tools/deploy/phase7-run-production-bootstrap.sh`                                | Operator command for rerunning the one-shot bootstrap job.     |
+| Production preflight              | `tools/deploy/phase7-preflight.sh`                                               | Fail-fast host, env, capacity, and Compose validation.         |
+| Production deployment runbook     | `docs/guides/production-deployment-runbook.md`                                   | Task 11 manual provisioning and deployment procedure.          |
+| Production human checklist        | `docs/guides/production-deployment-checklist.md`                                 | Human approvals and redacted Session 2 handoff.                |
 | Keycloak bootstrap                | `tools/keycloak-bootstrap.sh`                                                    | Realm/client/role bootstrap separated from demo-user creation. |
 | Kafka topic provisioning          | `tools/kafka/provision-topics.ts`                                                | Idempotent canonical topic provisioning.                       |
 | Canonical Kafka topics            | `libs/constants/src/lib/kafka-topic.constants.ts`                                | Shared durable Kafka topic registry.                           |

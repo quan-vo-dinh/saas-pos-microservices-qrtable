@@ -5,20 +5,21 @@
 > **Goal:** Lock down the quality of the QRTable SaaS POS system with multi-tier automated testing, make the distributed system **observable** (service health, log, metrics, trace), and package **deploy + sample data + demo script** for end-to-end reproducible thesis and review — reduce business regression risk (single, cash, multi-tenant, kitchen) and demonstrate the QR → kitchen → payment flow to the board.
 > **Estimated:** ~3–5 weeks (total Phase 5 + 6 + 7)
 > **Status:** ◐ In progress — Phase 5 Testing remains in progress. The Phase 7 production image,
-> Compose, bootstrap, and reverse-proxy foundations are implemented; public deployment, HTTPS
-> issuance, smoke, recovery, and demo evidence remain.
+> Compose, bootstrap, reverse proxy, Task 11 runbook, human checklist, and preflight foundations are
+> implemented; public deployment, HTTPS issuance, smoke, recovery, and demo evidence remain.
 
 ## Prerequisites
 
 - Completed core phases closed on critical/demo path: **0, 1, 2A, 2B, 3**, SaaS part completed at **4B**, and the representative **4A Order Confirm Saga** slice has been implemented. Full Phase 4A operational hardening and Phase 4C Staff Management have not started; they do not block Phase 5-7 unless the demo requires durable saga-state/CDC/retry-worker hardening or staff management. Notification/email is outside the current implementation scope.
 
-## Current Status Snapshot (2026-06-12)
+## Current Status Snapshot (2026-06-13)
 
 - **Phase 5 Testing progress:** ~75-80% for the testing workstream, based on traceability coverage,
   implemented test inventory, and the latest M2 local integration evidence.
 - **Phase 6/7 foundation:** Production monitoring and the Caddy reverse-proxy layer are implemented
-  alongside the production images, infra/app Compose, and bootstrap gate. DigitalOcean provisioning,
-  public certificates, external smoke, backup/rollback proof, and demo evidence remain.
+  alongside the production images, infra/app Compose, bootstrap gate, 4 GB budget tuning, production
+  runbook, human checklist, and fail-fast preflight. DigitalOcean provisioning, public certificates,
+  external smoke, backup/rollback proof, and demo evidence remain.
 - **Traceability matrix:** 52 P0/P1 rows: 38 covered, 9 partial, 1 implementation gap, and 4 deferred by phase. Remaining P0 partial rows are Order state/stock live compensation fault injection, SaaS onboarding saga live Authorizer/User-Access proof, and suspended Customer PWA pending-bill browser exception.
 - **Fresh deterministic gate:** `pnpm nx test frontend-utils` passed on 2026-06-01 with 36 tests passed and 36 runtime-dependent integration tests skipped by design.
 - **Fresh full unit/contract gate:** `pnpm exec nx run-many -t test --parallel=3` passed for all 23 projects after updating the stale `guards:test` and `management-app:test` expectations to the current contracts.
@@ -33,6 +34,8 @@
 | technical-architecture.md                   | §14 Deployment — deploy, compose, environment                                                                                                                       |
 | business-logic.md                           | Complete — automated testing to **validate** the described business rules (state machine, money, tokens, tenant isolation), does not replace business documentation |
 | testing/phase-5/saga-validation-strategy.md | Focused thesis evidence strategy for Order Confirm Saga and SaaS Onboarding Mini-Saga                                                                               |
+| guides/production-deployment-runbook.md     | Task 11 DigitalOcean provisioning, deployment, rollback, and troubleshooting procedure                                                                              |
+| guides/production-deployment-checklist.md   | Human approvals and redacted handoff for the production deployment session                                                                                          |
 
 ## Overview
 
@@ -375,8 +378,8 @@ Phase 5 canonicalizes testing for **deployed or finalized behavior as current co
 - **Deployment Artifact** (Dockerfile multi-stage, layered composition, seed, demo script) — allows re-establishing the QRTable POS system in a standard environment without depending on personal computer configuration.
 
 **Document status:** roadmap/spec canonicalized; Phase 5 Testing remains **in progress**. The Phase
-7 deployment foundation is implemented, while public deployment, smoke, recovery, and demo
-acceptance remain open.
+7 deployment/runbook/preflight foundation is implemented, while public deployment, smoke, recovery,
+and demo acceptance remain open.
 
 ## Note the Roadmap
 

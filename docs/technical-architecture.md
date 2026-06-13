@@ -1560,6 +1560,11 @@ their Docker service names, Keycloak to `keycloak:8080`, and protected Grafana t
 Automatic HTTPS state is persisted in named Caddy data/config volumes. Keycloak management port
 `9000`, Prometheus, Loki, Tempo, and all datastores remain private.
 
+The initial production capacity profile is one 2 vCPU / 4 GiB RAM / 25 GB Droplet with 2–4 GiB
+swap. Kafka uses a 512 MiB heap inside a 1 GiB container limit, and Keycloak uses a 384 MiB heap
+inside a 768 MiB limit. Images are built and pushed off-host; the Droplet only pulls immutable tags.
+An 8 GiB resize is temporary and evidence-driven, not the default architecture.
+
 ### 14.2 Build Pipeline
 
 ```bash
@@ -1570,13 +1575,13 @@ pnpm nx run-many -t test       # Run all tests
 pnpm nx run-many -t lint       # Lint all projects
 pnpm nx affected -t test       # Test only affected by changes
 
-# Docker Build (Multi-stage)
+# Docker Build (Multi-stage, trusted workstation or CI)
 pnpm nx run-many -t build      # Build all apps
 docker compose -f docker-compose.infra.yaml up -d   # Infra
-docker compose -f docker-compose.app.yaml up -d     # Apps
 docker compose -f docker-compose.monitoring.yaml up -d # Monitoring
 
 # Production Deploy
+tools/deploy/phase7-preflight.sh                    # Host, env, capacity, Compose
 pnpm deploy:bootstrap:compose                      # Fail-fast schema/topic/identity bootstrap
 docker compose -f docker-compose.app.yaml up -d    # Apps after bootstrap gate
 docker compose -f docker-compose.proxy.yaml up -d  # Proxy after DNS/firewall readiness
@@ -1584,11 +1589,11 @@ docker compose -f docker-compose.proxy.yaml up -d  # Proxy after DNS/firewall re
 
 ### 14.3 Environment Strategy
 
-| Environment    | Database   | Kafka  | Keycloak | SePay         | Monitoring |
-| -------------- | ---------- | ------ | -------- | ------------- | ---------- |
-| **Local**      | Docker PG  | Docker | Docker   | SePay sandbox | Optional   |
-| **Staging**    | Docker PG  | Docker | Docker   | SePay sandbox | Full stack |
-| **Production** | Managed PG | Docker | Docker   | SePay live    | Full stack |
+| Environment    | Database  | Kafka  | Keycloak | SePay         | Monitoring |
+| -------------- | --------- | ------ | -------- | ------------- | ---------- |
+| **Local**      | Docker PG | Docker | Docker   | SePay sandbox | Optional   |
+| **Staging**    | Docker PG | Docker | Docker   | SePay sandbox | Full stack |
+| **Production** | Docker PG | Docker | Docker   | Approved mode | Full stack |
 
 ---
 
@@ -1641,8 +1646,8 @@ Phase 4C — Staff Management:
 Phase 4D — Dashboard + Reporting:
 └── Completed. Includes report permissions, source-owner reporting read models, package feature gating, and dashboard UI polish.
 
-Phase 5-7 — Testing + Observability + Deploy:
-└── In progress. Phase 7 deployment foundation is implemented; DigitalOcean provisioning, public HTTPS, smoke, recovery, and demo evidence remain.
+Phase 5 + Phase 7 — Testing + Deploy:
+└── In progress. Phase 7 deployment foundation and Task 11 preparation are implemented; DigitalOcean provisioning, public HTTPS, smoke, recovery, and demo evidence remain.
 ```
 
 ---

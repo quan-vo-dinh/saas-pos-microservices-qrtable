@@ -5,20 +5,21 @@
 > **Mục tiêu:** Khóa chất lượng hệ thống QRTable SaaS POS bằng kiểm thử tự động đa tầng, làm hệ phân tán **có thể quan sát** (health service, log, metrics, trace), và đóng gói **deploy + dữ liệu mẫu + kịch bản demo** để luận văn và hội đồng tái hiện end-to-end — giảm rủi ro hồi quy nghiệp vụ (đơn lẻ, tiền mặt, đa tenant, bếp) và trình diễn luồng QR → bếp → thanh toán.
 > **Ước lượng:** ~3–5 tuần (tổng Phase 5 + 6 + 7)
 > **Trạng thái:** ◐ Đang thực hiện — Phase 5 Testing vẫn đang thực hiện. Nền tảng production image,
-> Compose, bootstrap và reverse proxy của Phase 7 đã triển khai; public deployment, HTTPS issuance,
-> smoke, recovery và demo evidence còn lại.
+> Compose, bootstrap, reverse proxy, Task 11 runbook, human checklist và preflight của Phase 7 đã
+> triển khai; public deployment, HTTPS issuance, smoke, recovery và demo evidence còn lại.
 
 ## Điều kiện tiên quyết
 
 - Các phase lõi đã đóng trên đường critical/demo: **0, 1, 2A, 2B, 3**, phần SaaS hoàn thành ở **4B**, và lát cắt đại diện **4A Order Confirm Saga** đã triển khai. Full hardening vận hành của Phase 4A và Phase 4C Quản lý nhân sự chưa bắt đầu; không chặn Phase 5–7 trừ khi demo bắt buộc hardening kiểu Saga state bền vững/CDC/retry worker hoặc quản lý nhân sự. Notification/email nằm ngoài phạm vi triển khai hiện tại.
 
-## Snapshot trạng thái hiện tại (2026-06-12)
+## Snapshot trạng thái hiện tại (2026-06-13)
 
 - **Tiến độ Phase 5 Testing:** ~75-80% cho workstream testing, dựa trên traceability coverage,
   inventory test đã có và bằng chứng integration M2 local mới nhất.
 - **Nền tảng Phase 6/7:** Production monitoring và Caddy reverse-proxy layer đã triển khai cùng
-  production images, infra/app Compose và bootstrap gate. DigitalOcean provisioning, public
-  certificates, external smoke, backup/rollback proof và demo evidence còn lại.
+  production images, infra/app Compose, bootstrap gate, tuning budget 4 GB, production runbook,
+  human checklist và fail-fast preflight. DigitalOcean provisioning, public certificates, external
+  smoke, backup/rollback proof và demo evidence còn lại.
 - **Traceability matrix:** 52 dòng P0/P1: 38 covered, 9 partial, 1 implementation gap và 4 deferred by phase. Các P0 còn partial là Order state/stock live compensation fault injection, SaaS onboarding saga live Authorizer/User-Access proof, và suspended Customer PWA pending-bill browser exception.
 - **Gate deterministic mới:** `pnpm nx test frontend-utils` pass ngày 2026-06-01 với 36 test passed và 36 runtime-dependent integration tests skip có chủ đích.
 - **Gate unit/contract đầy đủ mới:** `pnpm exec nx run-many -t test --parallel=3` đã pass toàn bộ 23 projects sau khi cập nhật expectation cũ ở `guards:test` và `management-app:test` theo contract hiện tại.
@@ -33,6 +34,8 @@
 | technical-architecture.md                   | §14 Deployment — deploy, compose, môi trường                                                                                                         |
 | business-logic.md                           | Toàn bộ — kiểm thử tự động **xác minh** quy tắc nghiệp vụ đã mô tả (state machine, tiền, token, tenant isolation), không thay thế tài liệu nghiệp vụ |
 | testing/phase-5/saga-validation-strategy.md | Chiến lược bằng chứng khóa luận cho Order Confirm Saga và SaaS Onboarding Mini-Saga                                                                  |
+| guides/production-deployment-runbook.md     | Quy trình Task 11 cho DigitalOcean provisioning, deployment, rollback và troubleshooting                                                             |
+| guides/production-deployment-checklist.md   | Human approvals và redacted handoff cho production deployment session                                                                                |
 
 ## Tổng quan
 
@@ -375,8 +378,8 @@ Phase 5 chuẩn hóa test cho **hành vi đã deploy hoặc chốt là contract 
 - **Artifact triển khai** (Dockerfile multi-stage, compose phân lớp, seed, script demo) — tái lập hệ thống QRTable POS trong môi trường chuẩn không phụ thuộc cấu hình máy cá nhân.
 
 **Trạng thái tài liệu:** roadmap/spec đã canonical hóa; Phase 5 Testing vẫn **đang thực hiện**.
-Deployment foundation Phase 7 đã triển khai, còn public deployment, smoke, recovery và demo
-acceptance vẫn mở.
+Deployment/runbook/preflight foundation Phase 7 đã triển khai, còn public deployment, smoke,
+recovery và demo acceptance vẫn mở.
 
 ## Ghi chú lộ trình
 

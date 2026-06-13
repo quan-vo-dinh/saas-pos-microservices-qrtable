@@ -164,7 +164,8 @@ after the first stable public deployment.
 - One DigitalOcean Droplet.
 - Ubuntu LTS.
 - Docker Engine and Docker Compose plugin.
-- Recommended size: 4 vCPU / 8 GiB RAM.
+- Budget target: the existing 2 vCPU / 4 GiB RAM / 25 GB Droplet with 2–4 GiB swap.
+- Temporary 8 GiB resize only after representative runtime evidence shows sustained pressure.
 - Self-host PostgreSQL, MongoDB, Redis, Kafka, Keycloak, and monitoring.
 - Enable DigitalOcean backups.
 - Use a Reserved IP when available.
@@ -449,6 +450,9 @@ Do not add long-term object storage or enterprise retention in Phase 7.
 
 ### Task 11: Provision DigitalOcean and deploy
 
+**Preparation status (2026-06-13):** Runbook, human checklist, 4 GB tuning, and fail-fast preflight
+are implemented. No production provisioning or deployment has been performed.
+
 **Outcome:** A public HTTPS deployment runs from an immutable image tag.
 
 Human actions:
@@ -469,8 +473,15 @@ Agent/script actions:
 - start monitoring, app, and proxy layers;
 - verify public TLS and container/network state.
 
-The first release can use manual image push/pull or a server build. It does not require a production
-CI/CD platform.
+Operator references:
+
+- `docs/guides/production-deployment-runbook.md`;
+- `docs/guides/production-deployment-checklist.md`;
+- `tools/deploy/phase7-preflight.sh`.
+
+Build and push `linux/amd64` images on a trusted workstation or CI runner. The Droplet only pulls
+immutable images; it never builds them. The first release does not require a production CI/CD
+platform.
 
 ### Task 12: Smoke, backup, rollback, demo, and documentation
 
@@ -561,4 +572,4 @@ but documentation and UI must not claim live SePay readiness.
 Task 6 runtime verification is complete. Task 9 bootstrap flow is implemented and statically
 verified; full runtime bootstrap against the Docker stack remains a pre-Task 11 deployment check.
 Task 7 proxy configuration is implemented and statically/runtime-config verified without requesting
-public certificates. Tasks 11 and 12 remain.
+certificates. Task 11 preparation is complete; Task 11 execution and Task 12 remain.

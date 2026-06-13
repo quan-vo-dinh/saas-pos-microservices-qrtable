@@ -37,12 +37,15 @@
 
 ### Context7 sources used
 
-This document was supplemented based on Context7 lookup on 2026-06-06:
+This document was supplemented based on Context7 lookups on 2026-06-06 and 2026-06-13:
 
-| Topic               | Context7 library              | Used to reinforce which sections                                                                                                           |
-| ------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Docker core docs    | `/docker/docs`                | Image/container model, Dockerfile, BuildKit, Buildx, Compose, volumes, health checks, registry, GitHub Actions build-push workflow         |
-| GitHub Actions docs | `/websites/github_en_actions` | Workflow jobs, `needs`, `permissions`, `environment: production`, deployment protection rules, required approval, secrets, deployment jobs |
+| Topic               | Context7 library                | Used to reinforce which sections                                                                                                           |
+| ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Docker core docs    | `/docker/docs`                  | Image/container model, Dockerfile, BuildKit, Buildx, Compose, volumes, health checks, registry, GitHub Actions build-push workflow         |
+| GitHub Actions docs | `/websites/github_en_actions`   | Workflow jobs, `needs`, `permissions`, `environment: production`, deployment protection rules, required approval, secrets, deployment jobs |
+| DigitalOcean docs   | `/websites/digitalocean`        | Recommended Droplet setup, SSH keys, Reserved IPs, backups, snapshots, and Cloud Firewall operations                                       |
+| Porkbun DNS API     | `/websites/porkbun_api_json_v3` | Relative record names, A record content, and the 600-second minimum/default TTL                                                            |
+| Caddy docs          | `/websites/caddyserver`         | Automatic HTTPS prerequisites, public ports, reverse proxy behavior, and certificate operations                                            |
 
 Primary sources:
 
@@ -53,6 +56,9 @@ Primary sources:
 - [Docker guide: Next.js with GitHub Actions](https://github.com/docker/docs/blob/main/content/guides/nextjs/configure-github-actions.md)
 - [GitHub Actions: deploy to an environment](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/deploy-to-environment)
 - [GitHub Actions: deployments and environments](https://docs.github.com/en/actions/deployment/about-deployments/deploying-with-github-actions)
+- [DigitalOcean recommended Droplet setup](https://docs.digitalocean.com/products/droplets/getting-started/recommended-droplet-setup/)
+- [Porkbun DNS management](https://kb.porkbun.com/article/68-how-to-edit-dns-records)
+- [Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https)
 
 ### How this guide covers the Phase 7 plan
 
@@ -65,13 +71,10 @@ Primary sources:
 | Task 5-6: Infra/app Compose                                 | Compose services, internal networks, service discovery, named volumes, health checks, layered compose   |
 | Task 7: Caddy reverse proxy                                 | Reverse proxy role, TLS termination, Let's Encrypt ACME, WebSocket forwarding                           |
 | Task 8: Production env and secrets                          | Secret taxonomy, runtime env files, file permissions, no secret build args                              |
-| Task 9: Schema/migration lifecycle                          | Per-service migrations with `TYPEORM_SYNCHRONIZE=false`                                                 |
-| Task 10: Keycloak public bootstrap                          | Public hostnames, TLS, proxy headers, env separation                                                    |
-| Task 11: SePay production integration                       | HTTPS-only webhook requirement, public API base URL, secret-key verification, CI negative checks        |
-| Task 12: Monitoring rewiring                                | Internal scrape targets, private observability stores, Grafana behind HTTPS/auth                        |
-| Task 13-16: DigitalOcean deploy, smoke, backup, operations  | Droplet sizing, firewall, DNS, Docker Engine install, preflight, smoke tests, backup and rollback model |
-| Task 17: CI/CD pipeline                                     | CI quality gate, image release workflow, production deploy approval, rollback workflow, audit trail     |
-| Task 18: Canonical docs                                     | Why implementation must update phase docs, architecture docs, and doc-code anchors                      |
+| Task 9: Production bootstrap                                | Per-service migrations, ownership verification, Kafka topics, and Keycloak bootstrap                    |
+| Task 10: Monitoring baseline                                | Internal scrape targets, private observability stores, Grafana behind HTTPS/auth                        |
+| Task 11: DigitalOcean provisioning and deployment           | 4 GB budget profile, firewall, Porkbun DNS, Docker setup, preflight, startup order, and public HTTPS    |
+| Task 12: Smoke, backup, rollback, demo, and docs            | External smoke, logical backup, restore proof, image rollback, demo evidence, and canonical docs        |
 
 ---
 
@@ -101,7 +104,10 @@ Many people ask: why not use Heroku, Railway, or DigitalOcean App Platform — P
 
 **Academic reason:** For a thesis/graduation project, self-deploying on a VPS (Droplet) with Docker Compose demonstrates real system operations capability better than using a managed service that hides the entire infrastructure layer.
 
-**Cost reason:** One 4 vCPU / 8 GiB Droplet ≈ $48/month holds the entire stack. DigitalOcean App Platform with 10 services costs much more. Managed Kafka on DigitalOcean is a high-priced multi-node cluster unsuitable for thesis/pilot.
+**Cost reason:** One 2 vCPU / 4 GiB Basic Droplet keeps the thesis/pilot topology on one host and
+fits the approved budget for at least two months. Resize to 8 GiB only when representative runtime
+evidence shows sustained memory pressure. Managed multi-service alternatives cost more and hide
+more of the infrastructure behavior that Phase 7 is intended to demonstrate.
 
 ---
 
@@ -1609,11 +1615,14 @@ docker compose --env-file docker/env/.env.production \
    → Prometheus, Loki, Promtail, Tempo, Grafana start
    → Promtail begins collecting logs from containers (including infra layer)
 
-3. docker compose -f docker-compose.app.yaml up -d
-   → All services start with explicit per-service environment mappings
-   → BFF waits for all microservices TCP reachable
+3. tools/deploy/phase7-run-production-bootstrap.sh
+   → Migrations → ownership verification → Kafka topics → Keycloak bootstrap
+   → Any failure blocks application startup
 
-4. docker compose -f docker-compose.proxy.yaml up -d
+4. docker compose -f docker-compose.app.yaml up -d
+   → All services start with explicit per-service environment mappings
+
+5. docker compose -f docker-compose.proxy.yaml up -d
    → Caddy starts, requests Let's Encrypt certs
    → HTTPS live for api, app, qr, auth, grafana subdomains
 ```
@@ -1901,8 +1910,8 @@ docker/env/.env.production.example  ← commit this (template with keys, no valu
 ARG DATABASE_PASSWORD
 ENV DATABASE_PASSWORD=$DATABASE_PASSWORD
 
-# ✅ Correct — secret injected runtime only via env_file
-# Nothing about secrets in Dockerfile
+# ✅ Correct — secret mapped explicitly by production Compose at runtime
+# Nothing about secrets in Dockerfile or image history
 ```
 
 ### 7.4 Practical Secret Management for QRTable
@@ -1924,19 +1933,20 @@ ls -la /opt/qrtable/.env.production
 # -rw------- 1 user user ... .env.production (0600)
 ```
 
-**In docker-compose.app.yaml:**
+**In `docker-compose.app.yaml`:**
 
 ```yaml
 services:
   bff:
-    env_file: /opt/qrtable/.env.production # load file from server
-    environment: # per-service overrides
+    environment:
+      NODE_ENV: production
       REDIS_HOST: redis
-      ORDER_SERVICE_HOST: order
-      # ... host/port values per-service, override values in env_file
+      CORS_ORIGINS: ${CORS_ORIGINS:?required}
 ```
 
-`env_file` loads all vars from the file. `environment` overrides. This pattern allows one shared env file for the entire stack, with each service overriding what it needs (host names, ports).
+Compose uses `/opt/qrtable/.env.production` only for interpolation through `--env-file`. Each
+service receives an explicit allowlist under `environment:`. Do not use service-level `env_file`
+because it would inject unrelated secrets into every container.
 
 ---
 
@@ -1944,13 +1954,17 @@ services:
 
 ### 8.1 Droplet Sizing and Rationale
 
-| Tier                | Config                        | Use case                               |
-| ------------------- | ----------------------------- | -------------------------------------- |
-| Budget smoke        | 2 vCPU / 4 GiB                | Demo windows, monitoring off           |
-| Pilot (recommended) | 4 vCPU / 8 GiB                | Thesis demo, monitoring on, full stack |
-| Hardening           | 4+ vCPU / 8+ GiB + managed DB | After thesis when data safety needed   |
+| Tier                  | Config                        | Use case                                                   |
+| --------------------- | ----------------------------- | ---------------------------------------------------------- |
+| Budget pilot (target) | 2 vCPU / 4 GiB + 2–4 GiB swap | Thesis demo and limited use with bounded retention         |
+| Temporary resize      | 4 vCPU / 8 GiB                | Only after measured OOM, sustained low memory, or paging   |
+| Hardening             | 4+ vCPU / 8+ GiB + managed DB | After thesis when availability and data safety need growth |
 
-**Why 4 vCPU / 8 GiB for pilot?** Keycloak alone uses ~512MB RAM, Kafka + ZK ~1GB, PostgreSQL ~256MB, monitoring stack ~1GB, 8 NestJS services ~64–128MB each. Total: 4–6 GiB. 8 GiB provides headroom.
+Local Phase 7 evidence measured the idle infrastructure and monitoring containers at about 2.4 GiB
+before the budget tuning. The production profile limits Kafka to a 512 MiB heap and Keycloak to a
+384 MiB heap. The 4 GiB target therefore requires swap, bounded logs/retention, off-host image
+builds, and runtime monitoring. See
+[`production-deployment-runbook.md`](production-deployment-runbook.md) for resize thresholds.
 
 **Region `sgp1` (Singapore):** Closest to Vietnam → lowest latency. Check availability because not every DO product is in every region.
 
@@ -1979,49 +1993,39 @@ Deny everything else:
 
 ### 8.3 Docker Engine Installation — From Official Repository
 
-Ubuntu package manager has `docker.io` (old Ubuntu version). Install from Docker official repo for the latest version:
+Follow the current [official Docker Engine installation instructions for Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
+Do not reuse an old copied repository-key block because Docker updates package repository setup over
+time. Install Docker Engine, containerd, Buildx, and the Compose plugin, then verify:
 
 ```bash
-# Add Docker official GPG key
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-# Add Docker repository
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Install Docker Engine + Compose plugin
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Verify
-docker --version           # Docker Engine version
-docker compose version     # Docker Compose plugin version
+docker version
+docker compose version
+docker buildx version
+docker info
 ```
 
-`**docker compose` (plugin) vs `docker-compose` (legacy standalone):\*\*
-Modern Docker uses `docker compose` (space, no hyphen) — the built-in plugin. `docker-compose` is the older standalone binary. Phase 7 uses the plugin.
+Modern Docker uses `docker compose` with a space. `docker-compose` is the legacy standalone binary
+and is not used by Phase 7.
 
 ### 8.4 DNS Configuration
 
 Before starting Caddy, DNS must resolve correctly:
 
 ```bash
-# Create A records in DigitalOcean DNS (or domain registrar):
-api.qrtable.vodinhquan.dev  → <Droplet IPv4>
-app.qrtable.vodinhquan.dev  → <Droplet IPv4>
-qr.qrtable.vodinhquan.dev   → <Droplet IPv4>
-auth.qrtable.vodinhquan.dev → <Droplet IPv4>
-grafana.qrtable.vodinhquan.dev → <Droplet IPv4>
+# In Porkbun, manage vodinhquan.dev and enter relative Host/Name values:
+api.qrtable      → <Reserved IP or approved final IPv4>
+app.qrtable      → <same IPv4>
+qr.qrtable       → <same IPv4>
+auth.qrtable     → <same IPv4>
+grafana.qrtable  → <same IPv4>
 
 # Verify propagation (may take 5-30 minutes)
 dig +short api.qrtable.vodinhquan.dev
 # Must return Droplet IP
 ```
 
-**TTL recommendation:** When setting up for the first time, set low TTL (60–300 seconds) so if IP is wrong you can fix quickly. After stable, set higher TTL (3600 seconds).
+Use TTL `600` for the initial deployment. Porkbun's official API documents `600` seconds as the
+minimum and default. Remove conflicting A, AAAA, CNAME, or forwarding records at the same names.
 
 ### 8.5 Server Layout and Preflight Checks
 
@@ -2029,13 +2033,12 @@ Production server needs a stable layout so deploy scripts do not depend on user 
 
 ```text
 /opt/qrtable/
-  docker-compose.infra.yaml
-  docker-compose.app.yaml
-  docker-compose.proxy.yaml
-  docker-compose.monitoring.yaml
-  docker-compose.monitoring.prod.yaml
-  docker/
-  tools/deploy/
+  current/
+    docker-compose.infra.yaml
+    docker-compose.app.yaml
+    docker-compose.proxy.yaml
+    docker/
+    tools/deploy/
   releases/
     current
     history.log
@@ -2044,16 +2047,17 @@ Production server needs a stable layout so deploy scripts do not depend on user 
 /opt/qrtable/.env.production     # private, permission 0600
 ```
 
-Preflight is the check before changing production state. It should fail early if conditions are missing:
+Preflight is the check before changing production state. Use the committed script:
 
 ```bash
-test -f /opt/qrtable/.env.production
-test "$(stat -c %a /opt/qrtable/.env.production)" = "600"
-test -n "${IMAGE_TAG:-}"
-docker compose -f docker-compose.app.yaml config > /dev/null
-docker login registry.digitalocean.com
-docker pull "registry.digitalocean.com/qrtable/bff:${IMAGE_TAG}"
+cd /opt/qrtable/current
+ENV_FILE=/opt/qrtable/.env.production tools/deploy/phase7-preflight.sh
 ```
+
+It checks the non-root operator, env ownership/mode, unresolved placeholders, immutable tag,
+production safety values, 4 GiB RAM profile, at least 2 GiB swap, disk headroom, Docker access, and
+the rendered four-layer Compose configuration. Image pull is a separate explicit step after
+preflight passes.
 
 **Do not confuse preflight with smoke test:**
 
@@ -2412,16 +2416,16 @@ jobs:
         run: |
           ssh -i "${{ secrets.PRODUCTION_SSH_KEY }}" \
             "${{ secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST }}" \
-            "cd /opt/qrtable && ./tools/deploy/phase7-preflight.sh"
+            "cd /opt/qrtable/current && ./tools/deploy/phase7-preflight.sh"
 
       - name: Backup before deploy
         if: inputs.run_backup == 'true'
         run: |
-          ssh ... "cd /opt/qrtable && ./tools/deploy/phase7-backup.sh"
+          ssh ... "cd /opt/qrtable/current && ./tools/deploy/phase7-backup.sh"
 
       - name: Remote deploy
         run: |
-          ssh ... "cd /opt/qrtable && \
+          ssh ... "cd /opt/qrtable/current && \
             IMAGE_TAG='${{ inputs.image_tag }}' \
             ./tools/deploy/phase7-remote-deploy.sh"
 
@@ -2740,7 +2744,7 @@ mindmap
       Rollback = separate from deploy workflow
       Audit trail = releases/current + history.log
     DigitalOcean
-      Droplet: 4 vCPU 8 GiB Ubuntu 24.04
+      Droplet: 2 vCPU 4 GiB Ubuntu 24.04 plus 2–4 GiB swap
       Cloud Firewall: only 22/80/443 public
       DNS: A records for 5 subdomains
       Caddy: automatic Let's Encrypt TLS

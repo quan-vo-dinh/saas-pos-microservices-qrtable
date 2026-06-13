@@ -37,12 +37,15 @@
 
 ### Context7 sources used
 
-Tài liệu này được bổ sung dựa trên Context7 lookup ngày 2026-06-06:
+Tài liệu này được bổ sung dựa trên Context7 lookup ngày 2026-06-06 và 2026-06-13:
 
-| Chủ đề              | Context7 library              | Dùng để củng cố phần nào                                                                                                                   |
-| ------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Docker core docs    | `/docker/docs`                | Image/container model, Dockerfile, BuildKit, Buildx, Compose, volumes, health checks, registry, GitHub Actions build-push workflow         |
-| GitHub Actions docs | `/websites/github_en_actions` | Workflow jobs, `needs`, `permissions`, `environment: production`, deployment protection rules, required approval, secrets, deployment jobs |
+| Chủ đề              | Context7 library                | Dùng để củng cố phần nào                                                                                                                   |
+| ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Docker core docs    | `/docker/docs`                  | Image/container model, Dockerfile, BuildKit, Buildx, Compose, volumes, health checks, registry, GitHub Actions build-push workflow         |
+| GitHub Actions docs | `/websites/github_en_actions`   | Workflow jobs, `needs`, `permissions`, `environment: production`, deployment protection rules, required approval, secrets, deployment jobs |
+| DigitalOcean docs   | `/websites/digitalocean`        | Recommended Droplet setup, SSH keys, Reserved IPs, backups, snapshots và Cloud Firewall                                                    |
+| Porkbun DNS API     | `/websites/porkbun_api_json_v3` | Relative record names, A record content và minimum/default TTL 600 giây                                                                    |
+| Caddy docs          | `/websites/caddyserver`         | Automatic HTTPS prerequisites, public ports, reverse proxy behavior và certificate operations                                              |
 
 Nguồn chính:
 
@@ -53,6 +56,9 @@ Nguồn chính:
 - [Docker guide: Next.js with GitHub Actions](https://github.com/docker/docs/blob/main/content/guides/nextjs/configure-github-actions.md)
 - [GitHub Actions: deploy to an environment](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/deploy-to-environment)
 - [GitHub Actions: deployments and environments](https://docs.github.com/en/actions/deployment/about-deployments/deploying-with-github-actions)
+- [DigitalOcean recommended Droplet setup](https://docs.digitalocean.com/products/droplets/getting-started/recommended-droplet-setup/)
+- [Porkbun DNS management](https://kb.porkbun.com/article/68-how-to-edit-dns-records)
+- [Caddy automatic HTTPS](https://caddyserver.com/docs/automatic-https)
 
 ### How this guide covers the Phase 7 plan
 
@@ -65,13 +71,10 @@ Nguồn chính:
 | Task 5-6: Infra/app Compose                                 | Compose services, internal networks, service discovery, named volumes, health checks, layered compose   |
 | Task 7: Caddy reverse proxy                                 | Reverse proxy role, TLS termination, Let's Encrypt ACME, WebSocket forwarding                           |
 | Task 8: Production env and secrets                          | Secret taxonomy, runtime env files, file permissions, no secret build args                              |
-| Task 9: Schema/migration lifecycle                          | Per-service migrations với `TYPEORM_SYNCHRONIZE=false`                                                  |
-| Task 10: Keycloak public bootstrap                          | Public hostnames, TLS, proxy headers, env separation                                                    |
-| Task 11: SePay production integration                       | HTTPS-only webhook requirement, public API base URL, secret-key verification, CI negative checks        |
-| Task 12: Monitoring rewiring                                | Internal scrape targets, private observability stores, Grafana behind HTTPS/auth                        |
-| Task 13-16: DigitalOcean deploy, smoke, backup, operations  | Droplet sizing, firewall, DNS, Docker Engine install, preflight, smoke tests, backup and rollback model |
-| Task 17: CI/CD pipeline                                     | CI quality gate, image release workflow, production deploy approval, rollback workflow, audit trail     |
-| Task 18: Canonical docs                                     | Why implementation must update phase docs, architecture docs, and doc-code anchors                      |
+| Task 9: Production bootstrap                                | Per-service migrations, ownership verification, Kafka topics và Keycloak bootstrap                      |
+| Task 10: Monitoring baseline                                | Internal scrape targets, private observability stores, Grafana sau HTTPS/auth                           |
+| Task 11: DigitalOcean provisioning và deployment            | 4 GB budget profile, firewall, Porkbun DNS, Docker setup, preflight, startup order và public HTTPS      |
+| Task 12: Smoke, backup, rollback, demo và docs              | External smoke, logical backup, restore proof, image rollback, demo evidence và canonical docs          |
 
 ---
 
@@ -101,7 +104,10 @@ Nhiều người sẽ hỏi: tại sao không dùng Heroku, Railway, hoặc Digi
 
 **Lý do học thuật:** Với thesis/đồ án, việc tự triển khai trên VPS (Droplet) với Docker Compose chứng minh khả năng vận hành hệ thống thực tế hơn là dùng managed service giấu toàn bộ infrastructure layer.
 
-**Lý do cost:** Một Droplet 4 vCPU / 8 GiB ≈ $48/tháng chứa toàn bộ stack. DigitalOcean App Platform với 10 services đắt hơn nhiều. Managed Kafka trên DigitalOcean là multi-node cluster giá cao không phù hợp thesis/pilot.
+**Lý do cost:** Một Basic Droplet 2 vCPU / 4 GiB giữ topology thesis/pilot trên một host và nằm
+trong ngân sách đã duyệt ít nhất hai tháng. Chỉ resize 8 GiB khi runtime evidence đại diện cho thấy
+memory pressure kéo dài. Các lựa chọn managed nhiều service tốn hơn và che bớt phần vận hành hạ tầng
+mà Phase 7 cần chứng minh.
 
 ---
 
@@ -1608,11 +1614,14 @@ docker compose --env-file docker/env/.env.production \
    → Prometheus, Loki, Promtail, Tempo, Grafana start
    → Promtail bắt đầu collect log từ containers (kể cả infra layer)
 
-3. docker compose -f docker-compose.app.yaml up -d
-   → All services start với explicit per-service environment mappings
-   → BFF đợi tất cả microservices TCP reachable
+3. tools/deploy/phase7-run-production-bootstrap.sh
+   → Migrations → ownership verification → Kafka topics → Keycloak bootstrap
+   → Bất kỳ lỗi nào cũng chặn application startup
 
-4. docker compose -f docker-compose.proxy.yaml up -d
+4. docker compose -f docker-compose.app.yaml up -d
+   → All services start với explicit per-service environment mappings
+
+5. docker compose -f docker-compose.proxy.yaml up -d
    → Caddy start, request Let's Encrypt certs
    → HTTPS live cho api, app, qr, auth, grafana subdomains
 ```
@@ -1899,8 +1908,8 @@ docker/env/.env.production.example  ← commit cái này (template với keys, k
 ARG DATABASE_PASSWORD
 ENV DATABASE_PASSWORD=$DATABASE_PASSWORD
 
-# ✅ Đúng — secret chỉ inject runtime qua env_file
-# Không có gì về secret trong Dockerfile
+# ✅ Đúng — production Compose map explicit secret ở runtime
+# Không có secret trong Dockerfile hoặc image history
 ```
 
 ### 7.4 Secret Management Thực Tế Cho QRTable
@@ -1922,19 +1931,20 @@ ls -la /opt/qrtable/.env.production
 # -rw------- 1 user user ... .env.production (0600)
 ```
 
-**Trong docker-compose.app.yaml:**
+**Trong `docker-compose.app.yaml`:**
 
 ```yaml
 services:
   bff:
-    env_file: /opt/qrtable/.env.production # load file từ server
-    environment: # override cụ thể từng service
+    environment:
+      NODE_ENV: production
       REDIS_HOST: redis
-      ORDER_SERVICE_HOST: order
-      # ... host/port values per-service, override giá trị trong env_file
+      CORS_ORIGINS: ${CORS_ORIGINS:?required}
 ```
 
-`env_file` load tất cả vars từ file. `environment` ghi đè. Pattern này cho phép có một env file chung cho toàn bộ stack, nhưng mỗi service override những gì cần thiết (host names, ports).
+Compose chỉ dùng `/opt/qrtable/.env.production` để interpolation qua `--env-file`. Mỗi service nhận
+allowlist rõ trong `environment:`. Không dùng service-level `env_file` vì nó sẽ inject secret không
+liên quan vào mọi container.
 
 ---
 
@@ -1942,13 +1952,16 @@ services:
 
 ### 8.1 Droplet Sizing và Lý Do
 
-| Tier                | Config                        | Use case                                |
-| ------------------- | ----------------------------- | --------------------------------------- |
-| Budget smoke        | 2 vCPU / 4 GiB                | Demo windows, monitoring tắt            |
-| Pilot (recommended) | 4 vCPU / 8 GiB                | Thesis demo, monitoring bật, full stack |
-| Hardening           | 4+ vCPU / 8+ GiB + managed DB | Sau thesis khi cần data safety          |
+| Tier                  | Config                        | Use case                                               |
+| --------------------- | ----------------------------- | ------------------------------------------------------ |
+| Budget pilot (target) | 2 vCPU / 4 GiB + 2–4 GiB swap | Thesis demo và limited use với retention có giới hạn   |
+| Temporary resize      | 4 vCPU / 8 GiB                | Chỉ sau measured OOM, sustained low memory hoặc paging |
+| Hardening             | 4+ vCPU / 8+ GiB + managed DB | Sau thesis khi availability và data safety cần tăng    |
 
-**Tại sao 4 vCPU / 8 GiB cho pilot?** Keycloak ngốn ~512MB RAM riêng, Kafka + ZK ~1GB, PostgreSQL ~256MB, monitoring stack ~1GB, 8 NestJS services ~64–128MB mỗi cái. Tổng: 4–6 GiB. 8 GiB để có headroom.
+Evidence Phase 7 local đo infra và monitoring idle khoảng 2.4 GiB trước budget tuning. Production
+profile giới hạn Kafka ở heap 512 MiB và Keycloak ở heap 384 MiB. Vì vậy target 4 GiB cần swap,
+bounded logs/retention, build image ngoài host và runtime monitoring. Xem
+[`production-deployment-runbook.md`](production-deployment-runbook.md) cho resize thresholds.
 
 **Region `sgp1` (Singapore):** Gần nhất với Vietnam → latency thấp nhất. Kiểm tra availability vì không phải mọi DO product đều có ở mọi region.
 
@@ -1977,49 +1990,39 @@ Deny tất cả còn lại:
 
 ### 8.3 Docker Engine Installation — Từ Official Repository
 
-Ubuntu package manager có `docker.io` (version cũ của Ubuntu). Cần cài từ Docker official repo để có phiên bản mới nhất:
+Follow [official Docker Engine installation instructions for Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+hiện hành. Không reuse repository-key block cũ vì Docker có thể thay đổi package repository setup.
+Install Docker Engine, containerd, Buildx và Compose plugin, sau đó verify:
 
 ```bash
-# Thêm Docker official GPG key
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-# Thêm Docker repository
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-  https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Install Docker Engine + Compose plugin
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Verify
-docker --version           # Docker Engine version
-docker compose version     # Docker Compose plugin version
+docker version
+docker compose version
+docker buildx version
+docker info
 ```
 
-`**docker compose` (plugin) vs `docker-compose` (legacy standalone):\*\*
-Modern Docker dùng `docker compose` (khoảng cách, không có dấu gạch ngang) — đây là plugin built-in. `docker-compose` là standalone binary cũ hơn. Phase 7 dùng plugin.
+Docker hiện đại dùng `docker compose` với khoảng trắng. `docker-compose` là standalone binary cũ và
+không được Phase 7 sử dụng.
 
 ### 8.4 DNS Configuration
 
 Trước khi start Caddy, DNS phải resolve đúng:
 
 ```bash
-# Tạo A records trong DigitalOcean DNS (hoặc domain registrar):
-api.qrtable.vodinhquan.dev  → <Droplet IPv4>
-app.qrtable.vodinhquan.dev  → <Droplet IPv4>
-qr.qrtable.vodinhquan.dev   → <Droplet IPv4>
-auth.qrtable.vodinhquan.dev → <Droplet IPv4>
-grafana.qrtable.vodinhquan.dev → <Droplet IPv4>
+# Trong Porkbun, quản lý vodinhquan.dev và nhập Host/Name tương đối:
+api.qrtable      → <Reserved IP hoặc final IPv4 đã duyệt>
+app.qrtable      → <cùng IPv4>
+qr.qrtable       → <cùng IPv4>
+auth.qrtable     → <cùng IPv4>
+grafana.qrtable  → <cùng IPv4>
 
 # Verify propagation (có thể mất 5-30 phút)
 dig +short api.qrtable.vodinhquan.dev
 # Phải trả về Droplet IP
 ```
 
-**TTL recommendation:** Khi setup lần đầu, set TTL thấp (60–300 giây) để nếu IP sai có thể sửa nhanh. Sau khi stable, set TTL cao hơn (3600 giây).
+Dùng TTL `600` cho deployment đầu. Porkbun official API ghi `600` giây là minimum và default.
+Xóa hoặc giải quyết A, AAAA, CNAME hoặc forwarding record xung đột tại cùng tên.
 
 ### 8.5 Server Layout Và Preflight Checks
 
@@ -2027,12 +2030,13 @@ Production server cần một layout ổn định để deploy script không ph�
 
 ```text
 /opt/qrtable/
-  docker-compose.infra.yaml
-  docker-compose.app.yaml
-  docker-compose.proxy.yaml
-  docker-compose.monitoring.yaml
-  docker/
-  tools/deploy/
+  current/
+    docker-compose.infra.yaml
+    docker-compose.app.yaml
+    docker-compose.proxy.yaml
+    docker-compose.monitoring.yaml
+    docker/
+    tools/deploy/
   releases/
     current
     history.log
@@ -2041,16 +2045,16 @@ Production server cần một layout ổn định để deploy script không ph�
 /opt/qrtable/.env.production     # private, permission 0600
 ```
 
-Preflight là bước kiểm tra trước khi thay đổi production state. Nó nên fail sớm nếu thiếu điều kiện:
+Preflight là bước kiểm tra trước khi thay đổi production state. Dùng script đã commit:
 
 ```bash
-test -f /opt/qrtable/.env.production
-test "$(stat -c %a /opt/qrtable/.env.production)" = "600"
-test -n "${IMAGE_TAG:-}"
-docker compose -f docker-compose.app.yaml config > /dev/null
-docker login registry.digitalocean.com
-docker pull "registry.digitalocean.com/qrtable/bff:${IMAGE_TAG}"
+cd /opt/qrtable/current
+ENV_FILE=/opt/qrtable/.env.production tools/deploy/phase7-preflight.sh
 ```
+
+Script kiểm tra non-root operator, env ownership/mode, unresolved placeholders, immutable tag,
+production safety values, 4 GiB RAM profile, ít nhất 2 GiB swap, disk headroom, Docker access và
+rendered four-layer Compose config. Image pull là bước explicit riêng sau khi preflight pass.
 
 **Không nhầm preflight với smoke test:**
 
@@ -2408,16 +2412,16 @@ jobs:
         run: |
           ssh -i "${{ secrets.PRODUCTION_SSH_KEY }}" \
             "${{ secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST }}" \
-            "cd /opt/qrtable && ./tools/deploy/phase7-preflight.sh"
+            "cd /opt/qrtable/current && ./tools/deploy/phase7-preflight.sh"
 
       - name: Backup before deploy
         if: inputs.run_backup == 'true'
         run: |
-          ssh ... "cd /opt/qrtable && ./tools/deploy/phase7-backup.sh"
+          ssh ... "cd /opt/qrtable/current && ./tools/deploy/phase7-backup.sh"
 
       - name: Remote deploy
         run: |
-          ssh ... "cd /opt/qrtable && \
+          ssh ... "cd /opt/qrtable/current && \
             IMAGE_TAG='${{ inputs.image_tag }}' \
             ./tools/deploy/phase7-remote-deploy.sh"
 
@@ -2736,7 +2740,7 @@ mindmap
       Rollback = tách biệt khỏi deploy workflow
       Audit trail = releases/current + history.log
     DigitalOcean
-      Droplet: 4 vCPU 8 GiB Ubuntu 24.04
+      Droplet: 2 vCPU 4 GiB Ubuntu 24.04 với 2–4 GiB swap
       Cloud Firewall: chỉ 22/80/443 public
       DNS: A records cho 5 subdomains
       Caddy: tự động Let's Encrypt TLS

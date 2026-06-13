@@ -162,7 +162,8 @@ tiên ổn định.
 - Một DigitalOcean Droplet.
 - Ubuntu LTS.
 - Docker Engine và Docker Compose plugin.
-- Khuyến nghị 4 vCPU / 8 GiB RAM.
+- Budget target: Droplet hiện có 2 vCPU / 4 GiB RAM / 25 GB với swap 2–4 GiB.
+- Chỉ resize tạm 8 GiB khi runtime evidence đại diện cho thấy pressure kéo dài.
 - Self-host PostgreSQL, MongoDB, Redis, Kafka, Keycloak và monitoring.
 - Bật DigitalOcean backups.
 - Dùng Reserved IP nếu có.
@@ -448,6 +449,9 @@ Không thêm long-term object storage hoặc enterprise retention trong Phase 7.
 
 ### Task 11: Provision DigitalOcean và deploy
 
+**Trạng thái chuẩn bị (2026-06-13):** Đã implement runbook, human checklist, tuning 4 GB và
+fail-fast preflight. Chưa provision hoặc deploy production.
+
 **Kết quả:** Public HTTPS deployment chạy từ immutable image tag.
 
 Human:
@@ -468,8 +472,14 @@ Agent/script:
 - start monitoring, app và proxy;
 - verify public TLS và container/network state.
 
-Release đầu có thể manual push/pull image hoặc build trên server. Không cần production CI/CD
-platform.
+Operator references:
+
+- `docs/guides/production-deployment-runbook.md`;
+- `docs/guides/production-deployment-checklist.md`;
+- `tools/deploy/phase7-preflight.sh`.
+
+Build và push image `linux/amd64` trên trusted workstation hoặc CI runner. Droplet chỉ pull immutable
+images, không build image. Release đầu không cần production CI/CD platform.
 
 ### Task 12: Smoke, backup, rollback, demo và documentation
 
@@ -559,5 +569,5 @@ không được tuyên bố live SePay ready.
 
 Task 6 đã hoàn tất runtime verification. Task 9 bootstrap flow đã implement và static-verified; full
 runtime bootstrap với Docker stack vẫn là deployment check trước Task 11. Task 7 proxy configuration
-đã implement và static/runtime-config verified mà không request public certificate. Tasks 11 và 12
-còn lại.
+static/runtime-config verified mà không request public certificate. Phần chuẩn bị Task 11 đã xong;
+Task 11 execution và Task 12 còn lại.

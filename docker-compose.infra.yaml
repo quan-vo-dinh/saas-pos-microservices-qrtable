@@ -96,6 +96,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
     healthcheck:
       test:
         ['CMD-SHELL', '/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1']
@@ -103,7 +104,7 @@ services:
       timeout: 10s
       retries: 12
       start_period: 45s
-    mem_limit: 1536m
+    mem_limit: 1024m
     volumes:
       - kafka_data:/var/lib/kafka/data
 
@@ -130,6 +131,7 @@ services:
       KC_HOSTNAME: ${KEYCLOAK_HOST:?required}
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:?required}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?required}
+      JAVA_OPTS_KC_HEAP: -Xms128m -Xmx384m
     command: ['start']
     healthcheck:
       test: ['CMD-SHELL', 'bash -lc ": > /dev/tcp/127.0.0.1/9000"']
@@ -137,6 +139,6 @@ services:
       timeout: 5s
       retries: 20
       start_period: 60s
-    mem_limit: 1024m
+    mem_limit: 768m
     volumes:
       - keycloak_data:/opt/keycloak/data
