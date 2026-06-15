@@ -558,6 +558,7 @@ sequenceDiagram
 | Kitchen       | `apps/kitchen/src/app/modules/kitchen/controllers/kitchen.controller.ts`                |
 | Kitchen       | `apps/kitchen/src/app/modules/kitchen/services/order-confirmed.consumer.ts`             |
 | Kitchen       | `apps/kitchen/src/app/modules/kitchen/services/kds-ticket.service.ts`                   |
+| Kitchen       | `apps/kitchen/src/app/modules/kitchen/services/kitchen-events.publisher.ts`             |
 | Kitchen       | `apps/kitchen/src/app/modules/kitchen/services/kitchen-recovery.service.ts`             |
 | Kitchen       | `apps/kitchen/src/app/modules/kitchen/services/kitchen-sla.worker.ts`                   |
 | Kitchen       | `apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts` facade      |
@@ -1039,19 +1040,22 @@ sequenceDiagram
 
 Đọc theo thứ tự:
 
-| Layer       | Files                                                                         |
-| ----------- | ----------------------------------------------------------------------------- |
-| BFF         | `apps/bff/src/app/modules/realtime/gateways/order-events.gateway.ts`          |
-| BFF         | `apps/bff/src/app/modules/realtime/services/realtime-auth.service.ts`         |
-| BFF         | `apps/bff/src/app/modules/realtime/services/realtime-events.service.ts`       |
-| BFF         | `apps/bff/src/app/modules/realtime/services/realtime-kafka-bridge.service.ts` |
-| BFF         | `apps/bff/src/app/modules/realtime/adapters/redis-io.adapter.ts`              |
-| Shared      | `libs/constants/src/lib/ws-room.constants.ts`                                 |
-| Customer UI | `apps/customer-pwa/src/features/order/hooks/use-customer-order-realtime.ts`   |
-| Customer UI | `apps/customer-pwa/src/components/realtime/realtime-status-pill.tsx`          |
-| Staff UI    | `apps/management-app/src/features/order/hooks/use-staff-order-realtime.ts`    |
-| KDS UI      | `apps/management-app/src/features/kds/hooks/use-kds-realtime.ts`              |
-| Tests       | `apps/bff/src/app/modules/realtime/tests/architecture-contracts.spec.ts`      |
+| Layer       | Files                                                                          |
+| ----------- | ------------------------------------------------------------------------------ |
+| BFF         | `apps/bff/src/app/modules/realtime/gateways/order-events.gateway.ts`           |
+| BFF         | `apps/bff/src/app/modules/realtime/realtime.module.ts`                         |
+| BFF         | `apps/bff/src/app/modules/realtime/services/realtime-auth.service.ts`          |
+| BFF         | `apps/bff/src/app/modules/realtime/services/realtime-events.service.ts`        |
+| BFF         | `apps/bff/src/app/modules/realtime/services/realtime-kafka-bridge.service.ts`  |
+| BFF         | `apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts` |
+| BFF         | `apps/bff/src/app/modules/realtime/adapters/redis-io.adapter.ts`               |
+| Shared      | `libs/constants/src/lib/ws-room.constants.ts`                                  |
+| Shared      | `libs/shared/types/src/lib/realtime-events.types.ts`                           |
+| Customer UI | `apps/customer-pwa/src/features/order/hooks/use-customer-order-realtime.ts`    |
+| Customer UI | `apps/customer-pwa/src/components/realtime/realtime-status-pill.tsx`           |
+| Staff UI    | `apps/management-app/src/features/order/hooks/use-staff-order-realtime.ts`     |
+| KDS UI      | `apps/management-app/src/features/kds/hooks/use-kds-realtime.ts`               |
+| Tests       | `apps/bff/src/app/modules/realtime/tests/architecture-contracts.spec.ts`       |
 
 Flow thực tế:
 
@@ -1100,6 +1104,7 @@ sequenceDiagram
 3. Room assignment là server-managed; legacy `join.session`/`join.staff` bị reject với message hướng dẫn.
 4. Domain event từ Order/Payment/Kitchen được BFF emit vào rooms tương ứng.
 5. Frontend nhận event để invalidate/refetch TanStack Query hoặc update UI nhẹ.
+6. `subscribe.kds` là ngoại lệ có client message, nhưng BFF vẫn validate tenant/role trước khi join station room.
 
 **Lý thuyết cần nắm:**
 
@@ -1111,6 +1116,61 @@ sequenceDiagram
 **Cách nói trong phỏng vấn:**
 
 > Realtime trong QRTable chủ yếu là invalidation hint. Khi có order/payment/KDS event, BFF emit qua Socket.IO để UI refetch đúng query. Em không đưa toàn bộ state consistency vào WebSocket payload, vì source of truth vẫn nằm ở domain service và database/Redis owner.
+
+### Deep Dive: Realtime, Kafka, Redis Reading Strategy
+
+Đọc ba phần này theo **dòng tín hiệu** thay vì đọc từng tool riêng lẻ. Cùng một nghiệp vụ thường đi qua cả Kafka, Redis và WebSocket, nhưng mỗi layer có vai trò khác nhau:
+
+| Layer     | Vai trò trong QRTable                                | Không nên hiểu nhầm là gì                          |
+| --------- | ---------------------------------------------------- | -------------------------------------------------- |
+| Kafka     | Durable async event log giữa service owners.         | Không phải kênh push trực tiếp tới browser.        |
+| Redis     | Runtime state/cache/queue/pub-sub ngắn hạn.          | Không thay PostgreSQL cho state cần audit lâu dài. |
+| WebSocket | Push invalidation hint tới đúng client room qua BFF. | Không phải source of truth cho business state.     |
+
+#### Track A: Order Confirm -> Kitchen KDS
+
+Đọc theo thứ tự:
+
+1. `apps/bff/src/app/modules/order/controllers/staff-order.controller.ts` — HTTP action và realtime emit tức thời cho POS.
+2. `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts` — confirm transaction, stock deduct, ghi outbox.
+3. `apps/order/src/app/modules/order/services/outbox-publisher.service.ts` — publish `order.confirmed` sang Kafka sau commit.
+4. `apps/kitchen/src/app/modules/kitchen/services/order-confirmed.consumer.ts` — consume, validate, dedupe.
+5. `apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts` — facade điều phối ticket/SLA/recovery stores.
+6. `apps/kitchen/src/app/modules/kitchen/services/kitchen-events.publisher.ts` — publish `realtime:kds:{tenantId}` qua Redis pub/sub.
+7. `apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts` — BFF subscribe Redis pub/sub và gọi realtime service.
+8. `apps/bff/src/app/modules/realtime/services/realtime-events.service.ts` — map event sang `WsRoom`.
+9. `apps/management-app/src/features/kds/hooks/use-kds-realtime.ts` — frontend nhận hint và refetch/update UI.
+
+Khi đọc track này, hãy hỏi: event nào cần durability, state nào chỉ là queue runtime, và client nhận event để refetch hay để tin luôn payload?
+
+#### Track B: Payment Completed -> UI Realtime
+
+Đọc theo thứ tự:
+
+1. `apps/payment/src/app/modules/payment/services/payment-settlement.service.ts` hoặc `sepay-webhook.service.ts` — tạo payment event sau khi external money movement hợp lệ.
+2. `apps/payment/src/app/modules/payment/repositories/payment-outbox.repository.ts` — ghi outbox `payment.completed`.
+3. `apps/payment/src/app/modules/payment/services/payment-outbox-publisher.service.ts` — publish Kafka.
+4. `apps/order/src/app/modules/order/services/payment-events-consumer.service.ts` — async retry-safety path để Order mark paid idempotently.
+5. `apps/bff/src/app/modules/realtime/services/realtime-kafka-bridge.service.ts` — consume `payment.completed`, lấy snapshot cần thiết rồi emit realtime.
+6. `apps/bff/src/app/modules/realtime/services/realtime-events.service.ts` — emit `events.paymentCompleted`.
+7. Customer/management payment hooks — refetch bill/payment snapshot từ API owner.
+
+Khi đọc track này, đừng xem BFF bridge là owner của payment state. Nó chỉ dịch Kafka event thành UI invalidation.
+
+#### Track C: Room, Key, Topic Contracts
+
+Đọc contracts trước khi đọc implementation chi tiết:
+
+| Contract                 | File                                                                     | Câu hỏi cần trả lời                                      |
+| ------------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------- |
+| WebSocket rooms          | `libs/constants/src/lib/ws-room.constants.ts`                            | Event đi tới tenant, session, staff hay KDS station nào? |
+| Realtime event payloads  | `libs/shared/types/src/lib/realtime-events.types.ts`                     | Payload là hint hay canonical state?                     |
+| Redis key builders       | `libs/constants/src/lib/redis-key.constants.ts`                          | Key có tenant/session scope không?                       |
+| KDS Redis key/score      | `apps/kitchen/src/app/modules/kitchen/utils/kds-keys.ts`, `kds-score.ts` | Queue sort theo thời gian, priority, SLA thế nào?        |
+| Kafka config/topic names | `libs/configuration/src/lib/kafka.config.ts`                             | Topic nào đang runtime, producer/consumer nào dùng?      |
+| TCP messages             | `libs/constants/src/lib/enum/tcp-request-message.ts`                     | Boundary sync nào xảy ra trước async side-effect?        |
+
+Rule đọc nhanh: nếu thấy hardcoded room/key/topic trong app code, kiểm tra lại constants/config trước. Nếu thấy WebSocket event chứa nhiều data, vẫn phải tìm API/query hook để biết snapshot chuẩn nằm ở đâu.
 
 ## Round 4: Shared Libs Và Contracts
 
@@ -1267,15 +1327,21 @@ Test trong microservices nên bảo vệ boundary: state machine, idempotency, c
 | BFF bootstrap             | `apps/bff/src/main.ts`                                                         |
 | BFF guard chain           | `apps/bff/src/app/app.module.ts`                                               |
 | TCP message names         | `libs/constants/src/lib/enum/tcp-request-message.ts`                           |
+| Kafka topic config        | `libs/configuration/src/lib/kafka.config.ts`                                   |
 | Redis keys                | `libs/constants/src/lib/redis-key.constants.ts` và Kitchen `utils/kds-keys.ts` |
 | WebSocket rooms           | `libs/constants/src/lib/ws-room.constants.ts`                                  |
+| Realtime event contracts  | `libs/shared/types/src/lib/realtime-events.types.ts`                           |
+| BFF realtime wiring       | `apps/bff/src/app/modules/realtime/realtime.module.ts`                         |
+| BFF KDS Redis subscriber  | `apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts` |
 | Error model               | `libs/error-messages/src/lib/business.exception.ts`, `error-code.enum.ts`      |
 | Order facade              | `apps/order/src/app/modules/order/services/order.service.ts`                   |
 | Order submit              | `apps/order/src/app/modules/order/services/order-submit.service.ts`            |
 | Order transitions         | `apps/order/src/app/modules/order/services/order-state-transition.service.ts`  |
 | Order bill                | `apps/order/src/app/modules/order/services/bill.service.ts`                    |
+| Order outbox publisher    | `apps/order/src/app/modules/order/services/outbox-publisher.service.ts`        |
 | Kitchen ticket logic      | `apps/kitchen/src/app/modules/kitchen/services/kds-ticket.service.ts`          |
 | Kitchen Redis facade      | `apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts`    |
+| Kitchen realtime publish  | `apps/kitchen/src/app/modules/kitchen/services/kitchen-events.publisher.ts`    |
 | Payment settlement        | `apps/payment/src/app/modules/payment/services/payment-settlement.service.ts`  |
 | SePay webhook             | `apps/payment/src/app/modules/payment/services/sepay-webhook.service.ts`       |
 | SaaS onboarding           | `apps/saas/src/services/onboarding-saga.service.ts`                            |
@@ -1306,6 +1372,9 @@ rg "@MessagePattern" apps/order apps/kitchen apps/payment apps/catalog apps/saas
 rg "TCP_REQUEST_MESSAGE\\.ORDER" apps libs -n
 rg "WsRoom" apps libs -n
 rg "RedisKey" apps libs -n
+rg "KAFKA_CONFIG|ORDER_CONFIRMED_TOPIC|PAYMENT_COMPLETED_TOPIC|KITCHEN_SLA_WARNING_TOPIC|TENANT_CREATED_TOPIC" apps libs -n
+rg "realtime:kds|KdsInternalEventsSubscriber|KitchenEventsPublisher" apps libs -n
+rg "events\\.(orderCreated|orderStatusChanged|kdsQueueChanged|paymentCompleted)" apps libs -n
 
 # Run focused slices
 pnpm dev:bff-order
