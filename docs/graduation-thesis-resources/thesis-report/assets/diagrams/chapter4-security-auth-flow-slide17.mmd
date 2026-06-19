@@ -1,0 +1,46 @@
+%%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "curve": "basis"}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#f8fafc", "primaryBorderColor": "#cbd5e1", "lineColor": "#475569", "tertiaryColor": "#ffffff"}}}%%
+flowchart LR
+  subgraph Staff_Path ["LUỒNG STAFF / ADMIN (Định danh - RBAC)"]
+    Staff@{ icon: "mdi:account-tie", form: "rounded", label: "Staff / Admin", pos: "t", h: 50 }
+    Keycloak@{ icon: "simple-icons:keycloak", form: "rounded", label: "Keycloak (Identity Provider)", pos: "t", h: 50 }
+    BFF_Staff@{ icon: "mdi:shield-lock", form: "rounded", label: "BFF (UserGuard)", pos: "t", h: 50 }
+    Auth_gRPC@{ icon: "mdi:api", form: "rounded", label: "Authorizer (gRPC)", pos: "t", h: 50 }
+    Domain_Staff@{ icon: "mdi:server-network", form: "rounded", label: "Domain Services", pos: "t", h: 50 }
+
+    Staff -->|"1. Đăng nhập"| Keycloak
+    Keycloak -->|"2. Trả JWT"| Staff
+    Staff -->|"3. Gửi request + JWT"| BFF_Staff
+    BFF_Staff -->|"4. Xác thực gRPC"| Auth_gRPC
+    BFF_Staff -->|"5. Cho phép"| Domain_Staff
+  end
+
+  subgraph Customer_Path ["LUỒNG CUSTOMER (Theo phiên - Anonymous QR Session)"]
+    Customer@{ icon: "mdi:silverware-fork-knife", form: "rounded", label: "Khách tại bàn", pos: "t", h: 50 }
+    QR@{ icon: "mdi:qrcode", form: "rounded", label: "QR Code (Bàn / Tenant)", pos: "t", h: 50 }
+    BFF_Cust@{ icon: "mdi:shield-check", form: "rounded", label: "BFF (SessionGuard)", pos: "t", h: 50 }
+    Redis_Session@{ icon: "logos:redis", form: "rounded", label: "Redis Session", pos: "t", h: 50 }
+    Domain_Cust@{ icon: "mdi:cart-outline", form: "rounded", label: "Catalog & Order", pos: "t", h: 50 }
+
+    Customer -->|"1. Quét QR"| QR
+    QR -->|"2. Vào PWA / Tạo Session"| BFF_Cust
+    BFF_Cust -->|"3. Kiểm tra Session"| Redis_Session
+    BFF_Cust -->|"4. Cho phép"| Domain_Cust
+  end
+
+  %% Highlight "Không dùng Keycloak"
+  NoKeycloak@{ icon: "mdi:shield-off-outline", form: "rounded", label: "KHÔNG DÙNG KEYCLOAK<br/>(Tránh cản trở trải nghiệm khách)", pos: "t", h: 55 }
+  BFF_Cust -.->|Không đi qua| NoKeycloak
+
+  classDef actor fill:#eff6ff,stroke:#2563eb,color:#0f172a;
+  classDef edge fill:#fff7ed,stroke:#ea580c,color:#0f172a;
+  classDef identity fill:#f5f3ff,stroke:#7c3aed,color:#0f172a;
+  classDef identityProvider fill:#f8fafc,stroke:#4b5563,stroke-width:1.2px,color:#4d4d4d;
+  classDef service fill:#f0fdf4,stroke:#16a34a,color:#0f172a;
+  classDef caution fill:#fee2e2,stroke:#dc2626,color:#0f172a;
+
+  class Staff,Customer actor;
+  class BFF_Staff,BFF_Cust edge;
+  class Keycloak identityProvider;
+  class Auth_gRPC,Redis_Session identity;
+  class Domain_Staff,Domain_Cust service;
+  class NoKeycloak caution;

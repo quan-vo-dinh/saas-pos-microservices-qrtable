@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&family=Inter:wght@400;700&family=IBM+Plex+Mono&display=swap"
+    rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: #09090B;
+    }
+
+    .slide-container {
+      width: 1280px;
+      min-height: 720px;
+      background-color: #09090B;
+      color: #FAFAFA;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding-top: 60px;
+      padding-left: 80px;
+      margin-bottom: 40px;
+    }
+
+    .section-tag {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 16px;
+      color: #22D3EE;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .page-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 42px;
+      font-weight: 700;
+      color: #FAFAFA;
+      margin: 0;
+    }
+
+    .subtitle {
+      font-size: 24px;
+      color: #A1A1AA;
+      margin-top: 10px;
+    }
+
+    .content-area {
+      flex: 1;
+      padding-left: 80px;
+      padding-right: 80px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 30px;
+      align-content: center;
+    }
+
+    .reason-item {
+      background-color: #18181B;
+      border: 1px solid #27272A;
+      padding-top: 30px;
+      padding-left: 30px;
+      padding-right: 30px;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .reason-icon {
+      font-size: 28px;
+      color: #34D399;
+      margin-bottom: 15px;
+    }
+
+    .reason-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: #FAFAFA;
+      margin-bottom: 10px;
+    }
+
+    .reason-desc {
+      font-size: 16px;
+      color: #A1A1AA;
+      line-height: 1.5;
+    }
+
+    .accent-line {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 8px;
+      background: linear-gradient(to right, #22D3EE, #34D399);
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 20px;
+      left: 80px;
+      right: 80px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      color: #A1A1AA;
+    }
+
+    .highlight {
+      color: #34D399;
+      font-weight: 700;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="slide-container">
+    <div class="header">
+      <span class="section-tag">Phần 2: Phân tích & Thiết kế Kiến trúc</span>
+      <h1 class="page-title">Tại sao chọn Microservices?</h1>
+      <p class="subtitle">Phân rã theo Domain và khả năng mở rộng độc lập</p>
+    </div>
+
+    <div class="content-area">
+      <div class="reason-item">
+        <i class="fas fa-layer-group reason-icon"></i>
+        <h3 class="reason-title">Phân rã nghiệp vụ (Bounded Contexts)</h3>
+        <p class="reason-desc">Mỗi dịch vụ tập trung vào một ranh giới nghiệp vụ cụ thể như <span
+            class="highlight">Catalog, Order, User-Access</span>, giúp giảm độ phức tạp và dễ quản lý mã nguồn.</p>
+      </div>
+      <div class="reason-item">
+        <i class="fas fa-expand-arrows-alt reason-icon"></i>
+        <h3 class="reason-title">Mở rộng độc lập (Independent Scaling)</h3>
+        <p class="reason-desc">Từng dịch vụ có thể được mở rộng tài nguyên riêng biệt dựa trên nhu cầu thực tế (ví dụ:
+          dịch vụ Order cần nhiều tài nguyên hơn vào giờ cao điểm).</p>
+      </div>
+      <div class="reason-item">
+        <i class="fas fa-shield-virus reason-icon"></i>
+        <h3 class="reason-title">Cô lập lỗi (Fault Isolation)</h3>
+        <p class="reason-desc">Lỗi xảy ra ở một dịch vụ (ví dụ: Payment) không làm sụp đổ toàn bộ hệ thống, đảm bảo các
+          chức năng khác như xem thực đơn vẫn hoạt động bình thường.</p>
+      </div>
+      <div class="reason-item">
+        <i class="fas fa-microchip reason-icon"></i>
+        <h3 class="reason-title">Đa dạng công nghệ (Tech Diversity)</h3>
+        <p class="reason-desc">Cho phép sử dụng các ngôn ngữ và cơ sở dữ liệu phù hợp nhất cho từng bài toán (ví dụ:
+          <span class="highlight">Go</span> cho hiệu năng cao, <span class="highlight">NestJS</span> cho nghiệp vụ phức
+          tạp).</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>QRTable Thesis Defense Deck</span>
+      <span>07_why_microservices</span>
+    </div>
+    <div class="accent-line"></div>
+  </div>
+</body>
+
+</html>
