@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "prj_7OPQmwjqCHOTAiqiWcRZziglRKi6",
+      "name": "customer-pwa",
+      "directory": "apps/customer-pwa",
+      "orgId": "team_0cMD4cQo20xXW3v5oDm3a8QK"
+    }
+  ]
+}
