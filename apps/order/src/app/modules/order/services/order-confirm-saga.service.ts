@@ -25,6 +25,7 @@ type ConfirmTxOutcome =
 type StockCompensationPayload = {
   tenantId: string;
   orderId: string;
+  reservationVersion: number | null;
   items: Array<{ menuItemId: string; quantity: number }>;
 };
 
@@ -76,53 +77,67 @@ export class OrderConfirmSagaService {
           dto.tenantId,
           manager,
         );
-        compensationPayload = {
+        const stockMutation = {
           tenantId: dto.tenantId,
           orderId: order.id,
           items: items.map((it) => ({ menuItemId: it.menuItemId, quantity: it.quantity })),
         };
 
-        await this.catalogStockGateway.deductForOrder({
-          ...compensationPayload,
+        const stockResult = await this.catalogStockGateway.deductForOrder({
+          tenantId: stockMutation.tenantId,
+          orderId: stockMutation.orderId,
           idempotencyKey: `confirm-order:${order.id}`,
+          items: stockMutation.items,
         });
         stockDeducted = true;
+        compensationPayload = {
+          ...stockMutation,
+          reservationVersion: stockResult.reservationVersion,
+        };
 
-        const now = new Date();
-        order.status = OrderStatus.PROCESSING;
-        order.confirmedAt = now;
-        order.confirmedByUserId = dto.userId;
-        await manager.save(Order, order);
+        try {
+          const now = new Date();
+          order.status = OrderStatus.PROCESSING;
+          order.confirmedAt = now;
+          order.confirmedByUserId = dto.userId;
+          order.stockReservationVersion = stockResult.reservationVersion;
+          await manager.save(Order, order);
 
-        for (const line of items) {
-          line.status = OrderItemStatus.PROCESSING;
-          await manager.save(OrderItem, line);
+          for (const line of items) {
+            line.status = OrderItemStatus.PROCESSING;
+            await manager.save(OrderItem, line);
+          }
+
+          const kafkaPayload = buildOrderConfirmedKafkaPayload({
+            tenantId: dto.tenantId,
+            order,
+            items,
+            confirmedAt: now,
+            confirmedByUserId: dto.userId,
+            correlationId: dto.processId,
+          });
+
+          const outbox = manager.create(OutboxEvent, {
+            tenantId: dto.tenantId,
+            topic: CONFIGURATION.KAFKA_CONFIG.ORDER_CONFIRMED_TOPIC,
+            eventType: 'order.confirmed',
+            aggregateId: order.id,
+            partitionKey: dto.tenantId,
+            payload: kafkaPayload as unknown as Record<string, unknown>,
+            status: 'PENDING',
+            publishedAt: null,
+            attemptCount: 0,
+            lastError: null,
+          });
+          await manager.save(OutboxEvent, outbox);
+
+          return { kind: 'confirmed', order, items, bill } satisfies ConfirmTxOutcome;
+        } catch (error) {
+          await this.compensateStock(compensationPayload, error);
+          stockDeducted = false;
+          compensationPayload = null;
+          throw error;
         }
-
-        const kafkaPayload = buildOrderConfirmedKafkaPayload({
-          tenantId: dto.tenantId,
-          order,
-          items,
-          confirmedAt: now,
-          confirmedByUserId: dto.userId,
-          correlationId: dto.processId,
-        });
-
-        const outbox = manager.create(OutboxEvent, {
-          tenantId: dto.tenantId,
-          topic: CONFIGURATION.KAFKA_CONFIG.ORDER_CONFIRMED_TOPIC,
-          eventType: 'order.confirmed',
-          aggregateId: order.id,
-          partitionKey: dto.tenantId,
-          payload: kafkaPayload as unknown as Record<string, unknown>,
-          status: 'PENDING',
-          publishedAt: null,
-          attemptCount: 0,
-          lastError: null,
-        });
-        await manager.save(OutboxEvent, outbox);
-
-        return { kind: 'confirmed', order, items, bill } satisfies ConfirmTxOutcome;
       });
 
       stockDeducted = false;
@@ -144,15 +159,18 @@ export class OrderConfirmSagaService {
   private async compensateStock(payload: StockCompensationPayload, originalError: unknown): Promise<void> {
     try {
       await this.catalogStockGateway.releaseForOrder({
-        ...payload,
-        idempotencyKey: `confirm-order-compensation:${payload.orderId}`,
+        tenantId: payload.tenantId,
+        orderId: payload.orderId,
+        idempotencyKey: `confirm-order-compensation:${payload.orderId}:${payload.reservationVersion ?? 'legacy'}`,
+        reservationVersion: payload.reservationVersion,
+        items: payload.items,
       });
     } catch (compensationError) {
       const message = [
         'Order confirm compensation failed',
         `tenantId=${payload.tenantId}`,
         `orderId=${payload.orderId}`,
-        `idempotencyKey=confirm-order-compensation:${payload.orderId}`,
+        `reservationVersion=${payload.reservationVersion ?? 'null'}`,
         `originalError=${this.getErrorMessage(originalError)}`,
         `compensationError=${this.getErrorMessage(compensationError)}`,
       ].join(' ');

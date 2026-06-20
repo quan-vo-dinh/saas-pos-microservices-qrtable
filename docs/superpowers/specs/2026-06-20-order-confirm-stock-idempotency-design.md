@@ -1,8 +1,56 @@
 # Order Confirm Stock Idempotency Design
 
-> **Status:** Approved direction on 2026-06-20.
+> **Status:** Implemented and verified on 2026-06-20.
 > **Scope:** Thesis-complete end-to-end idempotency for Order Confirm stock deduction, compensation, and processing-order cancellation.
 > **Canonical references:** `docs/phases/phase-4a-saga-hardening.md` and `docs/testing/phase-5/saga-validation-strategy.md`.
+> **AI/slide handoff:** The pre-implementation finding that Catalog ignored `idempotencyKey` is obsolete. Use the implementation snapshot and claim policy below.
+
+## 0. Implementation Snapshot For AI And Slide Sessions
+
+The design in this document is implemented in the current working tree.
+
+Current code behavior:
+
+- Catalog reads and persists the deduct reservation key in `stock_reservations`.
+- Catalog stores the immutable request hash, state, version, deduct result, and release result in PostgreSQL.
+- The reservation transition and menu-item stock mutation share one Catalog transaction.
+- Repeating the same active tenant/order/key/payload returns `REPLAYED` without another deduction.
+- A matching release restores stock once; a duplicate release returns `REPLAYED`.
+- Reconfirming after compensation increments the reservation version.
+- An older release returns `STALE` and cannot release the newer reservation.
+- Order stores `stock_reservation_version` with `PROCESSING`, order items, and `order.confirmed` outbox in one transaction.
+- A bounded five-second first-response timeout prevents an unbounded Catalog TCP wait.
+
+Primary implementation anchors:
+
+- `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts`
+- `apps/catalog/src/app/modules/menu-item/repositories/stock-reservation.repository.ts`
+- `libs/entities/src/lib/stock-reservation.entity.ts`
+- `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`
+- `apps/order/src/app/modules/order/services/catalog-stock-gateway.service.ts`
+- `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts`
+
+Fresh verification on 2026-06-20:
+
+- Catalog: 13 suites, 88 tests passed.
+- Order: 19 active suites, 120 tests passed; opt-in suites are separate.
+- Order Confirm lost-response/version integration: 3 tests passed against PostgreSQL and Catalog TCP.
+- Stock contention integration: 1 test passed against the external stack.
+- Catalog and Order lint passed.
+- `shared-types`, `entities`, Catalog, and Order builds passed. The `interfaces` project has no Nx `build` target and is compiled through consuming builds.
+- Documentation anchors: 55 verified.
+
+### Superseded finding
+
+The following statement described the code before this implementation and must not be reused in slides:
+
+> Catalog does not read `data.idempotencyKey`, does not persist the key, and therefore does not provide end-to-end stock idempotency.
+
+That statement is no longer true. The remaining limitation is narrower: recovery after an ambiguous Catalog response requires the caller to retry the same Order confirm. There is no autonomous Saga recovery worker, and exactly-once TCP/Kafka delivery is not claimed.
+
+### Slide-safe claim
+
+> Catalog persists a versioned stock reservation in the same local transaction as the stock mutation. Repeating the same active reservation returns the stored result instead of deducting stock again; versioned release prevents duplicate or stale compensation from changing a newer reservation.
 
 ## 1. Goal
 
@@ -20,7 +68,7 @@ The implementation must guarantee that:
 
 Automatic recovery when no caller ever retries remains outside this scope.
 
-## 2. CodeGraph Baseline
+## 2. Design-Time CodeGraph Baseline
 
 CodeGraph was run before direct source inspection.
 
@@ -43,11 +91,11 @@ shared Catalog TCP interfaces
 
 Direct source inspection adds one important caller that the graph did not report: `OrderStateTransitionService.cancelProcessing()` also calls `releaseForOrder`. The implementation must update this path to avoid a cancellation regression.
 
-Current behavior:
+Pre-implementation behavior, now superseded:
 
 - Order locks the order row and sends stable deduct/release keys.
 - Catalog performs transactional row-locked stock updates.
-- Catalog does not read or persist the idempotency key.
+- Catalog did not read or persist the idempotency key before this design was implemented.
 - Order only knows that stock was deducted after receiving the Catalog response.
 - A lost response after Catalog commit can therefore cause a second deduction on retry.
 
@@ -66,11 +114,11 @@ Order stores the successful `reservationVersion` so later cancellation releases 
 
 ### Rejected alternatives
 
-| Alternative | Reason rejected |
-| --- | --- |
+| Alternative                                                | Reason rejected                                                                                                                                                              |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unique row per `(tenant, idempotency_key, operation)` only | It cannot safely model `deduct -> compensate -> confirm again` with the current stable order key. A replay may return an old deduct result after stock was already restored. |
-| Durable Saga execution table and recovery worker in Order | It provides stronger autonomous recovery but adds a workflow engine, polling, retry policy, and operational state outside the thesis-complete scope. |
-| Redis lock or Redis idempotency cache | Stock is PostgreSQL-owned durable state. A cache cannot atomically commit the idempotency record with stock changes. |
+| Durable Saga execution table and recovery worker in Order  | It provides stronger autonomous recovery but adds a workflow engine, polling, retry policy, and operational state outside the thesis-complete scope.                         |
+| Redis lock or Redis idempotency cache                      | Stock is PostgreSQL-owned durable state. A cache cannot atomically commit the idempotency record with stock changes.                                                         |
 
 ## 4. Invariants
 
@@ -175,18 +223,18 @@ Semantics:
 
 ## 7. Catalog State Transitions
 
-| Current state | Command | Condition | Next state | Stock effect | Outcome |
-| --- | --- | --- | --- | --- | --- |
-| No row | Deduct | valid payload | `RESERVED`, v1 | subtract | `APPLIED` |
-| `RESERVED`, vN | Deduct | same key/hash | unchanged | none | `REPLAYED` |
-| `RELEASED`, vN | Deduct | same key/hash | `RESERVED`, vN+1 | subtract | `APPLIED` |
-| Any | Deduct | key/hash mismatch | unchanged | none | conflict |
-| `RESERVED`, vN | Release vN | valid payload | `RELEASED`, vN | add | `APPLIED` |
-| `RELEASED`, vN | Release vN | same payload | unchanged | none | `REPLAYED` |
-| vCurrent > vRequested | Release old version | same payload | unchanged | none | `STALE` |
-| Any | Release future version | vRequested > vCurrent | unchanged | none | conflict |
-| No row | Legacy release with null version | valid payload | `RELEASED`, v1 | add | `APPLIED` |
-| `RELEASED` legacy row | Legacy release with null version | same payload | unchanged | none | `REPLAYED` |
+| Current state         | Command                          | Condition             | Next state       | Stock effect | Outcome    |
+| --------------------- | -------------------------------- | --------------------- | ---------------- | ------------ | ---------- |
+| No row                | Deduct                           | valid payload         | `RESERVED`, v1   | subtract     | `APPLIED`  |
+| `RESERVED`, vN        | Deduct                           | same key/hash         | unchanged        | none         | `REPLAYED` |
+| `RELEASED`, vN        | Deduct                           | same key/hash         | `RESERVED`, vN+1 | subtract     | `APPLIED`  |
+| Any                   | Deduct                           | key/hash mismatch     | unchanged        | none         | conflict   |
+| `RESERVED`, vN        | Release vN                       | valid payload         | `RELEASED`, vN   | add          | `APPLIED`  |
+| `RELEASED`, vN        | Release vN                       | same payload          | unchanged        | none         | `REPLAYED` |
+| vCurrent > vRequested | Release old version              | same payload          | unchanged        | none         | `STALE`    |
+| Any                   | Release future version           | vRequested > vCurrent | unchanged        | none         | conflict   |
+| No row                | Legacy release with null version | valid payload         | `RELEASED`, v1   | add          | `APPLIED`  |
+| `RELEASED` legacy row | Legacy release with null version | same payload          | unchanged        | none         | `REPLAYED` |
 
 The deduct service claims the reservation row before locking menu items:
 

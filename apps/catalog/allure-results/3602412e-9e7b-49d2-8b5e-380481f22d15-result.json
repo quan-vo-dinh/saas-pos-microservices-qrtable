@@ -1,0 +1,37 @@
+{
+  "uuid": "3602412e-9e7b-49d2-8b5e-380481f22d15",
+  "name": "should clear image url and public id",
+  "historyId": "32655ab60ea6e5e514e99dfdc4d4020e:d41d8cd98f00b204e9800998ecf8427e",
+  "status": "passed",
+  "statusDetails": {},
+  "stage": "finished",
+  "steps": [],
+  "attachments": [],
+  "parameters": [],
+  "labels": [
+    { "name": "language", "value": "javascript" },
+    { "name": "framework", "value": "jest" },
+    { "name": "package", "value": "@einvoice/source.src.app.modules.menu-item.tests.menu-item.service.spec.ts" },
+    { "name": "_fallbackTestCaseId", "value": "1fd87551a1ae5ae4f307ec9134741558" },
+    { "name": "host", "value": "Macbook-Pro-14.local" },
+    { "name": "thread", "value": "1" },
+    { "name": "parentSuite", "value": "MenuItemService" },
+    { "name": "suite", "value": "clearImage" }
+  ],
+  "links": [],
+  "start": 1781934249280,
+  "fullName": "@einvoice/source:src/app/modules/menu-item/tests/menu-item.service.spec.ts#MenuItemService clearImage should clear image url and public id",
+  "titlePath": [
+    "@einvoice/source",
+    "src",
+    "app",
+    "modules",
+    "menu-item",
+    "tests",
+    "menu-item.service.spec.ts",
+    "MenuItemService",
+    "clearImage"
+  ],
+  "testCaseId": "32655ab60ea6e5e514e99dfdc4d4020e",
+  "stop": 1781934249281
+}

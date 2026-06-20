@@ -2,6 +2,14 @@ export type CategoryStatus = 'active' | 'inactive';
 
 export type MenuItemStatus = 'available' | 'out_of_stock';
 
+export type StockMutationResult = {
+  menuItemId: string;
+  menuItemName: string;
+  requestedQuantity: number;
+  remainingStock: number;
+  status: MenuItemStatus;
+};
+
 /** KDS routing — Catalog canonical (Step 2.4 Q11-A) */
 export const PreparationStation = {
   KITCHEN: 'KITCHEN',

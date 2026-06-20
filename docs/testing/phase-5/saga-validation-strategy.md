@@ -1,7 +1,7 @@
 # Saga Validation Strategy For Thesis Evidence
 
 > Purpose: define how QRTable proves the Saga pattern in a thesis-safe way without claiming full production-grade saga hardening.
-> Last updated: 2026-05-31.
+> Last updated: 2026-06-20.
 
 ## Scope
 
@@ -30,20 +30,20 @@ The thesis should present Saga validation as **multi-layer verification**: unit/
 
 ## Order Confirm Saga Evidence
 
-| Evidence item                 | Current proof                                                                                                                                                  | Thesis claim level                         |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Orchestrator exists           | `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`                                                                                      | Implemented                                |
-| Catalog stock gateway exists  | `apps/order/src/app/modules/order/services/catalog-stock-gateway.service.ts`                                                                                   | Implemented                                |
-| Success path                  | `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts` checks stock deduct, `PROCESSING`, item update, and `order.confirmed` outbox.      | Automated unit/contract                    |
-| Replay path                   | `order-confirm-saga.service.spec.ts` checks already-`PROCESSING` replay without new deduct/outbox.                                                             | Automated unit/contract                    |
-| Catalog business error path   | `order-confirm-saga.service.spec.ts` checks no Order save and no release before deduct success.                                                                | Automated unit/contract                    |
-| Compensation path             | `order-confirm-saga.service.spec.ts` checks release stock after failure following successful deduct, including original-error preservation when release fails. | Automated fault-injection at service layer |
-| TCP command shape             | `catalog-stock-gateway.service.spec.ts` checks deduct/release payloads and error normalization.                                                                | Automated contract                         |
-| External stack stock behavior | `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts` validates live Order/Catalog stock boundary when enabled.                 | Opt-in integration                         |
+| Evidence item                   | Current proof                                                                                                                                                                                      | Thesis claim level                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Orchestrator exists             | `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`                                                                                                                          | Implemented                                |
+| Catalog reservation state       | `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts` and its focused spec cover applied, replayed, stale, conflict, legacy, and reconfirm transitions.                   | Automated unit/state-machine               |
+| Success path                    | `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts` checks stock deduct, returned-version persistence, `PROCESSING`, item update, and outbox.                              | Automated unit/contract                    |
+| Replay and transport paths      | The Saga spec checks already-`PROCESSING`, active Catalog replay, and ambiguous transport failure without speculative compensation.                                                                | Automated unit/contract                    |
+| Compensation path               | The Saga spec checks versioned release inside the transaction callback, commit-time fallback, compensation logging, and original-error preservation.                                               | Automated fault-injection at service layer |
+| TCP command shape and timeout   | `catalog-stock-gateway.service.spec.ts` checks deduct/release envelopes, structural validation, business errors, and the bounded first-response timeout.                                           | Automated contract                         |
+| Lost-response and version proof | `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts` uses real PostgreSQL and Catalog TCP for duplicate deduct, lost response/retry, and v2/stale release. | Opt-in integration/fault injection         |
+| Stock contention                | `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts` validates one success, one insufficient-stock failure, stock zero, and one outbox.                            | Opt-in integration                         |
 
 Recommended thesis wording:
 
-> The Order Confirm Saga has automated unit/contract evidence for orchestration, replay, Catalog error handling, outbox creation, and compensation. It also has opt-in integration evidence for the live Order-Catalog stock boundary. A fully live deterministic fault-injection harness for "Catalog deduct succeeded, then Order commit/outbox failed" remains a future hardening test.
+> The Order Confirm Saga has automated unit/contract evidence for orchestration and versioned compensation. Catalog persists the reservation key, payload hash, result, state, and version in the same transaction as the stock mutation. Opt-in PostgreSQL plus Catalog TCP tests prove duplicate deduct, a discarded successful response followed by retry, compensation followed by reconfirm, stale release protection, and concurrent stock contention. Recovery from an ambiguous response still requires a caller retry; no autonomous Saga recovery worker or exactly-once delivery is claimed.
 
 Useful commands:
 
@@ -51,6 +51,7 @@ Useful commands:
 pnpm nx test order --testPathPatterns=order-confirm-saga.service.spec.ts --runInBand
 pnpm nx test order --testPathPatterns=catalog-stock-gateway.service.spec.ts --runInBand
 RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand
+RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-confirm-stock-idempotency.integration.spec.ts --runInBand
 ```
 
 Recommended demo artifacts:
@@ -108,7 +109,7 @@ Safe claims:
 - QRTable applies Saga to two representative workflows: Order confirmation and SaaS onboarding.
 - Both Saga flows use orchestration, not choreography.
 - Both flows define a business commit point and compensation actions.
-- Order Confirm Saga has service-level fault injection for compensation and opt-in Order-Catalog integration for stock behavior.
+- Order Confirm Saga has service-level compensation fault injection plus opt-in PostgreSQL/Catalog TCP evidence for duplicate deduct, lost-response retry, versioned reconfirm, stale release, and contention.
 - SaaS Onboarding Mini-Saga has opt-in PostgreSQL integration for rollback and live Payment TCP evidence.
 
 Claims to avoid:
@@ -118,11 +119,13 @@ Claims to avoid:
 - "Payment complete is a full Saga."
 - "The onboarding flow is fully live end-to-end across Keycloak, User-Access, Payment, Kafka, and UI."
 - "Exactly-once delivery is guaranteed."
+- "An abandoned reservation is recovered automatically without a caller retry."
 
 ## Evidence Checklist Before Final Thesis Submission
 
 - [ ] Run and save output for the Order Confirm Saga unit/contract tests.
 - [ ] Run and save output for the Order/Catalog stock integration if the local stack is ready.
+- [ ] Run and save output for the Order Confirm lost-response/version integration.
 - [ ] Run and save output for the SaaS onboarding PostgreSQL integration.
 - [ ] Run and save output for the SaaS live Payment TCP integration.
 - [ ] Capture UI happy path for POS confirm and SaaS onboarding.

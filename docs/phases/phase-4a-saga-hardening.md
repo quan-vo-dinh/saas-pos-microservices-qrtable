@@ -22,7 +22,7 @@
 
 ## Overview
 
-Within the thesis scope, Phase 4A focuses on two representative workflows rather than claiming every production hardening item. The POS core workflow is **Order Confirm Saga**: Order orchestrates, Catalog owns stock deduction/release, Order commits `PROCESSING` state plus `order.confirmed` outbox, and Kitchen reacts after commit. If Catalog already deducted stock but Order cannot commit, Order sends a Catalog release command as compensation. The platform workflow is the existing **SaaS Onboarding Mini-Saga** from Phase 4B: SaaS orchestrates tenant, Owner, profile, subscription, payment settings, and rollback.
+Within the thesis scope, Phase 4A focuses on two representative workflows rather than claiming every production hardening item. The POS core workflow is **Order Confirm Saga**: Order orchestrates, Catalog owns a versioned stock reservation and stock deduction/release, Order commits `PROCESSING`, the returned reservation version, and the `order.confirmed` outbox together, and Kitchen reacts after commit. If Catalog acknowledged a deduction but Order cannot commit, Order releases that exact reservation version as compensation. The platform workflow is the existing **SaaS Onboarding Mini-Saga** from Phase 4B: SaaS orchestrates tenant, Owner, profile, subscription, payment settings, and rollback.
 
 Payment is documented as settlement baseline with outbox + retry/idempotency, **not** as a full Payment Complete Saga. `max_orders_per_session`, Redis SET NX for order creation, durable Saga state, dedicated cancellation audit table, and CDC/Debezium are recorded as future hardening unless code implements them.
 
@@ -49,18 +49,20 @@ Payment is documented as settlement baseline with outbox + retry/idempotency, **
 
 **Saga Steps (Order Confirm):**
 
-| Step | Action                                                             | Service        | Compensation (reverse)                                      |
-| ---- | ------------------------------------------------------------------ | -------------- | ----------------------------------------------------------- |
-| 1    | Lock `PENDING` order, validate `OPEN` bill, load order items       | Order          | None — no external side effect yet                          |
-| 2    | Deduct stock with `confirm-order:{orderId}`                        | Catalog        | Release stock with `confirm-order-compensation:{orderId}`   |
-| 3    | Update order/items → `PROCESSING`, insert `order.confirmed` outbox | Order          | If this fails after step 2, call Catalog release stock      |
-| 4    | Publish Kafka `order.confirmed` for Kitchen tickets                | Outbox/Kitchen | Not part of stock compensation; consumer must be idempotent |
+| Step | Action                                                                                        | Service        | Compensation (reverse)                                                             |
+| ---- | --------------------------------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------- |
+| 1    | Lock `PENDING` order, validate `OPEN` bill, load order items                                  | Order          | None — no external side effect yet                                                 |
+| 2    | Ensure a versioned reservation with `confirm-order:{orderId}` and deduct stock                | Catalog        | Release the returned version with `confirm-order-compensation:{orderId}:{version}` |
+| 3    | Update order/items → `PROCESSING`, store reservation version, insert `order.confirmed` outbox | Order          | If this fails after step 2, call the versioned Catalog release                     |
+| 4    | Publish Kafka `order.confirmed` for Kitchen tickets                                           | Outbox/Kitchen | Not part of stock compensation; consumer must be idempotent                        |
 
-The business commit point is a successful Order DB commit containing `PROCESSING` order/items and `order.confirmed` outbox.
+The business commit point is a successful Order DB commit containing `PROCESSING` order/items, `stock_reservation_version`, and the `order.confirmed` outbox.
 
 **WHY:** Make sure there are no "created" orders when inventory runs out, and don't let inventory be held permanently if the next step fails.
 
-**Implemented compensation:** `OrderConfirmSagaService` calls Catalog `releaseForOrder` if an error happens after Catalog deduct succeeds but before Order commit completes.
+**Implemented stock idempotency and compensation:** Catalog persists one tenant/order `stock_reservations` row with the immutable payload hash, current state, stored result, and monotonically increasing version in the same local transaction as stock mutation. Replaying an active deduct returns the stored result without another deduction. A matching release restores stock once; an older release is `STALE` and cannot affect a newer reservation. `OrderConfirmSagaService` stores the acknowledged version and calls Catalog `releaseForOrder` if an error happens after Catalog deduct succeeds but before Order commit completes.
+
+If Catalog commits but its deduct response is lost, Order remains `PENDING` and does not guess that the mutation succeeded. A caller retry sends the same key and payload; Catalog replays the active reservation, and Order can then commit with the returned version. This is retry-driven recovery, not autonomous recovery: there is no Saga execution table or background recovery worker in Order.
 
 #### Payment Settlement Baseline (not a full Payment Complete Saga)
 
@@ -104,6 +106,9 @@ The business commit point is a successful Order DB commit containing `PROCESSING
 ## Acceptance Criteria
 
 - **Order Confirm Saga:** `OrderConfirmSagaService` orchestrates confirm; if Catalog deduct succeeds but Order commit/outbox fails, Order calls Catalog release stock.
+- **Catalog reservation replay:** the same tenant/order/key/payload returns the stored active reservation without deducting stock twice; a different key or payload is rejected.
+- **Versioned release:** duplicate release restores stock once, reconfirm after compensation increments the version, and a stale release cannot affect the newer reservation.
+- **Order commit point:** `PROCESSING`, order items, `stock_reservation_version`, and `order.confirmed` outbox commit together.
 - **Replay:** An already `PROCESSING` order returns current state without deducting stock again or creating a new outbox row.
 - **Catalog error:** If Catalog rejects before a successful deduct, Order does not move to `PROCESSING` and does not compensate.
 - **Payment:** Claim only settlement + outbox + retry/idempotency baseline, not a full Payment Complete Saga.
@@ -113,10 +118,10 @@ The business commit point is a successful Order DB commit containing `PROCESSING
 
 The thesis evidence for Phase 4A is intentionally scoped as a representative Saga slice, not full operational saga hardening.
 
-- **Order Confirm Saga:** use `order-confirm-saga.service.spec.ts` and `catalog-stock-gateway.service.spec.ts` for deterministic orchestration, replay, Catalog error, outbox, and compensation behavior; use the opt-in Order/Catalog stock integration for the live stock boundary.
+- **Order Confirm Saga:** use `order-confirm-saga.service.spec.ts`, `catalog-stock-gateway.service.spec.ts`, and `stock-reservation.service.spec.ts` for deterministic orchestration and state transitions. Use `order-confirm-stock-idempotency.integration.spec.ts` for real PostgreSQL plus Catalog TCP duplicate/lost-response/version evidence, and `order-stock-concurrency.integration.spec.ts` for two-order contention.
 - **SaaS Onboarding Mini-Saga:** use SaaS onboarding unit/mocked integration tests, `onboarding-saga-db.integration.spec.ts` for real PostgreSQL success/rollback, and `onboarding-saga-live-payment.integration.spec.ts` for the live Payment TCP boundary.
 - **Thesis artifacts:** UI screenshots, terminal output, DB/outbox snapshots, and logs can illustrate the flows, but the acceptance argument should reference the test layers above.
-- **Limit:** do not claim durable Saga state, retry workers, CDC/Debezium, stock ledger, or full live Keycloak/User-Access onboarding validation unless those artifacts are added later.
+- **Limit:** the Catalog reservation row is durable stock domain state, not durable Order Saga execution state. Do not claim autonomous recovery without a caller retry, exactly-once delivery, retry workers, CDC/Debezium, stock ledger, or full live Keycloak/User-Access onboarding validation.
 
 See `docs/testing/phase-5/saga-validation-strategy.md` for the detailed validation plan.
 

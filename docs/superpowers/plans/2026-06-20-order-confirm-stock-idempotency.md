@@ -1,12 +1,66 @@
 # Order Confirm Stock Idempotency Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution status:** Implemented and verified on 2026-06-20. The detailed unchecked boxes below preserve the original TDD execution sequence; they are not the current progress indicator.
+> **AI/slide handoff:** The earlier audit saying Catalog ignored the key is superseded. Read `Implementation Completion Record` before deriving slide claims.
+> **Do not re-execute:** The remaining unchecked task steps are historical sequencing detail. Use the checked completion criteria and current code/tests as the implementation status.
 
 **Goal:** Make Order Confirm stock deduction, compensation, and processing-order cancellation idempotent across the Order-Catalog TCP boundary.
 
 **Architecture:** Catalog owns a PostgreSQL `stock_reservations` state record per tenant/order. Deduct is an idempotent `ensure RESERVED` command; release is versioned so duplicate or stale compensation cannot mutate stock. Order stores the successful reservation version in the same transaction as `PROCESSING` and `order.confirmed` outbox.
 
 **Tech Stack:** Nx monorepo, NestJS, TypeScript, TypeORM, PostgreSQL, Nest TCP microservices, RxJS, Jest.
+
+---
+
+## Implementation Completion Record
+
+| Area                                        | Status              | Current evidence                                                                                           |
+| ------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Shared state, TCP contracts, and error code | Complete            | `StockReservationState`, operation envelope, versioned release request, `CATALOG_STOCK_OPERATION_CONFLICT` |
+| Catalog and Order migrations                | Complete            | `1781971200000-AddStockReservations.ts`, `1781971201000-AddOrderStockReservationVersion.ts`                |
+| Catalog durable reservation state machine   | Complete            | applied, replayed, stale, conflict, reconfirm, and legacy transitions                                      |
+| Catalog controller/module wiring            | Complete            | stock commands delegate to `StockReservationService`                                                       |
+| Order Catalog gateway                       | Complete            | typed response validation and bounded first-response timeout                                               |
+| Order Confirm Saga                          | Complete            | returned version persisted with `PROCESSING` and outbox; versioned compensation                            |
+| Processing cancellation                     | Complete            | versioned release plus null-version legacy compatibility                                                   |
+| Unit/contract verification                  | Complete            | Catalog 88 tests; Order 120 tests                                                                          |
+| PostgreSQL/Catalog TCP fault injection      | Complete            | lost response/retry and version/stale-release integration: 3 tests                                         |
+| Stock concurrency integration               | Complete            | one success, one stock failure, one outbox: 1 test                                                         |
+| Canonical docs and Slide 22-23              | Complete            | Phase 4A, Saga validation, architecture, business logic, doc anchors, slide builder                        |
+| Final commit/merge                          | Outside this record | Working tree contains unrelated thesis/deck changes; stage only task-owned files                           |
+
+### Current claim for slide generation
+
+Use this statement:
+
+> Catalog persists the reservation key, immutable payload hash, stored result, state, and version in the same PostgreSQL transaction as the stock mutation. Active replay does not deduct twice; versioned release makes duplicate compensation idempotent and stale compensation harmless.
+
+Do not reuse this superseded pre-implementation statement:
+
+> The request carries an operation key, but Catalog-side deduplication by key is not implemented.
+
+Remaining boundary:
+
+- ambiguous-response recovery is retry-driven;
+- without a caller retry, an abandoned reservation is not recovered automatically;
+- no autonomous Saga worker or exactly-once delivery guarantee is claimed.
+
+### Verification Snapshot
+
+Verified on 2026-06-20:
+
+```text
+Catalog unit suite:                    13 suites / 88 tests passed
+Order unit suite:                      19 active suites / 120 tests passed
+Order Confirm idempotency integration: 1 suite / 3 tests passed
+Stock concurrency integration:         1 suite / 1 test passed
+Catalog and Order lint:                passed
+shared-types/entities/Catalog/Order:   build passed
+interfaces Nx build target:            not configured; covered by consuming builds
+Documentation anchors:                 55 verified
+```
+
+Implementation added one focused controller spec and updated database-ownership verification in addition to the original target list. These are intentional verification improvements, not scope expansion.
 
 ---
 
@@ -18,7 +72,7 @@
 - Order orchestrator: `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`
 - Order Catalog gateway: `apps/order/src/app/modules/order/services/catalog-stock-gateway.service.ts`
 - Processing cancellation: `apps/order/src/app/modules/order/services/order-state-transition.service.ts`
-- Catalog stock implementation: `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts`
+- Catalog stock implementation: `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts`
 - Shared TCP contracts: `libs/interfaces/src/lib/tcp/catalog/`
 
 ## Start-Of-Session Protocol
@@ -358,19 +412,29 @@ Cover aggregation, sorting, invalid quantity, and stable hash:
 
 ```typescript
 it('aggregates duplicate item ids and returns deterministic sorted entries', () => {
-  expect(normalizeStockItems([
-    { menuItemId: 'b', quantity: 1 },
-    { menuItemId: 'a', quantity: 2 },
-    { menuItemId: 'b', quantity: 3 },
-  ])).toEqual([
+  expect(
+    normalizeStockItems([
+      { menuItemId: 'b', quantity: 1 },
+      { menuItemId: 'a', quantity: 2 },
+      { menuItemId: 'b', quantity: 3 },
+    ]),
+  ).toEqual([
     { menuItemId: 'a', quantity: 2 },
     { menuItemId: 'b', quantity: 4 },
   ]);
 });
 
 it('hashes equivalent payloads identically regardless of input order', () => {
-  expect(hashStockItems([{ menuItemId: 'b', quantity: 1 }, { menuItemId: 'a', quantity: 2 }])).toBe(
-    hashStockItems([{ menuItemId: 'a', quantity: 2 }, { menuItemId: 'b', quantity: 1 }]),
+  expect(
+    hashStockItems([
+      { menuItemId: 'b', quantity: 1 },
+      { menuItemId: 'a', quantity: 2 },
+    ]),
+  ).toBe(
+    hashStockItems([
+      { menuItemId: 'a', quantity: 2 },
+      { menuItemId: 'b', quantity: 1 },
+    ]),
   );
 });
 ```
@@ -552,7 +616,7 @@ git commit -m "feat(catalog): make stock reservations idempotent"
 Assert both message handlers delegate to `StockReservationService` and return:
 
 ```typescript
-Response.success<StockMutationOperationResult>(operationResult)
+Response.success<StockMutationOperationResult>(operationResult);
 ```
 
 - [ ] **Step 2: Move stock ownership out of `MenuItemService`**
@@ -586,7 +650,15 @@ Use fixtures such as:
 const operationResult: StockMutationOperationResult = {
   reservationVersion: 1,
   outcome: 'APPLIED',
-  items: [{ menuItemId: 'm1', menuItemName: 'Pho', requestedQuantity: 2, remainingStock: 8, status: MENU_ITEM_STATUS.AVAILABLE }],
+  items: [
+    {
+      menuItemId: 'm1',
+      menuItemName: 'Pho',
+      requestedQuantity: 2,
+      remainingStock: 8,
+      status: MENU_ITEM_STATUS.AVAILABLE,
+    },
+  ],
 };
 ```
 
@@ -645,7 +717,7 @@ Assert the saved Order contains:
 expect.objectContaining({
   status: OrderStatus.PROCESSING,
   stockReservationVersion: 1,
-})
+});
 ```
 
 - [ ] **Step 2: Update compensation tests**
@@ -723,9 +795,10 @@ Build the key from the stored version:
 
 ```typescript
 const reservationVersion = ord.stockReservationVersion;
-const releaseKey = reservationVersion === null
-  ? `cancel-processing:${ord.id}:legacy`
-  : `cancel-processing:${ord.id}:${reservationVersion}`;
+const releaseKey =
+  reservationVersion === null
+    ? `cancel-processing:${ord.id}:legacy`
+    : `cancel-processing:${ord.id}:${reservationVersion}`;
 ```
 
 Pass `reservationVersion` to Catalog. Do not directly inspect Catalog state from Order.
@@ -917,13 +990,13 @@ Do not stage unrelated pre-existing thesis, presentation, image, or generated-fi
 
 ## Completion Criteria
 
-- [ ] One active order reservation produces one net stock deduction under retry.
-- [ ] Duplicate release produces one net stock restoration.
-- [ ] Compensation followed by reconfirm increments the reservation version.
-- [ ] Stale release does not mutate a newer reservation.
-- [ ] Order confirmation stores reservation version with state/outbox atomically.
-- [ ] Processing cancellation uses the stored version, including documented legacy compatibility.
-- [ ] Catalog and Order unit/contract suites pass.
-- [ ] Real PostgreSQL lost-response fault injection passes when integration prerequisites are available.
-- [ ] Builds, lint, DataSource ownership tests, doc anchors, and `git diff --check` pass.
-- [ ] Slide 22-23 claims match the verified implementation and do not claim autonomous recovery or exactly-once delivery.
+- [x] One active order reservation produces one net stock deduction under retry.
+- [x] Duplicate release produces one net stock restoration.
+- [x] Compensation followed by reconfirm increments the reservation version.
+- [x] Stale release does not mutate a newer reservation.
+- [x] Order confirmation stores reservation version with state/outbox atomically.
+- [x] Processing cancellation uses the stored version, including documented legacy compatibility.
+- [x] Catalog and Order unit/contract suites pass.
+- [x] Real PostgreSQL lost-response fault injection passes when integration prerequisites are available.
+- [x] Builds, lint, DataSource ownership tests, doc anchors, and `git diff --check` pass.
+- [x] Slide 22-23 claims match the verified implementation and do not claim autonomous recovery or exactly-once delivery.

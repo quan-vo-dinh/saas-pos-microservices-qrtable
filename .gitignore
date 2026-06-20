@@ -82,3 +82,7 @@ docs/graduation-thesis-resources/thesis-report/*.run.xml
 docs/graduation-thesis-resources/thesis-report/*.synctex.gz
 docs/graduation-thesis-resources/thesis-report/*.toc
 docs/graduation-thesis-resources/thesis-report/*.xdv
+
+# Allure Report
+/allure-results/
+/allure-report/

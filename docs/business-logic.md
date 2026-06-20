@@ -326,11 +326,16 @@ The process from the moment the customer scans the QR until the order is sent to
 
   Confirm (staff, PENDING → PROCESSING):
   OrderConfirmSagaService orchestrates the flow.
-  Catalog service (owns menu_items): pessimistic lock + deduct in transaction Catalog
+  Catalog service (owns menu_items and stock_reservations): lock reservation + menu rows,
+  persist the request hash/result/version, and deduct in one Catalog transaction
   (via TCP transactional command — Order service does not directly UPDATE DB Catalog)
-  Order service: update order status + write simplified outbox `order.confirmed` for Kafka publishing after commit
-  If Catalog deduct succeeds but Order commit/outbox fails, Order calls Catalog release stock with a compensation key.
+  Repeating the active tenant/order/key/payload returns the stored result without another deduction.
+  Order service: persist the returned reservation version with order status/items and `order.confirmed` outbox.
+  If acknowledged Catalog deduct succeeds but Order commit/outbox fails, Order releases that exact version.
+  Reconfirm after a completed release creates the next version; an older release is stale and changes no stock.
   ```
+
+If the Catalog response is lost after its commit, Order remains `PENDING`. Retrying the same confirm recovers through the stored Catalog reservation. No automatic recovery occurs when no caller retries.
 
 If not enough inventory → structured error for staff (previously submitted customer is only pending)
 
@@ -647,11 +652,12 @@ Actor: Staff, Manager (RBAC details: permission-matrix §6 / §6.1)
 - TCP Catalog: enough inventory at the time of confirmation
   Action:
 - Catalog deduct stock (in DB Catalog)
+    - Persist Catalog reservation version on the order
     - Update order_status = "Processing"
 - Route to KDS (Kafka order.confirmed + station from `MenuItem.station`)
     - Print KOT if printer connected
   Compensation:
-    - If Catalog stock was deducted but Order commit/outbox fails, call Catalog release stock
+    - If Catalog acknowledged stock deduction but Order commit/outbox fails, release the matching reservation version
 
 Pending → Canceled:
   Trigger: Customer or Staff cancel
@@ -675,7 +681,7 @@ Processing → Canceled:
     - Update order_status = "Canceled"
     - Store cancellation reason/actor/timestamp on the order row
     - Notify kitchen to stop
-- Restore/adjust stock through Catalog (already deducted during confirmation)
+- Restore/adjust stock through Catalog using `stock_reservation_version` (legacy pre-migration orders use the null-version compatibility path once)
     - Write simplified outbox `order.status_changed` for durable status projection/audit
     - Flag for revenue report exclusion
 

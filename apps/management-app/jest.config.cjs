@@ -1,7 +1,14 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+const path = require('path');
+
+
 module.exports = {
   displayName: 'management-app',
   preset: '../../jest.preset.js',
-  testEnvironment: 'jsdom',
+  testEnvironment: 'allure-jest/jsdom',
+  testEnvironmentOptions: {
+    resultsDir: path.resolve(__dirname, '../../allure-results'),
+  },
   transform: {
     '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },

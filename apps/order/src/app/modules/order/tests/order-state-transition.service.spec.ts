@@ -3,6 +3,8 @@ import { OrderItem } from '@common/entities/order-item.entity';
 import { Order } from '@common/entities/order.entity';
 import { OutboxEvent } from '@common/entities/outbox-event.entity';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
+import type { StockMutationOperationResult } from '@common/interfaces/tcp/catalog/menu-item-response.interface';
 import { BillStatus, OrderItemStatus, OrderStatus } from '@einvoice/types';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
@@ -150,6 +152,7 @@ describe('OrderStateTransitionService', () => {
       status: OrderStatus.PROCESSING,
       confirmedAt: now,
       confirmedByUserId: 'staff-1',
+      stockReservationVersion: 2,
       createdAt: now,
       updatedAt: now,
     });
@@ -159,9 +162,19 @@ describe('OrderStateTransitionService', () => {
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(processingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([item]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(now));
-    catalogStockGateway.releaseForOrder.mockResolvedValue([
-      { menuItemId: 'm1', menuItemName: 'X', requestedQuantity: 2, remainingStock: 5 },
-    ]);
+    catalogStockGateway.releaseForOrder.mockResolvedValue({
+      reservationVersion: 2,
+      outcome: 'APPLIED',
+      items: [
+        {
+          menuItemId: 'm1',
+          menuItemName: 'X',
+          requestedQuantity: 2,
+          remainingStock: 5,
+          status: MENU_ITEM_STATUS.AVAILABLE,
+        },
+      ],
+    } satisfies StockMutationOperationResult);
 
     const manager = {
       findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
@@ -185,7 +198,8 @@ describe('OrderStateTransitionService', () => {
     expect(catalogStockGateway.releaseForOrder).toHaveBeenCalledWith({
       tenantId: 't1',
       orderId: 'o1',
-      idempotencyKey: 'cancel-processing:o1',
+      idempotencyKey: 'cancel-processing:o1:2',
+      reservationVersion: 2,
       items: [{ menuItemId: 'm1', quantity: 2 }],
     });
     expect(result.events.orderStatusChanged).toMatchObject({
@@ -221,6 +235,50 @@ describe('OrderStateTransitionService', () => {
         changedByUserId: 'manager-1',
       }),
     );
+  });
+
+  it('cancelProcessing uses the legacy release contract for a pre-migration order', async () => {
+    const now = new Date('2026-05-02T08:00:00.000Z');
+    const processingOrder = buildOrder({
+      status: OrderStatus.PROCESSING,
+      confirmedAt: now,
+      confirmedByUserId: 'staff-1',
+      stockReservationVersion: null,
+    });
+
+    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(processingOrder);
+    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([
+      buildOrderItem({ status: OrderItemStatus.PROCESSING }),
+    ]);
+    billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(now));
+    catalogStockGateway.releaseForOrder.mockResolvedValue({
+      reservationVersion: 1,
+      outcome: 'APPLIED',
+      items: [],
+    } satisfies StockMutationOperationResult);
+
+    const manager = {
+      findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
+      find: jest.fn().mockResolvedValue([]),
+      create: jest.fn((_ctor: unknown, payload: Record<string, unknown>) => payload),
+      save: jest.fn((_ctor: unknown, row: unknown) => Promise.resolve(row)),
+    };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    await service.cancelProcessing({
+      tenantId: 't1',
+      orderId: 'o1',
+      userId: 'manager-1',
+      reason: 'Customer complaint',
+    });
+
+    expect(catalogStockGateway.releaseForOrder).toHaveBeenCalledWith({
+      tenantId: 't1',
+      orderId: 'o1',
+      idempotencyKey: 'cancel-processing:o1:legacy',
+      reservationVersion: null,
+      items: [{ menuItemId: 'm1', quantity: 2 }],
+    });
   });
 
   it('markOrderItemsReady rejects when item station does not match ticket station', async () => {
@@ -446,6 +504,7 @@ function buildOrder(overrides: Partial<Order> = {}): Order {
     cancelledAt: null,
     cancelledByUserId: null,
     cancelReason: null,
+    stockReservationVersion: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

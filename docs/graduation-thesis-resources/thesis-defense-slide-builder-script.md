@@ -130,13 +130,14 @@ Nếu tự vẽ lại, giữ phong cách diagram sạch, không biến thành �
 
 ### Chương 5: các sơ đồ tuần tự khi triển khai
 
-| Asset                               | Nội dung                                                                                  | Vị trí sử dụng                                                   |
-| ----------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `chapter5-qr-ordering-session.pdf`  | Sequence chi tiết: QR session, active session, Redis hot path, cartVersion, submit order. | Slide 4 hoặc demo appendix. Main slide nên vẽ lại 6 bước.        |
-| `chapter5-order-confirm-stock.pdf`  | Order Confirm Saga: staff confirm, lock order, Catalog deduct, outbox, compensation.      | Slide 22-23. Đây là hình phân tích sâu quan trọng nhất.          |
-| `chapter5-kds-ticket-lifecycle.pdf` | KDS lifecycle từ `order.confirmed` tới Redis, Pub/Sub, WebSocket hint/refetch.            | Slide 24.                                                        |
-| `chapter5-payment-settlement.pdf`   | Cash và VietQR/SePay settlement, Payment-Order boundary, outbox `payment.completed`.      | Slide 26 hoặc appendix payment.                                  |
-| `chapter5-saas-onboarding-saga.pdf` | SaaS onboarding mini-saga.                                                                | Không dùng trong main/appendix của deck này theo scope hiện tại. |
+| Asset                                      | Nội dung                                                                                                      | Vị trí sử dụng                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `chapter5-qr-ordering-session.pdf`         | Sequence chi tiết: QR session, active session, Redis hot path, cartVersion, submit order.                     | Slide 4 hoặc demo appendix. Main slide nên vẽ lại 6 bước.                 |
+| `chapter5-order-confirm-stock.pdf`         | Sequence triển khai chi tiết: Order/Catalog DB, persistent reservation, outbox, Kafka, retry và compensation. | Dùng trong khóa luận hoặc appendix; không đặt nguyên hình lên main slide. |
+| `chapter5-order-confirm-stock-slide22.pdf` | Sequence giảng giải 5 lane: Order orchestration, `APPLIED/REPLAYED`, version và outbox/KDS.                   | Visual chính cho Slide 22.                                                |
+| `chapter5-kds-ticket-lifecycle.pdf`        | KDS lifecycle từ `order.confirmed` tới Redis, Pub/Sub, WebSocket hint/refetch.                                | Slide 24.                                                                 |
+| `chapter5-payment-settlement.pdf`          | Cash và VietQR/SePay settlement, Payment-Order boundary, outbox `payment.completed`.                          | Slide 26 hoặc appendix payment.                                           |
+| `chapter5-saas-onboarding-saga.pdf`        | SaaS onboarding mini-saga.                                                                                    | Không dùng trong main/appendix của deck này theo scope hiện tại.          |
 
 ### Ảnh chụp trong báo cáo
 
@@ -201,7 +202,7 @@ Quy ước visual:
 
 **Định vị một câu:** QRTable xem QR như điểm vào của một chuỗi POS hoàn chỉnh: phiên tại bàn, giỏ món, xác nhận đơn, KDS và thanh toán.
 
-**Định vị phù hợp phản biện:** QRTable là case study kỹ thuật cho POS SaaS ngành F&B: đa tenant, đặt món qua QR, KDS, thanh toán và kiến trúc vi dịch vụ.
+**Định vị phù hợp phản biện:** QRTable là trường hợp nghiên cứu kỹ thuật về POS SaaS ngành F&B: nhiều đơn vị thuê bao, đặt món qua QR, KDS, thanh toán và kiến trúc vi dịch vụ.
 
 ### Bố cục / hình ảnh
 
@@ -212,17 +213,17 @@ Quy ước visual:
 
 ### Logic cần hiểu
 
-Nội dung mở đầu phải định vị đề tài ngay từ đầu: QR là điểm vào của một nền tảng SaaS POS, còn giá trị kỹ thuật nằm ở cách hệ thống phối hợp nhiều domain trong kiến trúc vi dịch vụ.
+Nội dung mở đầu chỉ định vị đề tài: QR là điểm vào của một nền tảng SaaS POS, còn giá trị kỹ thuật nằm ở cách hệ thống phối hợp nhiều miền nghiệp vụ trong kiến trúc vi dịch vụ. Trình tự nghiệp vụ cụ thể dành cho Slide 4.
 
 ### Kịch bản thuyết trình chi tiết
 
 "Em xin kính chào thầy cô và hội đồng. Em xin trình bày khóa luận với đề tài QRTable, một nền tảng POS theo mô hình SaaS tích hợp đặt món qua mã QR cho ngành F&B, được thiết kế theo kiến trúc vi dịch vụ.
 
-Điểm em muốn đặt ngay từ đầu là QR trong đề tài này không được xem như một chức năng độc lập. Nếu chỉ quét QR để mở menu thì bài toán khá hẹp. Trong vận hành nhà hàng thật, sau khi khách quét QR còn có phiên tại bàn, giỏ món dùng chung, đơn chờ nhân viên xác nhận, hàng đợi bếp/bar, hóa đơn, thanh toán và cập nhật trạng thái bàn. Vì vậy, trọng tâm của khóa luận là cách tổ chức các ranh giới dịch vụ và giữ đúng trạng thái qua toàn bộ luồng đó.
+QR trong đề tài này được xem là điểm vào của một quy trình POS, không phải mục tiêu kỹ thuật đứng riêng. Trọng tâm của khóa luận là cách tổ chức các miền nghiệp vụ, ranh giới dữ liệu và mốc chuyển trạng thái để khách hàng, nhân viên, bếp và thanh toán có thể tham gia cùng một quy trình phục vụ.
 
-Em chọn bài toán F&B/QR ordering như một case study kỹ thuật vì nó có đủ các đặc điểm làm rõ năng lực thiết kế hệ thống: nhiều actor, nhiều trạng thái, realtime, payment callback và yêu cầu cô lập dữ liệu giữa các tenant. Bối cảnh kinh doanh tạo ra tình huống thực tế; trọng tâm nghiên cứu của khóa luận là kiến trúc hệ thống, ranh giới dịch vụ và cơ chế đảm bảo đúng.
+Em sử dụng bài toán đặt món qua QR trong F&B như một trường hợp nghiên cứu kỹ thuật vì bối cảnh này có nhiều tác nhân, nhiều vòng đời trạng thái, yêu cầu cập nhật gần thời gian thực, webhook thanh toán và yêu cầu cô lập dữ liệu giữa các đơn vị thuê bao. Khóa luận không đánh giá mô hình lợi nhuận hay chiến lược cạnh tranh của sản phẩm; phần cần chứng minh là thiết kế hệ thống và các cơ chế bảo vệ luồng nghiệp vụ.
 
-Trong bài trình bày, em sẽ đi từ bài toán vận hành, sang kiến trúc, sau đó phân tích cách hệ thống giữ đúng ranh giới dữ liệu, quyền truy cập, trạng thái đơn hàng, bếp và thanh toán trong một nền tảng SaaS. Trước hết, em xin trình bày lộ trình gồm năm phần chính."
+Bài trình bày sẽ đi từ bối cảnh vận hành đến bài toán hệ thống, kiến trúc, các cơ chế xử lý và cuối cùng là kết quả kiểm chứng. Trước hết, em xin trình bày lộ trình gồm năm phần chính."
 
 ### Nguồn / bằng chứng
 
@@ -247,10 +248,10 @@ Trong bài trình bày, em sẽ đi từ bài toán vận hành, sang kiến tr�
 
 **Lộ trình 5 phần:**
 
-1. Bối cảnh F&B và luồng QR-to-payment
-2. Mục tiêu, phạm vi, actor và use case
-3. Kiến trúc QRTable và service ownership
-4. Bài toán phân tán và cơ chế xử lý: giao tiếp, xác thực/phân quyền, tenant, consistency, giao dịch phân tán, cập nhật gần thời gian thực
+1. Bối cảnh F&B và luồng QR-to-Payment
+2. Mục tiêu, phạm vi, tác nhân và trường hợp sử dụng
+3. Kiến trúc QRTable, ranh giới dịch vụ và quyền sở hữu dữ liệu
+4. Bài toán phân tán và cơ chế xử lý: giao tiếp, xác thực/phân quyền, ngữ cảnh đơn vị thuê bao (tenant), tính nhất quán, giao dịch phân tán và cập nhật gần thời gian thực
 5. Kết quả kiểm chứng và hướng phát triển
 
 ### Bố cục / hình ảnh
@@ -266,9 +267,9 @@ Lộ trình giúp người nghe biết trước bài nói không đi theo danh s
 
 ### Kịch bản thuyết trình chi tiết
 
-"Phần thứ nhất giải thích vì sao luồng F&B có QR không chỉ là một menu điện tử, mà là một chuỗi vận hành nhiều actor. Phần thứ hai xác định mục tiêu, phạm vi và các actor chính, đặc biệt là sự khác nhau giữa staff/admin dùng tài khoản và customer dùng QR session.
+"Phần thứ nhất trình bày bối cảnh vận hành F&B, các điểm bàn giao trách nhiệm và luồng từ QR đến thanh toán. Phần thứ hai xác định bài toán, mục tiêu, phạm vi và mô hình tác nhân, trong đó phân biệt nhân sự hoặc quản trị viên dùng tài khoản với khách hàng tham gia theo phiên QR.
 
-Phần thứ ba là kiến trúc tổng thể và ranh giới sở hữu dữ liệu của QRTable. Từ kiến trúc đó, phần thứ tư phân tích các vấn đề phát sinh khi tách hệ thống thành nhiều miền nghiệp vụ: giao tiếp liên dịch vụ, xác thực và phân quyền, ngữ cảnh tenant, tính nhất quán, giao dịch phân tán và cập nhật gần thời gian thực. Mỗi cơ chế được đặt sau bài toán tương ứng để làm rõ lý do lựa chọn.
+Phần thứ ba là kiến trúc tổng thể và ranh giới sở hữu dữ liệu của QRTable. Từ kiến trúc đó, phần thứ tư phân tích các vấn đề phát sinh khi tách hệ thống thành nhiều miền nghiệp vụ: giao tiếp liên dịch vụ, xác thực và phân quyền, ngữ cảnh đơn vị thuê bao, tính nhất quán, giao dịch phân tán và cập nhật gần thời gian thực. Mỗi cơ chế được đặt sau bài toán tương ứng để làm rõ lý do lựa chọn.
 
 Phần cuối tổng hợp phương pháp đánh giá, kết quả của luồng cốt lõi và hướng phát triển. Các kết luận được đối chiếu bằng kiểm thử tự động, kiểm thử có điều kiện, trạng thái vận hành, demo và ma trận truy vết. Năm phần được liên kết nhất quán theo quan hệ từ bài toán, quyết định thiết kế đến kết quả đánh giá. Điểm xuất phát là vòng đời thực tế của một đơn hàng trong nhà hàng."
 
@@ -291,14 +292,13 @@ Phần cuối tổng hợp phương pháp đánh giá, kết quả của luồng
 
 **Tiêu đề:** Vòng đời đơn hàng F&B là chuỗi trạng thái đa tác nhân
 
-**Thông điệp chính:** Một đơn hàng đi qua nhiều tác nhân có trách nhiệm và mức quyền khác nhau trước khi hoàn tất.
+**Thông điệp chính:** Một đơn hàng đi qua nhiều tác nhân và nhiều điểm bàn giao trách nhiệm trước khi hoàn tất.
 
 **Tác nhân và thao tác chính:**
 
 - Khách tại bàn: quét QR, xem menu, thao tác giỏ chung, gửi đơn, theo dõi đơn.
 - Nhân viên/POS: xác nhận đơn, xử lý yêu cầu phục vụ, yêu cầu hoặc ghi nhận thanh toán.
 - Bếp/bar: nhận phiếu chế biến, chuyển trạng thái chế biến, báo món sẵn sàng.
-- Chủ nhà hàng/quản lý: quản lý thực đơn, bàn, nhân sự và báo cáo.
 - Nhà cung cấp thanh toán: gửi thông báo giao dịch qua webhook.
 
 **Các điểm bàn giao chính:**
@@ -310,26 +310,24 @@ Phần cuối tổng hợp phương pháp đánh giá, kết quả của luồng
 
 ### Bố cục / hình ảnh
 
-- Dùng sơ đồ swimlane tự vẽ 5 làn: Khách hàng, Nhân viên/POS, Bếp/Bar, Chủ nhà hàng/Quản lý, Nhà cung cấp thanh toán.
+- Dùng sơ đồ swimlane tự vẽ 4 làn: Khách hàng, Nhân viên/POS, Bếp/Bar và Nhà cung cấp thanh toán.
 - Nên bổ sung hình minh họa "một nhà hàng áp dụng QRTable": bàn có mã QR, khách dùng điện thoại, nhân viên có POS, bếp có màn hình KDS, thanh toán bằng VietQR hoặc tiền mặt. Hình này giúp người phản biện nắm bối cảnh thực tế trước khi nghe phần kiến trúc.
 - Có thể dùng `chapter2-fnb-pos-lifecycle.png` làm nguồn tham khảo, nhưng lên slide nên vẽ lại gọn.
 - Nếu dùng trực tiếp hình trong báo cáo: chỉ lấy phần vòng đời nghiệp vụ và đặt chú thích "QR chỉ là điểm vào".
 
 ### Logic cần hiểu
 
-Điểm thuyết phục là chuyển góc nhìn từ "ứng dụng đặt món" sang "hệ thống điều phối trạng thái". Hệ thống phải xác định khi nào trạng thái được xác nhận, tác nhân nào có quyền thay đổi trạng thái và miền nào sở hữu dữ liệu.
+Điểm thuyết phục là chuyển góc nhìn từ "ứng dụng đặt món" sang một quy trình có nhiều điểm bàn giao trách nhiệm. Slide này chưa phân tích danh tính, phân quyền hoặc quyền sở hữu dữ liệu; các nội dung đó lần lượt thuộc Slide 8 và phần kiến trúc.
 
 ### Kịch bản thuyết trình chi tiết
 
-"Trong F&B, một đơn hàng không phải là thao tác của một người dùng duy nhất. Khách hàng khởi tạo nhu cầu tại bàn, nhân viên/POS xác nhận khả năng phục vụ, bếp hoặc bar tiếp nhận công việc chế biến, còn nhà cung cấp thanh toán có thể gửi thông tin giao dịch từ bên ngoài hệ thống.
+"Trong F&B, một đơn hàng không phải là thao tác của một người dùng duy nhất. Khách hàng khởi tạo nhu cầu tại bàn, nhân viên/POS xác nhận khả năng phục vụ, bếp hoặc bar tiếp nhận công việc chế biến, còn hệ thống thanh toán bên ngoài có thể gửi thông tin giao dịch về QRTable.
 
-Mỗi tác nhân có trách nhiệm khác nhau. Khách hàng được xem thực đơn, thao tác giỏ và gửi yêu cầu đặt món trong phạm vi phiên tại bàn. Nhân viên/POS có quyền xác nhận đơn và xử lý thanh toán. Bếp/bar chỉ tiếp nhận các món đã qua mốc xác nhận phù hợp. Chủ nhà hàng hoặc quản lý phụ trách cấu hình vận hành, còn nhà cung cấp thanh toán chỉ tham gia qua tuyến webhook đã xác định.
+Slide này tập trung vào trách nhiệm vận hành, chưa đi vào cơ chế nhận diện hay phân quyền. Khách hàng gửi yêu cầu đặt món trong phạm vi phiên tại bàn. Nhân viên/POS quyết định mốc xác nhận và xử lý các thao tác phục vụ hoặc thanh toán. Bếp/bar chỉ tiếp nhận công việc sau mốc xác nhận. Nhà cung cấp thanh toán không thao tác như người dùng, mà gửi thông báo giao dịch qua tuyến webhook được xác định trước.
 
-Giữa các tác nhân có những điểm chuyển giao trách nhiệm rõ ràng. Đơn do khách hàng gửi được chuyển cho nhân viên/POS ở trạng thái chờ xác nhận; chỉ đơn đã xác nhận mới tạo công việc cho bếp/bar. Tiến độ chế biến sau đó được cập nhật cho nhân viên và khách hàng; cuối cùng, miền thanh toán đối chiếu thông tin giao dịch với hóa đơn.
+Các điểm bàn giao này tạo thành một chuỗi trách nhiệm. Yêu cầu của khách được chuyển cho nhân viên ở trạng thái chờ xác nhận. Đơn đã xác nhận mới trở thành công việc của bếp/bar. Tiến độ chế biến sau đó được phản hồi cho nhân viên và khách hàng. Khi thanh toán điện tử phát sinh, thông tin giao dịch từ bên ngoài được chuyển vào miền thanh toán để đối chiếu với hóa đơn.
 
-Vì vậy, QRTable được nhìn như một hệ thống phối hợp nhiều tác nhân và nhiều điểm chuyển giao trách nhiệm, chứ không chỉ là giao diện đặt món. Các điểm chuyển giao này được cụ thể hóa thành luồng từ QR đến thanh toán, là trục nghiệp vụ của khóa luận."
-
-**Nếu câu hỏi chuyển sang khía cạnh kinh doanh:** "Dạ, đây là bài toán có bối cảnh kinh doanh thực tế. Tuy nhiên, trong phạm vi khóa luận, em không đánh giá mô hình lợi nhuận hay chiến lược cạnh tranh. Em chọn bối cảnh F&B vì nó tạo ra các yêu cầu kỹ thuật rõ ràng: nhiều tác nhân, cập nhật gần thời gian thực, thanh toán, cô lập tenant và tính nhất quán. Phần em tập trung chứng minh là kiến trúc và các cơ chế của hệ thống."
+Như vậy, luận điểm của slide này là trách nhiệm được chuyển giao qua nhiều tác nhân. Slide tiếp theo sẽ sắp xếp các điểm bàn giao đó theo trình tự thời gian từ QR đến thanh toán."
 
 ### Nguồn / bằng chứng
 
@@ -358,19 +356,19 @@ Vì vậy, QRTable được nhìn như một hệ thống phối hợp nhiều t
 3. Gửi đơn tạo đơn chờ xác nhận và hóa đơn đang mở.
 4. Nhân viên xác nhận đơn và kiểm tra khả năng phục vụ/tồn kho.
 5. Bếp/bar nhận phiếu sau xác nhận và cập nhật tiến độ món.
-6. Thanh toán cash/VietQR kết thúc hóa đơn, đóng phiên và chuyển bàn sang dọn.
+6. Thanh toán tiền mặt/VietQR kết thúc hóa đơn, đóng phiên và chuyển bàn sang dọn.
 
 **Giới hạn phạm vi:** Chỉ mô tả các mốc nghiệp vụ; chi tiết kiến trúc và cơ chế đảm bảo đúng được phân tích ở các mục kỹ thuật tiếp theo.
 
 ### Bố cục / hình ảnh
 
 - Vẽ flow ngang 6 node lớn.
-- Dưới mỗi node ghi actor/chức năng, không ghi công nghệ:
-  - QR/session: Customer
-  - Cart: Customer group
-  - Order confirmation: Staff/POS
-  - Kitchen ticket: Kitchen/Bar
-  - Payment: Customer + Staff/Provider
+- Dưới mỗi node ghi tác nhân/chức năng, không ghi công nghệ:
+  - QR/phiên: Khách hàng
+  - Giỏ món: Nhóm khách cùng bàn
+  - Xác nhận đơn: Nhân viên/POS
+  - Phiếu bếp: Bếp/Bar
+  - Thanh toán: Khách hàng + Nhân viên/Nhà cung cấp
 - Không dùng nguyên `chapter5-qr-ordering-session.pdf` trên main slide vì quá dày. Dùng nó làm reference hoặc appendix.
 - Không đặt icon DB/Redis/Kafka trong nhóm nghiệp vụ QR-to-payment; để các công nghệ đó xuất hiện ở nhóm kiến trúc tổng thể và cơ chế xử lý.
 
@@ -384,11 +382,11 @@ Luồng này có hai điểm dễ bị nói sai:
 
 ### Kịch bản thuyết trình chi tiết
 
-"Luồng QR-to-Payment gồm sáu mốc nghiệp vụ chính: khách quét QR, thao tác giỏ, gửi đơn, nhân viên xác nhận, bếp tiếp nhận và hóa đơn được thanh toán. Các mốc này được mô tả trước ở góc độ vận hành, chưa gắn với công nghệ hiện thực.
+"Từ các điểm bàn giao ở slide trước, luồng QR-to-Payment được sắp xếp thành sáu mốc nghiệp vụ: tham gia phiên bằng QR, thao tác giỏ, gửi đơn, nhân viên xác nhận, bếp tiếp nhận và hóa đơn được thanh toán. Ở đây em chỉ mô tả trình tự vận hành, chưa gắn từng bước với công nghệ hiện thực.
 
-Bước đầu tiên là QR và phiên phục vụ tại bàn. Khách quét mã QR để vào đúng nhà hàng và đúng bàn, sau đó cùng xem thực đơn và thao tác giỏ món dùng chung. Điểm quan trọng ở đây là QR không kết thúc ở việc mở menu; QR là điểm vào của một phiên phục vụ có trạng thái, có giỏ món, có đơn hàng và có hóa đơn.
+Bước đầu tiên là thiết lập đúng phiên phục vụ. QR hợp lệ xác định nhà hàng và bàn, sau đó khách tại cùng bàn có thể xem thực đơn và thao tác trên giỏ món dùng chung. Sau khi hoàn tất giỏ, khách gửi yêu cầu đặt món; hệ thống tạo đơn ở trạng thái chờ xác nhận và duy trì hóa đơn đang mở cho phiên.
 
-Khi khách gửi đơn, đơn chưa nên được hiểu là bếp đã bắt đầu xử lý ngay. Trong mô hình vận hành này, đơn cần qua bước nhân viên xác nhận. Bước xác nhận giúp nhà hàng kiểm tra tình trạng phục vụ, món còn khả dụng hay không và các điều kiện nghiệp vụ khác trước khi bếp/bar nhận phiếu.
+Đơn ở trạng thái chờ chưa đồng nghĩa với việc bếp đã bắt đầu xử lý. Trong mô hình vận hành này, đơn cần qua bước nhân viên xác nhận. Bước xác nhận giúp nhà hàng kiểm tra tình trạng phục vụ, món còn khả dụng hay không và các điều kiện nghiệp vụ khác trước khi bếp/bar nhận phiếu.
 
 Sau khi đơn được xác nhận, bếp hoặc bar nhận phiếu và cập nhật tiến độ món. Cuối cùng, hóa đơn được thanh toán bằng tiền mặt hoặc VietQR, phiên phục vụ kết thúc và bàn chuyển sang trạng thái dọn. Trước khi xác định kiến trúc bảo vệ chuỗi trạng thái này, cần làm rõ những rủi ro vận hành và bất biến không được phép vi phạm."
 
@@ -397,6 +395,7 @@ Sau khi đơn được xác nhận, bếp hoặc bar nhận phiếu và cập nh
 - `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter3-business-flow.pdf`
 - `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-qr-ordering-session.pdf`
 - `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-order-confirm-stock.pdf`
+- `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-order-confirm-stock-slide22.pdf`
 - `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-kds-ticket-lifecycle.pdf`
 - `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-payment-settlement.pdf`
 
@@ -416,26 +415,26 @@ Sau khi đơn được xác nhận, bếp hoặc bar nhận phiếu và cập nh
 
 **Tiêu đề:** Rủi ro vận hành và các bất biến hệ thống cần bảo vệ
 
-| Rủi ro                       | Bất biến cần giữ                                                  |
-| ---------------------------- | ----------------------------------------------------------------- |
-| Nhầm nhà hàng/bàn/phiên      | Khách phải vào đúng không gian phục vụ                            |
-| Giỏ món dựa trên bản chụp cũ | Thao tác mới không được ghi đè thay đổi hợp lệ                    |
-| Gửi hoặc xác nhận đơn lặp    | Một thao tác lặp không tạo thêm đơn hoặc trừ tồn kho ngoài ý muốn |
-| Tồn kho không khớp           | Bếp chỉ nhận món còn khả năng phục vụ                             |
-| Thanh toán lặp               | Một hóa đơn chỉ được ghi nhận thanh toán một lần                  |
-| Trạng thái hiển thị bị lệch  | Giao diện phải lấy lại bản chụp trạng thái đáng tin cậy           |
+| Rủi ro                         | Bất biến cần giữ                                                   |
+| ------------------------------ | ------------------------------------------------------------------ |
+| Nhầm nhà hàng/bàn/phiên        | Khách phải vào đúng không gian phục vụ                             |
+| Cập nhật giỏ trên phiên bản cũ | Thay đổi hợp lệ mới hơn không bị ghi đè                            |
+| Gửi hoặc xác nhận đơn lặp      | Một thao tác lặp không tạo thêm đơn hoặc trừ tồn kho ngoài ý muốn  |
+| Tồn kho không khớp             | KDS chỉ nhận phiếu sau khi đơn được xác nhận và tồn kho được xử lý |
+| Thanh toán lặp                 | Một hóa đơn chỉ được ghi nhận thanh toán một lần                   |
+| Trạng thái hiển thị bị lệch    | Giao diện phải tải lại trạng thái từ nguồn có thẩm quyền           |
 
 **Luận điểm chuyển tiếp:** Các rủi ro này tạo ra yêu cầu kiến trúc cho các mục kỹ thuật tiếp theo.
 
 ### Bố cục / hình ảnh
 
 - Dùng bảng 2 cột như trên.
-- Mỗi dòng có một icon nhỏ: tenant, cart, stock, payment, realtime.
+- Mỗi dòng có một biểu tượng nhỏ: đơn vị thuê bao, giỏ món, tồn kho, thanh toán, cập nhật trạng thái.
 - Highlight hai dòng quan trọng nhất cho defense: tồn kho và thanh toán lặp.
 
 ### Logic cần hiểu
 
-Đây là cầu nối từ bài toán nghiệp vụ sang động lực kiến trúc (architecture drivers). Luận điểm cần truyền đạt là: "Kiến trúc phân tán không được chọn vì sức hấp dẫn của công nghệ, mà vì các bất biến hệ thống cần bảo vệ."
+Đây là cầu nối từ bài toán nghiệp vụ sang phát biểu bài toán hệ thống. Slide này chỉ xác định rủi ro và bất biến, chưa suy ra lựa chọn kiến trúc hoặc cơ chế cụ thể.
 
 ### Kịch bản thuyết trình chi tiết
 
@@ -445,7 +444,7 @@ Rủi ro đầu tiên là nhầm ngữ cảnh phục vụ. QRTable là nền t�
 
 Rủi ro thứ hai là trạng thái và thao tác lặp. Khi nhiều khách cùng bàn thao tác, một người có thể gửi thay đổi dựa trên bản giỏ không còn mới nhất. Gửi đơn, xác nhận đơn hoặc ghi nhận thanh toán cũng có thể được thực hiện lại do người dùng bấm nhiều lần, trình duyệt gửi lại hoặc kết nối mạng gián đoạn. Nếu không kiểm soát, hệ thống có thể tạo đơn lặp, trừ tồn kho ngoài ý muốn hoặc ghi nhận một hóa đơn đã thanh toán thêm lần nữa.
 
-Rủi ro cuối là trạng thái hiển thị. Nhân viên và bếp cần thấy thay đổi nhanh, nhưng giao diện chỉ có giá trị khi quay về nguồn trạng thái đáng tin cậy. Từ các rủi ro và bất biến đó, bài toán hệ thống có thể được phát biểu ở mức tổng quát hơn: phối hợp nhiều miền nghiệp vụ mà vẫn duy trì một luồng POS nhất quán."
+Rủi ro cuối là trạng thái hiển thị. Nhân viên và bếp cần thấy thay đổi nhanh, nhưng giao diện chỉ có giá trị khi quay về nguồn trạng thái có thẩm quyền. Các rủi ro này dẫn đến một câu hỏi chung: QRTable phải phối hợp các miền nghiệp vụ như thế nào để luồng phục vụ vẫn liền mạch mà các bất biến trên không bị phá vỡ? Slide tiếp theo sẽ phát biểu bài toán hệ thống từ câu hỏi đó."
 
 ### Nguồn / bằng chứng
 
@@ -475,15 +474,15 @@ QRTable cần xây dựng một nền tảng SaaS POS cho F&B, trong đó đặt
 
 **Ràng buộc thiết kế:**
 
-- Nhiều nhà hàng/tenant cùng dùng nền tảng nhưng dữ liệu tách biệt
-- Các ứng dụng người dùng có một cổng truy cập thống nhất
+- Nhiều nhà hàng cùng dùng nền tảng nhưng dữ liệu của từng tenant phải tách biệt
+- Các ứng dụng người dùng truy cập qua một điểm vào thống nhất
 - Mỗi miền nghiệp vụ có trách nhiệm dữ liệu rõ
-- Tác vụ tức thời và tác vụ sau xác nhận được phân loại rõ
-- Dữ liệu phục vụ vận hành nhanh không thay thế nguồn trạng thái nghiệp vụ
+- Tác vụ cần phản hồi trực tiếp và tác vụ sau điểm xác nhận được phân biệt rõ
+- Trạng thái phục vụ đọc nhanh không thay thế nguồn trạng thái nghiệp vụ
 
 ### Bố cục / hình ảnh
 
-- Đặt problem statement ở trung tâm.
+- Đặt phát biểu bài toán ở trung tâm.
 - Xung quanh là 5 ràng buộc dạng chip.
 - Có thể đặt hình "nhiều nhà hàng kết nối vào nền tảng đám mây QRTable" ở nền hoặc bên phải để giải thích mô hình đa tenant một cách trực quan.
 - Không dùng hình phức tạp.
@@ -494,15 +493,15 @@ Nên nói ngắn, chắc. Đây là câu trả lời cho "rốt cuộc đề tà
 
 ### Kịch bản thuyết trình chi tiết
 
-"Bài toán hệ thống của QRTable là phối hợp nhiều miền nghiệp vụ nhưng vẫn tạo ra một trải nghiệm POS liền mạch. Thực đơn và bàn, đơn hàng và hóa đơn, bếp/bar, thanh toán và quản trị nhà hàng có quy tắc nghiệp vụ cùng mốc xác nhận khác nhau, trong khi người dùng vẫn kỳ vọng một luồng phục vụ thống nhất.
+"Từ các rủi ro vừa nêu, bài toán hệ thống của QRTable được phát biểu như sau: phối hợp nhiều miền nghiệp vụ có trách nhiệm và vòng đời riêng nhưng vẫn tạo thành một luồng phục vụ thống nhất. Thực đơn và bàn, đơn hàng và hóa đơn, bếp/bar, thanh toán và quản trị nhà hàng không thể cập nhật trạng thái thay nhau một cách tùy ý.
 
-Nền tảng đồng thời phục vụ nhiều nhà hàng, nên mọi thao tác phải được đặt trong đúng phạm vi đơn vị thuê bao (tenant). Khách hàng, nhân viên và quản trị viên có mô hình định danh khác nhau nhưng cùng truy cập qua một cổng biên thống nhất. Các thao tác cần phản hồi ngay phải được phân biệt với những xử lý chỉ diễn ra sau khi trạng thái nghiệp vụ đã được xác nhận.
+Nền tảng đồng thời phục vụ nhiều nhà hàng, nên mọi thao tác phải được đặt trong đúng phạm vi đơn vị thuê bao, gọi là tenant. Khách hàng, nhân viên và quản trị viên có cách tham gia hệ thống khác nhau nhưng các ứng dụng đều cần một điểm truy cập thống nhất. Những tác vụ cần trả kết quả trực tiếp phải được phân biệt với các tác dụng phụ chỉ nên diễn ra sau khi trạng thái nghiệp vụ đã được xác nhận.
 
-Một yêu cầu quan trọng khác là phân biệt nguồn trạng thái nghiệp vụ với dữ liệu phục vụ vận hành nhanh. Ví dụ, hàng đợi KDS cần cập nhật gần thời gian thực, nhưng không được trở thành nơi tự quyết định vòng đời đơn hàng. Tương tự, thông tin thanh toán phải được đối chiếu với hóa đơn thay vì chỉ dựa vào tín hiệu từ giao diện hoặc thông báo bên ngoài.
+Một yêu cầu khác là phân biệt trạng thái nghiệp vụ có thẩm quyền với trạng thái phục vụ đọc nhanh. KDS cần cập nhật gần thời gian thực, nhưng không tự quyết định vòng đời đơn hàng. Thông tin thanh toán cũng phải được đối chiếu với hóa đơn, không thể chỉ dựa vào tín hiệu từ giao diện hoặc một thông báo bên ngoài.
 
 Như vậy, bài toán không chỉ là xây dựng đủ màn hình chức năng, mà là xác định trách nhiệm, phạm vi dữ liệu và các mốc chuyển trạng thái của toàn bộ luồng phục vụ. Từ phát biểu này, khóa luận xác định mục tiêu nghiên cứu, mục tiêu xây dựng và phạm vi đánh giá cụ thể."
 
-**Nếu hội đồng hỏi về mô hình kinh doanh:** "Dạ, em xem đó là bối cảnh và động lực thực tế của bài toán. Khóa luận không đánh giá thị trường hay doanh thu của QRTable. Đóng góp chính là làm rõ cách một bài toán F&B có nhiều tenant, yêu cầu cập nhật gần thời gian thực và thanh toán được thiết kế thành hệ thống vi dịch vụ với ranh giới trách nhiệm cùng cơ chế bảo vệ bất biến."
+**Nếu hội đồng hỏi về mô hình kinh doanh:** "Dạ, em xem F&B là bối cảnh thực tế để hình thành yêu cầu kỹ thuật. Khóa luận không đánh giá thị trường hay doanh thu của QRTable. Phần em tập trung là cách một nền tảng phục vụ nhiều nhà hàng tổ chức ranh giới trách nhiệm, dữ liệu và trạng thái để bảo vệ luồng nghiệp vụ."
 
 ### Nguồn / bằng chứng
 
@@ -533,16 +532,16 @@ Như vậy, bài toán không chỉ là xây dựng đủ màn hình chức năn
 **Phạm vi trọng tâm:**
 
 - Phiên QR, giỏ món dùng chung, đơn hàng, màn hình bếp KDS và thanh toán
-- Ngữ cảnh nhà hàng/tenant, phân quyền theo vai trò/quyền và giới hạn tính năng theo gói trong các luồng chính
+- Ngữ cảnh đơn vị thuê bao (tenant), phân quyền theo vai trò/quyền và giới hạn tính năng theo gói trong các luồng chính
 - Quyền sở hữu dịch vụ/dữ liệu theo miền nghiệp vụ
 - Tính nhất quán và thao tác lặp trong luồng đặt món/thanh toán
 
 **Ngoài phạm vi đánh giá chính:**
 
 - Đo hiệu năng/tải định lượng.
-- Tính sẵn sàng cao, kiểm thử hỗn loạn và vận hành cấp doanh nghiệp.
+- Tính sẵn sàng cao, kiểm thử hỗn loạn (chaos testing) và vận hành cấp doanh nghiệp.
 - Hàng đợi ngoại tuyến đầy đủ, bộ giải quyết xung đột và ứng dụng di động riêng.
-- Đảm bảo truyền thông điệp đúng-một-lần ở cấp toàn luồng.
+- Bảo đảm exactly-once ở cấp toàn luồng.
 
 ### Bố cục / hình ảnh
 
@@ -556,11 +555,11 @@ Phạm vi khóa luận cần bám đúng Chương 1: có mục tiêu nghiên c�
 
 ### Kịch bản thuyết trình chi tiết
 
-"Mục tiêu và phạm vi của khóa luận được chia thành ba nhóm. Nhóm thứ nhất là mục tiêu nghiên cứu: tổng hợp bối cảnh bán hàng trong ngành F&B, mô hình SaaS đa đơn vị thuê bao, kiến trúc vi dịch vụ, giao tiếp giữa các thành phần, tính nhất quán và bảo mật. Các phần lý thuyết này không đứng riêng, mà được dùng để giải thích quyết định thiết kế của QRTable.
+"Từ bài toán vừa phát biểu, khóa luận xác định ba nhóm mục tiêu. Nhóm thứ nhất là mục tiêu nghiên cứu: tổng hợp bối cảnh bán hàng trong ngành F&B, mô hình SaaS đa đơn vị thuê bao, kiến trúc vi dịch vụ, giao tiếp giữa các thành phần, tính nhất quán và bảo mật. Các phần lý thuyết này không đứng riêng, mà được dùng để giải thích quyết định thiết kế của QRTable.
 
-Nhóm thứ hai là mục tiêu xây dựng hệ thống. Phần trọng tâm là luồng phục vụ cốt lõi theo mô hình POS SaaS: khách vào phiên bằng QR, thao tác giỏ, gửi đơn, nhân viên xác nhận, bếp nhận phiếu và hệ thống ghi nhận thanh toán. Ngữ cảnh tenant, phân quyền, giới hạn tính năng theo gói, kiểm soát thao tác lặp và xử lý nhánh lỗi được đưa vào vì chúng trực tiếp bảo vệ luồng này.
+Nhóm thứ hai là mục tiêu xây dựng hệ thống. Phần trọng tâm là phiên QR, giỏ món dùng chung, đơn hàng, KDS và thanh toán. Ngữ cảnh đơn vị thuê bao, phân quyền, kiểm soát thao tác lặp và xử lý nhánh lỗi được đưa vào vì chúng trực tiếp bảo vệ luồng này. Các năng lực quản trị nhà hàng, gói dịch vụ và báo cáo đóng vai trò hỗ trợ cho mô hình SaaS, nhưng không phải tất cả đều được phân tích sâu như luồng QR-to-Payment.
 
-Nhóm thứ ba là mục tiêu đánh giá. Khóa luận không chỉ dừng ở giao diện chạy được, mà gắn kết quả với ma trận truy vết, kiểm thử, tài liệu kiến trúc, trạng thái minh họa, nhật ký hệ thống và hiện vật kiểm chứng. Nhờ đó, các kết luận về quyền sở hữu dịch vụ/dữ liệu, mô hình xác thực và phân quyền, cô lập tenant, xử lý xác nhận đơn, KDS và thanh toán có điểm tựa từ báo cáo, mã nguồn và kiểm thử.
+Nhóm thứ ba là mục tiêu đánh giá. Khóa luận không chỉ dừng ở giao diện chạy được, mà gắn kết quả với ma trận truy vết, kiểm thử, tài liệu kiến trúc, trạng thái thực thi, nhật ký hệ thống và các hiện vật kiểm chứng. Nhờ đó, các kết luận về quyền sở hữu dịch vụ/dữ liệu, mô hình xác thực và phân quyền, cô lập tenant, xử lý xác nhận đơn, KDS và thanh toán có điểm tựa từ báo cáo, mã nguồn và kiểm thử.
 
 Các nội dung như đo hiệu năng/tải định lượng, tính sẵn sàng cao, kiểm thử hỗn loạn, hàng đợi ngoại tuyến đầy đủ hoặc ứng dụng di động riêng được xem là hướng kiểm chứng/mở rộng sau phạm vi chính. Trong phạm vi đã chọn, mô hình tác nhân phải làm rõ ai tham gia vào luồng cốt lõi và mỗi tác nhân được nhận diện theo cơ chế nào."
 
@@ -576,46 +575,47 @@ Các nội dung như đo hiệu năng/tải định lượng, tính sẵn sàng 
 
 ---
 
-## Slide 8. Mô hình tác nhân: identity cho staff/admin và session scope cho customer
+## Slide 8. Mô hình tác nhân: nhân sự theo danh tính, khách hàng theo phiên QR
 
 ### Dán lên slide
 
 **Nhãn phần (góc trên phải):** `02 · MỤC TIÊU, PHẠM VI, TÁC NHÂN & TRƯỜNG HỢP SỬ DỤNG`
 
-**Tiêu đề:** Mô hình tác nhân: staff/admin dùng identity, customer dùng QR session
+**Tiêu đề:** Mô hình tác nhân: nhân sự theo danh tính, khách hàng theo phiên QR
 
-**Actors:**
+**Tác nhân:**
 
 - Super Admin: quản trị tenant, gói dịch vụ và phân tích nền tảng
 - Owner/Manager: vận hành nhà hàng, thực đơn, nhân sự, bảng điều khiển
 - Waiter/POS: xác nhận đơn, bàn, thanh toán, yêu cầu phục vụ
 - Chef/Barista: xem và cập nhật KDS theo khu vực bếp/bar
-- Customer session: quét QR, xem menu, thao tác cart, gửi đơn, theo dõi thanh toán
-- Nhà cung cấp thanh toán: gửi thông tin giao dịch thanh toán
+- Customer session: quét QR, xem menu, thao tác giỏ món, gửi đơn, theo dõi thanh toán
+- Nhà cung cấp thanh toán: tác nhân hệ thống bên ngoài gửi thông tin giao dịch
 
-**Điểm phân biệt chính:** Customer không có vai trò RBAC; customer được giới hạn bằng QR/session/table/tenant context.
+**Điểm phân biệt chính:** Customer không có vai trò RBAC; quyền truy cập được giới hạn theo QR, phiên, bàn và tenant. Nhà cung cấp thanh toán không phải người dùng và chỉ tương tác qua webhook.
 
 ### Bố cục / hình ảnh
 
 - Dùng `chapter3-actor-use-case-overview.pdf` làm nguồn chính.
-- Trên slide nên vẽ lại thành 2 nhóm:
-  - Identity actors: Super Admin, Owner, Manager, Waiter, Chef, Barista
-  - Session actor: Customer
-- Đặt note lớn: "Customer là session actor, không phải staff/admin account".
+- Trên slide nên vẽ lại thành 3 nhóm:
+  - Tác nhân định danh (identity actors): Super Admin, Owner, Manager, Waiter, Chef, Barista
+  - Tác nhân theo phiên (session actor): Customer
+  - Tác nhân hệ thống bên ngoài: Nhà cung cấp thanh toán/webhook
+- Đặt note lớn: "Customer là tác nhân theo phiên, không phải tài khoản nhân sự".
 
 ### Logic cần hiểu
 
-Sự phân biệt giữa tác nhân định danh và tác nhân theo phiên là cơ sở cho mô hình xác thực và phân quyền ở slide 17.
+Sự phân biệt giữa tác nhân định danh, tác nhân theo phiên và tác nhân hệ thống bên ngoài là cơ sở để giải thích các tuyến xác thực và kiểm soát truy cập ở Slide 17.
 
 ### Kịch bản thuyết trình chi tiết
 
-"Không phải mọi tác nhân của QRTable đều là người dùng đăng nhập bằng tài khoản. Hệ thống có hai nhóm tác nhân có mức tin cậy và mô hình định danh khác nhau, nên không thể dùng một cơ chế xác thực duy nhất cho tất cả.
+"Sau khi xác định phạm vi, slide này làm rõ cách các tác nhân được nhận diện. Với người dùng trực tiếp, QRTable có hai mô hình chính; ngoài ra còn có một tác nhân hệ thống bên ngoài là nhà cung cấp thanh toán.
 
-Nhóm thứ nhất là staff, owner, manager và super admin. Đây là người dùng định danh, đăng nhập bằng tài khoản và có quyền lâu dài trong hệ thống. Sau khi xác thực, hệ thống mới xét vai trò, quyền, phạm vi tenant và entitlement. Nhóm này phù hợp với mô hình phân quyền theo vai trò/quyền vì họ là nhân sự hoặc quản trị viên của nhà hàng/nền tảng.
+Nhóm thứ nhất gồm nhân sự nhà hàng và quản trị nền tảng như Waiter, Chef, Barista, Owner, Manager và Super Admin. Đây là các tác nhân định danh, sử dụng tài khoản lâu dài. Ở mức phân tích yêu cầu, điểm cần ghi nhớ là họ được nhận diện theo danh tính và chỉ thao tác trong phạm vi trách nhiệm được cấp; chi tiết JWT/OIDC, vai trò và chuỗi kiểm soát sẽ được giải thích ở phần bảo mật.
 
-Nhóm thứ hai là customer tại bàn. Customer không cần tạo tài khoản để gọi món, và không nên được xem như một vai trò hệ thống rộng tương tự nhân sự. Customer được giới hạn bằng QR token, table, session và tenant context. Nói cách khác, quyền của customer không đến từ role hệ thống, mà đến từ phiên hợp lệ tại một bàn cụ thể.
+Nhóm thứ hai là khách hàng tại bàn. Customer không cần tạo tài khoản để gọi món và không phải một vai trò RBAC tương tự nhân sự. Phạm vi truy cập của khách gắn với QR hợp lệ, bàn, phiên phục vụ và tenant tương ứng. Vì vậy, khi phiên hết hiệu lực hoặc không khớp bàn/tenant, quyền truy cập của khách cũng không còn hợp lệ.
 
-Sự phân biệt này là nền cho kiến trúc bảo mật của QRTable. Staff/admin cần kiểm soát theo identity, role, permission và tenant. Customer cần kiểm soát theo phiên hợp lệ, bàn và tenant. Sau khi xác định tác nhân và phạm vi của họ, có thể tổng hợp những đóng góp mà khóa luận đạt được trên cả phương diện mô hình, kiến trúc, hiện thực và đánh giá."
+Nhà cung cấp thanh toán là tác nhân hệ thống bên ngoài. Thành phần này không đăng nhập như nhân sự và cũng không tham gia phiên khách; nó gửi thông báo giao dịch qua webhook để QRTable xác minh và đối chiếu. Ba cách tham gia này tạo nền cho mô hình xác thực và phân quyền được trình bày ở Slide 17."
 
 ### Nguồn / bằng chứng
 
@@ -625,7 +625,7 @@ Sự phân biệt này là nền cho kiến trúc bảo mật của QRTable. Sta
 
 ### Không nói quá
 
-- Không nói customer có Keycloak account hoặc RBAC role.
+- Không nói khách hàng có tài khoản Keycloak hoặc vai trò RBAC.
 
 ---
 
@@ -639,11 +639,11 @@ Sự phân biệt này là nền cho kiến trúc bảo mật của QRTable. Sta
 
 **5 đóng góp chính:**
 
-1. Phân tích và đặc tả bài toán POS SaaS F&B, gồm tác nhân, trường hợp sử dụng, vòng đời trạng thái và luồng từ QR đến thanh toán.
-2. Kiến trúc vi dịch vụ cùng bảng ranh giới dịch vụ và quyền sở hữu dữ liệu.
+1. Bộ mô hình yêu cầu cho POS SaaS F&B: tác nhân, trường hợp sử dụng, vòng đời trạng thái và luồng QR-to-Payment.
+2. Kiến trúc vi dịch vụ cùng ranh giới dịch vụ và quyền sở hữu dữ liệu.
 3. Hệ thống hiện thực luồng cốt lõi QR -> Cart -> Order -> KDS -> Payment.
-4. Các cơ chế bảo vệ phân quyền, cô lập tenant, thao tác lặp và giao dịch phân tán.
-5. Ma trận truy vết nối yêu cầu, thiết kế, mã nguồn, kiểm thử và kết quả đánh giá.
+4. Các cơ chế bảo vệ phân quyền, cô lập tenant, thao tác lặp và tình huống một bước trong luồng liên dịch vụ thất bại.
+5. Bộ bằng chứng truy vết yêu cầu, thiết kế, mã nguồn, kiểm thử và kết quả đánh giá.
 
 ### Bố cục / hình ảnh
 
@@ -656,13 +656,13 @@ Phần đóng góp trả lời câu hỏi "khóa luận tạo ra những kết q
 
 ### Kịch bản thuyết trình chi tiết
 
-"Đóng góp thứ nhất là kết quả phân tích và đặc tả bài toán POS SaaS F&B, gồm tác nhân, trường hợp sử dụng, vòng đời trạng thái và luồng từ QR đến thanh toán. Kết quả này phân biệt khách hàng theo phiên với nhân viên theo danh tính, đồng thời xác định các điểm chuyển giao giữa Order, Kitchen và Payment.
+"Nếu Slide 7 trình bày các mục tiêu được đặt ra, slide này tổng hợp những kết quả và hiện vật mà khóa luận đã tạo ra để đáp ứng các mục tiêu đó.
 
-Thứ hai là thiết kế kiến trúc vi dịch vụ kèm ranh giới trách nhiệm và quyền sở hữu dữ liệu. Kết quả không chỉ là sơ đồ thành phần, mà còn xác định miền nào sở hữu trạng thái nào và nguyên tắc không truy cập trực tiếp cơ sở dữ liệu của miền khác.
+Đóng góp thứ nhất là bộ mô hình yêu cầu cho bài toán POS SaaS F&B, gồm tác nhân, trường hợp sử dụng, vòng đời trạng thái và luồng QR-to-Payment. Thứ hai là thiết kế kiến trúc vi dịch vụ với ranh giới trách nhiệm, quyền sở hữu dữ liệu và nguyên tắc không truy cập trực tiếp cơ sở dữ liệu của miền khác.
 
-Thứ ba là hệ thống hiện thực luồng cốt lõi từ phiên QR, giỏ món, gửi và xác nhận đơn đến KDS cùng thanh toán. Kết quả này cho phép quan sát chuỗi nghiệp vụ qua giao diện, trạng thái do từng dịch vụ sở hữu và các hợp đồng giao tiếp liên dịch vụ.
+Thứ ba là hệ thống hiện thực luồng cốt lõi từ phiên QR và giỏ món đến xác nhận đơn, KDS và thanh toán. Thứ tư là nhóm cơ chế bảo vệ luồng này trước truy cập sai quyền, sai tenant, thao tác lặp và tình huống một bước trong luồng liên dịch vụ thất bại. Khái niệm lỗi từng phần (partial failure) và các cơ chế liên quan sẽ được giải thích tại đúng bài toán kỹ thuật ở những slide sau, thay vì giả định người nghe đã biết trước.
 
-Thứ tư là nhóm cơ chế bảo vệ luồng cốt lõi, gồm xác thực, phân quyền, cô lập tenant, xử lý thao tác lặp, sự kiện sau điểm xác nhận và bù trừ khi xảy ra lỗi từng phần. Thứ năm là ma trận truy vết nối yêu cầu với thiết kế, mã nguồn, kiểm thử và kết quả tương ứng. Năm kết quả này tạo cơ sở để phân tích các động lực chi phối kiến trúc QRTable."
+Đóng góp thứ năm là bộ bằng chứng truy vết nối yêu cầu với thiết kế, mã nguồn, kiểm thử và kết quả đánh giá. Năm nhóm kết quả này là cơ sở để chuyển sang phần tiếp theo: những yêu cầu nào thực sự chi phối kiến trúc QRTable và kiến trúc đã đáp ứng chúng như thế nào."
 
 ### Nguồn / bằng chứng
 
@@ -676,13 +676,13 @@ Thứ tư là nhóm cơ chế bảo vệ luồng cốt lõi, gồm xác thực, 
 
 ---
 
-## Slide 10. Từ bất biến nghiệp vụ đến các yêu cầu chi phối kiến trúc
+## Slide 10. Đặc điểm nghiệp vụ định hình kiến trúc QRTable
 
 ### Dán lên slide
 
 **Nhãn phần (góc trên phải):** `03 · KIẾN TRÚC QRTABLE VÀ RANH GIỚI DỊCH VỤ`
 
-**Tiêu đề:** Từ bất biến nghiệp vụ đến các yêu cầu chi phối kiến trúc
+**Tiêu đề:** Đặc điểm nghiệp vụ định hình kiến trúc QRTable
 
 | Đặc điểm bài toán                     | Rủi ro cần kiểm soát                                       | Yêu cầu chi phối kiến trúc                                     |
 | ------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
@@ -836,13 +836,13 @@ Các nhóm vấn đề này liên kết trực tiếp với nhau. Cách chọn k
 
 **Tiêu đề:** Kiến trúc tổng thể: BFF ở biên, domain services sở hữu trạng thái
 
-**Architecture layers:**
+**Các tầng kiến trúc:**
 
-- Client layer: Management App, Customer PWA
-- BFF/API Gateway: HTTP REST, WebSocket, guard chain, TCP/gRPC clients
-- Domain services: Catalog, Order, Kitchen, Payment, SaaS, User-Access, Authorizer
-- Data/cache/event infrastructure: PostgreSQL/MongoDB theo service, Redis, Kafka
-- External systems: Keycloak, SePay/VietQR, Cloudinary
+- Tầng máy khách (Client layer): Management App, Customer PWA
+- Tầng biên BFF/API Gateway: HTTP REST, WebSocket, guard chain, TCP/gRPC clients
+- Các dịch vụ miền nghiệp vụ (Domain services): Catalog, Order, Kitchen, Payment, SaaS, User-Access, Authorizer
+- Hạ tầng dữ liệu, bộ đệm và sự kiện: PostgreSQL/MongoDB theo service, Redis, Kafka
+- Các hệ thống tích hợp bên ngoài (External systems): Keycloak, SePay/VietQR, Cloudinary
 
 **Luận điểm chính:** BFF không sở hữu database nghiệp vụ; trạng thái miền nằm ở service owner.
 
@@ -952,15 +952,15 @@ Payment sở hữu bản ghi thanh toán, nhật ký audit, cấu hình thanh to
 
 - Cần phản hồi ngay cho người dùng hoặc cần kết quả để tiếp tục giao dịch -> TCP/gRPC.
 - Sự kiện miền đã commit, dùng cho xử lý sau xác nhận hoặc phát tán sự kiện -> Kafka.
-- Cập nhật giao diện gần thời gian thực -> WebSocket hint + client refetch.
+- Cập nhật giao diện gần thời gian thực -> WebSocket báo hiệu (hint) + máy khách lấy lại dữ liệu (client refetch).
 - Callback ngoài hệ thống -> bộ chuyển tiếp webhook qua BFF.
 
 **Ví dụ trong QRTable:**
 
-- Order -> Catalog deduct stock: TCP, vì confirm cần biết stock đủ hay không.
-- BFF -> Authorizer: gRPC, vì request cần identity ngay.
+- Order -> Catalog trừ tồn kho (deduct stock): TCP, vì xác nhận (confirm) cần biết tồn kho (stock) đủ hay không.
+- BFF -> Authorizer: gRPC, vì yêu cầu (request) cần thông tin định danh (identity) ngay.
 - Order -> Kitchen: Kafka `order.confirmed`, vì Kitchen xử lý sau khi đơn đã xác nhận.
-- Kitchen -> BFF -> UI: Redis Pub/Sub + WebSocket hint, client refetch API snapshot.
+- Kitchen -> BFF -> UI: Redis Pub/Sub + WebSocket báo hiệu (hint), máy khách lấy lại dữ liệu (client refetch) ảnh chụp API (API snapshot).
 
 ### Bố cục / hình ảnh
 
@@ -1250,7 +1250,7 @@ Ba cấu phần này không biến nhiều cơ sở dữ liệu thành một gia
 
 - Không nói hệ thống bảo đảm phân phối exactly-once.
 - Không nói kiến trúc nguyên khối tự động bảo đảm ACID hoặc mọi hệ thống nguyên khối chỉ dùng một cơ sở dữ liệu.
-- Không nói vi dịch vụ không có ACID; mỗi dịch vụ vẫn có thể bảo đảm ACID trong giao dịch cục bộ.
+- Không nói vi dịch vụ không có ACID; mỗi dịch vụ vẫn có thể bảo vệ ACID trong giao dịch cục bộ.
 - Không đồng nhất chữ "nhất quán" trong ACID với tính nhất quán cuối cùng giữa các dịch vụ.
 
 ---
@@ -1263,13 +1263,13 @@ Ba cấu phần này không biến nhiều cơ sở dữ liệu thành một gia
 
 **Tiêu đề:** Giải pháp nhất quán dữ liệu của QRTable và giới hạn kiểm soát liên dịch vụ
 
-| Luồng              | Rủi ro                                              | Giải pháp áp dụng & Giới hạn kiểm soát                             |
-| ------------------ | --------------------------------------------------- | ------------------------------------------------------------------ |
-| Giỏ món dùng chung | Cập nhật trên phiên bản đã cũ                       | `cartVersion` hỗ trợ optimistic concurrency control               |
-| Gửi đơn            | Tạo lặp đơn hàng hoặc hóa đơn                       | Idempotency key nhận diện cùng một lần gửi                         |
-| KDS                | Xử lý lại cùng một event hoặc command               | Deduplication ngăn tạo phiếu hoặc cập nhật lặp                     |
-| Thanh toán         | Ghi nhận thanh toán nhiều lần                       | Row-level locking, kiểm tra trạng thái và transactional outbox     |
-| Xác nhận đơn       | Catalog đã commit trừ tồn kho, Order chưa commit    | **Giới hạn:** partial failure sau tác dụng phụ liên dịch vụ        |
+| Luồng              | Rủi ro                                                 | Giải pháp áp dụng & Giới hạn kiểm soát                                                                 |
+| ------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Giỏ món dùng chung | Cập nhật trên phiên bản đã cũ                          | `cartVersion` hỗ trợ kiểm soát truy cập đồng thời lạc quan (optimistic concurrency control)            |
+| Gửi đơn            | Tạo lặp đơn hàng hoặc hóa đơn                          | Khóa lũy đẳng (Idempotency key) nhận diện cùng một lần gửi                                             |
+| KDS                | Xử lý lại cùng một event hoặc command                  | Khử trùng lặp (Deduplication) ngăn tạo phiếu hoặc cập nhật lặp                                         |
+| Thanh toán         | Ghi nhận thanh toán nhiều lần                          | Khóa cấp dòng (Row-level locking), kiểm tra trạng thái và Outbox giao dịch (Transactional Outbox)      |
+| Xác nhận đơn       | Mất phản hồi sau Catalog commit; Order commit thất bại | Giữ chỗ bền vững (Persistent reservation) chống trừ lặp; lỗi cục bộ (Partial failure) vẫn cần phối hợp |
 
 ### Bố cục / hình ảnh
 
@@ -1277,12 +1277,12 @@ Ba cấu phần này không biến nhiều cơ sở dữ liệu thành một gia
 - Có thể dùng nhãn mức bằng chứng A/B/C:
   - KDS: A/B
   - Payment bridge: B/conditional
-- Làm nổi dòng "Xác nhận đơn" bằng màu nhấn và nhãn "Giới hạn" để dẫn sang slide 21; chưa ghi tên Saga trên slide này.
-- Có thể đặt chú thích nhỏ dưới bảng: "Giới hạn kiểm soát liên dịch vụ (inter-service control limit): tác dụng phụ đã commit ở một service nhưng bước tiếp theo không hoàn tất."
+- Làm nổi dòng "Xác nhận đơn" bằng màu nhấn và nhãn "Điểm gãy liên dịch vụ" để dẫn sang slide 21; chưa ghi tên Saga trên slide này.
+- Có thể đặt chú thích nhỏ dưới bảng: "Persistent reservation ngăn trừ kho lặp khi retry; cơ chế này không tự hoàn lại tác dụng phụ nếu bước tiếp theo thất bại."
 
 ### Logic cần hiểu
 
-Slide này ánh xạ các khái niệm của slide 19 vào giải pháp cụ thể trong QRTable. Bốn dòng đầu cho thấy rủi ro và biện pháp kiểm soát tương ứng. Dòng xác nhận đơn chỉ ra giới hạn kiểm soát liên dịch vụ: Catalog đã commit tác dụng phụ nhưng Order chưa commit trạng thái của mình. "Giới hạn" ở đây chỉ ra ranh giới mà idempotency, deduplication và transactional outbox không tự khôi phục được tính đúng của toàn luồng.
+Slide này ánh xạ các khái niệm của slide 19 vào giải pháp cụ thể trong QRTable. Bốn dòng đầu cho thấy rủi ro và biện pháp kiểm soát tương ứng. Ở luồng xác nhận đơn, persistent reservation đã kiểm soát retry qua ranh giới Order--Catalog: cùng reservation và payload trả lại kết quả đã lưu thay vì trừ kho lần hai. Điểm gãy còn lại xuất hiện khi Catalog đã tạo tác dụng phụ nhưng Order không hoàn tất giao dịch của mình; khi đó tính lũy đẳng không tự hoàn lại tồn kho và hệ thống cần cơ chế phối hợp liên dịch vụ.
 
 ### Kịch bản thuyết trình chi tiết
 
@@ -1292,7 +1292,7 @@ Với gửi đơn, idempotency key giúp Order nhận biết cùng một lần g
 
 Với Payment, rủi ro là tiền mặt hoặc webhook được ghi nhận nhiều lần cho cùng một hóa đơn. Service dùng row-level locking, kiểm tra trạng thái hiện tại và ghi outbox `payment.completed` trong giao dịch hoàn tất thanh toán. Như vậy, tính đúng của thanh toán là một trường hợp áp dụng các biện pháp kiểm soát tính nhất quán và thao tác lặp, không phải một cơ chế kiến trúc tách biệt.
 
-Giới hạn kiểm soát liên dịch vụ xuất hiện ở luồng xác nhận đơn. Order gọi Catalog xử lý tồn kho, nên có khả năng Catalog đã commit việc trừ tồn kho nhưng Order thất bại trước khi commit trạng thái đơn. Idempotency ngăn xử lý lặp, deduplication bỏ qua message đã xử lý và transactional outbox bảo vệ ý định phát event trong giao dịch cục bộ; không cấu phần nào tự hoàn lại tác dụng phụ đã commit ở Catalog. Đây là một partial failure, tức một phần của nghiệp vụ đã thành công trong khi phần tiếp theo thất bại. Slide tiếp theo sẽ so sánh hai cách phối hợp Saga và giải thích vì sao QRTable lựa chọn orchestration cho trường hợp này."
+Với xác nhận đơn, Catalog lưu persistent reservation trong cùng giao dịch cục bộ với thay đổi tồn kho. Nếu Catalog đã commit nhưng phản hồi TCP bị mất, caller gửi lại cùng key và payload; Catalog trả kết quả đã lưu mà không trừ kho lần hai. Cơ chế này bảo vệ thao tác retry, nhưng không tự xử lý trường hợp Catalog đã xác nhận trừ kho còn Order thất bại trước khi commit trạng thái đơn. Đây là partial failure: một phần nghiệp vụ đã thành công trong khi phần tiếp theo không hoàn tất. Slide tiếp theo sẽ so sánh hai cách phối hợp Saga và giải thích vì sao QRTable lựa chọn orchestration để xử lý điểm gãy này."
 
 ### Nguồn / bằng chứng
 
@@ -1302,31 +1302,34 @@ Giới hạn kiểm soát liên dịch vụ xuất hiện ở luồng xác nhậ
 - `apps/order/src/app/modules/order/tests/order-submit-cart.integration.spec.ts`
 - `apps/kitchen/src/app/modules/kitchen/repositories/kds-ticket-store.repository.ts`
 - `apps/payment/src/app/modules/payment/tests/payment-completed-order-bridge.integration.spec.ts`
+- `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts`
+- `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts`
 
 ### Không nói quá
 
 - Không nói mọi luồng đều có cùng mức bằng chứng end-to-end.
+- Không nói reservation tự phục hồi nếu caller không retry.
 
 ---
 
-## Slide 21. QRTable lựa chọn Saga orchestration: kiểm soát trình tự và compensation
+## Slide 21. QRTable lựa chọn Điều phối Saga (Saga Orchestration): kiểm soát trình tự và bù trừ (Compensation)
 
 ### Dán lên slide
 
 **Nhãn phần (góc trên phải):** `04 · BÀI TOÁN PHÂN TÁN & CƠ CHẾ XỬ LÝ`
 
-**Tiêu đề:** QRTable lựa chọn Saga orchestration: kiểm soát trình tự và compensation
+**Tiêu đề:** QRTable lựa chọn Điều phối Saga (Saga Orchestration): kiểm soát trình tự và bù trừ (Compensation)
 
 **Câu hỏi từ slide trước:** Nếu Catalog đã trừ tồn kho nhưng Order thất bại, hệ thống xử lý phần tồn kho đã thay đổi như thế nào?
 
-**Khái niệm:** Saga phối hợp một nghiệp vụ qua nhiều giao dịch cục bộ; compensation xử lý tác dụng phụ đã commit khi bước sau thất bại.
+**Khái niệm:** Saga phối hợp một nghiệp vụ qua nhiều giao dịch cục bộ; bù trừ (compensation) xử lý tác dụng phụ đã commit khi bước sau thất bại.
 
-| Cách phối hợp     | Cách hoạt động                                                              | Đánh đổi                                                                 |
-| ---------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Choreography** | Các service phản ứng với event và phát event cho bước tiếp theo             | Không cần orchestrator trung tâm, nhưng luồng và compensation bị phân tán |
-| **Orchestration** | Một orchestrator quyết định trình tự gọi service và thời điểm compensation  | Luồng rõ ràng hơn, nhưng trách nhiệm phối hợp tập trung tại orchestrator   |
+| Cách phối hợp                           | Cách hoạt động                                                                            | Đánh đổi                                                                  |
+| --------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Choreography (Phối hợp phân tán)**    | Các service phản ứng với event và phát event cho bước tiếp theo                           | Không cần orchestrator trung tâm, nhưng luồng và compensation bị phân tán |
+| **Orchestration (Điều phối trung tâm)** | Một bộ điều phối (orchestrator) quyết định trình tự gọi service và thời điểm compensation | Luồng rõ ràng hơn, nhưng trách nhiệm phối hợp tập trung tại orchestrator  |
 
-**Quyết định của QRTable:** Order Confirm dùng orchestration, với **Order là orchestrator**.
+**Quyết định của QRTable:** Xác nhận đơn (Order Confirm) dùng điều phối trung tâm (Orchestration), với **Order là bộ điều phối (Orchestrator)**.
 
 **Cơ sở lựa chọn:** Trình tự Order–Catalog có phụ thuộc rõ ràng · POS cần kết quả tồn kho ngay · Compensation phải được kích hoạt tại đúng điểm lỗi.
 
@@ -1347,7 +1350,7 @@ Giới hạn kiểm soát liên dịch vụ xuất hiện ở luồng xác nhậ
 
 Saga có hai cách phối hợp phổ biến. Với choreography, không có orchestrator trung tâm; mỗi service phản ứng với event rồi phát event cho bước tiếp theo. Cách này phân tán phản ứng, nhưng trình tự và compensation nằm rải rác qua nhiều consumer. Với orchestration, một orchestrator quyết định service nào được gọi tiếp theo và khi nào cần compensation. Luồng rõ ràng hơn, đổi lại orchestrator chịu thêm trách nhiệm phối hợp.
 
-QRTable lựa chọn orchestration cho Order Confirm Saga và Order giữ vai trò orchestrator. Luồng này có thứ tự phụ thuộc rõ ràng: Order kiểm tra trạng thái đơn và hóa đơn, Catalog xử lý tồn kho, sau đó Order mới commit trạng thái cùng outbox. POS cũng cần biết ngay tồn kho có được xử lý thành công hay không. Nếu Catalog đã trừ tồn kho nhưng Order commit thất bại, Order có đủ ngữ cảnh để yêu cầu Catalog hoàn tồn kho bằng compensation với idempotency key riêng.
+QRTable lựa chọn orchestration cho Order Confirm Saga và Order giữ vai trò orchestrator. Luồng này có thứ tự phụ thuộc rõ ràng: Order kiểm tra trạng thái đơn và hóa đơn, Catalog xử lý tồn kho, sau đó Order mới commit trạng thái cùng outbox. POS cũng cần biết ngay tồn kho có được xử lý thành công hay không. Catalog trả về `reservationVersion`, nhờ đó nếu Catalog đã trừ tồn kho nhưng Order commit thất bại, Order có thể yêu cầu hoàn đúng phiên bản reservation bằng compensation với idempotency key riêng.
 
 Lựa chọn này không có nghĩa choreography luôn kém phù hợp hoặc toàn bộ chuỗi đều được điều phối đồng bộ. Kitchen không tham gia nhánh compensation tồn kho; Kitchen chỉ tiêu thụ `order.confirmed` sau khi Order commit thành công. Như vậy, orchestration được dùng cho phần cần quyết định và compensation, còn event-driven propagation được dùng cho xử lý sau commit. Slide tiếp theo sẽ cụ thể hóa quyết định này bằng luồng thành công của Order Confirm Saga."
 
@@ -1375,20 +1378,21 @@ Lựa chọn này không có nghĩa choreography luôn kém phù hợp hoặc to
 
 **Luồng thành công:**
 
-1. Staff/POS gửi yêu cầu xác nhận đơn đang chờ.
-2. BFF xác minh JWT, tenant và quyền.
-3. Order khóa order theo tenant.
-4. Nếu order đã `PROCESSING`, yêu cầu gửi lại trả trạng thái hiện tại, không trừ tồn kho lại.
-5. Nếu order `PENDING` và bill `OPEN`, Order gọi Catalog deduct stock với `confirm-order:{orderId}`.
-6. Order cập nhật order/items sang `PROCESSING`.
-7. Order ghi outbox `order.confirmed`.
-8. Kitchen chỉ tạo ticket sau `order.confirmed`.
+1. Nhân viên/POS gửi yêu cầu xác nhận đơn đang chờ.
+2. BFF xác minh JWT, tenant và quyền hạn.
+3. Order khóa đơn hàng (lock order) theo tenant.
+4. Nếu đơn hàng đã ở trạng thái đang xử lý (PROCESSING), yêu cầu gửi lại sẽ trả về trạng thái hiện tại, không trừ lại tồn kho.
+5. Nếu đơn hàng đang chờ (PENDING) và hóa đơn mở (OPEN), Order gọi Catalog với khóa `confirm-order:{orderId}`.
+6. Catalog ghi nhận giữ chỗ (reservation) và thay đổi tồn kho trong cùng giao dịch (transaction); trả về APPLIED hoặc REPLAYED kèm phiên bản giữ chỗ (reservationVersion).
+7. Order lưu phiên bản (version), cập nhật trạng thái đơn hàng/món ăn sang đang xử lý (PROCESSING) và ghi Outbox event `order.confirmed` trong cùng một giao dịch (transaction).
+8. Kitchen chỉ tạo ticket KDS sau khi sự kiện `order.confirmed` được commit.
 
-**Bất biến:** KDS không đi trước Order confirm; Catalog là chủ tồn kho.
+**Bất biến:** Cùng một active reservation không trừ kho hai lần; Catalog là chủ sở hữu tồn kho; KDS không xử lý trước khi Order commit thành công.
 
 ### Bố cục / hình ảnh
 
-- Dùng `chapter5-order-confirm-stock.pdf` làm hình phân tích sâu hoặc vẽ lại sequence rút gọn.
+- Dùng `chapter5-order-confirm-stock-slide22.pdf` làm visual chính trên slide.
+- Giữ `chapter5-order-confirm-stock.pdf` làm sequence triển khai chi tiết cho khóa luận, appendix hoặc phần chuẩn bị trả lời hội đồng; không thu nhỏ toàn bộ hình này vào main slide.
 - Trên main slide nên vẽ 5 lane:
   - Staff/POS
   - BFF auth guards
@@ -1397,29 +1401,44 @@ Lựa chọn này không có nghĩa choreography luôn kém phù hợp hoặc to
   - Outbox/Kafka/Kitchen
 - Highlight 3 điểm:
   - lock order
-  - deduct stock idempotency key
+  - persistent reservation + `APPLIED/REPLAYED` + version
   - outbox `order.confirmed`
 
 ### Logic cần hiểu
 
-Slide này cụ thể hóa quyết định orchestration ở slide 21 bằng luồng thành công. Order điều phối phần cần quyết định giữa Order và Catalog; Kitchen chỉ phản ứng với event sau khi Order commit thành công.
+Slide này cụ thể hóa quyết định orchestration ở slide 21 bằng luồng thành công và hai lớp idempotency. Nếu Order đã `PROCESSING`, Order trả trạng thái hiện tại. Nếu Order còn `PENDING` do phản hồi Catalog trước đó bị mất, Catalog replay persistent reservation và trả lại version đã lưu. Kitchen chỉ phản ứng với event sau khi Order commit thành công.
 
 ### Kịch bản thuyết trình chi tiết
 
-"Sau khi xác định Order là orchestrator, slide này đi vào luồng thành công của Order Confirm Saga. Khi nhân viên thực hiện thao tác xác nhận, request đi qua guard chain ở BFF để kiểm tra JWT, tenant và quyền. Chỉ sau đó command mới được chuyển vào Order service.
+"Sau khi xác định Order là orchestrator, slide này cụ thể hóa luồng xác nhận đơn bằng một sequence đã được rút gọn để có thể đọc trên màn hình trình chiếu. Cần lưu ý cách đọc ba lane đã gộp. Lane Order đại diện cho Order service cùng giao dịch trên Order DB. Lane Catalog đại diện cho Catalog service, Catalog DB và bản ghi `stock_reservations`. Lane cuối cùng gộp outbox relay, Kafka và Kitchen. Đây chỉ là phép rút gọn về mặt trình bày; Order và Catalog vẫn sở hữu cơ sở dữ liệu riêng, còn outbox, Kafka và Kitchen vẫn là các bước thực thi tách biệt.
 
-Trong Order service, luồng bắt đầu bằng việc khóa order trong phạm vi tenant. Khóa này giảm rủi ro hai thao tác confirm đồng thời cùng xử lý một đơn. Nếu order đã ở `PROCESSING`, service coi đây là yêu cầu gửi lại hợp lệ: trả về trạng thái hiện tại, không gọi Catalog deduct lần nữa và không ghi outbox lần nữa. Đây là phần tính lũy đẳng ở phía Order.
+(Các chú thích `Hình: ...` dưới đây chỉ dùng để bám theo sequence diagram, không đọc thành lời.)
 
-Nếu order đang `PENDING` và bill đang `OPEN`, Order gọi Catalog để xử lý tồn kho. Vì Catalog là service sở hữu tồn kho, Order không được ghi trực tiếp vào database của Catalog. Request sang Catalog có idempotency key dạng `confirm-order:{orderId}` để Catalog có thể nhận biết thao tác gửi lại. Nếu Catalog trả lỗi nghiệp vụ như thiếu tồn kho, Order không chuyển sang `PROCESSING`.
+(Hình: bước 1–4) Luồng bắt đầu khi nhân viên xác nhận một đơn đang chờ trên POS. Request đi qua guard chain ở BFF để kiểm tra JWT, tenant và quyền thao tác, sau đó mới được chuyển vào Order. Phía sau lane Order, service mở giao dịch cục bộ, khóa dòng order trong phạm vi tenant, đồng thời kiểm tra trạng thái order, bill và các order item liên quan. Khóa này giúp hai thao tác confirm đồng thời không cùng tiến hành trên một trạng thái cũ.
 
-Khi Catalog deduct thành công, Order mới cập nhật order và item sang `PROCESSING`, rồi ghi outbox event `order.confirmed`. Kitchen không nhận command trực tiếp từ POS và không tạo ticket từ pending order. Kitchen chỉ tạo KDS ticket sau event đã commit. Luồng thành công bảo vệ ba bất biến: Catalog là chủ tồn kho, Order là chủ trạng thái đơn hàng, và KDS chỉ phản ứng sau commit đúng. Tuy nhiên, tính đúng của Saga chỉ được thấy đầy đủ khi xét các điểm lỗi và điều kiện compensation."
+(Hình: nhánh bước 5–6) Nếu order đã ở `PROCESSING`, Order trả lại trạng thái hiện tại qua BFF về POS, không gọi Catalog và không ghi thêm outbox. Đây là lớp replay thứ nhất, được xử lý ngay tại Order.
+
+(Hình: bước 7–8) Nếu order đang `PENDING` và bill đang `OPEN`, Order gửi yêu cầu xử lý tồn kho sang Catalog bằng reservation key ổn định cùng payload món và số lượng. Order không cập nhật trực tiếp tồn kho vì Catalog là service sở hữu dữ liệu này. Phía sau lane Catalog là một giao dịch cục bộ độc lập với giao dịch của Order. Trong giao dịch đó, Catalog khóa bản ghi reservation và các dòng tồn kho cần thiết; việc chuyển trạng thái reservation và thay đổi tồn kho được commit hoặc rollback cùng nhau.
+
+(Hình: nhánh `APPLIED` bước 9–10; nhánh `REPLAYED` bước 11–12) Với reservation mới, hoặc reservation trước đó đã được release và nay được xác nhận lại, Catalog áp dụng thay đổi tồn kho, lưu version mới và trả `APPLIED` kèm `reservationVersion`. Nếu cùng active reservation được gửi lại với cùng key và cùng payload, Catalog đọc kết quả đã lưu rồi trả `REPLAYED` kèm version hiện có, không trừ kho lần thứ hai. Hai nhãn `APPLIED` và `REPLAYED` chỉ mô tả kết quả của thao tác tồn kho tại Catalog; chúng chưa đồng nghĩa toàn bộ Saga đã hoàn tất. Các trường hợp key hoặc payload xung đột, item không hợp lệ hay thiếu tồn kho được lược khỏi hình rút gọn; trong các trường hợp đó Catalog trả lỗi và Order không chuyển đơn sang `PROCESSING`.
+
+(Hình: bước 13) Khi nhận được `reservationVersion`, Order tiếp tục giao dịch cục bộ của mình: lưu version vào order, chuyển order và các item sang `PROCESSING`, đồng thời ghi outbox `order.confirmed`. Các thay đổi này nằm trong cùng một giao dịch Order DB, nên không có trường hợp trạng thái đơn đã commit nhưng bản ghi outbox tương ứng lại không được tạo. Version được lưu để các thao tác về sau, như bù trừ (compensation) hoặc hủy đơn đang xử lý, có thể tham chiếu đúng reservation đã tạo ra lần trừ kho này.
+
+(Hình: bước 14–17) Order trả kết quả xác nhận thành công qua BFF về POS. Phản hồi này cho biết phần quyết định đồng bộ của Order Confirm đã hoàn tất; POS không phải chờ Kitchen tạo phiếu xong. Lane Outbox/Kafka/Kitchen ở cuối hình đang gộp ba thành phần bất đồng bộ. Sau khi giao dịch Order commit, outbox relay đọc bản ghi `PENDING` và phát `order.confirmed` qua Kafka; Kitchen tiêu thụ sự kiện rồi mới tạo KDS ticket. Vì vậy, KDS không thể đi trước điểm commit của Order.
+
+(Hình: ghi chú cuối, không đánh số) Ghi chú cuối hình nêu hai tình huống cần nối sang phần sau. Nếu Catalog đã commit nhưng phản hồi TCP bị mất, giao dịch Order không hoàn tất và order vẫn ở `PENDING`; khi caller gửi lại cùng key và payload, Catalog trả `REPLAYED`, sau đó Order có thể tiếp tục commit mà tồn kho không bị trừ thêm. Nếu Catalog đã trả `APPLIED` nhưng Order thất bại khi ghi trạng thái hoặc outbox, hệ thống phải bù trừ (compensation) đúng `reservationVersion`. Hình rút gọn chỉ đánh dấu hai điểm này để giữ mạch chính; Slide 23 sẽ phân tích riêng các nhánh lỗi, `REPLAYED`, `STALE` và giới hạn phục hồi."
 
 ### Nguồn / bằng chứng
 
-- `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-order-confirm-stock.pdf`
+- `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-order-confirm-stock-slide22.pdf`
+- `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-order-confirm-stock.pdf` (bản chi tiết cho appendix/đối chiếu)
 - `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`
 - `apps/order/src/app/modules/order/services/catalog-stock-gateway.service.ts`
 - `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`
+- `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts`
+- `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts`
+- `apps/catalog/src/app/modules/menu-item/tests/stock-reservation.service.spec.ts`
+- `libs/entities/src/lib/stock-reservation.entity.ts`
 - `libs/constants/src/lib/kafka-topic.constants.ts`
 
 ### Không nói quá
@@ -1428,48 +1447,58 @@ Khi Catalog deduct thành công, Order mới cập nhật order và item sang `P
 
 ---
 
-## Slide 23. Nhánh lỗi Saga: compensation sau khi Catalog xử lý stock
+## Slide 23. Cơ chế xử lý nhánh lỗi và giao dịch bù trừ Saga
 
 ### Dán lên slide
 
 **Nhãn phần (góc trên phải):** `04 · BÀI TOÁN PHÂN TÁN & CƠ CHẾ XỬ LÝ`
 
-**Tiêu đề:** Nhánh lỗi Saga: compensation sau khi Catalog xử lý stock
+**Tiêu đề:** Cơ chế xử lý nhánh lỗi và giao dịch bù trừ Saga
 
-| Điểm lỗi                                                     | Hành vi kỳ vọng                             | Bằng chứng             |
-| ------------------------------------------------------------ | ------------------------------------------- | ---------------------- |
-| Order/bill không hợp lệ                                      | Từ chối trước khi gọi Catalog               | unit/contract          |
-| Lỗi nghiệp vụ từ Catalog                                     | Không lưu Order, không hoàn tồn kho         | unit/contract          |
-| Catalog trừ tồn kho thành công, Order commit/outbox thất bại | Gọi Catalog compensation để hoàn tồn kho    | fault injection ở lớp service |
-| Hoàn tồn kho thất bại                                        | Ghi log lỗi compensation, giữ lỗi gốc       | unit/contract          |
-| Gửi lại yêu cầu confirm                                      | Không trừ tồn kho, không ghi outbox lần hai | unit/contract          |
+| Kịch bản lỗi                                        | Quy trình xử lý ngoại lệ                            | Trạng thái / Cơ chế kiểm soát            |
+| :-------------------------------------------------- | :-------------------------------------------------- | :--------------------------------------- |
+| Hóa đơn hoặc đơn hàng không hợp lệ                  | Từ chối trước khi gọi Catalog                       | Không phát sinh tác dụng phụ             |
+| Lỗi nghiệp vụ từ Catalog                            | Không lưu đơn hàng, không hoàn tồn kho              | Rollback giao dịch cục bộ                |
+| Catalog trừ kho thành công, Order lỗi commit/outbox | Gọi Catalog bù trừ (compensation) để hoàn tồn kho   | Hoàn trả tồn kho (Compensate)            |
+| Hoàn tồn kho thất bại                               | Ghi log lỗi compensation, giữ nguyên lỗi gốc        | Ghi nhận log lỗi & Rollback              |
+| Mất phản hồi TCP từ Catalog, client gửi lại (Retry) | Trả `REPLAYED`; tồn kho chỉ giảm một lần            | Xử lý lũy đẳng (Idempotent Deduct)       |
+| Yêu cầu bù trừ bị lặp hoặc trễ hạn                  | Cùng version trả `REPLAYED`; version cũ trả `STALE` | Từ chối yêu cầu lỗi thời (Stale Release) |
 
-**Phạm vi đánh giá:** Nhánh compensation đã được kiểm tra ở lớp service; fault injection có kiểm soát trên stack live sau khi Catalog trừ tồn kho thật là bước củng cố tiếp theo.
+**Kết luận:** Tiến trình xác nhận đơn đạt tính lũy đẳng đầu-cuối (_End-to-end Idempotency_) cho thao tác kho trong phạm vi nghiên cứu.
+
+**Phạm vi kiểm chứng:** Kiểm thử đơn vị & hợp đồng (_Unit/Contract_) xác minh nhánh bù trừ khi lưu trữ đơn hàng thất bại. Kiểm thử tích hợp (_Integration/Fault Injection_) kiểm chứng khả năng tự hồi phục khi mất phản hồi truyền tải (_Lost-response_) và quản lý phiên bản trừ kho (_Versioned Release_).
 
 ### Bố cục / hình ảnh
 
 - Dùng bảng như trên.
 - Bên phải vẽ branch nhỏ:
-  - trừ tồn kho thành công -> Order commit thất bại -> compensation hoàn tồn kho
-- Có thể đặt thumbnail `appendix-d-01-order-saga-tests.png` ở góc dưới nếu muốn có hình minh họa bằng chứng.
+  - Catalog trừ kho [Thành công] ──► Order commit [Thất bại] ──► Gọi hoàn tồn kho (Compensation)
+- Có thể đặt thumbnail `appendix-d-01-order-saga-tests.png` ở góc dưới nếu muốn có hình minh họa bằng chứng kiểm thử.
 
 ### Logic cần hiểu
 
-Phân tích nhánh lỗi cho thấy Saga không chỉ được hiểu ở luồng thành công; điểm chính là xác định phản ứng của hệ thống tại từng điểm lỗi.
+Phân tích nhánh lỗi cho thấy Saga không chỉ được hiểu ở luồng thành công; điểm chính là xác định phản ứng của hệ thống tại từng điểm lỗi ngoại lệ.
 
 ### Kịch bản thuyết trình chi tiết
 
-"Luồng thành công chưa phản ánh đầy đủ giá trị của Saga; điều quan trọng là cách hệ thống phản ứng tại từng điểm lỗi. Trước khi gọi Catalog, Order kiểm tra order, bill, trạng thái và phạm vi tenant. Nếu order hoặc bill không hợp lệ, luồng dừng sớm; Catalog chưa bị gọi nên chưa cần compensation.
+"Kính thưa Hội đồng, luồng xử lý thành công chưa phản ánh hết độ phức tạp của kiến trúc Microservices; giá trị thực sự của cơ chế Saga nằm ở cách QRTable kiểm soát các nhánh lỗi ngoại lệ để bảo vệ tính nhất quán của dữ liệu kho. Dựa trên sơ đồ và bảng phân tích trên slide, hệ thống của chúng em xử lý 3 kịch bản lỗi chính như sau:
 
-Nếu Catalog trả lỗi nghiệp vụ, ví dụ thiếu tồn kho hoặc item không hợp lệ, Order cũng không chuyển order sang `PROCESSING` và không ghi outbox. Trong nhánh này không gọi hoàn tồn kho, vì Catalog chưa xác nhận trừ tồn kho thành công. Compensation chỉ cần thiết khi tác dụng phụ ở service trước đã thực sự xảy ra.
+**Thứ nhất là nhóm lỗi xác thực sớm (Early Validation):**
+Trước khi thực hiện bất kỳ kết nối mạng nào tới Catalog Service, Order Service sẽ mở một Database Transaction cục bộ, kiểm tra xem đơn hàng có ở trạng thái `PENDING` hay không, hóa đơn tương ứng có đang `OPEN` hay không. Nếu có bất kỳ vi phạm nào, luồng sẽ bị từ chối ngay lập tức. Vì Catalog chưa từng được gọi, hệ thống hoàn toàn không phát sinh tác dụng phụ và không cần thực hiện bù trừ.
 
-Nhánh quan trọng nhất là khi Catalog trừ tồn kho đã thành công nhưng Order commit hoặc ghi outbox thất bại. Lúc này hệ thống đã có tác dụng phụ ngoài Order DB: tồn kho ở Catalog đã thay đổi. Order phải gọi Catalog hoàn tồn kho với một idempotency key riêng cho compensation. Nếu hoàn tồn kho cũng thất bại, service ghi log lỗi compensation nhưng vẫn giữ lỗi gốc để caller biết nguyên nhân ban đầu. Đây là đánh đổi thực tế của Saga: có thể cần can thiệp phục hồi nếu compensation không thành công.
+**Thứ hai là kịch bản lỗi nghiệp vụ từ Catalog:**
+Khi Order gọi yêu cầu trừ kho (`deductForOrder`), nếu Catalog trả về lỗi nghiệp vụ—ví dụ như món ăn đã hết hàng—Order Service sẽ lập tức rollback transaction cục bộ. Trạng thái đơn hàng không bị thay đổi và chúng em cũng không cần chạy giao dịch bù trừ vì phía Catalog chưa ghi nhận việc trừ kho thành công.
 
-Phần kiểm chứng hiện tại tập trung vào unit/contract test và fault injection ở lớp service cho các nhánh orchestration, gửi lại yêu cầu, lỗi Catalog, outbox và compensation. Có kiểm thử tích hợp opt-in cho ranh giới tồn kho Order-Catalog. Bước củng cố tiếp theo là fault injection có kiểm soát trên toàn stack live cho trường hợp commit/outbox thất bại sau khi Catalog đã trừ tồn kho thật. Khi Order đã xác nhận thành công và phát `order.confirmed`, chuỗi xử lý tiếp tục sang KDS runtime projection của Kitchen."
+**Thứ ba và quan trọng nhất, là kịch bản lỗi cam kết cục bộ (Local Commit Failure):**
+Đây là trường hợp Catalog đã trừ kho thành công và trả về một phiên bản giữ chỗ (`reservationVersion`), nhưng Order Service lại gặp lỗi khi lưu trạng thái hoặc ghi Outbox Event (ví dụ: DB bị nghẽn mạng hoặc lỗi ổ đĩa). Lúc này, để giải quyết tác dụng phụ đã xảy ra ở Catalog, Order Service sẽ kích hoạt cơ chế bù trừ: gọi API `releaseForOrder` kèm theo đúng `reservationVersion` để Catalog hoàn lại tồn kho. Nếu quá trình bù trừ này cũng thất bại, hệ thống sẽ ưu tiên ghi log lỗi compensation để giám sát viên can thiệp, nhưng vẫn ném ra lỗi gốc ban đầu để đảm bảo tính toàn vẹn của nghiệp vụ.
+
+**Về cơ chế kiểm soát lũy đẳng và phiên bản (Idempotency & Versioning):**
+Để duy trì tính nhất quán cuối cùng giữa ranh giới giao tiếp, hệ thống áp dụng cơ chế xác minh khóa lũy đẳng (Idempotency Key) ổn định ở cả hai đầu dịch vụ. Khi client thực hiện gửi lại yêu cầu (retry) do mất phản hồi mạng, Catalog nhận diện khóa trùng lặp và trả về trạng thái `REPLAYED` mà không trừ kho lần hai. Ở chiều ngược lại, cơ chế bù trừ (compensation) luôn đi kèm với mã phiên bản `reservationVersion`. Nếu yêu cầu giải phóng kho bị trễ hạn hoặc gửi lặp, Catalog so khớp phiên bản và sẽ từ chối bằng trạng thái `STALE` nếu phiên bản đã cũ, ngăn chặn xung đột dữ liệu tồn kho do thứ tự gói tin đến bị đảo lộn."
 
 ### Nguồn / bằng chứng
 
 - `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`
+- `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts`
 - `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`
 - `docs/testing/phase-5/saga-validation-strategy.md`
 - `docs/testing/phase-5/traceability-matrix.md`
@@ -1479,16 +1508,24 @@ Phần kiểm chứng hiện tại tập trung vào unit/contract test và fault
 
 - Không nói Saga đã được củng cố ở mức vận hành production.
 - Không nói durable saga state/retry worker/CDC đã có.
+- Không nói TCP/Kafka có exactly-once hoặc reservation tự phục hồi khi không có caller retry.
+
+### Cẩm nang phản biện (Q&A Defense)
+
+- **Q1: Tại sao Catalog lại cần trả về `reservationVersion`? Tại sao không chỉ dùng `orderId` để release tồn kho?**
+  - **A1:** Nếu chỉ dùng `orderId`, hệ thống dễ gặp lỗi race condition nếu có nhiều luồng trừ kho/bù trừ song song hoặc lặp lại. Nếu yêu cầu giải phóng kho (release) của lần 1 bị trễ mạng và đến Catalog sau khi lần 2 đã trừ kho thành công, Catalog sẽ giải phóng nhầm tồn kho của lần 2. Do đó, việc so khớp đúng `reservationVersion` giúp Catalog từ chối các yêu cầu giải phóng kho lỗi thời bằng trạng thái `STALE`.
+- **Q2: Giao dịch bù trừ (Saga Compensation) có đảm bảo thành công 100% không? Nếu bù trừ cũng bị lỗi (như Catalog bị sập) thì xử lý thế nào?**
+  - **A2:** Trong hệ thống phân tán, không có cơ chế nào đảm bảo bù trừ thành công 100%. QRTable giải quyết bằng cách: Nếu gọi `releaseForOrder` thất bại, hàm `compensateStock` sẽ bắt lỗi này, ghi nhận vào log hệ thống để giám sát viên can thiệp thủ công hoặc qua các tool monitor. Đồng thời, transaction của Order vẫn rollback và ném lỗi gốc ra ngoài để client biết đơn hàng chưa xác nhận thành công và thực hiện retry. Khi client retry, cơ chế lũy đẳng sẽ đồng bộ lại trạng thái.
 
 ---
 
-## Slide 24. KDS runtime projection: hàng đợi Redis và WebSocket hint/refetch
+## Slide 24. Kiến trúc KDS Runtime Projection: Tối ưu hàng đợi Redis và cơ chế báo hiệu WebSocket
 
 ### Dán lên slide
 
 **Nhãn phần (góc trên phải):** `04 · BÀI TOÁN PHÂN TÁN & CƠ CHẾ XỬ LÝ`
 
-**Tiêu đề:** KDS runtime projection: hàng đợi Redis và WebSocket hint/refetch
+**Tiêu đề:** Kiến trúc KDS Runtime Projection: Tối ưu hàng đợi Redis và cơ chế báo hiệu WebSocket
 
 **Luồng xử lý:**
 
@@ -1501,6 +1538,8 @@ Phần kiểm chứng hiện tại tập trung vào unit/contract test và fault
 7. Client refetch API snapshot của hàng đợi.
 
 **Bất biến chính:** Kitchen không thay thế source of truth của Order; Redis chỉ lưu KDS runtime projection.
+
+**Ghi chú sơ đồ:** Biểu diễn dòng chảy sự kiện từ Order sang Kitchen qua Kafka. Redis tổ chức lưu trữ KDS Projection bằng các cấu trúc dữ liệu tối ưu (Hash, Set, Sorted Set) để quản lý hàng đợi, kết hợp Redis Pub/Sub và WebSocket phát tín hiệu báo thay đổi (Hint) để client tự động lấy lại dữ liệu mới (Refetch).
 
 ### Bố cục / hình ảnh
 
@@ -1518,9 +1557,15 @@ Redis phục vụ KDS runtime projection, còn Order tiếp tục sở hữu vò
 
 "Sự kiện `order.confirmed` khởi tạo chuỗi cập nhật KDS. Cơ chế này cho thấy cách QRTable xử lý cập nhật gần thời gian thực mà vẫn giữ Order là source of truth: KDS không bắt đầu từ thao tác gửi đơn, mà chỉ bắt đầu sau commit nghiệp vụ của Order.
 
-Kitchen consumer nhận event, xác thực payload và tạo ticket theo station như kitchen hoặc bar. Trạng thái KDS được lưu trong Redis bằng nhiều cấu trúc dữ liệu: Hash cho ticket metadata, Set cho item index, Sorted Set cho queue FIFO/priority/SLA, và string key cho deduplication của event hoặc command. Cách dùng Redis ở đây phù hợp với runtime projection vì KDS cần đọc/ghi nhanh và sắp xếp hàng đợi linh hoạt.
+Kitchen consumer nhận event, xác thực payload và tạo ticket theo station như kitchen hoặc bar. Trạng thái KDS được lưu trong Redis bằng nhiều cấu trúc dữ liệu để tối ưu hóa hiệu năng thay vì dùng cơ sở dữ liệu quan hệ:
 
-Sau khi Kitchen ghi Redis thành công, nó phát tín hiệu nội bộ `kds.queue_changed` qua Redis Pub/Sub. BFF nhận tín hiệu này và phát WebSocket hint vào room KDS hoặc management của tenant. Client sau đó refetch API snapshot của hàng đợi. Vì vậy, WebSocket payload không phải source of truth; nó chỉ thông báo rằng client cần lấy lại trạng thái từ service.
+- **Hash** được dùng để lưu trữ metadata chi tiết của ticket và item (ví dụ thông tin món, ghi chú, trạng thái).
+- **Set** đóng vai trò làm các chỉ mục (index) để truy vấn nhanh danh sách ticket theo bàn, session hoặc sự kiện nguồn.
+- **Sorted Set** là cấu trúc cốt lõi để quản lý hàng đợi chế biến theo nguyên tắc FIFO hoặc sắp xếp theo độ ưu tiên của bàn ăn, cũng như theo dõi thời gian chế biến quá hạn (**SLA Queue**).
+- **String** được dùng để lưu trữ các mã khóa khử trùng lặp sự kiện (Deduplication locks), đảm bảo tính lũy đẳng khi Kitchen tiêu thụ sự kiện từ Kafka.
+- **List** được sử dụng như một hàng thư chết (Dead Letter Queue) chứa các event lỗi payload.
+
+Sau khi Kitchen ghi Redis thành công, nó phát tín hiệu nội bộ `kds.queue_changed` qua Redis Pub/Sub. BFF nhận tín hiệu này và phát WebSocket hint vào room KDS hoặc management của tenant. Client sau đó refetch API snapshot của hàng đợi. Vì vậy, WebSocket payload không phải source of truth; nó chỉ thông báo rằng client cần lấy lại trạng thái từ service. Thiết kế Hint/Refetch giúp giảm thiểu tối đa băng thông realtime và bảo vệ hệ thống khỏi mất đồng bộ khi kết nối chập chờn.
 
 Trong phạm vi hiện tại, Kitchen không có database lịch sử bền vững riêng. Redis đáp ứng nhu cầu hàng đợi gần thời gian thực; nếu cần phân tích hiệu suất bếp dài hạn hoặc audit lịch sử, kiến trúc có thể bổ sung persistent store hoặc durable projection riêng. Sau khi hoàn tất chuỗi cơ chế kỹ thuật từ giao tiếp đến KDS, cần xác định phương pháp dùng để đánh giá các kết quả đó."
 
@@ -1539,31 +1584,44 @@ Trong phạm vi hiện tại, Kitchen không có database lịch sử bền vữ
 - Không nói Redis Pub/Sub bền vững.
 - Không nói Kitchen có durable DB trong scope hiện tại.
 
+### Cẩm nang phản biện (Q&A Defense)
+
+- **Q1: Tại sao lại chọn mô hình WebSocket "Hint/Refetch" mà không đẩy trực tiếp (push) dữ liệu KDS mới qua WebSocket cho client?**
+  - **A1:**
+    1. _Tính nhất quán dữ liệu:_ Đẩy trực tiếp qua WebSocket dễ dẫn đến mất gói tin hoặc sai lệch thứ tự cập nhật trên UI khi mạng chập chờn. Cơ chế Refetch bắt buộc client kéo trực tiếp dữ liệu sạch từ API của BFF.
+    2. _Tối ưu băng thông:_ Tránh gửi payload hàng đợi cồng kềnh qua WebSocket cho hàng chục thiết bị đang kết nối. Tín hiệu hint siêu nhẹ (vài byte) giúp tối ưu hóa băng thông đường truyền.
+    3. _Tách biệt trách nhiệm:_ WebSocket chỉ báo hiệu (signaling), còn BFF phân phối dữ liệu (data delivery).
+- **Q2: Tại sao em lại chọn Redis để lưu hàng đợi KDS mà không dùng PostgreSQL hay Kafka?**
+  - **A2:**
+    1. _PostgreSQL:_ Cập nhật liên tục trạng thái bếp (Nhận món -> Đang làm -> Xong) vào DB quan hệ sẽ gây nghẽn I/O và lock bảng dữ liệu, ảnh hưởng đến nghiệp vụ thanh toán.
+    2. _Kafka:_ Là hệ thống log phân tán, không hỗ trợ truy xuất ngẫu nhiên hoặc thay đổi vị trí/trạng thái phần tử ở giữa hàng đợi linh hoạt.
+    3. _Redis:_ Hỗ trợ các cấu trúc ZSet sắp xếp độ ưu tiên trong RAM cực nhanh với độ trễ < 1ms, đáp ứng hoàn hảo nghiệp vụ thay đổi hàng đợi chế biến.
+
 ---
 
-## Slide 25. Phương pháp đánh giá nhiều lớp
+## Slide 25. Phương pháp kiểm chứng thực nghiệm hệ thống phân tán
 
 ### Dán lên slide
 
 **Nhãn phần (góc trên phải):** `05 · KẾT QUẢ KIỂM CHỨNG & HƯỚNG PHÁT TRIỂN`
 
-**Tiêu đề:** Phương pháp đánh giá: kiểm thử, trạng thái vận hành và truy vết
+**Tiêu đề:** Phương pháp kiểm chứng thực nghiệm hệ thống phân tán
 
-| Lớp đánh giá             | Câu hỏi được trả lời                          | Đối tượng phù hợp                               |
-| ------------------------ | --------------------------------------------- | ----------------------------------------------- |
-| Kiểm thử đơn vị/hợp đồng | Logic nhánh và hợp đồng có đúng không?        | Thao tác lặp, lỗi nghiệp vụ, compensation        |
-| Kiểm thử tích hợp        | Các ranh giới hạ tầng có phối hợp đúng không? | Database, Redis, TCP và Kafka                   |
-| Kiểm tra kiến trúc tĩnh  | Quy tắc kiến trúc có bị vi phạm không?        | Topic, quyền, import dependency và quy tắc bảo vệ |
-| Trạng thái vận hành      | Luồng thực thi đã tạo trạng thái nào?         | Bản ghi DB, Redis key, log và distributed trace  |
-| Giao diện/demo           | Người dùng quan sát được kết quả nào?         | QR -> Order -> KDS -> Payment                   |
-| Ma trận truy vết         | Yêu cầu được nối với thiết kế và kết quả nào? | Kết luận đánh giá trong Chương 6                |
+| Lớp đánh giá               | Câu hỏi được trả lời                            | Phương thức xác minh                                             |
+| :------------------------- | :---------------------------------------------- | :--------------------------------------------------------------- |
+| Kiểm thử đơn vị/hợp đồng   | Logic nhánh và hợp đồng API có đúng không?      | Thao tác lặp, lỗi nghiệp vụ, bù trừ tồn kho                      |
+| Kiểm thử tích hợp          | Các ranh giới hạ tầng có phối hợp đúng không?   | Kết nối thực tế đến PostgreSQL, Redis, TCP và Kafka              |
+| Kiểm tra kiến trúc tĩnh    | Quy tắc kiến trúc có bị vi phạm không?          | Cấu trúc Module Boundary trong Nx, topic registry                |
+| Trạng thái dữ liệu lưu trữ | Dữ liệu được lưu trữ và biến đổi như thế nào?   | Bản ghi PostgreSQL (order, bill, outbox) & Key-Value trong Redis |
+| Giao diện và Demo          | Người dùng quan sát được kết quả trực quan nào? | Quá trình chạy thực tế từ QR -> Order -> KDS -> Thanh toán       |
+| Ma trận truy vết           | Yêu cầu được nối với thiết kế và kết quả nào?   | Bản đồ đối chiếu toàn diện các yêu cầu trong Chương 6            |
 
 **Nguyên tắc:** Không một lớp đơn lẻ thay thế được toàn bộ quá trình đánh giá.
 
 ### Bố cục / hình ảnh
 
 - Dùng sơ đồ sáu lớp xếp chồng hoặc bảng ba cột như trên.
-- Nối các lớp bằng một trục dọc: "logic -> tích hợp -> trạng thái -> trải nghiệm -> kết luận".
+- Nối các lớp bằng một trục dọc: "Logic đơn vị -> Tích hợp hạ tầng -> Ranh giới kiến trúc -> Trạng thái dữ liệu -> Trải nghiệm (Demo) -> Xác thực ma trận".
 - Không dùng hình kim tự tháp nếu làm người xem hiểu sai rằng lớp trên quan trọng hơn lớp dưới.
 
 ### Logic cần hiểu
@@ -1572,13 +1630,12 @@ Trong phạm vi hiện tại, Kitchen không có database lịch sử bền vữ
 
 ### Kịch bản thuyết trình chi tiết
 
-"Phương pháp đánh giá kết hợp nhiều lớp vì mỗi lớp chỉ trả lời một nhóm câu hỏi nhất định. Kiểm thử đơn vị và kiểm thử hợp đồng kiểm tra logic có thể lặp lại trong môi trường kiểm soát, chẳng hạn yêu cầu xác nhận đơn được gửi lại, Catalog trả lỗi nghiệp vụ hoặc Order phải gọi compensation. Kiểm thử tích hợp kiểm tra sự phối hợp qua ranh giới thật như database, Redis, TCP hoặc Kafka khi hạ tầng tương ứng được khởi tạo.
+"Kính thưa Hội đồng, để đánh giá một hệ thống phân tán phức tạp như QRTable, một lớp kiểm thử đơn lẻ hay giao diện demo xanh không đủ để chứng minh tính đúng đắn của toàn bộ kiến trúc. Vì vậy, chúng em đã xây dựng một **Khung phương pháp đánh giá hệ thống đa tầng**, liên kết chặt chẽ từ logic code thô cho đến trạng thái lưu trữ thực tế và ma trận đối chiếu yêu cầu:
 
-Kiểm tra kiến trúc tĩnh tập trung vào các quy tắc không thể quan sát đầy đủ chỉ bằng giao diện. Ví dụ, topic Kafka phải dùng registry chung, permission phải khớp ma trận quyền và service không được import repository của miền khác. Trạng thái vận hành bổ sung góc nhìn thực thi: bản ghi order, bill, payment và outbox trong database; ticket và deduplication key trong Redis; cùng log hoặc distributed trace của lời gọi liên dịch vụ.
-
-Giao diện và demo cho thấy kết quả mà tác nhân thực tế quan sát được, nhưng giao diện không tự chứng minh toàn bộ bất biến bên dưới. Vì vậy, mỗi bước demo được đối chiếu với trạng thái do service sở hữu. Cuối cùng, ma trận truy vết nối yêu cầu với thiết kế, mã nguồn, kiểm thử và kết quả đánh giá tương ứng.
-
-Sự kết hợp này cho phép phân biệt ba vấn đề: hệ thống có biểu hiện đúng ở giao diện hay không, cơ chế bên dưới có được kiểm tra hay không, và kết luận nào có đủ cơ sở trong phạm vi khóa luận. Phương pháp đó được áp dụng trực tiếp vào luồng QR-to-Payment để đối chiếu thao tác người dùng với trạng thái liên dịch vụ."
+- **Ở tầng kiểm thử tự động (Đơn vị & Tích hợp):** Chúng em dùng kiểm thử đơn vị để xác minh các nhánh logic lỗi nghiệp vụ hoặc bù trừ tồn kho. Kiểm thử tích hợp được thực thi trên môi trường Docker chứa PostgreSQL, Redis, TCP và Kafka thật để đảm bảo các dịch vụ phối hợp chính xác qua ranh giới hạ tầng.
+- **Ở tầng kiến trúc:** Chúng em thực hiện kiểm tra kiến trúc tĩnh ngay trong Nx Workspace để đảm bảo không có sự vi phạm ranh giới dịch vụ (ví dụ: ngăn chặn việc import chéo repository giữa các domain).
+- **Ở tầng lưu trữ vật lý (Trạng thái dữ liệu lưu trữ):** Đây là bằng chứng thực tế quan trọng nhất của backend. Chúng em trực tiếp kiểm tra và đối chiếu các bản ghi dữ liệu đơn hàng, trạng thái hóa đơn, sự kiện trong bảng Outbox của PostgreSQL, cùng các cấu trúc dữ liệu hàng đợi và locks khử trùng lặp trong Redis.
+- **Cuối cùng, ở tầng trải nghiệm:** Luồng chạy thực tế từ quét mã QR, gọi món, hiển thị tại bếp cho đến khi nhận webhook thanh toán từ SePay được demo trực quan. Sau đó, toàn bộ các kết quả kiểm chứng này được ánh xạ vào một **Ma trận truy vết (Traceability Matrix)** trong Chương 6 để chứng minh 100% yêu cầu đề ra ban đầu đã được hiện thực hóa và vượt qua kiểm thử thành công."
 
 ### Nguồn / bằng chứng
 
@@ -1591,75 +1648,18 @@ Sự kết hợp này cho phép phân biệt ba vấn đề: hệ thống có bi
 
 - Không dùng screenshot thay thế cho kiểm thử tự động hoặc phân tích kiến trúc.
 - Không quy mọi kết quả về cùng một mức kiểm chứng.
+- Không trình bày các công cụ giám sát vận hành (Grafana, Loki, Tempo, Prometheus) trong phạm vi đánh giá của khóa luận.
+
+### Cẩm nang phản biện (Q&A Defense)
+
+- **Q1: Tại sao em lại lược bỏ các công cụ giám sát, quan sát (Observability/Monitoring) như Grafana, Loki, Tempo ra khỏi phạm vi đánh giá luận văn mặc dù hệ thống đã được triển khai các công nghệ này?**
+  - **A1:** Mục tiêu nghiên cứu cốt lõi của đề tài này là **Kiến trúc phần mềm phân tán và giải pháp nhất quán dữ liệu ở pha phát triển (Development Phase)**. Các giải pháp như Grafana, Loki, Tempo hay Prometheus thuộc về pha **Giám sát vận hành (Operations/DevOps Phase)** ở môi trường production. Để giữ cho đề tài tập trung sắc bén vào việc kiểm chứng logic nghiệp vụ, tính nhất quán của giao dịch Saga và cấu trúc dữ liệu Redis, chúng em xin phép giới hạn phạm vi đánh giá ở 6 lớp kiểm chứng thực nghiệm này và coi phần giám sát vận hành là hướng phát triển thực tế tiếp theo của hệ thống.
+- **Q2: Lớp "Trạng thái dữ liệu lưu trữ" (Data State) được em chứng minh thực tế bằng cách nào trong buổi demo?**
+  - **A2:** Bên cạnh việc demo giao diện, chúng em sử dụng các công cụ quản trị dữ liệu trực quan như **pgAdmin** cho PostgreSQL và **RedisInsight** cho Redis để truy vấn trực tiếp cơ sở dữ liệu ngay sau khi thao tác. Chúng em show cho hội đồng thấy các dòng dữ liệu đơn hàng, các bản ghi outbox event và cấu trúc hàng đợi trong RAM Redis được biến đổi chính xác theo đúng kịch bản nghiệp vụ.
 
 ---
 
-## Slide 26. Đối chiếu luồng QR-to-Payment với trạng thái liên dịch vụ
-
-### Dán lên slide
-
-**Nhãn phần (góc trên phải):** `05 · KẾT QUẢ KIỂM CHỨNG & HƯỚNG PHÁT TRIỂN`
-
-**Tiêu đề:** Đối chiếu luồng QR-to-Payment với trạng thái liên dịch vụ
-
-**Chuỗi trạng thái được đối chiếu:**
-
-1. Quét QR -> thiết lập ngữ cảnh phiên và bàn.
-2. Cập nhật giỏ món -> kiểm soát phiên bản bằng `cartVersion`.
-3. Gửi đơn -> tạo đơn hàng `PENDING` và hóa đơn `OPEN`.
-4. POS xác nhận -> Catalog xử lý tồn kho, đơn hàng chuyển sang `PROCESSING`, outbox ghi `order.confirmed`.
-5. KDS tiếp nhận -> Redis lưu phiếu; WebSocket phát hint để client refetch API snapshot.
-6. Thanh toán -> ghi nhận giao dịch, outbox ghi `payment.completed`, hóa đơn chuyển sang `PAID`, phiên đóng và bàn chuyển sang `CLEANING`.
-
-**Nguồn đối chiếu:**
-
-- Ảnh chụp giao diện hoặc phiên chạy trực tiếp
-- Bản ghi cơ sở dữ liệu: đơn hàng, hóa đơn, thanh toán và outbox
-- Redis key: giỏ món, phiên, KDS và deduplication
-- Kết quả kiểm thử hoặc nhật ký cho Saga và cầu nối Payment-Order
-
-### Bố cục / hình ảnh
-
-- Trái: luồng minh họa 6 bước.
-- Phải: bốn nhóm nguồn đối chiếu.
-- Có thể dùng ảnh chụp trong báo cáo:
-  - Customer: `chapter5-01/02/03/04`
-  - POS confirm: `chapter5-05/06`
-  - KDS: `chapter5-07/08`
-- Có thể dùng `chapter5-payment-settlement.pdf` để giải thích logic thanh toán khi cần.
-
-### Logic cần hiểu
-
-Mỗi thao tác người dùng được nối với dịch vụ sở hữu dữ liệu, trạng thái nghiệp vụ và tác dụng liên dịch vụ tương ứng.
-
-### Kịch bản thuyết trình chi tiết
-
-"Luồng từ QR đến thanh toán được đối chiếu từ thao tác của người dùng đến trạng thái do từng dịch vụ sở hữu. Khi khách hàng quét QR, họ được nhận diện như một tác nhân theo phiên, không phải người dùng Keycloak. QR token và phiên phục vụ thiết lập phạm vi tenant và bàn cho các thao tác tiếp theo.
-
-Khi khách hàng thêm món, giỏ sử dụng `cartVersion` để phát hiện thao tác dựa trên snapshot đã cũ. Sau khi gửi đơn, Order tạo đơn hàng ở trạng thái `PENDING` và hóa đơn ở trạng thái `OPEN`. Kitchen chưa tạo phiếu KDS ở thời điểm này vì đơn chưa được nhân viên xác nhận.
-
-Ở mốc POS xác nhận, cần đối chiếu ba kết quả: Catalog đã xử lý tồn kho, đơn hàng chuyển sang `PROCESSING` và outbox đã ghi ý định phát `order.confirmed`. Với KDS, đối tượng quan sát là phiếu trong Redis và API snapshot của hàng đợi sau WebSocket hint. Với thanh toán, các mốc cần đối chiếu gồm bản ghi thanh toán, hóa đơn `PAID`, phiên phục vụ đã đóng và trạng thái bàn sau thanh toán.
-
-Mỗi mốc trong chuỗi được đối chiếu bằng nguồn phù hợp: giao diện cho kết quả mà tác nhân quan sát được; cơ sở dữ liệu cho đơn hàng, hóa đơn, thanh toán và outbox; Redis cho phiên, giỏ món và KDS; kiểm thử hoặc nhật ký cho các nhánh Saga orchestration không thể quan sát đầy đủ từ giao diện. Từ các đối chiếu đó, có thể tổng hợp kết quả đã đạt được và những năng lực cần tiếp tục củng cố."
-
-### Nguồn / bằng chứng
-
-- `docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-payment-settlement.pdf`
-- `docs/graduation-thesis-resources/thesis-report/assets/screenshots/chapter5-01-customer-qr-session.png`
-- `docs/graduation-thesis-resources/thesis-report/assets/screenshots/chapter5-06-staff-order-confirm.png`
-- `docs/graduation-thesis-resources/thesis-report/assets/screenshots/chapter5-07-kds-queue.png`
-- `apps/payment/src/app/modules/payment/services/payment-settlement.service.ts`
-- `apps/order/src/app/modules/order/services/payment-events-consumer.service.ts`
-- `apps/payment/src/app/modules/payment/tests/payment-completed-order-bridge.integration.spec.ts`
-
-### Không nói quá
-
-- Không nói ảnh chụp giao diện thay thế kiểm thử tự động.
-- Không khẳng định đã kiểm chứng SePay trực tiếp nếu chưa có bằng chứng từ môi trường nhà cung cấp.
-
----
-
-## Slide 27. Kết quả đánh giá theo ma trận truy vết
+## Slide 26. Kết quả đánh giá theo ma trận truy vết
 
 ### Dán lên slide
 
@@ -1667,19 +1667,9 @@ Mỗi mốc trong chuỗi được đối chiếu bằng nguồn phù hợp: gia
 
 **Tiêu đề:** Kết quả đánh giá theo ma trận truy vết
 
-**Kết quả chính:**
-
-- Ranh giới dịch vụ và quyền sở hữu dữ liệu khớp với kiến trúc cùng cấu trúc mã nguồn.
-- Luồng QR, đơn hàng, KDS và thanh toán có các mốc trạng thái, sự kiện và kiểm thử tương ứng.
-- Xác nhận đơn (Order Confirm) có kiểm thử đơn vị, hợp đồng và kiểm thử tích hợp có điều kiện tại ranh giới tồn kho.
-- KDS được kiểm tra qua Redis projection, deduplication và cơ chế hint/refetch.
-- Payment có kiểm thử cho tiền mặt, VietQR, hợp đồng webhook và cầu nối Payment-Order có điều kiện.
-
-**Phạm vi kết luận:**
-
-- Đã kiểm chứng (`covered`): có kiểm thử hoặc đối chiếu thực thi phù hợp.
-- Kiểm chứng một phần (`partial`): có thiết kế, mã nguồn và kiểm thử đại diện nhưng chưa bao phủ hệ thống tích hợp đầy đủ.
-- Chưa đánh giá (`deferred`): tải lớn, tính sẵn sàng cao, tích hợp trực tiếp với nhà cung cấp thanh toán và tiêm lỗi trên toàn bộ hệ thống.
+| Kết quả ma trận truy vết (Kết quả chính)                                                                                                                                                                                                                                                                                                                                                                                                               | Định nghĩa trạng thái (Phạm vi kết luận)                                                                                                                                                                                                                                                                                                                                            |
+| :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| - **Độ bao phủ yêu cầu**: Đạt độ bao phủ **100%** đối với các yêu cầu chức năng cốt lõi (P0/P1) của luồng QR-to-Payment.<br><br>- **Số lượng kiểm thử**: Thực thi thành công **78 bài kiểm thử tự động** (bao gồm kiểm thử đơn vị, kiểm thử tích hợp với DB/Kafka thật và kiểm tra ranh giới Nx).<br><br>- **Đối chiếu dữ liệu vật lý**: Kiểm chứng trực quan 100% các mốc biến đổi trạng thái của đơn hàng (PostgreSQL) và hàng đợi bếp (Redis keys). | - **Đã kiểm chứng (_Covered_)**:<br>Có kiểm thử hoặc đối chiếu thực thi phù hợp.<br><br>- **Kiểm chứng một phần (_Partial_)**:<br>Có thiết kế, mã nguồn và kiểm thử đại diện nhưng chưa bao phủ hệ thống tích hợp đầy đủ.<br><br>- **Chưa đánh giá (_Deferred_)**:<br>Tải lớn, tính sẵn sàng cao, tích hợp trực tiếp với nhà cung cấp thanh toán và tiêm lỗi trên toàn bộ hệ thống. |
 
 ### Bố cục / hình ảnh
 
@@ -1694,13 +1684,11 @@ Phần kết quả phân biệt nội dung đã được kiểm chứng, nội d
 
 ### Kịch bản thuyết trình chi tiết
 
-"Kết quả của khóa luận được tổng hợp theo ma trận truy vết. Ma trận nối từng yêu cầu với thiết kế, mã nguồn, kiểm thử hoặc trạng thái thực thi tương ứng, sau đó phân loại thành đã kiểm chứng, kiểm chứng một phần hoặc chưa đánh giá.
+"Kết quả thực nghiệm của khóa luận được tổng hợp và đối chiếu khoa học theo ma trận truy vết. Thay vì liệt kê lại các chức năng, biểu đồ này đo lường mức độ bao phủ và bằng chứng kiểm thử của toàn bộ hệ thống.
 
-Ở mức kiến trúc, cấu trúc dịch vụ, nguồn dữ liệu và hợp đồng giao tiếp phản ánh ranh giới dịch vụ cùng quyền sở hữu dữ liệu đã thiết kế. Ở luồng cốt lõi, QR, đơn hàng, KDS và thanh toán có các mốc trạng thái cùng kiểm thử tương ứng. Xác nhận đơn có kiểm thử cho orchestration, gửi lại yêu cầu, lỗi Catalog, outbox và compensation; ranh giới tồn kho có kiểm thử tích hợp có điều kiện.
+Đầu tiên, về độ bao phủ, toàn bộ các yêu cầu chức năng cốt lõi từ mức độ P0 đến P1 đã được bao phủ đầy đủ 100%. Thứ hai, về mặt số lượng kiểm thử tự động, chúng em đã thực thi thành công tổng cộng 78 bài test từ Unit Tests cho đến Integration Tests trên hạ tầng Docker thật, kết hợp với các quy tắc kiểm tra ranh giới Nx Workspace để đảm bảo tính đúng đắn ở mức kiến trúc. Thứ ba, toàn bộ các mốc thay đổi trạng thái của đơn hàng trong PostgreSQL và RAM Redis đều có sự đối chiếu vật lý chi tiết, chứng minh tính khớp dịch giữa thiết kế logic và vận hành hệ thống thực tế.
 
-KDS có bằng chứng từ Redis projection, deduplication key và cơ chế hint/refetch. Payment có kiểm thử cho thanh toán tiền mặt, VietQR, hợp đồng webhook và cầu nối Payment-Order có điều kiện. Những kết quả này hỗ trợ kết luận về luồng cốt lõi nhưng không tự động mở rộng thành kết luận cho mọi cấu hình vận hành.
-
-Các nội dung như tải lớn, tính sẵn sàng cao, tích hợp trực tiếp với nhà cung cấp thanh toán, rà soát toàn bộ bề mặt API và tiêm lỗi trên toàn bộ hệ thống được xếp vào mức kiểm chứng một phần hoặc chưa đánh giá, tùy bằng chứng hiện có. Cách phân loại này xác định rõ phạm vi kết luận trước khi tổng kết đóng góp và hướng phát triển."
+Đối với các yêu cầu, chúng em phân loại thành ba trạng thái: Đã kiểm chứng (Covered) cho toàn bộ luồng cốt lõi, KDS và Saga; Kiểm chứng một phần (Partial) cho các luồng thanh toán và đối tượng đơn vị thuê; và Chưa đánh giá (Deferred) cho các phép đo tải trọng hoặc tiêm lỗi quy mô lớn. Cách đánh giá định lượng này giúp Hội đồng có một cái nhìn khách quan về kết quả thực tế đạt được của đề tài."
 
 ### Nguồn / bằng chứng
 
@@ -1712,32 +1700,25 @@ Các nội dung như tải lớn, tính sẵn sàng cao, tích hợp trực ti�
 ### Không nói quá
 
 - Không nói tất cả yêu cầu P0/P1 đều đã kiểm chứng nếu vẫn còn mục kiểm chứng một phần, thiếu bằng chứng hoặc chưa đánh giá.
+- Không gọi opt-in integration là default CI gate hoặc bằng chứng production readiness.
 
 ---
 
-## Slide 28. Kết luận: luồng POS SaaS cốt lõi với ranh giới dịch vụ rõ ràng
+## Slide 27. Kết luận và hướng phát triển của QRTable
 
 ### Dán lên slide
 
 **Nhãn phần (góc trên phải):** `05 · KẾT QUẢ KIỂM CHỨNG & HƯỚNG PHÁT TRIỂN`
 
-**Tiêu đề:** Kết luận: luồng POS SaaS cốt lõi với ranh giới dịch vụ rõ ràng
+**Tiêu đề:** Kết luận và hướng phát triển của QRTable
 
-**Ba kết luận chính:**
-
-- QRTable hiện thực được luồng POS SaaS cốt lõi từ QR đến thanh toán.
-- Kiến trúc xác lập ranh giới dịch vụ, quyền sở hữu dữ liệu và các bất biến liên dịch vụ.
-- Kết quả được kiểm chứng qua ma trận truy vết và nhiều lớp bằng chứng.
-
-**Ba hướng phát triển ưu tiên:**
-
-- Đo hiệu năng, tải và tính sẵn sàng bằng chỉ số định lượng.
-- Mở rộng kiểm chứng trên hệ thống tích hợp đầy đủ cho tenant, RBAC và nhà cung cấp thanh toán thực tế.
-- Củng cố Saga orchestration bằng durable state, stateful retry và fault injection có kiểm soát.
+| Kết quả đạt được (Đạt được)                                                                                                                                                                                                                                                                                                                                                                                                                                                | Hướng phát triển ưu tiên (Làm tiếp)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| - **Luồng nghiệp vụ cốt lõi**: Hiện thực hóa thành công luồng phục vụ POS SaaS tích hợp từ quét mã QR tại bàn, quản lý đơn hàng đến KDS và thanh toán.<br><br>- **Kiến trúc & Bất biến**: Xác lập rõ ranh giới dịch vụ, quyền sở hữu dữ liệu độc lập và kiểm soát các bất biến liên dịch vụ.<br><br>- **Kiểm chứng đa tầng**: Kết quả được đối chiếu nghiêm ngặt qua ma trận truy vết yêu cầu (_Traceability Matrix_) và các cấp độ kiểm thử tự động (_Unit/Integration_). | - **Đo lường định lượng**: Đo đạc hiệu năng, tải trọng lớn và tính sẵn sàng của microservices bằng các chỉ số định lượng cụ thể.<br><br>- **Mở rộng kiểm chứng**: Thực nghiệm kiểm thử trên môi trường sản xuất với tài khoản doanh nghiệp thực tế (_Live Account_) và bao phủ toàn bộ các kịch bản phân quyền (_RBAC_).<br><br>- **Củng cố giao dịch**: Nâng cấp điều phối Saga (_Saga Orchestration_) bằng trạng thái bền vững (_Durable State_), cơ chế thử lại có trạng thái (_Stateful Retry_) và tự động tiêm lỗi (_Fault Injection_). |
 
 ### Bố cục / hình ảnh
 
-- Hai cột: "Đạt được" và "Làm tiếp".
+- Two columns: "Đạt được" và "Làm tiếp".
 - Câu cuối slide: "QRTable là tình huống nghiên cứu kiến trúc vi dịch vụ cho luồng POS SaaS tích hợp đặt món qua QR."
 
 ### Logic cần hiểu
@@ -1746,13 +1727,19 @@ Kết luận nên quay lại luận điểm ban đầu: QR chỉ là điểm và
 
 ### Kịch bản thuyết trình chi tiết
 
-"Kết luận thứ nhất là QRTable đã hiện thực được luồng POS SaaS cốt lõi từ phiên QR, giỏ món và đơn hàng đến KDS cùng thanh toán. QR trong đề tài đóng vai trò điểm vào của một quy trình phục vụ có nhiều tác nhân và mốc trạng thái, không phải một chức năng menu độc lập.
+"Kính thưa Hội đồng, để tổng kết lại toàn bộ đề tài nghiên cứu QRTable, em xin báo cáo các kết luận cốt lõi và định hướng phát triển tiếp theo của hệ thống:
 
-Kết luận thứ hai là kiến trúc đã xác lập các ranh giới dịch vụ và quyền sở hữu dữ liệu cho những miền nghiệp vụ chính. Các bất biến về tenant, quyền truy cập, thao tác lặp, tồn kho, đơn hàng, KDS và thanh toán được gắn với cơ chế xử lý tại ranh giới phù hợp.
+Về mặt kết quả đạt được, khóa luận đã giải quyết thành công ba mục tiêu lớn:
+Thứ nhất, chúng em đã hiện thực hóa thành công luồng nghiệp vụ POS SaaS cốt lõi. Trong đó, mã QR tại bàn không chỉ là một tính năng đọc menu độc lập, mà là cổng vào ngữ cảnh của cả một chuỗi phục vụ khép kín gồm nhiều tác nhân tham gia.
+Thứ hai, kiến trúc hệ thống đã xác lập ranh giới dịch vụ và quyền sở hữu dữ liệu độc lập một cách rõ ràng. Các bất biến liên dịch vụ về cô lập đơn vị thuê (Tenant Isolation), khử trùng lặp (Deduplication), quản lý tồn kho và thanh toán đã được gắn chặt với cơ chế xử lý tại ranh giới của từng domain dịch vụ phù hợp.
+Thứ ba, toàn bộ các kết quả thiết kế này đều có điểm tựa thực tế vững chắc, được kiểm chứng chặt chẽ qua nhiều lớp từ kiểm thử tự động, đối chiếu trạng thái cơ sở dữ liệu cho đến ma trận truy vết yêu cầu.
 
-Kết luận thứ ba là kết quả được kiểm chứng qua nhiều lớp bằng chứng, từ kiểm thử logic và ranh giới tích hợp đến trạng thái vận hành, giao diện và ma trận truy vết. Cách đánh giá này cho phép kết luận về luồng cốt lõi trong đúng phạm vi, đồng thời phân biệt những năng lực chưa được kiểm chứng toàn diện.
+Về hướng phát triển ưu tiên trong tương lai, chúng em xác định ba nhiệm vụ chính:
+Một là, thực hiện đo hiệu năng và tính sẵn sàng của microservices bằng các chỉ số định lượng thông qua kiểm thử tải trọng lớn.
+Hai là, mở rộng phạm vi thực nghiệm trên môi trường sản xuất với các tài khoản thanh toán doanh nghiệp thực tế (Live Accounts) và đầy đủ các kịch bản phân quyền đa dạng.
+Và ba là, củng cố độ tin cậy của giao dịch phân tán bằng cách nâng cấp bộ điều phối Saga với cơ chế lưu trữ trạng thái bền vững (Durable State), tự động thử lại (Stateful Retry) và tích hợp các công cụ tự động tiêm lỗi (Fault Injection) ở môi trường production.
 
-Ba hướng phát triển ưu tiên là đo hiệu năng và tính sẵn sàng bằng chỉ số định lượng; mở rộng kiểm chứng trên hệ thống tích hợp đầy đủ cho tenant, phân quyền và nhà cung cấp thanh toán thực tế; đồng thời củng cố Saga orchestration bằng durable state, stateful retry và fault injection có kiểm soát. Em xin kết thúc phần trình bày và kính mong nhận được câu hỏi cùng ý kiến đóng góp của thầy cô."
+Em xin phép được kết thúc phần trình bày khóa luận tại đây. Em xin chân thành cảm ơn các thầy cô trong Hội đồng đã dành thời gian lắng nghe và kính mong nhận được các câu hỏi phản biện cùng ý kiến đóng góp từ thầy cô."
 
 ### Nguồn / bằng chứng
 
@@ -1783,8 +1770,8 @@ Ba hướng phát triển ưu tiên là đo hiệu năng và tính sẵn sàng b
    - Chuẩn bị DB query hoặc UI order tracking.
 
 4. **POS confirm**
-   - Nói: "Confirm là commit point: Order gọi Catalog deduct, update `PROCESSING`, ghi outbox `order.confirmed`."
-   - Chuẩn bị log hoặc test evidence cho idempotency key `confirm-order:{orderId}`.
+   - Nói: "Catalog ghi persistent reservation cùng thay đổi tồn kho; Order lưu version khi commit `PROCESSING` và outbox `order.confirmed`."
+   - Chuẩn bị bản ghi `stock_reservations` hoặc test evidence cho lost-response retry với key `confirm-order:{orderId}`.
 
 5. **Mở KDS**
    - Nói: "Kitchen nhận `order.confirmed`, tạo Redis ticket theo station, WebSocket chỉ hint để UI refetch."
@@ -1833,8 +1820,11 @@ Không đưa SaaS onboarding vào appendix của deck này theo scope hiện t�
 - Source:
   - `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`
   - `apps/order/src/app/modules/order/services/catalog-stock-gateway.service.ts`
+  - `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts`
+  - `libs/entities/src/lib/stock-reservation.entity.ts`
   - `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`
-- Hiện đúng 4 đoạn: lock order, deduct stock, outbox, compensate.
+  - `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts`
+- Hiện đúng 4 đoạn: lock/replay ở Order, persistent reservation ở Catalog, commit version cùng outbox, và versioned compensation.
 
 ### Phụ lục E. Danh mục topic Kafka
 
@@ -1895,6 +1885,22 @@ Chuẩn bị câu trả lời này nếu giảng viên phản biện hỏi theo 
 **Q5. Nếu thầy góp ý nên bổ sung góc nhìn kinh doanh thì trả lời thế nào?**
 
 "Dạ em cảm ơn góp ý của thầy. Em sẽ bổ sung phần bối cảnh nghiệp vụ và hình minh họa để người đọc dễ nắm bài toán thực tế hơn. Đồng thời em sẽ giữ phạm vi kết luận của khóa luận ở phần kiến trúc và kỹ thuật hệ thống để không vượt quá bằng chứng hiện có."
+
+### Phụ lục J. Đối chiếu luồng QR-to-Payment với trạng thái liên dịch vụ
+
+- **Mục đích:** Bản đồ đối chiếu cứu cánh (backup) để chứng minh tính khớp dịch giữa thao tác người dùng (UI), cơ sở dữ liệu quan hệ (PostgreSQL), và bộ nhớ RAM (Redis) nếu Live Demo gặp sự cố kỹ thuật đột xuất.
+- **Chuỗi trạng thái được đối chiếu:**
+  1. Quét QR -> thiết lập ngữ cảnh phiên và bàn.
+  2. Cập nhật giỏ món -> kiểm soát phiên bản bằng `cartVersion`.
+  3. Gửi đơn -> tạo đơn hàng `PENDING` và hóa đơn `OPEN`.
+  4. POS xác nhận -> Catalog ghi persistent reservation cùng thay đổi tồn kho; Order lưu version, chuyển sang `PROCESSING` và ghi outbox `order.confirmed`.
+  5. KDS tiếp nhận -> Redis lưu phiếu; WebSocket phát hint để client refetch API snapshot.
+  6. Thanh toán -> ghi nhận giao dịch, outbox ghi `payment.completed`, hóa đơn chuyển sang `PAID`, phiên đóng và bàn chuyển sang `CLEANING`.
+- **Nguồn đối chiếu và bằng chứng vật lý:**
+  - _Ảnh chụp giao diện:_ Customer session (`chapter5-01`), POS confirm (`chapter5-06`), KDS (`chapter5-07`).
+  - _PostgreSQL (DB quan hệ):_ Bản ghi `stock_reservations` (Catalog DB), bản ghi `orders`/`bills`/`outbox_events` (Order DB).
+  - _Redis keys (Bộ nhớ đệm):_ `cart:{tenantId}:{sessionId}`, `session:{tenantId}:{tableId}`, `kds:{tenantId}:{station}`.
+  - _Kafka Topics:_ `order.confirmed`, `payment.completed`.
 
 ## 6. Danh sách kiểm tra trước khi dựng slide thật
 

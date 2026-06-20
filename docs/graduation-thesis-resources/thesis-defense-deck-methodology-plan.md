@@ -649,19 +649,19 @@ Với nhóm người dùng tự thay, AI không cố tự vẽ cho đủ. AI ph�
 
 Mỗi asset nên được quản lý trong một registry từ mã nguồn deck với tối thiểu các trường:
 
-| Trường                    | Ý nghĩa                                                                                       |
-| ------------------------- | --------------------------------------------------------------------------------------------- |
-| `id`                      | Mã ổn định, ví dụ `SLIDE_ORDER_CONFIRM_SAGA`                                                   |
-| `type`                    | `logo`, `diagram`, `screenshot`, `database-state`, `log`, `test-output`, `photo`              |
-| `path`                    | Đường dẫn asset thật hoặc vị trí file người dùng sẽ thay                                       |
-| `status`                  | `placeholder`, `user-replacement`, `ready`, `verified`                                         |
-| `purpose`                 | Luận điểm hoặc invariant mà asset cần chứng minh                                                |
-| `requiredContent`         | Node, actor, state, row, log line hoặc annotation bắt buộc phải xuất hiện                       |
+| Trường                    | Ý nghĩa                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `id`                      | Mã ổn định, ví dụ `SLIDE_ORDER_CONFIRM_SAGA`                                                      |
+| `type`                    | `logo`, `diagram`, `screenshot`, `database-state`, `log`, `test-output`, `photo`                  |
+| `path`                    | Đường dẫn asset thật hoặc vị trí file người dùng sẽ thay                                          |
+| `status`                  | `placeholder`, `user-replacement`, `ready`, `verified`                                            |
+| `purpose`                 | Luận điểm hoặc invariant mà asset cần chứng minh                                                  |
+| `requiredContent`         | Node, actor, state, row, log line hoặc annotation bắt buộc phải xuất hiện                         |
 | `sourceLinks`             | Danh sách URL hoặc repo-relative path tới ảnh, diagram source, code, test hoặc tài liệu liên quan |
-| `replacementOwner`        | `agent` hoặc `user`                                                                            |
-| `replacementInstructions` | Brief ngắn để người thay asset biết phải vẽ/chụp gì và giữ những thành phần nào                 |
-| `aspectRatio`             | Tỉ lệ khung mong muốn để thay asset không làm vỡ layout                                         |
-| `caption`                 | Caption hoặc thông điệp đọc nhanh trên slide                                                    |
+| `replacementOwner`        | `agent` hoặc `user`                                                                               |
+| `replacementInstructions` | Brief ngắn để người thay asset biết phải vẽ/chụp gì và giữ những thành phần nào                   |
+| `aspectRatio`             | Tỉ lệ khung mong muốn để thay asset không làm vỡ layout                                           |
+| `caption`                 | Caption hoặc thông điệp đọc nhanh trên slide                                                      |
 
 Ví dụ về mô tả logic:
 
@@ -676,8 +676,7 @@ const assets = {
     requiredContent: ['Logo chính thức của Trường Đại học Công nghệ Thông tin'],
     sourceLinks: ['Asset chính thức do người dùng cung cấp hoặc nguồn trường đã kiểm chứng'],
     replacementOwner: 'user',
-    replacementInstructions:
-      'Cung cấp logo UIT chính thức có nền trong suốt hoặc bản guideline cho nền tối.',
+    replacementInstructions: 'Cung cấp logo UIT chính thức có nền trong suốt hoặc bản guideline cho nền tối.',
     aspectRatio: 'preserve',
   },
   schoolNameText: {
@@ -687,8 +686,7 @@ const assets = {
     purpose: 'Hiển thị tên trường như một thành phần text độc lập cạnh logo ở footer',
     requiredContent: ['TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN'],
     replacementOwner: 'agent',
-    replacementInstructions:
-      'Render bằng text box, không gộp vào ảnh logo; giữ kích thước nhỏ và tương phản vừa đủ.',
+    replacementInstructions: 'Render bằng text box, không gộp vào ảnh logo; giữ kích thước nhỏ và tương phản vừa đủ.',
     aspectRatio: 'inline',
   },
   coverBackground: {
@@ -706,17 +704,19 @@ const assets = {
   orderConfirmSaga: {
     id: 'SLIDE_ORDER_CONFIRM_SAGA',
     type: 'diagram',
-    path: null,
-    status: 'user-replacement',
-    purpose: 'Chứng minh invariant: không giữ confirmed order khi stock reservation/commit thất bại',
+    path: 'docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-order-confirm-stock-slide22.pdf',
+    status: 'ready',
+    purpose: 'Giải thích luồng xác nhận đơn, persistent reservation và hai kết quả APPLIED/REPLAYED trên Slide 22',
     requiredContent: [
-      'Order gọi Catalog reserve stock',
-      'Order commit',
-      'Failure path',
-      'Catalog compensation',
-      'Idempotency boundary',
+      'Order giữ vai trò orchestrator',
+      'Catalog sở hữu stock và persistent reservation',
+      'APPLIED/REPLAYED cùng reservationVersion',
+      'Order commit PROCESSING, version và outbox',
+      'Kitchen chỉ xử lý sau order.confirmed',
     ],
     sourceLinks: [
+      'docs/graduation-thesis-resources/thesis-report/assets/diagrams/chapter5-order-confirm-stock-slide22.mmd',
+      'docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-order-confirm-stock-slide22.pdf',
       'docs/graduation-thesis-resources/thesis-report/assets/diagrams/chapter5-order-confirm-stock.mmd',
       'docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-order-confirm-stock.pdf',
       'docs/graduation-thesis-resources/thesis-report/assets/test-evidence/appendix-d-order-saga-tests.txt',
@@ -724,9 +724,9 @@ const assets = {
     ],
     replacementOwner: 'user',
     replacementInstructions:
-      'Tự vẽ sequence/state diagram theo Manus-like Academic Dark, giữ đủ happy path, failure path, compensation và idempotency boundary.',
+      'Nếu thay visual, giữ bản Slide 22 ở mức 5 lane; dùng diagram gốc chi tiết cho failure path, compensation và transaction boundary trong appendix.',
     aspectRatio: '16:9-wide',
-    caption: 'Order Confirm Saga và nhánh bù trừ khi xác nhận thất bại',
+    caption: 'Order Confirm Saga: persistent reservation và replay không trừ kho lặp',
   },
 };
 ```

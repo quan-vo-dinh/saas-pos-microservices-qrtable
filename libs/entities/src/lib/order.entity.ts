@@ -43,4 +43,7 @@ export class Order extends BaseEntity {
 
   @Column({ name: 'cancel_reason', type: 'varchar', length: 255, nullable: true })
   cancelReason: string | null;
+
+  @Column({ name: 'stock_reservation_version', type: 'int', nullable: true })
+  stockReservationVersion: number | null;
 }

@@ -19,3 +19,8 @@ export enum TABLE_STATUS {
   BILLING = 'billing',
   CLEANING = 'cleaning',
 }
+
+export enum StockReservationState {
+  Reserved = 'RESERVED',
+  Released = 'RELEASED',
+}

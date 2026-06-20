@@ -707,7 +707,7 @@ Responsibility:
   - QR Token: sinh HMAC-SHA256 token, validate, re-generate
   - Table State Machine: Available → Occupied → Billing → Cleaning
   - Sort ordering (drag & drop), time-based category visibility
-- **Stock mutations for orders:** endpoint/command TCP transactional (reserve/deduct/release) — Order service **does not** write directly to `menu_items` (Phase 2A Step 2.4)
+- **Stock mutations for orders:** versioned TCP reservation/deduct/release commands; the reservation transition and `menu_items` mutation share one Catalog transaction. Order service **does not** write directly to Catalog tables.
 - Table status updates: receive orders from Order/BFF flow (bill request, transfer saga, safe empty-session release) in Catalog transactions. Occupied/billing release must validate the matching `sessionId` before clearing `tables.session_id`.
   - Delete constraints:
 → Do not allow MenuItem to be deleted if order_item exists
@@ -720,6 +720,8 @@ Entities (PostgreSQL):
   - categories: id, tenant_id, name, sort_order, time_start, time_end, status
   - menu_items: id, tenant_id, category_id, name, description, price, image_url,
                 stock, sort_order, status, deleted_at
+  - stock_reservations: id, tenant_id, order_id, reservation_key, request_hash,
+                        version, state, deduct_result, release_result, last_release_key, released_at
   - areas: id, tenant_id, name, sort_order
   - tables: id, tenant_id, area_id, name, capacity, status, qr_token, session_id
 
@@ -740,7 +742,7 @@ Responsibility:
 - Empty session recovery: Order owns stale/closed empty-session release and the staff `release_empty_table_session` command; Catalog only updates the table after Order validates tenant/table/session ownership, `orderCount == 0`, no bill and no persisted orders
 - Shared Cart: multi-device cart through Redis Hash + global cart version (optimistic concurrency)
 - Order State Machine: persist from `PENDING` or higher; `DRAFT` refers to cart/UI — see docs/specs/business-logic-step-2.4-spec.md §3.1
-- Stock: Order service **does not** mutate `menu_items`; When confirming (`PENDING → PROCESSING`) calls Catalog service (TCP) to deduct the Catalog transaction
+- Stock: Order service **does not** mutate Catalog tables; when confirming (`PENDING → PROCESSING`), it asks Catalog to ensure a versioned reservation and stores the returned version.
   - Order cancellation (soft delete + audit log); RBAC cancel theo state — permission-matrix §6.1
 - Bill aggregation: one bill/session; created in the first submitted order; `OPEN → PENDING_PAYMENT` in Step 2.4; `PAID` → Phase 3
 - service Request: receive service requests from customers (call staff, request payment, support); bill request is an explicit command, `REQUEST_BILL` can be a side effect notification
@@ -754,7 +756,7 @@ Validation Rules:
 Entities (PostgreSQL):
   - sessions: durable session rows (tenant_id, table_id, …) — canonical theo Step 2.4
   - orders: id, tenant_id, table_id, session_id, status, total_amount,
-            idempotency_key, created_at, updated_at, deleted_at
+            idempotency_key, stock_reservation_version, created_at, updated_at, deleted_at
   - order_items: id, order_id, menu_item_id, quantity, price, note, status
   - bills: id, tenant_id, session_id, subtotal, total, status, payment_method,
            rounding_amount (VND rounding delta)
@@ -799,8 +801,14 @@ Trigger: Staff/Manager moves table
 
 Stock / confirm flow (cross-service):
 Order (in transaction DB of Order): lock/include validate order `PENDING`
-→ Catalog TCP: deduct/reserve stock idempotent in DB Catalog
-  → success: Order `PROCESSING`, ghi outbox → Kafka `order.confirmed`
+→ Catalog TCP: ensure the tenant/order reservation is `RESERVED`
+  → Catalog locks the reservation and menu rows in deterministic order
+  → reservation state/result/version and stock mutation commit atomically in Catalog
+  → active same-key/same-payload replay returns the stored result without another deduction
+  → success: Order commits `PROCESSING`, reservation version, items, and outbox → Kafka `order.confirmed`
+  → acknowledged Order failure: release that exact version; duplicate release is replayed
+  → reconfirm after release increments the version; an older release is stale and cannot restore stock again
+  → lost response: Order remains `PENDING`; the caller must retry the same confirm to recover via Catalog replay
 ```
 
 #### 6.2.6 Kitchen Service (KDS)
@@ -1418,12 +1426,12 @@ Applicable to complex business flows that require multiple services combined wit
 │  Step 1: Lock/validate order row in Order DB (PENDING)  │
 │          and require current bill OPEN                  │
 │                                                          │
-│  Step 2: Catalog TCP deduct stock in Catalog TX          │
-│          idempotencyKey=confirm-order:{orderId}          │
-│    ✗ Compensation: Catalog release stock                 │
-│      idempotencyKey=confirm-order-compensation:{orderId} │
+│  Step 2: Catalog TCP ensures RESERVED version N          │
+│          key=confirm-order:{orderId}; payload is hashed  │
+│    ✗ Compensation: release reservation version N         │
+│      key=confirm-order-compensation:{orderId}:{N}        │
 │                                                          │
-│  Step 3: Order DB transaction commits PROCESSING rows    │
+│  Step 3: Order DB commits PROCESSING rows, version N,     │
 │          and order.confirmed outbox row                  │
 │                                                          │
 │  Step 4: Outbox poll publishes Kafka order.confirmed     │
@@ -1438,7 +1446,7 @@ SaaS onboarding is the second representative saga-style flow. `OnboardingSagaSer
 
 Payment completion is currently documented as settlement + outbox + idempotent retry/finalization baseline. It is not claimed as a full Payment Complete Saga with durable saga state and compensation for every session/table failure mode.
 
-**Validation strategy for thesis evidence:** Saga verification is multi-layered rather than a single browser proof. Order Confirm uses unit/contract tests for orchestration, replay, Catalog error handling, outbox creation, and deterministic compensation; opt-in integration proves the live Order-Catalog stock boundary. SaaS onboarding uses unit/contract tests for rollback rules, opt-in PostgreSQL integration for tenant/subscription/outbox persistence and rollback, and opt-in live Payment TCP integration for Payment-owned settings creation. UI screenshots, DB rows, outbox rows, and logs are supporting artifacts for the thesis; they do not replace the automated tests. The canonical evidence guide is `docs/testing/phase-5/saga-validation-strategy.md`.
+**Validation strategy for thesis evidence:** Saga verification is multi-layered rather than a single browser proof. Order Confirm uses unit/contract tests for orchestration and every reservation state transition. Opt-in PostgreSQL plus Catalog TCP tests prove duplicate deduct, discarded-response retry, versioned compensation/reconfirm, stale release, and two-order contention. SaaS onboarding uses unit/contract tests for rollback rules, opt-in PostgreSQL integration for tenant/subscription/outbox persistence and rollback, and opt-in live Payment TCP integration for Payment-owned settings creation. UI screenshots, DB rows, outbox rows, and logs are supporting artifacts; they do not replace automated tests. The canonical evidence guide is `docs/testing/phase-5/saga-validation-strategy.md`.
 
 ### 12.2 Idempotency
 
@@ -1450,7 +1458,10 @@ Strategy:
 
 Implementation:
 - Order submit: PostgreSQL UNIQUE/replay on the `idempotency_key` column
-- Order confirm stock commands carry stable command keys (`confirm-order:{orderId}` and compensation key)
+- Catalog persists one `(tenant_id, order_id)` stock reservation with a stable deduct key, immutable payload hash, stored results, state, and monotonically increasing version
+- Active deduct replay and matching release replay do not mutate stock; stale release cannot affect a newer version
+- Order stores the returned reservation version and uses it in compensation and processing-order cancellation
+- Ambiguous response recovery requires retrying the original confirm; there is no autonomous recovery worker or exactly-once TCP claim
 - Redis SET NX can be added later for edge request throttling, but is not required to describe current order submit behavior
 ```
 

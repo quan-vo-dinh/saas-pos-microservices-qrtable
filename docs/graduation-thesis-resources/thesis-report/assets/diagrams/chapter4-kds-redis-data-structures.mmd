@@ -1,44 +1,62 @@
-%%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "curve": "basis"}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#f8fafc", "primaryBorderColor": "#cbd5e1", "lineColor": "#475569", "tertiaryColor": "#ffffff"}}}%%
+---
+config:
+  theme: base
+  flowchart:
+    htmlLabels: true
+    curve: basis
+  themeVariables:
+    fontFamily: ''
+    primaryColor: '#f8fafc'
+    primaryBorderColor: '#cbd5e1'
+    lineColor: '#475569'
+    tertiaryColor: '#ffffff'
+---
 flowchart LR
-  Order["Dịch vụ Order<br/>DB commit + outbox<br/>Kafka: order.confirmed"]
-  Kafka@{ icon: "logos:kafka-icon", form: "rounded", label: "Topic Kafka được chấp nhận<br/>order.confirmed", pos: "t", h: 66 }
-  Kitchen["Dịch vụ Kitchen<br/>OrderConfirmedConsumer<br/>KdsRedisRepository"]
+ subgraph RedisStore["Vùng lưu trữ dữ liệu KDS (Redis)"]
+        n2["Redis Caching"]
+        TicketHash["Hash: kds:{tid}:ticket:{ticketId}<br>ticket metadata"]
+        ItemHash["Hash: kds:{tid}:ticket-item:{itemId}<br>item metadata"]
+        ItemSet["Set: index ticket/order/session"]
+        ActiveQueue["Sorted Set: kds:{tid}:{station}<br>hàng đợi FIFO/priority"]
+        ReadyQueue["Sorted Set: kds:{tid}:station:{station}:READY"]
+        SlaQueue["Sorted Set + Hash: kds:sla:due<br>SLA metadata"]
+        Locks["String lock: dedupe event/order/cmd"]
+        DeadLetter["List: dead-letter:order-confirmed"]
+  end
+    Order["Dịch vụ Order<br>DB commit + outbox<br>Kafka: order.confirmed"] --> n1["Topic Kafka<br>order.confirmed"]
+    n1 --> Kitchen["Dịch vụ Kitchen<br>OrderConfirmedConsumer<br>KdsRedisRepository"]
+    Kitchen --> TicketHash & ItemHash & ItemSet & ActiveQueue & ReadyQueue & SlaQueue & Locks & DeadLetter & Guardrail["Nguyên tắc kiểm soát<br>• Redis chỉ là runtime projection/hint.<br>• Order giữ lịch sử đơn bền vững.<br>• BFF không tự suy luận trạng thái KDS."]
+    TicketHash --> PubSub["Redis Pub/Sub<br>realtime:kds:{tenantId}<br>kds.queue_changed hint"]
+    ItemHash --> PubSub
+    ItemSet --> PubSub
+    ActiveQueue --> PubSub
+    ReadyQueue --> PubSub
+    SlaQueue --> PubSub
+    Locks --> PubSub
+    DeadLetter --> PubSub
+    PubSub --> BFF["BFF realtime subscriber<br>kiểm tra payload"] & Guardrail
+    BFF --> WebSocket["Socket.IO rooms<br>tenant:{tid}:kds:kitchen/bar<br>tenant:{tid}:management"]
 
-  TicketHash["Hash<br/>kds:{tid}:ticket:{ticketId}<br/>ticket metadata"]
-  ItemHash["Hash<br/>kds:{tid}:ticket-item:{itemId}<br/>item metadata"]
-  ItemSet["Set<br/>index ticket/order/session/source-event"]
-  ActiveQueue["Sorted Set<br/>kds:{tid}:{station}<br/>hàng đợi FIFO/priority"]
-  ReadyQueue["Sorted Set<br/>kds:{tid}:station:{station}:READY<br/>ready/recall queue"]
-  SlaQueue["Sorted Set + Hash<br/>kds:sla:due<br/>ticket SLA metadata"]
-  Locks["String lock<br/>dedupe event/order/cmd/SLA<br/>rebuild lock"]
-  DeadLetter["List<br/>kds:{tid}:dead-letter:order-confirmed"]
-  PubSub["Redis Pub/Sub<br/>realtime:kds:{tenantId}<br/>kds.queue_changed hint"]
-  BFF["BFF realtime subscriber<br/>kiểm tra payload"]
-  WebSocket["Socket.IO rooms<br/>tenant:{tid}:kds:kitchen/bar<br/>tenant:{tid}:management"]
-
-  Order --> Kafka --> Kitchen
-  Kitchen --> TicketHash
-  Kitchen --> ItemHash
-  Kitchen --> ItemSet
-  Kitchen --> ActiveQueue
-  Kitchen --> ReadyQueue
-  Kitchen --> SlaQueue
-  Kitchen --> Locks
-  Kitchen --> DeadLetter
-  Kitchen --> PubSub --> BFF --> WebSocket
-
-  Guardrail["Nguyên tắc kiểm soát<br/>Redis là runtime projection/hint.<br/>Order giữ lịch sử đơn bền vững.<br/>BFF không suy luận trạng thái KDS."]
-  Kitchen --> Guardrail
-  PubSub --> Guardrail
-
-  classDef service fill:#dbeafe,stroke:#2563eb,color:#0f172a,font-weight:bold;
-  classDef kafka fill:#fef3c7,stroke:#d97706,color:#111827,font-weight:bold;
-  classDef redis fill:#ecfeff,stroke:#0891b2,color:#0f172a;
-  classDef realtime fill:#dcfce7,stroke:#16a34a,color:#0f172a;
-  classDef caution fill:#fff7ed,stroke:#ea580c,color:#0f172a;
-
-  class Order,Kitchen service;
-  class Kafka kafka;
-  class TicketHash,ItemHash,ItemSet,ActiveQueue,ReadyQueue,SlaQueue,Locks,DeadLetter redis;
-  class PubSub,BFF,WebSocket realtime;
-  class Guardrail caution;
+    n2@{ img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRLuV_aZWnhJ6Nku3SvxpJiJmJoZ7SisUshVQ&s", h: 200, w: 200, pos: "b"}
+    n1@{ img: "https://kafka.apache.org/logos/kafka-logo-tall.png", h: 200, w: 200, pos: "b"}
+     n2:::redis
+     TicketHash:::redis
+     ItemHash:::redis
+     ItemSet:::redis
+     ActiveQueue:::redis
+     ReadyQueue:::redis
+     SlaQueue:::redis
+     Locks:::redis
+     DeadLetter:::redis
+     Order:::service
+     n1:::kafka
+     Kitchen:::service
+     Guardrail:::caution
+     PubSub:::realtime
+     BFF:::realtime
+     WebSocket:::realtime
+    classDef service fill:#dbeafe,stroke:#2563eb,color:#0f172a,font-weight:bold
+    classDef kafka fill:#fef3c7,stroke:#d97706,color:#111827,font-weight:bold
+    classDef redis fill:#ecfeff,stroke:#0891b2,color:#0f172a
+    classDef realtime fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef caution fill:#fff7ed,stroke:#ea580c,color:#0f172a

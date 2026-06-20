@@ -29,6 +29,7 @@ const TCP_TIMEOUT_MS = 1000;
 
 type Harness = {
   dataSource: DataSource;
+  catalogDataSource: DataSource;
   redis: Redis;
   catalogClient: ClientProxy;
   billService: BillService;
@@ -66,6 +67,9 @@ maybeDescribe('Phase 5 P0-ORD-BILL-REQUEST external-stack integration', () => {
     if (harness?.dataSource.isInitialized) {
       await harness.dataSource.destroy();
     }
+    if (harness?.catalogDataSource.isInitialized) {
+      await harness.catalogDataSource.destroy();
+    }
   });
 
   it('rejects bill request while the Redis cart still has items', async () => {
@@ -93,10 +97,12 @@ maybeDescribe('Phase 5 P0-ORD-BILL-REQUEST external-stack integration', () => {
     await expect(h.dataSource.getRepository(Bill).findOneByOrFail({ id: seed.billId })).resolves.toMatchObject({
       status: BillStatus.OPEN,
     });
-    await expect(h.dataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject({
-      status: TABLE_STATUS.OCCUPIED,
-      sessionId: seed.sessionId,
-    });
+    await expect(h.catalogDataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject(
+      {
+        status: TABLE_STATUS.OCCUPIED,
+        sessionId: seed.sessionId,
+      },
+    );
   });
 
   it('rejects bill request until every active order on the bill is served', async () => {
@@ -112,10 +118,12 @@ maybeDescribe('Phase 5 P0-ORD-BILL-REQUEST external-stack integration', () => {
     await expect(h.dataSource.getRepository(Bill).findOneByOrFail({ id: seed.billId })).resolves.toMatchObject({
       status: BillStatus.OPEN,
     });
-    await expect(h.dataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject({
-      status: TABLE_STATUS.OCCUPIED,
-      sessionId: seed.sessionId,
-    });
+    await expect(h.catalogDataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject(
+      {
+        status: TABLE_STATUS.OCCUPIED,
+        sessionId: seed.sessionId,
+      },
+    );
   });
 
   it('moves OPEN bill to PENDING_PAYMENT, locks the cart, and moves Catalog table to billing', async () => {
@@ -153,10 +161,12 @@ maybeDescribe('Phase 5 P0-ORD-BILL-REQUEST external-stack integration', () => {
       closedAt: expect.any(Date),
     });
     await expect(h.dataSource.getRepository(ServiceRequest).countBy({ tenantId: seed.tenantId })).resolves.toBe(1);
-    await expect(h.dataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject({
-      status: TABLE_STATUS.BILLING,
-      sessionId: seed.sessionId,
-    });
+    await expect(h.catalogDataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject(
+      {
+        status: TABLE_STATUS.BILLING,
+        sessionId: seed.sessionId,
+      },
+    );
 
     await expect(
       h.cartService.mutate({
@@ -216,6 +226,7 @@ async function ensureExternalStackReady(): Promise<ReadinessResult> {
 
 async function createHarness(): Promise<Harness> {
   const dataSource = await createDataSource();
+  const catalogDataSource = await createCatalogDataSource();
   const redis = createRedis();
   const redisClient = { getClient: () => redis } as unknown as RedisClientService;
   const catalogClient = ClientProxyFactory.create({
@@ -238,17 +249,22 @@ async function createHarness(): Promise<Harness> {
     catalogClient as unknown as TcpClient,
   );
 
-  return { dataSource, redis, catalogClient, billService, cartService };
+  return { dataSource, catalogDataSource, redis, catalogClient, billService, cartService };
 }
 
 function createDataSource(): Promise<DataSource> {
   return createPostgresDataSource(process.env['ORDER_TYPEORM_DATABASE'] ?? 'qrtable_order', [
-    Area,
-    Table,
     Session,
     Order,
     Bill,
     ServiceRequest,
+  ]).initialize();
+}
+
+function createCatalogDataSource(): Promise<DataSource> {
+  return createPostgresDataSource(process.env['CATALOG_TYPEORM_DATABASE'] ?? 'qrtable_catalog', [
+    Area,
+    Table,
   ]).initialize();
 }
 
@@ -276,15 +292,15 @@ function createRedis(): Redis {
 async function seedOpenBill(harness: Harness, tenantId: string, orderStatus: OrderStatus): Promise<SeedRows> {
   await cleanupTenant(harness, tenantId);
 
-  const area = await harness.dataSource.getRepository(Area).save(
-    harness.dataSource.getRepository(Area).create({
+  const area = await harness.catalogDataSource.getRepository(Area).save(
+    harness.catalogDataSource.getRepository(Area).create({
       tenantId,
       name: `Phase 5 Bill Area ${randomUUID()}`,
       sortOrder: 0,
     }),
   );
-  const table = await harness.dataSource.getRepository(Table).save(
-    harness.dataSource.getRepository(Table).create({
+  const table = await harness.catalogDataSource.getRepository(Table).save(
+    harness.catalogDataSource.getRepository(Table).create({
       tenantId,
       areaId: area.id,
       name: `Phase 5 Bill Table ${randomUUID()}`,
@@ -310,7 +326,7 @@ async function seedOpenBill(harness: Harness, tenantId: string, orderStatus: Ord
     }),
   );
   table.sessionId = session.id;
-  await harness.dataSource.getRepository(Table).save(table);
+  await harness.catalogDataSource.getRepository(Table).save(table);
   const order = await harness.dataSource.getRepository(Order).save(
     harness.dataSource.getRepository(Order).create({
       tenantId,
@@ -373,8 +389,8 @@ async function cleanupTenant(harness: Harness, tenantId: string): Promise<void> 
   await harness.dataSource.getRepository(Order).delete({ tenantId });
   await harness.dataSource.getRepository(Bill).delete({ tenantId });
   await harness.dataSource.getRepository(Session).delete({ tenantId });
-  await harness.dataSource.getRepository(Table).delete({ tenantId });
-  await harness.dataSource.getRepository(Area).delete({ tenantId });
+  await harness.catalogDataSource.getRepository(Table).delete({ tenantId });
+  await harness.catalogDataSource.getRepository(Area).delete({ tenantId });
   for (const session of sessions) {
     await harness.redis.del(`cart:${tenantId}:${session.id}`);
     await harness.redis.del(`session:${tenantId}:${session.id}`);

@@ -88,7 +88,8 @@ export class OrderStateTransitionService {
       await this.catalogStockGateway.releaseForOrder({
         tenantId: dto.tenantId,
         orderId: ord.id,
-        idempotencyKey: `cancel-processing:${ord.id}`,
+        idempotencyKey: `cancel-processing:${ord.id}:${ord.stockReservationVersion ?? 'legacy'}`,
+        reservationVersion: ord.stockReservationVersion ?? null,
         items: lines.map((it) => ({ menuItemId: it.menuItemId, quantity: it.quantity })),
       });
 

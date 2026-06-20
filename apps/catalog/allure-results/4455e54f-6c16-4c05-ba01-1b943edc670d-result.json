@@ -1,0 +1,37 @@
+{
+  "uuid": "4455e54f-6c16-4c05-ba01-1b943edc670d",
+  "name": "should update image url and public id",
+  "historyId": "a8c2a05c62a51edd66b78b7c125bd383:d41d8cd98f00b204e9800998ecf8427e",
+  "status": "passed",
+  "statusDetails": {},
+  "stage": "finished",
+  "steps": [],
+  "attachments": [],
+  "parameters": [],
+  "labels": [
+    { "name": "language", "value": "javascript" },
+    { "name": "framework", "value": "jest" },
+    { "name": "package", "value": "@einvoice/source.src.app.modules.menu-item.tests.menu-item.service.spec.ts" },
+    { "name": "_fallbackTestCaseId", "value": "83d38b670f2000a29290b83f7e6c3a72" },
+    { "name": "host", "value": "Macbook-Pro-14.local" },
+    { "name": "thread", "value": "1" },
+    { "name": "parentSuite", "value": "MenuItemService" },
+    { "name": "suite", "value": "updateImage" }
+  ],
+  "links": [],
+  "start": 1781934249279,
+  "fullName": "@einvoice/source:src/app/modules/menu-item/tests/menu-item.service.spec.ts#MenuItemService updateImage should update image url and public id",
+  "titlePath": [
+    "@einvoice/source",
+    "src",
+    "app",
+    "modules",
+    "menu-item",
+    "tests",
+    "menu-item.service.spec.ts",
+    "MenuItemService",
+    "updateImage"
+  ],
+  "testCaseId": "a8c2a05c62a51edd66b78b7c125bd383",
+  "stop": 1781934249280
+}

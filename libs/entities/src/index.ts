@@ -10,6 +10,7 @@ export * from './lib/pricing-plan.entity';
 export * from './lib/saas-outbox-event.entity';
 export * from './lib/service-request.entity';
 export * from './lib/session.entity';
+export * from './lib/stock-reservation.entity';
 export * from './lib/subscription.entity';
 export * from './lib/subscription-invoice.entity';
 export * from './lib/table.entity';

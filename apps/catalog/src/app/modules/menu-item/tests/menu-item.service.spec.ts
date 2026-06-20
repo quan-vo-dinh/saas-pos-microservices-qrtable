@@ -7,13 +7,11 @@ import { MenuItem } from '@common/entities/menu-item.entity';
 import { BusinessException } from '@common/error-messages/business.exception';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { MENU_ITEM_STATUS, PREPARATION_STATION } from '@common/constants/enum/catalog.enum';
-import { DataSource } from 'typeorm';
 
 describe('MenuItemService', () => {
   let service: MenuItemService;
   let repository: jest.Mocked<MenuItemRepository>;
   let categoryRepo: { findOne: jest.Mock };
-  let dataSource: { transaction: jest.Mock };
 
   const mockMenuItem = {
     id: 'item-1',
@@ -53,14 +51,12 @@ describe('MenuItemService', () => {
     };
 
     categoryRepo = { findOne: jest.fn() };
-    dataSource = { transaction: jest.fn((fn: (m: unknown) => Promise<unknown>) => fn({})) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MenuItemService,
         { provide: MenuItemRepository, useValue: mockMenuItemRepository },
         { provide: getRepositoryToken(Category), useValue: categoryRepo },
-        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 
@@ -253,157 +249,6 @@ describe('MenuItemService', () => {
           items: [{ menuItemId: 'item-1', quantity: 1 }],
         }),
       ).rejects.toMatchObject({ errorCode: ErrorCode.CATALOG_MENU_ITEM_NOT_ORDERABLE });
-    });
-  });
-
-  describe('deductForOrder', () => {
-    it('decreases stock within a transaction', async () => {
-      const inventory = { ...mockMenuItem, stock: 10 } as MenuItem;
-      const manager = {
-        save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)),
-      };
-      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
-      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
-
-      const result = await service.deductForOrder({
-        tenantId: 'tenant-1',
-        orderId: 'order-1',
-        idempotencyKey: 'idem-1',
-        items: [
-          { menuItemId: 'item-1', quantity: 2 },
-          { menuItemId: 'item-1', quantity: 1 },
-        ],
-      });
-
-      expect(result[0].remainingStock).toBe(7);
-      expect(result[0].status).toBe(MENU_ITEM_STATUS.AVAILABLE);
-      expect(manager.save).toHaveBeenCalled();
-    });
-
-    it('locks each menu item once in deterministic order before deducting stock', async () => {
-      const inventoryA = { ...mockMenuItem, id: 'item-a', stock: 10 } as MenuItem;
-      const inventoryB = { ...mockMenuItem, id: 'item-b', stock: 10 } as MenuItem;
-      const manager = {
-        save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)),
-      };
-      repository.findByIdsForUpdate.mockResolvedValue([inventoryB, inventoryA]);
-      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
-
-      await service.deductForOrder({
-        tenantId: 'tenant-1',
-        orderId: 'order-1',
-        idempotencyKey: 'idem-ordering',
-        items: [
-          { menuItemId: 'item-b', quantity: 1 },
-          { menuItemId: 'item-a', quantity: 2 },
-          { menuItemId: 'item-b', quantity: 3 },
-        ],
-      });
-
-      expect(repository.findByIdsForUpdate).toHaveBeenCalledWith('tenant-1', ['item-a', 'item-b'], manager);
-      expect(manager.save).toHaveBeenNthCalledWith(1, MenuItem, expect.objectContaining({ id: 'item-a', stock: 8 }));
-      expect(manager.save).toHaveBeenNthCalledWith(2, MenuItem, expect.objectContaining({ id: 'item-b', stock: 6 }));
-    });
-
-    it('lets only one concurrent stock=1 deduction succeed when transactions see locked final stock', async () => {
-      const inventory = { ...mockMenuItem, stock: 1 } as MenuItem;
-      const manager = {
-        save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)),
-      };
-      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
-
-      let tail = Promise.resolve();
-      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => {
-        const waitForPrevious = tail;
-        let release!: () => void;
-        tail = new Promise<void>((resolve) => {
-          release = resolve;
-        });
-        await waitForPrevious;
-        try {
-          return await fn(manager);
-        } finally {
-          release();
-        }
-      });
-
-      const attempts = await Promise.allSettled([
-        service.deductForOrder({
-          tenantId: 'tenant-1',
-          orderId: 'order-1',
-          idempotencyKey: 'idem-concurrent-1',
-          items: [{ menuItemId: 'item-1', quantity: 1 }],
-        }),
-        service.deductForOrder({
-          tenantId: 'tenant-1',
-          orderId: 'order-2',
-          idempotencyKey: 'idem-concurrent-2',
-          items: [{ menuItemId: 'item-1', quantity: 1 }],
-        }),
-      ]);
-
-      const fulfilled = attempts.filter((attempt) => attempt.status === 'fulfilled');
-      const rejected = attempts.filter((attempt) => attempt.status === 'rejected');
-      expect(fulfilled).toHaveLength(1);
-      expect(rejected).toHaveLength(1);
-      expect(rejected[0]).toMatchObject({
-        reason: expect.objectContaining({ errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT }),
-      });
-      expect(inventory.stock).toBe(0);
-      expect(manager.save).toHaveBeenCalledTimes(1);
-    });
-
-    it('marks out of stock when stock hits zero', async () => {
-      const inventory = { ...mockMenuItem, stock: 2 } as MenuItem;
-      const manager = { save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)) };
-      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
-      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
-
-      const result = await service.deductForOrder({
-        tenantId: 'tenant-1',
-        orderId: 'order-1',
-        idempotencyKey: 'idem-2',
-        items: [{ menuItemId: 'item-1', quantity: 2 }],
-      });
-
-      expect(result[0].remainingStock).toBe(0);
-      expect(result[0].status).toBe(MENU_ITEM_STATUS.OUT_OF_STOCK);
-    });
-
-    it('throws when insufficient stock', async () => {
-      const inventory = { ...mockMenuItem, stock: 1 } as MenuItem;
-      const manager = { save: jest.fn() };
-      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
-      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
-
-      await expect(
-        service.deductForOrder({
-          tenantId: 'tenant-1',
-          orderId: 'order-1',
-          idempotencyKey: 'idem-3',
-          items: [{ menuItemId: 'item-1', quantity: 5 }],
-        }),
-      ).rejects.toMatchObject({ errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT });
-      expect(manager.save).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('releaseForOrder', () => {
-    it('restores stock and sets available when releasing from zero', async () => {
-      const inventory = { ...mockMenuItem, stock: 0, status: MENU_ITEM_STATUS.OUT_OF_STOCK } as MenuItem;
-      const manager = { save: jest.fn((_ctor: typeof MenuItem, entity: MenuItem) => Promise.resolve(entity)) };
-      repository.findByIdsForUpdate.mockResolvedValue([inventory]);
-      dataSource.transaction.mockImplementation(async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager));
-
-      const result = await service.releaseForOrder({
-        tenantId: 'tenant-1',
-        orderId: 'order-1',
-        idempotencyKey: 'idem-4',
-        items: [{ menuItemId: 'item-1', quantity: 2 }],
-      });
-
-      expect(result[0].remainingStock).toBe(2);
-      expect(result[0].status).toBe(MENU_ITEM_STATUS.AVAILABLE);
     });
   });
 });

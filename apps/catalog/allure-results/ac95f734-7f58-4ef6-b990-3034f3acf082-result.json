@@ -1,0 +1,37 @@
+{
+  "uuid": "ac95f734-7f58-4ef6-b990-3034f3acf082",
+  "name": "should persist station when creating a menu item",
+  "historyId": "c5ce46f89aedc0200520f42ba5c77e1b:d41d8cd98f00b204e9800998ecf8427e",
+  "status": "passed",
+  "statusDetails": {},
+  "stage": "finished",
+  "steps": [],
+  "attachments": [],
+  "parameters": [],
+  "labels": [
+    { "name": "language", "value": "javascript" },
+    { "name": "framework", "value": "jest" },
+    { "name": "package", "value": "@einvoice/source.src.app.modules.menu-item.tests.menu-item.service.spec.ts" },
+    { "name": "_fallbackTestCaseId", "value": "6fa49dcd35a965910e360974db78274b" },
+    { "name": "host", "value": "Macbook-Pro-14.local" },
+    { "name": "thread", "value": "1" },
+    { "name": "parentSuite", "value": "MenuItemService" },
+    { "name": "suite", "value": "create" }
+  ],
+  "links": [],
+  "start": 1781934249268,
+  "fullName": "@einvoice/source:src/app/modules/menu-item/tests/menu-item.service.spec.ts#MenuItemService create should persist station when creating a menu item",
+  "titlePath": [
+    "@einvoice/source",
+    "src",
+    "app",
+    "modules",
+    "menu-item",
+    "tests",
+    "menu-item.service.spec.ts",
+    "MenuItemService",
+    "create"
+  ],
+  "testCaseId": "c5ce46f89aedc0200520f42ba5c77e1b",
+  "stop": 1781934249269
+}

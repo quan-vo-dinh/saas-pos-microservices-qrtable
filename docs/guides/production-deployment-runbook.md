@@ -1,22 +1,21 @@
-# QRTable Production Deployment Runbook
+# Tài liệu Hướng dẫn Triển khai Production của QRTable (QRTable Production Deployment Runbook)
 
-This runbook prepares the first QRTable deployment on the existing `quan-vps` DigitalOcean Droplet.
-It is written for a single operator and the 2 vCPU / 4 GB RAM / 25 GB disk budget profile.
+Tài liệu này chuẩn bị cho đợt triển khai QRTable đầu tiên trên DigitalOcean Droplet `quan-vps` hiện tại.
+Tài liệu được viết cho một kỹ sư vận hành (operator) duy nhất và cấu hình tài nguyên giới hạn ở mức 2 vCPU / 4 GB RAM / 25 GB ổ đĩa.
 
-## Safety Boundary
+## Ranh giới An toàn (Safety Boundary)
 
-This document does not authorize a deployment. The operator must approve the deployment window,
-payment mode, immutable image tag, backup state, firewall, DNS, and production credentials.
+Tài liệu này không tự động cấp quyền triển khai. Kỹ sư vận hành phải phê duyệt thời gian triển khai (deployment window), chế độ thanh toán (payment mode), tag của image bất biến (immutable image tag), trạng thái sao lưu (backup state), tường lửa (firewall), DNS và các thông tin xác thực cho production (production credentials).
 
-Never:
+Tuyệt đối KHÔNG:
 
-- paste production secrets into chat, tickets, screenshots, shell history, or git;
-- build QRTable images on the Droplet;
-- expose application, database, Kafka, Keycloak management, or monitoring ports;
-- use fake SePay credentials to satisfy production validation;
-- restore production data as part of a normal application rollback.
+- Dán các secrets của production vào chat, ticket, ảnh chụp màn hình, lịch sử shell hoặc git;
+- Build các image QRTable trên Droplet;
+- Expose các cổng ứng dụng, database, Kafka, Keycloak management hoặc monitoring;
+- Sử dụng thông tin xác thực SePay giả để vượt qua kiểm tra (production validation);
+- Khôi phục dữ liệu production như một phần của quá trình rollback ứng dụng thông thường.
 
-## Official References
+## Tài liệu Tham chiếu Chính thức (Official References)
 
 - [DigitalOcean recommended Droplet setup](https://docs.digitalocean.com/products/droplets/getting-started/recommended-droplet-setup/)
 - [DigitalOcean Cloud Firewalls](https://docs.digitalocean.com/products/networking/firewalls/)
@@ -30,66 +29,58 @@ Never:
 - [Caddy reverse proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
 - [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 
-Context7 lookups on 2026-06-13 used `/websites/digitalocean`,
-`/websites/porkbun_api_json_v3`, and `/websites/caddyserver`.
+Các tra cứu Context7 vào ngày 13-06-2026 đã sử dụng `/websites/digitalocean`, `/websites/porkbun_api_json_v3` và `/websites/caddyserver`.
 
-## 1. Capacity Decision
+## 1. Quyết định về Dung lượng (Capacity Decision)
 
-Start with the existing 4 GB Droplet. Do not resize preemptively.
+Bắt đầu với Droplet 4 GB hiện tại. Không thay đổi kích thước (resize) trước khi thực sự cần thiết.
 
-Local Phase 7 evidence measured the idle infrastructure and monitoring containers at about 2.4 GiB:
-Kafka used about 721 MiB and Keycloak about 538 MiB before the budget tuning. The production Compose
-profile now caps Kafka at 1 GiB with a 512 MiB heap and Keycloak at 768 MiB with a 384 MiB heap.
+Các đo lường thực tế tại Local Phase 7 cho thấy hạ tầng nhàn rỗi (idle) và các container giám sát (monitoring) chiếm khoảng 2.4 GiB:
+Kafka sử dụng khoảng 721 MiB và Keycloak khoảng 538 MiB trước khi tinh chỉnh ngân sách (budget tuning). Cấu hình production Compose hiện tại giới hạn Kafka ở mức tối đa 1 GiB với heap 512 MiB và Keycloak ở mức 768 MiB với heap 384 MiB.
 
-Required safeguards:
+Các biện pháp bảo vệ bắt buộc:
 
-- configure 2–4 GB swap before starting the full stack;
-- keep at least 8 GiB free before pulling a release;
-- keep Prometheus retention bounded at 2 GB and 15 days;
-- keep Loki and Tempo retention at 7 days;
-- configure Docker JSON log rotation;
-- retain the current and previous good image tags only on the 25 GB host;
-- never build images on the Droplet.
+- Cấu hình swap từ 2–4 GB trước khi khởi chạy toàn bộ stack;
+- Giữ trống ít nhất 8 GiB trước khi pull một bản release;
+- Giới hạn lưu trữ Prometheus tối đa 2 GB và 15 ngày;
+- Giữ thời gian lưu trữ Loki và Tempo ở mức 7 ngày;
+- Cấu hình Docker JSON log rotation;
+- Chỉ lưu giữ các image tag tốt hiện tại và trước đó trên host 25 GB;
+- Tuyệt đối không build image trên Droplet.
 
-Temporarily resize to 8 GB only when representative runtime evidence shows one or more of:
+Chỉ tạm thời tăng kích thước (resize) lên 8 GB khi các bằng chứng thực tế lúc runtime cho thấy một hoặc nhiều dấu hiệu sau:
 
-- repeated kernel OOM kills or container OOM restarts;
-- `MemAvailable` remains below 300 MiB for at least 15 minutes;
-- swap usage exceeds 1 GiB with sustained paging and user-visible latency;
-- Kafka or Keycloak repeatedly reaches its heap cap under expected demo traffic.
+- Kernel liên tục kích hoạt OOM kill hoặc container bị khởi động lại do OOM;
+- `MemAvailable` duy trì dưới mức 300 MiB trong ít nhất 15 minutes;
+- Dung lượng swap sử dụng vượt quá 1 GiB đi kèm với tình trạng paging liên tục và độ trễ có thể thấy rõ từ phía người dùng (user-visible latency);
+- Kafka hoặc Keycloak liên tục đạt giới hạn heap dưới lưu lượng demo dự kiến.
 
-Record the evidence before resizing. Return to 4 GB after the exceptional window if the evidence no
-longer reproduces.
+Ghi lại bằng chứng trước khi resize. Quay lại mức 4 GB sau khi kết thúc giai đoạn đặc biệt nếu các bằng chứng trên không còn xuất hiện.
 
-## 2. Human Go/No-Go
+## 2. Phê duyệt Con người (Human Go/No-Go)
 
-Complete [the human checklist](production-deployment-checklist.md). Stop if any required item is
-unknown.
+Hoàn thành [danh sách kiểm tra con người (human checklist)](production-deployment-checklist.md). Dừng lại nếu bất kỳ mục bắt buộc nào chưa rõ ràng.
 
-Payment mode is a hard gate:
+Chế độ thanh toán (payment mode) là một chốt chặn cứng (hard gate):
 
-- `sepay-live` requires real, approved OAuth, webhook, QR account, and bank values.
-- `cash-demo` requires an explicit tested production startup path that does not require SePay
-  credentials. The current Payment Compose contract still requires SePay OAuth values, so cash-only
-  deployment is blocked until that contract is changed and verified.
+- `sepay-live` yêu cầu các thông số OAuth, webhook, tài khoản QR và ngân hàng thực tế đã được phê duyệt.
+- `cash-demo` yêu cầu một quy trình khởi chạy production rõ ràng đã được kiểm thử mà không cần thông số SePay. Hợp đồng Payment Compose hiện tại vẫn yêu cầu các giá trị SePay OAuth, do đó việc triển khai chỉ dùng tiền mặt (cash-only deployment) bị chặn cho đến khi hợp đồng đó được thay đổi và xác minh.
 
-Do not insert fake provider values.
+Không điền các giá trị giả của provider.
 
-## 3. Backups and Stable Address
+## 3. Sao lưu và Địa chỉ Ổn định (Backups and Stable Address)
 
-In the DigitalOcean control panel:
+Trong bảng điều khiển (control panel) của DigitalOcean:
 
-1. Enable Droplet backups.
-2. Record the backup schedule and retention shown by DigitalOcean.
-3. Create a manual snapshot before risky host-level changes when a clean recovery point is useful.
-4. Assign a Reserved IP in `sgp1` to `quan-vps`, or explicitly approve the Droplet's final public
-   IPv4 when a Reserved IP is not used.
-5. Use the selected stable IPv4 for all DNS records.
+1. Bật tính năng Droplet backups.
+2. Ghi lại lịch trình backup và thời gian lưu trữ (retention) được hiển thị bởi DigitalOcean.
+3. Tạo một snapshot thủ công trước khi thực hiện các thay đổi rủi ro ở cấp độ host để có một điểm khôi phục sạch khi cần.
+4. Gán một Reserved IP ở vùng `sgp1` cho `quan-vps`, hoặc phê duyệt rõ ràng IPv4 công khai cuối cùng của Droplet nếu không sử dụng Reserved IP.
+5. Sử dụng IPv4 ổn định đã chọn cho tất cả các bản ghi DNS.
 
-Provider backup or snapshot recovery is coarse-grained. It does not replace PostgreSQL and MongoDB
-logical backups before schema-changing releases.
+Tính năng backup hoặc khôi phục snapshot của provider chỉ ở mức thô (coarse-grained). Nó không thay thế cho các bản backup logic PostgreSQL và MongoDB trước các bản release có thay đổi schema.
 
-For a later release with existing data, create logical dumps before bootstrap:
+Đối với các bản release sau này có dữ liệu hiện tại, hãy tạo các bản backup logic trước khi bootstrap:
 
 ```bash
 cd /opt/qrtable/current
@@ -111,46 +102,41 @@ sha256sum "/opt/qrtable/backups/postgres-${backup_at}.sql" \
   > "/opt/qrtable/backups/checksums-${backup_at}.sha256"
 ```
 
-Verify both files are non-empty and keep a bounded retention policy. A representative restore into
-disposable containers remains a Task 12 acceptance requirement.
+Xác minh cả hai file đều không trống và duy trì chính sách lưu trữ có giới hạn. Việc khôi phục thử nghiệm vào các container tạm thời vẫn là một yêu cầu nghiệm thu của Task 12.
 
-## 4. Cloud Firewall
+## 4. Tường lửa Đám mây (Cloud Firewall)
 
-Attach one DigitalOcean Cloud Firewall to `quan-vps`.
+Gán một DigitalOcean Cloud Firewall cho `quan-vps`.
 
-Inbound rules:
+Các inbound rules (luật đi vào):
 
-| Protocol | Port | Source                                        |
-| -------- | ---: | --------------------------------------------- |
-| TCP      |   22 | Approved administrator IPv4/IPv6 CIDR only    |
-| TCP      |   80 | All IPv4 and IPv6                             |
-| TCP      |  443 | All IPv4 and IPv6                             |
-| UDP      |  443 | All IPv4 and IPv6 only when HTTP/3 is enabled |
+| Protocol | Port | Source                                          |
+| -------- | ---: | ----------------------------------------------- |
+| TCP      |   22 | Chỉ CIDR IPv4/IPv6 của quản trị viên được duyệt |
+| TCP      |   80 | Tất cả IPv4 và IPv6                             |
+| TCP      |  443 | Tất cả IPv4 và IPv6                             |
+| UDP      |  443 | Tất cả IPv4 và IPv6 chỉ khi bật HTTP/3          |
 
-Do not add inbound rules for `3000`, `3201-3208`, `3300-3308`, `4318`, `5432`, `6379`, `8080`,
-`9000`, `9090`, `9092`, or `27017`.
+Không thêm các inbound rules cho các cổng `3000`, `3201-3208`, `3300-3308`, `4318`, `5432`, `6379`, `8080`, `9000`, `9090`, `9092` hoặc `27017`.
 
-Keep outbound access sufficient for DNS, NTP, Ubuntu packages, the container registry, ACME, and
-external providers. DigitalOcean Cloud Firewalls are stateful, so reply traffic for allowed
-connections is permitted.
+Giữ quyền truy cập outbound (đi ra ngoài) đủ cho DNS, NTP, các package Ubuntu, container registry, ACME và các provider bên ngoài. DigitalOcean Cloud Firewalls là stateful, vì vậy lưu lượng phản hồi cho các kết nối được phép sẽ tự động được chấp nhận.
 
 ## 5. Porkbun DNS
 
-Manage DNS under `vodinhquan.dev`. Porkbun's `Host` or `Name` field is relative to that domain.
-Create these records with TTL `600` during initial deployment:
+Quản lý DNS dưới tên miền `vodinhquan.dev`. Trường `Host` hoặc `Name` của Porkbun sẽ tương đối với domain đó.
+Tạo các bản ghi này với TTL `600` trong suốt quá trình triển khai ban đầu:
 
-| Type | Host / Name       | Answer                             |
-| ---- | ----------------- | ---------------------------------- |
-| A    | `api.qrtable`     | Reserved IP or approved final IPv4 |
-| A    | `app.qrtable`     | Same IPv4                          |
-| A    | `qr.qrtable`      | Same IPv4                          |
-| A    | `auth.qrtable`    | Same IPv4                          |
-| A    | `grafana.qrtable` | Same IPv4                          |
+| Type | Host / Name       | Answer                                     |
+| ---- | ----------------- | ------------------------------------------ |
+| A    | `api.qrtable`     | Reserved IP hoặc IPv4 cuối cùng được duyệt |
+| A    | `app.qrtable`     | Cùng IPv4                                  |
+| A    | `qr.qrtable`      | Cùng IPv4                                  |
+| A    | `auth.qrtable`    | Cùng IPv4                                  |
+| A    | `grafana.qrtable` | Cùng IPv4                                  |
 
-Before saving, remove or resolve conflicting `A`, `AAAA`, `CNAME`, or forwarding records at the same
-five names. Do not create a wildcard unless separately reviewed.
+Trước khi lưu, hãy xóa hoặc giải quyết các bản ghi `A`, `AAAA`, `CNAME` hoặc các bản ghi chuyển tiếp (forwarding records) bị xung đột tại 5 tên này. Không tạo bản ghi wildcard trừ khi được xem xét riêng.
 
-Verify from at least two public resolvers before starting Caddy:
+Xác minh từ ít nhất hai public resolver trước khi khởi chạy Caddy:
 
 ```bash
 for host in api app qr auth grafana; do
@@ -159,11 +145,11 @@ for host in api app qr auth grafana; do
 done
 ```
 
-Every answer must equal the selected stable IPv4.
+Mỗi câu trả lời nhận được phải bằng IPv4 ổn định đã chọn.
 
-## 6. SSH and Deploy User
+## 6. SSH và Deploy User
 
-Use the DigitalOcean console or the initial root SSH key session only for provisioning.
+Chỉ sử dụng DigitalOcean console hoặc session root SSH ban đầu cho mục đích provisioning.
 
 ```bash
 adduser deploy
@@ -175,9 +161,9 @@ chown deploy:deploy /home/deploy/.ssh/authorized_keys
 chmod 0600 /home/deploy/.ssh/authorized_keys
 ```
 
-Open a second terminal and verify `ssh deploy@<stable-ip>` before changing SSH policy.
+Mở một terminal thứ hai và xác minh `ssh deploy@<stable-ip>` trước khi thay đổi policy SSH.
 
-Create `/etc/ssh/sshd_config.d/99-qrtable.conf`:
+Tạo file `/etc/ssh/sshd_config.d/99-qrtable.conf`:
 
 ```text
 PasswordAuthentication no
@@ -185,28 +171,26 @@ KbdInteractiveAuthentication no
 PermitRootLogin no
 ```
 
-Then validate and reload:
+Sau đó kiểm tra cú pháp cấu hình và tải lại dịch vụ:
 
 ```bash
 sshd -t
 systemctl reload ssh
 ```
 
-Keep the verified `deploy` session open until a second fresh login succeeds. Membership in the
-Docker group is root-equivalent; grant it only to the deploy user:
+Giữ session `deploy` đã xác minh mở cho đến khi một lượt đăng nhập mới thứ hai thành công. Quyền thành viên trong group `docker` tương đương với quyền root; chỉ cấp quyền này cho deploy user:
 
 ```bash
 usermod -aG docker deploy
 ```
 
-Log out and back in after changing group membership.
+Đăng xuất và đăng nhập lại sau khi thay đổi thông tin group.
 
-## 7. Docker and Host Preparation
+## 7. Chuẩn bị Docker và Host
 
-Install Docker Engine, Buildx, and the Compose plugin using the current official Ubuntu instructions
-linked above. Do not use an old copied repository setup block.
+Cài đặt Docker Engine, Buildx và plugin Compose bằng hướng dẫn chính thức hiện tại của Ubuntu được liên kết ở trên. Không sử dụng lại đoạn lệnh thiết lập repository cũ được sao chép từ trước.
 
-Verify as `deploy`:
+Xác minh với user `deploy`:
 
 ```bash
 docker version
@@ -215,7 +199,7 @@ docker buildx version
 docker info
 ```
 
-Configure swap once. Use 2 GB initially; use 4 GB when disk headroom permits:
+Cấu hình swap một lần. Ban đầu sử dụng 2 GB; tăng lên 4 GB khi dung lượng ổ đĩa cho phép:
 
 ```bash
 sudo fallocate -l 2G /swapfile
@@ -229,9 +213,9 @@ free -h
 swapon --show
 ```
 
-Do not repeat the `fstab` line when `/swapfile` already exists.
+Không lặp lại dòng `fstab` khi `/swapfile` đã tồn tại.
 
-Configure bounded Docker logs in `/etc/docker/daemon.json` before starting QRTable:
+Cấu hình giới hạn dung lượng log của Docker trong `/etc/docker/daemon.json` trước khi khởi chạy QRTable:
 
 ```json
 {
@@ -243,11 +227,11 @@ Configure bounded Docker logs in `/etc/docker/daemon.json` before starting QRTab
 }
 ```
 
-Validate the JSON, restart Docker during the approved window, and re-run `docker info`.
+Kiểm tra cú pháp JSON, khởi động lại Docker trong thời gian triển khai đã được phê duyệt và chạy lại `docker info`.
 
-## 8. Server Layout
+## 8. Sắp xếp Thư mục trên Server (Server Layout)
 
-Use this layout:
+Sử dụng cấu trúc thư mục sau:
 
 ```text
 /opt/qrtable/
@@ -266,7 +250,7 @@ Use this layout:
     history.log
 ```
 
-The repository checkout lives at `/opt/qrtable/current`. Mutable state stays outside the checkout:
+Thư mục chứa mã nguồn clone từ repository nằm tại `/opt/qrtable/current`. Trạng thái có thể thay đổi (mutable state) nằm ngoài thư mục code này:
 
 ```bash
 sudo install -d -m 0750 -o deploy -g deploy /opt/qrtable
@@ -276,12 +260,11 @@ git checkout <reviewed-git-sha>
 install -d -m 0750 /opt/qrtable/backups /opt/qrtable/releases
 ```
 
-For later releases, fetch and checkout the exact reviewed commit. Do not run a build on the
-Droplet.
+Đối với các bản release sau này, fetch và checkout chính xác commit đã được review. Không chạy build trên Droplet.
 
-## 9. Protected Environment
+## 9. Môi trường Bảo mật (Protected Environment)
 
-Create the file as `deploy`:
+Tạo file dưới quyền user `deploy`:
 
 ```bash
 cd /opt/qrtable/current
@@ -289,7 +272,7 @@ umask 077
 install -m 0600 docker/env/.env.production.example /opt/qrtable/.env.production
 ```
 
-Generate values locally in the protected SSH session and paste only into `.env.production`:
+Tạo các giá trị bảo mật cục bộ trong SSH session và chỉ dán vào `.env.production`:
 
 ```bash
 openssl rand -hex 32
@@ -298,34 +281,32 @@ docker run --rm apache/kafka:4.3.0 /opt/kafka/bin/kafka-storage.sh random-uuid
 docker run --rm -it caddy:2.10.2-alpine caddy hash-password
 ```
 
-Use the 64-hex output for `PAYMENT_SECRETS_ENCRYPTION_KEY`. Single-quote the Caddy bcrypt value so
-its dollar signs remain literal:
+Sử dụng chuỗi 64 ký tự hex cho `PAYMENT_SECRETS_ENCRYPTION_KEY`. Đặt giá trị bcrypt của Caddy trong dấu nháy đơn để các ký tự đô la (`$`) được hiểu là chuỗi thuần túy:
 
 ```dotenv
 GRAFANA_BASIC_AUTH_HASH='$2a$...'
 ```
 
-Set `IMAGE_TAG` to the immutable Git SHA whose `linux/amd64` images were built and pushed off the
-Droplet. Confirm these equality constraints:
+Đặt `IMAGE_TAG` thành Git SHA bất biến có các image `linux/amd64` đã được build và push từ bên ngoài Droplet. Xác nhận các ràng buộc tương đương sau:
 
-- `POSTGRES_PASSWORD` equals `TYPEORM_PASSWORD`;
-- `MANAGEMENT_APP_CLIENT_SECRET` equals `AUTH_KEYCLOAK_SECRET`;
-- all five public URLs use the production hostnames;
-- `CORS_ORIGINS` contains only the Management App and Customer PWA origins;
-- every placeholder is replaced;
-- provider values are real or the deployment is stopped.
+- `POSTGRES_PASSWORD` bằng với `TYPEORM_PASSWORD`;
+- `MANAGEMENT_APP_CLIENT_SECRET` bằng với `AUTH_KEYCLOAK_SECRET`;
+- Cả 5 URL công khai đều sử dụng các tên miền production;
+- `CORS_ORIGINS` chỉ chứa origin của Management App và Customer PWA;
+- Mọi placeholder đều được thay thế;
+- Các giá trị provider phải là thật, nếu không đợt triển khai phải dừng lại.
 
-Verify without printing contents:
+Xác minh quyền truy cập mà không in nội dung file:
 
 ```bash
 stat -c '%a %U:%G %n' /opt/qrtable/.env.production
 ```
 
-Expected mode and owner: `600 deploy:deploy`.
+Quyền (mode) và chủ sở hữu (owner) mong đợi: `600 deploy:deploy`.
 
-## 10. Release Images
+## 10. Image cho Bản Release (Release Images)
 
-Build and push `linux/amd64` images on a trusted workstation or CI runner:
+Build và push các image `linux/amd64` trên máy trạm đáng tin cậy hoặc CI runner:
 
 ```bash
 export IMAGE_TAG="$(git rev-parse HEAD)"
@@ -334,7 +315,7 @@ export PUSH_IMAGES=true
 bash tools/deploy/phase7-build-images.sh
 ```
 
-On the Droplet, authenticate to the registry without placing the token in shell history. Then run:
+Trên Droplet, đăng nhập vào registry mà không lưu token trong lịch sử shell. Sau đó chạy:
 
 ```bash
 cd /opt/qrtable/current
@@ -348,50 +329,49 @@ docker compose --env-file /opt/qrtable/.env.production \
   pull
 ```
 
-Record the selected tag in `releases/current` and the previous good tag in `releases/previous`.
+Ghi lại tag đã chọn vào `releases/current` và tag tốt trước đó vào `releases/previous`.
 
-## 11. Startup Order
+## 11. Thứ tự Khởi động (Startup Order)
 
-Start infrastructure and wait for health:
+Khởi động phần hạ tầng (infrastructure) và đợi trạng thái healthy:
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.infra.yaml up -d --wait --wait-timeout 300
 ```
 
-Start monitoring before applications so startup traces have a destination:
+Khởi động các dịch vụ giám sát (monitoring) trước ứng dụng để các startup trace có nơi nhận dữ liệu:
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.monitoring.yaml up -d --wait --wait-timeout 180
 ```
 
-Run the production bootstrap gate:
+Chạy lệnh bootstrap cho môi trường production:
 
 ```bash
 ENV_FILE=/opt/qrtable/.env.production tools/deploy/phase7-run-production-bootstrap.sh
 ```
 
-This must complete migrations, migration state display, database ownership verification, Kafka
-topic provisioning, and Keycloak bootstrap. It must not create demo users.
+Lệnh này phải hoàn thành các migration, hiển thị trạng thái migration, xác minh quyền sở hữu database, khởi tạo Kafka topic và bootstrap Keycloak. Lệnh này không được tạo người dùng demo (demo users).
 
-Start applications:
+Khởi động ứng dụng:
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.app.yaml up -d --wait --wait-timeout 300
 ```
 
-Start Caddy only after all five DNS names resolve to the stable IPv4:
+Chỉ khởi động Caddy sau khi cả 5 tên miền DNS đã phân giải về IPv4 ổn định:
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.proxy.yaml up -d --wait --wait-timeout 180
 ```
 
-## 12. HTTPS and Health Verification
+## 12. Xác minh HTTPS và Health Check (Health Verification)
 
-Inspect the runtime without printing secrets:
+Kiểm tra trạng thái hệ thống runtime mà không hiển thị các secrets:
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production -f docker-compose.infra.yaml ps
@@ -403,7 +383,7 @@ docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.proxy.yaml logs --tail=100 caddy
 ```
 
-From a machine outside the Droplet:
+Từ một máy khách bên ngoài Droplet:
 
 ```bash
 curl -fsS https://api.qrtable.vodinhquan.dev/api/v1/health/live
@@ -413,8 +393,7 @@ curl -fsSI https://auth.qrtable.vodinhquan.dev/
 curl -sSI https://grafana.qrtable.vodinhquan.dev/ | head -1
 ```
 
-Grafana should return `401` without Caddy basic authentication. Verify authenticated access
-manually without recording the password. Confirm each certificate hostname and expiry:
+Grafana sẽ trả về mã lỗi `401` nếu không có cấu hình Caddy basic authentication. Xác minh quyền truy cập có xác thực một cách thủ công mà không ghi lại mật khẩu. Xác nhận tên miền chứng chỉ (certificate hostname) và ngày hết hạn:
 
 ```bash
 for host in api app qr auth grafana; do
@@ -425,23 +404,21 @@ for host in api app qr auth grafana; do
 done
 ```
 
-Caddy's `/data` and `/config` volumes must remain persistent. TCP 80 and 443 are required for normal
-automatic HTTPS issuance. UDP 443 is optional and enables HTTP/3; HTTPS still works over TCP when it
-is closed. Caddy `reverse_proxy` handles WebSocket upgrades automatically.
+Các volume `/data` và `/config` của Caddy phải được giữ persistent. Cần mở cổng TCP 80 và 443 để cấp chứng chỉ HTTPS tự động bình thường. Cổng UDP 443 là tùy chọn để kích hoạt HTTP/3; HTTPS vẫn hoạt động qua TCP khi cổng này bị đóng. Caddy `reverse_proxy` sẽ tự động xử lý các nâng cấp kết nối WebSocket.
 
-## 13. Rollback
+## 13. Khôi phục Trạng thái trước (Rollback)
 
-Application rollback and data restore are separate.
+Quá trình rollback ứng dụng và khôi phục dữ liệu là hai việc tách biệt.
 
-Before an application rollback:
+Trước khi tiến hành rollback ứng dụng:
 
-1. Record the failing tag and reason.
-2. Confirm the previous image tag still exists.
-3. Confirm the previous application is compatible with the current schema.
-4. Set `IMAGE_TAG` to the previous tag in `.env.production`.
-5. Pull the previous images.
-6. Run the bootstrap compatibility gate.
-7. Recreate the app layer and verify health.
+1. Ghi lại image tag bị lỗi và nguyên nhân.
+2. Xác nhận image tag trước đó vẫn còn tồn tại.
+3. Xác nhận phiên bản ứng dụng trước đó tương thích với schema hiện tại.
+4. Thiết lập `IMAGE_TAG` về tag trước đó trong file `.env.production`.
+5. Pull các image cũ về.
+6. Chạy kiểm tra tính tương thích lúc bootstrap.
+7. Khởi tạo lại ứng dụng và xác minh trạng thái health.
 
 ```bash
 cd /opt/qrtable/current
@@ -455,10 +432,9 @@ docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.app.yaml up -d --force-recreate --wait --wait-timeout 300
 ```
 
-Do not automatically revert migrations or restore databases. A data restore requires a separately
-approved incident procedure and a clearly identified backup timestamp.
+Không tự động revert các migration hoặc restore database. Việc khôi phục dữ liệu (data restore) yêu cầu một quy trình xử lý sự cố riêng biệt đã được phê duyệt và một mốc thời gian backup được xác định rõ ràng.
 
-If Caddy fails after a configuration-only change, restore the previous Caddyfile and run:
+Nếu Caddy gặp lỗi sau khi thay đổi cấu hình, hãy khôi phục lại file Caddyfile trước đó và chạy:
 
 ```bash
 cd /opt/qrtable/current
@@ -468,11 +444,11 @@ docker run --rm \
   caddy:2.10.2-alpine caddy validate --config /etc/caddy/Caddyfile
 ```
 
-Then recreate only the proxy layer.
+Sau đó chỉ khởi tạo lại layer proxy.
 
-## 14. Troubleshooting
+## 14. Xử lý Sự cố (Troubleshooting)
 
-Memory pressure:
+Quá tải bộ nhớ (Memory pressure):
 
 ```bash
 free -h
@@ -482,7 +458,7 @@ docker stats --no-stream
 sudo journalctl -k --since "30 minutes ago" | grep -Ei 'oom|out of memory|killed process'
 ```
 
-Disk pressure:
+Thiếu dung lượng đĩa (Disk pressure):
 
 ```bash
 df -h / /var/lib/docker /opt/qrtable
@@ -490,26 +466,23 @@ docker system df
 du -sh /opt/qrtable/backups /opt/qrtable/current/docker/docker_data/* 2>/dev/null
 ```
 
-Never run `docker system prune --volumes` on production. Remove only dangling build/cache artifacts
-and image tags that are neither current nor the previous rollback target.
+Tuyệt đối không chạy lệnh `docker system prune --volumes` trên môi trường production. Chỉ xóa các build/cache artifact dư thừa và các image tag không phải là bản hiện tại hoặc bản mục tiêu rollback trước đó.
 
-TLS failure:
+Lỗi TLS:
 
-- verify all public DNS answers;
-- verify TCP 80/443 reachability and UDP 443 only when HTTP/3 is expected;
-- inspect Caddy logs;
-- verify system time;
-- preserve the Caddy data volume to avoid unnecessary certificate reissuance.
+- Xác minh tất cả các phân giải public DNS;
+- Xác minh khả năng kết nối tới các cổng TCP 80/443, và cổng UDP 443 chỉ khi cần HTTP/3;
+- Kiểm tra logs của Caddy;
+- Xác minh thời gian hệ thống;
+- Giữ volume dữ liệu của Caddy để tránh việc yêu cầu cấp lại chứng chỉ không cần thiết.
 
-Bootstrap failure:
+Lỗi Bootstrap:
 
-- stop before starting or recreating application services;
-- inspect the `production-bootstrap` logs;
-- fix the specific migration, ownership, Kafka, or Keycloak error;
-- rerun the idempotent bootstrap helper.
+- Dừng lại trước khi khởi chạy hoặc tạo lại các service ứng dụng;
+- Kiểm tra logs của container `production-bootstrap`;
+- Khắc phục lỗi cụ thể liên quan đến migration, quyền sở hữu database, Kafka hoặc Keycloak;
+- Chạy lại script hỗ trợ bootstrap có tính idempotency.
 
-## 15. Stop Point
+## 15. Điểm Dừng (Stop Point)
 
-After preparation, wait for the explicit production deployment session. Do not SSH, change DNS or
-firewall, enter production secrets, pull production images, or start containers from a documentation
-preparation session.
+Sau khi hoàn tất khâu chuẩn bị, hãy đợi phiên làm việc triển khai production chính thức. Không thực hiện kết nối SSH, thay đổi DNS hoặc tường lửa, nhập secrets của production, pull các production images hoặc khởi chạy các container chỉ từ một phiên chuẩn bị tài liệu.

@@ -1,6 +1,10 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { findOwnershipViolations } = require('./verify-service-database-ownership');
+const { EXPECTED_TABLES, findOwnershipViolations } = require('./verify-service-database-ownership');
+
+test('includes Catalog stock reservation state in the ownership contract', () => {
+  assert.ok(EXPECTED_TABLES.catalog.includes('stock_reservations'));
+});
 
 test('accepts an exact service-owned table set', () => {
   assert.deepEqual(

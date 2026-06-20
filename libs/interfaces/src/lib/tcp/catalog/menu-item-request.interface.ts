@@ -72,5 +72,6 @@ export type StockReleaseForOrderTcpRequest = {
   tenantId: string;
   orderId: string;
   idempotencyKey: string;
+  reservationVersion: number | null;
   items: ValidateOrderableItemInput[];
 };

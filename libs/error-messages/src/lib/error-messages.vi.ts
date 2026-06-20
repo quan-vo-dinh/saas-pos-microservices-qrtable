@@ -59,6 +59,7 @@ export const ERROR_MESSAGES_VI: Record<ErrorCode, string> = {
   [ErrorCode.CATALOG_MENU_ITEM_NOT_ORDERABLE]: 'Món không khả dụng để đặt',
   [ErrorCode.CATALOG_STOCK_INSUFFICIENT]: 'Không đủ tồn kho cho món {{menuItemId}}',
   [ErrorCode.CATALOG_STOCK_LOCK_TIMEOUT]: 'Cập nhật tồn kho quá thời gian, vui lòng thử lại',
+  [ErrorCode.CATALOG_STOCK_OPERATION_CONFLICT]: 'Thao tác giữ tồn kho xung đột với yêu cầu đã xử lý',
   [ErrorCode.USER_ALREADY_EXISTS]: 'Tài khoản đã tồn tại',
   [ErrorCode.USER_ID_REQUIRED]: 'Thiếu thông tin người dùng',
   [ErrorCode.USER_NOT_FOUND]: 'Không tìm thấy nhân viên trong cửa hàng này',

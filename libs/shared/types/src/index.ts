@@ -11,6 +11,7 @@ export {
   type MenuItem,
   type CategoryStatus,
   type MenuItemStatus,
+  type StockMutationResult,
 } from './lib/menu.types';
 
 // ─── Table ──────────────────────────────────────────

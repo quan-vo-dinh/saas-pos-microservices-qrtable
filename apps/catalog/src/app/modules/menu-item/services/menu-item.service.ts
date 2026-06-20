@@ -14,20 +14,15 @@ import {
   UpdateMenuItemImageTcpRequest,
   ClearMenuItemImageTcpRequest,
   ValidateOrderableTcpRequest,
-  StockDeductForOrderTcpRequest,
-  StockReleaseForOrderTcpRequest,
-  type ValidateOrderableItemInput,
   type OrderableMenuItemSnapshot,
-  type StockMutationResult,
 } from '@common/interfaces/tcp/catalog';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class MenuItemService {
   constructor(
     private readonly menuItemRepository: MenuItemRepository,
-    private readonly dataSource: DataSource,
     @InjectRepository(Category)
     private readonly categoryRepo: Repository<Category>,
   ) {}
@@ -147,100 +142,5 @@ export class MenuItemService {
         station: item.station,
       };
     });
-  }
-
-  async deductForOrder(data: StockDeductForOrderTcpRequest): Promise<StockMutationResult[]> {
-    const quantities = this.aggregateQuantities(data.items);
-    const sortedIds = [...quantities.keys()].sort();
-    this.ensurePositiveQuantities(quantities);
-
-    return this.dataSource.transaction(async (manager) => {
-      const locked = await this.menuItemRepository.findByIdsForUpdate(data.tenantId, sortedIds, manager);
-      if (locked.length !== sortedIds.length) {
-        throw new BusinessException(ErrorCode.CATALOG_MENU_ITEM_NOT_FOUND, HttpStatus.NOT_FOUND);
-      }
-
-      const byId = new Map(locked.map((row) => [row.id, row]));
-      const results: StockMutationResult[] = [];
-
-      for (const id of sortedIds) {
-        const item = byId.get(id) as MenuItem;
-        const qty = quantities.get(id) as number;
-        if (item.stock < qty) {
-          throw new BusinessException(ErrorCode.CATALOG_STOCK_INSUFFICIENT, HttpStatus.CONFLICT, {
-            menuItemId: id,
-          });
-        }
-
-        item.stock -= qty;
-        item.status = item.stock === 0 ? MENU_ITEM_STATUS.OUT_OF_STOCK : MENU_ITEM_STATUS.AVAILABLE;
-
-        await manager.save(MenuItem, item);
-        results.push({
-          menuItemId: item.id,
-          menuItemName: item.name,
-          requestedQuantity: qty,
-          remainingStock: item.stock,
-          status: item.status,
-        });
-      }
-
-      return results;
-    });
-  }
-
-  async releaseForOrder(data: StockReleaseForOrderTcpRequest): Promise<StockMutationResult[]> {
-    const quantities = this.aggregateQuantities(data.items);
-    const sortedIds = [...quantities.keys()].sort();
-    this.ensurePositiveQuantities(quantities);
-
-    return this.dataSource.transaction(async (manager) => {
-      const locked = await this.menuItemRepository.findByIdsForUpdate(data.tenantId, sortedIds, manager);
-      if (locked.length !== sortedIds.length) {
-        throw new BusinessException(ErrorCode.CATALOG_MENU_ITEM_NOT_FOUND, HttpStatus.NOT_FOUND);
-      }
-
-      const byId = new Map(locked.map((row) => [row.id, row]));
-      const results: StockMutationResult[] = [];
-
-      for (const id of sortedIds) {
-        const item = byId.get(id) as MenuItem;
-        const qty = quantities.get(id) as number;
-
-        item.stock += qty;
-        if (item.stock > 0) {
-          item.status = MENU_ITEM_STATUS.AVAILABLE;
-        }
-
-        await manager.save(MenuItem, item);
-        results.push({
-          menuItemId: item.id,
-          menuItemName: item.name,
-          requestedQuantity: qty,
-          remainingStock: item.stock,
-          status: item.status,
-        });
-      }
-
-      return results;
-    });
-  }
-
-  private aggregateQuantities(items: ValidateOrderableItemInput[]): Map<string, number> {
-    const quantities = new Map<string, number>();
-    for (const line of items) {
-      quantities.set(line.menuItemId, (quantities.get(line.menuItemId) ?? 0) + line.quantity);
-    }
-    return quantities;
-  }
-
-  private ensurePositiveQuantities(quantities: Map<string, number>): void {
-    for (const [menuItemId, qty] of quantities) {
-      if (!Number.isFinite(qty) || qty < 1) {
-        throw new BusinessException(ErrorCode.COMMON_VALIDATION_FAILED, HttpStatus.BAD_REQUEST, {
-          menuItemId,
-        });
-      }
-    }
   }
 }

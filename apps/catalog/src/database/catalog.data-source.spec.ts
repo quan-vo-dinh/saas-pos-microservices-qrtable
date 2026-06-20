@@ -14,6 +14,6 @@ describe('Catalog migration DataSource', () => {
 
     expect(dataSource.options.database).toBe('qrtable_catalog_test');
     expect(dataSource.options.synchronize).toBe(false);
-    expect(entityNames).toEqual(['Area', 'Category', 'MenuItem', 'Table']);
+    expect(entityNames).toEqual(['Area', 'Category', 'MenuItem', 'StockReservation', 'Table']);
   });
 });

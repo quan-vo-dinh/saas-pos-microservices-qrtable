@@ -3,6 +3,8 @@ import { OrderItem } from '@common/entities/order-item.entity';
 import { Order } from '@common/entities/order.entity';
 import { OutboxEvent } from '@common/entities/outbox-event.entity';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
+import { MENU_ITEM_STATUS } from '@common/constants/enum/catalog.enum';
+import type { StockMutationOperationResult } from '@common/interfaces/tcp/catalog/menu-item-response.interface';
 import { BillStatus, OrderItemStatus, OrderStatus } from '@einvoice/types';
 import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
@@ -12,6 +14,34 @@ import { OrderItemRepository } from '../repositories/order-item.repository';
 import { OrderRepository } from '../repositories/order.repository';
 import { CatalogStockGatewayService } from '../services/catalog-stock-gateway.service';
 import { OrderConfirmSagaService } from '../services/order-confirm-saga.service';
+
+const APPLIED_DEDUCT: StockMutationOperationResult = {
+  reservationVersion: 1,
+  outcome: 'APPLIED',
+  items: [
+    {
+      menuItemId: 'm1',
+      menuItemName: 'X',
+      requestedQuantity: 2,
+      remainingStock: 0,
+      status: MENU_ITEM_STATUS.OUT_OF_STOCK,
+    },
+  ],
+};
+
+const APPLIED_RELEASE: StockMutationOperationResult = {
+  reservationVersion: 1,
+  outcome: 'APPLIED',
+  items: [
+    {
+      menuItemId: 'm1',
+      menuItemName: 'X',
+      requestedQuantity: 2,
+      remainingStock: 2,
+      status: MENU_ITEM_STATUS.AVAILABLE,
+    },
+  ],
+};
 
 describe('OrderConfirmSagaService', () => {
   let service: OrderConfirmSagaService;
@@ -40,7 +70,7 @@ describe('OrderConfirmSagaService', () => {
     );
   });
 
-  it('confirms a pending order by deducting stock, moving rows to processing, and recording order.confirmed outbox', async () => {
+  it('confirms a pending order by deducting stock, persisting reservationVersion, and recording order.confirmed outbox', async () => {
     const now = new Date('2026-05-02T08:00:00.000Z');
     const pendingOrder = buildOrder({ createdAt: now, updatedAt: now });
     const item = buildOrderItem({ createdAt: now, updatedAt: now });
@@ -49,9 +79,7 @@ describe('OrderConfirmSagaService', () => {
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([item]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(now));
-    catalogStockGateway.deductForOrder.mockResolvedValue([
-      { menuItemId: 'm1', menuItemName: 'X', requestedQuantity: 2, remainingStock: 0 },
-    ]);
+    catalogStockGateway.deductForOrder.mockResolvedValue(APPLIED_DEDUCT);
 
     const manager = {
       findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
@@ -84,7 +112,11 @@ describe('OrderConfirmSagaService', () => {
       expect.arrayContaining([
         expect.objectContaining({
           ctor: Order,
-          row: expect.objectContaining({ status: OrderStatus.PROCESSING, confirmedByUserId: 'staff-1' }),
+          row: expect.objectContaining({
+            status: OrderStatus.PROCESSING,
+            confirmedByUserId: 'staff-1',
+            stockReservationVersion: 1,
+          }),
         }),
         expect.objectContaining({
           ctor: OrderItem,
@@ -114,6 +146,7 @@ describe('OrderConfirmSagaService', () => {
       status: OrderStatus.PROCESSING,
       confirmedAt: now,
       confirmedByUserId: 'staff-1',
+      stockReservationVersion: 1,
       createdAt: now,
       updatedAt: now,
     });
@@ -166,19 +199,65 @@ describe('OrderConfirmSagaService', () => {
     expect(catalogStockGateway.releaseForOrder).not.toHaveBeenCalled();
   });
 
-  it('releases stock when the Order transaction fails after Catalog deduct succeeds', async () => {
+  it('does not compensate an ambiguous transport failure before Catalog acknowledges a reservation', async () => {
+    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildOrder());
+    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
+    billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date()));
+    const transportError = new Error('Catalog TCP response timed out');
+    catalogStockGateway.deductForOrder.mockRejectedValue(transportError);
+
+    const manager = {
+      findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
+      save: jest.fn(),
+      create: jest.fn(),
+    };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    await expect(service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' })).rejects.toBe(
+      transportError,
+    );
+    expect(catalogStockGateway.releaseForOrder).not.toHaveBeenCalled();
+  });
+
+  it('persists the returned version when Catalog replays an active reservation', async () => {
+    const pendingOrder = buildOrder();
+    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
+    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
+    billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date()));
+    catalogStockGateway.deductForOrder.mockResolvedValue({
+      ...APPLIED_DEDUCT,
+      reservationVersion: 2,
+      outcome: 'REPLAYED',
+    });
+
+    const manager = {
+      findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
+      create: jest.fn((_ctor: unknown, payload: Record<string, unknown>) => payload),
+      save: jest.fn((_ctor: unknown, row: unknown) => Promise.resolve(row)),
+    };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+
+    const result = await service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' });
+
+    expect(result.order.status).toBe(OrderStatus.PROCESSING);
+    expect(pendingOrder.stockReservationVersion).toBe(2);
+    expect(catalogStockGateway.releaseForOrder).not.toHaveBeenCalled();
+  });
+
+  it('releases stock with correct version when the Order transaction fails after Catalog deduct succeeds', async () => {
     const pendingOrder = buildOrder();
     const orderCommitError = new Error('Order DB failed after stock deduct');
+    let isTransactionCallbackActive = false;
+    let compensatedWhileTransactionCallbackActive = false;
 
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date()));
-    catalogStockGateway.deductForOrder.mockResolvedValue([
-      { menuItemId: 'm1', menuItemName: 'X', requestedQuantity: 2, remainingStock: 0 },
-    ]);
-    catalogStockGateway.releaseForOrder.mockResolvedValue([
-      { menuItemId: 'm1', menuItemName: 'X', requestedQuantity: 2, remainingStock: 2 },
-    ]);
+    catalogStockGateway.deductForOrder.mockResolvedValue(APPLIED_DEDUCT);
+    catalogStockGateway.releaseForOrder.mockImplementation(() => {
+      compensatedWhileTransactionCallbackActive = isTransactionCallbackActive;
+      return Promise.resolve(APPLIED_RELEASE);
+    });
 
     const manager = {
       findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
@@ -190,7 +269,14 @@ describe('OrderConfirmSagaService', () => {
         return Promise.resolve(row);
       }),
     };
-    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => {
+      isTransactionCallbackActive = true;
+      try {
+        return await cb(manager);
+      } finally {
+        isTransactionCallbackActive = false;
+      }
+    });
 
     await expect(service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' })).rejects.toBe(
       orderCommitError,
@@ -199,9 +285,11 @@ describe('OrderConfirmSagaService', () => {
     expect(catalogStockGateway.releaseForOrder).toHaveBeenCalledWith({
       tenantId: 't1',
       orderId: 'o1',
-      idempotencyKey: 'confirm-order-compensation:o1',
+      idempotencyKey: 'confirm-order-compensation:o1:1',
+      reservationVersion: 1,
       items: [{ menuItemId: 'm1', quantity: 2 }],
     });
+    expect(compensatedWhileTransactionCallbackActive).toBe(true);
   });
 
   it('logs compensation failure and still propagates the original Order error', async () => {
@@ -213,9 +301,7 @@ describe('OrderConfirmSagaService', () => {
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date()));
-    catalogStockGateway.deductForOrder.mockResolvedValue([
-      { menuItemId: 'm1', menuItemName: 'X', requestedQuantity: 2, remainingStock: 0 },
-    ]);
+    catalogStockGateway.deductForOrder.mockResolvedValue(APPLIED_DEDUCT);
     catalogStockGateway.releaseForOrder.mockRejectedValue(compensationError);
 
     const manager = {
@@ -235,12 +321,37 @@ describe('OrderConfirmSagaService', () => {
     );
 
     expect(catalogStockGateway.releaseForOrder).toHaveBeenCalled();
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Order confirm compensation failed'),
-      expect.any(String),
-    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('reservationVersion=1'), expect.any(String));
 
     logSpy.mockRestore();
+  });
+
+  it('compensates when the Order transaction rejects during commit', async () => {
+    const commitError = new Error('Order transaction commit failed');
+    orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildOrder());
+    orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
+    billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date()));
+    catalogStockGateway.deductForOrder.mockResolvedValue(APPLIED_DEDUCT);
+    catalogStockGateway.releaseForOrder.mockResolvedValue(APPLIED_RELEASE);
+
+    const manager = {
+      findOne: jest.fn().mockResolvedValue({ id: 's1', tenantId: 't1', currentBillId: 'b1' }),
+      create: jest.fn((_ctor: unknown, payload: Record<string, unknown>) => payload),
+      save: jest.fn((_ctor: unknown, row: unknown) => Promise.resolve(row)),
+    };
+    dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => {
+      await cb(manager);
+      throw commitError;
+    });
+
+    await expect(service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' })).rejects.toBe(commitError);
+    expect(catalogStockGateway.releaseForOrder).toHaveBeenCalledWith({
+      tenantId: 't1',
+      orderId: 'o1',
+      idempotencyKey: 'confirm-order-compensation:o1:1',
+      reservationVersion: 1,
+      items: [{ menuItemId: 'm1', quantity: 2 }],
+    });
   });
 });
 
@@ -261,6 +372,7 @@ function buildOrder(overrides: Partial<Order> = {}): Order {
     cancelledAt: null,
     cancelledByUserId: null,
     cancelReason: null,
+    stockReservationVersion: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

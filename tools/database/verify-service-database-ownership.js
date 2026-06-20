@@ -2,7 +2,7 @@ const { Client } = require('pg');
 const { buildPostgresServiceConfigs } = require('../dev-seed/postgres/database-config');
 
 const EXPECTED_TABLES = {
-  catalog: ['areas', 'categories', 'menu_items', 'tables', 'typeorm_migrations'],
+  catalog: ['areas', 'categories', 'menu_items', 'stock_reservations', 'tables', 'typeorm_migrations'],
   order: ['bills', 'order_items', 'orders', 'outbox_events', 'service_requests', 'sessions', 'typeorm_migrations'],
   payment: ['audit_payments', 'outbox_events', 'payments', 'tenant_payment_settings', 'typeorm_migrations'],
   saas: ['outbox_events', 'pricing_plans', 'subscription_invoices', 'subscriptions', 'tenants', 'typeorm_migrations'],

@@ -37,6 +37,7 @@ const TCP_TIMEOUT_MS = 1000;
 
 type Harness = {
   dataSource: DataSource;
+  catalogDataSource: DataSource;
   redis: Redis;
   catalogClient: ClientProxy;
   orderService: OrderService;
@@ -73,6 +74,9 @@ maybeDescribe('Phase 5 P0-ORD-SESSION-JOIN external-stack integration', () => {
     if (harness?.dataSource.isInitialized) {
       await harness.dataSource.destroy();
     }
+    if (harness?.catalogDataSource.isInitialized) {
+      await harness.catalogDataSource.destroy();
+    }
   });
 
   it('validates Catalog QR for an available table, creates an active Order session, caches it in Redis, and marks the table occupied', async () => {
@@ -105,10 +109,12 @@ maybeDescribe('Phase 5 P0-ORD-SESSION-JOIN external-stack integration', () => {
       tableId: seed.tableId,
       status: SessionStatus.ACTIVE,
     });
-    await expect(h.dataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject({
-      status: TABLE_STATUS.OCCUPIED,
-      sessionId: session.id,
-    });
+    await expect(h.catalogDataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject(
+      {
+        status: TABLE_STATUS.OCCUPIED,
+        sessionId: session.id,
+      },
+    );
   });
 
   it('rejoins an occupied table only when Catalog points at an active Order session and refreshes session activity', async () => {
@@ -117,7 +123,7 @@ maybeDescribe('Phase 5 P0-ORD-SESSION-JOIN external-stack integration', () => {
     const seed = await seedCatalogTable(h, `${TENANT_PREFIX}-occupied-${randomUUID()}`, TABLE_STATUS.OCCUPIED);
     currentTenantId = seed.tenantId;
     const activeSession = await seedActiveSession(h, seed);
-    await h.dataSource
+    await h.catalogDataSource
       .getRepository(Table)
       .update({ id: seed.tableId, tenantId: seed.tenantId }, { sessionId: activeSession.id });
     const oldActivity = new Date(Date.now() - 60_000);
@@ -144,10 +150,12 @@ maybeDescribe('Phase 5 P0-ORD-SESSION-JOIN external-stack integration', () => {
     expect(pgSession.lastActivity.getTime()).toBeGreaterThan(oldActivity.getTime());
     const cached = await h.redis.hgetall(`session:${seed.tenantId}:${activeSession.id}`);
     expect(new Date(cached['lastActivity']).getTime()).toBeGreaterThan(oldActivity.getTime());
-    await expect(h.dataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject({
-      status: TABLE_STATUS.OCCUPIED,
-      sessionId: activeSession.id,
-    });
+    await expect(h.catalogDataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject(
+      {
+        status: TABLE_STATUS.OCCUPIED,
+        sessionId: activeSession.id,
+      },
+    );
   });
 
   it.each([
@@ -216,6 +224,7 @@ async function ensureExternalStackReady(): Promise<ReadinessResult> {
 
 async function createHarness(): Promise<Harness> {
   const dataSource = await createDataSource();
+  const catalogDataSource = await createCatalogDataSource();
   const redis = createRedis();
   const redisClient = { getClient: () => redis } as unknown as RedisClientService;
   const catalogClient = ClientProxyFactory.create({
@@ -271,17 +280,22 @@ async function createHarness(): Promise<Harness> {
     orderStateTransitionService,
   );
 
-  return { dataSource, redis, catalogClient, orderService };
+  return { dataSource, catalogDataSource, redis, catalogClient, orderService };
 }
 
 function createDataSource(): Promise<DataSource> {
   return createPostgresDataSource(process.env['ORDER_TYPEORM_DATABASE'] ?? 'qrtable_order', [
-    Area,
-    Table,
     Session,
     Order,
     OrderItem,
     Bill,
+  ]).initialize();
+}
+
+function createCatalogDataSource(): Promise<DataSource> {
+  return createPostgresDataSource(process.env['CATALOG_TYPEORM_DATABASE'] ?? 'qrtable_catalog', [
+    Area,
+    Table,
   ]).initialize();
 }
 
@@ -336,15 +350,15 @@ function createSaasClient(): TcpClient {
 
 async function seedCatalogTable(harness: Harness, tenantId: string, status: TABLE_STATUS): Promise<SeedTable> {
   await cleanupTenant(harness, tenantId);
-  const area = await harness.dataSource.getRepository(Area).save(
-    harness.dataSource.getRepository(Area).create({
+  const area = await harness.catalogDataSource.getRepository(Area).save(
+    harness.catalogDataSource.getRepository(Area).create({
       tenantId,
       name: `Phase 5 Join Area ${randomUUID()}`,
       sortOrder: 0,
     }),
   );
-  const table = await harness.dataSource.getRepository(Table).save(
-    harness.dataSource.getRepository(Table).create({
+  const table = await harness.catalogDataSource.getRepository(Table).save(
+    harness.catalogDataSource.getRepository(Table).create({
       tenantId,
       areaId: area.id,
       name: `Phase 5 Join Table ${randomUUID()}`,
@@ -381,8 +395,8 @@ async function cleanupTenant(harness: Harness, tenantId: string): Promise<void> 
   await harness.dataSource.getRepository(Order).delete({ tenantId });
   await harness.dataSource.getRepository(Bill).delete({ tenantId });
   await harness.dataSource.getRepository(Session).delete({ tenantId });
-  await harness.dataSource.getRepository(Table).delete({ tenantId });
-  await harness.dataSource.getRepository(Area).delete({ tenantId });
+  await harness.catalogDataSource.getRepository(Table).delete({ tenantId });
+  await harness.catalogDataSource.getRepository(Area).delete({ tenantId });
   for (const session of sessions) {
     await harness.redis.del(`cart:${tenantId}:${session.id}`);
     await harness.redis.del(`session:${tenantId}:${session.id}`);

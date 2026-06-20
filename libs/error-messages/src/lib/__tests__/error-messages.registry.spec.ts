@@ -51,4 +51,13 @@ describe('getErrorMessage', () => {
       'SePay access token is not configured',
     );
   });
+
+  it('should expose CATALOG_STOCK_OPERATION_CONFLICT in both locales', () => {
+    expect(getErrorMessage(ErrorCode.CATALOG_STOCK_OPERATION_CONFLICT, 'en')).toBe(
+      'Stock reservation conflicts with an existing operation',
+    );
+    expect(getErrorMessage(ErrorCode.CATALOG_STOCK_OPERATION_CONFLICT, 'vi')).toBe(
+      'Thao tác giữ tồn kho xung đột với yêu cầu đã xử lý',
+    );
+  });
 });

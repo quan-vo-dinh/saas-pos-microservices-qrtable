@@ -8,6 +8,7 @@ import { OrderItem } from '@common/entities/order-item.entity';
 import { Order } from '@common/entities/order.entity';
 import { OutboxEvent } from '@common/entities/outbox-event.entity';
 import { Session } from '@common/entities/session.entity';
+import { StockReservation } from '@common/entities/stock-reservation.entity';
 import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { Request } from '@common/interfaces/tcp/common/request.interface';
 import type { ResponseType } from '@common/interfaces/tcp/common/response.interface';
@@ -183,7 +184,7 @@ function createCatalogDataSource(): Promise<DataSource> {
     password: process.env['TYPEORM_PASSWORD'] ?? 'postgres',
     database: process.env['CATALOG_TYPEORM_DATABASE'] ?? 'qrtable_catalog',
     synchronize: false,
-    entities: [Category, MenuItem],
+    entities: [Category, MenuItem, StockReservation],
   });
   return source.initialize();
 }
@@ -249,6 +250,7 @@ async function seedStockRace(
       cancelledAt: null,
       cancelledByUserId: null,
       cancelReason: null,
+      stockReservationVersion: null,
     }),
     orderDataSource.getRepository(Order).create({
       tenantId,
@@ -264,6 +266,7 @@ async function seedStockRace(
       cancelledAt: null,
       cancelledByUserId: null,
       cancelReason: null,
+      stockReservationVersion: null,
     }),
   ]);
 
@@ -331,6 +334,7 @@ async function cleanupTenant(
   await orderDataSource.getRepository(Order).delete({ tenantId });
   await orderDataSource.getRepository(Bill).delete({ tenantId });
   await orderDataSource.getRepository(Session).delete({ tenantId });
+  await catalogDataSource.getRepository(StockReservation).delete({ tenantId });
   await catalogDataSource.getRepository(MenuItem).delete({ tenantId });
   await catalogDataSource.getRepository(Category).delete({ tenantId });
 }

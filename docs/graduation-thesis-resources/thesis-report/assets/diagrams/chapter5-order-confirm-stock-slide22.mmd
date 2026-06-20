@@ -1,0 +1,36 @@
+%% Compact teaching diagram for defense Slide 22. Detailed failure and database boundaries remain in chapter5-order-confirm-stock.mmd.
+%%{init: {"theme": "base", "sequence": {"showSequenceNumbers": true, "actorMargin": 180, "messageMargin": 36, "mirrorActors": false}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "actorBkg": "#f0fdf4", "actorBorderColor": "#16a34a", "actorBorder": "#16a34a", "noteBkgColor": "#fff7ed", "noteBorderColor": "#ea580c", "lineColor": "#475569"}}}%%
+sequenceDiagram
+  autonumber
+  actor Staff as Staff<br/>POS
+  participant BFF as BFF<br/>auth guards
+  participant Order as Order<br/>orchestrator
+  participant Catalog as Catalog<br/>stock owner
+  participant Event as Outbox / Kafka / Kitchen
+
+  Staff->>BFF: Confirm pending order
+  BFF->>BFF: Verify JWT, tenant, permission
+  BFF->>Order: Verified confirm command
+  Order->>Order: Lock and validate order in tenant scope
+
+  alt Order already PROCESSING
+    Order-->>BFF: Return current state
+    BFF-->>Staff: Confirmation already applied
+  else Order is PENDING and bill is OPEN
+    Order->>Catalog: Deduct stock<br/>key + immutable payload
+    Catalog->>Catalog: Transaction: lock reservation and stock rows
+    alt New or previously released reservation
+      Catalog->>Catalog: Deduct stock + persist RESERVED version
+      Catalog-->>Order: APPLIED + reservationVersion
+    else Active reservation with the same key and payload
+      Catalog->>Catalog: Read stored result, no stock mutation
+      Catalog-->>Order: REPLAYED + reservationVersion
+    end
+    Order->>Order: Transaction: PROCESSING + version + outbox
+    Order-->>BFF: Confirmation success
+    BFF-->>Staff: Confirmation success
+    Order-->>Event: Relay committed order.confirmed
+    Event->>Event: Kitchen creates KDS ticket
+  end
+
+  Note over Order,Catalog: Lost response: retry the same key and payload to receive REPLAYED<br/>Order commit failure after APPLIED: compensate the matching reservationVersion (Slide 23)

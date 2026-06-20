@@ -184,17 +184,17 @@
 
 ---
 
-### `P0-ORD-STATE-STOCK` — `partial` (P0, money)
+### `P0-ORD-STATE-STOCK` — `covered` (P0, money)
 
-**Requirement:** Staff confirm is orchestrated by `OrderConfirmSagaService`: lock/validate order and bill, deduct stock through Catalog TCP, commit Order rows plus `order.confirmed` outbox, replay already-`PROCESSING` orders, and release stock if Order commit/outbox fails after Catalog deduct succeeds.
+**Requirement:** Staff confirm is orchestrated by `OrderConfirmSagaService`: lock/validate order and bill, ensure a durable versioned Catalog stock reservation, commit Order rows plus the returned version and `order.confirmed` outbox, replay already-`PROCESSING` orders, and release the matching reservation version if Order commit/outbox fails after Catalog acknowledges deduct.
 
 **Sources:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); `phase-2a-order-kafka` accepted decisions; `phase-4a-saga-hardening`; `phase-5-p0-order-stock-confirmation-spec`.
 
-**Tests:** `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`; `apps/order/src/app/modules/order/tests/catalog-stock-gateway.service.spec.ts`; Order service delegate spec; Catalog menu-item service spec; Catalog menu-item repository spec; order-confirmed payload spec in Order app; opt-in external-stack spec `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts`.
+**Tests:** `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`; `apps/order/src/app/modules/order/tests/catalog-stock-gateway.service.spec.ts`; `apps/catalog/src/app/modules/menu-item/tests/stock-reservation.service.spec.ts`; Order service delegate spec; Catalog menu-item repository spec; order-confirmed payload spec; opt-in external-stack specs `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts` and `order-stock-concurrency.integration.spec.ts`.
 
 **Target layer:** integration. **Stack:** PostgreSQL, Catalog TCP, Kafka or outbox harness.
 
-**Notes:** Unit-contract coverage proves Saga orchestration, stock deduct/release command shape, `PROCESSING` transition, outbox persistence, replay no-rededuct, no compensation before successful deduct, and compensation logging while preserving the original error. Step 5.3A-1 external-stack coverage passed with PostgreSQL plus live Order and Catalog TCP using `RUN_PHASE5_STOCK_INTEGRATION=1 pnpm nx test order --testPathPatterns=order-stock-concurrency.integration.spec.ts --runInBand`; Order preserves live TCP business error payloads such as `CATALOG_STOCK_INSUFFICIENT`. Thesis evidence strategy is captured in `docs/testing/phase-5/saga-validation-strategy.md`: use unit/contract tests for the deterministic compensation proof, opt-in stock integration for the real Order-Catalog boundary, and UI/DB/log artifacts for the visible demo. This remains `partial` because a focused integration test for Order commit/outbox failure after live Catalog deduct still needs a deterministic live fault-injection harness.
+**Notes:** Unit-contract coverage proves Saga orchestration, versioned deduct/release contracts, Order version/outbox persistence, replay, timeout handling, compensation timing, and original-error preservation. On 2026-06-20, the opt-in PostgreSQL plus Catalog TCP slice passed duplicate deduct, discarded successful response followed by retry, compensation/reconfirm to version 2, and stale version-1 release; the existing live Order/Catalog contention slice also passed one success, one `CATALOG_STOCK_INSUFFICIENT`, final stock zero, and one outbox. Recovery from a discarded response requires retrying the original confirm; no autonomous recovery worker or exactly-once delivery is claimed. The thesis evidence strategy is captured in `docs/testing/phase-5/saga-validation-strategy.md`.
 
 ---
 

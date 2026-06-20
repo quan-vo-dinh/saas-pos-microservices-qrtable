@@ -15,16 +15,20 @@ import {
   StockDeductForOrderTcpRequest,
   StockReleaseForOrderTcpRequest,
   type OrderableMenuItemSnapshot,
-  type StockMutationResult,
+  type StockMutationOperationResult,
 } from '@common/interfaces/tcp/catalog';
 import { Controller, UseInterceptors } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
 import { MenuItemService } from '../services/menu-item.service';
+import { StockReservationService } from '../services/stock-reservation.service';
 
 @UseInterceptors(TcpLoggingInterceptor)
 @Controller()
 export class MenuItemController {
-  constructor(private readonly menuItemService: MenuItemService) {}
+  constructor(
+    private readonly menuItemService: MenuItemService,
+    private readonly stockReservationService: StockReservationService,
+  ) {}
 
   @MessagePattern(TCP_REQUEST_MESSAGE.MENU_ITEM.CREATE)
   async create(@RequestParams() body: CreateMenuItemTcpRequest): Promise<Response<MenuItemTcpResponse>> {
@@ -77,16 +81,18 @@ export class MenuItemController {
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_DEDUCT_FOR_ORDER)
-  async deductForOrder(@RequestParams() body: StockDeductForOrderTcpRequest): Promise<Response<StockMutationResult[]>> {
-    const result = await this.menuItemService.deductForOrder(body);
-    return Response.success<StockMutationResult[]>(result);
+  async deductForOrder(
+    @RequestParams() body: StockDeductForOrderTcpRequest,
+  ): Promise<Response<StockMutationOperationResult>> {
+    const result = await this.stockReservationService.deductForOrder(body);
+    return Response.success<StockMutationOperationResult>(result);
   }
 
   @MessagePattern(TCP_REQUEST_MESSAGE.MENU_ITEM.STOCK_RELEASE_FOR_ORDER)
   async releaseForOrder(
     @RequestParams() body: StockReleaseForOrderTcpRequest,
-  ): Promise<Response<StockMutationResult[]>> {
-    const result = await this.menuItemService.releaseForOrder(body);
-    return Response.success<StockMutationResult[]>(result);
+  ): Promise<Response<StockMutationOperationResult>> {
+    const result = await this.stockReservationService.releaseForOrder(body);
+    return Response.success<StockMutationOperationResult>(result);
   }
 }

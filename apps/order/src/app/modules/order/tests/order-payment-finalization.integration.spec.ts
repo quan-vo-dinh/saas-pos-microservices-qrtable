@@ -28,6 +28,7 @@ const TCP_TIMEOUT_MS = 1000;
 
 type Harness = {
   dataSource: DataSource;
+  catalogDataSource: DataSource;
   redis: Redis;
   catalogClient: ClientProxy;
   billService: BillService;
@@ -63,6 +64,9 @@ maybeDescribe('Phase 5 P0-ORD-PAYMENT-FINALIZATION external-stack integration', 
     await harness?.redis.quit();
     if (harness?.dataSource.isInitialized) {
       await harness.dataSource.destroy();
+    }
+    if (harness?.catalogDataSource.isInitialized) {
+      await harness.catalogDataSource.destroy();
     }
   });
 
@@ -162,6 +166,7 @@ async function ensureExternalStackReady(): Promise<ReadinessResult> {
 
 async function createHarness(): Promise<Harness> {
   const dataSource = await createDataSource();
+  const catalogDataSource = await createCatalogDataSource();
   const redis = createRedis();
   const redisClient = { getClient: () => redis } as unknown as RedisClientService;
   const catalogClient = ClientProxyFactory.create({
@@ -184,17 +189,22 @@ async function createHarness(): Promise<Harness> {
     catalogClient as unknown as TcpClient,
   );
 
-  return { dataSource, redis, catalogClient, billService };
+  return { dataSource, catalogDataSource, redis, catalogClient, billService };
 }
 
 function createDataSource(): Promise<DataSource> {
   return createPostgresDataSource(process.env['ORDER_TYPEORM_DATABASE'] ?? 'qrtable_order', [
-    Area,
-    Table,
     Session,
     Order,
     Bill,
     ServiceRequest,
+  ]).initialize();
+}
+
+function createCatalogDataSource(): Promise<DataSource> {
+  return createPostgresDataSource(process.env['CATALOG_TYPEORM_DATABASE'] ?? 'qrtable_catalog', [
+    Area,
+    Table,
   ]).initialize();
 }
 
@@ -222,15 +232,15 @@ function createRedis(): Redis {
 async function seedBillForPayment(harness: Harness, tenantId: string, status: BillStatus): Promise<SeedRows> {
   await cleanupTenant(harness, tenantId);
   const paymentId = randomUUID();
-  const area = await harness.dataSource.getRepository(Area).save(
-    harness.dataSource.getRepository(Area).create({
+  const area = await harness.catalogDataSource.getRepository(Area).save(
+    harness.catalogDataSource.getRepository(Area).create({
       tenantId,
       name: `Phase 5 Pay Area ${randomUUID()}`,
       sortOrder: 0,
     }),
   );
-  const table = await harness.dataSource.getRepository(Table).save(
-    harness.dataSource.getRepository(Table).create({
+  const table = await harness.catalogDataSource.getRepository(Table).save(
+    harness.catalogDataSource.getRepository(Table).create({
       tenantId,
       areaId: area.id,
       name: `Phase 5 Pay Table ${randomUUID()}`,
@@ -256,7 +266,7 @@ async function seedBillForPayment(harness: Harness, tenantId: string, status: Bi
     }),
   );
   table.sessionId = session.id;
-  await harness.dataSource.getRepository(Table).save(table);
+  await harness.catalogDataSource.getRepository(Table).save(table);
   const bill = await harness.dataSource.getRepository(Bill).save(
     harness.dataSource.getRepository(Bill).create({
       tenantId,
@@ -322,7 +332,9 @@ async function expectFinalized(harness: Harness, seed: SeedRows): Promise<void> 
   });
   await expect(harness.redis.exists(`session:${seed.tenantId}:${seed.sessionId}`)).resolves.toBe(0);
   await expect(harness.redis.exists(`cart:${seed.tenantId}:${seed.sessionId}`)).resolves.toBe(0);
-  await expect(harness.dataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId })).resolves.toMatchObject({
+  await expect(
+    harness.catalogDataSource.getRepository(Table).findOneByOrFail({ id: seed.tableId }),
+  ).resolves.toMatchObject({
     status: TABLE_STATUS.CLEANING,
     sessionId: seed.sessionId,
   });
@@ -334,8 +346,8 @@ async function cleanupTenant(harness: Harness, tenantId: string): Promise<void> 
   await harness.dataSource.getRepository(Order).delete({ tenantId });
   await harness.dataSource.getRepository(Bill).delete({ tenantId });
   await harness.dataSource.getRepository(Session).delete({ tenantId });
-  await harness.dataSource.getRepository(Table).delete({ tenantId });
-  await harness.dataSource.getRepository(Area).delete({ tenantId });
+  await harness.catalogDataSource.getRepository(Table).delete({ tenantId });
+  await harness.catalogDataSource.getRepository(Area).delete({ tenantId });
   for (const session of sessions) {
     await harness.redis.del(`cart:${tenantId}:${session.id}`);
     await harness.redis.del(`session:${tenantId}:${session.id}`);
