@@ -5,7 +5,7 @@ Phụ lục này trình bày các hiện vật kiểm chứng có tính tái hi�
 
 \section{Kết quả kiểm thử Saga}
 
-Hai nhóm kiểm thử dưới đây được chạy với \texttt{NODE\_ENV} đặt là \texttt{test} và \texttt{GLOBAL\_PREFIX} đặt là \texttt{api/v1}. Cách chạy này giới hạn phụ thuộc vào cấu hình runtime của dịch vụ và tập trung vào logic điều phối, hợp đồng phụ thuộc và nhánh bù trừ của từng Saga.
+Hai nhóm kiểm thử dưới đây được chạy với \texttt{NODE\_ENV} đặt là \texttt{test} và \texttt{GLOBAL\_PREFIX} đặt là \texttt{api/v1}. Cách chạy này giới hạn phụ thuộc vào cấu hình khi vận hành của dịch vụ và tập trung vào logic điều phối, hợp đồng phụ thuộc và nhánh bù trừ của từng Saga.
 
 Lệnh kiểm thử Order Confirm Saga:
 
@@ -22,11 +22,11 @@ catalog-stock-gateway.service.spec.ts
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.42\textheight,keepaspectratio]{appendix-d-01-order-saga-tests.png}
-  \caption{Kết quả kiểm thử Order Confirm Saga và hợp đồng Catalog stock gateway.}
+  \caption[Kiểm thử Order Confirm Saga và hợp đồng tồn kho Catalog.]{Kết quả kiểm thử Order Confirm Saga và hợp đồng tồn kho của Catalog.}
   \label{fig:appendix-d-order-saga-tests}
 \end{figure}
 
-Kết quả trong Hình~\ref{fig:appendix-d-order-saga-tests} chứng minh Order Confirm Saga bằng kiểm thử đơn vị và kiểm thử hợp đồng: điều phối xác nhận đơn, phát lại khi đơn đã ở trạng thái xử lý, lỗi nghiệp vụ từ Catalog, nhánh bù trừ khi Order commit/outbox thất bại sau khi Catalog đã trừ tồn kho, và hợp đồng TCP deduct/release của Catalog stock gateway. Kết quả này không thay thế kiểm thử tích hợp Order--Catalog trên toàn ngăn xếp; vì vậy Chương~6 kết luận luồng Saga đã có bằng chứng tốt ở lớp điều phối và hợp đồng, đồng thời có thêm bằng chứng tích hợp có điều kiện.
+Kết quả trong Hình~\ref{fig:appendix-d-order-saga-tests} chứng minh Order Confirm Saga bằng kiểm thử đơn vị và kiểm thử hợp đồng: điều phối xác nhận đơn, phát lại khi đơn đã ở trạng thái xử lý, lỗi nghiệp vụ từ Catalog, nhánh bù trừ khi Order commit/outbox thất bại sau khi Catalog đã trừ tồn kho, và hợp đồng TCP trừ và hoàn tồn kho của Catalog. Kết quả này không thay thế kiểm thử tích hợp Order--Catalog trên toàn ngăn xếp; vì vậy Chương~6 kết luận luồng Saga đã có bằng chứng tốt ở lớp điều phối và hợp đồng, đồng thời có thêm bằng chứng tích hợp có điều kiện.
 
 Lệnh kiểm thử SaaS Onboarding Mini-Saga:
 
@@ -56,7 +56,7 @@ Bảng~\ref{tab:appendix-d-saga-artifact-scope} tóm tắt mỗi kết quả ki�
 \begingroup
 \small
 \setlength{\tabcolsep}{3pt}
-\begin{longtable}{p{0.22\textwidth}p{0.24\textwidth}p{0.28\textwidth}p{0.18\textwidth}}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}}
   \caption{Kết quả kiểm thử Saga và kết luận tương ứng.}
   \label{tab:appendix-d-saga-artifact-scope}\\
   \toprule
@@ -69,7 +69,7 @@ Bảng~\ref{tab:appendix-d-saga-artifact-scope} tóm tắt mỗi kết quả ki�
   \endhead
   \bottomrule
   \endfoot
-  Order Confirm Saga & Hình~\ref{fig:appendix-d-order-saga-tests} và lệnh kiểm thử Order/Catalog gateway. & Có bằng chứng cho điều phối, phát lại, lỗi nghiệp vụ từ Catalog, bù trừ ở lớp dịch vụ và hợp đồng TCP deduct/release. & Chưa phải bằng chứng tiêm lỗi toàn ngăn xếp Order--Catalog với PostgreSQL, Redis và TCP services chạy thật. \\
+  Order Confirm Saga & Hình~\ref{fig:appendix-d-order-saga-tests} và lệnh kiểm thử Order--Catalog. & Có bằng chứng cho điều phối, phát lại, lỗi nghiệp vụ từ Catalog, bù trừ ở lớp dịch vụ và hợp đồng TCP trừ/hoàn tồn kho. & Chưa phải bằng chứng tiêm lỗi toàn ngăn xếp Order--Catalog với PostgreSQL, Redis và TCP services chạy thật. \\
   SaaS Onboarding Mini-Saga & Hình~\ref{fig:appendix-d-saas-onboarding-tests} và lệnh kiểm thử SaaS onboarding. & Có bằng chứng cho điều phối, đối tượng giả lập theo hợp đồng với phụ thuộc ngoài SaaS và bù trừ trong lớp kiểm thử đơn vị và hợp đồng. & Chưa phải bằng chứng đầu-cuối qua Keycloak, User-Access, Payment, Kafka và client. \\
 \end{longtable}
 \endgroup

@@ -1,10 +1,10 @@
 \chapter{Cơ sở lý thuyết và các công trình liên quan}
 
-Chương này trình bày nền tảng lý thuyết và bối cảnh công nghệ liên quan đến QRTable trước khi đi vào phân tích yêu cầu, thiết kế kiến trúc và triển khai hệ thống ở các chương sau. Trọng tâm của chương không phải là chứng minh QRTable đã triển khai từng cơ chế cụ thể, mà là làm rõ các khái niệm nền: POS trong lĩnh vực F\&B, đặt món qua mã QR, SaaS và mô hình đa tenant, kiến trúc microservices, kiến trúc hướng sự kiện, nhất quán dữ liệu trong hệ thống phân tán, giao tiếp thời gian thực và bảo mật trong SaaS POS.
+Chương này trình bày nền tảng lý thuyết và bối cảnh công nghệ phục vụ việc phân tích QRTable. Các nội dung chính gồm POS trong lĩnh vực F\&B, đặt món qua mã QR, SaaS và mô hình nhiều đơn vị thuê bao, kiến trúc vi dịch vụ, kiến trúc hướng sự kiện, tính nhất quán dữ liệu trong hệ thống phân tán, giao tiếp thời gian thực và bảo mật trong SaaS POS. Những khái niệm này tạo cơ sở cho phân tích yêu cầu, thiết kế kiến trúc và triển khai hệ thống ở các chương sau.
 
-Các nguồn được sử dụng trong chương này được chia thành hai nhóm. Nhóm thứ nhất là nguồn học thuật, chuẩn hoặc tài liệu chính thức như NIST, ISO/IEC, RFC, OpenID, OWASP, tài liệu Apache Kafka và các sách, bài báo về microservices. Nhóm này được dùng để định nghĩa khái niệm và giải thích các đánh đổi kỹ thuật. Nhóm thứ hai là nguồn thị trường hoặc tài liệu sản phẩm như KiotViet, Sapo, iPOS và NAPAS/VietQR. Nhóm này chỉ được dùng để minh họa hệ thống liên quan, bối cảnh sản phẩm và nhu cầu thực tiễn, không được dùng thay cho định nghĩa học thuật.
+Các nguồn được sử dụng gồm hai nhóm. Nguồn học thuật, tiêu chuẩn và tài liệu chính thức như NIST, ISO/IEC, RFC, OpenID, OWASP, Apache Kafka cùng các sách và bài báo về vi dịch vụ cung cấp định nghĩa và cơ sở phân tích đánh đổi kỹ thuật. Nguồn thị trường hoặc tài liệu sản phẩm của KiotViet, Sapo, iPOS và NAPAS/VietQR cung cấp bối cảnh sản phẩm, hệ thống liên quan và nhu cầu thực tiễn; nhóm này không thay thế cơ sở học thuật.
 
-Về mạch lập luận, Chương 2 đóng vai trò cầu nối giữa bài toán nghiệp vụ và quyết định thiết kế. Các khái niệm về POS và đặt món qua QR giúp giải thích vì sao hệ thống phải xử lý bàn, phiên gọi món, đơn hàng, bếp và thanh toán như một chuỗi nghiệp vụ thống nhất. Các khái niệm về SaaS, đa tenant và bảo mật giải thích vì sao cô lập tenant, RBAC và phân tách dữ liệu là yêu cầu cốt lõi. Các khái niệm về microservices, Kafka, WebSocket, xử lý lặp an toàn (idempotency) và mẫu saga giúp đặt nền cho các quyết định kiến trúc ở Chương 4, nhưng chương này không xem mọi mẫu thiết kế đó như kết quả vận hành thực tế đã hoàn thiện.
+Về mạch lập luận, các khái niệm POS và đặt món qua QR giải thích mối liên hệ giữa bàn, phiên gọi món, đơn hàng, bếp và thanh toán. Cơ sở về SaaS, mô hình nhiều đơn vị thuê bao và bảo mật làm rõ yêu cầu cô lập dữ liệu, kiểm soát truy cập theo vai trò và phân tách dữ liệu. Lý thuyết về vi dịch vụ, Kafka, WebSocket, xử lý lặp an toàn và Saga tạo nền tảng cho thiết kế ở Chương 4. Việc triển khai và mức độ kiểm chứng các cơ chế này được trình bày riêng ở Chương 5 và Chương 6.
 
 \section{Tổng quan về POS trong lĩnh vực F\&B}
 
@@ -14,7 +14,7 @@ POS (\textit{Point of Sale} — điểm bán hàng) trong bối cảnh nhà hàn
 
 Đặc thù thứ hai là đơn hàng trong nhà hàng thường có vòng đời dài hơn một giao dịch bán lẻ. Khách có thể gọi thêm món nhiều lần, nhân viên có thể cần xác nhận đơn trước khi đưa vào bếp, bếp có thể xử lý từng nhóm món theo trạm, và món có thể chuyển qua nhiều trạng thái trước khi được phục vụ. Do đó, một hệ thống POS F\&B cần mô hình hóa đơn hàng, chi tiết món, phiếu bếp và hóa đơn thanh toán như các thực thể có trạng thái thay vì chỉ là một dòng giao dịch.
 
-Đặc thù thứ ba là thanh toán có thể diễn ra sau khi nhiều đơn con đã phát sinh. Việc tổng hợp hóa đơn, áp dụng phương thức thanh toán, ghi nhận trạng thái trả tiền và giải phóng bàn phải nhất quán với trạng thái đơn hàng và bàn. Trong bối cảnh Việt Nam, thanh toán QR/chuyển khoản qua VietQR cũng là một ngữ cảnh thực tiễn đáng chú ý; NAPAS mô tả VietQR trong dịch vụ chuyển tiền nhanh 24/7 như một dạng mã QR dùng cho thông tin chuyển tiền ngân hàng \cite{napas-fastfund-vietqr}. Tuy nhiên, việc hỗ trợ VietQR ở mức sản phẩm không tự động chứng minh một hệ thống đã có quyết toán, đối soát hoặc bảo mật webhook đầy đủ; các cơ chế đó phải được thiết kế và đánh giá riêng.
+Đặc thù thứ ba là thanh toán có thể diễn ra sau khi nhiều đơn con đã phát sinh. Việc tổng hợp hóa đơn, áp dụng phương thức thanh toán, ghi nhận trạng thái trả tiền và giải phóng bàn phải nhất quán với trạng thái đơn hàng và bàn. Trong bối cảnh Việt Nam, thanh toán QR/chuyển khoản qua VietQR cũng là một ngữ cảnh thực tiễn đáng chú ý; NAPAS mô tả VietQR trong dịch vụ chuyển tiền nhanh 24/7 như một dạng mã QR dùng cho thông tin chuyển tiền ngân hàng \cite{napas-fastfund-vietqr}. Việc hỗ trợ VietQR ở mức sản phẩm mới xác lập kênh thanh toán; ghi nhận giao dịch, đối soát và bảo mật webhook vẫn là các cơ chế cần được thiết kế và đánh giá riêng.
 
 Hình~\ref{fig:chapter2-fnb-pos-lifecycle} minh họa vòng đời vận hành POS F\&B từ bàn, đơn hàng, bếp đến thanh toán, kèm hai nhánh nhân viên và khách qua đặt món bằng QR.
 
@@ -25,7 +25,7 @@ Hình~\ref{fig:chapter2-fnb-pos-lifecycle} minh họa vòng đời vận hành P
   \label{fig:chapter2-fnb-pos-lifecycle}
 \end{figure}
 
-Bảng~\ref{tab:chapter2-pos-qr-comparison} tóm tắt sự khác biệt giữa POS truyền thống ở mức thu ngân và mô hình SaaS POS tích hợp đặt món qua QR mà khóa luận hướng đến. Bảng này không nhằm khẳng định một mô hình luôn tốt hơn mô hình kia trong mọi bối cảnh, mà chỉ làm rõ vì sao QRTable cần xử lý nhiều ràng buộc hơn một ứng dụng menu điện tử đơn giản.
+Bảng~\ref{tab:chapter2-pos-qr-comparison} tóm tắt sự khác biệt giữa POS thiên về chức năng thu ngân và mô hình SaaS POS tích hợp đặt món qua QR. Sự khác biệt nằm ở phạm vi trạng thái, số nhóm tác nhân, cơ chế đồng bộ và yêu cầu cô lập dữ liệu, qua đó cho thấy QRTable phải xử lý nhiều ràng buộc hơn một ứng dụng thực đơn điện tử.
 
 {\footnotesize\sloppy
 \setlength{\tabcolsep}{3pt}
@@ -44,33 +44,33 @@ Bảng~\ref{tab:chapter2-pos-qr-comparison} tóm tắt sự khác biệt giữa 
   \endfoot
   Điểm bắt đầu nghiệp vụ & Nhân viên nhập đơn hoặc hóa đơn tại quầy/POS. & Khách có thể tự bắt đầu phiên gọi món bằng cách quét QR tại bàn. \\
   \addlinespace
-  Phạm vi trạng thái & Thường tập trung vào đơn, hóa đơn và thanh toán. & Cần gắn đơn với tenant, bàn, phiên, giỏ chung, màn hình bếp (KDS), hóa đơn và vòng đời thanh toán. \\
+  Phạm vi trạng thái & Thường tập trung vào đơn, hóa đơn và thanh toán. & Cần gắn đơn với đơn vị thuê bao, bàn, phiên, giỏ chung, màn hình bếp (KDS), hóa đơn và vòng đời thanh toán. \\
   \addlinespace
-  Vai trò người dùng & Chủ yếu là nhân viên, quản lý và chủ cửa hàng. & Có thêm khách ẩn danh theo phiên bàn và quản trị nền tảng (Super Admin) trong mô hình SaaS. \\
+  Vai trò người dùng & Chủ yếu là nhân viên, quản lý và chủ cửa hàng. & Có thêm khách theo phiên bàn và quản trị viên nền tảng trong mô hình SaaS. \\
   \addlinespace
   Đồng bộ vận hành & Nhân viên là trung gian chính giữa khách và bếp. & Cần đồng bộ trực tiếp giữa ứng dụng khách (PWA), POS, KDS và thanh toán qua API và kênh thời gian thực. \\
   \addlinespace
-  Triển khai & Có thể là phần mềm cài đặt riêng hoặc dịch vụ độc lập cho từng cửa hàng. & Nhiều nhà hàng dùng chung nền tảng, yêu cầu cô lập tenant, gói thuê bao và hạn mức sử dụng. \\
+  Triển khai & Có thể là phần mềm cài đặt riêng hoặc dịch vụ độc lập cho từng cửa hàng. & Nhiều nhà hàng dùng chung nền tảng, yêu cầu cô lập dữ liệu theo đơn vị thuê bao, gói thuê bao và hạn mức sử dụng. \\
   \addlinespace
-  Rủi ro kỹ thuật nổi bật & Sai sót nhập liệu, đồng bộ ca, lỗi tính tiền hoặc báo cáo. & QR giả/sai bàn, rò rỉ phiên, đơn trùng lặp, webhook trùng, rò rỉ dữ liệu giữa các tenant. \\
+  Rủi ro kỹ thuật nổi bật & Sai sót nhập liệu, đồng bộ ca, lỗi tính tiền hoặc báo cáo. & QR giả/sai bàn, rò rỉ phiên, đơn trùng lặp, webhook trùng, rò rỉ dữ liệu giữa các đơn vị thuê bao. \\
 \end{longtable}
 }
 
-Từ góc nhìn nghiên cứu phần mềm, vấn đề không nằm ở việc số hóa menu bằng mã QR đơn lẻ, mà ở việc tích hợp đặt món qua QR vào một POS vận hành đầy đủ. Một mã QR chỉ là điểm vào; hệ thống phía sau mới quyết định việc nhận diện bàn, ràng buộc phiên, cập nhật giỏ hàng chung, xác nhận đơn, điều phối bếp và thanh toán có nhất quán hay không.
+Từ góc nhìn nghiên cứu phần mềm, vấn đề không nằm ở việc số hóa menu bằng mã QR đơn lẻ, mà ở việc tích hợp đặt món qua QR vào một POS vận hành đầy đủ. Một mã QR chỉ là điểm vào; hệ thống phía sau mới xác định việc nhận diện bàn, ràng buộc phiên, cập nhật giỏ hàng chung, xác nhận đơn, điều phối bếp và thanh toán có nhất quán hay không.
 
 \section{Đặt món qua mã QR}
 
 Mã QR là một dạng mã vạch hai chiều được chuẩn hóa. ISO/IEC 18004:2024 mô tả mã QR ở mức ký hiệu mã, bao gồm đặc tính mã, phương pháp mã hóa ký tự, định dạng biểu tượng, đặc tính kích thước, quy tắc sửa lỗi và các tham số ứng dụng \cite{iso-iec-18004-2024}. Trong bối cảnh F\&B, mã QR thường được dùng như một đường dẫn để khách truy cập thực đơn điện tử hoặc phiên gọi món của một bàn.
 
-Một hệ thống đặt món qua QR đơn giản có thể chỉ cần hiển thị thực đơn sau khi khách quét mã. Tuy nhiên, đặt món qua QR trong POS nhà hàng có nhiều yêu cầu hơn. Mã QR phải xác định đúng tenant và bàn, token phải chống việc sửa URL tùy tiện, hệ thống phải biết khi nào tạo phiên mới hoặc cho khách tham gia phiên đang tồn tại, và các thao tác trên giỏ hàng phải được đồng bộ giữa nhiều thiết bị của cùng bàn. Nếu nhiều khách cùng quét một mã QR, họ không nên tạo ra nhiều phiên bàn độc lập gây trùng đơn hoặc chia sai hóa đơn.
+Một hệ thống đặt món qua QR đơn giản có thể chỉ cần hiển thị thực đơn sau khi khách quét mã. Tuy nhiên, đặt món qua QR trong POS nhà hàng có nhiều yêu cầu hơn. Mã QR phải xác định đúng đơn vị thuê bao và bàn, token phải chống việc sửa URL tùy tiện, hệ thống phải biết khi nào tạo phiên mới hoặc cho khách tham gia phiên đang tồn tại, và các thao tác trên giỏ hàng phải được đồng bộ giữa nhiều thiết bị của cùng bàn. Nếu nhiều khách cùng quét một mã QR, họ không nên tạo ra nhiều phiên bàn độc lập gây trùng đơn hoặc chia sai hóa đơn.
 
-Lợi ích thực tiễn của đặt món qua QR là giảm thao tác trung gian của nhân viên, giúp khách truy cập thực đơn nhanh hơn và hỗ trợ gọi thêm món trong lúc đang dùng bữa. Các nền tảng POS F\&B tại Việt Nam đã cung cấp hoặc mô tả các luồng gọi món qua QR trong tài liệu sản phẩm, ví dụ KiotViet hướng dẫn chức năng gọi món qua mã QR \cite{kiotviet-qr-order-doc}, còn iPOS mô tả giải pháp đặt món O2O/QR cho vận hành nhà hàng \cite{ipos-o2o-qr-order}. Những nguồn này cho thấy đặt món qua QR là nhu cầu sản phẩm thực tế, nhưng không phải bằng chứng học thuật rằng mọi hệ thống như vậy đều đúng, an toàn hoặc phù hợp với kiến trúc microservices.
+Đặt món qua QR có thể giảm thao tác trung gian của nhân viên, rút ngắn thời gian truy cập thực đơn và hỗ trợ gọi bổ sung trong phiên phục vụ. Các nền tảng POS F\&B tại Việt Nam đã mô tả những luồng tương tự trong tài liệu sản phẩm: KiotViet hướng dẫn chức năng gọi món qua mã QR \cite{kiotviet-qr-order-doc}, còn iPOS giới thiệu giải pháp đặt món O2O/QR cho nhà hàng \cite{ipos-o2o-qr-order}. Các nguồn này phản ánh nhu cầu sản phẩm thực tế; tính đúng đắn, an toàn và sự phù hợp kiến trúc của từng hệ thống cần được đánh giá bằng cơ sở kỹ thuật riêng.
 
-Thách thức quan trọng là xác thực ngữ cảnh. Khác với nhân viên đăng nhập bằng tài khoản, khách hàng thường không muốn tạo tài khoản chỉ để gọi món tại bàn. Vì vậy, hệ thống phải cân bằng giữa trải nghiệm thuận tiện và kiểm soát bảo mật. Token QR, token phiên, giới hạn tần suất, trạng thái bàn và ngữ cảnh tenant trở thành các lớp kiểm soát thay cho mô hình đăng nhập truyền thống.
+Thách thức quan trọng là xác thực ngữ cảnh. Khác với nhân viên đăng nhập bằng tài khoản, khách hàng thường không muốn tạo tài khoản chỉ để gọi món tại bàn. Vì vậy, hệ thống phải cân bằng giữa trải nghiệm thuận tiện và kiểm soát bảo mật. Token QR, token phiên, giới hạn tần suất, trạng thái bàn và ngữ cảnh đơn vị thuê bao trở thành các lớp kiểm soát thay cho mô hình đăng nhập truyền thống.
 
 Thách thức thứ hai là chống trùng lặp. Mạng di động có thể chập chờn, khách có thể bấm gửi lại, trình duyệt có thể gửi lại yêu cầu, hoặc nhiều khách cùng bàn có thể thao tác gần như đồng thời. Nếu hệ thống không có khóa xử lý lặp an toàn (idempotency) hoặc phiên bản giỏ hàng, cùng một đơn có thể bị tạo nhiều lần hoặc giỏ hàng có thể bị ghi đè. Vì vậy, luồng đặt món qua QR không thể chỉ được thiết kế như một lần gửi biểu mẫu đơn giản.
 
-Thách thức thứ ba là liên kết cập nhật thời gian thực với nguồn trạng thái đáng tin. Khách và nhân viên đều mong muốn thấy trạng thái đơn hoặc bếp cập nhật nhanh, nhưng kênh thời gian thực không nên trở thành nơi quyết định trạng thái nghiệp vụ cuối cùng. Thiết kế an toàn hơn là dùng thông báo thời gian thực để báo ứng dụng phía người dùng tải lại bản chụp trạng thái từ API của dịch vụ sở hữu dữ liệu. Nguyên tắc này sẽ được nối với WebSocket ở mục~\ref{sec:chapter2-realtime}.
+Thách thức thứ ba là liên kết cập nhật thời gian thực với nguồn trạng thái đáng tin. Khách và nhân viên đều mong muốn thấy trạng thái đơn hoặc bếp cập nhật nhanh, nhưng kênh thời gian thực không nên trở thành nơi xác định trạng thái nghiệp vụ cuối cùng. Thiết kế an toàn hơn là dùng thông báo thời gian thực để báo ứng dụng phía người dùng tải lại trạng thái mới nhất từ API của dịch vụ sở hữu dữ liệu. Nguyên tắc này sẽ được nối với WebSocket ở mục~\ref{sec:chapter2-realtime}.
 
 Hình~\ref{fig:chapter2-qr-ordering-flow} minh họa luồng khái niệm từ quét QR đến gửi đơn, nhấn mạnh các lớp kiểm soát phiên và chống trùng lặp.
 
@@ -81,27 +81,27 @@ Hình~\ref{fig:chapter2-qr-ordering-flow} minh họa luồng khái niệm từ q
   \label{fig:chapter2-qr-ordering-flow}
 \end{figure}
 
-\section{SaaS và mô hình đa tenant}
+\section{SaaS và mô hình nhiều đơn vị thuê bao}
 
 NIST định nghĩa điện toán đám mây là mô hình cho phép truy cập mạng thuận tiện, theo nhu cầu, tới một nhóm tài nguyên tính toán dùng chung có thể được cấp phát và thu hồi nhanh với ít công sức quản trị \cite{nist-sp800145-2011}. Trong các mô hình dịch vụ đám mây, SaaS cho phép người dùng sử dụng ứng dụng của nhà cung cấp chạy trên hạ tầng đám mây mà không quản trị trực tiếp hạ tầng, hệ điều hành hoặc phần lớn thành phần nền bên dưới. Đối với QRTable, ý nghĩa thực tiễn của SaaS là nhiều nhà hàng có thể sử dụng cùng một nền tảng POS thay vì mỗi nhà hàng tự triển khai một hệ thống riêng.
 
-Đa tenant là vấn đề trung tâm của SaaS. Một tenant có thể hiểu là một đơn vị khách hàng hoặc tổ chức sử dụng hệ thống như một phạm vi vận hành riêng. Trong QRTable, một tenant tương ứng với một nhà hàng hoặc chuỗi nhà hàng trong phạm vi đề tài. Mỗi tenant có dữ liệu riêng về thực đơn, bàn, nhân sự, đơn hàng, cấu hình thanh toán, gói thuê bao và trạng thái vận hành. Dù nhiều tenant dùng chung mã nguồn và hạ tầng, dữ liệu và quyền truy cập của họ phải được cô lập.
+Mô hình nhiều đơn vị thuê bao là vấn đề trung tâm của SaaS. Một đơn vị thuê bao có thể hiểu là một khách hàng hoặc tổ chức sử dụng hệ thống như một phạm vi vận hành riêng. Trong QRTable, một đơn vị thuê bao tương ứng với một nhà hàng hoặc chuỗi nhà hàng trong phạm vi đề tài. Mỗi đơn vị thuê bao có dữ liệu riêng về thực đơn, bàn, nhân sự, đơn hàng, cấu hình thanh toán, gói thuê bao và trạng thái vận hành. Dù nhiều đơn vị thuê bao dùng chung mã nguồn và hạ tầng, dữ liệu và quyền truy cập của họ phải được cô lập.
 
-Đa tenant không chỉ là một quyết định về cơ sở dữ liệu. Nó liên quan đến API, xác thực, phân quyền, bộ nhớ đệm, sự kiện, phòng thời gian thực, tải tệp và cả tham chiếu thanh toán. Nếu chỉ lọc tenant ở cơ sở dữ liệu nhưng khóa bộ nhớ đệm hoặc phòng WebSocket không gắn không gian tên tenant, hệ thống vẫn có nguy cơ lộ dữ liệu chéo tenant. Vì vậy, cô lập tenant phải được xem là ràng buộc bất biến xuyên suốt kiến trúc.
+Mô hình nhiều đơn vị thuê bao không chỉ là một lựa chọn về cơ sở dữ liệu. Nó liên quan đến API, xác thực, phân quyền, bộ nhớ đệm, sự kiện, phòng thời gian thực, tải tệp và cả tham chiếu thanh toán. Nếu chỉ lọc dữ liệu ở cơ sở dữ liệu nhưng khóa bộ nhớ đệm hoặc phòng WebSocket không gắn không gian tên đơn vị thuê bao, hệ thống vẫn có nguy cơ lộ dữ liệu chéo đơn vị thuê bao. Vì vậy, cô lập dữ liệu theo đơn vị thuê bao phải được xem là ràng buộc bất biến xuyên suốt kiến trúc.
 
-Microsoft Azure Architecture Center mô tả khi thiết kế lưu trữ dữ liệu cho hệ thống đa tenant cần quyết định mức chia sẻ hoặc cô lập dữ liệu giữa các tenant, đồng thời có thể chọn một mẫu nhất quán hoặc kết hợp nhiều mẫu tùy quy mô và yêu cầu \cite{microsoft-multitenant-storage-data-2026}. Hình~\ref{fig:chapter2-saas-multitenancy} minh họa mô hình nhiều tenant trên nền tảng dùng chung và ranh giới cô lập xuyên suốt. Bảng~\ref{tab:chapter2-multitenancy-models} tóm tắt một số mô hình phổ biến ở mức khái niệm.
+Microsoft Azure Architecture Center mô tả khi thiết kế lưu trữ dữ liệu cho hệ thống nhiều đơn vị thuê bao cần xác định mức chia sẻ hoặc cô lập dữ liệu giữa các đơn vị thuê bao, đồng thời có thể chọn một mẫu nhất quán hoặc kết hợp nhiều mẫu tùy quy mô và yêu cầu \cite{microsoft-multitenant-storage-data-2026}. Hình~\ref{fig:chapter2-saas-multitenancy} minh họa mô hình nhiều đơn vị thuê bao trên nền tảng dùng chung và ranh giới cô lập xuyên suốt. Bảng~\ref{tab:chapter2-multitenancy-models} tóm tắt một số mô hình phổ biến ở mức khái niệm.
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{chapter2-saas-multitenancy.png}
-  \caption{Mô hình khái niệm SaaS đa tenant và ranh giới cô lập.}
+  \caption{Mô hình khái niệm SaaS nhiều đơn vị thuê bao và ranh giới cô lập.}
   \label{fig:chapter2-saas-multitenancy}
 \end{figure}
 
 {\footnotesize\sloppy
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.23\textwidth}}
-  \caption{So sánh các mô hình lưu trữ dữ liệu trong kiến trúc đa tenant.}
+  \caption{So sánh các mô hình lưu trữ dữ liệu trong kiến trúc nhiều đơn vị thuê bao.}
   \label{tab:chapter2-multitenancy-models}\\
   \toprule
   Mô hình & Đặc điểm & Ưu điểm & Hạn chế / rủi ro \\
@@ -113,25 +113,25 @@ Microsoft Azure Architecture Center mô tả khi thiết kế lưu trữ dữ li
   \endhead
   \bottomrule
   \endfoot
-  CSDL chung, lược đồ chung & Nhiều tenant dùng chung cơ sở dữ liệu/lược đồ; bảng có cột phân biệt tenant như \texttt{tenant\_id}. & Chi phí vận hành thấp, di chuyển lược đồ đơn giản, phù hợp giai đoạn đầu. & Cần bộ lọc truy vấn nghiêm ngặt; lỗi lọc tenant có thể gây rò rỉ dữ liệu. \\
+  CSDL chung, lược đồ chung & Nhiều đơn vị thuê bao dùng chung cơ sở dữ liệu/lược đồ; bảng có cột phân biệt như \texttt{tenant\_id}. & Chi phí vận hành thấp, di chuyển lược đồ đơn giản, phù hợp giai đoạn đầu. & Cần bộ lọc truy vấn nghiêm ngặt; lỗi lọc đơn vị thuê bao có thể gây rò rỉ dữ liệu. \\
   \addlinespace
-  CSDL chung, lược đồ riêng mỗi tenant & Tenant dùng chung máy chủ CSDL nhưng có lược đồ riêng. & Cô lập tốt hơn ở lớp lược đồ, dễ sao lưu/di chuyển theo tenant hơn mô hình lược đồ chung. & Số lượng lược đồ lớn làm di chuyển và vận hành phức tạp. \\
+  CSDL chung, lược đồ riêng mỗi đơn vị thuê bao & Các đơn vị thuê bao dùng chung máy chủ CSDL nhưng có lược đồ riêng. & Cô lập tốt hơn ở lớp lược đồ, dễ sao lưu/di chuyển theo đơn vị thuê bao hơn mô hình lược đồ chung. & Số lượng lược đồ lớn làm di chuyển và vận hành phức tạp. \\
   \addlinespace
-  CSDL riêng mỗi tenant & Mỗi tenant có cơ sở dữ liệu riêng. & Cô lập vật lý cao hơn, dễ đáp ứng yêu cầu tuân thủ hoặc khách hàng lớn. & Chi phí và tự động hóa vận hành cao; khó tối ưu tài nguyên cho nhiều tenant nhỏ. \\
+  CSDL riêng mỗi đơn vị thuê bao & Mỗi đơn vị thuê bao có cơ sở dữ liệu riêng. & Cô lập vật lý cao hơn, dễ đáp ứng yêu cầu tuân thủ hoặc khách hàng lớn. & Chi phí và tự động hóa vận hành cao; khó tối ưu tài nguyên cho nhiều đơn vị thuê bao nhỏ. \\
   \addlinespace
-  Lai ghép / triển khai tách & Kết hợp nhiều mức cô lập, ví dụ tenant nhỏ dùng mô hình chung, tenant lớn dùng triển khai tách. & Linh hoạt theo gói dịch vụ, quy mô và yêu cầu đặc biệt của tenant. & Kiến trúc và tự động hóa phức tạp hơn; cần quản trị vòng đời rõ. \\
+  Lai ghép / triển khai tách & Kết hợp nhiều mức cô lập, ví dụ đơn vị thuê bao nhỏ dùng mô hình chung, đơn vị thuê bao lớn dùng triển khai tách. & Linh hoạt theo gói dịch vụ, quy mô và yêu cầu đặc biệt của đơn vị thuê bao. & Kiến trúc và tự động hóa phức tạp hơn; cần quản trị vòng đời rõ. \\
 \end{longtable}
 }
 
-Trong một SaaS POS cho F\&B, việc chọn mô hình đa tenant phải cân bằng giữa chi phí, độ phức tạp và mức cô lập. Với hệ thống khóa luận hoặc giai đoạn sản phẩm ban đầu, lược đồ chung có \texttt{tenant\_id} kết hợp kiểm soát ở API, bộ nhớ đệm và sự kiện có thể là lựa chọn thực dụng. Với quy mô lớn hơn, tenant có yêu cầu tuân thủ cao hoặc dữ liệu nhạy cảm hơn, mô hình CSDL riêng mỗi tenant hoặc lai ghép có thể phù hợp hơn. Điều quan trọng là khóa luận không nên trình bày đa tenant như một lựa chọn duy nhất; mỗi mô hình đều có đánh đổi.
+Trong SaaS POS cho F\&B, mô hình nhiều đơn vị thuê bao cần cân bằng chi phí, độ phức tạp và mức cô lập. Ở giai đoạn sản phẩm ban đầu, lược đồ chung có \texttt{tenant\_id} kết hợp kiểm soát tại API, bộ nhớ đệm và sự kiện có chi phí vận hành thấp hơn. Khi quy mô hoặc yêu cầu tuân thủ tăng, cơ sở dữ liệu riêng cho từng đơn vị thuê bao hoặc mô hình lai có thể phù hợp hơn. Do đó, mỗi mô hình là một lựa chọn có đánh đổi và phụ thuộc vào bối cảnh sử dụng.
 
-Ngoài cô lập dữ liệu, SaaS còn đặt ra bài toán vòng đời tenant. Tenant cần được tạo, cấu hình chủ sở hữu, gói dịch vụ, hạn mức, cấu hình thanh toán và trạng thái hoạt động. Khi tenant bị tạm ngưng, hệ thống phải xác định thao tác nào bị chặn, thao tác nào vẫn được xử lý để không làm mất trạng thái tiền hoặc đơn hàng đã phát sinh. Đây là điểm khác biệt giữa một ứng dụng POS đơn lẻ và nền tảng SaaS POS có quản trị tenant.
+Ngoài cô lập dữ liệu, SaaS còn đặt ra bài toán vòng đời đơn vị thuê bao. Đơn vị thuê bao cần được tạo, cấu hình chủ sở hữu, gói dịch vụ, hạn mức, cấu hình thanh toán và trạng thái hoạt động. Khi đơn vị thuê bao bị tạm ngưng, hệ thống phải xác định thao tác nào bị chặn, thao tác nào vẫn được xử lý để không làm mất trạng thái tiền hoặc đơn hàng đã phát sinh. Đây là điểm khác biệt giữa một ứng dụng POS đơn lẻ và nền tảng SaaS POS có quản trị đơn vị thuê bao.
 
 \section{Kiến trúc microservices}
 
 Microservices là một phong cách kiến trúc trong đó hệ thống được tổ chức thành nhiều dịch vụ nhỏ, mỗi dịch vụ chạy trong tiến trình riêng, giao tiếp qua cơ chế nhẹ và có thể được triển khai độc lập theo năng lực nghiệp vụ. Lewis và Fowler nhấn mạnh các đặc trưng như dịch vụ theo năng lực nghiệp vụ, tự động hóa triển khai, quản lý dữ liệu phân tán và thiết kế chịu lỗi \cite{lewis-fowler-microservices-2014}. Trong ngữ cảnh QRTable, microservices được xem là cách tách các ngữ cảnh giới hạn như thực đơn (Catalog), đơn hàng (Order), bếp (Kitchen), thanh toán (Payment), SaaS và truy cập người dùng (User-Access).
 
-Lợi ích chính của microservices không phải là hiệu năng tự động cao hơn. Lợi ích quan trọng hơn là làm rõ trách nhiệm sở hữu dữ liệu và giảm gắn kết theo miền nghiệp vụ. Dịch vụ thực đơn sở hữu menu, bàn và tồn kho; dịch vụ đơn hàng sở hữu phiên, giỏ, đơn và hóa đơn; dịch vụ thanh toán sở hữu quyết toán và cấu hình thanh toán; dịch vụ bếp sở hữu chiếu KDS; dịch vụ SaaS sở hữu vòng đời tenant và gói thuê bao. Khi trách nhiệm rõ, các ràng buộc nghiệp vụ có nơi đặt cụ thể, ví dụ chỉ dịch vụ thực đơn được quyết định tồn kho, chỉ dịch vụ đơn hàng được quyết định vòng đời đơn/hóa đơn, chỉ dịch vụ thanh toán được quyết định trạng thái giao dịch thanh toán.
+Lợi ích chính của microservices không phải là hiệu năng tự động cao hơn. Lợi ích quan trọng hơn là làm rõ trách nhiệm sở hữu dữ liệu và giảm gắn kết theo miền nghiệp vụ. Dịch vụ thực đơn sở hữu menu, bàn và tồn kho; dịch vụ đơn hàng sở hữu phiên, giỏ, đơn và hóa đơn; dịch vụ thanh toán sở hữu quyết toán và cấu hình thanh toán; dịch vụ bếp sở hữu chiếu KDS; dịch vụ SaaS sở hữu vòng đời đơn vị thuê bao và gói thuê bao. Khi trách nhiệm rõ, các ràng buộc nghiệp vụ có nơi đặt cụ thể, ví dụ chỉ dịch vụ thực đơn được xác định tồn kho, chỉ dịch vụ đơn hàng được xác định vòng đời đơn/hóa đơn, chỉ dịch vụ thanh toán được xác định trạng thái giao dịch thanh toán.
 
 Newman nhấn mạnh việc thiết kế ranh giới dịch vụ phải quan tâm đến gắn kết, độ gắn kết nội bộ và khả năng thay đổi độc lập \cite{newman-building-microservices-2021}. Nếu chia dịch vụ theo tầng kỹ thuật hoặc theo tên bảng thay vì miền nghiệp vụ, hệ thống vẫn gắn kết cao nhưng lại gánh thêm chi phí phân tán. Vì vậy, microservices cần đi cùng ranh giới dịch vụ có nghĩa nghiệp vụ, không chỉ là nhiều thư mục hoặc nhiều container.
 
@@ -146,7 +146,7 @@ Các đánh đổi chính của microservices gồm:
   \item \textbf{Chi phí vận hành}: nhiều dịch vụ cần cấu hình, triển khai, ghi nhật ký, kiểm tra sức khỏe, quản lý phiên bản và hợp đồng giao tiếp.
 \end{itemize}
 
-Do đó, một khóa luận không nên dùng microservices như một khẩu hiệu. Quyết định dùng microservices chỉ thuyết phục khi có các miền nghiệp vụ thực sự khác nhau, có trách nhiệm dữ liệu riêng và có lý do bảo trì, mở rộng rõ. Với QRTable, cơ sở lập luận là hệ thống có nhiều miền vận hành tương đối độc lập: vòng đời tenant, thực đơn/bàn/QR, đơn/phiên/hóa đơn, hàng đợi bếp, quyết toán thanh toán và truy cập người dùng.
+Giá trị của kiến trúc vi dịch vụ phụ thuộc vào sự tồn tại của các miền nghiệp vụ khác biệt, trách nhiệm dữ liệu riêng và nhu cầu thay đổi độc lập. Trong QRTable, cơ sở phân tách gồm vòng đời đơn vị thuê bao, thực đơn và bàn, đơn và phiên, hàng đợi bếp, ghi nhận thanh toán và truy cập người dùng. Những miền này có dữ liệu, quy tắc và nhịp thay đổi khác nhau, đồng thời phải chấp nhận chi phí của hệ thống phân tán.
 
 Hình~\ref{fig:chapter2-monolith-vs-microservices} so sánh kiến trúc monolith và microservices theo ngữ cảnh giới hạn và mô hình cơ sở dữ liệu riêng. Bảng~\ref{tab:chapter2-architecture-styles} tóm tắt đánh đổi ở mức khái niệm.
 
@@ -174,7 +174,7 @@ Hình~\ref{fig:chapter2-monolith-vs-microservices} so sánh kiến trúc monolit
   \endfoot
   Monolith & Một ứng dụng, thường một cơ sở dữ liệu. & Triển khai và gỡ lỗi đơn giản; giao dịch ACID nội bộ. & Gắn kết tăng theo thời gian; khó mở rộng theo miền nghiệp vụ. \\
   \addlinespace
-  Monolith mô-đun & Một gói triển khai nhưng module/miền tách trong mã nguồn. & Cân bằng đơn giản vận hành và ranh giới miền. & Vẫn chia sẻ runtime và CSDL nếu không kiểm soát ranh giới. \\
+  Monolith mô-đun & Một gói triển khai nhưng module/miền tách trong mã nguồn. & Cân bằng đơn giản vận hành và ranh giới miền. & Vẫn chia sẻ môi trường chạy và CSDL nếu không kiểm soát ranh giới. \\
   \addlinespace
   Microservices & Nhiều dịch vụ độc lập, CSDL riêng mỗi dịch vụ. & Mở rộng và thay đổi theo miền; trách nhiệm sở hữu rõ. & Độ phức tạp phân tán, nhất quán và quan sát khó hơn. \\
 \end{longtable}
@@ -197,9 +197,9 @@ Hình~\ref{fig:chapter2-kafka-event-flow} minh họa luồng hướng sự kiệ
 
 Kafka phù hợp với các tình huống cần lưu và truyền sự kiện bền vững, phát tán tới nhiều bên tiêu thụ (consumer), xử lý bất đồng bộ hoặc khôi phục bên tiêu thụ sau sự cố. Trong QRTable, ví dụ điển hình là khi đơn đã được xác nhận, dịch vụ bếp có thể tạo phiếu KDS từ sự kiện \texttt{order.confirmed}; hoặc khi thanh toán hoàn tất, hệ thống có thể phát sự kiện để các thành phần liên quan cập nhật trạng thái hoặc gửi gợi ý thời gian thực. Bên phát không nhất thiết phải chờ mọi xử lý kéo theo hoàn thành trước khi trả lời người dùng.
 
-Tuy nhiên, Kafka không nên được dùng thay cho mọi lời gọi đồng bộ. Nếu một lệnh cần biết kết quả ngay để quyết định giao dịch, ví dụ dịch vụ đơn hàng cần biết dịch vụ thực đơn có trừ tồn kho thành công hay không trước khi chuyển đơn sang trạng thái xử lý, gọi RPC đồng bộ thường phù hợp hơn. Nếu thao tác chỉ là thông báo giao diện sau khi lớp BFF đã có phản hồi, WebSocket hoặc kênh trực tiếp qua BFF có thể đơn giản hơn Kafka. Nếu dùng Kafka cho mọi việc, hệ thống có thể tăng độ trễ, khó gỡ lỗi và làm mờ ranh giới giao dịch.
+Kafka phù hợp với sự kiện bất đồng bộ nhưng không thay thế mọi lời gọi đồng bộ. Lệnh cần kết quả tức thời, chẳng hạn kiểm tra việc trừ tồn kho trước khi chuyển trạng thái đơn, phù hợp hơn với RPC. Thông báo giao diện sau khi BFF đã nhận phản hồi có thể đi qua WebSocket hoặc kênh trực tiếp. Sự phân công này hạn chế độ trễ không cần thiết, giảm độ phức tạp chẩn đoán và giữ rõ ranh giới giao dịch.
 
-Bảng~\ref{tab:chapter2-sync-async-communication} so sánh giao tiếp đồng bộ và bất đồng bộ trong microservices. Bảng này là nền cho khung quyết định ở Chương 4, nơi QRTable chọn TCP/gRPC cho lệnh/truy vấn cần phản hồi và Kafka cho sự kiện miền nghiệp vụ và xử lý kéo theo bất đồng bộ.
+Bảng~\ref{tab:chapter2-sync-async-communication} so sánh giao tiếp đồng bộ và bất đồng bộ trong microservices. Bảng này là nền cho quy trình lựa chọn ở Chương 4, nơi QRTable chọn TCP/gRPC cho lệnh/truy vấn cần phản hồi và Kafka cho sự kiện miền nghiệp vụ và xử lý kéo theo bất đồng bộ.
 
 {\footnotesize\sloppy
 \setlength{\tabcolsep}{3pt}
@@ -222,21 +222,21 @@ Bảng~\ref{tab:chapter2-sync-async-communication} so sánh giao tiếp đồng 
   \addlinespace
   Ví dụ phù hợp & Xác thực QR, lấy thực đơn, trừ tồn kho khi xác nhận đơn, lấy bản chụp hóa đơn. & Tạo phiếu KDS sau khi đơn xác nhận, phát tán khi thanh toán xong, cảnh báo SLA. \\
   \addlinespace
-  Ưu điểm & Dễ hiểu, dễ trả lỗi tức thời, phù hợp ranh giới giao dịch cần quyết định ngay. & Tách rời tốt hơn, mở rộng bên tiêu thụ, hỗ trợ phát lại/khôi phục tùy cấu hình broker. \\
+  Ưu điểm & Dễ hiểu, dễ trả lỗi tức thời, phù hợp ranh giới giao dịch cần kết quả ngay. & Tách rời tốt hơn, mở rộng bên tiêu thụ, hỗ trợ phát lại/khôi phục tùy cấu hình broker. \\
   \addlinespace
-  Hạn chế & Dễ lan truyền lỗi/hết thời gian chờ, gắn kết runtime cao hơn. & Khó gỡ lỗi hơn, cần consumer xử lý lặp an toàn, nhất quán dần và giám sát tốt. \\
+  Hạn chế & Dễ lan truyền lỗi/hết thời gian chờ, gắn kết khi vận hành cao hơn. & Khó gỡ lỗi hơn, cần consumer xử lý lặp an toàn, nhất quán dần và giám sát tốt. \\
   \addlinespace
   Nguyên tắc trong QRTable & Không dùng để phát tán xử lý kéo theo không cần chờ. & Không dùng thay mọi RPC hoặc làm nguồn trạng thái cuối của giao diện. \\
 \end{longtable}
 }
 
-Một điểm cần nhấn mạnh là sự kiện không thay thế giao dịch cơ sở dữ liệu. Kafka có thể giúp truyền đạt rằng một việc đã xảy ra, nhưng tính đúng đắn của nghiệp vụ vẫn phụ thuộc vào ranh giới giao dịch và dịch vụ sở hữu dữ liệu. Nếu dịch vụ đơn hàng phát sự kiện trước khi giao dịch CSDL hoàn tất, hoặc giao dịch CSDL thành công nhưng phát sự kiện thất bại, hệ thống có nguy cơ ghi kép (dual-write). Vì vậy, các mẫu như outbox giao dịch thường được dùng để giảm rủi ro giữa ghi CSDL và phát hành sự kiện \cite{richardson-microservices-patterns-2018}. Chương 4 và Chương 5 sẽ chỉ khẳng định mức QRTable đã triển khai khi có bằng chứng mã nguồn hoặc kiểm thử tương ứng.
+Sự kiện không thay thế giao dịch cơ sở dữ liệu. Kafka truyền đạt một thay đổi đã xảy ra, còn tính đúng đắn nghiệp vụ phụ thuộc vào ranh giới giao dịch và dịch vụ sở hữu dữ liệu. Nếu dịch vụ đơn hàng phát sự kiện trước khi giao dịch CSDL hoàn tất, hoặc giao dịch CSDL thành công nhưng phát sự kiện thất bại, hệ thống có nguy cơ ghi kép (dual-write). Mẫu outbox giao dịch giúp giảm rủi ro giữa ghi CSDL và phát hành sự kiện \cite{richardson-microservices-patterns-2018}. Mức độ áp dụng cơ chế này trong QRTable được xác định dựa trên mã nguồn và kiểm thử trình bày ở Chương 4 và Chương 5.
 
 \section{Nhất quán dữ liệu, xử lý lặp an toàn và các mẫu giao dịch phân tán}
 
 Trong kiến trúc monolith dùng một cơ sở dữ liệu duy nhất, nhiều thao tác có thể được bao phủ bởi một giao dịch ACID. Trong microservices, mỗi dịch vụ sở hữu cơ sở dữ liệu riêng nên giao dịch xuyên dịch vụ không còn đơn giản. Ví dụ, xác nhận đơn trong QRTable liên quan đến CSDL đơn hàng, tồn kho thực đơn, sự kiện Kafka và chiếu bếp. Nếu cố gắng gom tất cả vào một giao dịch phân tán, hệ thống sẽ phức tạp và phụ thuộc hạ tầng hơn; nếu tách rời hoàn toàn, hệ thống phải chấp nhận nhất quán dần và thiết kế bù trừ phù hợp.
 
-Nhất quán dữ liệu trong microservices vì vậy cần được hiểu theo từng ràng buộc nghiệp vụ. Ràng buộc tồn kho thuộc dịch vụ thực đơn; ràng buộc vòng đời đơn thuộc dịch vụ đơn hàng; ràng buộc quyết toán thanh toán thuộc dịch vụ thanh toán; ràng buộc vòng đời tenant thuộc dịch vụ SaaS. Mỗi dịch vụ nên đảm bảo tính nhất quán mạnh trong phạm vi dữ liệu mình sở hữu. Khi cần phối hợp với dịch vụ khác, hệ thống dùng RPC, sự kiện, outbox, saga hoặc bù trừ tùy tính chất thao tác.
+Nhất quán dữ liệu trong microservices vì vậy cần được hiểu theo từng ràng buộc nghiệp vụ. Ràng buộc tồn kho thuộc dịch vụ thực đơn; ràng buộc vòng đời đơn thuộc dịch vụ đơn hàng; ràng buộc quyết toán thanh toán thuộc dịch vụ thanh toán; ràng buộc vòng đời đơn vị thuê bao thuộc dịch vụ SaaS. Mỗi dịch vụ nên đảm bảo tính nhất quán mạnh trong phạm vi dữ liệu mình sở hữu. Khi cần phối hợp với dịch vụ khác, hệ thống dùng RPC, sự kiện, outbox, saga hoặc bù trừ tùy tính chất thao tác.
 
 Xử lý lặp an toàn (idempotency) là khả năng xử lý một yêu cầu lặp lại mà không tạo thêm tác dụng phụ ngoài lần xử lý đầu tiên. Trong đặt món qua QR, cơ chế này cần cho việc gửi đơn vì khách hoặc trình duyệt có thể gửi yêu cầu lặp. Trong thanh toán, cần cho webhook vì nhà cung cấp có thể gửi lại cùng một thông báo. Trong luồng hướng sự kiện, cần cho consumer vì cùng một sự kiện có thể được xử lý lại khi gửi lại hoặc cân bằng lại nhóm.
 
@@ -244,12 +244,12 @@ Saga là một mẫu cổ điển cho giao dịch kéo dài. Garcia-Molina và S
 
 Outbox là mẫu thường đi cùng hệ thống hướng sự kiện. Ý tưởng cơ bản là ghi thay đổi nghiệp vụ và thông điệp cần gửi vào cùng giao dịch CSDL của dịch vụ sở hữu; sau đó một tiến trình nền đưa thông điệp từ outbox ra trình môi giới. Mẫu này giảm rủi ro giữa hoàn tất giao dịch CSDL và phát hành sự kiện, nhưng vẫn cần xử lý gửi trùng, consumer idempotent và giám sát hàng đợi outbox.
 
-Đối với QRTable, các khái niệm này tạo nền cho ba nguyên tắc:
+Đối với QRTable, các khái niệm trên dẫn đến ba nguyên tắc kiến trúc:
 
 \begin{itemize}
-  \item Không dùng Kafka để thay thế giao dịch nghiệp vụ nội bộ của dịch vụ sở hữu dữ liệu.
-  \item Không viết webhook hoặc consumer sự kiện như thao tác chỉ chạy đúng một lần.
-  \item Không khẳng định saga/outbox đạt mức vận hành thực tế nếu mới có thiết kế cơ bản mà chưa kiểm chứng đầy đủ.
+  \item Giao dịch nghiệp vụ nội bộ được hoàn tất tại dịch vụ sở hữu dữ liệu trước khi sự kiện được phát qua Kafka.
+  \item Webhook và bộ tiêu thụ sự kiện phải xử lý an toàn khi cùng thông điệp được gửi lại.
+  \item Mức độ hoàn thiện của Saga và outbox được đánh giá theo bằng chứng triển khai và kiểm thử tương ứng.
 \end{itemize}
 
 Hình~\ref{fig:chapter2-outbox-saga-overview} tóm tắt outbox giao dịch và saga phối hợp phân tán ở mức khái niệm.
@@ -279,15 +279,15 @@ WebSocket là giao thức cho phép giao tiếp hai chiều giữa ứng dụng 
 
 Lợi ích của cập nhật thời gian thực là giảm độ trễ nhận biết trên giao diện. Nếu khách gửi đơn, POS có thể nhận thông báo ngay để nhân viên xác nhận. Nếu đơn được xác nhận, KDS có thể nhận gợi ý để tải lại hàng đợi. Nếu thanh toán hoàn tất, giao diện POS hoặc khách có thể biết cần cập nhật hóa đơn và trạng thái bàn. Với trải nghiệm vận hành nhà hàng, các cập nhật này giúp giảm việc nhân viên phải làm mới trang thủ công.
 
-Tuy nhiên, giao tiếp thời gian thực không đồng nghĩa với nguồn trạng thái đáng tin. Kết nối WebSocket có thể bị mất, ứng dụng có thể ngoại tuyến, sự kiện có thể đến trễ, hoặc người dùng có thể mở lại trình duyệt sau một khoảng thời gian. Nếu giao diện tin tuyệt đối vào nội dung sự kiện mà không tải lại trạng thái từ phía backend, trạng thái hiển thị có thể lệch với cơ sở dữ liệu hoặc dịch vụ sở hữu. Vì vậy, mẫu an toàn là dùng WebSocket như thông báo hoặc gợi ý làm mới: ứng dụng nhận tín hiệu, sau đó tải bản chụp trạng thái từ API.
+Giao tiếp thời gian thực không đồng nghĩa với nguồn trạng thái có thẩm quyền. Kết nối WebSocket có thể bị gián đoạn, ứng dụng có thể ngoại tuyến và sự kiện có thể đến trễ. Vì vậy, WebSocket phù hợp với vai trò thông báo hoặc gợi ý làm mới; sau khi nhận tín hiệu, ứng dụng tải trạng thái mới nhất từ API của dịch vụ sở hữu dữ liệu.
 
-Trong SaaS đa tenant, kênh thời gian thực còn cần kiểm soát phòng hoặc không gian tên. Nhân viên của tenant A không được nhận sự kiện của tenant B; khách của bàn này không được nhận sự kiện của bàn khác. Do đó, WebSocket phải gắn với ngữ cảnh tenant, phiên và bàn, kèm chuỗi kiểm soát truy cập tương ứng. Đây là lý do thiết kế thời gian thực không thể tách khỏi cô lập tenant và phân quyền.
+Trong SaaS nhiều đơn vị thuê bao, kênh thời gian thực còn cần kiểm soát phòng hoặc không gian tên. Nhân viên của đơn vị thuê bao A không được nhận sự kiện của đơn vị thuê bao B; khách của bàn này không được nhận sự kiện của bàn khác. Do đó, WebSocket phải gắn với ngữ cảnh đơn vị thuê bao, phiên và bàn, kèm chuỗi kiểm soát truy cập tương ứng. Đây là lý do thiết kế thời gian thực không thể tách khỏi cô lập dữ liệu theo đơn vị thuê bao và phân quyền.
 
-Một điểm khác là thời gian thực không thay thế hàng đợi hoặc trình môi giới. WebSocket phù hợp để đẩy thông báo tới ứng dụng đang kết nối. Kafka phù hợp hơn cho sự kiện miền nghiệp vụ bền vững giữa các dịch vụ backend. Redis có thể phù hợp cho hàng đợi runtime hoặc pub/sub nội bộ. Việc chọn sai công cụ có thể làm hệ thống khó vận hành: dùng WebSocket để lưu sự kiện bền vững sẽ mất dữ liệu khi ứng dụng ngoại tuyến; dùng Kafka chỉ để báo giao diện làm mới sau một phản hồi HTTP có thể làm hệ thống nặng hơn cần thiết.
+Một điểm khác là thời gian thực không thay thế hàng đợi hoặc trình môi giới. WebSocket phù hợp để đẩy thông báo tới ứng dụng đang kết nối. Kafka phù hợp hơn cho sự kiện miền nghiệp vụ bền vững giữa các dịch vụ backend. Redis có thể phù hợp cho hàng đợi khi vận hành hoặc pub/sub nội bộ. Việc chọn sai công cụ có thể làm hệ thống khó vận hành: dùng WebSocket để lưu sự kiện bền vững sẽ mất dữ liệu khi ứng dụng ngoại tuyến; dùng Kafka chỉ để báo giao diện làm mới sau một phản hồi HTTP có thể làm hệ thống nặng hơn cần thiết.
 
 \section{Xác thực, phân quyền và bảo mật trong SaaS POS}
 
-Xác thực trả lời câu hỏi người gọi là ai; phân quyền trả lời người đó có được phép thực hiện hành động hay không. Trong SaaS POS, hai câu hỏi này phải luôn đi cùng ngữ cảnh tenant. Chủ quán có quyền trong tenant của mình không có nghĩa người đó có quyền xem dữ liệu của tenant khác. Nhân viên có quyền xác nhận đơn không nhất thiết có quyền cập nhật cấu hình thanh toán hoặc gói thuê bao.
+Xác thực trả lời câu hỏi người gọi là ai; phân quyền trả lời người đó có được phép thực hiện hành động hay không. Trong SaaS POS, hai câu hỏi này phải luôn đi cùng ngữ cảnh đơn vị thuê bao. Chủ quán có quyền trong đơn vị thuê bao của mình không có nghĩa người đó có quyền xem dữ liệu của đơn vị thuê bao khác. Nhân viên có quyền xác nhận đơn không nhất thiết có quyền cập nhật cấu hình thanh toán hoặc gói thuê bao.
 
 Hình~\ref{fig:chapter2-oidc-rbac-saas-pos} phân tách luồng xác thực nhân viên (OIDC/JWT/RBAC) và khách hàng theo phiên QR.
 
@@ -304,13 +304,13 @@ OpenID Connect là lớp danh tính xây trên OAuth 2.0, cho phép ứng dụng
 
 Phân quyền trong POS thường dùng RBAC (\textit{kiểm soát truy cập theo vai trò}) vì vai trò vận hành khá rõ: quản trị nền tảng, chủ quán, quản lý, phục vụ, bếp/bar. RBAC giúp gắn quyền với vai trò thay vì kiểm tra rời rạc ở từng màn hình. Tuy nhiên, điều hướng giao diện chỉ là lớp hỗ trợ trải nghiệm. Thực thi phân quyền phải nằm ở backend vì phía client có thể bị bỏ qua.
 
-OWASP ASVS cung cấp chuẩn tham chiếu để kiểm tra các yêu cầu bảo mật ứng dụng, bao gồm xác thực, quản lý phiên, kiểm soát truy cập, kiểm tra đầu vào và nhiều nhóm kiểm soát khác \cite{owasp-asvs-2026}. Trong khóa luận này, ASVS được dùng như nguồn nền để diễn đạt các nhóm rủi ro và nguyên tắc kiểm soát, không phải để khẳng định QRTable đã đạt một mức ASVS cụ thể nếu chưa có đánh giá tương ứng.
+OWASP ASVS cung cấp chuẩn tham chiếu cho các yêu cầu bảo mật ứng dụng, bao gồm xác thực, quản lý phiên, kiểm soát truy cập và kiểm tra đầu vào \cite{owasp-asvs-2026}. Khóa luận sử dụng ASVS để hệ thống hóa nhóm rủi ro và nguyên tắc kiểm soát; mức tuân thủ cụ thể chỉ có thể được xác định thông qua một quy trình đánh giá riêng.
 
 Bảo mật trong SaaS POS còn bao gồm các rủi ro riêng:
 
 \begin{itemize}
-  \item \textbf{Truy cập chéo tenant}: người dùng hoặc yêu cầu của tenant này truy cập dữ liệu tenant khác.
-  \item \textbf{Lạm dụng QR/phiên}: QR bị sửa, quét tràn, token phiên dùng sai bàn hoặc sai tenant.
+  \item \textbf{Truy cập chéo đơn vị thuê bao}: người dùng hoặc yêu cầu của đơn vị thuê bao này truy cập dữ liệu đơn vị thuê bao khác.
+  \item \textbf{Lạm dụng QR/phiên}: QR bị sửa, quét tràn, token phiên dùng sai bàn hoặc sai đơn vị thuê bao.
   \item \textbf{Lạm dụng webhook thanh toán}: webhook giả, webhook trùng, thanh toán thiếu hoặc tham chiếu không khớp.
   \item \textbf{Lộ bí mật}: token, khóa webhook, trạng thái OAuth hoặc cấu hình thanh toán bị lộ ra giao diện hoặc nhật ký.
   \item \textbf{Leo thang đặc quyền}: vai trò nhân viên được cấp nhầm quyền chủ quán hoặc quản trị nền tảng.
@@ -320,16 +320,16 @@ ISO/IEC 25010:2023 đặt bảo mật là một thuộc tính chất lượng tr
 
 \section{Các hệ thống và công trình liên quan}
 
-Phần này xem xét các hệ thống, sản phẩm và nguồn liên quan ở mức phù hợp với phạm vi khóa luận. Vì QRTable là đề tài xây dựng hệ thống phần mềm ứng dụng, công trình liên quan không chỉ gồm bài báo học thuật mà còn gồm các nền tảng POS và đặt món qua QR thực tế trên thị trường Việt Nam. Tuy nhiên, cần phân biệt rõ: nguồn sản phẩm chỉ cho thấy chức năng tồn tại trên thị trường hoặc cách nhà cung cấp mô tả giải pháp; chúng không chứng minh khẳng định học thuật về kiến trúc, hiệu năng, bảo mật hoặc độ tin cậy.
+Các hệ thống và công trình liên quan gồm cả nguồn học thuật lẫn các nền tảng POS và đặt món qua QR trên thị trường Việt Nam. Nguồn sản phẩm phản ánh chức năng hiện có và cách nhà cung cấp mô tả giải pháp; nguồn học thuật và tài liệu kỹ thuật cung cấp cơ sở phân tích kiến trúc, hiệu năng, bảo mật và độ tin cậy.
 
 KiotViet có tài liệu hướng dẫn gọi món qua mã QR trong ngữ cảnh F\&B \cite{kiotviet-qr-order-doc}. Nguồn này cho thấy một hướng triển khai phổ biến: khách quét QR để xem thực đơn và gọi món, còn nhà hàng quản lý đơn trong hệ thống POS. Sapo mô tả phần mềm quản lý nhà hàng, quán ăn với các chức năng vận hành như quản lý đơn, bàn, thanh toán và báo cáo \cite{sapo-fnb-restaurant-pos}. iPOS mô tả giải pháp đặt món O2O/QR nhằm tối ưu thao tác gọi món trong nhà hàng \cite{ipos-o2o-qr-order}. Các hệ thống này cho thấy đặt món qua QR và SaaS POS F\&B là nhu cầu thực tế, đặc biệt khi nhà hàng muốn giảm thao tác thủ công và tăng tốc phục vụ.
 
-Bảng~\ref{tab:chapter2-related-systems} tóm tắt cách nhìn an toàn về các hệ thống liên quan. Bảng không so sánh hơn/thua vì khóa luận không có benchmark hoặc audit nội bộ của các sản phẩm thương mại. Thay vào đó, bảng xác định các khía cạnh liên quan đến QRTable và khoảng trống mà đề tài tập trung mô tả.
+Bảng~\ref{tab:chapter2-related-systems} tổng hợp khía cạnh liên quan của các hệ thống và giới hạn của nguồn công khai. Do không có dữ liệu đo lường hoặc thông tin kiến trúc nội bộ của sản phẩm thương mại, bảng tập trung vào giá trị tham khảo cho QRTable thay vì xếp hạng các hệ thống.
 
 {\footnotesize\sloppy
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.21\textwidth}}
-  \caption{Tổng hợp hệ thống/sản phẩm liên quan ở mức bối cảnh.}
+  \caption{Tổng hợp các hệ thống và sản phẩm liên quan trong bối cảnh đề tài.}
   \label{tab:chapter2-related-systems}\\
   \toprule
   Hệ thống / nguồn & Khía cạnh liên quan & Giá trị tham khảo cho đề tài & Giới hạn khi sử dụng làm nguồn \\
@@ -345,19 +345,19 @@ Bảng~\ref{tab:chapter2-related-systems} tóm tắt cách nhìn an toàn về c
   \addlinespace
   Sapo POS F\&B & Quản lý nhà hàng, quán ăn, đơn, bàn, thanh toán và vận hành. & Cho thấy POS F\&B cần nhiều module vận hành hơn menu điện tử. & Là trang sản phẩm; không dùng để định nghĩa học thuật về SaaS hay microservices. \\
   \addlinespace
-  iPOS O2O/QR & Giải pháp đặt món qua QR/O2O cho nhà hàng. & Ví dụ thị trường về tích hợp đặt món QR vào quy trình vận hành. & Không suy ra được mức cô lập tenant, nhất quán hay bảo mật của sản phẩm. \\
+  iPOS O2O/QR & Giải pháp đặt món qua QR/O2O cho nhà hàng. & Ví dụ thị trường về tích hợp đặt món QR vào quy trình vận hành. & Không suy ra được mức cô lập dữ liệu theo đơn vị thuê bao, nhất quán hay bảo mật của sản phẩm. \\
   \addlinespace
   NAPAS/VietQR & QR/chuyển tiền nhanh trong thanh toán nội địa. & Hỗ trợ bối cảnh thanh toán QR tại Việt Nam. & Không thay thế bằng chứng triển khai webhook, quyết toán hay đối soát của QRTable. \\
 \end{longtable}
 }
 
-Từ các nguồn liên quan, có thể rút ra ba nhận xét. Thứ nhất, POS F\&B và đặt món qua QR đã là nhu cầu sản phẩm rõ ràng, nên đề tài không cần khẳng định tính mới ở bản thân mã QR. Thứ hai, thách thức của QRTable nằm ở việc tích hợp các miền POS, phiên QR, KDS, thanh toán, vòng đời tenant và RBAC thành một hệ thống có ranh giới dịch vụ rõ. Thứ ba, tài liệu sản phẩm công khai thường không trình bày chi tiết cách xử lý cô lập tenant, xử lý lặp an toàn, outbox, Kafka, WebSocket gợi ý làm mới hay bảo mật webhook thanh toán; đây là khoảng trống mà khóa luận có thể tập trung phân tích ở mức kỹ thuật phần mềm.
+Từ các nguồn liên quan, có thể rút ra ba nhận xét. Thứ nhất, POS F\&B và đặt món qua QR đã là nhu cầu sản phẩm rõ ràng, nên đề tài không cần khẳng định tính mới ở bản thân mã QR. Thứ hai, thách thức của QRTable nằm ở việc tích hợp các miền POS, phiên QR, KDS, thanh toán, vòng đời đơn vị thuê bao và RBAC thành một hệ thống có ranh giới dịch vụ rõ. Thứ ba, tài liệu sản phẩm công khai thường không trình bày chi tiết cách xử lý cô lập dữ liệu theo đơn vị thuê bao, xử lý lặp an toàn, outbox, Kafka, WebSocket gợi ý làm mới hay bảo mật webhook thanh toán; đây là khoảng trống mà khóa luận có thể tập trung phân tích ở mức kỹ thuật phần mềm.
 
-Về phía học thuật và kỹ thuật, các nguồn về SaaS, microservices, Kafka, WebSocket, JWT/OIDC, ASVS và saga/outbox cung cấp cơ sở để đánh giá quyết định thiết kế của QRTable. Khoảng trống của đề tài không phải phát minh thuật toán mới, mà thiết kế và hiện thực nền tảng SaaS POS có đặt món qua QR trong bối cảnh F\&B Việt Nam, với các ràng buộc thực tế về cô lập tenant, thời gian thực, thanh toán nội địa và kiểm soát nhất quán dữ liệu.
+Về phía học thuật và kỹ thuật, các nguồn về SaaS, microservices, Kafka, WebSocket, JWT/OIDC, ASVS và saga/outbox cung cấp cơ sở để đánh giá lựa chọn thiết kế của QRTable. Khoảng trống của đề tài không phải phát minh thuật toán mới, mà là thiết kế và triển khai nền tảng SaaS POS có đặt món qua QR trong bối cảnh F\&B Việt Nam, với các ràng buộc thực tế về cô lập dữ liệu theo đơn vị thuê bao, thời gian thực, thanh toán nội địa và kiểm soát nhất quán dữ liệu.
 
 \section{Tổng hợp nền tảng lý thuyết cho QRTable}
 
-Bảng~\ref{tab:chapter2-theory-to-qrtable} tổng hợp cách các khái niệm trong Chương 2 ánh xạ sang các chương sau. Bảng này giúp giữ ranh giới giữa lý thuyết và triển khai: Chương 2 giải thích khái niệm, Chương 3 biến chúng thành yêu cầu, Chương 4 thiết kế kiến trúc, Chương 5 trình bày hiện thực và Chương 6 đánh giá bằng bằng chứng thực nghiệm.
+Bảng~\ref{tab:chapter2-theory-to-qrtable} tổng hợp mối liên hệ giữa cơ sở lý thuyết và phạm vi QRTable. Các khái niệm được chuyển thành yêu cầu ở Chương 3, cấu trúc thiết kế ở Chương 4, kết quả triển khai ở Chương 5 và tiêu chí đánh giá ở Chương 6.
 
 {\footnotesize\sloppy
 \setlength{\tabcolsep}{3pt}
@@ -365,31 +365,31 @@ Bảng~\ref{tab:chapter2-theory-to-qrtable} tổng hợp cách các khái niệm
   \caption{Ánh xạ cơ sở lý thuyết sang phạm vi QRTable.}
   \label{tab:chapter2-theory-to-qrtable}\\
   \toprule
-  Nền tảng & Hàm ý đối với QRTable & Nguyên tắc khi viết các chương sau & Chương liên quan \\
+  Nền tảng & Hàm ý đối với QRTable & Hàm ý thiết kế và đánh giá & Chương liên quan \\
   \midrule
   \endfirsthead
   \toprule
-  Nền tảng & Hàm ý đối với QRTable & Nguyên tắc khi viết các chương sau & Chương liên quan \\
+  Nền tảng & Hàm ý đối với QRTable & Hàm ý thiết kế và đánh giá & Chương liên quan \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  POS F\&B & Hệ thống phải quản lý bàn, đơn, bếp, hóa đơn và thanh toán như một luồng vận hành. & Không viết QRTable như menu điện tử đơn lẻ. & Chương 3, 5 \\
+  POS F\&B & Hệ thống phải quản lý bàn, đơn, bếp, hóa đơn và thanh toán như một luồng vận hành. & Đặt món qua QR được tích hợp với toàn bộ vòng đời phục vụ. & Chương 3, 5 \\
   \addlinespace
-  Đặt món qua QR & Khách vào hệ thống qua QR/phiên thay vì tài khoản nhân viên. & Không đồng nhất khách với người dùng RBAC/Keycloak. & Chương 3, 4, 5 \\
+  Đặt món qua QR & Khách vào hệ thống qua QR/phiên thay vì tài khoản nhân viên. & Khách được kiểm soát theo phiên, tách biệt với người dùng RBAC/Keycloak. & Chương 3, 4, 5 \\
   \addlinespace
-  SaaS / đa tenant & Mọi dữ liệu theo tenant cần ngữ cảnh tenant xuyên API, CSDL, bộ nhớ đệm, sự kiện và thời gian thực. & Không khẳng định cô lập toàn diện nếu thiếu bằng chứng kiểm thử. & Chương 3, 4, 6 \\
+  SaaS và nhiều đơn vị thuê bao & Mọi dữ liệu theo đơn vị thuê bao cần ngữ cảnh xuyên API, CSDL, bộ nhớ đệm, sự kiện và thời gian thực. & Mức cô lập được đánh giá theo phạm vi kiểm thử đã thực hiện. & Chương 3, 4, 6 \\
   \addlinespace
-  Microservices & Ranh giới dịch vụ phải bám miền nghiệp vụ và trách nhiệm dữ liệu. & Không chia dịch vụ chỉ vì công nghệ; không truy cập chéo CSDL. & Chương 4, 5 \\
+  Microservices & Ranh giới dịch vụ phải bám miền nghiệp vụ và trách nhiệm dữ liệu. & Giao tiếp liên miền đi qua hợp đồng, không truy cập chéo CSDL. & Chương 4, 5 \\
   \addlinespace
-  Kafka / hướng sự kiện & Sự kiện miền phù hợp cho xử lý kéo theo bất đồng bộ và phát tán. & Không dùng Kafka thay mọi RPC hoặc ranh giới giao dịch. & Chương 4, 5 \\
+  Kafka / hướng sự kiện & Sự kiện miền phù hợp cho xử lý kéo theo bất đồng bộ và phát tán. & RPC và Kafka được lựa chọn theo nhu cầu phản hồi và ranh giới giao dịch. & Chương 4, 5 \\
   \addlinespace
-  Idempotency, saga, outbox & Luồng đơn, thanh toán và webhook cần chống trùng và nhất quán có kiểm soát. & Không khẳng định saga/outbox hoàn thiện nếu thiếu bằng chứng. & Chương 4, 5, 6 \\
+  Idempotency, saga, outbox & Luồng đơn, thanh toán và webhook cần chống trùng và nhất quán có kiểm soát. & Mức hoàn thiện được xác định bằng mã nguồn và kiểm thử tương ứng. & Chương 4, 5, 6 \\
   \addlinespace
-  WebSocket / thời gian thực & Giao diện nhận gợi ý nhanh nhưng trạng thái backend vẫn là nguồn đáng tin. & Không coi nội dung socket là trạng thái cuối cùng. & Chương 4, 5, 6 \\
+  WebSocket / thời gian thực & Giao diện nhận gợi ý nhanh nhưng trạng thái backend vẫn là nguồn đáng tin. & Ứng dụng tải lại trạng thái từ API sau tín hiệu thời gian thực. & Chương 4, 5, 6 \\
   \addlinespace
-  JWT, OIDC, RBAC, bảo mật & Nhân viên/quản trị dùng nhà cung cấp danh tính và quyền; khách dùng quyền theo phiên QR. & Không khẳng định đạt mức ASVS nếu chưa đánh giá. & Chương 3, 4, 6 \\
+  JWT, OIDC, RBAC, bảo mật & Nhân viên/quản trị dùng nhà cung cấp danh tính và quyền; khách dùng quyền theo phiên QR. & Các cơ chế bảo mật được đánh giá theo từng lớp kiểm soát. & Chương 3, 4, 6 \\
 \end{longtable}
 }
 
-Tóm lại, Chương 2 đặt nền cho cách QRTable được phân tích và thiết kế như một hệ thống kỹ thuật phần mềm hoàn chỉnh. POS F\&B và đặt món qua QR xác định bài toán nghiệp vụ; SaaS và đa tenant xác định yêu cầu cô lập dữ liệu; microservices và kiến trúc hướng sự kiện cung cấp khung phân tách miền và giao tiếp; nhất quán dữ liệu, xử lý lặp an toàn, saga và outbox giải thích rủi ro khi trạng thái trải qua nhiều dịch vụ; WebSocket giải thích cơ chế thời gian thực nhưng cũng đặt nguyên tắc về nguồn trạng thái đáng tin; xác thực, phân quyền và bảo mật xác định cách bảo vệ nhân viên, khách, tenant và webhook. Các chương sau sẽ dùng nền này để trình bày yêu cầu, kiến trúc, triển khai và đánh giá QRTable theo phạm vi bằng chứng thực tế.
+Tóm lại, Chương 2 đặt nền cho cách QRTable được phân tích và thiết kế như một hệ thống kỹ thuật phần mềm hoàn chỉnh. POS F\&B và đặt món qua QR xác định bài toán nghiệp vụ; SaaS và mô hình nhiều đơn vị thuê bao xác định yêu cầu cô lập dữ liệu; microservices và kiến trúc hướng sự kiện cung cấp khung phân tách miền và giao tiếp; nhất quán dữ liệu, xử lý lặp an toàn, saga và outbox giải thích rủi ro khi trạng thái trải qua nhiều dịch vụ; WebSocket giải thích cơ chế thời gian thực nhưng cũng đặt nguyên tắc về nguồn trạng thái đáng tin; xác thực, phân quyền và bảo mật xác định cách bảo vệ nhân viên, khách, đơn vị thuê bao và webhook. Các chương sau sẽ dùng nền này để trình bày yêu cầu, kiến trúc, triển khai và đánh giá QRTable theo phạm vi bằng chứng thực tế.

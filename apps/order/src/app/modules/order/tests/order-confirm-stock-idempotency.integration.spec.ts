@@ -83,24 +83,35 @@ maybeDescribe('Order Confirm stock reservation idempotency integration', () => {
   });
 
   it('deducts stock once when the same tenant, order, key, and payload are sent twice', async () => {
+    console.log(
+      '\n  [TEST 2.1] 🚀 Starting Integration Flow: Verify stock is deducted exactly once on duplicate requests',
+    );
     const activeHarness = requireHarness(harness);
     const seed = await seedPendingOrder(activeHarness);
     currentTenantId = seed.tenantId;
     const request = deductRequest(seed);
 
+    console.log('  [TEST 2.1] 🔄 Send stock deduct request #1...');
     const first = await activeHarness.catalogGateway.deductForOrder(request);
+    console.log('  [TEST 2.1] 🔄 Send stock deduct request #2 (Duplicate)...');
     const second = await activeHarness.catalogGateway.deductForOrder(request);
 
+    console.log('  [TEST 2.1] ✅ Verify outcomes: 1st = APPLIED, 2nd = REPLAYED');
     expect(first.outcome).toBe('APPLIED');
     expect(second.outcome).toBe('REPLAYED');
     expect(second.reservationVersion).toBe(first.reservationVersion);
     const finalMenuItem = await activeHarness.catalogDataSource
       .getRepository(MenuItem)
       .findOneByOrFail({ id: seed.menuItemId, tenantId: seed.tenantId });
+    console.log(
+      `  [TEST 2.1] 📊 Initial stock: ${seed.initialStock}, Final stock after 2 calls: ${finalMenuItem.stock} (Reduced by exactly ${seed.quantity} unit(s))`,
+    );
     expect(finalMenuItem.stock).toBe(seed.initialStock - seed.quantity);
+    console.log('  [TEST 2.1] 🎉 Test Case 2.1 PASSED!');
   });
 
   it('recovers a lost deduct response on confirm retry without a second stock mutation', async () => {
+    console.log('\n  [TEST 2.2] 🚀 Starting Integration Flow: Recover lost deduct response on confirm retry');
     const activeHarness = requireHarness(harness);
     const seed = await seedPendingOrder(activeHarness);
     currentTenantId = seed.tenantId;
@@ -111,6 +122,7 @@ maybeDescribe('Order Confirm stock reservation idempotency integration', () => {
         const result = await activeHarness.catalogGateway.deductForOrder(request);
         if (discardFirstResponse) {
           discardFirstResponse = false;
+          console.log('  [TEST 2.2] 💥 [Simulated] Network lost immediately after Catalog reserves stock in DB');
           throw syntheticTransportError;
         }
         return result;
@@ -120,6 +132,7 @@ maybeDescribe('Order Confirm stock reservation idempotency integration', () => {
     };
     const saga = createOrderConfirmSaga(activeHarness.orderDataSource, faultInjectingGateway);
 
+    console.log('  [TEST 2.2] 🔄 Staff confirms order first time -> Expecting transport network error');
     await expect(
       saga.confirmOrder({ tenantId: seed.tenantId, orderId: seed.orderId, userId: 'phase5-staff' }),
     ).rejects.toBe(syntheticTransportError);
@@ -130,9 +143,11 @@ maybeDescribe('Order Confirm stock reservation idempotency integration', () => {
     const stockAfterLostResponse = await activeHarness.catalogDataSource
       .getRepository(MenuItem)
       .findOneByOrFail({ id: seed.menuItemId, tenantId: seed.tenantId });
+    console.log('  [TEST 2.2] 📊 Verify: Order remains PENDING but Catalog has already deducted the stock');
     expect(orderAfterLostResponse.status).toBe(OrderStatus.PENDING);
     expect(stockAfterLostResponse.stock).toBe(seed.initialStock - seed.quantity);
 
+    console.log('  [TEST 2.2] 🔄 Staff triggers confirm order again (Retry)...');
     await saga.confirmOrder({ tenantId: seed.tenantId, orderId: seed.orderId, userId: 'phase5-staff' });
 
     const confirmedOrder = await activeHarness.orderDataSource
@@ -146,29 +161,43 @@ maybeDescribe('Order Confirm stock reservation idempotency integration', () => {
       aggregateId: seed.orderId,
       eventType: 'order.confirmed',
     });
+    console.log(
+      '  [TEST 2.2] ✅ Verify: Order changes to PROCESSING successfully, Outbox Event is created, and final stock is unchanged',
+    );
     expect(confirmedOrder.status).toBe(OrderStatus.PROCESSING);
     expect(confirmedOrder.stockReservationVersion).toBe(1);
     expect(finalMenuItem.stock).toBe(seed.initialStock - seed.quantity);
     expect(outboxRows).toHaveLength(1);
+    console.log('  [TEST 2.2] 🎉 Test Case 2.2 PASSED!');
   });
 
   it('increments the version after compensation and ignores a stale release', async () => {
+    console.log(
+      '\n  [TEST 2.3] 🚀 Starting Integration Flow: Increment version after compensation and ignore stale releases',
+    );
     const activeHarness = requireHarness(harness);
     const seed = await seedPendingOrder(activeHarness);
     currentTenantId = seed.tenantId;
     const deduct = deductRequest(seed);
 
+    console.log('  [TEST 2.3] 🔄 Step 1: Deduct stock version 1');
     const firstDeduct = await activeHarness.catalogGateway.deductForOrder(deduct);
+    console.log('  [TEST 2.3] 🔄 Step 2: Trigger release stock version 1');
     const firstRelease = await activeHarness.catalogGateway.releaseForOrder({
       ...releaseRequest(seed, firstDeduct.reservationVersion),
       idempotencyKey: `confirm-order-compensation:${seed.orderId}:1`,
     });
+    console.log('  [TEST 2.3] 🔄 Step 3: Deduct stock version 2');
     const secondDeduct = await activeHarness.catalogGateway.deductForOrder(deduct);
+    console.log('  [TEST 2.3] 🔄 Step 4: Simulate delayed stale release (version 1) arriving late at Catalog');
     const staleRelease = await activeHarness.catalogGateway.releaseForOrder({
       ...releaseRequest(seed, firstDeduct.reservationVersion),
       idempotencyKey: `delayed-compensation:${seed.orderId}:1`,
     });
 
+    console.log(
+      '  [TEST 2.3] ✅ Verify: Catalog detects stale release version and ignores it to prevent wrong inventory state',
+    );
     expect(firstDeduct).toMatchObject({ reservationVersion: 1, outcome: 'APPLIED' });
     expect(firstRelease).toMatchObject({ reservationVersion: 1, outcome: 'APPLIED' });
     expect(secondDeduct).toMatchObject({ reservationVersion: 2, outcome: 'APPLIED' });
@@ -181,6 +210,7 @@ maybeDescribe('Order Confirm stock reservation idempotency integration', () => {
       .findOneByOrFail({ id: seed.menuItemId, tenantId: seed.tenantId });
     expect(reservation).toMatchObject({ version: 2, state: StockReservationState.Reserved });
     expect(finalMenuItem.stock).toBe(seed.initialStock - seed.quantity);
+    console.log('  [TEST 2.3] 🎉 Test Case 2.3 PASSED!');
   });
 });
 

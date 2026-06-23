@@ -62,6 +62,9 @@ maybeDescribe('Phase 5 P0-ORD-STATE-STOCK external-stack integration', () => {
   });
 
   it('stock=1 with two concurrent staff confirmations yields one success, one stock failure, final stock 0, and one order.confirmed outbox', async () => {
+    console.log(
+      '\n  [TEST 3.1] 🚀 Starting Concurrent Integration Flow: Race Condition on last item in stock (stock = 1)',
+    );
     const readiness = await ensureExternalStackReady();
     if (!readiness.ok) {
       throw new Error(`[Phase 5 stock integration not ready] ${readiness.reason ?? 'external stack is not ready'}`);
@@ -70,6 +73,10 @@ maybeDescribe('Phase 5 P0-ORD-STATE-STOCK external-stack integration', () => {
     orderDataSource = await createOrderDataSource();
     catalogDataSource = await createCatalogDataSource();
     currentTenantId = `${TENANT_PREFIX}-${randomUUID()}`;
+
+    console.log(
+      '  [TEST 3.1] 🔍 Step 1: Seed data - Set stock = 1, create 2 concurrent PENDING orders purchasing this item',
+    );
     seed = await seedStockRace(orderDataSource, catalogDataSource, currentTenantId);
     orderClient = ClientProxyFactory.create({
       transport: Transport.TCP,
@@ -80,6 +87,7 @@ maybeDescribe('Phase 5 P0-ORD-STATE-STOCK external-stack integration', () => {
     });
     await orderClient.connect();
 
+    console.log('  [TEST 3.1] 🔄 Step 2: Send 2 concurrent confirmOrder() requests (Race Condition)...');
     const results = await Promise.allSettled([
       confirmOrder(orderClient, seed.tenantId, seed.orderIds[0], 'phase5-staff-1'),
       confirmOrder(orderClient, seed.tenantId, seed.orderIds[1], 'phase5-staff-2'),
@@ -90,11 +98,17 @@ maybeDescribe('Phase 5 P0-ORD-STATE-STOCK external-stack integration', () => {
     );
     const rejected = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
 
+    console.log(
+      '  [TEST 3.1] ✅ Step 3: Verify results - Exactly 1 request succeeds, 1 request fails with stock insufficient error',
+    );
     expect(fulfilled).toHaveLength(1);
     expect(rejected).toHaveLength(1);
     expect(readErrorCode(rejected[0].reason)).toBe(ErrorCode.CATALOG_STOCK_INSUFFICIENT);
 
     const finalMenuItem = await catalogDataSource.getRepository(MenuItem).findOneByOrFail({ id: seed.menuItemId });
+    console.log(
+      `  [TEST 3.1] 📊 Verify final stock quantity: ${finalMenuItem.stock} (reduced to 0 and marked OUT_OF_STOCK)`,
+    );
     expect(finalMenuItem.stock).toBe(0);
     expect(finalMenuItem.stock).toBeGreaterThanOrEqual(0);
     expect(finalMenuItem.status).toBe(MENU_ITEM_STATUS.OUT_OF_STOCK);
@@ -103,6 +117,9 @@ maybeDescribe('Phase 5 P0-ORD-STATE-STOCK external-stack integration', () => {
       where: seed.orderIds.map((id) => ({ id, tenantId: seed?.tenantId })),
       order: { id: 'ASC' },
     });
+    console.log(
+      `  [TEST 3.1] 📊 Trạng thái 2 đơn hàng: Order 1 = ${finalOrders[0].status}, Order 2 = ${finalOrders[1].status}`,
+    );
     expect(finalOrders).toHaveLength(2);
     expect(finalOrders.filter((order) => order.status === OrderStatus.PROCESSING)).toHaveLength(1);
     expect(finalOrders.filter((order) => order.status === OrderStatus.PENDING)).toHaveLength(1);
@@ -111,6 +128,9 @@ maybeDescribe('Phase 5 P0-ORD-STATE-STOCK external-stack integration', () => {
       tenantId: seed.tenantId,
       eventType: 'order.confirmed',
     });
+    console.log(
+      `  [TEST 3.1] 💾 Verify Outbox Event: Correctly saved ${outboxRows.length} event record(s) for the successful order`,
+    );
     expect(outboxRows).toHaveLength(1);
     expect(outboxRows[0].aggregateId).toBe(finalOrders.find((order) => order.status === OrderStatus.PROCESSING)?.id);
     expect(outboxRows[0].payload).toEqual(
@@ -120,6 +140,7 @@ maybeDescribe('Phase 5 P0-ORD-STATE-STOCK external-stack integration', () => {
         orderId: outboxRows[0].aggregateId,
       }),
     );
+    console.log('  [TEST 3.1] 🎉 Test Case 3.1 PASSED!');
   });
 });
 

@@ -1,18 +1,18 @@
-\chapter{Thiết kế kiến trúc và quyết định công nghệ cho QRTable}
+\chapter{Thiết kế kiến trúc và lựa chọn công nghệ cho QRTable}
 
-Chương này trình bày cách QRTable chuyển các yêu cầu ở Chương 3 thành ranh giới kiến trúc, trách nhiệm dịch vụ, trách nhiệm dữ liệu, cơ chế giao tiếp và lựa chọn công nghệ cụ thể. Trọng tâm của chương không phải là liệt kê công nghệ, mà là giải thích vì sao từng quyết định phù hợp với bài toán nền tảng POS theo mô hình SaaS cho F\&B, có đặt món qua mã QR, màn hình bếp KDS, thanh toán VietQR/SePay và quản trị nhiều đơn vị thuê bao.
+Chương này chuyển các yêu cầu ở Chương 3 thành thiết kế kiến trúc của QRTable, gồm ranh giới dịch vụ, quyền sở hữu dữ liệu, cơ chế giao tiếp và nền tảng công nghệ. Mỗi thành phần được phân tích theo vai trò trong bài toán SaaS POS cho F\&B có đặt món qua mã QR, KDS, thanh toán VietQR/SePay và quản trị nhiều đơn vị thuê bao.
 
-QRTable được thiết kế theo hướng vi dịch vụ (microservices) có kiểm soát. Các tài liệu về microservices nhấn mạnh việc tách hệ thống theo năng lực nghiệp vụ, sở hữu dữ liệu riêng và giao tiếp qua hợp đồng rõ ràng \cite{lewis-fowler-microservices-2014}. Tuy nhiên, trong phạm vi khóa luận, vi dịch vụ cũng tạo thêm chi phí về giao tiếp mạng, tính nhất quán dữ liệu (consistency), kiểm thử tích hợp và chẩn đoán lỗi phân tán. Vì vậy, QRTable không dùng Kafka cho mọi tương tác, không xem WebSocket là nguồn trạng thái nghiệp vụ, và không tách dịch vụ chỉ vì lý do kỹ thuật. Ranh giới được chọn dựa trên tác nhân, ngữ cảnh giới hạn, trách nhiệm dữ liệu và luồng nghiệp vụ thật của hệ thống.
+QRTable được thiết kế theo kiến trúc vi dịch vụ có kiểm soát. Các tài liệu về vi dịch vụ nhấn mạnh việc phân tách theo năng lực nghiệp vụ, sở hữu dữ liệu riêng và giao tiếp qua hợp đồng rõ ràng \cite{lewis-fowler-microservices-2014}. Kiến trúc này đồng thời làm tăng chi phí giao tiếp mạng, duy trì tính nhất quán, kiểm thử tích hợp và chẩn đoán lỗi phân tán. Do đó, ranh giới dịch vụ của QRTable dựa trên tác nhân, ngữ cảnh giới hạn, trách nhiệm dữ liệu và luồng nghiệp vụ; Kafka chỉ phục vụ sự kiện phù hợp, còn WebSocket giữ vai trò thông báo thay vì nguồn trạng thái nghiệp vụ.
 
 \section{Mục tiêu thiết kế và nguyên tắc kiến trúc}
 
-Các quyết định kiến trúc của QRTable được dẫn dắt bởi sáu mục tiêu chính.
+Các lựa chọn kiến trúc của QRTable được dẫn dắt bởi sáu mục tiêu chính.
 
 Thứ nhất, hệ thống cần tách trách nhiệm theo miền nghiệp vụ. Catalog sở hữu thực đơn, bàn và tồn kho; Order sở hữu phiên, giỏ, đơn và hóa đơn; Payment sở hữu thanh toán và cấu hình thanh toán; SaaS sở hữu vòng đời đơn vị thuê bao và gói thuê bao. Cách tách này giúp quy tắc nghiệp vụ có nơi đặt rõ ràng, đồng thời tránh việc một dịch vụ ghi trực tiếp cơ sở dữ liệu của dịch vụ khác.
 
-Thứ hai, cô lập đơn vị thuê bao phải là mặc định. QRTable phục vụ nhiều nhà hàng trên cùng nền tảng, nên mọi thao tác của dữ liệu nhà hàng phải mang ngữ cảnh \texttt{tenant\_id}. Mô hình hiện tại kết hợp cơ sở dữ liệu riêng theo dịch vụ với cột phân biệt \texttt{tenant\_id}. Cách tiếp cận này chưa phải mức cô lập vật lý cao nhất như cơ sở dữ liệu riêng cho từng đơn vị thuê bao, nhưng phù hợp với phạm vi hiện tại vì giảm chi phí vận hành, giữ quá trình thay đổi lược đồ dữ liệu đơn giản và vẫn cho phép kiểm soát dữ liệu theo đơn vị thuê bao ở API, cơ sở dữ liệu, Redis, Kafka và WebSocket. Khái niệm SaaS và chia sẻ tài nguyên nền tảng cũng làm cô lập đơn vị thuê bao trở thành một yêu cầu thiết kế cốt lõi \cite{nist-sp800145-2011}.
+Thứ hai, cô lập đơn vị thuê bao phải là mặc định. QRTable phục vụ nhiều nhà hàng trên cùng nền tảng, nên mọi thao tác của dữ liệu nhà hàng phải mang ngữ cảnh \texttt{tenant\_id}. Mô hình hiện tại kết hợp cơ sở dữ liệu riêng theo dịch vụ với cột phân biệt \texttt{tenant\_id}. Cách tiếp cận này chưa phải mức cô lập vật lý cao nhất như cơ sở dữ liệu riêng cho từng đơn vị thuê bao, nhưng phù hợp với phạm vi hiện tại vì giảm chi phí vận hành, giữ quá trình thay đổi lược đồ dữ liệu đơn giản và vẫn cho phép kiểm soát dữ liệu theo đơn vị thuê bao ở API, cơ sở dữ liệu, Redis, Kafka và WebSocket. Khái niệm SaaS và chia sẻ tài nguyên nền tảng cũng làm cô lập đơn vị thuê bao trở thành một yêu cầu thiết kế trọng yếu \cite{nist-sp800145-2011}.
 
-Thứ ba, BFF (Backend For Frontend) là điểm vào duy nhất của các ứng dụng phía người dùng. PWA khách và ứng dụng quản trị không gọi trực tiếp các dịch vụ nội bộ. BFF chịu trách nhiệm định tuyến HTTP, chuỗi guard bảo vệ, kiểm tra ngữ cảnh đơn vị thuê bao, cổng WebSocket và các thành phần gọi TCP/gRPC đến dịch vụ miền nghiệp vụ. Quyết định này giúp gom các mối quan tâm xuyên suốt ở lớp biên, trong khi bất biến nghiệp vụ vẫn nằm ở dịch vụ sở hữu.
+Thứ ba, BFF (Backend For Frontend) là điểm vào duy nhất của các ứng dụng phía người dùng. PWA khách và ứng dụng quản trị không gọi trực tiếp các dịch vụ nội bộ. BFF chịu trách nhiệm định tuyến HTTP, chuỗi guard bảo vệ, kiểm tra ngữ cảnh đơn vị thuê bao, cổng WebSocket và các thành phần gọi TCP/gRPC đến dịch vụ miền nghiệp vụ. Cách tổ chức này giúp gom các mối quan tâm xuyên suốt ở lớp biên, trong khi bất biến nghiệp vụ vẫn nằm ở dịch vụ sở hữu.
 
 Thứ tư, QRTable dùng giao tiếp hướng sự kiện có chọn lọc. TCP/gRPC được dùng cho lệnh hoặc truy vấn cần phản hồi ngay, chẳng hạn BFF gọi Order để gửi đơn hoặc Order gọi Catalog để trừ tồn kho khi nhân viên xác nhận. Kafka được dùng cho sự kiện miền nghiệp vụ và tác dụng phụ (side effect) bất đồng bộ, chẳng hạn \texttt{order.confirmed} để Kitchen tạo phiếu KDS hoặc \texttt{payment.completed} để Order hoàn tất hóa đơn. Cách dùng này tận dụng khả năng tách rời của Kafka \cite{apache-kafka-docs-2026} nhưng tránh biến bộ trung gian thông điệp thành tầng trung gian cho mọi thao tác phía client.
 
@@ -22,12 +22,12 @@ Thứ sáu, các thao tác ghi ảnh hưởng đến trạng thái bên ngoài p
 
 \section{Lựa chọn công nghệ và vai trò trong QRTable}
 
-Lựa chọn công nghệ trong QRTable xuất phát từ các mục tiêu thiết kế ở trên. Bảng~\ref{tab:chapter4-technology-decision} không nhằm so sánh đầy đủ mọi công nghệ thay thế; bảng này chỉ làm rõ công nghệ nào được dùng ở đâu, hỗ trợ mục tiêu nào và có giới hạn nào cần diễn đạt thận trọng. Riêng với Nx, tài liệu chính thức mô tả khả năng quản lý đồ thị dự án, xác định phần bị ảnh hưởng, bộ nhớ đệm tác vụ và thư viện dùng chung trong monorepo \cite{nx-docs-2026}; đây là lý do QRTable dùng Nx để quản lý nhiều ứng dụng và thư viện trong cùng kho mã nguồn.
+Các công nghệ trong Bảng~\ref{tab:chapter4-technology-decision} được đặt trong mối quan hệ với mục tiêu thiết kế, vị trí sử dụng và giới hạn kỹ thuật. Đối với Nx, tài liệu chính thức mô tả khả năng quản lý đồ thị dự án, xác định phần bị ảnh hưởng, bộ nhớ đệm tác vụ và thư viện dùng chung trong monorepo \cite{nx-docs-2026}. Các khả năng này phù hợp với nhu cầu quản lý nhiều ứng dụng và thư viện của QRTable trong cùng kho mã nguồn.
 
 {\footnotesize
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}>{\raggedright\arraybackslash}p{0.19\textwidth}}
-  \caption{Quyết định công nghệ chính và vai trò trong QRTable.}
+  \caption{Các công nghệ sử dụng trong QRTable và vai trò tương ứng.}
   \label{tab:chapter4-technology-decision}\\
   \toprule
   Công nghệ & Vị trí trong QRTable & Lý do sử dụng & Giới hạn cần lưu ý \\
@@ -41,7 +41,7 @@ Lựa chọn công nghệ trong QRTable xuất phát từ các mục tiêu thi�
   \endfoot
   Nx monorepo & Quản lý \texttt{apps/} và \texttt{libs/} & Giữ ứng dụng, dịch vụ và hợp đồng dùng chung trong một kho mã nguồn; hỗ trợ phát hiện phụ thuộc và kiểm thử/xây dựng theo phần bị ảnh hưởng. & Monorepo không được làm mờ ranh giới dịch vụ hoặc cho phép nhập trực tiếp repository của dịch vụ khác. \\
   TypeScript và NestJS & BFF và các dịch vụ phía máy chủ & Tạo cấu trúc module/controller/service rõ ràng, thuận lợi cho DTO, guard, lớp tích hợp và hợp đồng TCP/gRPC/Kafka có kiểu. & Không thay thế được kiểm thử hợp đồng và quy tắc không truy cập chéo CSDL. \\
-  Next.js và React & Ứng dụng quản trị & Phù hợp với client quản trị POS/KDS/báo cáo, nhiều trạng thái dữ liệu và luồng xác thực nhân viên. & Không biến client quản trị thành nơi quyết định nghiệp vụ; nghiệp vụ vẫn ở dịch vụ sở hữu. \\
+  Next.js và React & Ứng dụng quản trị & Phù hợp với client quản trị POS/KDS/báo cáo, nhiều trạng thái dữ liệu và luồng xác thực nhân viên. & Không biến client quản trị thành nơi xử lý nghiệp vụ; nghiệp vụ vẫn ở dịch vụ sở hữu. \\
   React/Vite PWA & Ứng dụng khách tại bàn & Tải nhanh cho luồng quét QR, xem thực đơn, giỏ chung và theo dõi đơn theo phiên. & Khách là tác nhân theo phiên, không dùng Keycloak như nhân viên. \\
   PostgreSQL & Dữ liệu nghiệp vụ quan hệ của nhiều dịch vụ & Phù hợp với đơn, hóa đơn, thực đơn, thanh toán, gói thuê bao và ràng buộc giao dịch nội bộ từng dịch vụ. & Không dùng một CSDL chung cho mọi dịch vụ; mỗi dịch vụ vẫn sở hữu dữ liệu của mình. \\
   MongoDB & User-Access & Lưu hồ sơ ứng dụng, vai trò và ánh xạ người dùng theo đơn vị thuê bao. & Không dùng MongoDB để thay thế nguồn danh tính Keycloak. \\
@@ -55,7 +55,7 @@ Lựa chọn công nghệ trong QRTable xuất phát từ các mục tiêu thi�
 
 \section{Kiến trúc tổng thể và bản đồ tích hợp công nghệ}
 
-Hình~\ref{fig:chapter4-technology-integration-map} là bản đồ đọc nhanh cho Chương 4. Hình đặt mỗi công nghệ vào đúng lớp kiến trúc: ứng dụng người dùng, lớp biên, dịch vụ miền nghiệp vụ, hạ tầng dữ liệu/sự kiện và nhà cung cấp ngoài. Các mũi tên không nhằm liệt kê mọi lời gọi trong mã nguồn, mà nhấn mạnh các luồng quyết định: ứng dụng chỉ đi qua BFF, dịch vụ giao tiếp nội bộ qua TCP/gRPC, Kafka chỉ dùng cho một số sự kiện miền, Redis chỉ giữ bộ nhớ đệm hoặc trạng thái chạy, còn webhook thanh toán đi qua BFF trước khi vào Payment hoặc SaaS.
+Hình~\ref{fig:chapter4-technology-integration-map} đặt các công nghệ vào năm lớp kiến trúc: ứng dụng người dùng, lớp biên, dịch vụ miền nghiệp vụ, hạ tầng dữ liệu và sự kiện, cùng nhà cung cấp ngoài. Các luồng chính thể hiện ứng dụng truy cập qua BFF, dịch vụ giao tiếp nội bộ bằng TCP/gRPC, Kafka truyền một số sự kiện miền, Redis giữ bộ nhớ đệm hoặc trạng thái khi vận hành, và webhook thanh toán được BFF định tuyến đến Payment hoặc SaaS.
 
 \begin{figure}[H]
   \centering
@@ -64,13 +64,13 @@ Hình~\ref{fig:chapter4-technology-integration-map} là bản đồ đọc nhanh
   \label{fig:chapter4-technology-integration-map}
 \end{figure}
 
-Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng thể theo các lớp ứng dụng người dùng, BFF, dịch vụ miền nghiệp vụ và hạ tầng. Hình~\ref{fig:chapter4-c4-container} trình bày cùng hệ thống ở mức container theo C4 để làm rõ tác nhân, ứng dụng web, dịch vụ, kho lưu trữ (storage) và hệ thống ngoài. Trước khi đọc hai hình này, cần nắm ngắn gọn vai trò từng lớp như sau.
+Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng thể theo các lớp ứng dụng người dùng, BFF, dịch vụ miền nghiệp vụ và hạ tầng. Hình~\ref{fig:chapter4-c4-container} trình bày hệ thống ở mức container theo C4, qua đó làm rõ tác nhân, ứng dụng web, dịch vụ, kho lưu trữ và hệ thống ngoài. Vai trò của từng lớp được mô tả dưới đây.
 
 Ở lớp ứng dụng người dùng, QRTable có hai ứng dụng chính. PWA khách phục vụ khách tại bàn, bắt đầu từ thao tác quét mã QR, xem thực đơn, cập nhật giỏ chung, gửi đơn, theo dõi trạng thái và yêu cầu thanh toán. Ứng dụng quản trị phục vụ các tác nhân đã xác thực như quản trị nền tảng, chủ quán, quản lý, phục vụ, bếp và bar qua các vùng chức năng POS, KDS, bảng điều khiển và quản trị nền tảng.
 
 Ở lớp biên, BFF là cửa vào duy nhất. BFF xử lý HTTP REST, WebSocket\slash Socket.IO, chuỗi guard và các thành phần gọi nội bộ đến dịch vụ miền nghiệp vụ. BFF có thể phát WebSocket hoặc làm mất hiệu lực bộ nhớ đệm sau khi nhận phản hồi từ dịch vụ, nhưng không sở hữu trạng thái nghiệp vụ như đơn, tồn kho, hóa đơn hoặc gói thuê bao.
 
-Ở lớp dịch vụ miền nghiệp vụ, hệ thống gồm Authorizer, User-Access, SaaS, Catalog, Order, Kitchen và Payment. Mỗi dịch vụ đại diện cho một ngữ cảnh giới hạn: xác minh danh tính, hồ sơ ứng dụng/RBAC, vòng đời đơn vị thuê bao, thực đơn/bàn/tồn kho, đơn/phiên/hóa đơn, hàng đợi KDS và quyết toán thanh toán. Module \texttt{product} trong monorepo chỉ là phần mẫu do Nx sinh ra, không thuộc kiến trúc lõi QRTable vì không gánh trách nhiệm nghiệp vụ của hệ thống.
+Ở lớp dịch vụ miền nghiệp vụ, hệ thống gồm Authorizer, User-Access, SaaS, Catalog, Order, Kitchen và Payment. Mỗi dịch vụ đại diện cho một ngữ cảnh giới hạn: xác minh danh tính, hồ sơ ứng dụng/RBAC, vòng đời đơn vị thuê bao, thực đơn/bàn/tồn kho, đơn/phiên/hóa đơn, hàng đợi KDS và quyết toán thanh toán. Module \texttt{product} trong monorepo chỉ là phần mẫu do Nx sinh ra, không thuộc kiến trúc chính của QRTable vì không gánh trách nhiệm nghiệp vụ của hệ thống.
 
 Ở lớp hạ tầng, QRTable dùng PostgreSQL cho dữ liệu nghiệp vụ quan hệ, MongoDB cho User-Access, Redis cho bộ nhớ đệm/phiên/hàng đợi KDS/cờ trạng thái chạy, Kafka cho sự kiện miền nghiệp vụ, Keycloak cho định danh nhân viên, SePay\slash VietQR cho thanh toán chuyển khoản, Cloudinary cho ảnh thực đơn và Docker\slash Docker Compose cho môi trường chạy.
 
@@ -92,11 +92,11 @@ Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng th�
 
 QRTable được tổ chức trong một kho mã nguồn Nx monorepo. Thư mục \texttt{apps/} chứa các đơn vị có thể triển khai như BFF, dịch vụ miền nghiệp vụ, PWA khách, ứng dụng quản trị và client Keycloak. Thư mục \texttt{libs/} chứa các thư viện chia sẻ như cấu hình, hằng số, DTO, guard, lớp tích hợp, hàng đợi, kiểu dùng chung, tiện ích, interface dùng chung và hook phía client.
 
-Lý do dùng monorepo không phải để làm mờ ranh giới dịch vụ. Ngược lại, monorepo được dùng để giữ hợp đồng (contract) dùng chung ở một nơi có kiểm soát. Các phần như hằng số topic Kafka, bộ dựng khóa Redis, bộ dựng phòng WebSocket, DTO, interface, lớp tích hợp và guard có thể được nhập thống nhất thay vì định nghĩa lại ở từng dịch vụ. Điều này giảm nguy cơ lệch contract giữa BFF, dịch vụ và phía client khi hệ thống phát triển.
+Monorepo cung cấp vị trí thống nhất cho các hợp đồng dùng chung mà không làm thay đổi ranh giới dịch vụ. Hằng số topic Kafka, bộ dựng khóa Redis, bộ dựng phòng WebSocket, DTO, interface, lớp tích hợp và guard được chia sẻ có kiểm soát thay vì định nghĩa lại ở từng dịch vụ. Cách tổ chức này giảm nguy cơ sai lệch hợp đồng giữa BFF, dịch vụ và ứng dụng phía người dùng.
 
 Một lợi ích khác của Nx là hỗ trợ đồ thị phụ thuộc và lệnh xác định phần bị ảnh hưởng (affected). Với hệ thống có nhiều ứng dụng và thư viện, thay đổi ở thư viện dùng chung có thể ảnh hưởng đến nhiều dự án con. Việc để các ứng dụng và thư viện trong cùng không gian làm việc Nx giúp phát hiện phụ thuộc rõ hơn, thuận lợi cho kiểm thử/xây dựng chọn lọc và tăng khả năng bảo trì. Tuy nhiên, monorepo không thay thế ranh giới dịch vụ: một dịch vụ vẫn không được nhập trực tiếp repository/entity nội bộ của dịch vụ khác để truy cập cơ sở dữ liệu. Mọi truy cập chéo miền nghiệp vụ phải đi qua TCP/gRPC hoặc sự kiện Kafka theo hợp đồng.
 
-Hình~\ref{fig:chapter4-nx-module-boundary} minh họa cách QRTable dùng Nx như một cơ chế quản lý không gian làm việc, không phải như lý do để trộn trách nhiệm nghiệp vụ. Trục bên trái là các ứng dụng/dịch vụ có thể chạy độc lập; trục bên phải là các thư viện hợp đồng và tiện ích dùng chung. Phần giữa nhấn mạnh ranh giới quan trọng nhất: ứng dụng được phép nhập hợp đồng dùng chung, nhưng không được nhập trực tiếp repository hoặc entity nội bộ của dịch vụ khác để ghi dữ liệu.
+Hình~\ref{fig:chapter4-nx-module-boundary} minh họa Nx như cơ chế quản lý không gian làm việc. Trục bên trái là các ứng dụng và dịch vụ có thể chạy độc lập; trục bên phải là thư viện hợp đồng và tiện ích dùng chung. Ranh giới ở giữa cho phép ứng dụng nhập hợp đồng dùng chung nhưng ngăn việc nhập trực tiếp repository hoặc entity nội bộ của dịch vụ khác để ghi dữ liệu.
 
 \begin{figure}[H]
   \centering
@@ -107,7 +107,7 @@ Hình~\ref{fig:chapter4-nx-module-boundary} minh họa cách QRTable dùng Nx nh
 
 \section{Ranh giới dịch vụ và trách nhiệm dữ liệu}
 
-Bảng~\ref{tab:chapter4-service-ownership} tóm tắt trách nhiệm sở hữu chính của các thành phần trong QRTable. Đây là quyết định quan trọng nhất của Chương 4 vì nó xác định nơi đặt quy tắc nghiệp vụ, nơi lưu dữ liệu và cách các dịch vụ phối hợp mà không phá vỡ tính độc lập của từng ngữ cảnh giới hạn.
+Bảng~\ref{tab:chapter4-service-ownership} tóm tắt trách nhiệm sở hữu chính của các thành phần trong QRTable. Đây là nội dung trọng yếu của Chương 4 vì nó xác định nơi đặt quy tắc nghiệp vụ, nơi lưu dữ liệu và cách các dịch vụ phối hợp mà không phá vỡ tính độc lập của từng ngữ cảnh giới hạn.
 
 {\footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -141,19 +141,19 @@ Catalog và Order là ví dụ điển hình cho trách nhiệm sở hữu. Khi 
 
 Payment và Order cũng được tách tương tự. Payment sở hữu giao dịch thanh toán, cấu hình thanh toán của đơn vị thuê bao và quyết toán webhook. Order sở hữu vòng đời hóa đơn/phiên. Khi thanh toán hoàn tất, Payment có thể gọi Order theo đường nhanh có idempotency hoặc xuất bản \texttt{payment.completed} để Order xử lý phục hồi/phân phối, nhưng Payment không tự đóng hóa đơn/phiên hay cập nhật trạng thái bàn.
 
-Kitchen là trường hợp đặc biệt vì không có PostgreSQL hoặc MongoDB riêng trong kiến trúc hiện tại. Kitchen tiêu thụ \texttt{order.confirmed}, dựng phiếu KDS và lưu hàng đợi trạng thái khi vận hành trong Redis Sorted Set/hash. Quyết định này phù hợp với yêu cầu sắp xếp FIFO, ưu tiên, SLA và cập nhật nhanh cho màn hình bếp/bar. Nếu sau này cần phân tích lịch sử bếp hoặc kiểm toán sâu hơn, có thể bổ sung lưu trữ hoặc bản chiếu riêng mà không làm thay đổi trách nhiệm của Order.
+Kitchen là trường hợp đặc biệt vì không có PostgreSQL hoặc MongoDB riêng trong kiến trúc hiện tại. Kitchen tiêu thụ \texttt{order.confirmed}, dựng phiếu KDS và lưu hàng đợi trạng thái khi vận hành trong Redis Sorted Set/hash. Cách tổ chức này phù hợp với yêu cầu sắp xếp FIFO, ưu tiên, SLA và cập nhật nhanh cho màn hình bếp/bar. Nếu sau này cần phân tích lịch sử bếp hoặc kiểm toán sâu hơn, có thể bổ sung lưu trữ hoặc bản chiếu riêng mà không làm thay đổi trách nhiệm của Order.
 
-Báo cáo và bảng điều khiển trong QRTable được thiết kế theo mô hình đọc tổng hợp: BFF điều phối truy vấn, chuỗi guard kiểm soát phạm vi và quyền, còn dữ liệu nghiệp vụ vẫn do các dịch vụ sở hữu cung cấp qua hợp đồng — không tách thành dịch vụ phân tích riêng. Chủ quán và quản lý truy cập báo cáo trong phạm vi đơn vị thuê bao của mình với quyền \texttt{report.read\_own}, đồng thời chịu ràng buộc tính năng theo gói thuê bao. Quản trị nền tảng (Super Admin) dùng \texttt{report.read\_any} để phân tích xuyên đơn vị thuê bao và không bị giới hạn bởi gói của đơn vị thuê bao đang xem. Thiết kế này nằm ở lớp BFF, guard và mô hình đọc, giữ nguyên ranh giới kiến trúc lõi đã nêu.
+Báo cáo và bảng điều khiển được thiết kế theo mô hình đọc tổng hợp: BFF điều phối truy vấn, chuỗi guard kiểm soát phạm vi và quyền, còn dữ liệu nghiệp vụ do các dịch vụ sở hữu cung cấp qua hợp đồng. Chủ quán và quản lý truy cập báo cáo trong phạm vi đơn vị thuê bao với quyền \texttt{report.read\_own} và chịu ràng buộc theo gói. Quản trị viên nền tảng dùng \texttt{report.read\_any} để phân tích xuyên đơn vị thuê bao mà không phụ thuộc gói của đơn vị đang xem. Thiết kế này được triển khai tại BFF, guard và các mô hình đọc, không cần dịch vụ phân tích riêng.
 
 \section{Thiết kế cơ sở dữ liệu theo ranh giới dịch vụ}
 
-Thiết kế cơ sở dữ liệu của QRTable đi theo cùng nguyên tắc với ranh giới dịch vụ: mỗi dịch vụ sở hữu tập dữ liệu nghiệp vụ của mình, còn dịch vụ khác chỉ được truy cập thông qua hợp đồng (contract) TCP/gRPC hoặc sự kiện Kafka. Vì vậy, cơ sở dữ liệu không được xem là kho chung để các dịch vụ tùy ý nối bảng hoặc cập nhật chéo. PostgreSQL và MongoDB giữ trạng thái bền vững của từng ngữ cảnh giới hạn; Redis giữ bộ nhớ đệm, trạng thái phiên khi vận hành hoặc hàng đợi; Kafka và outbox giao dịch (transactional outbox) giữ vai trò truyền sự kiện sau điểm commit của dịch vụ phát.
+Thiết kế cơ sở dữ liệu tuân theo ranh giới dịch vụ: mỗi dịch vụ sở hữu dữ liệu nghiệp vụ của mình, còn truy cập liên dịch vụ đi qua hợp đồng TCP/gRPC hoặc sự kiện Kafka. PostgreSQL và MongoDB giữ trạng thái bền vững của từng ngữ cảnh giới hạn; Redis giữ bộ nhớ đệm, trạng thái phiên khi vận hành hoặc hàng đợi; Kafka và outbox giao dịch truyền sự kiện sau điểm ghi nhận của dịch vụ phát. Cách tổ chức này loại bỏ nhu cầu nối bảng hoặc cập nhật chéo giữa các cơ sở dữ liệu dịch vụ.
 
 \subsection{Nguyên tắc sở hữu dữ liệu}
 
-Với các dữ liệu nằm trong phạm vi đơn vị thuê bao, \texttt{tenant\_id} là thuộc tính bắt buộc để truy vấn, khóa Redis, payload sự kiện và phòng WebSocket đều gắn với cùng ngữ cảnh. Quy tắc này không làm thay đổi việc mỗi dịch vụ vẫn có cơ sở dữ liệu hoặc nhóm dữ liệu riêng: Catalog quyết định dữ liệu catalog/tồn kho, Order quyết định phiên/đơn/hóa đơn, Payment quyết định bản ghi thanh toán và cấu hình thanh toán, SaaS quyết định đơn vị thuê bao/gói thuê bao, còn User-Access quyết định hồ sơ người dùng và vai trò nghiệp vụ. BFF và Authorizer nằm ở lớp biên/xác thực nên không được trình bày như chủ sở hữu bảng nghiệp vụ.
+Với các dữ liệu nằm trong phạm vi đơn vị thuê bao, \texttt{tenant\_id} là thuộc tính bắt buộc để truy vấn, khóa Redis, payload sự kiện và phòng WebSocket đều gắn với cùng ngữ cảnh. Quy tắc này không làm thay đổi việc mỗi dịch vụ vẫn có cơ sở dữ liệu hoặc nhóm dữ liệu riêng: Catalog sở hữu dữ liệu catalog/tồn kho, Order sở hữu phiên/đơn/hóa đơn, Payment sở hữu bản ghi thanh toán và cấu hình thanh toán, SaaS sở hữu đơn vị thuê bao/gói thuê bao, còn User-Access sở hữu hồ sơ người dùng và vai trò nghiệp vụ. BFF và Authorizer nằm ở lớp biên/xác thực nên không được trình bày như chủ sở hữu bảng nghiệp vụ.
 
-Bảng~\ref{tab:chapter4-data-ownership-schema} tổng hợp các bảng, collection hoặc trạng thái khi vận hành tiêu biểu theo thiết kế entity/schema của từng dịch vụ. Bảng này không thay thế ERD chi tiết; mục đích của nó là làm rõ quyền sở hữu cơ sở dữ liệu và giải thích vì sao Chương 5 mô tả luồng qua contract thay vì truy cập chéo cơ sở dữ liệu.
+Bảng~\ref{tab:chapter4-data-ownership-schema} tổng hợp các bảng, collection và trạng thái khi vận hành tiêu biểu của từng dịch vụ. Trọng tâm của bảng là quyền sở hữu cơ sở dữ liệu và các hợp đồng được sử dụng trong luồng liên dịch vụ; cấu trúc quan hệ chi tiết được thể hiện trong các sơ đồ dữ liệu tiếp theo.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{2pt}
@@ -180,7 +180,7 @@ Bảng~\ref{tab:chapter4-data-ownership-schema} tổng hợp các bảng, collec
 \end{longtable}
 }
 
-Các sơ đồ sau đây mô tả cấu trúc dữ liệu tiêu biểu của từng dịch vụ, được trình bày bằng hình SVG xuất từ dbdiagram.io để minh họa. Sơ đồ không biểu diễn khóa ngoại (foreign key) xuyên dịch vụ vì ranh giới dữ liệu không cho phép nối CSDL trực tiếp giữa các ngữ cảnh giới hạn. Các định danh trỏ sang dịch vụ khác chỉ là tham chiếu bên ngoài (external reference) qua contract hoặc sự kiện, không phải ràng buộc CSDL chéo dịch vụ. Hình~\ref{fig:chapter4-db-catalog-schema}--\ref{fig:chapter4-db-user-access-schema} trình bày lần lượt schema tiêu biểu của Catalog, Order, Payment, SaaS và User-Access trong cùng mục thiết kế dữ liệu.
+Các sơ đồ tiếp theo mô tả cấu trúc dữ liệu tiêu biểu của từng dịch vụ bằng hình SVG xuất từ dbdiagram.io. Ranh giới dữ liệu không sử dụng khóa ngoại xuyên dịch vụ; định danh trỏ sang miền khác là tham chiếu bên ngoài qua hợp đồng hoặc sự kiện. Hình~\ref{fig:chapter4-db-catalog-schema}--\ref{fig:chapter4-db-user-access-schema} trình bày lần lượt lược đồ của Catalog, Order, Payment, SaaS và User-Access.
 
 \begin{figure}[H]
   \centering
@@ -219,13 +219,13 @@ Các sơ đồ sau đây mô tả cấu trúc dữ liệu tiêu biểu của t�
 
 \subsection{Ý nghĩa đối với các dịch vụ nghiệp vụ}
 
-Ở nhóm Catalog--Order, bảng dữ liệu phản ánh trực tiếp điểm commit nghiệp vụ. Catalog lưu bàn, khu vực, danh mục và món; vì vậy tồn kho và khả dụng món thuộc về Catalog. Order lưu phiên, giỏ, đơn, dòng đơn và hóa đơn; vì vậy Order có thể quyết định đơn đang ở trạng thái nào, nhưng không tự sửa bảng món của Catalog. Luồng xác nhận đơn ở Chương 5 vì thế phải đi qua lời gọi Order--Catalog, có idempotency và bù trừ, thay vì tạo một giao dịch cơ sở dữ liệu dùng chung.
+Ở nhóm Catalog--Order, bảng dữ liệu phản ánh trực tiếp điểm commit nghiệp vụ. Catalog lưu bàn, khu vực, danh mục và món; vì vậy tồn kho và khả dụng món thuộc về Catalog. Order lưu phiên, giỏ, đơn, dòng đơn và hóa đơn; vì vậy Order có thể xác định đơn đang ở trạng thái nào, nhưng không tự sửa bảng món của Catalog. Luồng xác nhận đơn ở Chương 5 vì thế phải đi qua lời gọi Order--Catalog, có idempotency và bù trừ, thay vì tạo một giao dịch cơ sở dữ liệu dùng chung.
 
-Ở nhóm Kitchen, Redis chỉ là bản chiếu trạng thái khi vận hành của dữ liệu đã được commit ở Order. Kitchen dựng phiếu KDS từ \texttt{order.confirmed}, lưu hàng đợi theo trạm, phát gợi ý WebSocket và cho phép client lấy lại snapshot. Nếu cần truy xuất lịch sử đơn, hệ thống quay về Order hoặc các nguồn bền vững khác; hàng đợi KDS không được xem như nguồn dữ liệu lịch sử có thẩm quyền.
+Ở nhóm Kitchen, Redis chỉ là bản chiếu trạng thái khi vận hành của dữ liệu đã được commit ở Order. Kitchen dựng phiếu KDS từ \texttt{order.confirmed}, lưu hàng đợi theo trạm, phát gợi ý WebSocket và cho phép client lấy lại trạng thái mới nhất. Nếu cần truy xuất lịch sử đơn, hệ thống quay về Order hoặc các nguồn bền vững khác; hàng đợi KDS không được xem như nguồn dữ liệu lịch sử có thẩm quyền.
 
 Ở nhóm Payment--SaaS--User-Access, ranh giới dữ liệu giúp tách hai dòng tiền và hai loại danh tính. Payment lưu bản ghi thanh toán và cấu hình SePay/VietQR cho hóa đơn nhà hàng; SaaS lưu đơn vị thuê bao, gói giá, subscription và hóa đơn gói nền tảng; User-Access lưu hồ sơ ứng dụng và vai trò nghiệp vụ trong MongoDB trong khi Keycloak giữ định danh. Cách tách này giúp webhook, khởi tạo đơn vị thuê bao (onboarding) và quyền lợi gói (entitlement) được giải thích theo chủ sở hữu rõ ràng, không gom vào một bảng người dùng hoặc thanh toán chung.
 
-Tóm lại, thiết kế dữ liệu theo dịch vụ là bằng chứng cụ thể cho ranh giới dịch vụ (service boundary) của QRTable. Khi Chương 5 trình bày các luồng phiên QR, xác nhận đơn, KDS, thanh toán và onboarding, mỗi luồng đều phải đi qua contract giữa dịch vụ thay vì nối bảng hoặc cập nhật chéo cơ sở dữ liệu. Đây là điểm quan trọng để hệ thống giữ được tính độc lập theo ngữ cảnh giới hạn trong một Nx monorepo.
+Thiết kế dữ liệu cụ thể hóa ranh giới dịch vụ của QRTable. Các luồng phiên QR, xác nhận đơn, KDS, thanh toán và khởi tạo đơn vị thuê bao đi qua hợp đồng giữa dịch vụ thay vì nối bảng hoặc cập nhật chéo cơ sở dữ liệu. Nhờ đó, các ngữ cảnh giới hạn vẫn duy trì tính độc lập trong cùng Nx monorepo.
 
 \section{Chiến lược đa đơn vị thuê bao}
 
@@ -265,13 +265,13 @@ Bảng~\ref{tab:chapter4-communication-matrix} trình bày các kênh giao tiế
   WebSocket / Socket.IO & BFF -- khách / nhân viên / KDS / quản trị & Gợi ý thời gian thực, làm mất hiệu lực và làm mới dữ liệu cho đơn, giỏ, KDS, thanh toán và vòng đời đơn vị thuê bao. & Không phải trạng thái có thẩm quyền. \\
   TCP RPC & BFF -- Catalog / Order / Kitchen / Payment / SaaS / User-Access & Lệnh/truy vấn nội bộ cần phản hồi ngay. & Không dùng thay cho phân phối sự kiện. \\
   TCP RPC & Order -- Catalog & Trừ/hoàn tồn kho và thao tác bàn theo trách nhiệm của Catalog. & Order không ghi CSDL Catalog. \\
-  TCP RPC & Payment -- Order & Lấy snapshot hóa đơn và đánh dấu đã thanh toán theo cách có idempotency cho đường nhanh/phục hồi. & Payment không sở hữu hóa đơn/phiên. \\
+  TCP RPC & Payment -- Order & Lấy trạng thái hóa đơn mới nhất và đánh dấu đã thanh toán theo cách có idempotency cho đường nhanh/phục hồi. & Payment không sở hữu hóa đơn/phiên. \\
   TCP RPC & SaaS -- Authorizer / User-Access / Payment / Catalog / Order & Mini-saga đưa đơn vị thuê bao vào hệ thống, tạo chủ quán/hồ sơ/cấu hình, bộ đếm sử dụng và hạn mức. & Điều phối SaaS không đồng nghĩa sở hữu dữ liệu của dịch vụ khác. \\
   gRPC & BFF -- Authorizer & Xác minh token và đường xác thực nhanh bằng contract dịch vụ có kiểu. & Luồng QR khách không đi qua Keycloak. \\
   Kafka & Order / Payment / Kitchen / SaaS -- bên tiêu thụ & Sự kiện miền bất đồng bộ, tách thời gian, phân phối và phục hồi. & Chỉ dùng 5 topic được chấp nhận. \\
   Gợi ý nội bộ Redis & Trạng thái KDS khi vận hành -- cầu nối WebSocket BFF & Báo hàng đợi KDS thay đổi sau khi ghi Redis. & Gợi ý/làm mới, không thay trạng thái Kitchen. \\
   Webhook HTTP & SePay -- BFF -- Payment/SaaS & Quyết toán chuyển khoản cho hóa đơn nhà hàng \texttt{QRTBL} và hóa đơn gói \texttt{QRSUB}. & Không trộn tuyến webhook theo tầng. \\
-  HTTP/API ngoài & Catalog / Payment / Authorizer -- Cloudinary / SePay / Keycloak & Tải ảnh, API OAuth/nhà cung cấp và thao tác quản trị IAM. & Chỉ khẳng định phần có mã/bằng chứng. \\
+HTTP/API ngoài & Catalog / Payment / Authorizer -- Cloudinary / SePay / Keycloak & Tải ảnh, API OAuth/nhà cung cấp và thao tác quản trị IAM. & Phạm vi đánh giá phụ thuộc vào mã nguồn, kiểm thử và hiện vật nhà cung cấp tương ứng. \\
 \end{longtable}
 }
 
@@ -284,37 +284,37 @@ Hình~\ref{fig:chapter4-communication-topology} đặt các kênh trong Bảng~\
   \label{fig:chapter4-communication-topology}
 \end{figure}
 
-HTTP REST chỉ xuất hiện ở ranh giới ứng dụng đến BFF hoặc nhà cung cấp ngoài đến BFF. TCP RPC được dùng cho lệnh/truy vấn nội bộ cần kết quả ngay, ví dụ BFF cần trả phản hồi thực đơn/đơn cho phía client, Order cần biết Catalog có trừ tồn kho thành công hay không, hoặc Payment cần lấy snapshot hóa đơn từ Order. gRPC được dùng cho đường xác thực đến Authorizer vì đây là đường nhanh có contract có kiểu.
+HTTP REST chỉ xuất hiện ở ranh giới ứng dụng đến BFF hoặc nhà cung cấp ngoài đến BFF. TCP RPC được dùng cho lệnh/truy vấn nội bộ cần kết quả ngay, ví dụ BFF cần trả phản hồi thực đơn/đơn cho phía client, Order cần biết Catalog có trừ tồn kho thành công hay không, hoặc Payment cần lấy trạng thái hóa đơn mới nhất từ Order. gRPC được dùng cho đường xác thực đến Authorizer vì đây là đường nhanh có contract có kiểu.
 
 Kafka được dùng khi bên phát (Producer) không cần đợi bên tiêu thụ (Consumer) hoàn thành hoặc khi sự kiện cần kích hoạt phản ứng nghiệp vụ ở ngữ cảnh giới hạn khác. Ví dụ, khi đơn được xác nhận, Order không cần chờ Kitchen tạo xong phiếu KDS để trả kết quả xác nhận cho nhân viên; do đó \texttt{order.confirmed} đi qua Kafka. Ngược lại, khi khách cập nhật giỏ hoặc khi BFF cần phát thông báo cho client sau một phản hồi TCP đã thành công, dùng Kafka sẽ làm tăng độ trễ và phụ thuộc hạ tầng mà không thêm giá trị nghiệp vụ. Trường hợp này được xử lý bằng đường trực tiếp qua BFF hoặc gợi ý WebSocket/làm mới dữ liệu.
 
 WebSocket trong QRTable được dùng để cải thiện trải nghiệm thời gian thực nhưng không thay thế nguồn sự thật của hệ thống. Theo bản chất giao thức, WebSocket cung cấp kênh hai chiều lâu dài giữa phía người dùng và máy chủ \cite{fette-websocket-rfc6455-2011}; trong QRTable, kênh này chỉ mang sự kiện thông báo, làm mất hiệu lực hoặc gợi ý làm mới. Nếu phía người dùng mất kết nối hoặc nhận sự kiện trễ, trạng thái đúng vẫn phải được lấy lại từ API và dịch vụ sở hữu.
 
-\section{Thiết kế hướng sự kiện và sổ đăng ký topic Kafka}
+\section{Thiết kế hướng sự kiện và danh mục topic Kafka}
 
-Hình~\ref{fig:chapter4-kafka-decision-flow} trình bày luồng quyết định chọn TCP/gRPC, Kafka, WebSocket/đường trực tiếp qua BFF hoặc bộ chuyển đổi webhook. Luồng này giúp tránh hai cực đoan: dùng Kafka cho mọi thứ, hoặc dùng RPC đồng bộ cho các tác dụng phụ có thể chạy bất đồng bộ.
+Hình~\ref{fig:chapter4-kafka-decision-flow} trình bày cơ sở lựa chọn giữa TCP/gRPC, Kafka, WebSocket, đường trực tiếp qua BFF và bộ chuyển đổi webhook. Tiêu chí chính gồm nhu cầu phản hồi tức thời, ranh giới giao dịch và khả năng xử lý bất đồng bộ.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter4-kafka-decision-flow.pdf}
-  \caption{Luồng quyết định chọn TCP/gRPC, Kafka, WebSocket/đường trực tiếp qua BFF hoặc bộ chuyển đổi webhook.}
+  \caption{Cơ sở lựa chọn kênh giao tiếp trong kiến trúc QRTable.}
   \label{fig:chapter4-kafka-decision-flow}
 \end{figure}
 
 \subsection{Vai trò của Kafka trong kiến trúc QRTable}
 
-Khung quyết định của QRTable có thể tóm tắt như sau. Nếu một thay đổi trạng thái cần quy tắc nghiệp vụ ở ngữ cảnh giới hạn khác, Kafka là lựa chọn phù hợp. Nếu bên phát không cần đợi bên tiêu thụ, hoặc sự kiện được tạo bởi bộ hẹn giờ/tiến trình nền nội bộ, Kafka cũng phù hợp. Nếu sự kiện là kết quả của một ghi CSDL và cần phát ra ngoài dịch vụ, outbox giao dịch (transactional outbox) được dùng để giảm rủi ro ghi kép. Ngược lại, nếu tác dụng phụ chỉ là thông báo cho client hoặc làm mất hiệu lực bộ nhớ đệm sau khi BFF đã có phản hồi từ TCP, đường trực tiếp qua BFF là lựa chọn đơn giản hơn.
+Kafka được sử dụng khi thay đổi trạng thái cần kích hoạt quy tắc ở ngữ cảnh giới hạn khác, khi bên phát không phải chờ bên tiêu thụ, hoặc khi sự kiện được tạo bởi tiến trình nền. Sự kiện phát sinh từ giao dịch CSDL đi qua outbox giao dịch để giảm rủi ro ghi kép. Các tác dụng phụ chỉ nhằm thông báo cho ứng dụng hoặc làm mất hiệu lực bộ nhớ đệm sau phản hồi TCP được xử lý trực tiếp qua BFF.
 
-Do đó, Kafka trong QRTable không phải lớp trung gian cho mọi lời gọi. Lệnh hoặc truy vấn cần phản hồi ngay vẫn đi qua TCP/gRPC, ví dụ Order gọi Catalog để trừ tồn kho khi nhân viên xác nhận đơn, BFF gọi Order để lấy trạng thái phiên hoặc Payment gọi Order để lấy snapshot hóa đơn. Kafka chỉ xuất hiện khi sự kiện đã xảy ra ở một dịch vụ sở hữu và cần kích hoạt phản ứng bất đồng bộ ở dịch vụ khác, như Kitchen dựng phiếu KDS từ \texttt{order.confirmed}, Order hoàn tất hóa đơn từ \texttt{payment.completed}, Catalog tạo dữ liệu mặc định từ \texttt{tenant.created}, hoặc BFF phát cảnh báo thời gian thực từ \texttt{kitchen.sla\_warning}.
+Do đó, Kafka trong QRTable không phải lớp trung gian cho mọi lời gọi. Lệnh hoặc truy vấn cần phản hồi ngay vẫn đi qua TCP/gRPC, ví dụ Order gọi Catalog để trừ tồn kho khi nhân viên xác nhận đơn, BFF gọi Order để lấy trạng thái phiên hoặc Payment gọi Order để lấy trạng thái hóa đơn mới nhất. Kafka chỉ xuất hiện khi sự kiện đã xảy ra ở một dịch vụ sở hữu và cần kích hoạt phản ứng bất đồng bộ ở dịch vụ khác, như Kitchen dựng phiếu KDS từ \texttt{order.confirmed}, Order hoàn tất hóa đơn từ \texttt{payment.completed}, Catalog tạo dữ liệu mặc định từ \texttt{tenant.created}, hoặc BFF phát cảnh báo thời gian thực từ \texttt{kitchen.sla\_warning}.
 
-\subsection{Sổ đăng ký topic và hợp đồng sự kiện}
+\subsection{Danh mục topic và hợp đồng sự kiện}
 
-Bảng~\ref{tab:chapter4-kafka-topic-registry} liệt kê năm topic được chấp nhận trong sổ đăng ký hiện tại. Mỗi dòng trình bày topic như một hợp đồng (contract) kiến trúc: bên phát, bên tiêu thụ, khóa phân vùng, payload chính và cơ chế độ tin cậy/idempotency theo quyết định thiết kế. Payload trong bảng chỉ nêu các trường đại diện để người đọc hiểu ý nghĩa sự kiện, không thay thế định nghĩa DTO đầy đủ trong triển khai.
+Bảng~\ref{tab:chapter4-kafka-topic-registry} liệt kê năm topic được sử dụng trong kiến trúc hiện tại. Mỗi topic được mô tả như một hợp đồng kiến trúc gồm bên phát, bên tiêu thụ, khóa phân vùng, nội dung chính và cơ chế xử lý lặp. Các trường trong bảng mang tính đại diện; định nghĩa đầy đủ nằm trong DTO của hệ thống.
 
 {\scriptsize
 \setlength{\tabcolsep}{1pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.12\textwidth}>{\raggedright\arraybackslash}p{0.08\textwidth}>{\raggedright\arraybackslash}p{0.13\textwidth}>{\raggedright\arraybackslash}p{0.08\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.13\textwidth}>{\raggedright\arraybackslash}p{0.14\textwidth}}
-  \caption{Hợp đồng sự kiện Kafka được chấp nhận trong QRTable.}
+  \caption{Các hợp đồng sự kiện Kafka trong kiến trúc QRTable.}
   \label{tab:chapter4-kafka-topic-registry}\\
   \toprule
   Topic & Bên phát & Bên tiêu thụ / trạng thái & Khóa phân vùng & Payload chính & Lý do dùng Kafka & Độ tin cậy / idempotency \\
@@ -334,14 +334,14 @@ Bảng~\ref{tab:chapter4-kafka-topic-registry} liệt kê năm topic được ch
 \end{longtable}
 }
 
-\subsection{Outbox giao dịch và kỷ luật phát sự kiện}
+\subsection{Outbox giao dịch và nguyên tắc phát sự kiện}
 
-Các sự kiện phát sinh từ ghi CSDL không được gửi thẳng ra Kafka như một thao tác rời rạc. QRTable dùng outbox giao dịch (transactional outbox): trong cùng giao dịch nghiệp vụ, dịch vụ ghi dữ liệu miền và ghi thêm một dòng \texttt{outbox\_events}. Tiến trình xuất bản sau đó đọc các dòng \texttt{PENDING}, gửi Kafka với \texttt{key = partition\_key}, rồi đánh dấu \texttt{PUBLISHED}; nếu lỗi, dòng được tăng số lần thử và giữ trạng thái có thể retry hoặc chuyển \texttt{FAILED} sau ngưỡng lỗi. Thiết kế này giảm rủi ro ghi dữ liệu thành công nhưng mất sự kiện, nhưng không được diễn đạt như CDC, Debezium hoặc bảo đảm phân phối exactly-once.
+Các sự kiện phát sinh từ ghi CSDL đi qua outbox giao dịch. Trong cùng giao dịch nghiệp vụ, dịch vụ ghi dữ liệu miền và một dòng \texttt{outbox\_events}. Tiến trình xuất bản đọc các dòng \texttt{PENDING}, gửi Kafka theo khóa phân vùng rồi đánh dấu \texttt{PUBLISHED}; trường hợp lỗi làm tăng số lần thử và có thể chuyển sang \texttt{FAILED} sau ngưỡng quy định. Thiết kế giảm rủi ro dữ liệu đã ghi nhưng sự kiện bị mất; phạm vi hiện tại chưa bao gồm CDC, Debezium hoặc bảo đảm phân phối chính xác một lần.
 
 {\footnotesize
 \setlength{\tabcolsep}{3pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}}
-  \caption{Các trường outbox và kỷ luật phát sự kiện trong QRTable.}
+  \caption{Các trường outbox và nguyên tắc phát sự kiện trong QRTable.}
   \label{tab:chapter4-outbox-discipline}\\
   \toprule
   Trường outbox & Ý nghĩa thiết kế & Tác dụng trong QRTable \\
@@ -367,13 +367,13 @@ Các sự kiện phát sinh từ ghi CSDL không được gửi thẳng ra Kafka
 
 \subsection{Ranh giới giữa Kafka, đường trực tiếp qua BFF và WebSocket}
 
-Bảng~\ref{tab:chapter4-kafka-topic-registry} cũng thể hiện một ranh giới kiểm soát quan trọng: QRTable chỉ công nhận năm topic trong sổ đăng ký hiện tại. Các sự kiện như giỏ cập nhật, yêu cầu hóa đơn, chuyển bàn, hàng đợi KDS thay đổi, đơn vị thuê bao bị tạm ngưng hoặc thực đơn cập nhật không được viết như topic Kafka lõi nếu chưa có hợp đồng tương ứng. Chúng có thể là sự kiện socket, gợi ý nội bộ Redis, làm mất hiệu lực bộ nhớ đệm hoặc làm mới client tùy trường hợp.
+Bảng~\ref{tab:chapter4-kafka-topic-registry} xác định phạm vi năm topic Kafka của kiến trúc hiện tại. Các thay đổi như cập nhật giỏ, yêu cầu hóa đơn, chuyển bàn, thay đổi hàng đợi KDS, tạm ngưng đơn vị thuê bao hoặc cập nhật thực đơn được truyền bằng sự kiện socket, gợi ý nội bộ Redis hoặc cơ chế làm mất hiệu lực bộ nhớ đệm tùy theo yêu cầu nghiệp vụ.
 
-Đường thời gian thực của BFF vì vậy có hai nguồn khác nhau. Với hai topic thanh toán và cảnh báo SLA đã được phê duyệt, BFF có thể tiêu thụ Kafka để phát WebSocket. Với hàng đợi KDS thay đổi sau thao tác bếp hoặc sau khi Kitchen ghi Redis, Kitchen phát \texttt{kds.queue\_changed} vào Redis Pub/Sub theo mẫu \texttt{realtime:kds:*}; BFF đăng ký nhận kênh này và phát tới phòng KDS bếp/bar tương ứng. Sự kiện đó là gợi ý làm mới client, không phải topic Kafka và không phải nguồn trạng thái bếp có thẩm quyền.
+Đường thời gian thực của BFF nhận dữ liệu từ hai nguồn. BFF tiêu thụ các topic thanh toán và cảnh báo SLA để phát WebSocket. Đối với thay đổi hàng đợi KDS, Kitchen phát \texttt{kds.queue\_changed} qua Redis Pub/Sub theo mẫu \texttt{realtime:kds:*}; BFF nhận kênh này và chuyển tín hiệu tới phòng KDS tương ứng. Tín hiệu chỉ yêu cầu ứng dụng làm mới dữ liệu và không phải nguồn trạng thái bếp có thẩm quyền.
 
-\subsection{Giới hạn thiết kế và các khẳng định không mở rộng}
+\subsection{Phạm vi áp dụng của thiết kế hướng sự kiện}
 
-Kafka trong QRTable được thiết kế theo hướng ít nhất một lần (at-least-once) ở mức thực tế triển khai: bên phát có thể retry, tiến trình outbox có thể gửi lại dòng chưa đánh dấu thành công và bên tiêu thụ phải xử lý bản ghi trùng bằng \texttt{eventId}, \texttt{aggregate\_id} hoặc khóa idempotency riêng. Khóa luận vì vậy không khẳng định phân phối exactly-once, không khẳng định CDC/Debezium và không dùng Kafka để chứng minh mọi tính nhất quán dữ liệu (consistency). Tính đúng của tồn kho vẫn nằm ở Catalog và giao dịch xác nhận đơn; tính đúng của hóa đơn vẫn nằm ở Order/Payment; Kafka chỉ giúp tách thời gian và phục hồi tác dụng phụ sau điểm commit.
+Kafka trong QRTable hoạt động theo mô hình phân phối ít nhất một lần: bên phát có thể thử lại, tiến trình outbox có thể gửi lại dòng chưa được đánh dấu thành công và bên tiêu thụ xử lý bản ghi trùng bằng \texttt{eventId}, \texttt{aggregate\_id} hoặc khóa lũy đẳng riêng. Phạm vi thiết kế không bao gồm phân phối chính xác một lần hoặc CDC/Debezium. Tính đúng của tồn kho nằm ở Catalog và giao dịch xác nhận đơn; tính đúng của hóa đơn nằm ở Order và Payment; Kafka tách thời gian xử lý và hỗ trợ phục hồi tác dụng phụ sau điểm ghi nhận.
 
 \section{Redis cho bộ nhớ đệm, trạng thái khi vận hành và KDS}
 
@@ -420,7 +420,7 @@ Bảng~\ref{tab:chapter4-redis-data-structures} tóm tắt các nhóm Redis chí
 \end{longtable}
 }
 
-Bộ nhớ đệm thực đơn phục vụ thực đơn công khai và giảm số lần truy vấn Catalog cho các yêu cầu đọc lặp lại từ khách. BFF có thể lưu đệm hoặc làm mất hiệu lực thực đơn sau khi sửa đổi, nhưng CSDL Catalog vẫn là nguồn sự thật. Phiên và giỏ do Order quản lý: \texttt{session:\{tenantId\}:\{sessionId\}} là hash phản chiếu thông tin phiên đang hoạt động, còn \texttt{cart:\{tenantId\}:\{sessionId\}} lưu giỏ chung, trạng thái khóa và phiên bản \texttt{cartVersion}. Khi nhiều khách cùng bàn thao tác, phiên bản giỏ giúp phát hiện xung đột thay vì ghi đè im lặng. Hết hạn Redis không tự động có nghĩa đơn/phiên nghiệp vụ đã biến mất; Order vẫn là nơi quyết định đóng phiên, giải phóng bàn và xóa giỏ khi đủ điều kiện.
+Bộ nhớ đệm thực đơn phục vụ thực đơn công khai và giảm số lần truy vấn Catalog cho các yêu cầu đọc lặp lại từ khách. BFF có thể lưu đệm hoặc làm mất hiệu lực thực đơn sau khi sửa đổi, nhưng CSDL Catalog vẫn là nguồn sự thật. Phiên và giỏ do Order quản lý: \texttt{session:\{tenantId\}:\{sessionId\}} là hash phản chiếu thông tin phiên đang hoạt động, còn \texttt{cart:\{tenantId\}:\{sessionId\}} lưu giỏ chung, trạng thái khóa và phiên bản \texttt{cartVersion}. Khi nhiều khách cùng bàn thao tác, phiên bản giỏ giúp phát hiện xung đột thay vì ghi đè im lặng. Hết hạn Redis không tự động có nghĩa đơn/phiên nghiệp vụ đã biến mất; Order vẫn là nơi chịu trách nhiệm đóng phiên, giải phóng bàn và xóa giỏ khi đủ điều kiện.
 
 SaaS dùng Redis cho cờ tạm ngưng đơn vị thuê bao và bộ nhớ đệm gói thuê bao để BFF/guard có thể đọc nhanh trạng thái vận hành. Payment dùng bộ nhớ đệm trạng thái OAuth với TTL ngắn để chống phát lại/CSRF trong SePay OAuth Connect. Các khóa này hỗ trợ đường xử lý tần suất cao, nhưng cơ sở dữ liệu của dịch vụ sở hữu vẫn là nơi lưu trạng thái bền vững.
 
@@ -434,20 +434,20 @@ KDS là trường hợp dùng Redis sâu nhất trong QRTable. Kitchen không c�
   \caption{Cấu trúc dữ liệu Redis trong ví dụ minh họa KDS.}
   \label{tab:chapter4-kds-redis-data-structures}\\
   \toprule
-  Mẫu khóa & Kiểu & Nội dung / thành viên & Mục đích & Ghi chú consistency \\
+  Mẫu khóa & Kiểu & Nội dung / thành viên & Mục đích & Ghi chú về tính nhất quán \\
   \midrule
   \endfirsthead
   \toprule
-  Mẫu khóa & Kiểu & Nội dung / thành viên & Mục đích & Ghi chú consistency \\
+  Mẫu khóa & Kiểu & Nội dung / thành viên & Mục đích & Ghi chú về tính nhất quán \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
   \texttt{kds:\{tenantId\}:}\newline\texttt{ticket:\{ticketId\}} & Hash & Siêu dữ liệu phiếu, trạng thái, trạm, SLA, phiên bản. & Bản ghi chạy chính của phiếu KDS. & Sinh từ \texttt{order.confirmed}; không thay thế lịch sử Order. \\
   \texttt{kds:\{tenantId\}:}\newline\texttt{ticket-item:\{ticketItemId\}} & Hash & Món trong phiếu, số lượng, trạng thái món. & Theo dõi từng món trong bếp/bar. & Món đi theo phiếu và dòng đơn gốc. \\
-  \texttt{kds:\{tenantId\}:}\newline\texttt{ticket:\{ticketId\}:items} & Set & Danh sách \texttt{ticketItemId}. & Chỉ mục từ phiếu sang món. & Giúp lấy snapshot phiếu mà không quét toàn Redis. \\
+  \texttt{kds:\{tenantId\}:}\newline\texttt{ticket:\{ticketId\}:items} & Set & Danh sách \texttt{ticketItemId}. & Chỉ mục từ phiếu sang món. & Giúp lấy trạng thái phiếu mà không quét toàn Redis. \\
   \texttt{kds:\{tenantId\}:}\newline\texttt{order:\{orderId\}:tickets} & Set & Danh sách phiếu thuộc đơn. & Tìm phiếu khi hủy đơn hoặc tái dựng. & Giữ liên hệ khi vận hành với aggregate Order. \\
-  \texttt{kds:\{tenantId\}:}\newline\texttt{session:}\newline\texttt{\{sessionId\}:tickets} & Set & Danh sách phiếu thuộc phiên. & Cập nhật bổ sung snapshot bàn/phiên. & Tối ưu tra cứu theo phiên, không là dữ liệu nghiệp vụ bền vững. \\
+  \texttt{kds:\{tenantId\}:}\newline\texttt{session:}\newline\texttt{\{sessionId\}:tickets} & Set & Danh sách phiếu thuộc phiên. & Cập nhật bổ sung trạng thái bàn/phiên. & Tối ưu tra cứu theo phiên, không là dữ liệu nghiệp vụ bền vững. \\
   \texttt{kds:\{tenantId\}:}\newline\texttt{\{station\}} & Sorted Set & Phiếu đang hoạt động, điểm theo FIFO/ưu tiên. & Hàng đợi đang chờ/đang xử lý theo trạm. & Điểm tính từ thời điểm xác nhận và ưu tiên. \\
   \texttt{kds:\{tenantId\}:}\newline\texttt{station:\{station\}:READY} & Sorted Set & Phiếu đã sẵn sàng, điểm là thời điểm sẵn sàng. & Giữ nhóm món đã sẵn sàng cho gọi lại/hiển thị. & Không làm thay đổi nguồn sự thật của đơn. \\
   \texttt{kds:sla:due} & Sorted Set & \texttt{tenantId|station|}\newline\texttt{ticketId|level}. & Lịch cảnh báo/vượt ngưỡng SLA. & Tiến trình chiếm quyền xử lý/khử trùng trước khi phát cảnh báo. \\
@@ -456,7 +456,7 @@ KDS là trường hợp dùng Redis sâu nhất trong QRTable. Kitchen không c�
   \texttt{kds:\{tenantId\}:}\newline\texttt{dedupe:order:\{orderId\}:}\newline\texttt{\{station\}} & Khóa chuỗi & Dấu phiếu theo đơn/trạm đã tạo. & Chống tạo hai phiếu cùng trạm khi phát lại. & Khử trùng theo sự kiện và theo đơn/trạm. \\
   \texttt{kds:\{tenantId\}:}\newline\texttt{cmd:\{requestId\}} & Khóa chuỗi & Dấu lệnh đã nhận. & Idempotency cho thao tác phiếu. & Tránh nhấn đôi hoặc retry từ client. \\
   \texttt{kds:\{tenantId\}:}\newline\texttt{dead-letter:}\newline\texttt{order-confirmed} & List & Payload lỗi/sai định dạng hoặc thiếu trạm. & Lưu mẫu lỗi để điều tra. & Không dùng làm luồng xử lý chính. \\
-  \texttt{lock:kds:rebuild:}\newline\texttt{\{tenantId\}} & Khóa chuỗi & Mã tái dựng snapshot. & Chống nhiều tiến trình tái dựng cùng đơn vị thuê bao. & TTL ngắn, giải phóng khi hoàn tất. \\
+  \texttt{lock:kds:rebuild:}\newline\texttt{\{tenantId\}} & Khóa chuỗi & Mã tái dựng trạng thái. & Chống nhiều tiến trình tái dựng cùng đơn vị thuê bao. & TTL ngắn, giải phóng khi hoàn tất. \\
   \texttt{realtime:kds:}\newline\texttt{\{tenantId\}} & Pub/Sub & \texttt{kds.queue\_changed}. & Gợi ý nội bộ cho BFF phát WebSocket. & Không bền vững, không là nguồn trạng thái. \\
 \end{longtable}
 }
@@ -472,11 +472,11 @@ Hình~\ref{fig:chapter4-kds-redis-data-structures} trực quan hóa bảng trên
 
 \subsection{Redis Pub/Sub cho gợi ý thời gian thực}
 
-Redis Pub/Sub trong KDS chỉ là kênh phát gợi ý sau khi Kitchen đã ghi xong trạng thái khi vận hành. Kitchen xuất bản vào kênh \texttt{realtime:kds:*} với loại sự kiện hàng đợi KDS thay đổi; BFF kiểm tra payload và phát Socket.IO tới phòng KDS bếp/bar hoặc phòng quản trị của đơn vị thuê bao. Vì Pub/Sub không lưu bền vững, client phải có khả năng tải lại snapshot khi mất kết nối hoặc nhận sự kiện trễ.
+Redis Pub/Sub trong KDS chỉ là kênh phát gợi ý sau khi Kitchen đã ghi xong trạng thái khi vận hành. Kitchen xuất bản vào kênh \texttt{realtime:kds:*} với loại sự kiện hàng đợi KDS thay đổi; BFF kiểm tra payload và phát Socket.IO tới phòng KDS bếp/bar hoặc phòng quản trị của đơn vị thuê bao. Vì Pub/Sub không lưu bền vững, client phải có khả năng tải lại trạng thái mới nhất khi mất kết nối hoặc nhận sự kiện trễ.
 
 \subsection{Giới hạn và nguồn sự thật của dữ liệu}
 
-Giới hạn quan trọng của thiết kế Redis là Redis không quyết định nghiệp vụ cuối cùng. Catalog PostgreSQL vẫn là nguồn sự thật của thực đơn, bàn và tồn kho; Order PostgreSQL vẫn là nguồn sự thật của phiên, đơn và hóa đơn; Payment PostgreSQL vẫn là nguồn sự thật của giao dịch và cấu hình thanh toán; SaaS PostgreSQL vẫn là nguồn sự thật của đơn vị thuê bao, gói và subscription. Riêng KDS, Redis là bản chiếu khi vận hành do Kitchen sở hữu, được dựng từ sự kiện đã commit ở Order. Nếu sau này cần kiểm toán lịch sử bếp hoặc phân tích hiệu suất chế biến lâu dài, hệ thống có thể bổ sung kho lưu trữ bền vững hoặc bản chiếu riêng cho Kitchen mà không phá vỡ ranh giới hiện tại.
+Giới hạn quan trọng của thiết kế Redis là Redis không xác định nghiệp vụ cuối cùng. Catalog PostgreSQL vẫn là nguồn sự thật của thực đơn, bàn và tồn kho; Order PostgreSQL vẫn là nguồn sự thật của phiên, đơn và hóa đơn; Payment PostgreSQL vẫn là nguồn sự thật của giao dịch và cấu hình thanh toán; SaaS PostgreSQL vẫn là nguồn sự thật của đơn vị thuê bao, gói và subscription. Riêng KDS, Redis là bản chiếu khi vận hành do Kitchen sở hữu, được dựng từ sự kiện đã commit ở Order. Nếu sau này cần kiểm toán lịch sử bếp hoặc phân tích hiệu suất chế biến lâu dài, hệ thống có thể bổ sung kho lưu trữ bền vững hoặc bản chiếu riêng cho Kitchen mà không phá vỡ ranh giới hiện tại.
 
 \section{Kiến trúc bảo mật, xác thực và phân quyền}
 
@@ -484,7 +484,7 @@ Thiết kế bảo mật của QRTable xuất phát từ ranh giới tin cậy: 
 
 \subsection{Ranh giới tin cậy và mô hình tác nhân}
 
-QRTable không dùng một mô hình xác thực duy nhất cho mọi tác nhân. Khách tại bàn cần truy cập nhanh qua QR và phiên; nhân viên vận hành cần quyền theo vai trò trong một đơn vị thuê bao; chủ quán và quản lý cần thêm quyền quản trị nội bộ; Super Admin cần quyền nền tảng có kiểm soát; SePay là nhà cung cấp ngoài gửi callback chứ không phải người dùng hệ thống. Bảng~\ref{tab:chapter4-auth-actor-model} tóm tắt mô hình này.
+QRTable sử dụng cơ chế xác thực theo từng nhóm tác nhân. Khách tại bàn truy cập qua mã QR và phiên; nhân viên vận hành dùng quyền theo vai trò trong một đơn vị thuê bao; chủ quán và quản lý có thêm quyền quản trị nội bộ; quản trị viên nền tảng có quyền xuyên đơn vị thuê bao; SePay là hệ thống ngoài gửi đường gọi lại. Bảng~\ref{tab:chapter4-auth-actor-model} tóm tắt mô hình này.
 
 {\scriptsize
 \setlength{\tabcolsep}{3pt}
@@ -499,18 +499,18 @@ QRTable không dùng một mô hình xác thực duy nhất cho mọi tác nhân
   Tác nhân & Điểm vào & Cơ chế xác thực & Phạm vi truy cập & Ghi chú kiến trúc \\
   \midrule
   \endhead
-  Customer & Customer PWA qua BFF & QR/table token và phiên & Bàn, phiên và đơn vị thuê bao hiện tại & Không có role RBAC trong \texttt{role.json}; hành vi bị giới hạn bởi session/ownership. \\
-  Waiter/\newline Chef/\newline Barista & Management App qua BFF & Keycloak, JWT/OIDC & Một đơn vị thuê bao & Quyền thao tác đến từ permission set, ví dụ xác nhận đơn hoặc cập nhật KDS. \\
-  Owner/\newline Manager & Management App qua BFF & Keycloak, JWT/OIDC & Một đơn vị thuê bao, kèm quyền quản trị theo role & Một số chức năng quản trị/báo cáo còn phụ thuộc entitlement của gói dịch vụ. \\
-  Super Admin & Management App admin qua BFF & Keycloak, JWT/OIDC & Nền tảng và thao tác nhiều đơn vị thuê bao có kiểm soát & Quyền nền tảng không đồng nghĩa bỏ toàn bộ kiểm soát hoặc kiểm toán. \\
-  SePay webhook/\newline OAuth callback & HTTP callback vào BFF & Secret/header,\newline reference hoặc OAuth state & Payment hoặc SaaS tùy tuyến và tiền tố tham chiếu & Là external integration boundary, không phải user flow. \\
+  Khách hàng & PWA khách qua BFF & Token QR/bàn và phiên & Bàn, phiên và đơn vị thuê bao hiện tại & Không có vai trò RBAC trong \texttt{role.json}; hành vi được giới hạn theo phiên và quyền sở hữu. \\
+  Phục vụ/\newline Bếp/\newline Bar & Ứng dụng quản trị qua BFF & Keycloak, JWT/OIDC & Một đơn vị thuê bao & Quyền thao tác đến từ tập quyền, ví dụ xác nhận đơn hoặc cập nhật KDS. \\
+  Chủ quán/\newline Quản lý & Ứng dụng quản trị qua BFF & Keycloak, JWT/OIDC & Một đơn vị thuê bao, kèm quyền quản trị theo vai trò & Một số chức năng quản trị và báo cáo còn phụ thuộc quyền theo gói dịch vụ. \\
+  Quản trị nền tảng & Vùng quản trị qua BFF & Keycloak, JWT/OIDC & Nền tảng và thao tác nhiều đơn vị thuê bao có kiểm soát & Quyền nền tảng vẫn chịu kiểm soát truy cập và kiểm toán. \\
+  Webhook SePay/\newline đường gọi lại OAuth & Đường gọi lại HTTP vào BFF & Bí mật/header,\newline mã tham chiếu hoặc trạng thái OAuth & Payment hoặc SaaS tùy tuyến và tiền tố tham chiếu & Đây là ranh giới tích hợp ngoài, không phải luồng người dùng. \\
   \bottomrule
 \end{longtable}
 }
 
 \subsection{Hai luồng xác thực: nhân viên/quản trị và khách tại bàn}
 
-Hình~\ref{fig:chapter4-security-auth-flow} đặt hai luồng này cạnh nhau. Luồng nhân viên/chủ quán/quản trị đi qua Keycloak, Authorizer, User-Access và chuỗi guard của BFF. Luồng khách bắt đầu từ QR/phiên, đi qua SessionGuard và TenantGuard, sau đó chỉ được truy cập các thao tác phù hợp với phiên/bàn hiện tại. Sự tách biệt này là lý do chương không mô tả khách như một người dùng Keycloak.
+Hình~\ref{fig:chapter4-security-auth-flow} đặt hai luồng xác thực cạnh nhau. Nhân viên, chủ quán và quản trị đi qua Keycloak, Authorizer, User-Access cùng chuỗi guard của BFF. Khách bắt đầu từ mã QR và phiên, đi qua SessionGuard cùng TenantGuard, sau đó chỉ truy cập các thao tác thuộc phiên và bàn hiện tại. Vì vậy, khách được mô hình hóa như tác nhân theo phiên thay vì người dùng Keycloak.
 
 \begin{figure}[H]
   \centering
@@ -519,11 +519,11 @@ Hình~\ref{fig:chapter4-security-auth-flow} đặt hai luồng này cạnh nhau.
   \label{fig:chapter4-security-auth-flow}
 \end{figure}
 
-Khách không dùng Keycloak. Khách là tác nhân ẩn danh theo phiên, bắt đầu từ URL QR có token bàn và sau đó đi qua guard phiên. Quyết định này phù hợp với bối cảnh F\&B: khách tại bàn cần truy cập nhanh, không nên bị buộc đăng nhập tài khoản chỉ để xem thực đơn hoặc đặt món. Bảo mật của luồng khách dựa trên token QR, HMAC, quyền sở hữu phiên, ngữ cảnh đơn vị thuê bao và giới hạn hành vi theo phiên tại bàn. Session trong ngữ cảnh này không đồng nghĩa tài khoản người dùng; nó là ràng buộc ngắn hạn giữa đơn vị thuê bao, bàn, phiên và các thao tác được phép.
+Khách không dùng Keycloak. Khách là tác nhân ẩn danh theo phiên, bắt đầu từ URL QR có token bàn và sau đó đi qua guard phiên. Cách tổ chức này phù hợp với bối cảnh F\&B: khách tại bàn cần truy cập nhanh, không nên bị buộc đăng nhập tài khoản chỉ để xem thực đơn hoặc đặt món. Bảo mật của luồng khách dựa trên token QR, HMAC, quyền sở hữu phiên, ngữ cảnh đơn vị thuê bao và giới hạn hành vi theo phiên tại bàn. Session trong ngữ cảnh này không đồng nghĩa tài khoản người dùng; nó là ràng buộc ngắn hạn giữa đơn vị thuê bao, bàn, phiên và các thao tác được phép.
 
-\subsection{Request context và chuỗi kiểm soát tại BFF}
+\subsection{Ngữ cảnh yêu cầu và chuỗi kiểm soát tại BFF}
 
-Chuỗi guard ở BFF giúp tách các câu hỏi bảo mật thành nhiều lớp. UserGuard hoặc SessionGuard trả lời ``người gọi là ai'', TenantGuard trả lời ``yêu cầu thuộc đơn vị thuê bao nào'', PermissionGuard trả lời ``tác nhân có quyền thực hiện hành động này không'', còn PlanFeatureGuard trả lời ``đơn vị thuê bao có được dùng tính năng này theo gói không''. Bảng~\ref{tab:chapter4-security-control-layers} diễn đạt các lớp này như request context và câu hỏi kiến trúc, thay vì phân tích từng method của framework.
+Chuỗi guard ở BFF giúp tách các câu hỏi bảo mật thành nhiều lớp. UserGuard hoặc SessionGuard trả lời ``người gọi là ai'', TenantGuard trả lời ``yêu cầu thuộc đơn vị thuê bao nào'', PermissionGuard trả lời ``tác nhân có quyền thực hiện hành động này không'', còn PlanFeatureGuard trả lời ``đơn vị thuê bao có được dùng tính năng này theo gói không''. Bảng~\ref{tab:chapter4-security-control-layers} diễn đạt các lớp này như ngữ cảnh yêu cầu và câu hỏi kiến trúc, thay vì phân tích từng phương thức của framework.
 
 {\scriptsize
 \setlength{\tabcolsep}{3pt}
@@ -538,21 +538,21 @@ Chuỗi guard ở BFF giúp tách các câu hỏi bảo mật thành nhiều l�
   Lớp kiểm soát & Câu hỏi kiến trúc & Áp dụng cho & Kết quả mong muốn \\
   \midrule
   \endhead
-  Xác định actor & Người gọi là staff/admin hay customer session? & HTTP/WebSocket từ client & Có identity hoặc session context trước khi xử lý. \\
-  Khóa đơn vị thuê bao & Request đang thuộc \texttt{tenantId} nào? & Hầu hết API tenant-scoped & Không để tác nhân của đơn vị thuê bao A truy cập dữ liệu của đơn vị thuê bao B. \\
-  Kiểm tra quyền thao tác & Tác nhân có permission cho hành động không? & API staff/owner/admin & Ngăn role không phù hợp thao tác menu, order, payment hoặc report. \\
-  Kiểm tra quyền theo gói & Đơn vị thuê bao có tính năng trong subscription không? & Dashboard/reporting và feature-gated routes & Phân biệt entitlement thương mại với RBAC của người dùng. \\
-  Kiểm tra phiên/bàn & Session có khớp bàn, đơn vị thuê bao và trạng thái hợp lệ không? & Customer PWA & Giữ khách trong phạm vi phiên hiện tại. \\
-  Định tuyến external callback & Webhook/OAuth callback có đúng tuyến, secret/header, reference hoặc state không? & SePay webhook/OAuth callback & Chuyển đúng Payment hoặc SaaS, hỗ trợ xử lý idempotency và audit. \\
+  Xác định tác nhân & Người gọi là nhân viên, quản trị viên hay khách theo phiên? & HTTP/WebSocket từ ứng dụng & Có định danh hoặc ngữ cảnh phiên trước khi xử lý. \\
+  Khóa đơn vị thuê bao & Yêu cầu đang thuộc \texttt{tenantId} nào? & Hầu hết API có phạm vi đơn vị thuê bao & Không để tác nhân của đơn vị thuê bao A truy cập dữ liệu của đơn vị thuê bao B. \\
+  Kiểm tra quyền thao tác & Tác nhân có quyền thực hiện hành động không? & API nhân viên, chủ quán và quản trị & Ngăn vai trò không phù hợp thao tác thực đơn, đơn, thanh toán hoặc báo cáo. \\
+  Kiểm tra quyền theo gói & Gói thuê bao có bao gồm tính năng không? & Bảng điều khiển, báo cáo và tuyến khóa theo tính năng & Phân biệt quyền thương mại theo gói với RBAC của người dùng. \\
+  Kiểm tra phiên/bàn & Phiên có khớp bàn, đơn vị thuê bao và trạng thái hợp lệ không? & PWA khách & Giữ khách trong phạm vi phiên hiện tại. \\
+  Định tuyến đường gọi lại ngoài & Webhook hoặc OAuth có đúng tuyến, bí mật/header, mã tham chiếu hoặc trạng thái không? & Webhook và OAuth SePay & Chuyển đúng Payment hoặc SaaS, hỗ trợ xử lý lặp an toàn và kiểm toán. \\
   \bottomrule
 \end{longtable}
 }
 
-BFF gom các cross-cutting security concern như xác thực, ngữ cảnh đơn vị thuê bao, permission, entitlement, định tuyến webhook và cầu nối thời gian thực. Tuy nhiên, BFF không trở thành nơi quyết định bất biến nghiệp vụ cốt lõi. Trạng thái đơn, tồn kho, thanh toán, gói thuê bao và dữ liệu báo cáo vẫn thuộc về dịch vụ sở hữu tương ứng.
+BFF tập trung các mối quan tâm bảo mật xuyên suốt như xác thực, ngữ cảnh đơn vị thuê bao, quyền thao tác, quyền theo gói, định tuyến webhook và cầu nối thời gian thực. Các bất biến về đơn, tồn kho, thanh toán, gói thuê bao và dữ liệu báo cáo vẫn thuộc về dịch vụ sở hữu tương ứng.
 
-\subsection{RBAC, tenant isolation và quyền theo gói}
+\subsection{RBAC, cô lập dữ liệu theo đơn vị thuê bao và quyền theo gói}
 
-Ba khái niệm trong mục này dễ bị trộn lẫn nếu chỉ nhìn qua tên guard. RBAC kiểm tra người dùng có quyền thực hiện hành động hay không; tenant isolation khóa dữ liệu và hành động vào một đơn vị thuê bao hợp lệ; quyền theo gói dịch vụ kiểm tra đơn vị thuê bao có được dùng tính năng hay không. Bảng~\ref{tab:chapter4-rbac-tenant-entitlement} tách ba lớp này và bổ sung quyền nền tảng của Super Admin.
+Thiết kế phân biệt ba lớp kiểm soát. RBAC xác định người dùng có quyền thực hiện hành động hay không; cô lập dữ liệu ràng buộc dữ liệu và hành động với một đơn vị thuê bao hợp lệ; quyền theo gói xác định đơn vị thuê bao có được sử dụng tính năng hay không. Bảng~\ref{tab:chapter4-rbac-tenant-entitlement} trình bày ba lớp này cùng quyền của quản trị viên nền tảng.
 
 {\scriptsize
 \setlength{\tabcolsep}{3pt}
@@ -567,25 +567,25 @@ Ba khái niệm trong mục này dễ bị trộn lẫn nếu chỉ nhìn qua t�
   Cơ chế & Trả lời câu hỏi & Ví dụ trong QRTable & Giới hạn diễn giải \\
   \midrule
   \endhead
-  RBAC & Người dùng có quyền làm hành động này không? & Waiter được xác nhận đơn; Chef/Barista xem và cập nhật KDS; Owner quản lý menu/staff. & Không tự quyết định đơn vị thuê bao hoặc gói dịch vụ. \\
-  Tenant isolation & Dữ liệu/hành động thuộc đơn vị thuê bao nào? & API, DB query, Redis key, Kafka payload và WebSocket room đều mang ngữ cảnh \texttt{tenantId}. & Không phải cơ sở dữ liệu riêng cho từng đơn vị thuê bao trong thiết kế hiện tại. \\
-  Plan entitlement & Đơn vị thuê bao có được dùng tính năng này theo gói không? & Owner/Manager có \texttt{report.read\_own}, nhưng báo cáo nâng cao còn phụ thuộc \texttt{analytics\_basic}. & Không phải role người dùng. \\
-  Platform permission & Super Admin có quyền nền tảng nào? & Onboard tenant, quản lý plan, xem platform analytics và tenant drilldown có kiểm soát. & Không phải quyền tự do bỏ qua mọi kiểm soát hoặc audit. \\
+  RBAC & Người dùng có quyền thực hiện hành động này không? & Nhân viên phục vụ xác nhận đơn; nhân viên bếp/bar cập nhật KDS; chủ quán quản lý thực đơn và nhân sự. & Không tự xác định đơn vị thuê bao hoặc gói dịch vụ. \\
+  Cô lập dữ liệu theo đơn vị thuê bao & Dữ liệu/hành động thuộc đơn vị thuê bao nào? & API, DB query, Redis key, Kafka payload và WebSocket room đều mang ngữ cảnh \texttt{tenantId}. & Không phải cơ sở dữ liệu riêng cho từng đơn vị thuê bao trong thiết kế hiện tại. \\
+  Quyền theo gói & Đơn vị thuê bao có được dùng tính năng này theo gói không? & Chủ quán và quản lý có \texttt{report.read\_own}, còn báo cáo phụ thuộc \texttt{analytics\_basic}. & Không phải vai trò người dùng. \\
+  Quyền nền tảng & Quản trị viên có quyền nền tảng nào? & Khởi tạo đơn vị thuê bao, quản lý gói, xem phân tích nền tảng và xem chi tiết đơn vị thuê bao có kiểm soát. & Vẫn chịu kiểm soát truy cập và kiểm toán. \\
   \bottomrule
 \end{longtable}
 }
 
-Ma trận permission đầy đủ của QRTable nằm ở tài liệu kiến trúc RBAC, không được lặp toàn bộ trong chương chính. Về thiết kế, điểm cần nhấn mạnh là Customer không nằm trong \texttt{role.json}; khách được bảo vệ bằng session/ownership. Ngược lại, staff/owner/manager/super admin dùng role/permission do Keycloak và User-Access phối hợp cung cấp cho BFF.
+Ma trận quyền đầy đủ của QRTable được lưu trong tài liệu kiến trúc RBAC. Trong thiết kế này, khách hàng không thuộc \texttt{role.json} mà được kiểm soát theo phiên và quyền sở hữu. Nhân viên, chủ quán, quản lý và quản trị viên nền tảng sử dụng vai trò cùng quyền do Keycloak và User-Access phối hợp cung cấp cho BFF.
 
 \subsection{WebSocket và webhook trong mô hình bảo mật}
 
-WebSocket trong QRTable không phải nguồn quyền và cũng không phải nguồn trạng thái có thẩm quyền. Socket chỉ được join room sau khi có auth/session context phù hợp: staff đi theo token và \texttt{tenantId}; khách đi theo session và \texttt{tenantId}; KDS đi theo room của đơn vị thuê bao và trạm bếp/bar. Khi nhận gợi ý thời gian thực, client vẫn phải có khả năng tải lại snapshot qua API nếu cần trạng thái chính xác.
+WebSocket trong QRTable không phải nguồn quyền và cũng không phải nguồn trạng thái có thẩm quyền. Socket chỉ được join room sau khi có auth/session context phù hợp: staff đi theo token và \texttt{tenantId}; khách đi theo session và \texttt{tenantId}; KDS đi theo room của đơn vị thuê bao và trạm bếp/bar. Khi nhận gợi ý thời gian thực, client vẫn phải có khả năng tải lại trạng thái mới nhất qua API nếu cần trạng thái chính xác.
 
 Bảo mật cũng xuất hiện ở webhook thanh toán. QRTable phân biệt các tuyến webhook của SePay theo tầng: tuyến HMAC tương thích, tuyến hóa đơn nhà hàng và tuyến hóa đơn gói nền tảng. Hóa đơn nhà hàng dùng tiền tố \texttt{QRTBL}, hóa đơn gói dùng tiền tố \texttt{QRSUB}. BFF xác thực tuyến và header phù hợp trước khi chuyển payload đến Payment hoặc SaaS. OAuth callback được ràng buộc bằng state ngắn hạn để gắn quá trình kết nối SePay với đúng đơn vị thuê bao/chủ sở hữu.
 
-\subsection{Giới hạn thiết kế và phạm vi khẳng định}
+\subsection{Phạm vi kiểm chứng của thiết kế bảo mật}
 
-Phần bảo mật của Chương 4 trình bày thiết kế và ranh giới kiểm soát, không thay thế đánh giá kiểm thử ở Chương 6. QRTable có cơ sở để nói rằng kiến trúc đã tách hai luồng xác thực, có guard chain cho nhân viên/khách, có permission matrix cho sáu role staff/admin, có session-scoped customer actor, có entitlement cho dashboard/reporting và có contract webhook theo tuyến. Tuy nhiên, chương này không khẳng định đã có kiểm thử xâm nhập chính thức, tự động xoay vòng bí mật, mTLS nội bộ, service mesh, WAF hoặc bằng chứng phủ toàn bộ bề mặt API liên đơn vị thuê bao. Kết quả kiểm chứng các điểm này được trình bày thận trọng trong Chương~\ref{chap:danh-gia}.
+Thiết kế bảo mật xác lập hai luồng xác thực, chuỗi guard cho nhân viên và khách, ma trận quyền cho sáu vai trò nội bộ, tác nhân khách theo phiên, quyền theo gói cho báo cáo và hợp đồng webhook theo tuyến. Phạm vi hiện tại chưa bao gồm kiểm thử xâm nhập chính thức, tự động xoay vòng bí mật, mTLS nội bộ, service mesh, WAF hoặc kiểm thử toàn bộ bề mặt API liên đơn vị thuê bao. Kết quả kiểm thử các cơ chế đã triển khai được trình bày ở Chương~\ref{chap:danh-gia}.
 
 \section{Thiết kế tích hợp thanh toán SePay/VietQR}
 
@@ -604,20 +604,20 @@ Việc tách hai tầng giúp tránh nhầm lẫn trách nhiệm. Payment không
 
 Luồng VietQR cũng phải giữ nguyên tắc idempotency. Một webhook từ nhà cung cấp có thể đến trễ, đến nhiều lần hoặc thiếu trường nhận dạng trong một số tình huống. Payment/SaaS cần khớp tham chiếu trong \texttt{code}, \texttt{content} hoặc dữ liệu liên quan, kiểm tra số tiền, ghi kiểm toán và chỉ chuyển trạng thái khi đủ điều kiện. Phần này mô tả thiết kế tích hợp và ranh giới kiểm soát; kết quả kiểm chứng nhà cung cấp thật, webhook giả lập hoặc kiểm thử thủ công sẽ thuộc Chương 6.
 
-\section{Thiết kế triển khai và giới hạn khẳng định}
+\section{Thiết kế triển khai và phạm vi kiểm chứng}
 
 QRTable có thiết kế chạy bằng Docker/Docker Compose cùng các thành phần phụ thuộc như PostgreSQL, MongoDB, Redis, Kafka và Keycloak. Thiết kế này giúp gom môi trường phát triển/trình diễn vào một bộ môi trường có thể tái lập, giảm chênh lệch giữa máy phát triển và môi trường trình diễn.
 
-Tuy nhiên, thiết kế triển khai không đồng nghĩa hệ thống đã đạt sẵn sàng cao, kiểm thử áp lực dưới tải lớn hoặc kiểm thử gây lỗi có chủ đích. Trong phạm vi Chương 4, triển khai được trình bày như nền tảng cho trình diễn và thu thập hiện vật production. Các khẳng định về thời gian hoạt động, thông lượng, khả năng phục hồi hoặc vận hành cấp doanh nghiệp chỉ phù hợp khi có minh chứng kiểm chứng riêng.
+Thiết kế triển khai tạo nền tảng cho trình diễn và thu thập hiện vật trên môi trường công khai. Tính sẵn sàng cao, khả năng chịu tải, kiểm thử gây lỗi có chủ đích, thời gian hoạt động và khả năng phục hồi cần môi trường cùng quy trình kiểm chứng riêng nên không thuộc kết quả của mục này.
 
 \section{Tổng hợp đánh đổi kiến trúc}
 
-Quyết định dùng vi dịch vụ thay vì một khối ứng dụng duy nhất giúp QRTable tách rõ các ngữ cảnh giới hạn có nhịp thay đổi khác nhau: Catalog/tồn kho, Order/phiên/hóa đơn, Kitchen/KDS, Payment/quyết toán, SaaS/gói thuê bao và User-Access/RBAC. Lợi ích chính là trách nhiệm dữ liệu rõ hơn, giảm phụ thuộc chéo miền nghiệp vụ và dễ trình bày/đánh giá từng luồng theo ranh giới dịch vụ. Đổi lại, hệ thống phải xử lý độ phức tạp phân tán: lỗi mạng, nhất quán cuối cùng (eventual consistency), idempotency, truy vết và lệch contract. Vì vậy, vi dịch vụ trong QRTable được dùng như một lựa chọn thiết kế có đánh đổi, không phải khẳng định luôn tốt hơn kiến trúc nguyên khối.
+Việc sử dụng vi dịch vụ thay vì một khối ứng dụng duy nhất giúp QRTable tách rõ các ngữ cảnh giới hạn có nhịp thay đổi khác nhau: Catalog/tồn kho, Order/phiên/hóa đơn, Kitchen/KDS, Payment/quyết toán, SaaS/gói thuê bao và User-Access/RBAC. Lợi ích chính là trách nhiệm dữ liệu rõ hơn, giảm phụ thuộc chéo miền nghiệp vụ và dễ trình bày/đánh giá từng luồng theo ranh giới dịch vụ. Đổi lại, hệ thống phải xử lý độ phức tạp phân tán: lỗi mạng, nhất quán cuối cùng (eventual consistency), idempotency, truy vết và lệch contract. Vì vậy, vi dịch vụ trong QRTable được dùng như một lựa chọn thiết kế có đánh đổi, không phải khẳng định luôn tốt hơn kiến trúc nguyên khối.
 
-Quyết định kết hợp RPC đồng bộ và Kafka cũng là một đánh đổi. TCP/gRPC đơn giản hơn cho lệnh/truy vấn cần phản hồi tức thời và lỗi rõ ràng với người dùng. Kafka phù hợp hơn cho sự kiện miền bất đồng bộ, tách thời gian và phân phối. Nếu dùng Kafka cho mọi yêu cầu, hệ thống sẽ khó gỡ lỗi hơn và tăng độ trễ cho luồng khách/nhân viên. Nếu chỉ dùng RPC, các tác dụng phụ như phiếu KDS, hoàn tất thanh toán hoặc cảnh báo SLA sẽ dễ bị siết chặt với dịch vụ phát sự kiện. Khung quyết định ở Hình~\ref{fig:chapter4-kafka-decision-flow} là cách QRTable giữ cân bằng giữa hai hướng này.
+Việc kết hợp RPC đồng bộ và Kafka cũng là một đánh đổi. TCP/gRPC đơn giản hơn cho lệnh/truy vấn cần phản hồi tức thời và lỗi rõ ràng với người dùng. Kafka phù hợp hơn cho sự kiện miền bất đồng bộ, tách thời gian và phân phối. Nếu dùng Kafka cho mọi yêu cầu, hệ thống sẽ khó gỡ lỗi hơn và tăng độ trễ cho luồng khách/nhân viên. Nếu chỉ dùng RPC, các tác dụng phụ như phiếu KDS, hoàn tất thanh toán hoặc cảnh báo SLA sẽ dễ bị siết chặt với dịch vụ phát sự kiện. Quy trình lựa chọn ở Hình~\ref{fig:chapter4-kafka-decision-flow} là cách QRTable giữ cân bằng giữa hai hướng này.
 
-Quyết định dùng Redis cho bộ nhớ đệm/phiên/KDS giúp tăng tốc các luồng tần suất cao và hỗ trợ cấu trúc hàng đợi thời gian thực. Nhưng Redis không được dùng như lối tắt để bỏ qua trách nhiệm dịch vụ. Với thực đơn, CSDL Catalog vẫn là nguồn sự thật; với phiên/giỏ, Order vẫn quyết định vòng đời; với KDS, Kitchen sở hữu bản chiếu khi vận hành; với tạm ngưng đơn vị thuê bao, SaaS sở hữu trạng thái bền vững.
+Việc sử dụng Redis cho bộ nhớ đệm, phiên và KDS giúp tăng tốc các luồng tần suất cao và hỗ trợ cấu trúc hàng đợi thời gian thực. Quyền sở hữu dữ liệu vẫn thuộc dịch vụ nghiệp vụ: Catalog sở hữu thực đơn, Order sở hữu vòng đời phiên và giỏ, Kitchen sở hữu bản chiếu KDS, còn SaaS sở hữu trạng thái tạm ngưng bền vững.
 
-Quyết định dùng cơ sở dữ liệu riêng theo dịch vụ kết hợp \texttt{tenant\_id} phù hợp với mục tiêu SaaS và phiên bản khả dụng tối thiểu của khóa luận vì giảm chi phí vận hành và vẫn giữ được truy cập dữ liệu theo đơn vị thuê bao. Hạn chế là mức cô lập vật lý giữa các đơn vị thuê bao chưa bằng cơ sở dữ liệu riêng cho từng đơn vị thuê bao. Đây là đánh đổi có thể chấp nhận trong phạm vi hiện tại, đồng thời mở đường cho mô hình cô lập lai nếu hệ thống cần phục vụ đơn vị thuê bao lớn hơn hoặc yêu cầu tuân thủ nghiêm ngặt hơn.
+Việc dùng cơ sở dữ liệu riêng theo dịch vụ kết hợp \texttt{tenant\_id} phù hợp với mục tiêu SaaS và phiên bản khả dụng tối thiểu của khóa luận vì giảm chi phí vận hành và vẫn giữ được truy cập dữ liệu theo đơn vị thuê bao. Hạn chế là mức cô lập vật lý giữa các đơn vị thuê bao chưa bằng cơ sở dữ liệu riêng cho từng đơn vị thuê bao. Đây là đánh đổi có thể chấp nhận trong phạm vi hiện tại, đồng thời mở đường cho mô hình cô lập lai nếu hệ thống cần phục vụ đơn vị thuê bao lớn hơn hoặc yêu cầu tuân thủ nghiêm ngặt hơn.
 
-Cuối cùng, WebSocket được chọn để cải thiện trải nghiệm thời gian thực nhưng không được dùng làm nguồn trạng thái đáng tin. Thiết kế gợi ý/làm mới cho phép client phản hồi nhanh khi có sự kiện đơn, KDS, thanh toán hoặc vòng đời đơn vị thuê bao, đồng thời vẫn cho phép phía người dùng tái đồng bộ bằng REST/truy vấn khi mất kết nối. Tóm lại, kiến trúc QRTable hướng tới sự cân bằng giữa tách biệt theo miền nghiệp vụ và khả năng triển khai/đánh giá trong phạm vi khóa luận.
+WebSocket cải thiện tốc độ nhận biết thay đổi nhưng không giữ trạng thái nghiệp vụ có thẩm quyền. Cơ chế gợi ý làm mới cho phép ứng dụng phản hồi nhanh với sự kiện đơn, KDS, thanh toán hoặc vòng đời đơn vị thuê bao, đồng thời tái đồng bộ qua REST khi mất kết nối. Kiến trúc QRTable vì vậy cân bằng sự tách biệt theo miền với khả năng triển khai và đánh giá trong phạm vi khóa luận.

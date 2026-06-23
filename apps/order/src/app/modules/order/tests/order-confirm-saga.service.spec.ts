@@ -71,14 +71,18 @@ describe('OrderConfirmSagaService', () => {
   });
 
   it('confirms a pending order by deducting stock, persisting reservationVersion, and recording order.confirmed outbox', async () => {
+    console.log('\n  [TEST 1.1] 🚀 Starting Flow: Confirm order successfully and create Outbox Event');
     const now = new Date('2026-05-02T08:00:00.000Z');
     const pendingOrder = buildOrder({ createdAt: now, updatedAt: now });
     const item = buildOrderItem({ createdAt: now, updatedAt: now });
     const savedRows: Array<{ ctor: unknown; row: unknown }> = [];
 
+    console.log('  [TEST 1.1] 🔍 Step 1: Mock DB - Order #o1 is in PENDING state');
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([item]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(now));
+
+    console.log('  [TEST 1.1] 📦 Step 2: Mock Catalog - Deduct stock succeeds, returning reservationVersion = 1');
     catalogStockGateway.deductForOrder.mockResolvedValue(APPLIED_DEDUCT);
 
     const manager = {
@@ -91,8 +95,10 @@ describe('OrderConfirmSagaService', () => {
     };
     dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
 
+    console.log('  [TEST 1.1] 🔄 Step 3: Call confirmOrder()...');
     const result = await service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' });
 
+    console.log('  [TEST 1.1] ✅ Step 4: Verify order status changed to PROCESSING');
     expect(catalogStockGateway.deductForOrder).toHaveBeenCalledWith({
       tenantId: 't1',
       orderId: 'o1',
@@ -108,6 +114,8 @@ describe('OrderConfirmSagaService', () => {
         changedByUserId: 'staff-1',
       }),
     );
+
+    console.log('  [TEST 1.1] 💾 Step 5: Verify Outbox Event (order.confirmed) is persisted to DB');
     expect(savedRows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -138,9 +146,11 @@ describe('OrderConfirmSagaService', () => {
 
     const outbox = savedRows.find((entry) => entry.ctor === OutboxEvent)?.row as { payload?: Record<string, unknown> };
     expect(outbox.payload).toEqual(expect.objectContaining({ eventType: 'order.confirmed', orderId: 'o1' }));
+    console.log('  [TEST 1.1] 🎉 Test Case 1.1 PASSED!');
   });
 
   it('replays an already processing order without deducting stock or creating a new outbox row', async () => {
+    console.log('\n  [TEST 1.2] 🚀 Starting Flow: Replay mechanism when order is already PROCESSING');
     const now = new Date('2026-05-02T08:00:00.000Z');
     const processingOrder = buildOrder({
       status: OrderStatus.PROCESSING,
@@ -151,6 +161,7 @@ describe('OrderConfirmSagaService', () => {
       updatedAt: now,
     });
 
+    console.log('  [TEST 1.2] 🔍 Step 1: Mock DB - Order #o1 is already PROCESSING');
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(processingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([
       buildOrderItem({ createdAt: now, updatedAt: now }),
@@ -164,21 +175,28 @@ describe('OrderConfirmSagaService', () => {
     };
     dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
 
+    console.log('  [TEST 1.2] 🔄 Step 2: Call confirmOrder() again...');
     const result = await service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' });
 
+    console.log('  [TEST 1.2] ✅ Step 3: Verify stock is NOT deducted again, and no new Outbox Event is created');
     expect(result.order.status).toBe(OrderStatus.PROCESSING);
     expect(catalogStockGateway.deductForOrder).not.toHaveBeenCalled();
     expect(catalogStockGateway.releaseForOrder).not.toHaveBeenCalled();
     expect(manager.create).not.toHaveBeenCalledWith(OutboxEvent, expect.anything());
     expect(manager.save).not.toHaveBeenCalled();
+    console.log('  [TEST 1.2] 🎉 Test Case 1.2 PASSED!');
   });
 
   it('propagates Catalog stock errors and does not compensate when stock was never deducted', async () => {
+    console.log('\n  [TEST 1.3] 🚀 Starting Flow: Catalog stock error handling and no compensation');
     const pendingOrder = buildOrder();
 
+    console.log('  [TEST 1.3] 🔍 Step 1: Mock DB - Order #o1 is PENDING');
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem({ quantity: 1 })]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date(), { subtotal: 2000, total: 2000 }));
+
+    console.log('  [TEST 1.3] ❌ Step 2: Mock Catalog - Return CATALOG_STOCK_INSUFFICIENT error');
     catalogStockGateway.deductForOrder.mockRejectedValue(
       Object.assign(new Error('Insufficient stock'), {
         errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT,
@@ -192,18 +210,25 @@ describe('OrderConfirmSagaService', () => {
     };
     dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
 
+    console.log('  [TEST 1.3] 🔄 Step 3: Call confirmOrder() and expect exception');
     await expect(service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' })).rejects.toMatchObject({
       errorCode: ErrorCode.CATALOG_STOCK_INSUFFICIENT,
     });
+
+    console.log('  [TEST 1.3] ✅ Step 4: Verify release is NOT called (no stock was ever reserved)');
     expect(manager.save).not.toHaveBeenCalled();
     expect(catalogStockGateway.releaseForOrder).not.toHaveBeenCalled();
+    console.log('  [TEST 1.3] 🎉 Test Case 1.3 PASSED!');
   });
 
   it('does not compensate an ambiguous transport failure before Catalog acknowledges a reservation', async () => {
+    console.log('\n  [TEST 1.4] 🚀 Starting Flow: No automatic compensation on ambiguous network timeouts');
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildOrder());
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date()));
+
     const transportError = new Error('Catalog TCP response timed out');
+    console.log('  [TEST 1.4] ❌ Step 1: Mock Catalog - Simulate TCP network timeout');
     catalogStockGateway.deductForOrder.mockRejectedValue(transportError);
 
     const manager = {
@@ -213,17 +238,24 @@ describe('OrderConfirmSagaService', () => {
     };
     dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
 
+    console.log('  [TEST 1.4] 🔄 Step 2: Call confirmOrder() and expect timeout error');
     await expect(service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' })).rejects.toBe(
       transportError,
     );
+
+    console.log('  [TEST 1.4] ✅ Step 3: Verify release is NOT called to prevent incorrect stock state');
     expect(catalogStockGateway.releaseForOrder).not.toHaveBeenCalled();
+    console.log('  [TEST 1.4] 🎉 Test Case 1.4 PASSED!');
   });
 
   it('persists the returned version when Catalog replays an active reservation', async () => {
+    console.log('\n  [TEST 1.5] 🚀 Starting Flow: Persisting reservation version on Catalog Replay');
     const pendingOrder = buildOrder();
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date()));
+
+    console.log('  [TEST 1.5] 📦 Step 1: Mock Catalog - Return REPLAYED status with reservationVersion = 2');
     catalogStockGateway.deductForOrder.mockResolvedValue({
       ...APPLIED_DEDUCT,
       reservationVersion: 2,
@@ -237,23 +269,32 @@ describe('OrderConfirmSagaService', () => {
     };
     dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
 
+    console.log('  [TEST 1.5] 🔄 Step 2: Call confirmOrder()');
     const result = await service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' });
 
+    console.log('  [TEST 1.5] ✅ Step 3: Verify order status = PROCESSING and stockReservationVersion = 2');
     expect(result.order.status).toBe(OrderStatus.PROCESSING);
     expect(pendingOrder.stockReservationVersion).toBe(2);
     expect(catalogStockGateway.releaseForOrder).not.toHaveBeenCalled();
+    console.log('  [TEST 1.5] 🎉 Test Case 1.5 PASSED!');
   });
 
   it('releases stock with correct version when the Order transaction fails after Catalog deduct succeeds', async () => {
+    console.log(
+      '\n  [TEST 1.6] 🚀 Starting Flow: Trigger Compensating Transaction (Rollback Stock) on DB Commit Failure',
+    );
     const pendingOrder = buildOrder();
     const orderCommitError = new Error('Order DB failed after stock deduct');
     let isTransactionCallbackActive = false;
     let compensatedWhileTransactionCallbackActive = false;
 
+    console.log('  [TEST 1.6] 🔍 Step 1: Mock Catalog - Deduct stock succeeds (reservationVersion = 1)');
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(pendingOrder);
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date()));
     catalogStockGateway.deductForOrder.mockResolvedValue(APPLIED_DEDUCT);
+
+    console.log('  [TEST 1.6] 🔄 Step 2: Simulate DB Order failed when saving OutboxEvent');
     catalogStockGateway.releaseForOrder.mockImplementation(() => {
       compensatedWhileTransactionCallbackActive = isTransactionCallbackActive;
       return Promise.resolve(APPLIED_RELEASE);
@@ -278,10 +319,12 @@ describe('OrderConfirmSagaService', () => {
       }
     });
 
+    console.log('  [TEST 1.6] 🔄 Step 3: Call confirmOrder() and expect rollback behavior');
     await expect(service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' })).rejects.toBe(
       orderCommitError,
     );
 
+    console.log('  [TEST 1.6] ✅ Step 4: Verify Catalog releaseForOrder was called with reservationVersion = 1');
     expect(catalogStockGateway.releaseForOrder).toHaveBeenCalledWith({
       tenantId: 't1',
       orderId: 'o1',
@@ -290,9 +333,11 @@ describe('OrderConfirmSagaService', () => {
       items: [{ menuItemId: 'm1', quantity: 2 }],
     });
     expect(compensatedWhileTransactionCallbackActive).toBe(true);
+    console.log('  [TEST 1.6] 🎉 Test Case 1.6 PASSED!');
   });
 
   it('logs compensation failure and still propagates the original Order error', async () => {
+    console.log('\n  [TEST 1.7] 🚀 Starting Flow: Log compensation failure and propagate original error');
     const pendingOrder = buildOrder();
     const orderCommitError = new Error('Order DB failed after stock deduct');
     const compensationError = new Error('Catalog release failed');
@@ -302,6 +347,8 @@ describe('OrderConfirmSagaService', () => {
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
     billRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildBill(new Date()));
     catalogStockGateway.deductForOrder.mockResolvedValue(APPLIED_DEDUCT);
+
+    console.log('  [TEST 1.7] ❌ Step 1: Mock Catalog - Release compensation fails');
     catalogStockGateway.releaseForOrder.mockRejectedValue(compensationError);
 
     const manager = {
@@ -316,17 +363,23 @@ describe('OrderConfirmSagaService', () => {
     };
     dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => cb(manager));
 
+    console.log('  [TEST 1.7] 🔄 Step 2: Call confirmOrder()');
     await expect(service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' })).rejects.toBe(
       orderCommitError,
     );
 
+    console.log(
+      '  [TEST 1.7] ✅ Step 3: Verify Saga logs the critical compensation error but still propagates the original DB error',
+    );
     expect(catalogStockGateway.releaseForOrder).toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('reservationVersion=1'), expect.any(String));
 
     logSpy.mockRestore();
+    console.log('  [TEST 1.7] 🎉 Test Case 1.7 PASSED!');
   });
 
   it('compensates when the Order transaction rejects during commit', async () => {
+    console.log('\n  [TEST 1.8] 🚀 Starting Flow: Compensate stock when Order transaction rejects during commit');
     const commitError = new Error('Order transaction commit failed');
     orderRepository.findByIdAndTenantForUpdate.mockResolvedValue(buildOrder());
     orderItemRepository.findByOrderIdAndTenantWithManager.mockResolvedValue([buildOrderItem()]);
@@ -341,10 +394,14 @@ describe('OrderConfirmSagaService', () => {
     };
     dataSource.transaction.mockImplementation(async (cb: (m: unknown) => Promise<unknown>) => {
       await cb(manager);
+      console.log('  [TEST 1.8] 💥 Trigger transaction commit rejection');
       throw commitError;
     });
 
+    console.log('  [TEST 1.8] 🔄 Call confirmOrder()');
     await expect(service.confirmOrder({ tenantId: 't1', orderId: 'o1', userId: 'staff-1' })).rejects.toBe(commitError);
+
+    console.log('  [TEST 1.8] ✅ Verify Saga automatically calls releaseForOrder with reservationVersion = 1');
     expect(catalogStockGateway.releaseForOrder).toHaveBeenCalledWith({
       tenantId: 't1',
       orderId: 'o1',
@@ -352,6 +409,7 @@ describe('OrderConfirmSagaService', () => {
       reservationVersion: 1,
       items: [{ menuItemId: 'm1', quantity: 2 }],
     });
+    console.log('  [TEST 1.8] 🎉 Test Case 1.8 PASSED!');
   });
 });
 

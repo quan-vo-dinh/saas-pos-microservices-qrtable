@@ -1,30 +1,30 @@
-%%{init: {"theme": "base", "flowchart": {"htmlLabels": true, "curve": "basis"}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#f8fafc", "primaryBorderColor": "#cbd5e1", "lineColor": "#475569", "tertiaryColor": "#ffffff"}}}%%
+%%{init: {"theme": "base", "maxTextSize": 100000, "flowchart": {"htmlLabels": true, "curve": "basis"}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#f8fafc", "primaryBorderColor": "#cbd5e1", "lineColor": "#475569", "tertiaryColor": "#ffffff"}}}%%
 flowchart TB
   subgraph BillLane["Dòng tiền hóa đơn nhà hàng - QRTBL"]
     direction TB
     Customer["Khách / POS<br/>yêu cầu thanh toán hóa đơn"]
     BillBff["BFF<br/>điều phối yêu cầu thanh toán"]
-    Order["Order<br/>ảnh chụp hóa đơn, phiên, bill"]
-    Payment["Payment<br/>tạo VietQR ref QRTBL<br/>sở hữu payment/settings/audit"]
-    SepayBill@{ img: "assets/diagrams/icons/sepay-placeholder.png", label: "SePay/VietQR - webhook QRTBL", pos: "t", h: 58, constraint: "on" }
-    PaymentSettle["Payment<br/>idempotent settle + audit"]
+    Order["Order<br/>trạng thái hóa đơn và phiên"]
+    Payment["Payment<br/>tạo tham chiếu QRTBL<br/>sở hữu giao dịch, cấu hình, kiểm toán"]
+    SepayBill["SePay / VietQR<br/>webhook QRTBL"]
+    PaymentSettle["Payment<br/>ghi nhận lũy đẳng và kiểm toán"]
     OrderPaid["Order<br/>đánh dấu hóa đơn đã thanh toán"]
     Kafka@{ icon: "logos:kafka-icon", form: "rounded", label: "Kafka - payment.completed", pos: "t", h: 58 }
   end
 
   subgraph SubscriptionLane["Dòng tiền gói thuê bao nền tảng - QRSUB"]
     direction TB
-    Owner["Owner / Admin<br/>mua hoặc gia hạn gói"]
-    SubBff["BFF<br/>điều phối checkout gói"]
+    Owner["Chủ quán / Quản trị viên<br/>mua hoặc gia hạn gói"]
+    SubBff["BFF<br/>điều phối thanh toán gói"]
     SaasInvoice["SaaS<br/>tạo hóa đơn gói"]
-    SepaySub@{ img: "assets/diagrams/icons/sepay-placeholder.png", label: "SePay/VietQR - webhook QRSUB", pos: "t", h: 58, constraint: "on" }
-    SaasSettle["SaaS<br/>idempotent settle subscription invoice"]
-    Entitlement["Subscription / entitlement<br/>cập nhật quyền gói"]
+    SepaySub["SePay / VietQR<br/>webhook QRSUB"]
+    SaasSettle["SaaS<br/>ghi nhận hóa đơn gói lũy đẳng"]
+    Entitlement["Gói thuê bao<br/>cập nhật quyền theo gói"]
   end
 
   Customer --> BillBff
-  BillBff -->|"lấy bill snapshot"| Order
-  BillBff -->|"tạo payment"| Payment
+  BillBff -->|"lấy trạng thái hóa đơn"| Order
+  BillBff -->|"tạo giao dịch"| Payment
   Payment -->|"VietQR QRTBL"| SepayBill
   SepayBill -->|"webhook qua BFF"| PaymentSettle
   PaymentSettle --> OrderPaid
