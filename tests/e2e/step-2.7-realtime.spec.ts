@@ -5,6 +5,8 @@
  * Skip entirely: `SKIP_STEPP27_E2E=1`, or when BFF health is unreachable.
  */
 import { test, expect } from '@playwright/test';
+import { allure } from 'allure-playwright';
+import { attachPageShot, attachText, setAllureContext } from './helpers/allure';
 import { loginWithKeycloak } from './helpers/auth';
 import { devQrTokenHex } from './helpers/qr';
 import { reachable } from './helpers/readiness';
@@ -29,90 +31,110 @@ test.describe('Step 2.7 realtime (dev stack)', () => {
   test('PWA → POS → KDS → POS serve → customer SERVED after reconnect + reload keeps snapshot', async ({
     browser,
     request,
-  }) => {
+  }, testInfo) => {
     test.skip(process.env.SKIP_STEPP27_E2E === '1', 'Step 2.7 E2E skipped: set SKIP_STEPP27_E2E=1');
 
     test.skip(
       !(await reachable(request, BFF_HEALTH_URL)),
       `BFF not reachable at ${BFF_HEALTH_URL} (start pnpm dev:bff-order after pnpm dev:reseed -- --yes)`,
     );
+    setAllureContext({
+      epic: 'Realtime ordering',
+      feature: 'Step 2.7 customer-to-kitchen handoff',
+      story: 'Customer order survives reconnect and is served end-to-end',
+      suite: 'E2E / Step 2.7',
+    });
 
     const qrToken = devQrTokenHex(DEV_TENANT_ID, 'A01');
     const landingUrl = `${PWA_BASE}/landing?tenant=${encodeURIComponent(TENANT_SLUG)}&table=${encodeURIComponent(TABLE_A01_ID)}&token=${encodeURIComponent(qrToken)}`;
 
-    const pwaContext = await browser.newContext();
-    const pwa = await pwaContext.newPage();
-    try {
-      await pwa.goto(landingUrl, { waitUntil: 'domcontentloaded' });
-      await expect(pwa.getByRole('button', { name: 'Vào Menu' })).toBeVisible();
-      await pwa.getByRole('button', { name: 'Vào Menu' }).click();
-
-      await expect(pwa.getByRole('button', { name: 'Tất cả' })).toBeVisible();
-      await pwa.locator('button[aria-label="Thêm vào giỏ"]').first().click();
-      await expect(pwa.getByRole('button', { name: 'Mở giỏ hàng' })).toBeVisible();
-      await pwa.getByRole('button', { name: 'Mở giỏ hàng' }).click();
-      await pwa.getByRole('button', { name: 'Đặt món' }).click();
-
-      await expect(pwa).toHaveURL(/\/order-tracking\/[^/]+/, { timeout: 120_000 });
-      const trackingUrl = pwa.url();
-      await pwaContext.setOffline(true);
-      await pwa.waitForTimeout(10_000);
-
-      const waiterContext = await browser.newContext();
-      const waiter = await waiterContext.newPage();
+    await allure.step('Customer opens QR landing page', async () => {
+      const pwaContext = await browser.newContext();
+      const pwa = await pwaContext.newPage();
       try {
-        await loginWithKeycloak(waiter, MGMT_BASE, '/pos', WAITER_EMAIL, WAITER_PASSWORD);
-        const liveOrders = waiter.locator('[data-slot="pos-live-orders"]');
-        await expect(liveOrders).toBeVisible();
-        await liveOrders.getByRole('button', { name: 'Nhận', exact: true }).first().click();
-        await expect(waiter.getByText('Đang chế biến').first()).toBeVisible({ timeout: 120_000 });
-      } finally {
-        await waiterContext.close();
-      }
+        await pwa.goto(landingUrl, { waitUntil: 'domcontentloaded' });
+        await expect(pwa.getByRole('button', { name: 'Vào thực đơn' })).toBeVisible();
+        await attachText(testInfo, 'landing-url', landingUrl);
+        await pwa.getByRole('button', { name: 'Vào thực đơn' }).click();
 
-      const chefContext = await browser.newContext();
-      const chef = await chefContext.newPage();
-      try {
-        await loginWithKeycloak(chef, MGMT_BASE, '/kds/kitchen', CHEF_EMAIL, CHEF_PASSWORD);
-        await expect(chef.getByRole('button', { name: 'Bắt đầu', exact: true }).first()).toBeVisible({
-          timeout: 180_000,
+        await expect(pwa.getByRole('button', { name: 'Tất cả' })).toBeVisible();
+        await pwa.locator('button[aria-label="Thêm vào giỏ"]').first().click();
+        await expect(pwa.getByRole('button', { name: 'Mở giỏ hàng' })).toBeVisible();
+        await pwa.getByRole('button', { name: 'Mở giỏ hàng' }).click();
+        await pwa.getByRole('button', { name: 'Đặt món' }).click();
+
+        await expect(pwa).toHaveURL(/\/order-tracking\/[^/]+/, { timeout: 120_000 });
+        const trackingUrl = pwa.url();
+        await attachText(testInfo, 'tracking-url', trackingUrl);
+        await attachPageShot(pwa, testInfo, 'customer tracking screenshot');
+
+        await pwaContext.setOffline(true);
+        await pwa.waitForTimeout(10_000);
+
+        await allure.step('Waiter accepts order in POS', async () => {
+          const waiterContext = await browser.newContext();
+          const waiter = await waiterContext.newPage();
+          try {
+            await loginWithKeycloak(waiter, MGMT_BASE, '/pos', WAITER_EMAIL, WAITER_PASSWORD);
+            const liveOrders = waiter.locator('[data-slot="pos-live-orders"]');
+            await expect(liveOrders).toBeVisible();
+            await liveOrders.getByRole('button', { name: 'Nhận', exact: true }).first().click();
+            await expect(waiter.getByText('Đang chế biến').first()).toBeVisible({ timeout: 120_000 });
+            await attachPageShot(waiter, testInfo, 'pos live orders screenshot');
+          } finally {
+            await waiterContext.close();
+          }
         });
-        await chef.getByRole('button', { name: 'Bắt đầu', exact: true }).first().click();
 
-        const doneBtn = chef.getByRole('button', { name: 'Giữ để Xong', exact: true }).first();
-        await expect(doneBtn).toBeVisible();
-        await doneBtn.dispatchEvent('pointerdown');
-        await chef.waitForTimeout(900);
-        const serveContext = await browser.newContext();
-        const servePage = await serveContext.newPage();
-        try {
-          await loginWithKeycloak(servePage, MGMT_BASE, '/pos', WAITER_EMAIL, WAITER_PASSWORD);
-          const liveOrders = servePage.locator('[data-slot="pos-live-orders"]');
-          await expect(liveOrders).toBeVisible();
-          await expect(liveOrders.getByRole('button', { name: 'Đã phục vụ', exact: true }).first()).toBeVisible({
-            timeout: 120_000,
-          });
-          await liveOrders.getByRole('button', { name: 'Đã phục vụ', exact: true }).first().click();
-          await expect(servePage.getByText('Đã phục vụ').first()).toBeVisible({ timeout: 120_000 });
-        } finally {
-          await serveContext.close();
-        }
+        await allure.step('Chef finishes ticket on KDS', async () => {
+          const chefContext = await browser.newContext();
+          const chef = await chefContext.newPage();
+          try {
+            await loginWithKeycloak(chef, MGMT_BASE, '/kds/kitchen', CHEF_EMAIL, CHEF_PASSWORD);
+            await expect(chef.getByRole('button', { name: 'Bắt đầu', exact: true }).first()).toBeVisible({
+              timeout: 180_000,
+            });
+            await chef.getByRole('button', { name: 'Bắt đầu', exact: true }).first().click();
 
-        await doneBtn.dispatchEvent('pointerup').catch(() => undefined);
+            const doneBtn = chef.getByRole('button', { name: 'Giữ để Xong', exact: true }).first();
+            await expect(doneBtn).toBeVisible();
+            await doneBtn.dispatchEvent('pointerdown');
+            await chef.waitForTimeout(900);
+
+            await attachPageShot(chef, testInfo, 'kds ticket before serve');
+
+            const serveContext = await browser.newContext();
+            const servePage = await serveContext.newPage();
+            try {
+              await loginWithKeycloak(servePage, MGMT_BASE, '/pos', WAITER_EMAIL, WAITER_PASSWORD);
+              const liveOrders = servePage.locator('[data-slot="pos-live-orders"]');
+              await expect(liveOrders).toBeVisible();
+              await expect(liveOrders.getByRole('button', { name: 'Đã phục vụ', exact: true }).first()).toBeVisible({
+                timeout: 120_000,
+              });
+              await liveOrders.getByRole('button', { name: 'Đã phục vụ', exact: true }).first().click();
+              await expect(servePage.getByText('Đã phục vụ').first()).toBeVisible({ timeout: 120_000 });
+              await attachPageShot(servePage, testInfo, 'pos served screenshot');
+            } finally {
+              await serveContext.close();
+            }
+          } finally {
+            await chefContext.close();
+          }
+        });
+
+        await pwaContext.setOffline(false);
+        await pwa.bringToFront();
+        await expect(pwa.getByText(/SERVED|Đã phục vụ/)).toBeVisible({ timeout: 180_000 });
+
+        await pwa.reload({ waitUntil: 'domcontentloaded' });
+        await expect(pwa).toHaveURL(trackingUrl);
+        await expect(pwa.getByText(/SERVED|Đã phục vụ/)).toBeVisible({ timeout: 60_000 });
+        await attachPageShot(pwa, testInfo, 'customer served screenshot');
       } finally {
-        await chefContext.close();
+        await pwaContext.setOffline(false).catch(() => undefined);
+        await pwaContext.close();
       }
-
-      await pwaContext.setOffline(false);
-      await pwa.bringToFront();
-      await expect(pwa.getByText(/SERVED|Đã phục vụ/)).toBeVisible({ timeout: 180_000 });
-
-      await pwa.reload({ waitUntil: 'domcontentloaded' });
-      await expect(pwa).toHaveURL(trackingUrl);
-      await expect(pwa.getByText(/SERVED|Đã phục vụ/)).toBeVisible({ timeout: 60_000 });
-    } finally {
-      await pwaContext.setOffline(false).catch(() => undefined);
-      await pwaContext.close();
-    }
+    });
   });
 });

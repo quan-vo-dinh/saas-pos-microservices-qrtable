@@ -1,238 +1,480 @@
 \chapter{Kiểm chứng và đánh giá hệ thống QRTable}
 \label{chap:danh-gia}
 
-Chương này đánh giá QRTable dựa trên mối liên hệ có thể truy vết giữa yêu cầu, thiết kế, triển khai và kiểm thử. Ba nội dung chính được xem xét gồm mức độ đáp ứng các luồng nghiệp vụ, mức độ tuân thủ các nguyên tắc kiến trúc và những giới hạn cần tiếp tục kiểm chứng. Các nguyên tắc kiến trúc được đánh giá bao gồm ranh giới dịch vụ, quyền sở hữu dữ liệu, cô lập đơn vị thuê bao, RBAC, Saga và tính lũy đẳng.
+\newcommand{\chapterSixEvidenceFigure}[5][]{%
+  \begin{figure}[htbp]%
+    \centering%
+    \includegraphics[width=\textwidth,height=#2,keepaspectratio]{#3}%
+    \if\relax\detokenize{#1}\relax%
+      \caption{#5}%
+    \else%
+      \caption[#1]{#5}%
+    \fi%
+    \label{#4}%
+  \end{figure}%
+}
 
-Đặc điểm phân tán của QRTable đòi hỏi đánh giá theo nhiều lớp thay vì chỉ dựa trên số lượng kiểm thử thành công. Luồng đặt món qua QR đi qua PWA khách, BFF, Order, Catalog, Redis và PostgreSQL; luồng thanh toán VietQR/SePay còn liên quan đến webhook, Payment, Order và cầu nối thời gian thực. Vì vậy, phương pháp đánh giá kết hợp truy vết yêu cầu, kiểm thử đơn vị, kiểm thử hợp đồng, kiểm thử tích hợp có điều kiện, kiểm chứng kiến trúc tĩnh, phân tích kịch bản và hiện vật triển khai trên môi trường công khai. Phạm vi kết luận được giới hạn theo dữ liệu đo lường và môi trường kiểm chứng hiện có.
+\newcommand{\chapterSixEvidencePair}[8][]{%
+  \begin{figure}[htbp]%
+    \centering%
+    \begin{minipage}[t]{0.49\textwidth}%
+      \centering%
+      \includegraphics[width=\linewidth,height=#2,keepaspectratio]{#3}%
+    \end{minipage}\hfill%
+    \begin{minipage}[t]{0.49\textwidth}%
+      \centering%
+      \includegraphics[width=\linewidth,height=#2,keepaspectratio]{#4}%
+    \end{minipage}%
+    \if\relax\detokenize{#1}\relax%
+      \caption{#6}%
+    \else%
+      \caption[#1]{#6}%
+    \fi%
+    \label{#5}%
+    \label{#7}%
+    \label{#8}%
+  \end{figure}%
+}
 
-Cơ sở đối chiếu trực tiếp của chương này là các minh chứng đã trình bày ở Chương 4 và Chương 5: Bảng~\ref{tab:chapter4-data-ownership-schema} về quyền sở hữu dữ liệu, Bảng~\ref{tab:chapter4-communication-matrix} về giao tiếp liên dịch vụ, Bảng~\ref{tab:chapter4-kafka-topic-registry} về chủ đề Kafka, Bảng~\ref{tab:chapter4-auth-actor-model}--\ref{tab:chapter4-rbac-tenant-entitlement} về mô hình bảo mật/xác thực/quyền theo gói, năm sơ đồ trình tự Hình~\ref{fig:chapter5-qr-ordering-session}--\ref{fig:chapter5-saas-onboarding-saga} và Bảng~\ref{tab:chapter5-implemented-evidence} về minh chứng triển khai. Vì vậy, Chương 6 không lặp lại toàn bộ lược đồ dữ liệu hoặc cấu trúc mã nguồn, mà dùng các minh chứng đó để kiểm chứng mức độ đúng của các kết luận.
+Chương này đánh giá QRTable dựa trên mối liên hệ giữa yêu cầu, thiết kế, phần triển khai và kết quả kiểm chứng. Trọng tâm không phải là liệt kê từng màn hình hay từng đoạn mã, mà là trả lời ba câu hỏi chính: các luồng nghiệp vụ quan trọng có vận hành đúng trong phạm vi kiểm thử hay không; kiến trúc microservices có giữ được ranh giới dữ liệu và trách nhiệm dịch vụ hay không; và những kết luận nào vẫn cần được giới hạn vì chưa có đủ điều kiện kiểm chứng.
 
-\section{Phương pháp đánh giá và phân loại bằng chứng}
+Do QRTable là hệ thống phân tán, một kết quả kiểm thử đơn lẻ không đủ để kết luận toàn bộ hệ thống. Vì vậy, chương này kết hợp nhiều loại cơ sở đánh giá: kết quả kiểm thử tự động, ảnh chụp từ luồng nghiệp vụ đại diện, trạng thái quan sát được trên công cụ vận hành và phân tích giới hạn. Cách trình bày này giúp người đọc nhìn thấy cả phần hệ thống đã được kiểm chứng lẫn phần chưa nên mở rộng kết luận.
 
-Phương pháp đánh giá của khóa luận được tổ chức theo bốn lớp bằng chứng. Lớp thứ nhất là kiểm chứng chức năng, tập trung vào các luồng nghiệp vụ chính: quét QR và tạo phiên, thao tác giỏ đặt món dùng chung, gửi đơn, nhân viên xác nhận đơn và trừ tồn kho, KDS nhận phiếu bếp, ghi nhận thanh toán, khởi tạo đơn vị thuê bao, vòng đời gói thuê bao và bảng điều khiển/báo cáo theo quyền. Lớp này chủ yếu dựa trên kiểm thử đơn vị, kiểm thử hợp đồng, kiểm thử tích hợp có điều kiện và một số kiểm thử khói trên trình duyệt khi có bộ dữ liệu mẫu phù hợp.
+Cơ sở đối chiếu trực tiếp của chương là các nội dung đã trình bày ở Chương 4 và Chương 5: quyền sở hữu dữ liệu, giao tiếp liên dịch vụ, mô hình phân quyền, các luồng triển khai và bảng tổng hợp kết quả triển khai. Chương này không lặp lại toàn bộ thiết kế, mà tập trung vào mức độ các thiết kế đó được kiểm chứng qua kiểm thử và kết quả quan sát được.
 
-Lớp thứ hai là kiểm chứng kiến trúc. Nhóm bằng chứng này kiểm tra ranh giới dịch vụ, quyền sở hữu dữ liệu, sổ đăng ký chủ đề Kafka, quyền sở hữu Redis, mô hình WebSocket gợi ý/tải lại và rào cản kiến trúc không truy cập chéo cơ sở dữ liệu. Đây là lớp đánh giá quan trọng với microservices, vì mã nguồn có thể chạy đúng ở từng API nhỏ nhưng vẫn phá vỡ kiến trúc nếu một dịch vụ import trực tiếp repository của dịch vụ khác hoặc tự tạo chủ đề Kafka ngoài sổ đăng ký.
+\section{Phương pháp đánh giá và phân loại cơ sở kết luận}
 
-Lớp thứ ba là đánh giá yêu cầu phi chức năng. Các thuộc tính như bảo mật, độ tin cậy, khả năng bảo trì, khả năng sửa đổi, hiệu quả hiệu năng và khả năng mở rộng được diễn đạt theo mô hình chất lượng phần mềm và bối cảnh SaaS nhiều đơn vị thuê bao \cite{iso-iec-25010-2023}. Trong phạm vi hiện tại, bảo mật, tính lũy đẳng, tính nhất quán, khả năng bảo trì và phản hồi gần thời gian thực có nhiều bằng chứng mã nguồn/kiểm thử hơn; hiệu năng và khả năng mở rộng được phân tích dựa trên cơ sở kiến trúc vì chưa có đo tải lớn.
+Phương pháp đánh giá được tổ chức theo các lớp bằng chứng khác nhau. Lớp thứ nhất là kiểm thử tự động ở mức dịch vụ và luồng nghiệp vụ. Lớp thứ hai là quan sát trực tiếp trên các công cụ như Allure, Kafka, Redis, Docker và Vercel. Lớp thứ ba là phân tích kiến trúc dựa trên ranh giới dịch vụ, quyền sở hữu dữ liệu và cách các thành phần phối hợp với nhau. Lớp cuối cùng là phân tích giới hạn, nhằm tránh biến kết quả kiểm thử đại diện thành những kết luận vượt quá phạm vi của đề tài.
 
-Lớp thứ tư là minh chứng từ trình diễn và triển khai trên môi trường công khai. Ảnh giao diện, nhật ký, kết quả lệnh, kiểm tra sức khỏe dịch vụ và URL công khai minh họa hệ thống, đồng thời bổ sung cho kiểm thử chức năng và kiểm chứng kiến trúc. Khi hiện vật vận hành chưa đầy đủ, kết quả được giới hạn ở phương pháp và phạm vi bằng chứng đã thu thập.
-
-Mỗi kết luận được gắn với loại bằng chứng tương ứng. Bảng~\ref{tab:chapter6-evidence-policy} trình bày nguyên tắc phân loại được sử dụng trong chương.
+Việc phân lớp này giúp chương đánh giá có giọng điệu thận trọng hơn. Ví dụ, một luồng Playwright đạt trạng thái thành công cho thấy hệ thống xử lý được kịch bản QR--POS--KDS đại diện, nhưng chưa thay thế kiểm thử tải hoặc kiểm chứng toàn bộ API. Tương tự, ảnh Kafka hoặc Redis giúp quan sát trạng thái trong một luồng cụ thể, nhưng không phải bằng chứng cho mọi trường hợp vận hành dài hạn.
 
 {\footnotesize\sloppy
 \setlength{\tabcolsep}{3pt}
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.3\textwidth}>{\raggedright\arraybackslash}p{0.26\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}}
-  \caption{Nguyên tắc phân loại kết luận theo loại bằng chứng.}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.16\textwidth}}
+  \caption{Nguyên tắc phân loại kết luận theo cơ sở đánh giá.}
   \label{tab:chapter6-evidence-policy}\\
   \toprule
-  Mức kết luận & Cơ sở bằng chứng & Phạm vi kết luận & Ví dụ trong QRTable \\
+  Mức kết luận & Cơ sở đánh giá & Phạm vi kết luận & Ví dụ trong QRTable \\
   \midrule
   \endfirsthead
   \toprule
-  Mức kết luận & Cơ sở bằng chứng & Phạm vi kết luận & Ví dụ trong QRTable \\
+  Mức kết luận & Cơ sở đánh giá & Phạm vi kết luận & Ví dụ trong QRTable \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  A -- Kiểm chứng tự động & Kiểm thử đơn vị, hợp đồng, tích hợp hoặc đầu-cuối chạy thành công với vị trí và lệnh kiểm chứng xác định. & Kết luận áp dụng trong phạm vi của bộ kiểm thử tương ứng. & Làm tròn VND, tính lũy đẳng gửi đơn, khử trùng KDS, danh mục topic Kafka. \\
-  B -- Kiểm chứng có điều kiện & Kiểm thử cần ngăn xếp, dữ liệu gieo, Redis, Kafka, Keycloak hoặc nhà cung cấp riêng. & Kết luận áp dụng cho môi trường và điều kiện đã mô tả. & Tích hợp tồn kho Order--Catalog, Redis KDS và lát cắt Payment của khởi tạo SaaS. \\
-  C -- Hỗ trợ bởi thiết kế và mã nguồn & Mã nguồn, tài liệu, hợp đồng kiến trúc hoặc phân tích kịch bản; chưa có kiểm thử toàn ngăn xếp hoặc số đo. & Kết luận giới hạn ở tính phù hợp của cấu trúc thiết kế. & Khả năng mở rộng theo ranh giới dịch vụ, Kafka và Redis; khả năng bảo trì nhờ Nx. \\
-  D -- Minh họa bằng kiểm thử khói & Tuyến kiểm thử khói, ảnh chụp hoặc kịch bản kiểm chứng thủ công đại diện. & Kết luận xác nhận khả năng trình diễn của kịch bản, chưa thay thế cổng hồi quy. & Bảng điều khiển quản trị, trạng thái tạm ngưng và triển khai công khai. \\
-  E -- Giới hạn hoặc hướng phát triển & Thiếu hiện vật, phụ thuộc nhà cung cấp hoặc nằm ngoài phạm vi triển khai chính. & Chưa hình thành kết luận kiểm chứng trong phạm vi khóa luận. & Hàng đợi ngoại tuyến đầy đủ, thông báo, vận hành cấp doanh nghiệp và kiểm thử tải. \\
+  A -- Kiểm chứng tự động & Kiểm thử chạy thành công theo kịch bản xác định. & Kết luận trong phạm vi kịch bản kiểm thử. & Gửi đơn, thanh toán, KDS, Saga đại diện. \\
+  B -- Quan sát bằng công cụ & Ảnh chụp hoặc báo cáo từ công cụ trong một lần chạy cụ thể. & Cho thấy trạng thái đã được quan sát, không thay thế kiểm thử hồi quy. & Allure, Kafka, Redis, Docker, Vercel. \\
+  C -- Hỗ trợ bởi thiết kế & Sơ đồ, bảng thiết kế, ranh giới dịch vụ và tài liệu kỹ thuật của đề tài. & Kết luận ở mức phù hợp kiến trúc, chưa phải số đo vận hành. & Quyền sở hữu dữ liệu, tổ chức monorepo, khả năng mở rộng. \\
+  D -- Giới hạn hoặc hướng phát triển & Chưa có đủ môi trường, dữ liệu, nhà cung cấp thực tế hoặc số đo định lượng. & Chưa hình thành kết luận kiểm chứng trong phạm vi hiện tại. & Kiểm thử tải, kiểm chứng dài hạn, khả năng quan sát. \\
 \end{longtable}
 }
 
-Theo nguyên tắc trên, kết quả hiện tại xác nhận nhiều bất biến chính bằng kiểm thử đơn vị, hợp đồng và tích hợp. Tính sẵn sàng cao, khả năng chịu tải lớn, kiểm chứng tự động với SePay và độ phủ cô lập trên toàn bộ API chưa có đủ cơ sở thực nghiệm. Các nội dung này được tách thành giới hạn và hướng phát triển.
+Theo nguyên tắc trên, các kết luận mạnh nhất của QRTable nằm ở các luồng đã có kiểm thử và kết quả quan sát rõ ràng như đặt món qua QR, gửi đơn, xử lý bếp, thanh toán, một số nghiệp vụ SaaS và luồng Saga đại diện. Những nội dung như kiểm thử tải, kiểm chứng SePay với nhà cung cấp thực tế hoặc vận hành dài hạn trên môi trường công khai chưa đủ cơ sở để viết như kết quả đã hoàn tất; chúng được đưa vào phần giới hạn và hướng phát triển.
 
-\section{Truy vết yêu cầu và kết quả kiểm thử}
+\section{Đối chiếu yêu cầu và kết quả kiểm thử}
 
-Ma trận truy vết ghi nhận 52 yêu cầu và quy tắc ưu tiên cao. Trong đó, 36 mục có bằng chứng kiểm thử ở lớp tương ứng, 11 mục được kiểm chứng một phần, 1 mục còn thiếu triển khai và 4 mục thuộc phạm vi mở rộng. Bảng~\ref{tab:chapter6-traceability-summary} tổng hợp kết quả theo nhóm miền.
+Ma trận đối chiếu của QRTable ghi nhận 52 yêu cầu và quy tắc ưu tiên cao. Trong phạm vi chương này, phần lớn yêu cầu đã có kiểm thử hoặc kết quả quan sát đủ rõ để dùng làm kết luận chính; một số yêu cầu còn phụ thuộc dữ liệu khởi tạo, môi trường đầy đủ hoặc nhà cung cấp thực tế nên chỉ được xem là kiểm chứng một phần. Cách trình bày này giúp kết quả đánh giá không chỉ dựa vào tỷ lệ kiểm thử thành công, mà còn gắn từng kết luận với phạm vi bằng chứng tương ứng.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}}
-  \caption{Tóm tắt truy vết yêu cầu theo nhóm miền.}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.2\textwidth}>{\centering\arraybackslash}p{0.1\textwidth}>{\raggedright\arraybackslash}p{0.48\textwidth}>{\raggedright\arraybackslash}p{0.14\textwidth}}
+  \caption{Bản tổng hợp đối chiếu các yêu cầu ưu tiên cao dùng cho Chương 6.}
   \label{tab:chapter6-traceability-summary}\\
   \toprule
-  Nhóm miền & Đã kiểm chứng & Một phần & Giới hạn và phạm vi mở rộng & Kết quả đánh giá \\
+  Trạng thái & Số dòng & Ý nghĩa đánh giá & Mức kết luận \\
   \midrule
   \endfirsthead
   \toprule
-  Nhóm miền & Đã kiểm chứng & Một phần & Giới hạn và phạm vi mở rộng & Kết quả đánh giá \\
+  Trạng thái & Số dòng & Ý nghĩa đánh giá & Mức kết luận \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  Catalog và QR & 5 & 2 & 1 giới hạn triển khai & Thực đơn công khai, token QR và hạn mức bàn có bằng chứng tốt; cổng API A/B đơn vị thuê bao trên môi trường thật và giới hạn tốc độ quét QR chưa đủ để khẳng định toàn diện. \\
-  Order, phiên, giỏ và hóa đơn & 7 & 2 & 0 & Tham gia phiên, phiên bản giỏ, tính lũy đẳng khi gửi đơn, yêu cầu hóa đơn và hoàn tất thanh toán có độ phủ rõ; Order Confirm Saga còn cần bộ tiêm lỗi trên môi trường thật để củng cố kết quả kiểm chứng hiện tại. \\
-  Kitchen/KDS gần thời gian thực & 5 & 0 & 0 & KDS khử trùng sự kiện, RBAC theo trạm, FIFO/ưu tiên/SLA, gợi ý tải lại và khôi phục chỉ bằng Redis có thể đánh giá tích cực trong phạm vi kiểm thử hiện có. \\
-  Ghi nhận thanh toán & 8 & 1 & 1 ngoài phạm vi chính & Tiền mặt, tham chiếu VietQR, tính lũy đẳng webhook, lịch sử thanh toán chỉ đọc và cầu nối Payment--Order có bằng chứng tốt; hoàn tiền và nhà cung cấp thật vẫn thủ công/ngoài phạm vi chính. \\
-  Vòng đời SaaS & 7 & 3 & 0 & Vòng đời đơn vị thuê bao, hóa đơn thuê bao, hạn mức, cấu hình thanh toán và tuyến quản trị có minh chứng; khởi tạo toàn ngăn xếp trên môi trường thật còn cần bổ sung. \\
-  Bảng điều khiển và báo cáo & 2 & 1 & 1 minh họa cần bổ sung & Guard báo cáo, quyền theo gói và trạng thái khóa ứng dụng có bằng chứng kỹ thuật; minh họa trình duyệt cần bổ sung. \\
-  RBAC và cô lập đơn vị thuê bao & 2 & 1 & 0 & Chuỗi guard và dữ liệu quyền khởi tạo có bằng chứng mạnh; bộ kiểm thử API liên đơn vị thuê bao đại diện chưa phủ rộng. \\
-  Bất biến kiến trúc & 2 & 2 & 0 & Sổ đăng ký chủ đề Kafka và chính sách truy cập Redis có kiểm thử hợp đồng; một số mẫu rộng như BFF Direct và độ phủ TCP còn cần kiểm chứng thêm. \\
-  Phạm vi mở rộng & 0 & 0 & 3 ngoài phạm vi hiện tại & Hàng đợi thao tác ngoại tuyến đầy đủ, củng cố Saga chuyên sâu và thông báo/email được xếp vào hướng phát triển, không thuộc kết quả đánh giá chính. \\
+  Đã kiểm chứng & 38 & Có kiểm thử hoặc kết quả quan sát đủ rõ để dùng làm kết luận chính. & A/B \\
+  Kiểm chứng một phần & 9 & Có cơ sở nền, nhưng còn thiếu môi trường hoặc dữ liệu kiểm chứng đầy đủ. & B/C \\
+  Khoảng trống triển khai & 1 & Chưa đủ cơ sở để xem là kết quả của khóa luận. & D \\
+  Hoãn khỏi phạm vi & 4 & Thuộc nhóm mở rộng hoặc củng cố vận hành sau phạm vi hiện tại. & D \\
 \end{longtable}
 }
 
-Kết quả cho thấy độ truy vết cao hơn ở các miền Order, Kitchen và Payment. Năm khu vực còn được kiểm chứng một phần gồm cô lập API liên đơn vị thuê bao, tiêm lỗi cho Order Confirm Saga, khởi tạo SaaS toàn ngăn xếp, hóa đơn chờ khi đơn vị thuê bao tạm ngưng và RBAC liên đơn vị thuê bao. Vì vậy, kết luận về các khu vực này được giới hạn theo phạm vi kiểm thử đã thực hiện.
+Nhìn theo miền nghiệp vụ, các nhóm có kết quả rõ nhất là đặt món, quản lý giỏ, xác nhận đơn, KDS và thanh toán. Đây là các luồng gắn trực tiếp với trải nghiệm của nhà hàng và khách hàng, đồng thời đi qua nhiều ranh giới dịch vụ. Vòng đời SaaS, báo cáo theo gói và phân quyền cũng có cơ sở đối chiếu, nhưng một số nhánh vẫn phụ thuộc môi trường xác thực và dữ liệu khởi tạo ổn định hơn.
 
-Đường cơ sở đã chạy kiểm thử cho 23 dự án trong kho mã nguồn bằng lệnh \texttt{pnpm exec nx run-many -t test} với tùy chọn \texttt{--parallel=3}. Các kiểm thử có điều kiện bao gồm khử trùng Redis KDS, tích hợp PostgreSQL khi khởi tạo SaaS và lát cắt Payment của luồng khởi tạo. Phụ lục~\ref{app:test-evidence} trình bày kết quả terminal của hai Saga đại diện. Kiểm thử liên đơn vị thuê bao, kiểm thử trình duyệt diện rộng và SePay thực tế vẫn phụ thuộc ngăn xếp, dữ liệu gieo hoặc nhà cung cấp.
+Do đó, chương này không gộp mọi kết quả vào một tỷ lệ thành công chung. Mỗi nhóm kiểm thử được diễn giải theo ý nghĩa nghiệp vụ và đầu ra quan sát được, thay vì đưa các chi tiết triển khai nội bộ vào phần báo cáo chính.
 
-Bảng~\ref{tab:chapter6-functional-validation} đối chiếu từng nhóm chức năng với phương pháp kiểm chứng và hiện vật liên quan. Tên file được rút gọn để bảo đảm bố cục; đường dẫn đầy đủ và lệnh chạy nằm trong ma trận truy vết kỹ thuật hoặc Phụ lục~\ref{app:test-evidence}.
+\chapterSixEvidencePair[Tổng quan và danh sách bộ kiểm thử trên Allure]{0.82\textheight}
+  {chapter6-01-allure-overview.png}
+  {chapter6-02-allure-critical-suites.png}
+  {fig:chapter6-allure-pair}
+  {Giao diện Allure Report: tổng quan tỷ lệ thành công (trái) và danh sách bộ kiểm thử theo dịch vụ (phải).}
+  {fig:chapter6-allure-overview}
+  {fig:chapter6-allure-critical-suites}
+
+Hình~\ref{fig:chapter6-allure-pair} cho thấy kết quả tổng hợp trên Allure Report. Màn hình tổng quan ghi nhận toàn bộ các ca trong lần chạy này đạt trạng thái thành công; màn hình danh sách bộ kiểm thử cho thấy kết quả được phân nhóm theo các miền nghiệp vụ như đơn hàng, thanh toán, phiên đặt món và tồn kho. Ở mức báo cáo, hình này được dùng để ghi nhận phạm vi kiểm thử nền, còn các luồng nghiệp vụ quan trọng được phân tích thêm ở các mục sau.
 
 \section{Kiểm chứng các luồng nghiệp vụ chính}
 
-Kiểm chứng chức năng được tổ chức theo các cụm trường hợp sử dụng thay vì theo từng dịch vụ. Cách tổ chức này phản ánh góc nhìn người dùng cuối, trong đó kết quả của toàn bộ luồng quét QR, đặt món, xử lý tại bếp và thanh toán quan trọng hơn chi tiết phân chia nội bộ giữa Order và Catalog.
+Kiểm chứng chức năng được tổ chức theo trường hợp sử dụng thay vì theo từng dịch vụ riêng lẻ. Với người đọc là hội đồng, điều quan trọng không phải là mỗi service có bao nhiêu ca kiểm thử, mà là các luồng nghiệp vụ chính có giữ được trạng thái nhất quán khi đi qua nhiều thành phần hay không.
 
-Với Catalog và QR, hệ thống đã có bằng chứng cho token QR/bàn, lọc thực đơn công khai, đường tải tệp lên theo đơn vị thuê bao và hạn mức bàn theo gói thuê bao. Token QR được kiểm tra trong bước tạo/xác thực và được dùng trong luồng tham gia phiên. Thực đơn công khai chỉ trả danh mục/món đang hoạt động, còn phục vụ và chưa bị xóa. Tuy nhiên, cô lập đơn vị thuê bao trên ngăn xếp BFF/Keycloak/Catalog ở môi trường thật vẫn chưa đủ rộng để kết luận toàn bộ bề mặt API đã được chứng minh bằng kiểm thử A/B đơn vị thuê bao.
+Kết quả kiểm thử cho thấy các luồng quan trọng đã được bao phủ ở mức đại diện. Khách có thể vào phiên đặt món qua mã QR, xem thực đơn hợp lệ, thao tác với giỏ và gửi đơn. Nhân viên có thể tiếp nhận đơn, bếp có thể xử lý phiếu trên KDS, và trạng thái đơn được phản ánh lại cho khách hàng. Các kiểm thử thanh toán ghi nhận việc đóng hóa đơn đúng điều kiện và xử lý các thông báo lặp trong phạm vi mô phỏng. Với phần SaaS, hệ thống đã có cơ sở đối chiếu cho gói dịch vụ, đơn vị thuê bao, báo cáo và quyền thao tác theo vai trò.
 
-Với Order/phiên/giỏ/hóa đơn, minh chứng mạnh hơn. Tham gia phiên xử lý bàn trống, bàn đang có phiên hoạt động, phiên trống cũ và các trạng thái không được phép như đang thanh toán/đang dọn. Giỏ dùng chung dùng Redis và \texttt{cartVersion} để phát hiện thay đổi lỗi thời. Gửi đơn dùng khóa tính lũy đẳng, tạo đơn \texttt{PENDING}, gắn hóa đơn \texttt{OPEN} và xóa giỏ một lần. Yêu cầu hóa đơn yêu cầu giỏ rỗng và các đơn đang hoạt động đã phục vụ trước khi chuyển hóa đơn sang \texttt{PENDING\_PAYMENT}. Hoàn tất thanh toán đóng hóa đơn/phiên và chuyển bàn sang dọn theo hướng lũy đẳng.
-
-Với xác nhận của nhân viên và nhất quán tồn kho, điểm quan trọng là Order không tự ghi tồn kho. Thao tác xác nhận của nhân viên chuyển đơn từ \texttt{PENDING} sang \texttt{PROCESSING} chỉ sau khi Catalog trừ tồn kho qua TCP thành công. Nếu Catalog báo thiếu tồn kho hoặc lỗi nghiệp vụ, Order không được chuyển trạng thái. Kiểm thử tại lớp dịch vụ cũng ép nhánh lỗi sau khi trừ tồn kho để kiểm tra bù trừ hoàn tồn kho và giữ lỗi gốc.
-
-Với Kitchen và KDS, các kiểm thử xác nhận việc xử lý sự kiện đơn đã duyệt, tạo phiếu theo trạm, lưu hàng đợi bằng Redis, khử trùng sự kiện và phát gợi ý để ứng dụng tải lại. Kết quả áp dụng cho bản chiếu KDS khi vận hành trên Redis, Kafka và mô hình WebSocket hiện tại; cơ sở dữ liệu lịch sử và phân tích bếp chuyên sâu nằm ngoài phạm vi.
-
-Với Payment, hệ thống có bằng chứng cho ghi nhận tiền mặt, tham chiếu VietQR, xác minh webhook SePay/tính lũy đẳng, xử lý thanh toán thiếu, webhook trùng và cầu nối Payment--Order. Điều này đủ để đánh giá tích cực về tính nhất quán và tính lũy đẳng trong luồng thanh toán nội bộ. Tuy nhiên, kiểm chứng nhà cung cấp SePay thật không nằm trong đường cơ sở tự động vì cần thông tin xác thực, đường gọi lại công khai và dữ liệu nhà cung cấp thật.
-
-Với vòng đời SaaS, bảng điều khiển và báo cáo, QRTable có bằng chứng cho đơn vị thuê bao, gói dịch vụ, hóa đơn, hạn mức, cấu hình thanh toán, chính sách slug và một phần Saga khởi tạo. Chủ quán cùng quản lý dùng \texttt{report.read\_own} và chịu kiểm tra \texttt{analytics\_basic}; quản trị viên nền tảng dùng \texttt{report.read\_any} để xem số liệu tổng hợp và chi tiết theo đơn vị thuê bao. Guard và mã nguồn cung cấp bằng chứng kỹ thuật, còn ảnh trình duyệt giữ vai trò minh họa.
+Một số kết quả vẫn cần đọc với phạm vi phù hợp. Kiểm thử hiện tại đủ để đánh giá các luồng chính và một số nhánh lỗi đại diện, nhưng chưa thay thế kiểm thử toàn bộ bề mặt API, kiểm thử tải hoặc kiểm chứng với nhà cung cấp thanh toán thật.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{2pt}
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.3\textwidth}>{\raggedright\arraybackslash}p{0.35\textwidth}>{\raggedright\arraybackslash}p{0.1\textwidth}}
-  \caption{Ma trận kiểm chứng chức năng và hiện vật đối chiếu.}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.36\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}}
+  \caption{Ma trận kiểm chứng chức năng theo logic nghiệp vụ.}
   \label{tab:chapter6-functional-validation}\\
   \toprule
-  Nội dung kiểm chứng & Phương pháp kiểm chứng & File/hiện vật đối chiếu & Loại \\
+  Nội dung kiểm chứng & Loại kiểm thử & Logic kiểm thử & Đầu ra cần quan sát \\
   \midrule
   \endfirsthead
   \toprule
-  Nội dung kiểm chứng & Phương pháp kiểm chứng & File/hiện vật đối chiếu & Loại \\
+  Nội dung kiểm chứng & Loại kiểm thử & Logic kiểm thử & Đầu ra cần quan sát \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  QR, thực đơn và phiên khách & Kiểm thử service/contract cho token QR, thực đơn công khai và trạng thái bàn; integration tham gia phiên cần PostgreSQL, Redis và Catalog TCP. & \path{table.service.spec.ts}; \path{menu.service.spec.ts}; \path{order-session-join.integration.spec.ts}; Hình~\ref{fig:chapter5-screenshot-customer-pwa-ordering}. & A/B \\
-  Giỏ chung và gửi đơn & Kiểm thử cart version, idempotency key, không tạo \texttt{DRAFT} và tích hợp DB/Redis có điều kiện. & \path{cart.service.spec.ts}; \path{order-submit.service.spec.ts}; \path{order-submit-cart.integration.spec.ts}. & A/B \\
-  Order Confirm Saga và tồn kho & Kiểm thử đơn vị và kiểm thử hợp đồng đã chạy cho điều phối, phát lại, lỗi Catalog và bù trừ; tích hợp tồn kho toàn ngăn xếp chưa được dùng làm bằng chứng chính. & \path{order-confirm-saga.service.spec.ts}; \path{catalog-stock-gateway.service.spec.ts}; Hình~\ref{fig:appendix-d-order-saga-tests}. & A/B \\
-  KDS và cập nhật gần thời gian thực & Kiểm thử consumer, hàng đợi Redis, khử trùng \texttt{order.confirmed}, RBAC theo trạm và WebSocket gợi ý tải lại. & \path{order-confirmed.consumer.spec.ts}; \path{order-confirmed-dedupe.integration.spec.ts}; \path{kds-ticket.service.spec.ts}; \path{realtime-auth.service.spec.ts}. & A/B \\
-  Thanh toán và webhook & Kiểm thử tiền mặt, VietQR reference, webhook SePay thiếu/trùng/sai secret, HMAC ở BFF và cầu nối Payment--Order; SePay thật không thuộc đường cơ sở tự động. & \path{payment.service.spec.ts}; \path{payment.controller.spec.ts}; \path{payment-completed-order-bridge.integration.spec.ts}. & A/B \\
-  SaaS Onboarding Mini-Saga & Kiểm thử đơn vị và kiểm thử hợp đồng đã chạy cho điều phối và bù trừ; DB integration và Payment TCP là bằng chứng có điều kiện; Authorizer/Keycloak/User-Access live còn một phần. & \path{onboarding-saga.service.spec.ts}; \path{onboarding-saga.integration.spec.ts}; Hình~\ref{fig:appendix-d-saas-onboarding-tests}. & A/B/C \\
-  Báo cáo, phân tích và quyền theo gói & Kiểm thử chuyển tiếp tại BFF, \texttt{PlanFeatureGuard}, quyền \texttt{report.read\_own}/\texttt{report.read\_any} và trạng thái quyền theo gói trên ứng dụng; minh họa trình duyệt cần bổ sung. & \path{dashboard-report.controller.spec.ts}; \path{dashboard-report.controller.plan-feature.spec.ts}; \path{admin-analytics.controller.spec.ts}; \path{derive-dashboard-entitlements.spec.ts}. & B/C/D \\
-  RBAC, phiên khách và cô lập đơn vị thuê bao & Kiểm thử guard chain, sai lệch đơn vị thuê bao, sai lệch đơn vị thuê bao trong phiên, ma trận quyền và một số kiểm thử tích hợp A/B; chưa phủ toàn bộ bề mặt API trên môi trường thật. & \path{tenant.guard.spec.ts}; \path{permission.guard.spec.ts}; \path{session.guard.spec.ts}; \path{tenant-isolation.integration.spec.ts}. & A/B/C \\
+  QR, thực đơn và phiên khách & Kiểm thử dịch vụ và tích hợp có điều kiện. & Kiểm tra khách vào đúng phiên, xem đúng thực đơn và không vượt trạng thái bàn cho phép. & Phiên đặt món hợp lệ được mở; dữ liệu sai phạm vi bị từ chối. \\
+  Giỏ, gửi đơn và xác nhận đơn & Kiểm thử dịch vụ, tích hợp và Saga đại diện. & Kiểm tra thao tác giỏ, gửi đơn lặp, xác nhận đơn và xử lý thiếu tồn kho. & Đơn chuyển trạng thái hợp lệ, không phát sinh đơn trùng hoặc trừ tồn kho lặp. \\
+  KDS và phục vụ món & Kiểm thử E2E đại diện kết hợp kiểm thử dịch vụ. & Kiểm tra đơn sau khi xác nhận được đưa tới bếp và trạng thái phục vụ được phản ánh lại cho khách. & Phiếu xuất hiện ở KDS; khách thấy trạng thái cuối cùng sau khi tải lại. \\
+  Thanh toán & Kiểm thử dịch vụ và hợp đồng. & Kiểm tra ghi nhận thanh toán, điều kiện đóng hóa đơn và xử lý thông báo lặp. & Hóa đơn/phiên đóng đúng điều kiện; thông báo trùng không tạo kết quả phụ. \\
+  SaaS, báo cáo và phân quyền & Kiểm thử dịch vụ và quan sát trên ứng dụng. & Kiểm tra dữ liệu đơn vị thuê bao, gói dịch vụ, quyền báo cáo và phạm vi thao tác theo vai trò. & Người dùng chỉ thao tác trong phạm vi được cấp quyền. \\
 \end{longtable}
 }
 
-\section{Kiểm chứng Saga, tính lũy đẳng và tính nhất quán}
+\section{Luồng đặt món qua mã QR, POS và KDS}
 
-Hai Saga đại diện trong Bảng~\ref{tab:chapter5-representative-sagas} được kiểm chứng theo nhiều lớp. Kiểm thử đơn vị và hợp đồng xác minh thứ tự điều phối, phát lại, xử lý lỗi và bù trừ; kiểm thử tích hợp xác minh ranh giới cơ sở dữ liệu và TCP; tiêm lỗi có kiểm soát kích hoạt nhánh bù trừ; nhật ký và trạng thái cơ sở dữ liệu hỗ trợ đối chiếu khi có môi trường phù hợp. Kết quả terminal được lưu tại Hình~\ref{fig:appendix-d-order-saga-tests} và Hình~\ref{fig:appendix-d-saas-onboarding-tests}.
+Để đánh giá luồng nghiệp vụ đi qua nhiều giao diện và nhiều ranh giới dịch vụ, khóa luận sử dụng kiểm thử hộp đen toàn luồng bằng Playwright. Kịch bản này không nhằm trình diễn các màn hình riêng lẻ, mà kiểm tra một tiến trình nghiệp vụ liên tục: khách hàng gửi đơn qua mã QR, nhân viên tiếp nhận tại POS, bếp xử lý trên KDS, nhân viên đánh dấu đã phục vụ và khách hàng nhìn thấy trạng thái cuối cùng sau khi kết nối lại. Kết quả được trình bày qua Allure Report; các hình trong mục này là những lát chụp của cùng một trang kết quả kiểm thử.
 
-Order Confirm Saga là luồng đại diện cho POS. Bằng chứng chính gồm kiểm thử điều phối xác nhận đơn, kiểm thử cổng tồn kho Catalog, tích hợp có điều kiện cho ranh giới tồn kho giữa Order và Catalog, cùng minh chứng từ POS, KDS và outbox. Nhánh bù trừ quan trọng là tình huống Catalog đã trừ tồn kho nhưng Order ghi nhận hoặc ghi outbox thất bại; khi đó Order phải gọi Catalog hoàn trả tồn kho bằng khóa bù trừ. Ở thời điểm đánh giá hiện tại, nhánh này đã có tiêm lỗi tại lớp dịch vụ; bộ tiêm lỗi đầy đủ trên môi trường thật cho lỗi ghi nhận/outbox sau khi trừ tồn kho thật vẫn là bước củng cố tiếp theo.
+Kịch bản được diễn giải theo các chặng nghiệp vụ chính:
+\begin{itemize}
+  \item Khách hàng mở phiên đặt món, chọn món và gửi đơn.
+  \item Nhân viên phục vụ tiếp nhận đơn tại POS.
+  \item Bếp xử lý phiếu trên KDS.
+  \item Nhân viên đánh dấu đã phục vụ và khách hàng tải lại trang sau khi kết nối lại.
+\end{itemize}
 
-SaaS Onboarding Mini-Saga đại diện cho cấp phát nền tảng. Bằng chứng gồm kiểm thử đơn vị với đối tượng giả lập cho nhánh quay lui, tích hợp PostgreSQL cho đường thành công và bù trừ, cùng tích hợp Payment TCP có điều kiện để xác nhận mỗi đơn vị thuê bao có đúng một bản ghi cấu hình thanh toán. Authorizer/Keycloak và User-Access vẫn được thay thế bằng đối tượng giả lập hợp đồng trong các kiểm thử tự động; vì vậy, kết quả hiện tại xác nhận lớp cơ sở dữ liệu và một phần tích hợp Payment, chưa bao phủ toàn bộ luồng đầu-cuối.
+Quy trình trên được dùng để đánh giá một luồng nghiệp vụ đại diện trong môi trường kiểm chứng. Kết quả cho thấy ứng dụng khách hàng, POS và KDS có thể phối hợp qua BFF, WebSocket và các dịch vụ phía sau để giữ trạng thái đơn hàng thống nhất trong một kịch bản có mất kết nối tạm thời.
 
-Tính lũy đẳng và tính nhất quán được áp dụng tại nhiều luồng. Giỏ dùng số phiên bản để phát hiện cập nhật lỗi thời; gửi đơn dùng khóa lũy đẳng để tránh tạo đơn lặp; webhook xử lý giao dịch trùng hoặc thiếu; KDS khử trùng sự kiện trước khi tạo phiếu. Kết quả xác nhận các luồng chính, còn phân phối chính xác một lần, Saga bền vững và CDC/Debezium nằm ngoài phạm vi hiện tại.
+\subsection{Phân tích kết quả kiểm thử trên Allure Report}
 
-\section{Kiểm chứng phân quyền, cô lập đơn vị thuê bao và quyền theo gói}
+Báo cáo Allure được kết xuất từ kết quả thực thi kịch bản kiểm thử tích hợp. Các lát chụp trong mục này nên được đọc như những phần khác nhau của cùng một luồng kiểm thử, không phải các kịch bản độc lập:
 
-Bảo mật của QRTable có nhiều lớp: JWT/OIDC và RBAC cho nhân viên/chủ/quản trị, truy cập theo phạm vi QR/phiên cho khách, TenantGuard cho ngữ cảnh đơn vị thuê bao trên yêu cầu, ma trận quyền cho vai trò/hành động và xác minh cho webhook/thanh toán. Bảng~\ref{tab:chapter4-auth-actor-model} và Bảng~\ref{tab:chapter4-security-control-layers} là cơ sở thiết kế để đánh giá các lớp này. Kết quả đánh giá tích cực nhất nằm ở chuỗi guard, dữ liệu quyền khởi tạo và hợp đồng webhook thanh toán. Khách không dùng Keycloak, nhưng đây là lựa chọn phù hợp với bối cảnh khách tại bàn và đã được bù bằng ranh giới QR/phiên.
+\begin{itemize}
+  \item \textbf{Kết quả thực thi tổng quan (Hình~\ref{fig:chapter6-e2e-playwright-overview}):} 
+    \begin{itemize}
+      \item Trang Allure cho thấy toàn bộ luồng kiểm thử đã hoàn thành thành công.
+      \item Cây bước kiểm thử thể hiện tiến trình từ phía khách hàng sang POS, KDS và quay lại trang theo dõi đơn.
+    \end{itemize}
 
-Cô lập đơn vị thuê bao được thể hiện tại API, cơ sở dữ liệu, Redis, nội dung sự kiện Kafka và phòng WebSocket. Kiểm thử hiện tại xác nhận một số lát cắt nhưng chưa bao phủ toàn bộ ngăn xếp BFF, Keycloak và cơ sở dữ liệu dịch vụ với dữ liệu nhiều đơn vị thuê bao. Vì vậy, kết quả đánh giá ở mức thiết kế và kiểm thử một phần.
+  \item \textbf{Tiến trình đặt món của khách hàng (Hình~\ref{fig:chapter6-e2e-customer-tracking}):}
+    \begin{itemize}
+      \item Ảnh đính kèm cho thấy khách hàng đã có đơn trên màn hình theo dõi.
+      \item Các thông tin bàn, món và trạng thái giúp đối chiếu đơn của khách với các bước xử lý phía sau.
+    \end{itemize}
 
-Quyền theo gói được thể hiện rõ ở bảng điều khiển và báo cáo. Chủ quán cùng quản lý phải có \texttt{report.read\_own}, đúng ngữ cảnh đơn vị thuê bao và tính năng tương ứng trong gói. Nếu thiếu \texttt{analytics\_basic}, ứng dụng hiển thị trạng thái khóa và API từ chối yêu cầu. Quản trị viên nền tảng dùng \texttt{report.read\_any} để xem số liệu tổng hợp cùng chi tiết theo đơn vị thuê bao mà không phụ thuộc gói đang xem. Cơ chế này phân biệt RBAC theo vai trò với quyền sử dụng tính năng theo gói.
+  \item \textbf{Tiếp nhận đơn hàng tại quầy POS (Hình~\ref{fig:chapter6-e2e-pos-live-order-accepted}):}
+    \begin{itemize}
+      \item Ảnh POS cho thấy đơn từ bàn tương ứng xuất hiện trong danh sách đơn trực tiếp.
+      \item Nhân viên có thể tiếp nhận đơn để chuyển sang bước chế biến.
+    \end{itemize}
+
+  \item \textbf{Điều phối chế biến tại màn hình bếp KDS (Hình~\ref{fig:chapter6-e2e-kds-ticket-finished}):}
+    \begin{itemize}
+      \item Ảnh KDS cho thấy đơn đã được đưa tới màn hình bếp.
+      \item Phiếu chế biến có thể được xử lý và chuyển sang bước hoàn thành.
+    \end{itemize}
+
+  \item \textbf{Đồng bộ trạng thái phục vụ và khôi phục sau sự cố (Hình~\ref{fig:chapter6-e2e-customer-served-after-reload}):}
+    \begin{itemize}
+      \item Ảnh cuối cho thấy khách hàng vẫn nhìn thấy trạng thái đã phục vụ sau khi trang được tải lại.
+      \item Điều này cho thấy trạng thái cuối cùng được lấy lại từ hệ thống phía sau, không chỉ nằm tạm trên trình duyệt.
+    \end{itemize}
+\end{itemize}
+
+\chapterSixEvidenceFigure[Báo cáo Allure E2E tổng quan]{0.82\textheight}
+  {chapter6-04-e2e-playwright-overview.png}
+  {fig:chapter6-e2e-playwright-overview}
+  {Báo cáo Allure E2E tổng quan cho luồng đặt món tại bàn.}
+
+\chapterSixEvidencePair[Allure E2E chặng khách đặt món và POS]{0.82\textheight}
+  {chapter6-05-e2e-customer-tracking.png}
+  {chapter6-06-e2e-pos-live-order-accepted.png}
+  {fig:chapter6-e2e-customer-pos}
+  {Báo cáo chặng khách đặt đơn (trái) và tiếp nhận đơn tại POS (phải).}
+  {fig:chapter6-e2e-customer-tracking}
+  {fig:chapter6-e2e-pos-live-order-accepted}
+
+\chapterSixEvidencePair[Allure E2E chặng KDS và phục vụ]{0.82\textheight}
+  {chapter6-07-e2e-kds-ticket-finished.png}
+  {chapter6-08-e2e-customer-served-after-reload.png}
+  {fig:chapter6-e2e-kds-served}
+  {Báo cáo chặng bếp hoàn thành món (trái) và khách hàng nhận món thành công (phải).}
+  {fig:chapter6-e2e-kds-ticket-finished}
+  {fig:chapter6-e2e-customer-served-after-reload}
+\section{Saga, xử lý yêu cầu lặp và tính nhất quán liên dịch vụ}
+
+Trong kiến trúc microservices, một thao tác nghiệp vụ thường đi qua nhiều dịch vụ khác nhau. Điều này giúp hệ thống có ranh giới trách nhiệm rõ hơn, nhưng cũng tạo ra rủi ro về tính nhất quán khi một bước thành công còn bước sau thất bại, hoặc khi cùng một yêu cầu được gửi lại. Vì vậy, chương này xem Saga như một cơ chế kiểm soát tính nhất quán liên dịch vụ theo nghĩa đã trình bày trong cơ sở lý thuyết \cite{garcia-molina-sagas-1987,richardson-microservices-patterns-2018}.
+
+QRTable dùng hai Saga đại diện. Luồng xác nhận đơn bảo vệ quan hệ giữa đơn hàng và tồn kho: đơn chỉ được xử lý khi tồn kho được chấp nhận, yêu cầu lặp không được làm trừ hàng nhiều lần, và hệ thống phải có cách khôi phục khi một bước trung gian thất bại. Luồng khởi tạo đơn vị thuê bao bảo vệ quá trình cấp phát dữ liệu nền tảng: nếu lỗi xảy ra giữa chừng, trạng thái dở dang cần được xử lý theo thiết kế thay vì để lại dữ liệu không nhất quán.
+
+\chapterSixEvidenceFigure[Kiểm thử Order Confirm Saga]{0.82\textheight}
+  {chapter6-09-order-saga-tests.png}
+  {fig:chapter6-order-saga-tests}
+  {Kết quả thực thi các ca kiểm thử cho quy trình xác nhận đơn hàng hiển thị trên Nx Cloud.}
+
+Hình~\ref{fig:chapter6-order-saga-tests} ghi nhận kết quả kiểm thử cho luồng xác nhận đơn hàng trên Nx Cloud. Ảnh cho thấy nhóm kiểm thử liên quan đến xác nhận đơn đã chạy thành công, bao gồm cả đường đi bình thường và một số tình huống lỗi đại diện như thiếu hàng, yêu cầu lặp hoặc cần khôi phục trạng thái.
+
+\chapterSixEvidenceFigure[Kiểm thử SaaS Onboarding Saga]{0.82\textheight}
+  {chapter6-10-saas-onboarding-saga-tests.png}
+  {fig:chapter6-saas-onboarding-saga-tests}
+  {Kết quả thực thi kiểm thử dịch vụ SaaS và quy trình khởi tạo đơn vị thuê bao hiển thị trên Nx Cloud.}
+
+Hình~\ref{fig:chapter6-saas-onboarding-saga-tests} ghi nhận kết quả kiểm thử cho nhóm nghiệp vụ SaaS và quy trình khởi tạo đơn vị thuê bao. Ảnh cho thấy phần lớn bộ kiểm thử đạt trạng thái thành công, đồng thời vẫn có một số cảnh báo nghiệp vụ cần được hiểu là thông tin vận hành trong lần chạy, không phải kết luận về toàn bộ môi trường vận hành thực tế.
+
+Đối với luồng xác nhận đơn, ý nghĩa chính của kiểm thử là hệ thống không chỉ xử lý đường đi thành công, mà còn xét đến các tình huống thường gặp trong hệ thống phân tán: yêu cầu được gửi lại, tồn kho không đủ, phản hồi bị mất hoặc cần hoàn tác một bước đã thực hiện. Đây là nhóm rủi ro quan trọng vì sai sót ở đây có thể làm lệch tồn kho hoặc làm đơn hàng vượt trạng thái hợp lệ.
+
+Đối với luồng khởi tạo đơn vị thuê bao, kiểm thử tập trung vào việc tạo đủ dữ liệu nền tảng và xử lý trạng thái dở dang khi lỗi xảy ra giữa chừng. Kết quả này đủ để đánh giá phần điều phối đại diện, nhưng chưa nên mở rộng thành kết luận rằng toàn bộ phụ thuộc bên ngoài đã được kiểm chứng trên môi trường vận hành thực tế.
+
+\subsection{Các kịch bản kiểm chứng ràng buộc của Order Confirm Saga}
+
+Để đánh giá Saga xác nhận đơn hàng, hệ thống thực thi các kịch bản kiểm thử nhằm bảo vệ bốn ràng buộc nghiệp vụ trọng yếu:
+\begin{itemize}
+  \item \textbf{Bù trừ khi lỗi xảy ra giữa chừng:} nếu một bước liên quan đến tồn kho đã hoàn tất nhưng bước sau thất bại, hệ thống cần đưa trạng thái về mức an toàn.
+  \item \textbf{Kiểm soát tranh chấp tồn kho:} khi nhiều yêu cầu cùng cạnh tranh lượng hàng còn ít, chỉ yêu cầu hợp lệ được xử lý.
+  \item \textbf{Khôi phục khi phản hồi bị mất:} khi kết quả xử lý không được trả về đúng lúc, lần gửi lại không được làm phát sinh tác dụng phụ mới.
+  \item \textbf{Bỏ qua thông điệp lỗi thời:} thông điệp đến muộn không được làm thay đổi trạng thái mới hơn.
+\end{itemize}
+
+Các ảnh nhật ký kiểm thử trong mục này được dùng để đối chiếu các ràng buộc trên:
+
+\begin{itemize}
+  \item \textbf{Kích hoạt giao dịch bù trừ (Hình~\ref{fig:chapter6-saga-test-compensation}):} 
+    \begin{itemize}
+      \item Mục tiêu kiểm tra là tình huống một bước đã thực hiện nhưng luồng tổng thể không hoàn tất.
+      \item Đầu ra quan sát được là hệ thống có bước bù trừ để tránh để lại trạng thái dở dang.
+    \end{itemize}
+
+  \item \textbf{Kiểm soát tranh chấp tương tranh (Hình~\ref{fig:chapter6-saga-test-concurrency}):}
+    \begin{itemize}
+      \item Mục tiêu kiểm tra là tình huống nhiều yêu cầu cùng tranh chấp lượng tồn kho hạn chế.
+      \item Đầu ra quan sát được là chỉ yêu cầu hợp lệ được chấp nhận, yêu cầu còn lại bị từ chối theo quy tắc nghiệp vụ.
+    \end{itemize}
+
+  \item \textbf{Khôi phục sau mất phản hồi mạng (Hình~\ref{fig:chapter6-saga-test-lost-response}):}
+    \begin{itemize}
+      \item Mục tiêu kiểm tra là trường hợp phản hồi từ một bước xử lý không quay về đúng lúc.
+      \item Đầu ra quan sát được là lần gửi lại không tạo thêm tác dụng phụ ngoài ý muốn.
+    \end{itemize}
+
+  \item \textbf{Bỏ qua yêu cầu giải phóng lỗi thời (Hình~\ref{fig:chapter6-saga-test-stale-release}):}
+    \begin{itemize}
+      \item Mục tiêu kiểm tra là thông điệp cũ đến sau khi trạng thái mới đã hình thành.
+      \item Đầu ra quan sát được là thông điệp đến muộn bị bỏ qua, nhờ đó trạng thái mới không bị ảnh hưởng.
+    \end{itemize}
+\end{itemize}
+
+\chapterSixEvidenceFigure[Nhật ký kiểm thử bù trừ giao dịch]{0.82\textheight}
+  {chapter6-saga-test-compensation.png}
+  {fig:chapter6-saga-test-compensation}
+  {Nhật ký thực thi kịch bản kiểm thử bù trừ giao dịch khi gặp lỗi cơ sở dữ liệu.}
+
+\chapterSixEvidenceFigure[Nhật ký kiểm thử tương tranh tồn kho]{0.82\textheight}
+  {chapter6-saga-test-concurrency.png}
+  {fig:chapter6-saga-test-concurrency}
+  {Nhật ký kiểm thử tích hợp xử lý tương tranh khi tồn kho chỉ còn 1.}
+
+\chapterSixEvidenceFigure[Nhật ký kiểm thử khôi phục mất phản hồi mạng]{0.82\textheight}
+  {chapter6-saga-test-lost-response.png}
+  {fig:chapter6-saga-test-lost-response}
+  {Nhật ký kiểm thử tính lặp an toàn khi gặp sự cố mất phản hồi mạng.}
+
+\chapterSixEvidenceFigure[Nhật ký kiểm thử bỏ qua yêu cầu giải phóng lỗi thời]{0.82\textheight}
+  {chapter6-saga-test-stale-release.png}
+  {fig:chapter6-saga-test-stale-release}
+  {Nhật ký kiểm thử kiểm soát phiên bản đặt trước khi bản tin đến muộn.}
+
+{\scriptsize\sloppy
+\setlength{\tabcolsep}{2pt}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.23\textwidth}>{\raggedright\arraybackslash}p{0.1\textwidth}}
+  \caption{Ràng buộc Saga và lớp bằng chứng cần đối chiếu.}
+  \label{tab:chapter6-saga-invariants}\\
+  \toprule
+  Luồng & Ranh giới dịch vụ & Rủi ro cần kiểm soát & Cơ chế trong QRTable & Đối chiếu \\
+  \midrule
+  \endfirsthead
+  \toprule
+  Luồng & Ranh giới dịch vụ & Rủi ro cần kiểm soát & Cơ chế trong QRTable & Đối chiếu \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  Xác nhận đơn & Order -- Catalog -- Kitchen & Trừ tồn kho lặp, phản hồi bị mất hoặc đơn vượt trạng thái hợp lệ. & Xử lý yêu cầu lặp, kiểm soát tồn kho và bù trừ khi cần. & Hình~\ref{fig:chapter6-order-saga-tests}, \ref{fig:chapter6-saga-test-compensation}, \ref{fig:chapter6-saga-test-concurrency}, \ref{fig:chapter6-saga-test-lost-response}, \ref{fig:chapter6-saga-test-stale-release}. \\
+  Khởi tạo đơn vị thuê bao & SaaS và các dịch vụ nền tảng & Tạo dữ liệu dở dang hoặc thiếu liên kết giữa các thành phần. & Điều phối thứ tự tạo dữ liệu và xử lý trạng thái dở dang. & Hình~\ref{fig:chapter6-saas-onboarding-saga-tests}. \\
+  Cập nhật KDS & Order -- Kitchen -- client & Phiếu bếp bị lặp hoặc client hiển thị trạng thái cũ. & Cập nhật bản chiếu KDS và gửi gợi ý làm mới tới client. & Hình~\ref{fig:chapter6-kafkio-topic-event}, \ref{fig:chapter6-redisinsight-kds-projection}. \\
+\end{longtable}
+}
+
+
+Khả năng xử lý thao tác lặp không chỉ xuất hiện trong Saga, mà còn liên quan đến giỏ hàng, gửi đơn, thanh toán và cập nhật KDS. Kết quả hiện tại đủ để xác nhận các luồng chính trong phạm vi kiểm thử, nhưng chưa nên mở rộng thành kết luận về bảo đảm phân phối tuyệt đối hoặc một cơ chế Saga đã được củng cố cho vận hành dài hạn.
+
+\section{Trạng thái khi vận hành của kiến trúc microservices}
+
+Kafka và Redis chỉ có giá trị trong đánh giá khi chúng được gắn với một luận điểm cụ thể. Trong QRTable, Kafka thể hiện việc truyền sự kiện giữa các dịch vụ, còn Redis thể hiện các trạng thái cần truy cập nhanh như phiên, hàng đợi bếp hoặc bản chiếu KDS. Vì vậy, các ảnh ở mục này không nhằm liệt kê toàn bộ cấu hình hạ tầng, mà cho thấy một phần trạng thái của luồng đặt món khi hệ thống đang vận hành.
+
+\chapterSixEvidenceFigure[Giám sát sự kiện xác nhận đơn hàng trên Kafka]{0.82\textheight}
+  {chapter6-17-kafkio-topic-event.png}
+  {fig:chapter6-kafkio-topic-event}
+  {Nội dung thông điệp sự kiện xác nhận đơn hàng trên công cụ quản lý Kafka.}
+
+Hình~\ref{fig:chapter6-kafkio-topic-event} ghi nhận một thông điệp sự kiện xác nhận đơn hàng trên công cụ giám sát Kafka. Nội dung hiển thị cho thấy sự kiện mang theo thông tin nghiệp vụ của đơn, bàn và món ăn, qua đó hỗ trợ đối chiếu việc truyền trạng thái từ luồng đặt món sang luồng xử lý bếp.
+
+\chapterSixEvidenceFigure[Cấu hình khóa dữ liệu KDS trong Redis]{0.82\textheight}
+  {chapter6-18-redisinsight-kds-projection.png}
+  {fig:chapter6-redisinsight-kds-projection}
+  {Cấu trúc bảng băm lưu trữ trạng thái chế biến trên công cụ RedisInsight.}
+
+Hình~\ref{fig:chapter6-redisinsight-kds-projection} minh họa trạng thái KDS được lưu trong RedisInsight. Ảnh cho thấy sau khi sự kiện được xử lý, hệ thống có bản ghi tương ứng cho phiếu bếp, giúp client KDS đọc lại trạng thái hiện tại thay vì chỉ phụ thuộc vào thông báo thời gian thực.
+
+Như vậy, kiểm thử nghiệp vụ và trạng thái quan sát được bổ sung cho nhau: kiểm thử cho biết logic xử lý có đi đúng nhánh hay không, còn Kafka và Redis giúp đối chiếu trạng thái đã đi qua các thành phần liên quan trong một lần chạy cụ thể.
 
 \section{Đánh giá kiến trúc và khả năng bảo trì}
 
-Kiểm chứng kiến trúc xem xét mức độ tuân thủ các nguyên tắc đã thiết kế. Các nguyên tắc của QRTable gồm BFF là điểm vào của ứng dụng, mỗi dịch vụ sở hữu cơ sở dữ liệu của mình, thư viện dùng chung không tạo đường truy cập chéo dữ liệu, topic Kafka thuộc danh mục thống nhất, khóa Redis có chủ sở hữu, WebSocket chỉ gợi ý làm mới và ngữ cảnh đơn vị thuê bao được duy trì xuyên suốt API, dịch vụ, bộ nhớ đệm, sự kiện và kênh thời gian thực.
+Đánh giá kiến trúc xem xét QRTable có giữ được các nguyên tắc đã thiết kế hay không. Các nguyên tắc chính gồm: có điểm vào thống nhất cho client, mỗi dịch vụ chịu trách nhiệm cho miền nghiệp vụ của mình, dữ liệu không bị ghi chéo giữa các dịch vụ, và trạng thái của đơn vị thuê bao được duy trì xuyên suốt các luồng quan trọng. Những nguyên tắc này tương thích với quan điểm microservices có ranh giới dịch vụ và dữ liệu rõ ràng \cite{lewis-fowler-microservices-2014,newman-building-microservices-2021}.
 
-Ở ranh giới dịch vụ và quyền sở hữu dữ liệu, bằng chứng mạnh nhất đến từ Bảng~\ref{tab:chapter4-data-ownership-schema}, Bảng~\ref{tab:chapter5-implemented-evidence} và cấu trúc mã nguồn. Catalog sở hữu thực đơn, bàn và tồn kho; Order sở hữu phiên, giỏ, đơn và hóa đơn; Payment sở hữu bản ghi thanh toán và cấu hình; SaaS sở hữu đơn vị thuê bao và thuê bao; Kitchen sở hữu hàng đợi Redis khi vận hành. Các sơ đồ trình tự Hình~\ref{fig:chapter5-qr-ordering-session}--\ref{fig:chapter5-saas-onboarding-saga} cho thấy các tương tác liên dịch vụ đi qua TCP/Kafka thay vì truy cập cơ sở dữ liệu trực tiếp. Đây là cơ sở để đánh giá kiến trúc microservices của QRTable là có kiểm soát, không chỉ là chia thư mục theo tên dịch vụ.
+Ở ranh giới dịch vụ và quyền sở hữu dữ liệu, cơ sở đối chiếu rõ ràng nhất đến từ các bảng thiết kế ở Chương 4, các sơ đồ trình tự ở Chương 5 và kết quả kiểm thử ở Chương 6. Các dịch vụ chính được tổ chức theo miền nghiệp vụ như thực đơn, đơn hàng, bếp, thanh toán và SaaS. Các luồng liên dịch vụ đi qua kênh giao tiếp đã thiết kế, thay vì để một dịch vụ ghi trực tiếp vào dữ liệu thuộc trách nhiệm của dịch vụ khác.
 
-Ở giao tiếp liên dịch vụ, Bảng~\ref{tab:chapter4-communication-matrix} cho thấy TCP/gRPC, Kafka, WebSocket và bộ chuyển webhook được dùng theo vai trò khác nhau. Riêng Kafka, sổ đăng ký hiện tại công nhận năm chủ đề chính đã trình bày trong Bảng~\ref{tab:chapter4-kafka-topic-registry}. Kiểm thử hợp đồng kiến trúc bảo vệ sổ đăng ký này và ngăn một số sự kiện chưa thuộc phạm vi bị dùng sai. Điều này giúp QRTable giữ đúng quan điểm hướng sự kiện có chọn lọc: Kafka dùng cho sự kiện miền nghiệp vụ bất đồng bộ hoặc phát tán, không dùng thay cho mọi lệnh/truy vấn.
+Ở giao tiếp liên dịch vụ, QRTable dùng cách tiếp cận chọn lọc. Các yêu cầu cần phản hồi tức thời được xử lý theo kênh đồng bộ, còn các tác vụ lan truyền trạng thái được xử lý bằng sự kiện. WebSocket không thay thế cơ sở dữ liệu hoặc hàng đợi sự kiện; nó chủ yếu giúp client nhận biết khi cần tải lại trạng thái mới nhất. Cách kết hợp này giữ luồng nghiệp vụ dễ theo dõi hơn so với việc dùng một cơ chế giao tiếp cho mọi trường hợp.
 
-Ở Redis, minh chứng hiện tại cho thấy Redis được dùng với quyền sở hữu theo miền: Order quản lý phiên/giỏ, Kitchen quản lý hàng đợi KDS, Catalog/BFF dùng bộ nhớ đệm thực đơn theo hợp đồng, SaaS dùng bộ nhớ đệm đơn vị thuê bao/thuê bao và Payment dùng trạng thái OAuth. Redis không được viết như nguồn sự thật chung cho tất cả miền. Với phiên/đơn/hóa đơn/thanh toán/đơn vị thuê bao, trạng thái bền vững vẫn nằm ở cơ sở dữ liệu dịch vụ tương ứng.
+Ở khả năng bảo trì, Nx monorepo hỗ trợ tổ chức nhiều ứng dụng và thư viện dùng chung trong cùng một kho dự án. Điều này thuận lợi cho việc chia sẻ kiểu dữ liệu, hằng số, tiện ích và cấu hình kiểm thử. Tuy nhiên, Nx chỉ phản ánh cách tổ chức dự án, chưa đủ để kết luận các dịch vụ vận hành độc lập. Vì vậy, Hình~\ref{fig:chapter6-nx-project-graph} chỉ được dùng như cơ sở hỗ trợ cho nhận định về khả năng bảo trì; luận điểm microservices vẫn phải dựa vào ranh giới dịch vụ, quyền sở hữu dữ liệu, Saga và trạng thái khi vận hành.
 
-Khả năng bảo trì được đánh giá bằng phân tích kịch bản. Phương thức thanh toán mới chủ yếu tác động đến Payment, tuyến và DTO tại BFF, cấu hình theo đơn vị thuê bao và giao diện cấu hình; Catalog cùng Kitchen không phải thay đổi cơ sở dữ liệu. Bộ tiêu thụ Kafka mới chỉ cần bổ sung bộ xử lý và hợp đồng topic tương ứng. Vai trò hoặc quyền mới tập trung thay đổi tại ma trận quyền, User-Access, guard và bảo vệ tuyến. Nx monorepo cùng hợp đồng dùng chung hỗ trợ các thay đổi này trong khi vẫn duy trì ranh giới dịch vụ.
+\chapterSixEvidenceFigure[Biểu tượng công cụ quản lý dự án Nx]{0.22\textheight}
+  {chapter6-20-nx-project-graph.png}
+  {fig:chapter6-nx-project-graph}
+  {Biểu tượng công cụ quản lý dự án Nx Monorepo.}
 
-\section{Phân tích hiệu năng và khả năng mở rộng theo cơ sở kiến trúc}
-
-Phạm vi đánh giá hiện tại chưa có số liệu định lượng về độ trễ p50/p95/p99, thông lượng, tỉ lệ lỗi hoặc mức sử dụng tài nguyên. Do đó, phần này chỉ phân tích cơ sở kiến trúc và không thực hiện so sánh hiệu năng với kiến trúc nguyên khối. Một phép so sánh có giá trị cần hệ thống đối chứng tương đương về nghiệp vụ, cơ sở dữ liệu, bộ nhớ đệm, xác thực, thanh toán, KDS, tài nguyên triển khai và dữ liệu đo.
-
-Những gì có thể kết luận là thiết kế hỗ trợ các điểm tối ưu hợp lý: BFF có thể mở rộng theo đường biên không trạng thái, Redis hỗ trợ đường xử lý nóng phiên/giỏ/KDS/bộ nhớ đệm thực đơn, Kafka tách tác dụng phụ bất đồng bộ, và ranh giới dịch vụ cho phép mở rộng các ngữ cảnh như Order, Kitchen hoặc Payment theo nhu cầu khác nhau. Phòng Socket.IO theo đơn vị thuê bao/phiên giúp giảm phạm vi phát sự kiện, còn WebSocket chỉ là gợi ý/tải lại nên tính đúng không phụ thuộc vào độ tin cậy tuyệt đối của kênh thời gian thực.
-
-Một kế hoạch đo lường đầy đủ bao gồm tải thực đơn QR, thay đổi giỏ, gửi đơn, xác nhận nhân viên/trừ tồn kho, lan truyền KDS, hoàn tất webhook thanh toán, độ trễ gợi ý WebSocket và mức sử dụng tài nguyên PostgreSQL/Redis/Kafka. Nếu có số đo từ môi trường công khai, chúng được trình bày như số đo vận hành có bối cảnh, không dùng để khẳng định microservices nhanh hơn monolith.
+Hình~\ref{fig:chapter6-nx-project-graph} chỉ đóng vai trò minh họa cho công cụ quản lý monorepo được sử dụng trong đề tài. Ảnh này không tự xác nhận chất lượng kiến trúc, mà hỗ trợ phần trình bày về cách tổ chức và bảo trì dự án.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.19\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}}
-  \caption{Trạng thái bằng chứng kiến trúc và yêu cầu phi chức năng.}
-  \label{tab:chapter6-nfr-evidence}\\
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}}
+  \caption{Tiêu chí đánh giá quyền sở hữu dịch vụ và khả năng bảo trì.}
+  \label{tab:chapter6-architecture-rubric}\\
   \toprule
-  Thuộc tính và kết luận & Bằng chứng hiện có & Trạng thái đánh giá & Phạm vi kết luận \\
+  Tiêu chí & Cách QRTable áp dụng & Cơ sở đối chiếu & Giới hạn \\
   \midrule
   \endfirsthead
   \toprule
-  Thuộc tính và kết luận & Bằng chứng hiện có & Trạng thái đánh giá & Phạm vi kết luận \\
+  Tiêu chí & Cách QRTable áp dụng & Cơ sở đối chiếu & Giới hạn \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  Cô lập đơn vị thuê bao & TenantGuard, \texttt{tenant\_id}, Redis/sự kiện/phòng nhận biết đơn vị thuê bao, một số kiểm thử đơn vị thuê bao. & Một phần & Có bất biến thiết kế và kiểm thử một phần; chưa khẳng định toàn bộ bề mặt API trên môi trường thật đã được chứng minh. \\
-  Xác thực/RBAC & Keycloak/JWT cho nhân viên/quản trị, SessionGuard cho khách, dữ liệu khởi tạo cho sáu vai trò. & Mạnh & Chuỗi guard và dữ liệu quyền khởi tạo đã được kiểm chứng bằng kiểm thử đơn vị, kiểm thử hợp đồng và kiểm thử khói. \\
-  Quyền báo cáo theo gói & \texttt{report.read\_own}, \texttt{report.read\_any}, PlanFeatureGuard và trạng thái khóa ứng dụng. & Mạnh theo mã nguồn và kiểm thử & Ảnh chụp và kiểm thử khói trình duyệt bổ sung minh họa giao diện. \\
-  Bảo mật thanh toán & Token QR, bí mật webhook/HMAC, che bí mật, xử lý trùng/thiếu. & Mạnh theo kiểm thử nội bộ & Kiểm chứng SePay thực tế cần môi trường và dữ liệu của nhà cung cấp. \\
-  Nhất quán và tính lũy đẳng & Phiên bản giỏ, tính lũy đẳng gửi đơn, trừ/hoàn tồn kho, hoàn tất thanh toán, webhook trùng. & Mạnh cho luồng chính & Phạm vi hiện tại chưa bao gồm phân phối chính xác một lần hoặc CDC hoàn chỉnh. \\
-  Phản hồi gần thời gian thực & WebSocket gợi ý làm mới, cơ chế kết nối ứng dụng KDS và khách, kiểm thử đầu-cuối gần thời gian thực. & Mạnh & WebSocket giảm độ trễ nhận biết nhưng không là nguồn trạng thái có thẩm quyền. \\
-  Khả năng bảo trì & Monorepo Nx, quyền sở hữu dịch vụ, hợp đồng dùng chung, kiểm thử kiến trúc. & Mạnh về kiến trúc & Đánh giá bằng kịch bản và cấu trúc mã, không gán số liệu năng suất. \\
-  Khả năng mở rộng & Ranh giới dịch vụ, nhóm bộ tiêu thụ Kafka, bộ nhớ đệm/hàng đợi Redis, mô hình phòng Socket.IO. & Được hỗ trợ bởi thiết kế & Chỉ khẳng định thiết kế tạo cơ sở cho mở rộng; chưa có kiểm thử tải/áp lực. \\
-  Hiệu quả hiệu năng & Chưa có thông lượng/độ trễ đo chuẩn được ghi nhận. & Chưa đo định lượng & Không tạo số; đề xuất chỉ số và kiểm thử tải cho hướng phát triển. \\
-  Đóng gói triển khai công khai & Docker/compose, cấu hình môi trường, kiểm tra sức khỏe, URL/HTTPS và kiểm thử khói cần được chốt bằng hiện vật vận hành công khai. & Cần bổ sung hiện vật công khai & Chỉ kết luận về khả năng đóng gói và vận hành các dịch vụ chính khi có hiện vật triển khai tương ứng. \\
-  Khả năng chịu lỗi ngoại tuyến & Kết nối lại và tải lại ứng dụng đã có kiểm thử; hàng đợi thao tác ngoại tuyến đầy đủ chưa có. & Giới hạn & Phạm vi hiện tại bao phủ kết nối lại; hàng đợi ghi ngoại tuyến là hướng phát triển. \\
+  Ranh giới dịch vụ & Các dịch vụ chính được tổ chức theo miền nghiệp vụ riêng. & Thiết kế Chương 4, luồng Chương 5 và kiểm thử Chương 6. & Cần thêm kiểm soát tự động để tránh trôi ranh giới theo thời gian. \\
+  Quyền sở hữu dữ liệu & Mỗi nhóm dữ liệu có dịch vụ chịu trách nhiệm chính. & Bảng thiết kế và các luồng kiểm chứng đại diện. & Chưa kết luận toàn bộ bề mặt dữ liệu trên môi trường vận hành thực tế. \\
+  Khả năng bảo trì & Monorepo hỗ trợ chia sẻ phần dùng chung và chạy kiểm thử theo project. & Cấu trúc Nx và kết quả kiểm thử. & Công cụ quản lý dự án không thay thế kiểm chứng vận hành. \\
 \end{longtable}
 }
 
-\section{Kiểm chứng triển khai trên môi trường công khai}
+\section{Hiệu năng, khả năng mở rộng và vận hành công khai}
 
-Triển khai trên môi trường công khai là một lớp đánh giá bổ sung cho kiểm thử. Tiêu chí tối thiểu gồm BFF, PWA khách và ứng dụng quản trị truy cập qua URL hoặc tên miền; HTTPS/TLS theo cấu hình môi trường; các dịch vụ chính chạy ngoài máy phát triển; PostgreSQL, Redis, Kafka và Keycloak được kết nối; đường gọi lại SePay công khai khi kiểm chứng nhà cung cấp; kiểm tra sức khỏe và kiểm thử khói; cùng một luồng từ phiên QR đến đơn, KDS và thanh toán.
+Phạm vi hiện tại chưa có số liệu định lượng về độ trễ, thông lượng, tỉ lệ lỗi hoặc mức sử dụng tài nguyên. Vì vậy, chương này không so sánh QRTable với kiến trúc nguyên khối về hiệu năng và không kết luận hệ thống đã chịu tải lớn. Một đánh giá hiệu năng đầy đủ cần môi trường đo ổn định, dữ liệu kiểm thử rõ ràng và phương pháp đo lặp lại được.
 
-Hiện vật vận hành công khai phải được thu từ đúng môi trường triển khai, tách biệt với ảnh chụp cục bộ. Các hiện vật này xác nhận khả năng đóng gói, cấu hình và vận hành dịch vụ chính trên môi trường tương ứng. Mức sẵn sàng vận hành thực tế còn phụ thuộc vào tính sẵn sàng cao, sao lưu và phục hồi, kiểm thử tải, cảnh báo, tài liệu vận hành và cơ chế hoàn tác.
+Những gì có thể kết luận là thiết kế tạo cơ sở hợp lý cho mở rộng từng phần. Các thành phần có thể được tách theo đặc điểm tải, bộ nhớ đệm hỗ trợ các trạng thái cần truy cập nhanh, và sự kiện bất đồng bộ giúp giảm phụ thuộc trực tiếp giữa một số bước xử lý. Tuy nhiên, các nhận định này vẫn ở mức cơ sở kiến trúc, chưa phải kết quả đo tải.
+
+Các số đo hiệu năng vì vậy được xem là hướng phát triển tiếp theo, thay vì kết quả đã hoàn tất trong phạm vi khóa luận.
+
+Về vận hành công khai, QRTable đã có kết quả đóng gói container cho các thành phần backend và triển khai độc lập hai ứng dụng frontend lên nền tảng đám mây. Các kết quả này cho thấy hệ thống đã đi qua bước đóng gói và phát hành ở mức thử nghiệm, nhưng chưa tương đương với kiểm chứng vận hành toàn bộ ngăn xếp trong thời gian dài.
+
+Các hoạt động vận hành và triển khai được đối chiếu qua ba nhóm kết quả:
+\begin{itemize}
+  \item \textbf{Đóng gói container:} các cấu hình backend và frontend được build thành công trên Docker Desktop.
+  \item \textbf{Triển khai ứng dụng khách hàng:} Customer PWA có bản phát hành hoạt động trên Vercel.
+  \item \textbf{Triển khai ứng dụng quản trị:} Management App có bản phát hành riêng trên Vercel.
+\end{itemize}
+
+\subsection{Phân tích kết quả đóng gói và giao diện triển khai thực tế}
+
+Các kết quả ghi nhận từ công cụ quản lý container và trang quản trị đám mây cung cấp cơ sở đối chiếu cho tiến trình đóng gói và phát hành:
+
+\begin{itemize}
+  \item \textbf{Quản lý và lịch sử đóng gói container (Hình~\ref{fig:chapter6-docker-image-or-compose-build}):}
+    \begin{itemize}
+      \item Bảng điều khiển Docker Desktop ghi nhận các lần build gần nhất đã hoàn thành thành công.
+      \item Các mục build bao gồm ứng dụng khách hàng, ứng dụng quản trị và backend, cho thấy các thành phần có thể được đóng gói tách biệt.
+    \end{itemize}
+
+  \item \textbf{Kết quả triển khai ứng dụng khách hàng trên đám mây Vercel (Hình~\ref{fig:chapter6-vercel-customer-pwa}):}
+    \begin{itemize}
+      \item Trang quản trị Vercel hiển thị bản phát hành của ứng dụng khách hàng ở trạng thái sẵn sàng.
+      \item Ảnh xem trước cho thấy nội dung ứng dụng đã được xuất bản và có thể truy cập qua tên miền công khai.
+    \end{itemize}
+
+  \item \textbf{Kết quả triển khai ứng dụng quản trị trên đám mây Vercel (Hình~\ref{fig:chapter6-vercel-management-app}):}
+    \begin{itemize}
+      \item Trang quản trị dự án hiển thị bản phát hành của ứng dụng quản trị ở trạng thái sẵn sàng.
+      \item Ảnh xem trước cho thấy giao diện quản trị đã được triển khai độc lập với ứng dụng khách hàng.
+    \end{itemize}
+\end{itemize}
+
+\chapterSixEvidenceFigure[Quản lý đóng gói container bằng Docker]{0.82\textheight}
+  {chapter6-22-docker-image-or-compose-build.png}
+  {fig:chapter6-docker-image-or-compose-build}
+  {Lịch sử đóng gói các hình ảnh container trên công cụ Docker Desktop.}
+
+Hình~\ref{fig:chapter6-docker-image-or-compose-build} minh họa lịch sử build trên Docker Desktop, trong đó các cấu hình chính của hệ thống đã hoàn thành thành công.
+
+\chapterSixEvidenceFigure[Triển khai ứng dụng khách hàng trên Vercel]{0.82\textheight}
+  {chapter6-23a-vercel-customer-pwa.png}
+  {fig:chapter6-vercel-customer-pwa}
+  {Trạng thái triển khai ứng dụng khách hàng lên nền tảng đám mây Vercel.}
+
+Hình~\ref{fig:chapter6-vercel-customer-pwa} ghi nhận giao diện quản lý trên Vercel, cho thấy ứng dụng khách hàng đã có bản phát hành trực tuyến ở trạng thái sẵn sàng.
+
+\chapterSixEvidenceFigure[Triển khai ứng dụng quản trị trên Vercel]{0.82\textheight}
+  {chapter6-23b-vercel-management-app.png}
+  {fig:chapter6-vercel-management-app}
+  {Trạng thái triển khai ứng dụng quản trị lên nền tảng đám mây Vercel.}
+
+Hình~\ref{fig:chapter6-vercel-management-app} ghi nhận giao diện điều khiển đám mây, cho thấy ứng dụng quản trị đã được phát hành trực tuyến trong một dự án riêng.
 
 \section{Giới hạn của quá trình đánh giá}
 
-Bảng~\ref{tab:chapter6-limitations} tổng hợp các giới hạn của quá trình đánh giá, tác động đến kết luận và hướng xử lý tương ứng.
+Bảng~\ref{tab:chapter6-limitations} tổng hợp các giới hạn chính. Việc trình bày giới hạn không nhằm làm yếu kết quả của đề tài, mà nhằm xác định chính xác phạm vi suy luận. Đây là yêu cầu quan trọng của một báo cáo học thuật: kết luận phải tương ứng với bằng chứng đã có, còn phần chưa đủ bằng chứng cần được chuyển thành hướng phát triển hoặc kế hoạch kiểm chứng tiếp theo.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.2\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}}
+\begin{longtable}{>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.23\textwidth}>{\raggedright\arraybackslash}p{0.21\textwidth}}
   \caption{Giới hạn đánh giá và hướng phát triển tương ứng.}
   \label{tab:chapter6-limitations}\\
   \toprule
-  Giới hạn hiện tại & Bằng chứng / nguyên nhân & Tác động đến kết luận & Hướng phát triển \\
+  Giới hạn & Tác động & Cách giảm rủi ro trong khóa luận & Hướng tiếp theo \\
   \midrule
   \endfirsthead
   \toprule
-  Giới hạn hiện tại & Bằng chứng / nguyên nhân & Tác động đến kết luận & Hướng phát triển \\
+  Giới hạn & Tác động & Cách giảm rủi ro trong khóa luận & Hướng tiếp theo \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  Thiếu số liệu thông lượng, độ trễ và tải lớn. & Ma trận truy vết chưa ghi nhận phép đo chuẩn. & Kết quả hiệu năng mới dừng ở phân tích kiến trúc. & Thiết kế kiểm thử tải cho tham gia QR, gửi đơn, hàng đợi KDS và webhook thanh toán. \\
-  Cô lập API liên đơn vị thuê bao chưa được kiểm thử diện rộng. & Một số kịch bản cần ngăn xếp BFF, Keycloak và cơ sở dữ liệu dịch vụ có dữ liệu gieo. & Thiết kế có cơ sở rõ, nhưng kiểm thử toàn ngăn xếp mới bao phủ một phần. & Chuẩn hóa bộ dữ liệu và chạy kiểm thử API liên đơn vị thuê bao đại diện. \\
-  Khởi tạo SaaS chưa bao phủ đầy đủ Authorizer, Keycloak và User-Access. & Lát cắt Payment TCP đã có kiểm thử, còn định danh và hồ sơ dùng đối tượng giả lập ở một số luồng. & Kết quả hiện tại mới bao phủ một phần luồng đầu-cuối. & Bổ sung kiểm thử đa dịch vụ với Keycloak, User-Access, Payment TCP và outbox. \\
-  Ngoại lệ hóa đơn chờ khi đơn vị thuê bao tạm ngưng chưa có minh chứng trình duyệt đầy đủ. & Cần bộ dữ liệu xác định cho đơn vị thuê bao/phiên/hóa đơn tạm ngưng. & Hành vi tạm ngưng chỉ được đánh giá một phần. & Tạo bộ dữ liệu kiểm thử đầu-cuối cho ngoại lệ thanh toán hóa đơn chờ. \\
-  Bảng điều khiển và báo cáo còn thiếu minh họa trình duyệt. & Mã nguồn và kiểm thử đã có; ảnh chụp và kết quả trình duyệt chưa được dùng làm hiện vật chính. & Quyền và quyền theo gói đã được kiểm chứng ở lớp mã nguồn; giao diện cần minh họa bổ sung. & Chụp bảng điều khiển chủ quán, quản lý, phân tích nền tảng và trạng thái khóa trên môi trường minh họa. \\
-  Kiểm chứng SePay thực tế không thuộc đường chạy mặc định. & Cần \texttt{RUN\_LIVE\_SEPAY}, thông tin xác thực và đường gọi lại công khai. & Kết quả kiểm thử mặc định chỉ áp dụng cho mô phỏng và dữ liệu nội bộ. & Dùng mô phỏng cho hồi quy và quy trình riêng cho kiểm chứng nhà cung cấp. \\
-  Hàng đợi thao tác ngoại tuyến đầy đủ chưa được triển khai. & Hiện có kết nối lại và tải lại, chưa có hàng đợi IndexedDB. & Kết quả chỉ bao phủ khả năng phục hồi kết nối. & Thiết kế hàng đợi thao tác, cơ chế giải quyết xung đột và đồng bộ nền. \\
-  Triển khai công khai cần thêm hiện vật vận hành. & Cần URL/HTTPS, kiểm tra sức khỏe, kiểm thử khói, đường gọi lại webhook và nhật ký rút gọn. & Hiện vật hiện tại chưa đủ để đánh giá tính sẵn sàng cao hoặc vận hành cấp doanh nghiệp. & Chuẩn hóa gói triển khai, danh sách kiểm tra sức khỏe và hiện vật vận hành công khai. \\
-  Thông báo/email nằm ngoài phạm vi đánh giá chính. & Các luồng chính được đánh giá không phụ thuộc email giao dịch. & Không dùng email biên nhận hoặc email chào mừng làm kết quả. & Có thể tích hợp dịch vụ thông báo hoặc SMTP/nhà cung cấp nếu phạm vi mở rộng. \\
+  Chưa có kiểm thử tải định lượng. & Không kết luận thông lượng, độ trễ hoặc sức chứa dưới tải lớn. & Đánh giá khả năng mở rộng ở mức cơ sở kiến trúc và không tạo số liệu. & Bổ sung kịch bản đo tải cho các luồng nghiệp vụ chính. \\
+  Cô lập dữ liệu theo đơn vị thuê bao chưa phủ toàn bộ bề mặt khi vận hành. & Kết luận còn gắn với thiết kế và kiểm thử đại diện. & Không viết như đã kiểm chứng toàn bộ mọi trường hợp. & Chuẩn hóa dữ liệu nhiều đơn vị thuê bao và mở rộng kiểm thử hồi quy. \\
+  Phân quyền phụ thuộc dữ liệu khởi tạo. & Kết quả có thể thay đổi nếu dữ liệu vai trò không ổn định. & Chỉ dùng ảnh hoặc kết quả khi dữ liệu kiểm thử được chuẩn hóa. & Cố định dữ liệu vai trò và quy trình đăng nhập trong môi trường kiểm thử. \\
+  Saga chưa đạt mức củng cố vận hành đầy đủ. & Không kết luận đã bảo đảm tuyệt đối cho mọi lỗi phân tán. & Chỉ nói hai Saga đại diện đã có kiểm thử và kết quả đối chiếu tương ứng. & Bổ sung cơ chế thử lại, quan sát lỗi và kiểm chứng dài hạn. \\
+  Chưa triển khai công khai toàn bộ ngăn xếp microservices. & Không đánh giá tính sẵn sàng cao hoặc khả năng vận hành dài hạn. & Chỉ dùng Docker/Vercel như kết quả đóng gói hoặc triển khai một phần. & Hoàn thiện môi trường triển khai đầy đủ và quy trình kiểm chứng sau triển khai. \\
+  Khả năng quan sát chưa có dữ liệu vận hành đầy đủ. & Không kết luận hệ thống đã đạt mức quan sát sản xuất. & Không đưa dashboard quan sát nếu chưa có dữ liệu vận hành thực tế. & Bổ sung log, metric, trace và cảnh báo trong môi trường vận hành. \\
+  Kiểm chứng SePay với nhà cung cấp thực tế chưa thuộc đường chạy mặc định. & Không kết luận kiểm chứng nhà cung cấp đã được tự động hóa. & Dùng mô phỏng và kiểm thử hợp đồng cho phạm vi hiện tại. & Kiểm chứng thủ công với giao dịch thực tế khi có điều kiện phù hợp. \\
+  Chưa có hàng đợi thao tác ngoại tuyến đầy đủ. & Không kết luận ứng dụng hỗ trợ đầy đủ thao tác ghi khi mất mạng. & Chỉ đánh giá kết nối lại, tải lại và trạng thái mới nhất. & Thiết kế cơ chế đồng bộ nền và xử lý xung đột. \\
 \end{longtable}
 }
 
 \section{Thảo luận kết quả}
 
-Kết quả đánh giá cho thấy hướng tiếp cận SaaS POS tích hợp đặt món qua QR theo kiến trúc microservices có chọn lọc là phù hợp với bài toán QRTable. Các luồng chính đã có bằng chứng truy vết: khách có thể đi từ phiên QR đến giỏ chung/đơn; nhân viên có thể xác nhận đơn mà vẫn giữ nhất quán tồn kho ở Catalog; Kitchen có thể nhận phiếu bếp qua sự kiện và hàng đợi Redis khi vận hành; Payment có thể xử lý ghi nhận thanh toán và webhook trùng theo mã nguồn/kiểm thử; SaaS có đường cơ sở cho vòng đời đơn vị thuê bao, thuê bao và khởi tạo; bảng điều khiển/báo cáo đã phản ánh được quyền, ngữ cảnh đơn vị thuê bao và quyền theo gói.
+Kết quả đánh giá cho thấy QRTable đáp ứng phần lớn mục tiêu chính trong phạm vi khóa luận. Ở lớp sản phẩm, hệ thống có luồng đặt món qua mã QR, POS và KDS đại diện cho thấy khách có thể đặt món, nhân viên tiếp nhận, bếp xử lý và khách nhận trạng thái phục vụ sau khi kết nối lại. Ở lớp nghiệp vụ, các luồng đặt món, thanh toán, KDS và SaaS đều có mối liên kết từ yêu cầu đến kiểm thử hoặc kết quả quan sát. Ở lớp kiến trúc, ranh giới dịch vụ, quyền sở hữu dữ liệu, sự kiện bất đồng bộ và bản chiếu trạng thái giúp QRTable không chỉ là một ứng dụng POS được chia thư mục theo tên dịch vụ.
 
-Về kiến trúc, QRTable giữ được các lựa chọn quan trọng: BFF là điểm vào, chủ dịch vụ giữ cơ sở dữ liệu/bất biến, Kafka chỉ dùng cho sự kiện miền bất đồng bộ, Redis có quyền sở hữu rõ, WebSocket là gợi ý/tải lại và khách không bị ép vào Keycloak. Những điểm này không chỉ là mô tả thiết kế ở Chương 4 mà đã có dấu vết triển khai và một số kiểm thử hợp đồng/tĩnh bảo vệ.
+Luận điểm microservices của QRTable rõ nhất khi được nhìn qua các luồng liên dịch vụ. Luồng xác nhận đơn nối đặt món, tồn kho và bếp; luồng khởi tạo đơn vị thuê bao nối dữ liệu nền tảng, chủ sở hữu và gói dịch vụ; luồng phân quyền nối vai trò người dùng với phạm vi thao tác. Mỗi chuỗi này đều thể hiện một đánh đổi thiết kế: chấp nhận phức tạp hơn kiến trúc nguyên khối để đạt ranh giới dữ liệu và khả năng mở rộng tổ chức, nhưng phải bù lại bằng kiểm thử, xử lý thao tác lặp và giới hạn kết luận.
 
-Kết quả đánh giá còn bốn giới hạn chính. Hiệu năng chưa có số đo định lượng về độ trễ và thông lượng; vận hành công khai chưa có đầy đủ hiện vật để đánh giá mức sẵn sàng; kiểm chứng SePay thực tế chưa được tự động hóa; và một số kịch bản toàn ngăn xếp ưu tiên cao chưa được bao phủ đầy đủ. Các giới hạn này xác định phạm vi của kết luận hiện tại và định hướng cho giai đoạn kiểm chứng tiếp theo.
+Các giới hạn còn lại chủ yếu nằm ở kiểm chứng vận hành quy mô lớn và kiểm chứng toàn ngăn xếp. Không có số đo hiệu năng thì không kết luận hiệu năng dưới tải; chưa triển khai công khai toàn bộ ngăn xếp thì không kết luận hệ thống đã sẵn sàng vận hành dài hạn; nhà cung cấp thanh toán thật chưa chạy mặc định thì không kết luận kiểm chứng nhà cung cấp đã được tự động hóa. Cách diễn đạt này giúp kết quả của khóa luận giữ được tính thuyết phục: phần đã làm được được trình bày bằng kiểm thử và kết quả quan sát, còn phần chưa đủ bằng chứng được nêu như giới hạn có hướng xử lý.
 
-Nhìn tổng thể, QRTable đáp ứng phần lớn mục tiêu trong phạm vi đề tài thông qua chuỗi yêu cầu, thiết kế, triển khai, truy vết và kiểm thử cho các bất biến quan trọng. Kết quả xác nhận tính khả thi của kiến trúc và phần triển khai có kiểm soát cho bài toán SaaS POS tích hợp đặt món qua QR. Các giới hạn đã nêu đồng thời xác định những bước cần bổ sung để nâng hệ thống từ phạm vi khóa luận lên mức vận hành thực tế.
+Nhìn tổng thể, QRTable cho thấy tính khả thi của một nền tảng POS theo mô hình SaaS tích hợp đặt món qua mã QR dựa trên kiến trúc microservices có kiểm soát. Giá trị của hệ thống nằm ở cách các luồng nghiệp vụ chính được nối với ranh giới dịch vụ, quyền sở hữu dữ liệu, kiểm thử, Saga, phân quyền và kết quả quan sát được. Đây là cơ sở để Chương 7 tổng hợp đóng góp của đề tài và đề xuất các hướng nâng cấp về kiểm thử tải, triển khai công khai, quan sát hệ thống, củng cố Saga và mở rộng sản phẩm.

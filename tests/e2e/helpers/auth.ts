@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const KEYCLOAK_REDIRECT_PATTERN = /8180|keycloak|openid-connect/i;
-const KEYCLOAK_CONTINUE_BUTTON = /Continue with Keycloak/i;
+const KEYCLOAK_CONTINUE_BUTTON = /(?:Tiếp tục với Keycloak|Continue with Keycloak)/i;
 
 function escapedPathPattern(path: string): RegExp {
   const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '\\/');

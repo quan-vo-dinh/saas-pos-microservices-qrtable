@@ -14,7 +14,11 @@ export default defineConfig({
   workers: 1,
   timeout: 240_000,
   expect: { timeout: 60_000 },
-  reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
+  reporter: [
+    ['list'],
+    ['html', { open: 'never', outputFolder: 'playwright-report' }],
+    ['allure-playwright', { resultsDir: 'allure-results', detail: true, suiteTitle: true }],
+  ],
   use: {
     trace: 'retain-on-failure',
     video: 'retain-on-failure',

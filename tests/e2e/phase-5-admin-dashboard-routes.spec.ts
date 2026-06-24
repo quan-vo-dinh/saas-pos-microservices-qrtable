@@ -8,6 +8,7 @@
  * Skip: `SKIP_PHASE5_ADMIN_ROUTES_E2E=1`, or when management-app/BFF/Keycloak/auth seed is not ready.
  */
 import { expect, test, type Page } from '@playwright/test';
+import { attachPageShot, setAllureContext } from './helpers/allure';
 import { loginWithKeycloakOrSkip } from './helpers/auth';
 import { reachable } from './helpers/readiness';
 
@@ -66,8 +67,15 @@ test.describe('Phase 5 admin/dashboard route smoke', () => {
     );
   });
 
-  test('public landing renders without auth', async ({ page }) => {
+  test('public landing renders without auth', async ({ page }, testInfo) => {
+    setAllureContext({
+      epic: 'Admin dashboard routing',
+      feature: 'Public and protected route smoke',
+      story: 'Public landing renders without auth and protected routes stay healthy',
+      suite: 'E2E / Phase 5',
+    });
     await expectNotBlankOrServerError(page, '/', /QRTable|Đặt món qua QR/i);
+    await attachPageShot(page, testInfo, 'public landing');
   });
 
   test.describe('admin routes (SUPER_ADMIN)', () => {
@@ -83,9 +91,10 @@ test.describe('Phase 5 admin/dashboard route smoke', () => {
     });
 
     for (const route of ADMIN_ROUTES) {
-      test(`${route.path} is not blank, 401, or 500`, async ({ page }) => {
+      test(`${route.path} is not blank, 401, or 500`, async ({ page }, testInfo) => {
         await loginWithKeycloakOrSkip(page, MGMT_BASE, route.path, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD);
         await expectNotBlankOrServerError(page, route.path, route.visibleText);
+        await attachPageShot(page, testInfo, `admin route ${route.path}`);
       });
     }
   });
@@ -103,9 +112,10 @@ test.describe('Phase 5 admin/dashboard route smoke', () => {
     });
 
     for (const route of DASHBOARD_ROUTES) {
-      test(`${route.path} is not blank, 401, or 500`, async ({ page }) => {
+      test(`${route.path} is not blank, 401, or 500`, async ({ page }, testInfo) => {
         await loginWithKeycloakOrSkip(page, MGMT_BASE, route.path, OWNER_EMAIL, OWNER_PASSWORD);
         await expectNotBlankOrServerError(page, route.path, route.visibleText);
+        await attachPageShot(page, testInfo, `dashboard route ${route.path}`);
       });
     }
   });

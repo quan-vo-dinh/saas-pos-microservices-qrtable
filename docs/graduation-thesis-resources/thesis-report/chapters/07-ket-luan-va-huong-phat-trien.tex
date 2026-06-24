@@ -6,11 +6,11 @@
 
 Hướng tiếp cận chính của đề tài là dùng kiến trúc microservices có kiểm soát. Hệ thống không chỉ chia mã nguồn thành nhiều ứng dụng, mà xác định rõ ranh giới dịch vụ và quyền sở hữu dữ liệu: Catalog sở hữu thực đơn, bàn và tồn kho; Order sở hữu phiên, đơn và hóa đơn; Kitchen sở hữu bản chiếu KDS khi vận hành; Payment sở hữu giao dịch và cấu hình thanh toán; SaaS sở hữu đơn vị thuê bao và gói thuê bao; User-Access sở hữu hồ sơ ứng dụng và vai trò; còn BFF giữ vai trò điểm vào cho HTTP/WebSocket. Các luồng liên dịch vụ đi qua TCP/gRPC hoặc Kafka, không truy cập chéo cơ sở dữ liệu.
 
-Kết quả của đề tài được xem xét trên cơ sở yêu cầu, thiết kế, phần triển khai và bằng chứng kiểm chứng tương ứng. Chương này tổng hợp mức độ đáp ứng mục tiêu, các đóng góp, hạn chế và hướng phát triển của QRTable.
+Kết quả của đề tài được xem xét trên cơ sở yêu cầu, thiết kế, phần triển khai và kết quả kiểm chứng tương ứng. Chương này tổng hợp mức độ đáp ứng mục tiêu, các đóng góp, hạn chế và hướng phát triển của QRTable.
 
 \section{Kết quả đạt được theo mục tiêu đề tài}
 
-Về đặt món qua QR, hệ thống hỗ trợ khách tham gia hoặc tạo phiên, xem thực đơn theo đơn vị thuê bao, sử dụng giỏ đặt món dùng chung và gửi đơn chờ nhân viên xác nhận. Phạm vi phiên, ngữ cảnh đơn vị thuê bao, phiên bản giỏ và tính lũy đẳng khi gửi đơn được kiểm chứng bằng các kiểm thử tương ứng. Kết quả này đáp ứng mục tiêu giảm thao tác trung gian trong quá trình gọi món tại bàn.
+Về đặt món qua QR, hệ thống hỗ trợ khách tham gia hoặc tạo phiên, xem thực đơn theo đơn vị thuê bao, sử dụng giỏ đặt món dùng chung và gửi đơn chờ nhân viên xác nhận. Phạm vi phiên, ngữ cảnh đơn vị thuê bao, phiên bản giỏ và khả năng xử lý gửi đơn lặp được kiểm chứng bằng các kiểm thử tương ứng. Kết quả này đáp ứng mục tiêu giảm thao tác trung gian trong quá trình gọi món tại bàn.
 
 Về vận hành POS, QRTable hỗ trợ nhân viên xác nhận đơn, bảo toàn tồn kho qua ranh giới Catalog--Order, tạo phiếu KDS từ sự kiện \texttt{order.confirmed} và cập nhật màn hình bếp bằng WebSocket gợi ý làm mới. Catalog sở hữu tồn kho, Kitchen sở hữu bản chiếu KDS khi vận hành và Order sở hữu trạng thái đơn có thẩm quyền. Sự phân công này duy trì tính nhất quán mà không phá vỡ ranh giới vi dịch vụ.
 
@@ -18,9 +18,9 @@ Về thanh toán, hệ thống hỗ trợ tiền mặt và VietQR/SePay, gồm b
 
 Về SaaS, QRTable quản lý đơn vị thuê bao, gói giá, thuê bao, hóa đơn và quyền theo gói. SaaS Onboarding Mini-Saga phối hợp SaaS, Authorizer, Keycloak, User-Access và Payment qua hợp đồng liên dịch vụ. Bảng điều khiển và báo cáo phân biệt phạm vi của chủ quán, quản lý với quyền phân tích xuyên đơn vị thuê bao của quản trị viên nền tảng.
 
-Về kiểm chứng, hệ thống có khả năng truy vết từ yêu cầu đến kiểm thử cho phần lớn luồng ưu tiên cao. Các kết quả được phân loại theo kiểm chứng chức năng, kiến trúc, yêu cầu phi chức năng và hiện vật vận hành. Nhờ đó, phạm vi của từng kết luận được xác định theo loại bằng chứng tương ứng.
+Về kiểm chứng, hệ thống có khả năng đối chiếu từ yêu cầu đến kiểm thử cho phần lớn luồng ưu tiên cao. Các kết quả được phân loại theo kiểm chứng chức năng, kiến trúc, yêu cầu phi chức năng và minh chứng vận hành. Nhờ đó, phạm vi của từng kết luận được xác định theo loại minh chứng tương ứng.
 
-Về triển khai công khai, đề tài xác định bộ hiện vật gồm tên miền hoặc URL, HTTPS/TLS, cấu hình dịch vụ, kiểm tra sức khỏe, đường gọi lại webhook, kiểm thử khói và nhật ký rút gọn. Các hiện vật này phục vụ đánh giá khả năng đóng gói và vận hành dịch vụ chính, đồng thời được tách khỏi kiểm thử chức năng và kiểm chứng kiến trúc.
+Về triển khai công khai, đề tài xác định bộ minh chứng gồm tên miền hoặc URL, HTTPS/TLS, cấu hình dịch vụ, kiểm tra sức khỏe, đường gọi lại webhook, kiểm tra vận hành cơ bản và nhật ký rút gọn. Các minh chứng này phục vụ đánh giá khả năng đóng gói và vận hành dịch vụ chính, đồng thời được tách khỏi kiểm thử chức năng và kiểm chứng kiến trúc.
 
 \section{Đóng góp của đề tài}
 
@@ -32,27 +32,27 @@ Về triển khai công khai, đề tài xác định bộ hiện vật gồm t�
 
 Đóng góp thứ tư là mô hình phân quyền và quyền theo gói phù hợp SaaS POS. Hệ thống phân biệt nhân viên/chủ/quản lý/quản trị nền tảng, tác nhân phiên khách, cô lập đơn vị thuê bao và quyền tính năng theo gói. Báo cáo/bảng điều khiển được dùng như ví dụ cụ thể cho sự khác biệt giữa quyền trong đơn vị thuê bao và quyền nền tảng.
 
-Đóng góp thứ năm là bộ minh chứng phục vụ lập luận khóa luận: bảng yêu cầu, bảng ranh giới dịch vụ/quyền sở hữu dữ liệu, sơ đồ kiến trúc, sơ đồ trình tự Chương 5, bảng bằng chứng triển khai và bảng đánh giá Chương 6. Đặc biệt, Bảng~\ref{tab:chapter4-data-ownership-schema}, Bảng~\ref{tab:chapter4-communication-matrix}, Hình~\ref{fig:chapter5-qr-ordering-session}--\ref{fig:chapter5-saas-onboarding-saga} và Bảng~\ref{tab:chapter5-implemented-evidence} giúp người đọc truy vết từ yêu cầu đến thiết kế, từ thiết kế đến triển khai và từ triển khai đến đánh giá.
+Đóng góp thứ năm là bộ minh chứng phục vụ lập luận khóa luận: bảng yêu cầu, bảng ranh giới dịch vụ/quyền sở hữu dữ liệu, sơ đồ kiến trúc, sơ đồ trình tự Chương 5, bảng minh chứng triển khai và bảng đánh giá Chương 6. Đặc biệt, Bảng~\ref{tab:chapter4-data-ownership-schema}, Bảng~\ref{tab:chapter4-communication-matrix}, Hình~\ref{fig:chapter5-qr-ordering-session}--\ref{fig:chapter5-saas-onboarding-saga} và Bảng~\ref{tab:chapter5-implemented-evidence} giúp người đọc đối chiếu từ yêu cầu đến thiết kế, từ thiết kế đến triển khai và từ triển khai đến đánh giá.
 
 \section{Hạn chế của đề tài}
 
 Hạn chế đầu tiên nằm ở đo lường thực nghiệm. Khóa luận đã phân tích cơ sở kiến trúc cho khả năng mở rộng thông qua ranh giới dịch vụ, Redis, Kafka và phòng Socket.IO, nhưng chưa có kiểm thử tải lớn với môi trường, dữ liệu và cấu hình được công bố đầy đủ. Vì vậy, kết quả về hiệu năng mới dừng ở phân tích kiến trúc.
 
-Hạn chế thứ hai thuộc vận hành hệ thống. Tính sẵn sàng cao, sao lưu và phục hồi, tự động hoàn tác cùng phục hồi nhiều dịch vụ đòi hỏi môi trường và hiện vật kiểm chứng riêng. Đây là các nội dung cần được củng cố sau phạm vi khóa luận.
+Hạn chế thứ hai thuộc vận hành hệ thống. Tính sẵn sàng cao, sao lưu và phục hồi, tự động hoàn tác cùng phục hồi nhiều dịch vụ đòi hỏi môi trường và minh chứng kiểm chứng riêng. Đây là các nội dung cần được củng cố sau phạm vi khóa luận.
 
-Hạn chế thứ ba liên quan đến các phụ thuộc ngoài hệ thống và luồng toàn ngăn xếp. Các kiểm thử nội bộ cho ghi nhận thanh toán, webhook trùng và thanh toán thiếu có giá trị; kiểm chứng nhà cung cấp SePay thật được gắn với hiện vật vận hành công khai gồm đường gọi lại công khai, thông tin xác thực hợp lệ và dữ liệu giao dịch thật. Tương tự, khởi tạo SaaS đã có bằng chứng tốt ở lớp cơ sở dữ liệu, Payment và bù trừ, còn kiểm chứng đầu-cuối qua Authorizer, Keycloak, User-Access, Payment TCP và outbox được xếp vào nhóm hiện vật toàn ngăn xếp đầy đủ hơn.
+Hạn chế thứ ba liên quan đến các phụ thuộc ngoài hệ thống và luồng toàn ngăn xếp. Các kiểm thử nội bộ cho ghi nhận thanh toán, webhook trùng và thanh toán thiếu có giá trị; kiểm chứng với nhà cung cấp SePay thực tế được gắn với minh chứng vận hành công khai gồm đường gọi lại công khai, thông tin xác thực hợp lệ và dữ liệu giao dịch thực tế. Tương tự, khởi tạo SaaS đã có minh chứng rõ ràng ở lớp cơ sở dữ liệu, Payment và bù trừ, còn kiểm chứng toàn luồng qua Authorizer, Keycloak, User-Access, Payment TCP và outbox được xếp vào nhóm minh chứng toàn ngăn xếp đầy đủ hơn.
 
-Hạn chế thứ tư thuộc phạm vi sản phẩm nâng cao. Phân tích dữ liệu và trí tuệ nhân tạo, quản trị nhân sự, quản trị quan hệ khách hàng, chương trình khách hàng thân thiết, hàng đợi ngoại tuyến, ứng dụng di động gốc, dịch vụ thông báo, tích hợp giao đồ ăn, phân tích hiệu suất nhân viên và lịch sử KDS chuyên sâu đều cần thiết kế cùng bằng chứng riêng.
+Hạn chế thứ tư thuộc phạm vi sản phẩm nâng cao. Phân tích dữ liệu và trí tuệ nhân tạo, quản trị nhân sự, quản trị quan hệ khách hàng, chương trình khách hàng thân thiết, hàng đợi ngoại tuyến, ứng dụng di động gốc, dịch vụ thông báo, tích hợp giao đồ ăn, phân tích hiệu suất nhân viên và lịch sử KDS chuyên sâu đều cần thiết kế cùng minh chứng riêng.
 
 \section{Hướng phát triển}
 
 Hướng phát triển thứ nhất là đo lường hiệu năng và khả năng mở rộng bằng số liệu thật. Các kịch bản cần đo gồm tải thực đơn QR, thay đổi giỏ, gửi đơn, xác nhận nhân viên/trừ tồn kho, lan truyền KDS, hoàn tất webhook thanh toán và độ trễ gợi ý WebSocket. Kết quả đo cần đi kèm môi trường, dữ liệu, cấu hình dịch vụ và giới hạn để tránh diễn giải sai.
 
-Hướng phát triển thứ hai là xây dựng bộ kiểm thử toàn ngăn xếp đại diện cho cô lập đơn vị thuê bao, RBAC và quyền theo gói. Bộ này cần gieo dữ liệu cho nhiều đơn vị thuê bao, nhiều vai trò, nhiều trạng thái thuê bao và chạy qua BFF/Keycloak/cơ sở dữ liệu dịch vụ thật để kiểm tra các API nhạy cảm như thực đơn, đơn, thanh toán, báo cáo và vòng đời đơn vị thuê bao.
+Hướng phát triển thứ hai là xây dựng bộ kiểm thử toàn ngăn xếp đại diện cho cô lập đơn vị thuê bao, RBAC và quyền theo gói. Bộ này cần chuẩn bị dữ liệu kiểm thử cho nhiều đơn vị thuê bao, nhiều vai trò, nhiều trạng thái thuê bao và chạy qua BFF/Keycloak/cơ sở dữ liệu dịch vụ thực tế để kiểm tra các API nhạy cảm như thực đơn, đơn, thanh toán, báo cáo và vòng đời đơn vị thuê bao.
 
 Hướng phát triển thứ ba là nâng cao tính sẵn sàng và khả năng phục hồi. Hệ thống cần chiến lược sao lưu, khôi phục, kiểm tra hoàn tác, quy trình phát hành an toàn và kịch bản phục hồi khi dịch vụ hoặc hạ tầng phụ thuộc gặp lỗi.
 
-Hướng phát triển thứ tư là củng cố thanh toán và Saga. Luồng thanh toán cần tách rõ kiểm chứng mô phỏng với kiểm chứng nhà cung cấp, kiểm soát việc gửi lại webhook, tăng khả năng truy vết nhật ký và bổ sung quy trình hoàn tiền khi mở rộng phạm vi. Đối với Saga, các hướng chính gồm trạng thái bền vững, tiến trình thử lại, xử lý thư chết, tăng độ tin cậy của outbox và tiêm lỗi trên môi trường thực tế.
+Hướng phát triển thứ tư là củng cố thanh toán và Saga. Luồng thanh toán cần tách rõ kiểm chứng mô phỏng với kiểm chứng nhà cung cấp, kiểm soát việc gửi lại webhook, tăng khả năng theo dõi nhật ký và bổ sung quy trình hoàn tiền khi mở rộng phạm vi. Đối với Saga, các hướng chính gồm trạng thái bền vững, tiến trình thử lại, xử lý thư chết, tăng độ tin cậy của outbox và tiêm lỗi trên môi trường thực tế.
 
 Hướng phát triển thứ năm là mở rộng năng lực phân tích và báo cáo. QRTable có hướng phát triển mô hình đọc bền vững hơn, báo cáo theo lịch, phân tích theo thực đơn, bàn và khung giờ, phân tích hiệu suất nhân viên theo bộ chỉ số được định nghĩa rõ và các lớp dự báo hoặc BI/AI sau khi dữ liệu lịch sử đạt chất lượng đủ.
 

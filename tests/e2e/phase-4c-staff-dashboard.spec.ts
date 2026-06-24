@@ -12,6 +12,7 @@
  * - `PHASE4C_OWNER_EMAIL`, `PHASE4C_OWNER_PASSWORD`
  */
 import { expect, test, type Page } from '@playwright/test';
+import { attachPageShot, setAllureContext } from './helpers/allure';
 import { loginWithKeycloakOrSkip } from './helpers/auth';
 import { reachable } from './helpers/readiness';
 
@@ -43,15 +44,29 @@ test.describe('Phase 4C staff dashboard', () => {
     test.skip(!(await reachable(request, KEYCLOAK_REALM_URL)), `Keycloak realm not reachable at ${KEYCLOAK_REALM_URL}`);
   });
 
-  test('owner opens /dashboard/staff with Vietnamese labels', async ({ page }) => {
+  test('owner opens /dashboard/staff with Vietnamese labels', async ({ page }, testInfo) => {
+    setAllureContext({
+      epic: 'Staff management',
+      feature: 'Management dashboard localization',
+      story: 'Owner can open staff dashboard with Vietnamese labels',
+      suite: 'E2E / Phase 4C',
+    });
     await loginWithKeycloakOrSkip(page, MGMT_BASE, STAFF_PATH, OWNER_EMAIL, OWNER_PASSWORD);
     await expectStaffPageRenders(page);
+    await attachPageShot(page, testInfo, 'staff dashboard overview');
   });
 
-  test('create staff dialog shows localized role labels', async ({ page }) => {
+  test('create staff dialog shows localized role labels', async ({ page }, testInfo) => {
+    setAllureContext({
+      epic: 'Staff management',
+      feature: 'Management dashboard localization',
+      story: 'Create staff dialog uses localized role labels',
+      suite: 'E2E / Phase 4C',
+    });
     await loginWithKeycloakOrSkip(page, MGMT_BASE, STAFF_PATH, OWNER_EMAIL, OWNER_PASSWORD);
     await page.getByRole('button', { name: 'Thêm nhân viên' }).click();
     await expect(page.getByRole('dialog')).toContainText(/Thêm nhân viên/);
     await expect(page.getByRole('dialog')).not.toContainText(/\bWAITER\b/);
+    await attachPageShot(page, testInfo, 'create staff dialog');
   });
 });

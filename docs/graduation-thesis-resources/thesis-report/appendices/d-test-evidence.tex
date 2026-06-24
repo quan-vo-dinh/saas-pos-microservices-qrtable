@@ -1,7 +1,7 @@
 \chapter{Minh chứng kiểm thử và khả năng tái hiện}
 \label{app:test-evidence}
 
-Phụ lục này trình bày các hiện vật kiểm chứng có tính tái hiện cho hai kết luận quan trọng về Saga ở Chương~6. Nội dung ở đây không thay thế phần đánh giá chính, mà bổ sung bằng chứng chi tiết để người đọc đối chiếu giữa lệnh kiểm thử, kết quả chạy và kết luận được hỗ trợ. Các ảnh client ở Chương~5 chỉ minh họa luồng nghiệp vụ thành công; các nhánh bù trừ của Saga, tính lũy đẳng và ranh giới dữ liệu được đối chiếu bằng kiểm thử đơn vị và kiểm thử hợp đồng.
+Phụ lục này trình bày các minh chứng kiểm chứng có tính tái hiện cho hai kết luận quan trọng về Saga ở Chương~6. Nội dung ở đây không thay thế phần đánh giá chính, mà bổ sung dữ liệu kiểm chứng chi tiết để người đọc đối chiếu giữa lệnh kiểm thử, kết quả chạy và kết luận được hỗ trợ. Các ảnh client ở Chương~5 chỉ minh họa luồng nghiệp vụ thành công; các nhánh bù trừ của Saga, khả năng xử lý thao tác lặp và ranh giới dữ liệu được đối chiếu bằng kiểm thử đơn vị và kiểm thử hợp đồng.
 
 \section{Kết quả kiểm thử Saga}
 
@@ -26,7 +26,7 @@ catalog-stock-gateway.service.spec.ts
   \label{fig:appendix-d-order-saga-tests}
 \end{figure}
 
-Kết quả trong Hình~\ref{fig:appendix-d-order-saga-tests} chứng minh Order Confirm Saga bằng kiểm thử đơn vị và kiểm thử hợp đồng: điều phối xác nhận đơn, phát lại khi đơn đã ở trạng thái xử lý, lỗi nghiệp vụ từ Catalog, nhánh bù trừ khi Order commit/outbox thất bại sau khi Catalog đã trừ tồn kho, và hợp đồng TCP trừ và hoàn tồn kho của Catalog. Kết quả này không thay thế kiểm thử tích hợp Order--Catalog trên toàn ngăn xếp; vì vậy Chương~6 kết luận luồng Saga đã có bằng chứng tốt ở lớp điều phối và hợp đồng, đồng thời có thêm bằng chứng tích hợp có điều kiện.
+Kết quả trong Hình~\ref{fig:appendix-d-order-saga-tests} chứng minh Order Confirm Saga bằng kiểm thử đơn vị và kiểm thử hợp đồng: điều phối xác nhận đơn, phát lại khi đơn đã ở trạng thái xử lý, lỗi nghiệp vụ từ Catalog, nhánh bù trừ khi Order commit/outbox thất bại sau khi Catalog đã trừ tồn kho, và hợp đồng TCP trừ và hoàn tồn kho của Catalog. Kết quả này không thay thế kiểm thử tích hợp Order--Catalog trên toàn ngăn xếp; vì vậy Chương~6 kết luận luồng Saga đã có kết quả kiểm chứng tốt ở lớp điều phối và hợp đồng, đồng thời có thêm minh chứng tích hợp có điều kiện.
 
 Lệnh kiểm thử SaaS Onboarding Mini-Saga:
 
@@ -47,11 +47,11 @@ onboarding-saga.integration.spec.ts
   \label{fig:appendix-d-saas-onboarding-tests}
 \end{figure}
 
-Kết quả trong Hình~\ref{fig:appendix-d-saas-onboarding-tests} chứng minh SaaS Onboarding Mini-Saga bằng kiểm thử đơn vị và kiểm thử hợp đồng: điều phối khởi tạo đơn vị thuê bao, tương tác hợp đồng với các dịch vụ phụ thuộc và nhánh bù trừ trong lát cắt có đối tượng giả lập. Kết quả này chưa phải là bằng chứng đầu-cuối đầy đủ qua Keycloak, User-Access, Payment, Kafka và client; do đó Chương~6 không kết luận luồng khởi tạo SaaS đã được kiểm chứng toàn ngăn xếp.
+Kết quả trong Hình~\ref{fig:appendix-d-saas-onboarding-tests} chứng minh SaaS Onboarding Mini-Saga bằng kiểm thử đơn vị và kiểm thử hợp đồng: điều phối khởi tạo đơn vị thuê bao, tương tác hợp đồng với các dịch vụ phụ thuộc và nhánh bù trừ trong lát cắt có đối tượng giả lập. Kết quả này chưa phải là minh chứng toàn luồng đầy đủ qua Keycloak, User-Access, Payment, Kafka và client; do đó Chương~6 không kết luận luồng khởi tạo SaaS đã được kiểm chứng toàn ngăn xếp.
 
 \section{Ý nghĩa của kết quả kiểm thử}
 
-Bảng~\ref{tab:appendix-d-saga-artifact-scope} tóm tắt mỗi kết quả kiểm thử hỗ trợ kết luận nào và phần nào chưa được bao phủ bởi hai hiện vật trong phụ lục. Cách trình bày này giúp tách rõ bằng chứng đã có với những kết luận cần thêm kiểm thử đầu-cuối toàn bộ hệ thống.
+Bảng~\ref{tab:appendix-d-saga-artifact-scope} tóm tắt mỗi kết quả kiểm thử hỗ trợ kết luận nào và phần nào chưa được bao phủ bởi hai minh chứng trong phụ lục. Cách trình bày này giúp tách rõ minh chứng đã có với những kết luận cần thêm kiểm thử toàn luồng ở toàn bộ hệ thống.
 
 \begingroup
 \small
@@ -60,16 +60,16 @@ Bảng~\ref{tab:appendix-d-saga-artifact-scope} tóm tắt mỗi kết quả ki�
   \caption{Kết quả kiểm thử Saga và kết luận tương ứng.}
   \label{tab:appendix-d-saga-artifact-scope}\\
   \toprule
-  Luồng kiểm chứng & Hiện vật trong phụ lục & Kết luận được hỗ trợ & Phần chưa bao phủ \\
+  Luồng kiểm chứng & Minh chứng trong phụ lục & Kết luận được hỗ trợ & Phần chưa bao phủ \\
   \midrule
   \endfirsthead
   \toprule
-  Luồng kiểm chứng & Hiện vật trong phụ lục & Kết luận được hỗ trợ & Phần chưa bao phủ \\
+  Luồng kiểm chứng & Minh chứng trong phụ lục & Kết luận được hỗ trợ & Phần chưa bao phủ \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  Order Confirm Saga & Hình~\ref{fig:appendix-d-order-saga-tests} và lệnh kiểm thử Order--Catalog. & Có bằng chứng cho điều phối, phát lại, lỗi nghiệp vụ từ Catalog, bù trừ ở lớp dịch vụ và hợp đồng TCP trừ/hoàn tồn kho. & Chưa phải bằng chứng tiêm lỗi toàn ngăn xếp Order--Catalog với PostgreSQL, Redis và TCP services chạy thật. \\
-  SaaS Onboarding Mini-Saga & Hình~\ref{fig:appendix-d-saas-onboarding-tests} và lệnh kiểm thử SaaS onboarding. & Có bằng chứng cho điều phối, đối tượng giả lập theo hợp đồng với phụ thuộc ngoài SaaS và bù trừ trong lớp kiểm thử đơn vị và hợp đồng. & Chưa phải bằng chứng đầu-cuối qua Keycloak, User-Access, Payment, Kafka và client. \\
+  Order Confirm Saga & Hình~\ref{fig:appendix-d-order-saga-tests} và lệnh kiểm thử Order--Catalog. & Có kết quả kiểm chứng cho điều phối, phát lại, lỗi nghiệp vụ từ Catalog, bù trừ ở lớp dịch vụ và hợp đồng TCP trừ/hoàn tồn kho. & Chưa phải minh chứng tiêm lỗi toàn ngăn xếp Order--Catalog với PostgreSQL, Redis và TCP services chạy thật. \\
+  SaaS Onboarding Mini-Saga & Hình~\ref{fig:appendix-d-saas-onboarding-tests} và lệnh kiểm thử SaaS onboarding. & Có kết quả kiểm chứng cho điều phối, đối tượng giả lập theo hợp đồng với phụ thuộc ngoài SaaS và bù trừ trong lớp kiểm thử đơn vị và hợp đồng. & Chưa phải minh chứng toàn luồng qua Keycloak, User-Access, Payment, Kafka và client. \\
 \end{longtable}
 \endgroup

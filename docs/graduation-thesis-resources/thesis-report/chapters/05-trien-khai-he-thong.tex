@@ -1,16 +1,16 @@
 \chapter{Các luồng vận hành chính của QRTable}
 
-Chương này trình bày kết quả triển khai các luồng vận hành chính từ thiết kế ở Chương 4. Nội dung được tổ chức theo luồng nghiệp vụ đại diện, qua đó làm rõ cách ranh giới dịch vụ, quyền sở hữu dữ liệu, cô lập đơn vị thuê bao, tính lũy đẳng, Saga, Redis, Kafka và WebSocket được áp dụng trong hệ thống.
+Chương này trình bày kết quả triển khai các luồng vận hành chính từ thiết kế ở Chương 4. Nội dung được tổ chức theo luồng nghiệp vụ đại diện, qua đó làm rõ cách ranh giới dịch vụ, quyền sở hữu dữ liệu, cô lập đơn vị thuê bao, xử lý thao tác lặp an toàn, Saga, Redis, Kafka và WebSocket được áp dụng trong hệ thống.
 
-Các luồng gồm phiên đặt món qua mã QR và giỏ dùng chung; xác nhận đơn và bảo toàn tồn kho; KDS nhận phiếu bếp từ sự kiện; ghi nhận thanh toán tiền mặt, VietQR và SePay; khởi tạo đơn vị thuê bao; bảng điều khiển và báo cáo theo gói dịch vụ. Mỗi luồng được phân tích theo mục tiêu nghiệp vụ, bất biến, dịch vụ sở hữu dữ liệu, thành phần triển khai và phạm vi hiện tại.
+Các luồng gồm phiên đặt món qua mã QR và giỏ dùng chung; xác nhận đơn và bảo toàn tồn kho; KDS nhận phiếu bếp từ sự kiện; ghi nhận thanh toán tiền mặt, VietQR và SePay; khởi tạo đơn vị thuê bao; bảng điều khiển và báo cáo theo gói dịch vụ. Mỗi luồng được phân tích theo mục tiêu nghiệp vụ, ràng buộc nghiệp vụ, dịch vụ sở hữu dữ liệu, thành phần triển khai và phạm vi hiện tại.
 
 \section{Mục tiêu và phạm vi triển khai}
 
-Các luồng triển khai tuân theo ba nguyên tắc từ Chương 4: cơ sở dữ liệu được tách theo ranh giới dịch vụ, BFF là điểm vào của ứng dụng và WebSocket chỉ phát tín hiệu làm mới. Trọng tâm của chương là cách từng luồng duy trì quyền sở hữu dữ liệu và các bất biến nghiệp vụ trong quá trình phối hợp liên dịch vụ.
+Các luồng triển khai tuân theo ba nguyên tắc từ Chương 4: cơ sở dữ liệu được tách theo ranh giới dịch vụ, BFF là điểm vào của ứng dụng và WebSocket chỉ phát tín hiệu làm mới. Trọng tâm của chương là cách từng luồng duy trì quyền sở hữu dữ liệu và các ràng buộc nghiệp vụ trong quá trình phối hợp liên dịch vụ.
 
-Phạm vi trình bày gồm cấu trúc dịch vụ, đăng ký mô-đun, thực thể và lược đồ dữ liệu, hợp đồng TCP/Kafka, kiểm thử đơn vị, kiểm thử hợp đồng, kiểm thử tích hợp có điều kiện, sơ đồ luồng và ảnh giao diện. Ảnh chụp thể hiện bề mặt vận hành; mã nguồn, kiểm thử và sơ đồ làm rõ ranh giới giao dịch, tính lũy đẳng, lọc theo đơn vị thuê bao và cơ chế bù trừ.
+Phạm vi trình bày gồm cấu trúc dịch vụ, đăng ký mô-đun, thực thể và lược đồ dữ liệu, hợp đồng TCP/Kafka, kiểm thử đơn vị, kiểm thử hợp đồng, kiểm thử tích hợp có điều kiện, sơ đồ luồng và ảnh giao diện. Ảnh chụp thể hiện bề mặt vận hành; mã nguồn, kiểm thử và sơ đồ làm rõ ranh giới giao dịch, xử lý thao tác lặp an toàn, lọc theo đơn vị thuê bao và cơ chế bù trừ.
 
-Chương 5 tập trung vào cấu trúc và kết quả triển khai. Chương 6 tiếp tục kiểm chứng các kết quả này bằng kiểm thử tự động, kiểm thử có điều kiện với SePay và hiện vật vận hành trên môi trường công khai.
+Chương 5 tập trung vào cấu trúc và kết quả triển khai. Chương 6 tiếp tục kiểm chứng các kết quả này bằng kiểm thử tự động, kiểm thử có điều kiện với SePay và minh chứng vận hành trên môi trường công khai.
 
 \section{Nền tảng triển khai và ranh giới trách nhiệm}
 
@@ -47,7 +47,7 @@ Hình~\ref{fig:chapter5-screenshot-customer-pwa-ordering} minh họa ba bước 
 
 \section{Xác nhận đơn hàng và bảo toàn tồn kho theo Order Confirm Saga}
 
-Hình~\ref{fig:chapter5-order-confirm-stock} trình bày Order Confirm Saga: luồng nhân viên xác nhận đơn và cách QRTable giữ bất biến tồn kho theo ranh giới Catalog--Order.
+Hình~\ref{fig:chapter5-order-confirm-stock} trình bày Order Confirm Saga: luồng nhân viên xác nhận đơn và cách QRTable bảo vệ ràng buộc tồn kho theo ranh giới Catalog--Order.
 
 \begin{figure}[H]
   \centering
@@ -62,7 +62,7 @@ Khi nhân viên xác nhận đơn từ POS, BFF kiểm tra JWT, ngữ cảnh đ�
 
 Sau khi Order ghi nhận thành công, outbox \texttt{order.confirmed} đánh dấu điểm hoàn tất nghiệp vụ và được thành phần xuất bản chuyển sang Kafka để Kitchen dựng phiếu bếp. Phản hồi cho nhân viên không phụ thuộc vào thời điểm Kitchen xử lý xong phiếu vì KDS là tác dụng phụ bất đồng bộ sau bước xác nhận. Order Confirm Saga phối hợp giao dịch cục bộ, sự kiện outbox và cơ chế bù trừ. Trạng thái Saga bền vững, CDC và phân phối chính xác một lần nằm ngoài phạm vi triển khai hiện tại.
 
-Hình~\ref{fig:chapter5-screenshot-staff-table-map} và Hình~\ref{fig:chapter5-screenshot-staff-order-confirm} minh họa luồng thành công của Order Confirm Saga trên POS: nhân viên xem sơ đồ bàn, kiểm tra đơn đang mở và xác nhận đơn để kích hoạt trừ tồn kho qua Catalog. Nhánh bù trừ được kiểm tra tự động; kết quả nằm ở Chương~6 và Phụ lục~\ref{app:test-evidence}.
+Hình~\ref{fig:chapter5-screenshot-staff-table-map} và Hình~\ref{fig:chapter5-screenshot-staff-order-confirm} minh họa luồng thành công của Order Confirm Saga trên POS: nhân viên xem sơ đồ bàn, kiểm tra đơn đang mở và xác nhận đơn để kích hoạt trừ tồn kho qua Catalog. Nhánh bù trừ được kiểm tra tự động; kết quả được đối chiếu trực tiếp trong Chương~6 tại Hình~\ref{fig:chapter6-order-saga-tests}.
 
 \screenshotfiguremgmt{chapter5-05-staff-pos-table-map.png}{POS — sơ đồ bàn và trạng thái đơn trước bước xác nhận trong Order Confirm Saga.}{fig:chapter5-screenshot-staff-table-map}
 \screenshotfiguremgmt{chapter5-06-staff-order-confirm.png}{POS — xác nhận đơn sau khi Order phối hợp Catalog kiểm tra và trừ tồn kho.}{fig:chapter5-screenshot-staff-order-confirm}
@@ -100,15 +100,15 @@ Hình~\ref{fig:chapter5-payment-settlement} tổng hợp hai nhánh thanh toán 
   \label{fig:chapter5-payment-settlement}
 \end{figure}
 
-Mục tiêu nghiệp vụ của luồng này là ghi nhận thanh toán đúng hóa đơn, đúng đơn vị thuê bao, đúng số tiền đã làm tròn VND và không hoàn tất hóa đơn nhiều lần khi có yêu cầu hoặc webhook lặp. Bất biến dữ liệu là Payment sở hữu bản ghi thanh toán, nhật ký thanh toán, cấu hình thanh toán và outbox thanh toán; Order sở hữu việc hoàn tất hóa đơn/phiên; Catalog sở hữu trạng thái bàn sau khi phiên kết thúc.
+Mục tiêu nghiệp vụ của luồng này là ghi nhận thanh toán đúng hóa đơn, đúng đơn vị thuê bao, đúng số tiền đã làm tròn VND và không hoàn tất hóa đơn nhiều lần khi có yêu cầu hoặc webhook lặp. Ràng buộc dữ liệu là Payment sở hữu bản ghi thanh toán, nhật ký thanh toán, cấu hình thanh toán và outbox thanh toán; Order sở hữu việc hoàn tất hóa đơn/phiên; Catalog sở hữu trạng thái bàn sau khi phiên kết thúc.
 
-Với tiền mặt, Payment lấy bản chụp hóa đơn từ Order qua hợp đồng, kiểm tra số tiền và ghi thanh toán, nhật ký kiểm toán và outbox trong cơ sở dữ liệu Payment. Sau đó Payment phối hợp với Order để đánh dấu hóa đơn đã thanh toán, đóng phiên, xóa trạng thái phiên/giỏ khi vận hành và chuyển bàn sang trạng thái phù hợp. Nếu cùng một giao dịch thanh toán được phát lại, phần hoàn tất hóa đơn phải đi theo hướng lũy đẳng để không tạo kết quả trùng.
+Với tiền mặt, Payment lấy bản chụp hóa đơn từ Order qua hợp đồng, kiểm tra số tiền và ghi thanh toán, nhật ký kiểm toán và outbox trong cơ sở dữ liệu Payment. Sau đó Payment phối hợp với Order để đánh dấu hóa đơn đã thanh toán, đóng phiên, xóa trạng thái phiên/giỏ khi vận hành và chuyển bàn sang trạng thái phù hợp. Nếu cùng một giao dịch thanh toán được phát lại, phần hoàn tất hóa đơn phải đi theo hướng xử lý lặp an toàn để không tạo kết quả trùng.
 
 Với VietQR/SePay, Payment tạo tham chiếu hóa đơn nhà hàng theo dòng tiền \texttt{QRTBL}. Webhook từ SePay đi vào BFF, được định tuyến và chuyển cho Payment. Payment kiểm tra bí mật của đơn vị thuê bao, khớp tham chiếu từ nội dung chuyển khoản, khóa bản ghi thanh toán, ghi nhật ký cho giao dịch trùng hoặc thanh toán thiếu, và chỉ gọi Order hoàn tất hóa đơn khi đủ điều kiện. Cấu hình tài khoản và trạng thái OAuth ngắn hạn thuộc Payment; hóa đơn gói nền tảng \texttt{QRSUB} thuộc SaaS, không bị trộn với bản ghi thanh toán của hóa đơn nhà hàng.
 
 Phần triển khai thanh toán bao gồm xử lý tiền mặt, webhook VietQR/SePay, thông báo trùng và giao dịch thiếu tiền. Các hành vi này được đối chiếu bằng mã nguồn và kiểm thử nội bộ. Đường gọi lại công khai, thông tin xác thực hợp lệ và dữ liệu giao dịch thực tế được thu thập riêng khi kiểm chứng với nhà cung cấp trên môi trường công khai.
 
-Hình~\ref{fig:chapter5-screenshot-customer-payment-flow} minh họa nhánh khách của luồng thanh toán (Hình~\ref{fig:chapter5-payment-settlement}): theo dõi tiến độ đơn và yêu cầu thanh toán VietQR tại bàn. Chương~6 đối chiếu thêm webhook SePay và tính lũy đẳng ghi nhận thanh toán với kiểm thử tương ứng.
+Hình~\ref{fig:chapter5-screenshot-customer-payment-flow} minh họa nhánh khách của luồng thanh toán (Hình~\ref{fig:chapter5-payment-settlement}): theo dõi tiến độ đơn và yêu cầu thanh toán VietQR tại bàn. Chương~6 đối chiếu thêm webhook SePay và khả năng xử lý thao tác lặp khi ghi nhận thanh toán với kiểm thử tương ứng.
 
 \screenshotpwafiguretwo{PWA khách — theo dõi đơn và yêu cầu thanh toán bằng VietQR.}{fig:chapter5-screenshot-customer-payment-flow}{chapter5-04-customer-order-tracking.png}{chapter5-04-customer-request-payment.png}
 \screenshotgridanchor{fig:chapter5-screenshot-customer-order-tracking}
@@ -131,7 +131,7 @@ Luồng bắt đầu từ quản trị viên nền tảng trong ứng dụng qu�
 
 Vòng đời đơn vị thuê bao gồm hoạt động, tạm ngưng và đóng. SaaS giữ trạng thái bền vững, còn Redis hỗ trợ đọc nhanh cho guard và quyền theo gói. Trạng thái tạm ngưng vẫn cho phép một số thao tác đọc hoặc xử lý thanh toán đang chờ nhưng chặn việc tạo đơn mới và các thay đổi không phù hợp. Đây là Saga đại diện thứ hai của đề tài, thể hiện cơ chế điều phối và bù trừ có kiểm soát. Tiến trình thử lại độc lập và trạng thái Saga bền vững thuộc hướng củng cố tiếp theo.
 
-Hình~\ref{fig:chapter5-screenshot-admin-tenant-onboarding}, Hình~\ref{fig:chapter5-screenshot-owner-payment-settings} và Hình~\ref{fig:chapter5-screenshot-owner-subscription} minh họa các bước sau SaaS Onboarding Mini-Saga: quản trị viên nền tảng tạo đơn vị thuê bao, chủ quán cấu hình thanh toán và xem gói đang hoạt động. Phần điều phối cùng bù trừ được đối chiếu với kiểm thử ở Chương~6 và Phụ lục~\ref{app:test-evidence}.
+Hình~\ref{fig:chapter5-screenshot-admin-tenant-onboarding}, Hình~\ref{fig:chapter5-screenshot-owner-payment-settings} và Hình~\ref{fig:chapter5-screenshot-owner-subscription} minh họa các bước sau SaaS Onboarding Mini-Saga: quản trị viên nền tảng tạo đơn vị thuê bao, chủ quán cấu hình thanh toán và xem gói đang hoạt động. Phần điều phối cùng bù trừ được đối chiếu với kiểm thử ở Chương~6 tại Hình~\ref{fig:chapter6-saas-onboarding-saga-tests}.
 
 \screenshotfiguremgmt{chapter5-12-admin-tenant-onboarding.png}{Ứng dụng quản trị — khởi tạo đơn vị thuê bao, chủ sở hữu và gói ban đầu.}{fig:chapter5-screenshot-admin-tenant-onboarding}
 \screenshotfiguremgmt{chapter5-11-owner-payment-settings.png}{Ứng dụng quản trị — cấu hình thanh toán SePay/VietQR của đơn vị thuê bao.}{fig:chapter5-screenshot-owner-payment-settings}
@@ -154,13 +154,13 @@ Hình~\ref{fig:chapter5-screenshot-owner-menu-management} và Hình~\ref{fig:cha
 
 \section{Đóng gói và vận hành trên môi trường công khai}
 
-QRTable được đóng gói bằng Docker/Docker Compose cùng các thành phần PostgreSQL, MongoDB, Redis, Kafka, Keycloak, BFF và ứng dụng phía người dùng. Môi trường công khai bổ sung URL hoặc tên miền, HTTPS/TLS, cấu hình kết nối dịch vụ, đường gọi lại webhook SePay, kiểm tra sức khỏe và kiểm thử khói cho các luồng phiên QR, xác nhận đơn, KDS, thanh toán và khởi tạo đơn vị thuê bao.
+QRTable được đóng gói bằng Docker/Docker Compose cùng các thành phần PostgreSQL, MongoDB, Redis, Kafka, Keycloak, BFF và ứng dụng phía người dùng. Môi trường công khai bổ sung URL hoặc tên miền, HTTPS/TLS, cấu hình kết nối dịch vụ, đường gọi lại webhook SePay, kiểm tra sức khỏe và kiểm tra vận hành cơ bản cho các luồng phiên QR, xác nhận đơn, KDS, thanh toán và khởi tạo đơn vị thuê bao.
 
-Hiện vật vận hành gồm kết quả kiểm tra sức khỏe, nhật ký rút gọn, kiểm thử khói, cấu hình đường gọi lại, phiên bản phát hành và thông tin mã nguồn tương ứng. Nhóm hiện vật này phục vụ đánh giá khả năng đóng gói và vận hành các dịch vụ chính. Tính sẵn sàng cao, tự động hoàn tác và khả năng chịu tải cần quy trình kiểm chứng riêng.
+Minh chứng vận hành gồm kết quả kiểm tra sức khỏe, nhật ký rút gọn, kiểm tra vận hành cơ bản, cấu hình đường gọi lại, phiên bản phát hành và thông tin mã nguồn tương ứng. Nhóm minh chứng này phục vụ đánh giá khả năng đóng gói và vận hành các dịch vụ chính. Tính sẵn sàng cao, tự động hoàn tác và khả năng chịu tải cần quy trình kiểm chứng riêng.
 
 \section{Tổng hợp kết quả triển khai}
 
-Bảng~\ref{tab:chapter5-implemented-evidence} tổng hợp các luồng chính theo mục tiêu nghiệp vụ, bất biến, thành phần triển khai và phạm vi hiện tại.
+Bảng~\ref{tab:chapter5-implemented-evidence} tổng hợp các luồng chính theo mục tiêu nghiệp vụ, ràng buộc nghiệp vụ, thành phần triển khai và phạm vi hiện tại.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{2pt}
@@ -180,10 +180,10 @@ Bảng~\ref{tab:chapter5-implemented-evidence} tổng hợp các luồng chính 
   Phiên QR và giỏ chung & Khách vào phiên từ QR, dùng chung giỏ và gửi đơn. & Order sở hữu phiên, giỏ và đơn; Catalog sở hữu bàn và thực đơn; Redis hỗ trợ đường xử lý tần suất cao. & Hình~\ref{fig:chapter5-qr-ordering-session}; kiểm thử phiên, giỏ và gửi đơn của Order. & Phiên trực tuyến, kết nối lại và tải trạng thái mới nhất; hàng đợi ngoại tuyến đầy đủ là hướng mở rộng. \\
   Xác nhận đơn và tồn kho & Nhân viên xác nhận đơn khi đủ tồn kho. & Catalog sở hữu tồn kho; Order sở hữu đơn; xác nhận lặp không trừ tồn kho lần hai. & Hình~\ref{fig:chapter5-order-confirm-stock}; kiểm thử đơn vị, hợp đồng và tích hợp có điều kiện cho Order Confirm Saga. & Saga đại diện đã được triển khai; trạng thái Saga bền vững, CDC và phân phối chính xác một lần là hướng củng cố. \\
   KDS & Phiếu bếp hoặc bar xuất hiện sau khi đơn được xác nhận và ứng dụng cập nhật gần thời gian thực. & Kitchen sở hữu bản chiếu Redis; Order sở hữu vòng đời đơn và dòng đơn; WebSocket gợi ý làm mới. & Hình~\ref{fig:chapter5-kds-ticket-lifecycle}; kiểm thử bộ tiêu thụ Kitchen/KDS. & Bản chiếu phục vụ vận hành; lịch sử KDS dài hạn cần kho bền vững riêng. \\
-  Thanh toán & Ghi nhận tiền mặt hoặc VietQR/SePay và hoàn tất hóa đơn, phiên. & Payment sở hữu bản ghi thanh toán; Order sở hữu hóa đơn và phiên; webhook trùng hoặc thiếu được xử lý lũy đẳng. & Hình~\ref{fig:chapter5-payment-settlement}; kiểm thử ghi nhận thanh toán và webhook. & Kiểm thử nội bộ xác nhận tính lũy đẳng; kiểm chứng nhà cung cấp cần đường gọi lại và dữ liệu giao dịch thực tế. \\
-  Khởi tạo SaaS & Tạo đơn vị thuê bao, chủ sở hữu, thuê bao và cấu hình thanh toán. & SaaS sở hữu đơn vị thuê bao/thuê bao; Authorizer/User-Access/Payment chỉ qua hợp đồng; có bù trừ. & Hình~\ref{fig:chapter5-saas-onboarding-saga}; kiểm thử khởi tạo với cơ sở dữ liệu/Payment có điều kiện. & Chứng minh mini-saga đại diện; kiểm chứng đầu-cuối qua mọi phụ thuộc thuộc nhóm hiện vật toàn ngăn xếp. \\
+  Thanh toán & Ghi nhận tiền mặt hoặc VietQR/SePay và hoàn tất hóa đơn, phiên. & Payment sở hữu bản ghi thanh toán; Order sở hữu hóa đơn và phiên; webhook trùng hoặc thiếu được xử lý lặp an toàn. & Hình~\ref{fig:chapter5-payment-settlement}; kiểm thử ghi nhận thanh toán và webhook. & Kiểm thử nội bộ xác nhận khả năng xử lý giao dịch hoặc thông báo lặp; kiểm chứng nhà cung cấp cần đường gọi lại và dữ liệu giao dịch thực tế. \\
+  Khởi tạo SaaS & Tạo đơn vị thuê bao, chủ sở hữu, thuê bao và cấu hình thanh toán. & SaaS sở hữu đơn vị thuê bao/thuê bao; Authorizer/User-Access/Payment chỉ qua hợp đồng; có bù trừ. & Hình~\ref{fig:chapter5-saas-onboarding-saga}; kiểm thử khởi tạo với cơ sở dữ liệu/Payment có điều kiện. & Chứng minh mini-saga đại diện; kiểm chứng toàn luồng qua mọi phụ thuộc thuộc nhóm minh chứng toàn ngăn xếp. \\
   Bảng điều khiển và báo cáo & Chủ quán, quản lý và quản trị viên nền tảng xem báo cáo đúng phạm vi quyền và gói. & BFF không truy vấn kết hợp trực tiếp cơ sở dữ liệu; Payment, Order, Catalog và SaaS cung cấp mô hình đọc của dữ liệu mình sở hữu. & Bộ điều khiển báo cáo BFF, dịch vụ báo cáo và kiểm thử ứng dụng quản trị. & Mô hình đọc vận hành và quyền theo gói; phân tích nâng cao và kho dữ liệu thuộc hướng mở rộng. \\
-  Đóng gói và triển khai công khai & Vận hành các dịch vụ chính trên môi trường công khai. & Đánh giá dựa trên URL, kiểm tra sức khỏe, kiểm thử khói và đường gọi lại webhook. & Docker, Docker Compose, cấu hình môi trường và hiện vật vận hành. & Tính sẵn sàng cao và tự động hoàn tác cần bằng chứng riêng. \\
+  Đóng gói và triển khai công khai & Vận hành các dịch vụ chính trên môi trường công khai. & Đánh giá dựa trên URL, kiểm tra sức khỏe, kiểm tra vận hành cơ bản và đường gọi lại webhook. & Docker, Docker Compose, cấu hình môi trường và minh chứng vận hành. & Tính sẵn sàng cao và tự động hoàn tác cần minh chứng riêng. \\
 \end{longtable}
 }
 
@@ -195,11 +195,11 @@ Bảng~\ref{tab:chapter5-representative-sagas} so sánh Saga xác nhận đơn c
   \caption{Hai Saga đại diện trong QRTable.}
   \label{tab:chapter5-representative-sagas}\\
   \toprule
-  Saga & Mục tiêu & Thành phần tham gia & Điểm ghi nhận và cơ chế bù trừ & Loại bằng chứng \\
+  Saga & Mục tiêu & Thành phần tham gia & Điểm ghi nhận và cơ chế bù trừ & Phương thức kiểm chứng \\
   \midrule
   \endfirsthead
   \toprule
-  Saga & Mục tiêu & Thành phần tham gia & Điểm ghi nhận và cơ chế bù trừ & Loại bằng chứng \\
+  Saga & Mục tiêu & Thành phần tham gia & Điểm ghi nhận và cơ chế bù trừ & Phương thức kiểm chứng \\
   \midrule
   \endhead
   \bottomrule
@@ -209,4 +209,4 @@ Bảng~\ref{tab:chapter5-representative-sagas} so sánh Saga xác nhận đơn c
 \end{longtable}
 }
 
-Các luồng trên cho thấy thiết kế kiến trúc đã được triển khai tại những ngữ cảnh nghiệp vụ chính. Giao tiếp liên dịch vụ đi qua hợp đồng thay vì truy cập chéo cơ sở dữ liệu; các bất biến về cô lập đơn vị thuê bao, quyền sở hữu tồn kho, tính lũy đẳng thanh toán, bù trừ Saga và WebSocket gợi ý làm mới được thể hiện trong mã nguồn, kiểm thử và sơ đồ. Chương 6 đánh giá mức độ kiểm chứng của từng nhóm kết quả.
+Các luồng trên cho thấy thiết kế kiến trúc đã được triển khai tại những ngữ cảnh nghiệp vụ chính. Giao tiếp liên dịch vụ đi qua hợp đồng thay vì truy cập chéo cơ sở dữ liệu; các ràng buộc về cô lập đơn vị thuê bao, quyền sở hữu tồn kho, xử lý thanh toán lặp, bù trừ Saga và WebSocket gợi ý làm mới được thể hiện trong mã nguồn, kiểm thử và sơ đồ. Chương 6 đánh giá mức độ kiểm chứng của từng nhóm kết quả.
