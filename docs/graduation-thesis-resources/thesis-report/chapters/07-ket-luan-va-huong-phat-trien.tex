@@ -18,9 +18,11 @@ Về thanh toán, hệ thống hỗ trợ tiền mặt và VietQR/SePay, gồm b
 
 Về SaaS, QRTable quản lý đơn vị thuê bao, gói giá, thuê bao, hóa đơn và quyền theo gói. SaaS Onboarding Mini-Saga phối hợp SaaS, Authorizer, Keycloak, User-Access và Payment qua hợp đồng liên dịch vụ. Bảng điều khiển và báo cáo phân biệt phạm vi của chủ quán, quản lý với quyền phân tích xuyên đơn vị thuê bao của quản trị viên nền tảng.
 
-Về kiểm chứng, hệ thống có khả năng đối chiếu từ yêu cầu đến kiểm thử cho phần lớn luồng ưu tiên cao. Các kết quả được phân loại theo kiểm chứng chức năng, kiến trúc, yêu cầu phi chức năng và minh chứng vận hành. Nhờ đó, phạm vi của từng kết luận được xác định theo loại minh chứng tương ứng.
+Về kiểm chứng, hệ thống có khả năng đối chiếu từ yêu cầu đến kiểm thử cho phần lớn luồng ưu tiên cao. Các kết quả được phân loại theo kiểm chứng chức năng, kiến trúc, yêu cầu phi chức năng, benchmark đại diện và minh chứng vận hành. Nhờ đó, phạm vi của từng kết luận được xác định theo loại minh chứng tương ứng.
 
-Về triển khai công khai, đề tài xác định bộ minh chứng gồm tên miền hoặc URL, HTTPS/TLS, cấu hình dịch vụ, kiểm tra sức khỏe, đường gọi lại webhook, kiểm tra vận hành cơ bản và nhật ký rút gọn. Các minh chứng này phục vụ đánh giá khả năng đóng gói và vận hành dịch vụ chính, đồng thời được tách khỏi kiểm thử chức năng và kiểm chứng kiến trúc.
+Về đánh giá định lượng, khóa luận đã bổ sung một lát cắt benchmark k6 trên môi trường local cho các luồng đọc công khai, đặt món qua QR và xác nhận đơn/KDS. Kết quả này cung cấp số liệu độ trễ, thông lượng request, failed rate và check pass rate trong phạm vi đo cụ thể, đồng thời đối chiếu được với Prometheus/Grafana cho metric/dashboard và Tempo/OpenTelemetry cho trace đại diện.
+
+Về triển khai công khai, đề tài xác định bộ minh chứng gồm tên miền hoặc URL, HTTPS/TLS, cấu hình dịch vụ, kiểm tra sức khỏe, đường gọi lại webhook, kiểm tra vận hành cơ bản, nhật ký rút gọn và lớp quan sát bằng Prometheus, Grafana, Tempo/OpenTelemetry, Loki. Các minh chứng này phục vụ đánh giá khả năng đóng gói và vận hành dịch vụ chính, đồng thời được tách khỏi kiểm thử chức năng và kiểm chứng kiến trúc.
 
 \section{Đóng góp của đề tài}
 
@@ -32,13 +34,13 @@ Về triển khai công khai, đề tài xác định bộ minh chứng gồm t�
 
 Đóng góp thứ tư là mô hình phân quyền và quyền theo gói phù hợp SaaS POS. Hệ thống phân biệt nhân viên/chủ/quản lý/quản trị nền tảng, tác nhân phiên khách, cô lập đơn vị thuê bao và quyền tính năng theo gói. Báo cáo/bảng điều khiển được dùng như ví dụ cụ thể cho sự khác biệt giữa quyền trong đơn vị thuê bao và quyền nền tảng.
 
-Đóng góp thứ năm là bộ minh chứng phục vụ lập luận khóa luận: bảng yêu cầu, bảng ranh giới dịch vụ/quyền sở hữu dữ liệu, sơ đồ kiến trúc, sơ đồ trình tự Chương 5, bảng minh chứng triển khai và bảng đánh giá Chương 6. Đặc biệt, Bảng~\ref{tab:chapter4-data-ownership-schema}, Bảng~\ref{tab:chapter4-communication-matrix}, Hình~\ref{fig:chapter5-qr-ordering-session}--\ref{fig:chapter5-saas-onboarding-saga} và Bảng~\ref{tab:chapter5-implemented-evidence} giúp người đọc đối chiếu từ yêu cầu đến thiết kế, từ thiết kế đến triển khai và từ triển khai đến đánh giá.
+Đóng góp thứ năm là bộ minh chứng phục vụ lập luận khóa luận: bảng yêu cầu, bảng ranh giới dịch vụ/quyền sở hữu dữ liệu, sơ đồ kiến trúc, sơ đồ trình tự Chương 5, bảng minh chứng triển khai, benchmark k6 đại diện, dashboard/metric/trace quan sát và bảng đánh giá Chương 6. Đặc biệt, Bảng~\ref{tab:chapter4-data-ownership-schema}, Bảng~\ref{tab:chapter4-communication-matrix}, Hình~\ref{fig:chapter5-qr-ordering-overview}--\ref{fig:chapter5-saas-onboarding-saga}, Bảng~\ref{tab:chapter5-implemented-evidence} và Bảng~\ref{tab:chapter6-k6-benchmark-summary} giúp người đọc đối chiếu từ yêu cầu đến thiết kế, từ thiết kế đến triển khai và từ triển khai đến đánh giá.
 
 \section{Hạn chế của đề tài}
 
-Hạn chế đầu tiên nằm ở đo lường thực nghiệm. Khóa luận đã phân tích cơ sở kiến trúc cho khả năng mở rộng thông qua ranh giới dịch vụ, Redis, Kafka và phòng Socket.IO, nhưng chưa có kiểm thử tải lớn với môi trường, dữ liệu và cấu hình được công bố đầy đủ. Vì vậy, kết quả về hiệu năng mới dừng ở phân tích kiến trúc.
+Hạn chế đầu tiên nằm ở phạm vi đo lường thực nghiệm. Khóa luận đã có benchmark k6 đại diện trên môi trường local, có metric/dashboard/trace từ Prometheus, Grafana và Tempo/OpenTelemetry, đồng thời đã phân tích cơ sở kiến trúc cho khả năng mở rộng thông qua ranh giới dịch vụ, Redis, Kafka và phòng Socket.IO. Tuy nhiên, khóa luận chưa có kiểm thử tải lớn, đo dài hạn hoặc môi trường tách biệt đủ để kết luận sức chứa tối đa, khả năng mở rộng ngang và độ ổn định sản xuất.
 
-Hạn chế thứ hai thuộc vận hành hệ thống. Tính sẵn sàng cao, sao lưu và phục hồi, tự động hoàn tác cùng phục hồi nhiều dịch vụ đòi hỏi môi trường và minh chứng kiểm chứng riêng. Đây là các nội dung cần được củng cố sau phạm vi khóa luận.
+Hạn chế thứ hai thuộc vận hành hệ thống. Tính sẵn sàng cao, sao lưu và phục hồi, tự động hoàn tác, phục hồi nhiều dịch vụ, log correlation bằng Loki ở mức ứng dụng, cảnh báo và lưu trữ số liệu dài hạn đòi hỏi môi trường và minh chứng kiểm chứng riêng. Đây là các nội dung cần được củng cố sau phạm vi khóa luận.
 
 Hạn chế thứ ba liên quan đến các phụ thuộc ngoài hệ thống và luồng toàn ngăn xếp. Các kiểm thử nội bộ cho ghi nhận thanh toán, webhook trùng và thanh toán thiếu có giá trị; kiểm chứng với nhà cung cấp SePay thực tế được gắn với minh chứng vận hành công khai gồm đường gọi lại công khai, thông tin xác thực hợp lệ và dữ liệu giao dịch thực tế. Tương tự, khởi tạo SaaS đã có minh chứng rõ ràng ở lớp cơ sở dữ liệu, Payment và bù trừ, còn kiểm chứng toàn luồng qua Authorizer, Keycloak, User-Access, Payment TCP và outbox được xếp vào nhóm minh chứng toàn ngăn xếp đầy đủ hơn.
 
@@ -46,7 +48,7 @@ Hạn chế thứ tư thuộc phạm vi sản phẩm nâng cao. Phân tích dữ
 
 \section{Hướng phát triển}
 
-Hướng phát triển thứ nhất là đo lường hiệu năng và khả năng mở rộng bằng số liệu thật. Các kịch bản cần đo gồm tải thực đơn QR, thay đổi giỏ, gửi đơn, xác nhận nhân viên/trừ tồn kho, lan truyền KDS, hoàn tất webhook thanh toán và độ trễ gợi ý WebSocket. Kết quả đo cần đi kèm môi trường, dữ liệu, cấu hình dịch vụ và giới hạn để tránh diễn giải sai.
+Hướng phát triển thứ nhất là mở rộng đo lường hiệu năng, khả năng mở rộng và khả năng quan sát vượt ngoài lát cắt local hiện tại. Các kịch bản cần đo dài hơn gồm tải thực đơn QR, thay đổi giỏ, gửi đơn, xác nhận nhân viên/trừ tồn kho, lan truyền KDS, hoàn tất webhook thanh toán và độ trễ gợi ý WebSocket. Kết quả đo cần đi kèm môi trường, dữ liệu, cấu hình dịch vụ, tài nguyên máy, Prometheus/Grafana cho metric/dashboard, Tempo/OpenTelemetry cho trace, Loki cho log ứng dụng có traceId và giới hạn để tránh diễn giải sai.
 
 Hướng phát triển thứ hai là xây dựng bộ kiểm thử toàn ngăn xếp đại diện cho cô lập đơn vị thuê bao, RBAC và quyền theo gói. Bộ này cần chuẩn bị dữ liệu kiểm thử cho nhiều đơn vị thuê bao, nhiều vai trò, nhiều trạng thái thuê bao và chạy qua BFF/Keycloak/cơ sở dữ liệu dịch vụ thực tế để kiểm tra các API nhạy cảm như thực đơn, đơn, thanh toán, báo cáo và vòng đời đơn vị thuê bao.
 

@@ -1,0 +1,52 @@
+@startuml chapter2-qr-ordering-flow
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequence {
+  ArrowColor #374151
+  LifeLineBorderColor #6b7280
+  LifeLineBackgroundColor white
+  ParticipantBorderColor #374151
+  ParticipantBackgroundColor white
+  ActorBorderColor #374151
+  ActorBackgroundColor white
+  DatabaseBorderColor #374151
+  DatabaseBackgroundColor white
+}
+
+actor "Khách hàng" as Customer
+participant "Customer PWA" as PWA
+participant "BFF/API Gateway" as BFF
+participant "Catalog Service" as Catalog
+participant "Order Service" as Order
+database "Redis\nphiên và giỏ" as Redis
+
+Customer -> PWA: Quét mã QR tại bàn
+PWA -> BFF: Mở phiên theo QR token
+BFF -> Catalog: Kiểm tra tenant, bàn và token
+Catalog --> BFF: Trả về ngữ cảnh hợp lệ
+BFF -> Order: Tạo hoặc tham gia phiên bàn
+Order -> Redis: Lưu phiên và giỏ dùng chung
+Order --> BFF: Trả về session token
+BFF --> PWA: Trả về phiên gọi món
+
+Customer -> PWA: Chọn món và cập nhật giỏ
+PWA -> BFF: Gửi thay đổi giỏ kèm phiên bản
+BFF -> Order: Cập nhật giỏ nếu đúng phiên bản
+Order -> Redis: Ghi phiên bản giỏ mới
+Order --> BFF: Trả về ảnh chụp giỏ
+BFF --> PWA: Hiển thị giỏ mới nhất
+
+Customer -> PWA: Gửi đơn
+PWA -> BFF: Submit order kèm idempotency key
+BFF -> Order: Tạo đơn PENDING từ giỏ
+Order -> Redis: Khóa/xóa giỏ sau khi gửi thành công
+Order --> BFF: Trả về đơn chờ xác nhận
+BFF --> PWA: Hiển thị trạng thái chờ xác nhận
+
+note over BFF,Order
+QR token xác định đúng tenant/bàn.
+Session token chỉ cho phép truy cập phạm vi phiên.
+Idempotency key ngăn tạo đơn trùng khi gửi lại.
+end note
+@enduml

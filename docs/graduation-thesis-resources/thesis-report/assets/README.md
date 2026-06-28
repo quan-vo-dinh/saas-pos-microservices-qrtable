@@ -21,21 +21,22 @@ Quy tắc:
 - Tạo placeholder: `bash thesis-report/tools/generate-screenshot-placeholders.sh` hoặc `python3 thesis-report/tools/generate-screenshot-placeholders.py`.
 - Trạng thái backlog đúng cho placeholder là `placeholder`; chỉ dùng `captured`/`verified` sau khi thay ảnh thật và build kiểm tra.
 
-## Hình 3.1 — use case UML (PlantUML)
+## Chương 3 — UML diagrams (PlantUML)
 
-- Source: `diagrams/chapter3-actor-use-case-overview.puml`
-- Render: `bash tools/render-chapter3-use-case.sh` (cần Java, Graphviz `dot`, `rsvg-convert` cho PDF)
-- Output: `figures/chapter3-actor-use-case-overview.pdf` (LaTeX chèn file này)
+- Source chính:
+  - `diagrams/chapter3-actor-use-case-overview.puml` — UML use case diagram.
+  - `diagrams/chapter3-business-flow.puml` — UML activity diagram.
+- Render: `bash tools/render-chapter3-use-case.sh` (cần Java, Graphviz `dot`, `rsvg-convert`).
+- Output: `figures/chapter3-*.pdf` cho LaTeX; `.svg` và `.png` dùng để preview.
 
 Ghi chú: `plantuml.jar` trong repo không bundle Batik nên không dùng trực tiếp `-tpdf`; pipeline render SVG rồi `rsvg-convert` sang PDF.
 
-## Chương 2 — Excalidraw (có nhúng logo)
+## Chương 2 — Academic diagrams (PlantUML)
 
-- Source chỉnh sửa: `diagrams/chapter2-*.excalidraw` (embedded images trong trường `files`).
-- Icon gốc: `diagrams/chapter2-icons/*.svg` (Simple Icons).
-- Ảnh cho LaTeX Chương 2: `figures/chapter2-*.png` (export thủ công từ Excalidraw; giữ cùng tên file khi thay ảnh).
-- PDF/SVG trong `figures/` là artifact pipeline cũ hoặc trung gian, không dùng trong `\includegraphics` Chương 2.
-- **Không** dùng Mermaid (`.mmd`) cho Chương 2.
+- Source chính: `diagrams/chapter2-*.puml`.
+- Hình cho LaTeX Chương 2: `figures/chapter2-*.pdf`; `.svg` và `.png` cùng tên dùng để preview nhanh.
+- Các file `.mmd` cũ chỉ là con trỏ deprecated sang `.puml`.
+- Các file `.excalidraw` và thư mục icon là artifact cũ, không còn là source canonical cho Chương 2.
 
 Render:
 
@@ -43,7 +44,7 @@ Render:
 bash thesis-report/tools/render-chapter2-diagrams.sh
 ```
 
-Pipeline: fetch icons → generate `.excalidraw` → export SVG → `rsvg-convert` PDF.
+Pipeline: PlantUML `.puml` → SVG → PDF/PNG bằng `rsvg-convert`.
 
 ## Chương 4 — Mermaid source và Iconify icons
 

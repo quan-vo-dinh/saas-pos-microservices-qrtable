@@ -16,13 +16,13 @@ Thứ ba, BFF (Backend For Frontend) là điểm vào duy nhất của các ứn
 
 Thứ tư, QRTable dùng giao tiếp hướng sự kiện có chọn lọc. TCP/gRPC được dùng cho lệnh hoặc truy vấn cần phản hồi ngay, chẳng hạn BFF gọi Order để gửi đơn hoặc Order gọi Catalog để trừ tồn kho khi nhân viên xác nhận. Kafka được dùng cho sự kiện miền nghiệp vụ và tác dụng phụ (side effect) bất đồng bộ, chẳng hạn \texttt{order.confirmed} để Kitchen tạo phiếu KDS hoặc \texttt{payment.completed} để Order hoàn tất hóa đơn. Cách dùng này tận dụng khả năng tách rời của Kafka \cite{apache-kafka-docs-2026} nhưng tránh biến bộ trung gian thông điệp thành tầng trung gian cho mọi thao tác phía client.
 
-Thứ năm, Redis là bộ nhớ đệm (cache) và vùng trạng thái khi vận hành cho dữ liệu tần suất cao, không phải nguồn sự thật (source of truth) chung của hệ thống. Bộ nhớ đệm thực đơn công khai, phiên/giỏ khi vận hành, hàng đợi KDS, cờ tạm ngưng đơn vị thuê bao và trạng thái OAuth đều dùng Redis với chủ sở hữu rõ ràng. Với đơn, hóa đơn, thanh toán, đơn vị thuê bao và thực đơn, nguồn dữ liệu có thẩm quyền vẫn nằm ở dịch vụ sở hữu tương ứng.
+Thứ năm, Redis là bộ nhớ đệm (cache) và vùng trạng thái khi vận hành cho dữ liệu tần suất cao, không phải nguồn dữ liệu có thẩm quyền chung của hệ thống. Bộ nhớ đệm thực đơn công khai, phiên/giỏ khi vận hành, hàng đợi KDS, cờ tạm ngưng đơn vị thuê bao và trạng thái OAuth đều dùng Redis với chủ sở hữu rõ ràng. Với đơn, hóa đơn, thanh toán, đơn vị thuê bao và thực đơn, nguồn dữ liệu có thẩm quyền vẫn nằm ở dịch vụ sở hữu tương ứng.
 
 Thứ sáu, các thao tác ghi ảnh hưởng đến trạng thái bên ngoài phải hướng tới idempotency (xử lý thao tác lặp an toàn), bù trừ có kiểm soát và dấu thời gian phía máy chủ. Điều này đặc biệt quan trọng ở webhook thanh toán, xác nhận đơn, xuất bản outbox và gửi đơn của khách. Trong phạm vi hiện tại, khóa luận xem saga pattern như thiết kế đại diện ở hai luồng: Order Confirm Saga cho xác nhận đơn/trừ tồn kho và SaaS Onboarding Mini-Saga cho khởi tạo đơn vị thuê bao (onboarding). Các tăng cường sâu hơn như trạng thái saga bền vững, tiến trình nền retry đầy đủ, CDC hoặc bảo đảm phân phối exactly-once được xem là hướng phát triển, không phải kết quả vận hành thực tế đã hoàn thiện.
 
 \section{Lựa chọn công nghệ và vai trò trong QRTable}
 
-Các công nghệ trong Bảng~\ref{tab:chapter4-technology-decision} được đặt trong mối quan hệ với mục tiêu thiết kế, vị trí sử dụng và giới hạn kỹ thuật. Đối với Nx, tài liệu chính thức mô tả khả năng quản lý đồ thị dự án, xác định phần bị ảnh hưởng, bộ nhớ đệm tác vụ và thư viện dùng chung trong monorepo \cite{nx-docs-2026}. Các khả năng này phù hợp với nhu cầu quản lý nhiều ứng dụng và thư viện của QRTable trong cùng kho mã nguồn.
+Các công nghệ trong Bảng~\ref{tab:chapter4-technology-decision} được đặt trong mối quan hệ với mục tiêu thiết kế, vị trí sử dụng và giới hạn kỹ thuật. Bảng này bao gồm cả công nghệ chạy hệ thống và công cụ phục vụ đánh giá, nhưng tách rõ vai trò của từng nhóm để tránh xem benchmark local như một thành phần nghiệp vụ thường trực. Đối với Nx, tài liệu chính thức mô tả khả năng quản lý đồ thị dự án, xác định phần bị ảnh hưởng, bộ nhớ đệm tác vụ và thư viện dùng chung trong monorepo \cite{nx-docs-2026}. Các khả năng này phù hợp với nhu cầu quản lý nhiều ứng dụng và thư viện của QRTable trong cùng kho mã nguồn.
 
 {\footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -49,13 +49,15 @@ Các công nghệ trong Bảng~\ref{tab:chapter4-technology-decision} được �
   Kafka & Sự kiện miền bất đồng bộ & Tách thời gian giữa Order, Kitchen, Payment, SaaS và Catalog cho các tác dụng phụ không cần phản hồi ngay. & Chỉ dùng 5 topic được chấp nhận; không dùng Kafka cho mọi cập nhật phía client. \\
   Keycloak và JWT/OIDC & Xác thực nhân viên, chủ quán và quản trị & Tách nguồn định danh khỏi hồ sơ ứng dụng; BFF/Authorizer xác minh token, User-Access giữ thông tin ứng dụng. & Khách đặt món qua QR không đi qua Keycloak. \\
   Socket.IO\slash WebSocket & Gợi ý thời gian thực cho khách, nhân viên và KDS & Cải thiện trải nghiệm bằng thông báo, làm mất hiệu lực và gợi ý làm mới dữ liệu. & Không là nguồn trạng thái có thẩm quyền. \\
+  Prometheus, Grafana, Tempo\slash OpenTelemetry và Loki & Lớp quan sát hệ thống & Thu thập metric, hiển thị dashboard, truy vết request đại diện và chuẩn bị khả năng đối chiếu log khi có \texttt{traceId}. & Minh chứng hiện tại chủ yếu ở môi trường local; Loki không thay thế log nghiệp vụ nếu log chưa đủ dữ liệu đối chiếu. \\
+  k6 & Công cụ đánh giá hiệu năng đại diện & Tạo tải HTTP có kiểm soát cho các luồng đọc, đặt món và xác nhận đơn/KDS để bổ sung số liệu định lượng ở Chương 6. & Không phải công nghệ chạy hệ thống của QRTable; không dùng kết quả local để suy rộng thành stress test sản xuất. \\
   SePay\slash VietQR và Cloudinary & Thanh toán chuyển khoản và ảnh thực đơn & SePay\slash VietQR phục vụ thanh toán hóa đơn/gói thuê bao; Cloudinary phục vụ tệp ảnh thực đơn. & Chỉ khẳng định kiểm chứng nhà cung cấp hoặc vận hành thực tế khi có minh chứng tương ứng. \\
 \end{longtable}
 }
 
 \section{Kiến trúc tổng thể và bản đồ tích hợp công nghệ}
 
-Hình~\ref{fig:chapter4-technology-integration-map} đặt các công nghệ vào năm lớp kiến trúc: ứng dụng người dùng, lớp biên, dịch vụ miền nghiệp vụ, hạ tầng dữ liệu và sự kiện, cùng nhà cung cấp ngoài. Các luồng chính thể hiện ứng dụng truy cập qua BFF, dịch vụ giao tiếp nội bộ bằng TCP/gRPC, Kafka truyền một số sự kiện miền, Redis giữ bộ nhớ đệm hoặc trạng thái khi vận hành, và webhook thanh toán được BFF định tuyến đến Payment hoặc SaaS.
+Hình~\ref{fig:chapter4-technology-integration-map} đặt các công nghệ chạy hệ thống vào năm lớp kiến trúc: ứng dụng người dùng, lớp biên, dịch vụ miền nghiệp vụ, hạ tầng dữ liệu và sự kiện, cùng nhà cung cấp ngoài. Các luồng chính thể hiện ứng dụng truy cập qua BFF, dịch vụ giao tiếp nội bộ bằng TCP/gRPC, Kafka truyền một số sự kiện miền, Redis giữ bộ nhớ đệm hoặc trạng thái khi vận hành, và webhook thanh toán được BFF định tuyến đến Payment hoặc SaaS. Lớp quan sát và công cụ benchmark được trình bày trong bảng công nghệ vì chúng phục vụ vận hành và đánh giá, nhưng không làm thay đổi ranh giới nghiệp vụ của hình.
 
 \begin{figure}[H]
   \centering
@@ -64,7 +66,7 @@ Hình~\ref{fig:chapter4-technology-integration-map} đặt các công nghệ và
   \label{fig:chapter4-technology-integration-map}
 \end{figure}
 
-Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng thể theo các lớp ứng dụng người dùng, BFF, dịch vụ miền nghiệp vụ và hạ tầng. Hình~\ref{fig:chapter4-c4-container} trình bày hệ thống ở mức container theo C4, qua đó làm rõ tác nhân, ứng dụng web, dịch vụ, kho lưu trữ và hệ thống ngoài. Vai trò của từng lớp được mô tả dưới đây.
+Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng thể theo các lớp ứng dụng người dùng, BFF, dịch vụ miền nghiệp vụ và hạ tầng. Hình~\ref{fig:chapter4-c4-container} trình bày hệ thống ở mức container, qua đó làm rõ tác nhân, ứng dụng web, dịch vụ, kho lưu trữ và hệ thống ngoài. Vai trò của từng lớp được mô tả dưới đây.
 
 Ở lớp ứng dụng người dùng, QRTable có hai ứng dụng chính. PWA khách phục vụ khách tại bàn, bắt đầu từ thao tác quét mã QR, xem thực đơn, cập nhật giỏ chung, gửi đơn, theo dõi trạng thái và yêu cầu thanh toán. Ứng dụng quản trị phục vụ các tác nhân đã xác thực như quản trị nền tảng, chủ quán, quản lý, phục vụ, bếp và bar qua các vùng chức năng POS, KDS, bảng điều khiển và quản trị nền tảng.
 
@@ -72,7 +74,7 @@ Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng th�
 
 Ở lớp dịch vụ miền nghiệp vụ, hệ thống gồm Authorizer, User-Access, SaaS, Catalog, Order, Kitchen và Payment. Mỗi dịch vụ đại diện cho một ngữ cảnh giới hạn: xác minh danh tính, hồ sơ ứng dụng/RBAC, vòng đời đơn vị thuê bao, thực đơn/bàn/tồn kho, đơn/phiên/hóa đơn, hàng đợi KDS và quyết toán thanh toán. Module \texttt{product} trong monorepo chỉ là phần mẫu do Nx sinh ra, không thuộc kiến trúc chính của QRTable vì không gánh trách nhiệm nghiệp vụ của hệ thống.
 
-Ở lớp hạ tầng, QRTable dùng PostgreSQL cho dữ liệu nghiệp vụ quan hệ, MongoDB cho User-Access, Redis cho bộ nhớ đệm/phiên/hàng đợi KDS/cờ trạng thái chạy, Kafka cho sự kiện miền nghiệp vụ, Keycloak cho định danh nhân viên, SePay\slash VietQR cho thanh toán chuyển khoản, Cloudinary cho ảnh thực đơn và Docker\slash Docker Compose cho môi trường chạy.
+Ở lớp hạ tầng, QRTable dùng PostgreSQL cho dữ liệu nghiệp vụ quan hệ, MongoDB cho User-Access, Redis cho bộ nhớ đệm/phiên/hàng đợi KDS/cờ trạng thái chạy, Kafka cho sự kiện miền nghiệp vụ, Keycloak cho định danh nhân viên, SePay\slash VietQR cho thanh toán chuyển khoản, Cloudinary cho ảnh thực đơn và Docker\slash Docker Compose cho môi trường chạy. Lớp quan sát dùng Prometheus, Grafana, Tempo/OpenTelemetry và Loki để thu thập metric, trình bày dashboard, truy vết request và chuẩn bị đối chiếu log; còn k6 được dùng ở Chương 6 như công cụ tạo tải đại diện cho đánh giá định lượng.
 
 \begin{figure}[H]
   \centering
@@ -84,7 +86,7 @@ Hình~\ref{fig:chapter4-overall-architecture} tóm tắt kiến trúc tổng th�
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth]{chapter4-c4-container.pdf}
-  \caption{Sơ đồ container của QRTable theo góc nhìn C4.}
+  \caption{Các container chính và hệ thống liên quan của QRTable.}
   \label{fig:chapter4-c4-container}
 \end{figure}
 
@@ -180,40 +182,40 @@ Bảng~\ref{tab:chapter4-data-ownership-schema} tổng hợp các bảng, collec
 \end{longtable}
 }
 
-Các sơ đồ tiếp theo mô tả cấu trúc dữ liệu tiêu biểu của từng dịch vụ bằng hình SVG xuất từ dbdiagram.io. Ranh giới dữ liệu không sử dụng khóa ngoại xuyên dịch vụ; định danh trỏ sang miền khác là tham chiếu bên ngoài qua hợp đồng hoặc sự kiện. Hình~\ref{fig:chapter4-db-catalog-schema}--\ref{fig:chapter4-db-user-access-schema} trình bày lần lượt lược đồ của Catalog, Order, Payment, SaaS và User-Access.
+Các hình tiếp theo mô tả cấu trúc dữ liệu tiêu biểu của từng dịch vụ theo ranh giới sở hữu dữ liệu. Ranh giới dữ liệu không sử dụng khóa ngoại xuyên dịch vụ; định danh trỏ sang miền khác là tham chiếu bên ngoài qua hợp đồng hoặc sự kiện. Hình~\ref{fig:chapter4-db-catalog-schema}--\ref{fig:chapter4-db-user-access-schema} trình bày lần lượt lược đồ của Catalog, Order, Payment, SaaS và User-Access.
 
 \begin{figure}[H]
   \centering
   \includesvg[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter4-db-catalog-schema.svg}
-  \caption{Sơ đồ dữ liệu dịch vụ Catalog.}
+  \caption{Dữ liệu dịch vụ Catalog.}
   \label{fig:chapter4-db-catalog-schema}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includesvg[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter4-db-order-schema.svg}
-  \caption{Sơ đồ dữ liệu dịch vụ Order.}
+  \caption{Dữ liệu dịch vụ Order.}
   \label{fig:chapter4-db-order-schema}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includesvg[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter4-db-payment-schema.svg}
-  \caption{Sơ đồ dữ liệu dịch vụ Payment.}
+  \caption{Dữ liệu dịch vụ Payment.}
   \label{fig:chapter4-db-payment-schema}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includesvg[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter4-db-saas-schema.svg}
-  \caption{Sơ đồ dữ liệu dịch vụ SaaS.}
+  \caption{Dữ liệu dịch vụ SaaS.}
   \label{fig:chapter4-db-saas-schema}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includesvg[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter4-db-user-access-schema.svg}
-  \caption{Sơ đồ dữ liệu dịch vụ User-Access (mô hình tài liệu MongoDB, mô phỏng bằng DBML).}
+  \caption{Dữ liệu dịch vụ User-Access.}
   \label{fig:chapter4-db-user-access-schema}
 \end{figure}
 
@@ -381,7 +383,7 @@ Kafka trong QRTable hoạt động theo mô hình phân phối ít nhất một 
 
 Redis được dùng vì một số trạng thái có tần suất đọc/ghi cao, cần TTL hoặc cần cấu trúc dữ liệu khi vận hành phù hợp hơn cơ sở dữ liệu quan hệ. Tuy nhiên, mỗi nhóm khóa phải có dịch vụ sở hữu rõ ràng. QRTable không dùng Redis như một cơ sở dữ liệu nghiệp vụ chia sẻ giữa các dịch vụ; Redis chỉ giữ bộ nhớ đệm, trạng thái khi vận hành, cờ ngắn hạn, khóa idempotency hoặc bản chiếu phục vụ thời gian thực.
 
-Hình~\ref{fig:chapter4-redis-ownership} tách Redis theo nhóm khóa và dịch vụ sở hữu. Cách trình bày này giúp tránh hiểu nhầm Redis là kho trạng thái chung của toàn hệ thống. Với mỗi nhóm khóa, Redis chỉ giữ bộ nhớ đệm, cờ vận hành ngắn hạn hoặc bản chiếu khi vận hành; nguồn sự thật (source of truth) vẫn nằm ở dịch vụ sở hữu.
+Hình~\ref{fig:chapter4-redis-ownership} tách Redis theo nhóm khóa và dịch vụ sở hữu. Cách trình bày này giúp tránh hiểu nhầm Redis là kho trạng thái chung của toàn hệ thống. Với mỗi nhóm khóa, Redis chỉ giữ bộ nhớ đệm, cờ vận hành ngắn hạn hoặc bản chiếu khi vận hành; nguồn dữ liệu có thẩm quyền vẫn nằm ở dịch vụ sở hữu.
 
 \begin{figure}[H]
   \centering

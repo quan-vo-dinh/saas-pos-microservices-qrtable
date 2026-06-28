@@ -1,3 +1,16 @@
+allowBuilds:
+  '@nestjs/core': set this to true or false
+  '@parcel/watcher': set this to true or false
+  '@scarf/scarf': set this to true or false
+  '@swc/core': set this to true or false
+  '@tsparticles/engine': set this to true or false
+  esbuild: set this to true or false
+  msw: set this to true or false
+  nx: set this to true or false
+  protobufjs: set this to true or false
+  puppeteer: set this to true or false
+  sharp: set this to true or false
+  unrs-resolver: set this to true or false
 autoInstallPeers: true
 packages:
   - 'apps/*'

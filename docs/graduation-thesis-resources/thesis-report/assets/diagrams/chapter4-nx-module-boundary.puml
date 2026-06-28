@@ -1,0 +1,43 @@
+@startuml chapter4-nx-module-boundary
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #374151
+skinparam package {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+
+left to right direction
+
+package "apps/" as Apps {
+  component "bff" as Bff
+  component "authorizer\nuser-access\nsaas\ncatalog\norder\nkitchen\npayment" as BackendApps
+  component "management-app\ncustomer-pwa" as FrontendApps
+}
+
+package "libs/" as Libs {
+  component "configuration\nconstants\ndtos" as Contracts
+  component "kiểm soát truy cập\ntích hợp\nhàng đợi" as Integration
+  component "shared types\nui/hooks/utils" as Shared
+}
+
+component "Nx workspace\nđồ thị dự án,\nbuild/test phần ảnh hưởng" as Nx
+component "Giao tiếp liên dịch vụ\nTCP/gRPC hoặc Kafka" as Runtime
+
+Bff --> Contracts : import hợp đồng
+BackendApps --> Contracts : import hợp đồng
+FrontendApps --> Shared : import UI/type
+Bff --> Integration : dùng chung
+BackendApps --> Integration : dùng chung
+
+Apps ..> Nx : được phân tích
+Libs ..> Nx : được phân tích
+Nx ..> Runtime : xác định phần bị ảnh hưởng
+BackendApps --> Runtime : phối hợp liên dịch vụ
+@enduml

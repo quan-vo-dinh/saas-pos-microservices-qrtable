@@ -1,48 +1,29 @@
-%%{init: {"theme": "base", "sequence": {"showSequenceNumbers": true, "actorMargin": 90, "messageMargin": 48}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "actorBkg": "#f0fdf4", "actorBorder": "#16a34a", "noteBkgColor": "#fff7ed", "noteBorderColor": "#ea580c", "lineColor": "#475569"}}}%%
 sequenceDiagram
   autonumber
   actor Admin as Super Admin<br/>Management App
   participant BFF as BFF<br/>Platform API
-  participant SaaS as SaaS<br/>tenant owner
-  participant SDB as PostgreSQL<br/>SaaS DB
+  participant SaaS as SaaS<br/>tenant/subscription owner
   participant Authz as Authorizer<br/>identity contract
   participant UserAccess as User-Access<br/>profile contract
-  participant Payment as Payment<br/>settings contract
-  participant Outbox as SaaS<br/>Outbox relay
+  participant Payment as Payment<br/>settings owner
   participant Kafka as Kafka<br/>tenant.created
+  participant Catalog as Catalog<br/>tenant seed consumer
 
-  Admin->>BFF: POST tenant onboarding
-  BFF->>BFF: Verify SUPER_ADMIN permission
-  BFF->>SaaS: Start tenant onboarding
-  SaaS->>SaaS: Validate slug and onboarding request
-  SaaS->>SDB: Create tenant ACTIVE
-  SaaS->>Authz: Create tenant owner identity
-  Authz-->>SaaS: ownerUserId from Keycloak
-  SaaS->>UserAccess: Create owner profile and role mapping
-  UserAccess-->>SaaS: Profile upserted
-  SaaS->>SDB: Update tenant.ownerId
-  SaaS->>SDB: Assign initial subscription
-  SaaS->>Payment: Create tenant payment settings
-  Payment-->>SaaS: Payment settings created idempotently
-  SaaS->>SDB: Insert outbox tenant.created
-  SaaS-->>BFF: {tenant, ownerUserId}
+  Admin->>BFF: Onboard tenant
+  BFF->>SaaS: Verified onboarding command
+  SaaS->>SaaS: Create tenant<br/>and initial subscription
+  SaaS->>Authz: Create owner identity
+  SaaS->>UserAccess: Upsert owner profile and roles
+  SaaS->>Payment: Create empty payment settings
+  SaaS-->>BFF: Tenant and owner created
   BFF-->>Admin: Onboarding success
-  Outbox->>SDB: Poll pending tenant.created
-  Outbox->>Kafka: Publish tenant.created
+  SaaS-->>Kafka: Publish tenant.created after commit
+  Kafka-->>Catalog: Seed default tenant data idempotently
 
-  alt Failure after owner user was created
+  opt Failure after side effects
     SaaS->>Authz: Disable owner identity
-    Authz-->>SaaS: User disabled or ignored
-    opt Initial subscription was assigned
-      SaaS->>SDB: Compensate initial subscription
-    end
-    SaaS->>SDB: Delete partially created tenant
+    SaaS->>SaaS: Remove initial subscription<br/>and partial tenant
     SaaS-->>BFF: Onboarding failed
-    BFF-->>Admin: Show onboarding failure
-  else Failure before owner user creation
-    SaaS->>SDB: Delete tenant if it exists
-    SaaS-->>BFF: Validation or dependency error
-    BFF-->>Admin: Show failure reason
   end
 
-  Note over SaaS,Payment: SaaS coordinates by contract and tenant/subscription data remain in SaaS DB
+  Note over SaaS,Payment: SaaS coordinates by contract<br/>It does not write Authorizer, User-Access, Payment or Catalog databases directly

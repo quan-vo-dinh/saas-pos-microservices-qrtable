@@ -1,0 +1,37 @@
+@startuml chapter2-kafka-event-flow
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam queue {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam ArrowColor #374151
+
+component "Order Service\nProducer" as Producer
+queue "Topic: order.confirmed\nPartition 0..n" as Topic
+component "Kitchen Service\nConsumer group: kitchen" as Kitchen
+component "Payment Service\nConsumer group: payment" as Payment
+component "Reporting/Notification\nConsumer group riêng" as Reporting
+
+Producer --> Topic : publish domain event\nkey = tenantId/orderId
+Topic --> Kitchen : mỗi group nhận bản sao riêng
+Topic --> Payment : xử lý độc lập
+Topic --> Reporting : fan-out bất đồng bộ
+
+note right of Topic
+Topic là log bền vững theo thứ tự trong partition.
+Consumer group tự quản lý offset.
+Sự kiện có thể được xử lý lại nên consumer phải idempotent.
+end note
+
+note bottom
+Kafka phù hợp cho sự kiện miền và fan-out.
+Không dùng thay cho truy vấn cần phản hồi tức thời.
+end note
+@enduml

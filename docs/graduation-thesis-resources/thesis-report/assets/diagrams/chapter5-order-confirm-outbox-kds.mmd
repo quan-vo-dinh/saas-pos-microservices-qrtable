@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  participant Order as Order<br/>domain owner
+  participant ODB as PostgreSQL<br/>Order DB
+  participant Outbox as Outbox relay
+  participant Kafka as Kafka<br/>order.confirmed
+  participant Kitchen as Kitchen<br/>consumer
+  participant Redis as Redis<br/>KDS projection
+  participant BFF as BFF<br/>WebSocket hint
+  participant KDS as KDS client
+
+  Order->>ODB: Commit order PROCESSING<br/>and PENDING outbox row atomically
+  Outbox->>ODB: Poll pending outbox rows
+  Outbox->>Kafka: Publish order.confirmed
+  Kafka-->>Kitchen: Consume event
+  Kitchen->>Kitchen: Validate schema and contract
+  Kitchen->>Redis: Create station tickets<br/>and queue projection
+  Kitchen->>BFF: Publish kds.queue_changed hint
+  BFF-->>KDS: WebSocket hint
+  KDS->>BFF: Refetch latest KDS state
+
+  Note over Order,KDS: Staff confirmation does not wait for KDS ticket creation.<br/>Kafka and WebSocket carry side effects after the Order commit.

@@ -1,31 +1,29 @@
-# Ánh xạ Mermaid ↔ Excalidraw (Chương 2)
+# Ánh xạ diagram Chương 2
 
-> **Chỉ dùng để tham chiếu khi chỉnh `.excalidraw` thủ công.** PDF trong khóa luận xuất từ Excalidraw, không từ Mermaid.
+> Source chính của Chương 2 là PlantUML (`.puml`) để giữ notation học thuật rõ ràng. Các file `.mmd` cũ chỉ còn là con trỏ deprecated để tránh dùng lại bản flowchart/Excalidraw cũ.
 >
-> Mỗi `.mmd` là **sơ đồ khái niệm** (tiếng Việt, ví von dễ hình dung); chỉ giữ thuật ngữ kỹ thuật chuẩn (POS, QR, SaaS, API, JWT, WebSocket, Kafka, …). Không mô tả logic triển khai chi tiết. Khi vẽ Excalidraw: ưu tiên layout trực quan, ít chữ trên mỗi khối.
+> Quy ước ngôn ngữ: tiếng Việt là chính; chỉ giữ thuật ngữ kỹ thuật cần thiết như POS, QR, SaaS, API, JWT, WebSocket, Kafka, tenant, idempotency.
 
-| Hình | Mermaid (preview)                        | Excalidraw (source chính thức)                  | Icons (`chapter2-icons/`)    |
-| ---- | ---------------------------------------- | ----------------------------------------------- | ---------------------------- |
-| 2.1  | `chapter2-fnb-pos-lifecycle.mmd`         | `chapter2-fnb-pos-lifecycle.excalidraw`         | fnb-delivery, scan-qr        |
-| 2.2  | `chapter2-qr-ordering-flow.mmd`          | `chapter2-qr-ordering-flow.excalidraw`          | scan-qr, redis               |
-| 2.3  | `chapter2-saas-multitenancy.mmd`         | `chapter2-saas-multitenancy.excalidraw`         | cloud, postgresql, redis     |
-| 2.4  | `chapter2-monolith-vs-microservices.mmd` | `chapter2-monolith-vs-microservices.excalidraw` | postgresql, docker           |
-| 2.5  | `chapter2-kafka-event-flow.mmd`          | `chapter2-kafka-event-flow.excalidraw`          | kafka                        |
-| 2.6  | `chapter2-outbox-saga-overview.mmd`      | `chapter2-outbox-saga-overview.excalidraw`      | postgresql, kafka            |
-| 2.7  | `chapter2-websocket-hint-refetch.mmd`    | `chapter2-websocket-hint-refetch.excalidraw`    | websocket, nginx, postgresql |
-| 2.8  | `chapter2-oidc-rbac-saas-pos.mmd`        | `chapter2-oidc-rbac-saas-pos.excalidraw`        | keycloak, openid, scan-qr    |
+| Hình | Source chính | Loại diagram | Vai trò trong chương |
+| ---- | ------------ | ------------ | -------------------- |
+| 2.1  | `chapter2-fnb-pos-lifecycle.puml` | UML activity diagram | Vòng đời vận hành POS F\&B. |
+| 2.2  | `chapter2-qr-ordering-flow.puml` | UML sequence diagram | Luồng QR/session/giỏ/gửi đơn. |
+| 2.3  | `chapter2-saas-multitenancy.puml` | Component/deployment-style diagram | Mô hình SaaS nhiều tenant và ranh giới cô lập. |
+| 2.4  | `chapter2-monolith-vs-microservices.puml` | UML component diagram | So sánh ownership dữ liệu giữa monolith và microservices. |
+| 2.5  | `chapter2-kafka-event-flow.puml` | Component/topology diagram | Producer, topic, partition và consumer group. |
+| 2.6  | `chapter2-outbox-saga-overview.puml` | UML sequence diagram | Outbox và Saga ở mức cơ chế nhất quán dữ liệu. |
+| 2.7  | `chapter2-websocket-hint-refetch.puml` | UML sequence diagram | WebSocket hint và API snapshot. |
+| 2.8  | `chapter2-oidc-rbac-saas-pos.puml` | Component diagram | Tách luồng OIDC/RBAC của nhân sự và phiên QR của khách. |
 
-## Preview nhanh một file
+## Render nhanh một file
 
-Từ thư mục repo root (cần Chrome cho `mmdc`):
+Từ thư mục repo root:
 
 ```bash
-export PUPPETEER_EXECUTABLE_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-cd docs/graduation-thesis-resources/thesis-report/assets/diagrams
-pnpm exec mmdc -i chapter2-kafka-event-flow.mmd -o preview-kafka.png -b transparent
+bash docs/graduation-thesis-resources/thesis-report/tools/render-chapter2-diagrams.sh chapter2-kafka-event-flow
 ```
 
-## Sau khi sửa Excalidraw
+## Sau khi sửa PlantUML
 
 ```bash
 bash docs/graduation-thesis-resources/thesis-report/tools/render-chapter2-diagrams.sh

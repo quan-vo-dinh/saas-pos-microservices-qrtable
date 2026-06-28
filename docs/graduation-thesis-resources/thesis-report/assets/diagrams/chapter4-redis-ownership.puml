@@ -1,0 +1,48 @@
+@startuml chapter4-redis-ownership
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #374151
+skinparam package {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+
+top to bottom direction
+
+database "Redis\ncache, TTL, hàng đợi" as Redis
+
+package "Chủ sở hữu nhóm khóa" {
+  component "BFF\ntoken người dùng,\ncache thực đơn" as Bff
+  component "Order\nphiên, giỏ, hạn mức" as Order
+  component "Kitchen\nhàng đợi KDS, SLA" as Kitchen
+  component "Payment\ntrạng thái OAuth" as Payment
+  component "SaaS\ngói thuê bao,\nquyền theo gói" as Saas
+}
+
+package "Nguồn dữ liệu có thẩm quyền" {
+  database "Catalog DB\nthực đơn/bàn/tồn kho" as CatalogDb
+  database "Order DB\nphiên/đơn/hóa đơn" as OrderDb
+  database "Payment DB\nthanh toán/cấu hình/kiểm toán" as PaymentDb
+  database "SaaS DB\nđơn vị thuê bao/gói" as SaasDb
+  database "User-Access DB\nhồ sơ/vai trò" as UserDb
+}
+
+Bff ..> Redis : cache đọc nhanh
+Order ..> Redis : phiên/giỏ
+Kitchen ..> Redis : hàng đợi KDS
+Payment ..> Redis : chống phát lại OAuth
+Saas ..> Redis : cache gói thuê bao
+
+Bff --> CatalogDb
+Bff --> UserDb
+Order --> OrderDb
+Kitchen --> OrderDb : đọc nguồn lịch sử khi cần
+Payment --> PaymentDb
+Saas --> SaasDb
+@enduml

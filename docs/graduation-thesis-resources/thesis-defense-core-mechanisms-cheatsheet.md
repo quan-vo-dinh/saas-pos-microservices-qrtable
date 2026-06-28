@@ -74,6 +74,33 @@ Ranh giới dịch vụ quan trọng vì nó trả lời ai có quyền quyết 
 - "Kitchen sở hữu vòng đời Order."
 - "Payment sở hữu Bill." Payment sở hữu payment; Order sở hữu bill/session.
 
+## 3a. Lựa chọn Cơ sở dữ liệu (SQL, NoSQL, Redis)
+
+### Câu 20 giây
+
+QRTable áp dụng mô hình "Mỗi dịch vụ một cơ sở dữ liệu" (Database-per-service), cho phép chọn giải pháp lưu trữ tối ưu nhất cho từng miền (Polyglot Persistence): PostgreSQL (SQL) cho các service cần ACID/tồn kho/giao dịch; MongoDB (NoSQL) cho User-Access cần schema linh hoạt và đọc nhanh; Kitchen dùng Redis (In-memory) làm database chính cho KDS để đạt tốc độ sub-millisecond và quản lý hàng đợi Sorted Set tối ưu.
+
+### Câu đào sâu
+
+Việc phân chia cơ sở dữ liệu dựa trên đặc thù nghiệp vụ và tính chất của dữ liệu:
+
+- **PostgreSQL (SQL)**: Dành cho Catalog, Order, Payment và SaaS. Các miền này quản lý thực đơn, tồn kho, đơn hàng và tiền tệ của nhà hàng – nơi dữ liệu có cấu trúc cao, quan hệ chặt chẽ và yêu cầu giao dịch ACID nghiêm ngặt. Catalog cần cơ chế **khóa bi quan (pessimistic locking)** để tránh bán lặp (overselling) khi trừ kho; Order và Payment cần ghi transaction cục bộ để tránh mất hóa đơn/tiền của khách.
+- **MongoDB (NoSQL)**: Dành cho User-Access. Hồ sơ nhân viên, tuỳ chọn cấu hình, và siêu dữ liệu (metadata) của từng nhà hàng (tenant) có cấu trúc phi đồng nhất và dễ thay đổi. MongoDB giúp lưu trữ dạng tài liệu (document) linh hoạt mà không cần migrate schema phức tạp, đồng thời tối ưu hiệu năng đọc cực nhanh cho luồng kiểm tra quyền hạn (RBAC) trên mỗi request.
+- **Redis (In-Memory Database)**: Kitchen sử dụng Redis làm **primary data store** cho KDS (màn hình bếp). KDS chỉ quản lý các ticket chế biến live (dữ liệu ngắn hạn) với tần suất cập nhật rất cao, do đó Redis Sorted Set giúp xếp hàng chế biến (FIFO) theo độ ưu tiên cực nhanh ($O(\log N)$). Các service khác dùng Redis làm Cache (Menu, User Session, Rate Limiter) để giảm tải cho database chính.
+
+### Anchor QRTable
+
+- PostgreSQL: `qrtable_catalog`, `qrtable_order`, `qrtable_payment`, `qrtable_saas`.
+- MongoDB: `qrtable_auth` (User-Access).
+- Redis KDS: [kds-redis.repository.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts)
+- Redis Cache: [redis.provider.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/libs/providers/src/lib/redis.provider.ts)
+
+### Không nói
+
+- "Redis chỉ dùng làm cache trong QRTable." (Kitchen dùng Redis làm database chính cho live KDS).
+- "Dữ liệu người dùng bắt buộc phải dùng SQL mới đảm bảo an toàn."
+- "Cơ sở dữ liệu của các service có thể kết nối chéo hoặc thực hiện join SQL với nhau."
+
 ## 4. Giao tiếp: HTTP, TCP, gRPC, Kafka, WebSocket
 
 ### Câu 20 giây
@@ -285,11 +312,14 @@ Redis Pub/Sub khác Kafka: Pub/Sub là tín hiệu ngắn hạn để phát tán
 
 ### Câu 20 giây
 
-QRTable tách bốn câu hỏi: người gọi là ai, request thuộc tenant nào, người đó có quyền thao tác gì, và tenant có được dùng tính năng đó theo gói dịch vụ không. Nhân viên/admin dùng Keycloak JWT qua Authorizer; khách dùng QR/session; guard chain ở BFF thiết lập ngữ cảnh trước khi vào service.
+QRTable tách biệt hai lớp: Định danh (Identity - giao cho Keycloak OIDC) và Hồ sơ nghiệp vụ (Application User Profile - tại User-Access service). Nhân viên/admin đăng nhập qua Keycloak nhận JWT tự chứa thông tin; khách hàng dùng QR session riêng trong Redis để tránh ma sát trải nghiệm; lớp Authorizer nội bộ xác minh chữ ký JWT qua gRPC/JWKS để giữ tốc độ phản hồi tối ưu.
 
 ### Câu đào sâu
 
-Phân quyền theo vai trò (RBAC) trả lời người dùng có được làm thao tác đó không. Cô lập tenant trả lời dữ liệu/hành động thuộc nhà hàng nào và ngăn tenant A truy cập tenant B. Quyền theo gói dịch vụ (entitlement) trả lời tenant có subscription và feature tương ứng hay không. Super Admin là ngoại lệ có kiểm soát cho thao tác cấp nền tảng. Khách không có role Keycloak; session chỉ ràng buộc tenant/table/session.
+- **Lý do chọn Keycloak & OIDC**: OpenID Connect (OIDC) xây dựng trên OAuth 2.0 cấp mã thông báo JSON Web Token (JWT) được ký số bảo mật. Keycloak là hệ thống Quản lý định danh Chuẩn doanh nghiệp (Enterprise IAM) giúp giảm rủi ro bảo mật (không tự lưu mật khẩu, tự động quản lý session và thu hồi token).
+- **Custom Claims & Cô lập Tenant**: Chúng em cấu hình Keycloak Protocol Mapper để nhúng `tenant_id` của nhân viên trực tiếp vào JWT. Khi request đi qua BFF, `TenantGuard` chỉ cần đọc token để biết nhân viên thuộc nhà hàng nào mà không cần truy vấn chéo database.
+- **Authorizer gRPC**: Để tránh việc các domain service gọi HTTP liên tục tới Keycloak gây nghẽn, dịch vụ `Authorizer` (gRPC) xác minh chữ ký token bằng cách tải khóa công khai (JWKS) từ Keycloak và cache kết quả vào Redis (TTL 30 phút). Các service khác chỉ cần gọi gRPC tới Authorizer để verify với tốc độ sub-millisecond.
+- **Phân quyền nhiều lớp**: Hệ thống tách biệt: Phân quyền vai trò (RBAC) xác định hành vi được làm; Cô lập tenant xác định dữ liệu của nhà hàng nào; Quyền theo gói (entitlement) xác định tính năng được dùng theo gói subscription đăng ký ở SaaS service.
 
 ### Anchor QRTable
 
@@ -298,6 +328,7 @@ Phân quyền theo vai trò (RBAC) trả lời người dùng có được làm 
 - `libs/guards/src/lib/tenant.guard.ts`
 - `libs/guards/src/lib/permission.guard.ts`
 - `libs/guards/src/lib/plan-feature.guard.ts`
+- Authorizer: `apps/authorizer/src/app/modules/auth/services/keycloak.service.ts`
 - Report Chương 4 mục security/auth/RBAC.
 
 ### Không nói
@@ -305,6 +336,7 @@ Phân quyền theo vai trò (RBAC) trả lời người dùng có được làm 
 - "RBAC tự giải quyết tenant isolation."
 - "Customer dùng Keycloak."
 - "Tenant isolation là database riêng cho từng tenant." Thiết kế hiện tại là database theo service + `tenant_id` trong từng service.
+- "Chúng em tự lập trình giải pháp OAuth 2.0 / IAM riêng từ đầu" (Sử dụng Keycloak để đảm bảo tính an toàn bảo mật chuẩn doanh nghiệp).
 
 ## 13. Payment, VietQR và SePay
 

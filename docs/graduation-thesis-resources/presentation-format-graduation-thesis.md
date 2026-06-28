@@ -113,7 +113,7 @@
 
 **<Tên khóa luận Tiếng Anh>(Bold, size 15-25)**
 
-**KỸ SƯ/ CỬ NHÂNNGÀNH <TÊN NGÀNH>(Bold, size 14)**
+**CỬ NHÂNNGÀNH <TÊN NGÀNH>(Bold, size 14)**
 
 **TP. HỒ CHÍ MINH, <NĂM>(Bold, size 13)**
 

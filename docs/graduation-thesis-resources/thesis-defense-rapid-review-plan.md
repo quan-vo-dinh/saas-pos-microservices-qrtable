@@ -91,6 +91,7 @@ Cách nói business-first:
 
 1. Vì sao chọn vi dịch vụ (microservices) thay vì monolith.
 2. Ranh giới dịch vụ (service boundary) và sở hữu dữ liệu (data ownership).
+   2a. Lý do lựa chọn cơ sở dữ liệu (PostgreSQL, MongoDB, Redis) cho từng service.
 3. HTTP/TCP/gRPC/Kafka/WebSocket dùng khi nào.
 4. Tính lũy đẳng (idempotency) là gì và QRTable dùng ở đâu.
 5. Bảng sự kiện chờ phát (transactional outbox) giải quyết vấn đề gì.

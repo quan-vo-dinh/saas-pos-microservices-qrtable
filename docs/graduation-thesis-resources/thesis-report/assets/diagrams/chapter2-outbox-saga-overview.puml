@@ -1,0 +1,42 @@
+@startuml chapter2-outbox-saga-overview
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequence {
+  ArrowColor #374151
+  LifeLineBorderColor #6b7280
+  LifeLineBackgroundColor white
+  ParticipantBorderColor #374151
+  ParticipantBackgroundColor white
+  DatabaseBorderColor #374151
+  DatabaseBackgroundColor white
+}
+
+participant "Dịch vụ sở hữu nghiệp vụ" as Service
+database "CSDL dịch vụ\nbảng nghiệp vụ + outbox" as Db
+participant "Outbox Publisher" as Publisher
+queue "Kafka" as Kafka
+participant "Dịch vụ tiêu thụ" as Consumer
+
+Service -> Db: Giao dịch: cập nhật nghiệp vụ\nvà ghi bản ghi outbox
+Db --> Service: Commit thành công
+Publisher -> Db: Đọc outbox chưa phát hành
+Publisher -> Kafka: Phát sự kiện miền
+Kafka -> Consumer: Chuyển sự kiện tới consumer group
+Consumer -> Consumer: Xử lý idempotent
+Publisher -> Db: Đánh dấu outbox đã phát hành
+
+== Saga nhiều bước ==
+Service -> Consumer: Yêu cầu bước tiếp theo
+alt Bước tiếp theo thành công
+  Consumer --> Service: Xác nhận hoàn tất
+else Bước tiếp theo thất bại
+  Consumer --> Service: Báo lỗi có kiểm soát
+  Service -> Service: Thực hiện hành động bù trừ
+end
+
+note over Service,Consumer
+Outbox giảm rủi ro giữa commit CSDL và phát sự kiện.
+Saga điều phối chuỗi bước dài có hành động bù trừ rõ ràng.
+end note
+@enduml

@@ -1,0 +1,31 @@
+
+sequenceDiagram
+  autonumber
+  actor Device1 as Device 1<br/>cartVersion: 5
+  actor Device2 as Device 2<br/>cartVersion: 5
+  participant Order as Order<br/>cart version check
+  participant Redis as Redis<br/>cart state + version
+
+  Device1->>Order: Add item to cart<br/>expected version: 5
+  Order->>Redis: Compare and update
+  Redis->>Redis: Version matches<br/>apply change v5 → v6
+  Redis-->>Order: Updated cart v6
+  Order-->>Device1: Success, cart v6
+
+  Device2->>Order: Add different item<br/>expected version: 5 (stale)
+  Order->>Redis: Compare and update
+  Redis-->>Order: Version mismatch<br/>expected 5, actual 6
+  Order-->>Device2: 409 CONFLICT<br/>+ current cart v6
+
+  Device2->>Order: Refetch cart state
+  Order->>Redis: Read current cart
+  Redis-->>Order: Cart v6
+  Order-->>Device2: Cart v6
+
+  Device2->>Order: Retry with version 6
+  Order->>Redis: Compare and update
+  Redis->>Redis: Version matches<br/>apply change v6 → v7
+  Redis-->>Order: Updated cart v7
+  Order-->>Device2: Success, cart v7
+
+  Note over Order,Redis: Optimistic version prevents lost updates.<br/>Client must retry with the version received from the conflict response.

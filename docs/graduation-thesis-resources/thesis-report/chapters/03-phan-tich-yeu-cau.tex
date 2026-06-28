@@ -135,11 +135,11 @@ Nhóm KDS và thanh toán hoàn tất vòng đời vận hành. KDS cần ưu ti
 
 Nhóm bảng điều khiển và báo cáo bổ sung khả năng đọc hiểu vận hành sau khi dữ liệu giao dịch đã phát sinh. Trong phạm vi yêu cầu của QRTable, báo cáo là mô hình dữ liệu đọc chỉ đọc do các miền sở hữu dữ liệu cung cấp, ví dụ miền Thanh toán cho doanh thu đã thanh toán, miền Đơn cho đơn/hóa đơn, miền Thực đơn cho bàn/thực đơn và miền SaaS cho số liệu nền tảng. Chương 3 vì vậy xác định nhu cầu đọc tổng hợp và quyền truy cập báo cáo, còn dịch vụ phân tích riêng, kho dữ liệu OLAP hoặc quy trình phân tích nghiệp vụ chuyên sâu thuộc nhóm mở rộng sản phẩm.
 
-Hình~\ref{fig:chapter3-business-flow} tổng hợp các yêu cầu chức năng thành luồng nghiệp vụ từ khi khách tham gia phiên qua mã QR đến khi bàn được dọn và sẵn sàng cho lượt phục vụ tiếp theo. Sơ đồ thể hiện trình tự nghiệp vụ và các điều kiện kiểm soát; tương tác chi tiết giữa các dịch vụ được trình bày ở Chương 5.
+Hình~\ref{fig:chapter3-business-flow} tổng hợp các yêu cầu chức năng thành luồng nghiệp vụ chính từ khi khách tham gia phiên qua mã QR đến khi bàn được dọn và sẵn sàng cho lượt phục vụ tiếp theo. Sơ đồ chỉ giữ các chặng nghiệp vụ lớn; tương tác chi tiết giữa các dịch vụ được trình bày ở Chương 5.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter3-business-flow.pdf}
+  \includegraphics[width=\textwidth]{chapter3-business-flow.pdf}
   \caption{Luồng nghiệp vụ từ đặt món qua QR đến KDS, thanh toán và dọn bàn.}
   \label{fig:chapter3-business-flow}
 \end{figure}
@@ -169,7 +169,9 @@ Phản hồi thời gian thực & Hệ thống cần phản hồi kịp thời c
 \addlinespace
 Khả năng bảo trì & Hệ thống cần có ranh giới miền rõ, hợp đồng dùng chung ổn định và cấu trúc monorepo hỗ trợ thay đổi có kiểm soát. & Đánh giá bằng trách nhiệm dịch vụ, thư viện dùng chung, hợp đồng kiến trúc và khả năng liên kết yêu cầu sang module liên quan. \\
 \addlinespace
-Khả năng mở rộng & Kiến trúc cần cho phép mở rộng theo ranh giới dịch vụ, bộ nhớ đệm, nhóm consumer hoặc bộ chuyển đổi thời gian thực khi cần. & Đánh giá bằng lập luận kiến trúc và minh chứng ranh giới dịch vụ; phép đo tải lớn thuộc lớp kiểm chứng thực nghiệm với môi trường và dữ liệu riêng. \\
+Khả năng mở rộng & Kiến trúc cần cho phép mở rộng theo ranh giới dịch vụ, bộ nhớ đệm, nhóm consumer hoặc bộ chuyển đổi thời gian thực khi cần. & Đánh giá bằng lập luận kiến trúc, benchmark đại diện ở môi trường local và giới hạn rõ phạm vi; phép đo tải lớn hoặc dài hạn cần môi trường riêng. \\
+\addlinespace
+Khả năng quan sát & Các luồng vận hành quan trọng cần có metric, dashboard và trace đủ để đối chiếu khi kiểm thử hoặc benchmark. & Đánh giá bằng k6 cho tải đại diện, Prometheus/Grafana cho metric/dashboard và Tempo/OpenTelemetry cho trace; Loki chỉ dùng khi log ứng dụng có traceId phù hợp. \\
 \addlinespace
 Khả năng kiểm thử và tái lập & Yêu cầu ưu tiên cao cần có ánh xạ sang kiểm thử, kịch bản minh họa hoặc tư liệu để người đọc đối chiếu kết quả. & Đánh giá bằng ma trận đối chiếu, kết quả kiểm thử, ảnh minh họa và kết quả biên dịch tài liệu. \\
 \bottomrule
@@ -226,6 +228,6 @@ Phạm vi yêu cầu của QRTable tập trung vào các năng lực cần thi�
 
 Các năng lực mở rộng như quản trị nhân sự nâng cao, CRM/loyalty, kho dữ liệu phân tích, BI/AI, ứng dụng di động gốc, hàng đợi thao tác ngoại tuyến đầy đủ, tích hợp sâu với nền tảng giao đồ ăn, hoàn tiền phức tạp hoặc nhiều ngân hàng thanh toán đồng thời được tách khỏi phạm vi yêu cầu chính. Việc đặt ranh giới này giúp phần đánh giá tập trung vào các luồng chính thay vì mở rộng sang những miền sản phẩm cần thiết kế, triển khai và kiểm chứng riêng.
 
-Đối với hiệu năng, khả năng mở rộng và kiểm chứng nhà cung cấp thanh toán, Chương 3 xác định tiêu chí yêu cầu để Chương 4, Chương 5 và Chương 6 lần lượt thiết kế, triển khai và phân loại minh chứng tương ứng. Các kết luận về tải lớn, độ trễ, thông lượng hoặc callback SePay/VietQR với nhà cung cấp thực tế được đặt trong lớp đánh giá minh chứng ở Chương 6. Nhờ đó, yêu cầu thanh toán vẫn bao gồm webhook, mã tham chiếu, xử lý thiếu tiền và trùng lặp, nhưng không trộn lẫn kiểm thử nội bộ với minh chứng vận hành thực tế.
+Đối với hiệu năng, khả năng mở rộng, khả năng quan sát và kiểm chứng nhà cung cấp thanh toán, Chương 3 xác định tiêu chí yêu cầu để Chương 4, Chương 5 và Chương 6 lần lượt thiết kế, triển khai và phân loại minh chứng tương ứng. Các số đo độ trễ và thông lượng đại diện được đọc trong phạm vi benchmark k6 local, đồng thời đối chiếu bằng Prometheus/Grafana cho metric và Tempo/OpenTelemetry cho trace; các kết luận về tải lớn, vận hành dài hạn hoặc callback SePay/VietQR với nhà cung cấp thực tế vẫn được đặt trong lớp đánh giá minh chứng riêng ở Chương 6. Nhờ đó, yêu cầu thanh toán vẫn bao gồm webhook, mã tham chiếu, xử lý thiếu tiền và trùng lặp, nhưng không trộn lẫn kiểm thử nội bộ với minh chứng vận hành thực tế.
 
 Tóm lại, Chương 3 xác định các tác nhân, trường hợp sử dụng, yêu cầu chức năng, yêu cầu phi chức năng và máy trạng thái chính của QRTable. Kết quả phân tích là cơ sở cho thiết kế kiến trúc và ranh giới dịch vụ ở Chương 4, triển khai các luồng vận hành ở Chương 5 và đánh giá mức độ đáp ứng yêu cầu ở Chương 6.

@@ -1,0 +1,33 @@
+flowchart LR
+  Event["order.confirmed<br/>tenantId + orderId + items"] --> Split{"Station?"}
+  Split -->|KITCHEN| KitchenTicket["ticket hash<br/>kds:{tid}:ticket:{order}:KITCHEN"]
+  Split -->|BAR| BarTicket["ticket hash<br/>kds:{tid}:ticket:{order}:BAR"]
+  Split -->|missing| Dead["dead-letter list<br/>kds:{tid}:dead-letter:order-confirmed"]
+
+  KitchenTicket --> KItems["ticket items set/hash<br/>ticket:{id}:items<br/>ticket-item:{itemId}"]
+  BarTicket --> BItems["ticket items set/hash<br/>ticket:{id}:items<br/>ticket-item:{itemId}"]
+
+  KitchenTicket --> ActiveK["active sorted set<br/>kds:{tid}:kitchen"]
+  BarTicket --> ActiveB["active sorted set<br/>kds:{tid}:bar"]
+  KitchenTicket --> ReadyK["ready sorted set<br/>station:KITCHEN:READY"]
+  BarTicket --> ReadyB["ready sorted set<br/>station:BAR:READY"]
+
+  KitchenTicket --> OrderIndex["order tickets set<br/>order:{orderId}:tickets"]
+  BarTicket --> OrderIndex
+  KitchenTicket --> SessionIndex["session tickets set<br/>session:{sessionId}:tickets"]
+  BarTicket --> SessionIndex
+
+  ActiveK --> Revision["station revision<br/>station:{station}:revision"]
+  ActiveB --> Revision
+  ReadyK --> Revision
+  ReadyB --> Revision
+
+  KitchenTicket --> SLA["SLA hash + global due sorted set<br/>ticket:{id}:sla / kds:sla:due"]
+  BarTicket --> SLA
+
+  classDef event fill:#eef6ff,stroke:#2563eb,color:#0f172a;
+  classDef redis fill:#f0fdf4,stroke:#16a34a,color:#14532d;
+  classDef warn fill:#fff7ed,stroke:#ea580c,color:#7c2d12;
+  class Event event;
+  class KitchenTicket,BarTicket,KItems,BItems,ActiveK,ActiveB,ReadyK,ReadyB,OrderIndex,SessionIndex,Revision,SLA redis;
+  class Dead warn;

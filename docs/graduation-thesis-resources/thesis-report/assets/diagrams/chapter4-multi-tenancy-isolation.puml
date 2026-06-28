@@ -1,0 +1,64 @@
+@startuml chapter4-multi-tenancy-isolation
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #374151
+skinparam package {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+
+top to bottom direction
+
+package "Yêu cầu theo đơn vị thuê bao" {
+  actor "Người dùng đơn vị A" as TenantA
+  actor "Người dùng đơn vị B" as TenantB
+}
+
+component "BFF\nxác định tenantId" as Bff
+component "Ngữ cảnh yêu cầu\ntenantId, tác nhân, quyền" as Context
+
+package "Dịch vụ nhận ngữ cảnh tenantId" {
+  component "Catalog" as Catalog
+  component "Order" as Order
+  component "Payment" as Payment
+  component "SaaS" as Saas
+  component "Kitchen" as Kitchen
+}
+
+package "Cơ chế cô lập" {
+  database "PostgreSQL\ncột tenant_id" as Pg
+  database "Redis\nkey theo tenant" as Redis
+  queue "Kafka\npayload có tenantId" as Kafka
+  component "Phòng WebSocket\ntheo tenant/phiên" as Ws
+}
+
+TenantA --> Bff : HTTP/WebSocket
+TenantB --> Bff : HTTP/WebSocket
+Bff --> Context
+Context --> Catalog
+Context --> Order
+Context --> Payment
+Context --> Saas
+Context --> Kitchen
+
+Catalog --> Pg
+Order --> Pg
+Payment --> Pg
+Saas --> Pg
+Order ..> Redis
+Kitchen ..> Redis
+Saas ..> Redis
+Bff ..> Ws
+Catalog --> Kafka
+Order --> Kafka
+Payment --> Kafka
+Saas --> Kafka
+Kafka --> Kitchen
+Kafka --> Bff
+@enduml

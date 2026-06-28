@@ -1,0 +1,35 @@
+sequenceDiagram
+  autonumber
+  actor Owner as Owner<br/>Management App
+  actor Admin as Super Admin
+  participant BFF as BFF<br/>SaaS API
+  participant SaaS as SaaS<br/>subscription services
+  participant SDB as PostgreSQL<br/>SaaS DB
+  participant Redis as Redis<br/>subscription cache
+  participant Sepay as SePay / Bank
+
+  Owner->>BFF: Checkout subscription invoice
+  BFF->>SaaS: CHECKOUT_INVOICE
+  SaaS->>SDB: Create PENDING invoice<br/>with QRSUB reference
+  SaaS-->>Owner: Invoice + QR payload
+
+  alt Paid by SePay
+    Sepay->>BFF: POST platform webhook
+    BFF->>SaaS: HANDLE_WEBHOOK
+    SaaS->>SDB: Lock invoice by QRSUB reference
+    SaaS->>SDB: Mark paid and assign plan
+  else Manually confirmed by platform admin
+    Admin->>BFF: Manual confirm invoice with note
+    BFF->>SaaS: MANUAL_CONFIRM_INVOICE
+    SaaS->>SDB: Mark paid and assign plan
+  end
+
+  SaaS->>SDB: Supersede old subscription<br/>create ACTIVE subscription
+  SaaS->>Redis: Cache plan limits and features
+
+  opt Subscription expires beyond grace
+    SaaS->>SDB: Suspend tenant
+    SaaS->>Redis: Cache suspended status
+  end
+
+  Note over SaaS,Redis: Subscription changes update a short-lived entitlement cache<br/>Tenant lifecycle remains a SaaS-owned state

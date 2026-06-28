@@ -75,7 +75,7 @@ Thứ nhất, về mục tiêu nghiên cứu, khóa luận tổng hợp cơ sở
 
 Thứ hai, về mục tiêu xây dựng hệ thống, khóa luận hướng đến triển khai các luồng vận hành chính của QRTable. Các luồng này gồm: khởi tạo đơn vị thuê bao và chủ sở hữu ban đầu; quản lý thực đơn, bàn, khu vực và mã QR; khách tham gia phiên qua QR, thao tác giỏ và gửi đơn; nhân viên xác nhận đơn và bảo toàn tồn kho; KDS nhận phiếu bếp và cập nhật trạng thái món; ghi nhận thanh toán tiền mặt và VietQR/SePay; quản lý nhân sự/quyền; bảng điều khiển và báo cáo theo gói dịch vụ; quản trị nền tảng cho đơn vị thuê bao, gói và phân tích tổng quan.
 
-Thứ ba, về mục tiêu đánh giá, khóa luận xác định mức độ đáp ứng mục tiêu dựa trên minh chứng có thể đối chiếu giữa yêu cầu, thiết kế, mã nguồn, kiểm thử, sơ đồ, ảnh minh họa và minh chứng triển khai. Kết quả được phân loại theo mức độ kiểm chứng: bằng kiểm thử hoặc thực thi; bằng thiết kế, kiến trúc và mã nguồn; hoặc chưa đủ cơ sở và cần tiếp tục phát triển. Cách phân loại này giới hạn kết luận trong phạm vi minh chứng đã thu thập.
+Thứ ba, về mục tiêu đánh giá, khóa luận xác định mức độ đáp ứng mục tiêu dựa trên minh chứng có thể đối chiếu giữa yêu cầu, thiết kế, mã nguồn, kiểm thử, số liệu benchmark đại diện, sơ đồ, ảnh minh họa và minh chứng triển khai. Kết quả được phân loại theo mức độ kiểm chứng: bằng kiểm thử hoặc thực thi; bằng số liệu đo trong phạm vi local; bằng thiết kế, kiến trúc và mã nguồn; hoặc chưa đủ cơ sở và cần tiếp tục phát triển. Cách phân loại này giới hạn kết luận trong phạm vi minh chứng đã thu thập.
 
 Ba nhóm mục tiêu tạo thành mạch nghiên cứu thống nhất từ phân tích bài toán, thiết kế và xây dựng hệ thống đến kiểm chứng kết quả. Ngoài chức năng người dùng, khóa luận phân tích cơ sở phân chia dịch vụ, quyền sở hữu dữ liệu, cơ chế giao tiếp và các ràng buộc nghiệp vụ cần được bảo vệ tại từng ranh giới.
 
@@ -87,9 +87,9 @@ Về phạm vi nghiệp vụ, QRTable tập trung vào quản lý đơn vị thu
 
 Về phạm vi kỹ thuật, khóa luận tập trung vào kiến trúc vi dịch vụ trong Nx monorepo, với các dịch vụ và ứng dụng phía người dùng được tổ chức theo ranh giới nghiệp vụ. Nội dung nghiên cứu gồm quyền sở hữu dữ liệu, cô lập dữ liệu theo đơn vị thuê bao, kiểm soát truy cập theo vai trò và theo gói dịch vụ, giao tiếp hướng sự kiện có chọn lọc, bộ nhớ đệm và bản chiếu vận hành, cập nhật gần thời gian thực, xác thực nhân viên, phiên khách qua mã QR, tích hợp SePay/VietQR và xử lý lặp an toàn cho gửi đơn và webhook.
 
-Về phạm vi đánh giá, khóa luận sử dụng ma trận đối chiếu yêu cầu, kiểm thử đơn vị, kiểm thử hợp đồng, kiểm thử tích hợp, phân tích kiến trúc, sơ đồ, ảnh minh họa và minh chứng triển khai trên môi trường công khai. Các minh chứng về tên miền, HTTPS, kiểm tra sức khỏe, kiểm tra vận hành cơ bản, đường gọi lại webhook và nhật ký rút gọn bổ sung minh chứng vận hành khi được thu thập. Chúng được sử dụng cùng với kiểm thử chức năng và kiểm chứng kiến trúc, không thay thế hai nhóm minh chứng này.
+Về phạm vi đánh giá, khóa luận sử dụng ma trận đối chiếu yêu cầu, kiểm thử đơn vị, kiểm thử hợp đồng, kiểm thử tích hợp, benchmark k6 đại diện trên môi trường local, số liệu Prometheus/Grafana/Tempo trong cửa sổ đo, phân tích kiến trúc, sơ đồ, ảnh minh họa và minh chứng triển khai trên môi trường công khai. Các minh chứng về tên miền, HTTPS, kiểm tra sức khỏe, kiểm tra vận hành cơ bản, đường gọi lại webhook và nhật ký rút gọn bổ sung minh chứng vận hành khi được thu thập. Chúng được sử dụng cùng với kiểm thử chức năng và kiểm chứng kiến trúc, không thay thế hai nhóm minh chứng này.
 
-Các nội dung nâng cao được đặt ngoài phạm vi kết quả chính. Về vận hành và hiệu năng, nhóm này gồm kiểm thử tải lớn, đo độ trễ và thông lượng, tính sẵn sàng cao và kiểm thử khả năng chịu lỗi. Về sản phẩm, phạm vi chưa bao gồm ứng dụng di động gốc, phân tích dữ liệu nâng cao, quản trị quan hệ khách hàng, quản trị nhân sự, quản lý kho theo định mức, kế toán, hàng đợi ghi ngoại tuyến đầy đủ, hệ thống thông báo đa kênh, hoàn tiền phức tạp và tích hợp sâu với nền tảng giao đồ ăn. Mỗi hướng mở rộng cần thiết kế, triển khai và minh chứng đánh giá riêng.
+Các nội dung nâng cao được đặt ngoài phạm vi kết quả chính. Về vận hành và hiệu năng, nhóm này gồm kiểm thử tải lớn, đo dài hạn trên môi trường tách biệt, tính sẵn sàng cao và kiểm thử khả năng chịu lỗi. Về sản phẩm, phạm vi chưa bao gồm ứng dụng di động gốc, phân tích dữ liệu nâng cao, quản trị quan hệ khách hàng, quản trị nhân sự, quản lý kho theo định mức, kế toán, hàng đợi ghi ngoại tuyến đầy đủ, hệ thống thông báo đa kênh, hoàn tiền phức tạp và tích hợp sâu với nền tảng giao đồ ăn. Mỗi hướng mở rộng cần thiết kế, triển khai và minh chứng đánh giá riêng.
 
 Ranh giới trên tập trung phạm vi nghiên cứu vào nền tảng SaaS POS có đặt món qua mã QR, KDS, thanh toán, quản trị đơn vị thuê bao, phân quyền và ranh giới dịch vụ rõ ràng. Các nội dung về tải lớn, sản phẩm nâng cao và vận hành cấp doanh nghiệp được xem là hướng phát triển sau phạm vi khóa luận.
 
@@ -105,19 +105,19 @@ Bước thứ ba là thiết kế kiến trúc. Hệ thống được tổ chứ
 
 Bước thứ tư là triển khai hệ thống. QRTable được xây dựng trong Nx monorepo với các dịch vụ phía máy chủ, PWA khách, ứng dụng quản trị và thành phần phụ trợ. Mỗi luồng được mô tả theo mục tiêu nghiệp vụ, ràng buộc nghiệp vụ, dịch vụ sở hữu dữ liệu, mã nguồn, kiểm thử, sơ đồ trình tự và ảnh giao diện.
 
-Bước thứ năm là kiểm chứng và đánh giá. Khóa luận kết hợp kiểm thử tự động, kiểm thử có điều kiện, kiểm chứng kiến trúc, ma trận đối chiếu, ảnh minh họa và minh chứng triển khai trên môi trường công khai. Mỗi kết luận được gắn với loại minh chứng tương ứng để phân biệt kết quả đã kiểm chứng, kết quả được hỗ trợ bởi thiết kế và nội dung cần tiếp tục phát triển. Cách tiếp cận này phù hợp với đặc điểm của đề tài xây dựng hệ thống phần mềm và giới hạn các nhận định về hiệu năng, khả năng mở rộng và vận hành trong phạm vi đã đánh giá.
+Bước thứ năm là kiểm chứng và đánh giá. Khóa luận kết hợp kiểm thử tự động, kiểm thử có điều kiện, benchmark k6 đại diện, số liệu quan sát từ Prometheus, Grafana và Tempo, kiểm chứng kiến trúc, ma trận đối chiếu, ảnh minh họa và minh chứng triển khai trên môi trường công khai. Mỗi kết luận được gắn với loại minh chứng tương ứng để phân biệt kết quả đã kiểm chứng, kết quả được đo trong phạm vi local, kết quả được hỗ trợ bởi thiết kế và nội dung cần tiếp tục phát triển. Cách tiếp cận này phù hợp với đặc điểm của đề tài xây dựng hệ thống phần mềm và giới hạn các nhận định về hiệu năng, khả năng mở rộng và vận hành trong phạm vi đã đánh giá.
 
 \section{Đóng góp của đề tài}
 
 Đóng góp thứ nhất của đề tài là mô hình hóa bài toán SaaS POS tích hợp đặt món qua mã QR cho bối cảnh F\&B. Khóa luận không chỉ xem đặt món qua QR như một trang thực đơn điện tử, mà đặt nó trong chuỗi vận hành gồm bàn, phiên, giỏ, đơn, bếp, hóa đơn, thanh toán, báo cáo và quản trị đơn vị thuê bao. Cách mô hình hóa này giúp làm rõ các ràng buộc nghiệp vụ cần được bảo vệ khi nhiều tác nhân và nhiều thiết bị cùng tham gia một phiên phục vụ.
 
-Đóng góp thứ hai là thiết kế kiến trúc microservices với ranh giới nghiệp vụ và quyền sở hữu dữ liệu rõ. Các miền Catalog, Order, Kitchen, Payment, SaaS, User-Access và Authorizer được phân tách theo trách nhiệm, không chia theo tầng kỹ thuật thuần túy. Thiết kế này tạo cơ sở để giải thích các lựa chọn về database-per-service, giao tiếp liên dịch vụ, Kafka event, Redis cache/bản chiếu vận hành, WebSocket cập nhật gần thời gian thực và guard chain ở BFF.
+Đóng góp thứ hai là thiết kế kiến trúc vi dịch vụ với ranh giới nghiệp vụ và quyền sở hữu dữ liệu rõ ràng. Các miền Catalog, Order, Kitchen, Payment, SaaS, User-Access và Authorizer được phân tách theo trách nhiệm, không chia theo tầng kỹ thuật thuần túy. Thiết kế này tạo cơ sở để giải thích các lựa chọn về cơ sở dữ liệu theo dịch vụ, giao tiếp liên dịch vụ, sự kiện Kafka, bộ nhớ đệm/bản chiếu Redis, WebSocket cập nhật gần thời gian thực và chuỗi kiểm soát tại BFF.
 
 Đóng góp thứ ba là triển khai các luồng vận hành chính của QRTable. Các luồng gồm đặt món qua QR, xác nhận đơn và bảo toàn tồn kho, điều phối KDS, thanh toán tiền mặt hoặc VietQR/SePay, khởi tạo đơn vị thuê bao theo SaaS Onboarding Mini-Saga, báo cáo theo gói và phân tích cho quản trị viên nền tảng. Mỗi luồng có mã nguồn, kiểm thử, sơ đồ và ảnh giao diện tương ứng.
 
 Đóng góp thứ tư là áp dụng các cơ chế của hệ thống phân tán vào bối cảnh POS F\&B nhiều đơn vị thuê bao. QRTable sử dụng cô lập dữ liệu để bảo vệ phạm vi nhà hàng; RBAC và quyền theo gói để kiểm soát thao tác; cơ chế xử lý lặp để bảo vệ luồng gửi đơn hoặc webhook; Saga để phối hợp tác dụng phụ liên dịch vụ; WebSocket để gợi ý làm mới mà không thay thế nguồn trạng thái nghiệp vụ.
 
-Đóng góp thứ năm là xây dựng hệ thống tài liệu và đánh giá có khả năng đối chiếu cao. Khóa luận liên kết yêu cầu, thiết kế, triển khai, kiểm thử, sơ đồ, ảnh minh họa và minh chứng triển khai thành một mạch lập luận thống nhất. Nhờ đó, mỗi chức năng có thể được đối chiếu với ranh giới thiết kế, loại minh chứng kiểm chứng và hướng phát triển tương ứng.
+Đóng góp thứ năm là xây dựng hệ thống tài liệu và đánh giá có khả năng đối chiếu cao. Khóa luận liên kết yêu cầu, thiết kế, triển khai, kiểm thử, benchmark k6 đại diện, số liệu quan sát Prometheus/Grafana/Tempo, sơ đồ, ảnh minh họa và minh chứng triển khai thành một mạch lập luận thống nhất. Nhờ đó, mỗi chức năng có thể được đối chiếu với ranh giới thiết kế, loại minh chứng kiểm chứng và hướng phát triển tương ứng.
 
 \section{Cấu trúc khóa luận}
 
@@ -129,10 +129,10 @@ Chương 2 trình bày cơ sở lý thuyết và các công trình, hệ thống
 
 Chương 3 phân tích yêu cầu hệ thống QRTable trong bối cảnh vận hành F\&B. Chương này xác định tác nhân, use case, yêu cầu chức năng, yêu cầu phi chức năng, máy trạng thái chính và phạm vi yêu cầu.
 
-Chương 4 trình bày thiết kế kiến trúc và lựa chọn công nghệ. Chương này tập trung vào ranh giới dịch vụ, quyền sở hữu dữ liệu, kiến trúc Nx monorepo, giao tiếp liên dịch vụ, Kafka, Redis, bảo mật/RBAC/cô lập dữ liệu theo đơn vị thuê bao và tích hợp thanh toán.
+Chương 4 trình bày thiết kế kiến trúc và lựa chọn công nghệ. Chương này tập trung vào ranh giới dịch vụ, quyền sở hữu dữ liệu, kiến trúc Nx monorepo, giao tiếp liên dịch vụ, Kafka, Redis, bảo mật/RBAC/cô lập dữ liệu theo đơn vị thuê bao, tích hợp thanh toán và lớp quan sát hệ thống.
 
-Chương 5 trình bày các luồng vận hành chính của QRTable. Các luồng gồm phiên QR/giỏ/đơn, xác nhận đơn và tồn kho, KDS, thanh toán, SaaS onboarding, bảng điều khiển và báo cáo và đóng gói triển khai trên môi trường công khai.
+Chương 5 trình bày các luồng vận hành chính của QRTable. Các luồng gồm phiên QR/giỏ/đơn, xác nhận đơn và tồn kho, KDS, thanh toán, SaaS onboarding, bảng điều khiển và báo cáo, lớp quan sát vận hành và đóng gói triển khai trên môi trường công khai.
 
-Chương 6 kiểm chứng và đánh giá hệ thống. Chương này sử dụng ma trận đối chiếu, kiểm thử, phân tích kiến trúc, minh chứng demo và minh chứng triển khai trên môi trường công khai để phân loại minh chứng cho từng nhóm kết luận.
+Chương 6 kiểm chứng và đánh giá hệ thống. Chương này sử dụng ma trận đối chiếu, kiểm thử, benchmark k6 đại diện, số liệu Prometheus/Grafana/Tempo, phân tích kiến trúc, minh chứng demo và minh chứng triển khai trên môi trường công khai để phân loại minh chứng cho từng nhóm kết luận.
 
 Chương 7 tổng kết kết quả đạt được, đóng góp của đề tài, các hạn chế còn lại và hướng phát triển. Phần này nối lại mục tiêu ban đầu với kết quả triển khai/đánh giá và xác định các hướng mở rộng phù hợp cho QRTable sau phạm vi khóa luận.

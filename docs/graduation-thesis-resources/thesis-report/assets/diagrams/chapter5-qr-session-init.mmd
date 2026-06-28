@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  participant BFF as BFF<br/>QR validation
+  participant Order as Order<br/>session owner
+  participant Catalog as Catalog<br/>table owner
+  participant ODB as PostgreSQL<br/>Order DB
+
+  BFF->>BFF: Validate QR signature<br/>extract tenantId + tableId
+  BFF->>Order: Join or create session
+  Order->>Catalog: Validate table ownership<br/>via TCP contract
+  Catalog-->>Order: Table belongs to tenant<br/>current status AVAILABLE
+
+  Order->>ODB: Check active session<br/>by tenant + table
+  alt No active session found
+    Order->>ODB: Create ACTIVE session row
+    Order->>Catalog: Update table to OCCUPIED
+    Catalog-->>Order: Table updated
+    Order-->>BFF: New session created
+  else Active session exists
+    Order-->>BFF: Return existing session
+  end
+
+  Note over Order,Catalog: Session creation requires: valid QR, table belongs to tenant, no duplicate active session for that table.

@@ -1,0 +1,35 @@
+@startuml chapter2-websocket-hint-refetch
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequence {
+  ArrowColor #374151
+  LifeLineBorderColor #6b7280
+  LifeLineBackgroundColor white
+  ParticipantBorderColor #374151
+  ParticipantBackgroundColor white
+  DatabaseBorderColor #374151
+  DatabaseBackgroundColor white
+}
+
+participant "Dịch vụ sở hữu trạng thái" as Service
+database "CSDL nguồn trạng thái" as Db
+participant "BFF/WebSocket Gateway" as Gateway
+participant "Ứng dụng người dùng" as Client
+
+Service -> Db: Cập nhật trạng thái nghiệp vụ
+Service -> Gateway: Gửi tín hiệu thay đổi\nkèm tenant/session scope
+Gateway -> Client: WebSocket hint\n\"có thay đổi\"
+Client -> Gateway: REST/HTTP query\nlấy snapshot mới nhất
+Gateway -> Service: Truy vấn trạng thái hiện tại
+Service -> Db: Đọc nguồn trạng thái đáng tin
+Db --> Service: Snapshot mới nhất
+Service --> Gateway: Trả về dữ liệu đầy đủ
+Gateway --> Client: Hiển thị trạng thái mới
+
+note over Gateway,Client
+WebSocket chỉ là kênh thông báo/làm mới.
+Kết quả nghiệp vụ cuối cùng phải đọc từ API
+của dịch vụ sở hữu dữ liệu.
+end note
+@enduml

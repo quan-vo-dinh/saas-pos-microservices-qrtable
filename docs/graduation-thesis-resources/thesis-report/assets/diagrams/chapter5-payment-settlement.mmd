@@ -1,67 +1,32 @@
-%%{init: {"theme": "base", "sequence": {"showSequenceNumbers": true, "actorMargin": 90, "messageMargin": 48}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "actorBkg": "#f0fdf4", "actorBorder": "#16a34a", "noteBkgColor": "#fff7ed", "noteBorderColor": "#ea580c", "lineColor": "#475569"}}}%%
 sequenceDiagram
   autonumber
-  actor Staff as Staff/Customer
-  participant BFF as BFF<br/>Payment API + webhook edge
-  participant Payment as Payment<br/>payment owner
-  participant PDB as PostgreSQL<br/>Payment DB
+  actor Staff as Staff / Customer
+  participant BFF as BFF<br/>Payment edge
+  participant Payment as Payment<br/>owner
   participant Order as Order<br/>bill/session owner
-  participant ODB as PostgreSQL<br/>Order DB
-  participant Sepay as SePay / VietQR
-  participant Outbox as Payment<br/>Outbox relay
+  participant Sepay as SePay / Bank
   participant Kafka as Kafka<br/>payment.completed
 
-  rect rgb(240, 249, 255)
-    Note over Staff,Kafka: Cash branch
-    Staff->>BFF: Confirm cash payment
-    BFF->>Payment: Confirm cash settlement
-    Payment->>Order: Request bill payment snapshot
-    Order->>ODB: Read bill status and payable total
-    Order-->>Payment: PENDING_PAYMENT bill snapshot
-    Payment->>Payment: Validate amount and VND rounding
-    Payment->>PDB: Lock or create payment record
-    Payment->>PDB: Save PAID CASH and audit log
-    Payment->>PDB: Insert outbox payment.completed
-    Payment->>Order: Mark bill paid idempotently
-    Order->>ODB: Lock bill/session, mark bill PAID
-    Order->>ODB: Close session and update table flow
-    Order-->>Payment: Bill marked paid
-    Payment-->>BFF: Payment response
-    BFF-->>Staff: Settlement completed
-    Outbox->>PDB: Poll completed payment event
-    Outbox->>Kafka: Publish payment.completed
-  end
+  Staff->>BFF: Pay by cash or request VietQR
+  BFF->>Payment: Verified payment command
+  Payment->>Order: Read payable bill snapshot
+  Order-->>Payment: Status and rounded total
 
-  rect rgb(240, 253, 244)
-    Note over Staff,Kafka: VietQR / SePay branch
-    Staff->>BFF: Request VietQR for bill
-    BFF->>Payment: Create VietQR payment request
-    Payment->>Order: Request bill payment snapshot
-    Order-->>Payment: PENDING_PAYMENT bill snapshot
-    Payment->>Payment: Generate QRTBL bill reference
-    Payment->>PDB: Create/reuse PENDING payment
-    Payment-->>BFF: qrUrl, bank account, roundedTotal
+  alt Cash
+    Payment->>Payment: Commit PAID cash<br/>audit + outbox
+    Payment->>Order: Mark bill paid
+  else VietQR / SePay
+    Payment-->>BFF: QR payload + QRTBL reference
     BFF-->>Staff: Display VietQR
-    Staff->>Sepay: Bank transfer with billReference
-    Sepay->>BFF: POST /webhooks/sepay/{tenantSlug}
-    BFF->>Payment: Handle SePay webhook
-    Payment->>Payment: Verify tenant webhook secret
-    Payment->>Payment: Match bill reference from payload
-    Payment->>PDB: Lock payment by reference
-    alt Duplicate webhook
-      Payment->>PDB: Audit SEPAY_WEBHOOK_DUPLICATE
-      Payment-->>BFF: success
-    else Underpaid transfer
-      Payment->>PDB: Audit SEPAY_WEBHOOK_UNDERPAID
-      Payment-->>BFF: success without marking paid
-    else Amount is sufficient
-      Payment->>PDB: Save PAID VIETQR + sepayTransactionId
-      Payment->>PDB: Insert outbox payment.completed
-      Payment->>Order: Mark bill paid idempotently
-      Order->>ODB: Mark bill PAID, close session, table CLEANING
-      Payment-->>BFF: success
-      Outbox->>Kafka: Publish payment.completed
-    end
+    Staff->>Sepay: Bank transfer with bill reference
+    Sepay->>BFF: SePay webhook
+    BFF->>Payment: Webhook payload
+    Payment->>Payment: Validate secret, reference and amount
+    Payment->>Order: Mark bill paid if valid
   end
 
-  Note over Payment,Order: Payment owns payment records, Order owns bill/session finalization
+  Payment-->>BFF: Payment result
+  BFF-->>Staff: Show result
+  Payment-->>Kafka: Publish payment.completed after commit
+
+  Note over Payment,Order: Payment owns payment records and audit logs<br/>Order owns bill, session and table finalization

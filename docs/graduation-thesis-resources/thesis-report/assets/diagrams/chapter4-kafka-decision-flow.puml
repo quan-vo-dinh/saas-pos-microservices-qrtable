@@ -1,0 +1,36 @@
+@startuml chapter4-kafka-decision-flow
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #374151
+skinparam activity {
+  BackgroundColor white
+  BorderColor #374151
+  StartColor #111827
+  EndColor #111827
+  DiamondBackgroundColor white
+  DiamondBorderColor #374151
+}
+
+start
+:Xác định nhu cầu giao tiếp\nqua ranh giới thành phần;
+
+if (Cần phản hồi nghiệp vụ ngay?) then (Có)
+  :Dùng TCP/gRPC\ncho lệnh hoặc truy vấn;
+else (Không)
+  if (Là sự kiện miền\ncần phân phối hoặc phục hồi?) then (Có)
+    :Ghi outbox và phát Kafka\nqua topic đã chấp nhận;
+  else (Không)
+    if (Chỉ là thông báo UI\nhoặc gợi ý làm mới?) then (Có)
+      :Dùng WebSocket,\nRedis gợi ý hoặc tải lại;
+    else (Không)
+      if (Là webhook/API\nnhà cung cấp ngoài?) then (Có)
+        :Đi qua bộ chuyển đổi BFF\nvà chuyển cho Payment/SaaS;
+      else (Không)
+        :Thiết kế kênh tích hợp riêng;
+      endif
+    endif
+  endif
+endif
+stop
+@enduml

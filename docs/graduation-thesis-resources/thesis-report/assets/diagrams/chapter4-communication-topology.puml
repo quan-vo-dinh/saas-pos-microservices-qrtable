@@ -1,0 +1,53 @@
+@startuml chapter4-communication-topology
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #374151
+skinparam package {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+
+top to bottom direction
+
+actor "Ứng dụng người dùng" as Client
+component "BFF\nREST, WebSocket,\nkiểm soát truy cập" as Bff
+
+package "Dịch vụ miền nghiệp vụ" as Services {
+  component "Authorizer\nUser-Access" as Auth
+  component "SaaS\nCatalog\nOrder\nKitchen\nPayment" as Domains
+}
+
+package "Hạ tầng hệ thống" as Infra {
+  database "CSDL theo dịch vụ\nPostgreSQL/MongoDB" as Db
+  database "Redis\ncache, phiên, KDS" as Redis
+  queue "Kafka\nsự kiện miền" as Kafka
+}
+
+package "Tích hợp ngoài" as External {
+  component "Keycloak" as Keycloak
+  component "SePay/VietQR" as Sepay
+  component "Cloudinary" as Cloudinary
+}
+
+Client --> Bff : HTTP REST
+Bff ..> Client : WebSocket gợi ý làm mới
+Bff --> Auth : gRPC/TCP
+Bff --> Domains : TCP lệnh/truy vấn
+
+Auth --> Keycloak : OIDC/JWT
+Domains --> Db : dữ liệu sở hữu
+Domains ..> Redis : cache/trạng thái chạy
+Domains --> Kafka : sự kiện miền
+Kafka --> Domains : tiêu thụ sự kiện
+Kafka --> Bff : cầu nối thời gian thực
+
+Sepay --> Bff : webhook
+Domains --> Sepay : API nhà cung cấp
+Domains --> Cloudinary : ảnh món
+@enduml

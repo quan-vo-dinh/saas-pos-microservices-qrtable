@@ -1,0 +1,68 @@
+@startuml chapter4-overall-architecture
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #374151
+skinparam package {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+
+top to bottom direction
+
+package "Lớp ứng dụng người dùng" as ClientLayer {
+  component "PWA khách\nquét QR, gọi món" as CustomerPwa
+  component "Ứng dụng quản trị\nPOS, KDS, báo cáo,\nquản trị nền tảng" as ManagementApp
+}
+
+package "Lớp biên" as EdgeLayer {
+  component "BFF\nREST, WebSocket,\nkiểm soát truy cập" as Bff
+}
+
+package "Lớp dịch vụ miền" as DomainLayer {
+  component "Xác thực và truy cập\nAuthorizer, User-Access" as AuthAccess
+  component "Đơn vị thuê bao và thực đơn\nSaaS, Catalog" as SaasCatalog
+  component "Vận hành đơn và bếp\nOrder, Kitchen" as OrderKitchen
+  component "Thanh toán\nPayment" as Payment
+}
+
+package "Lớp dữ liệu và sự kiện" as InfraLayer {
+  database "PostgreSQL/MongoDB\nlưu trữ theo chủ sở hữu" as Db
+  database "Redis\ncache, phiên, hàng đợi KDS" as Redis
+  queue "Kafka\nsự kiện miền đã chấp nhận" as Kafka
+}
+
+package "Hệ thống ngoài" as ExternalLayer {
+  component "Keycloak" as Keycloak
+  component "SePay/VietQR" as Sepay
+  component "Cloudinary" as Cloudinary
+}
+
+CustomerPwa --> Bff : REST/WebSocket
+ManagementApp --> Bff : REST/WebSocket
+Bff --> AuthAccess : xác thực/quyền
+Bff --> SaasCatalog : lệnh/truy vấn
+Bff --> OrderKitchen : lệnh/truy vấn
+Bff --> Payment : lệnh/truy vấn
+
+AuthAccess --> Db
+SaasCatalog --> Db
+OrderKitchen --> Db
+Payment --> Db
+SaasCatalog ..> Redis
+OrderKitchen ..> Redis
+Payment ..> Redis
+SaasCatalog --> Kafka
+OrderKitchen --> Kafka
+Payment --> Kafka
+
+AuthAccess --> Keycloak
+Payment --> Sepay
+SaasCatalog --> Cloudinary
+Sepay --> Bff : webhook
+@enduml

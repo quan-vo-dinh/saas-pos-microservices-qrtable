@@ -16,11 +16,11 @@ POS (\textit{Point of Sale} — điểm bán hàng) trong bối cảnh nhà hàn
 
 Đặc thù thứ ba là thanh toán có thể diễn ra sau khi nhiều đơn con đã phát sinh. Việc tổng hợp hóa đơn, áp dụng phương thức thanh toán, ghi nhận trạng thái trả tiền và giải phóng bàn phải nhất quán với trạng thái đơn hàng và bàn. Trong bối cảnh Việt Nam, thanh toán QR/chuyển khoản qua VietQR cũng là một ngữ cảnh thực tiễn đáng chú ý; NAPAS mô tả VietQR trong dịch vụ chuyển tiền nhanh 24/7 như một dạng mã QR dùng cho thông tin chuyển tiền ngân hàng \cite{napas-fastfund-vietqr}. Việc hỗ trợ VietQR ở mức sản phẩm mới xác lập kênh thanh toán; ghi nhận giao dịch, đối soát và bảo mật webhook vẫn là các cơ chế cần được thiết kế và đánh giá riêng.
 
-Hình~\ref{fig:chapter2-fnb-pos-lifecycle} minh họa vòng đời vận hành POS F\&B từ bàn, đơn hàng, bếp đến thanh toán, kèm hai nhánh nhân viên và khách qua đặt món bằng QR.
+Hình~\ref{fig:chapter2-fnb-pos-lifecycle} minh họa vòng đời vận hành POS F\&B từ trạng thái bàn trống, gọi món, bếp/bar xử lý, thanh toán đến dọn bàn. Mã QR được xem như một kênh vào của cùng luồng POS thay vì một quy trình tách rời.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{chapter2-fnb-pos-lifecycle.png}
+  \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{chapter2-fnb-pos-lifecycle.pdf}
   \caption{Vòng đời vận hành POS F\&B từ bàn đến thanh toán.}
   \label{fig:chapter2-fnb-pos-lifecycle}
 \end{figure}
@@ -72,12 +72,12 @@ Thách thức thứ hai là chống trùng lặp. Mạng di động có thể ch
 
 Thách thức thứ ba là liên kết cập nhật thời gian thực với nguồn trạng thái đáng tin. Khách và nhân viên đều mong muốn thấy trạng thái đơn hoặc bếp cập nhật nhanh, nhưng kênh thời gian thực không nên trở thành nơi xác định trạng thái nghiệp vụ cuối cùng. Thiết kế an toàn hơn là dùng thông báo thời gian thực để báo ứng dụng phía người dùng tải lại trạng thái mới nhất từ API của dịch vụ sở hữu dữ liệu. Nguyên tắc này sẽ được nối với WebSocket ở mục~\ref{sec:chapter2-realtime}.
 
-Hình~\ref{fig:chapter2-qr-ordering-flow} minh họa luồng khái niệm từ quét QR đến gửi đơn, nhấn mạnh các lớp kiểm soát phiên và chống trùng lặp.
+Hình~\ref{fig:chapter2-qr-ordering-flow} minh họa luồng từ quét QR đến gửi đơn, nhấn mạnh các lớp kiểm soát phiên và chống trùng lặp.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{chapter2-qr-ordering-flow.png}
-  \caption{Luồng đặt món qua mã QR ở mức khái niệm.}
+  \includegraphics[width=\textwidth]{chapter2-qr-ordering-flow.pdf}
+  \caption{Luồng đặt món qua mã QR.}
   \label{fig:chapter2-qr-ordering-flow}
 \end{figure}
 
@@ -93,8 +93,8 @@ Microsoft Azure Architecture Center mô tả khi thiết kế lưu trữ dữ li
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{chapter2-saas-multitenancy.png}
-  \caption{Mô hình khái niệm SaaS nhiều đơn vị thuê bao và ranh giới cô lập.}
+  \includegraphics[width=\textwidth]{chapter2-saas-multitenancy.pdf}
+  \caption{Mô hình SaaS nhiều đơn vị thuê bao và ranh giới cô lập.}
   \label{fig:chapter2-saas-multitenancy}
 \end{figure}
 
@@ -152,7 +152,7 @@ Hình~\ref{fig:chapter2-monolith-vs-microservices} so sánh kiến trúc monolit
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{chapter2-monolith-vs-microservices.png}
+  \includegraphics[width=\textwidth]{chapter2-monolith-vs-microservices.pdf}
   \caption{So sánh monolith và microservices theo ngữ cảnh giới hạn nghiệp vụ.}
   \label{fig:chapter2-monolith-vs-microservices}
 \end{figure}
@@ -190,7 +190,7 @@ Hình~\ref{fig:chapter2-kafka-event-flow} minh họa luồng hướng sự kiệ
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{chapter2-kafka-event-flow.png}
+  \includegraphics[width=\textwidth]{chapter2-kafka-event-flow.pdf}
   \caption{Luồng hướng sự kiện với topic, phân vùng và nhóm consumer.}
   \label{fig:chapter2-kafka-event-flow}
 \end{figure}
@@ -256,8 +256,8 @@ Hình~\ref{fig:chapter2-outbox-saga-overview} tóm tắt outbox giao dịch và 
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{chapter2-outbox-saga-overview.png}
-  \caption{Outbox giao dịch và saga phối hợp phân tán ở mức khái niệm.}
+  \includegraphics[width=\textwidth]{chapter2-outbox-saga-overview.pdf}
+  \caption{Outbox giao dịch và saga phối hợp phân tán.}
   \label{fig:chapter2-outbox-saga-overview}
 \end{figure}
 
@@ -270,7 +270,7 @@ Hình~\ref{fig:chapter2-websocket-hint-refetch} minh họa mô hình WebSocket n
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{chapter2-websocket-hint-refetch.png}
+  \includegraphics[width=\textwidth]{chapter2-websocket-hint-refetch.pdf}
   \caption{WebSocket gợi ý làm mới và nguồn trạng thái đáng tin.}
   \label{fig:chapter2-websocket-hint-refetch}
 \end{figure}
@@ -293,8 +293,8 @@ Hình~\ref{fig:chapter2-oidc-rbac-saas-pos} phân tách luồng xác thực nhâ
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{chapter2-oidc-rbac-saas-pos.png}
-  \caption{Phân tách xác thực nhân viên (OIDC/JWT/RBAC) và khách theo phiên QR.}
+  \includegraphics[width=\textwidth,height=0.78\textheight,keepaspectratio]{chapter2-oidc-rbac-saas-pos.pdf}
+  \caption[Phân tách xác thực nhân sự và phiên QR]{Phân tách xác thực nhân viên (OIDC/JWT/RBAC) và khách theo phiên QR.}
   \label{fig:chapter2-oidc-rbac-saas-pos}
 \end{figure}
 
@@ -389,7 +389,9 @@ Bảng~\ref{tab:chapter2-theory-to-qrtable} tổng hợp mối liên hệ giữa
   WebSocket / thời gian thực & Giao diện nhận gợi ý nhanh nhưng trạng thái backend vẫn là nguồn đáng tin. & Ứng dụng tải lại trạng thái từ API sau tín hiệu thời gian thực. & Chương 4, 5, 6 \\
   \addlinespace
   JWT, OIDC, RBAC, bảo mật & Nhân viên/quản trị dùng nhà cung cấp danh tính và quyền; khách dùng quyền theo phiên QR. & Các cơ chế bảo mật được đánh giá theo từng lớp kiểm soát. & Chương 3, 4, 6 \\
+  \addlinespace
+  Hiệu năng và khả năng quan sát & Hệ thống phân tán cần số liệu độ trễ, thông lượng, lỗi và trace để đánh giá có kiểm soát. & k6 được dùng cho tải đại diện; Prometheus/Grafana hỗ trợ metric/dashboard; Tempo/OpenTelemetry hỗ trợ trace; Loki chỉ có giá trị khi log ứng dụng đủ dữ liệu đối chiếu. & Chương 3, 6 \\
 \end{longtable}
 }
 
-Tóm lại, Chương 2 đặt nền cho cách QRTable được phân tích và thiết kế như một hệ thống kỹ thuật phần mềm hoàn chỉnh. POS F\&B và đặt món qua QR xác định bài toán nghiệp vụ; SaaS và mô hình nhiều đơn vị thuê bao xác định yêu cầu cô lập dữ liệu; microservices và kiến trúc hướng sự kiện cung cấp khung phân tách miền và giao tiếp; nhất quán dữ liệu, xử lý lặp an toàn, saga và outbox giải thích rủi ro khi trạng thái trải qua nhiều dịch vụ; WebSocket giải thích cơ chế thời gian thực nhưng cũng đặt nguyên tắc về nguồn trạng thái đáng tin; xác thực, phân quyền và bảo mật xác định cách bảo vệ nhân viên, khách, đơn vị thuê bao và webhook. Các chương sau sẽ dùng nền này để trình bày yêu cầu, kiến trúc, triển khai và đánh giá QRTable theo phạm vi minh chứng thực tế.
+Tóm lại, Chương 2 đặt nền cho cách QRTable được phân tích và thiết kế như một hệ thống kỹ thuật phần mềm hoàn chỉnh. POS F\&B và đặt món qua QR xác định bài toán nghiệp vụ; SaaS và mô hình nhiều đơn vị thuê bao xác định yêu cầu cô lập dữ liệu; microservices và kiến trúc hướng sự kiện cung cấp khung phân tách miền và giao tiếp; nhất quán dữ liệu, xử lý lặp an toàn, saga và outbox giải thích rủi ro khi trạng thái trải qua nhiều dịch vụ; WebSocket giải thích cơ chế thời gian thực nhưng cũng đặt nguyên tắc về nguồn trạng thái đáng tin; xác thực, phân quyền và bảo mật xác định cách bảo vệ nhân viên, khách, đơn vị thuê bao và webhook; k6 cùng Prometheus, Grafana, Tempo/OpenTelemetry và Loki cung cấp cơ sở công nghệ để đọc kết quả benchmark và khả năng quan sát trong phạm vi đo cụ thể. Các chương sau sẽ dùng nền này để trình bày yêu cầu, kiến trúc, triển khai và đánh giá QRTable theo phạm vi minh chứng thực tế.

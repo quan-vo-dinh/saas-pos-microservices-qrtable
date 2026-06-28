@@ -1,0 +1,37 @@
+sequenceDiagram
+  autonumber
+  actor Bank as Bank / SePay
+  participant BFF as BFF<br/>webhook edge
+  participant Payment as Payment<br/>webhook service
+  participant PDB as PostgreSQL<br/>Payment DB
+  participant Order as Order<br/>bill owner
+  participant Kafka as Kafka<br/>payment.completed
+
+  Bank->>BFF: POST tenant SePay webhook
+  BFF->>Payment: tenantSlug, secret, payload
+  Payment->>Payment: Verify tenant secret<br/>and extract QRTBL reference
+
+  alt Invalid secret or tenant mismatch
+    Payment-->>BFF: Reject before mutation
+    BFF-->>Bank: Error response
+  else No payable QRTBL transfer
+    Payment-->>BFF: success without mutation
+    BFF-->>Bank: success
+  else Matched pending payment
+    Payment->>PDB: Lock payment by reference
+
+    alt Duplicate, after-paid, or underpaid
+      Payment->>PDB: Save audit only
+      Payment-->>BFF: success
+    else Amount is sufficient
+      Payment->>PDB: Save PAID VietQR<br/>metadata + outbox
+      PDB-->>Payment: Commit Payment transaction
+      Payment->>Order: BILL_MARK_PAID
+      Payment-->>Kafka: Publish payment.completed
+    end
+
+    Payment-->>BFF: success
+    BFF-->>Bank: success
+  end
+
+  Note over Payment,PDB: Duplicate, after-paid, and underpaid webhooks are audited<br/>but they do not complete the bill again

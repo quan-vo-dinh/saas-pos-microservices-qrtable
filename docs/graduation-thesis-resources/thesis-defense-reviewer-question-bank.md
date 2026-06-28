@@ -61,6 +61,27 @@ Có ba lớp đóng góp. Thứ nhất là mô hình hóa bài toán SaaS POS c�
 **Trả lời:**  
 Kiến trúc nguyên khối có chia module (modular monolith) là phương án hợp lý nếu mục tiêu chỉ là làm sản phẩm nhỏ nhanh hơn. Nhưng đề tài của em muốn nghiên cứu cách tổ chức một nền tảng SaaS POS theo vi dịch vụ (microservices), nên QRTable tách các miền như Catalog, Order, Kitchen, Payment, SaaS và User-Access. Đổi lại, hệ thống phải xử lý chi phí phân tán: lỗi mạng, gọi lặp an toàn nhờ tính lũy đẳng (idempotency), bảng sự kiện chờ phát (outbox), Saga và kiểm thử tích hợp.
 
+### Q6.1. Tại sao các service lại sử dụng các cơ sở dữ liệu khác nhau (SQL, NoSQL, Redis)? Giải thích lý do chọn cơ sở dữ liệu?
+
+**Trả lời:**  
+Trong kiến trúc vi dịch vụ, mô hình "mỗi dịch vụ một cơ sở dữ liệu" (Database-per-service) cho phép lựa chọn công nghệ lưu trữ tối ưu nhất cho đặc thù dữ liệu của từng miền nghiệp vụ (Polyglot Persistence). QRTable lựa chọn 3 nhóm cơ sở dữ liệu chính:
+
+1. **SQL (PostgreSQL) cho Catalog, Order, Payment, SaaS**:
+   - _Về nghiệp vụ_: Đây là các miền quản lý thực đơn, tồn kho, đơn hàng, hóa đơn và giao dịch tiền tệ của nhà hàng. Mọi sai lệch dữ liệu đều trực tiếp ảnh hưởng đến doanh thu và tính pháp lý.
+   - _Về kiến trúc_: Đòi hỏi tính toàn vẹn dữ liệu cực cao, quan hệ chặt chẽ và giao dịch ACID. Ví dụ: Catalog cần **khóa bi quan (pessimistic locking)** để bảo vệ số lượng tồn kho (stock) khi trừ kho đồng thời; Order và Payment cần transaction cục bộ để ghi nhận trạng thái đơn và đồng bộ hóa với bảng sự kiện chờ phát (transactional outbox) nhằm tránh lỗi ghi kép (dual-write).
+
+2. **NoSQL (MongoDB) cho User-Access**:
+   - _Về nghiệp vụ_: Quản lý tài khoản nhân viên, vai trò (role), phân quyền (RBAC) và thông tin hồ sơ của các tenant.
+   - _Về kiến trúc_:
+     - **Cấu trúc linh hoạt (Schema-less)**: Thông tin hồ sơ nhân viên, tuỳ chọn cấu hình, hoặc siêu dữ liệu (metadata) của các nhà hàng rất đa dạng và thường xuyên thay đổi mà không cần thực hiện migrate database phức tạp.
+     - **Tối ưu đọc (Read-heavy)**: Luồng xác thực người dùng diễn ra liên tục trên mọi request, cấu trúc document của MongoDB giúp truy vấn thông tin user kèm quyền hạn cực nhanh.
+     - **Nhật ký hoạt động (Audit Logs)**: Lịch sử thao tác của nhân viên là dạng dữ liệu chỉ ghi thêm (append-only), cấu trúc tự do, lưu trữ trong MongoDB rất hiệu quả.
+
+3. **Redis làm database chính cho Kitchen (KDS) và Caching**:
+   - _Về nghiệp vụ_: Màn hình bếp (KDS) cần tốc độ xử lý siêu nhanh để hiển thị món ăn, tính thời gian SLA chế biến và cập nhật realtime cho đầu bếp. KDS không cần lưu trữ lịch sử bếp dài hạn (vì lịch sử đơn hàng đã được Order service lưu trữ bền vững trong PostgreSQL).
+   - _Về kiến trúc_: Kitchen dùng Redis làm **bản sao trạng thái vận hành (runtime projection)**. Cấu trúc **Sorted Set** của Redis giúp quản lý hàng đợi chế biến (FIFO) theo độ ưu tiên cực kỳ hiệu quả với độ phức tạp $O(\log N)$. Redis **Hash** giúp Kitchen kiểm tra trùng lặp (deduplication) để loại bỏ các sự kiện `order.confirmed` gửi lặp từ Kafka.
+   - Bên cạnh đó, Redis đóng vai trò làm bộ nhớ đệm (Cache) cho Menu của Catalog, Session khách hàng quét QR, và Rate Limiter ở BFF để tăng tốc độ phản hồi tổng thể của hệ thống.
+
 ### Q7. Nếu vi dịch vụ phức tạp hơn, lợi ích thực tế là gì?
 
 **Trả lời:**  
@@ -93,10 +114,29 @@ Vì trong QRTable có nhiều kiểu giao tiếp khác nhau. Những thao tác c
 **Trả lời:**  
 Kafka phù hợp cho sự kiện bất đồng bộ (asynchronous event), nhưng không phù hợp cho mọi câu hỏi cần câu trả lời ngay. Ví dụ nhân viên bấm xác nhận đơn thì POS phải biết ngay món còn hay hết để phản hồi. Nếu tất cả đi qua Kafka, phản hồi cho nhân viên sẽ bị vòng vèo và khó kiểm soát lỗi. Vì vậy QRTable dùng Kafka sau khi quyết định nghiệp vụ đã được lưu, ví dụ Order đã chuyển đơn sang chế biến rồi mới phát `order.confirmed` cho Kitchen.
 
-### Q13. Khi nào dùng Kafka?
+### Q13. Kafka được áp dụng trong các nghiệp vụ cụ thể nào của QRTable và tại sao hệ thống lại cần Kafka trong các nghiệp vụ đó?
 
 **Trả lời:**  
-QRTable dùng Kafka khi một service đã hoàn tất quyết định nghiệp vụ và service khác chỉ cần phản ứng sau đó. Ví dụ Order đã xác nhận đơn, lưu trạng thái `PROCESSING` và tạo sự kiện `order.confirmed`; Kitchen đọc sự kiện này để tạo ticket trên KDS. Như vậy Kitchen không tham gia quyết định đơn có hợp lệ hay không, mà chỉ nhận kết quả sau commit.
+Trong QRTable, Apache Kafka được sử dụng làm **trục xương sống cho các sự kiện bất đồng bộ** phát sinh sau khi một giao dịch nghiệp vụ lõi đã được commit thành công xuống database:
+
+- **Nghiệp vụ xác nhận đơn hàng (`order.confirmed`):** Khi nhân viên POS xác nhận đơn hàng và `Order Service` commit trạng thái đơn thành công, sự kiện `order.confirmed` được phát lên Kafka. `Kitchen Service` tiêu thụ sự kiện này để tự động phân phối món ăn về các khu vực bếp và dựng màn hình bếp KDS.
+- **Nghiệp vụ hoàn tất thanh toán (`payment.completed`):** Khi hệ thống nhận được webhook chuyển tiền thành công, `Payment Service` phát sự kiện `payment.completed` lên Kafka. `Order Service` tiêu thụ sự kiện này để tự động cập nhật trạng thái hóa đơn sang `PAID` và giải phóng phiên bàn của khách hàng.
+- **Nghiệp vụ cảnh báo SLA bếp (`kitchen.sla_warning`):** Khi một món ăn trong hàng đợi KDS của `Kitchen Service` bị chế biến quá hạn so với thời gian cam kết, sự kiện cảnh báo được phát lên Kafka để hệ thống giám sát ghi nhận và đẩy thông báo về màn hình quản trị của POS.
+
+Chúng em cần Kafka trong các nghiệp vụ này để đảm bảo:
+
+1. **Nhất quán cuối cùng (Eventual Consistency):** Vì mỗi service quản lý database riêng nên không thể dùng giao dịch ACID cục bộ chéo service. Kafka giúp đồng bộ trạng thái giữa các DB một cách an toàn.
+2. **Cơ chế cô lập lỗi (Fault Tolerance):** Nếu dịch vụ bếp hoặc thanh toán bị sập, Kafka sẽ giữ lại toàn bộ sự kiện. Khi các dịch vụ này hoạt động trở lại, consumer sẽ tự động kéo tiếp các sự kiện chưa xử lý để chạy tiếp mà không làm mất mát dữ liệu của khách hàng.
+3. **Decoupling (Giải phóng hiệu năng luồng chính):** Luồng chính xác nhận đơn cần phản hồi ngay lập tức cho nhân viên. Việc bếp nhận đơn là hành động ăn theo bất đồng bộ, đưa vào Kafka giúp giảm độ trễ phản hồi tối đa cho POS.
+
+### Q13.1. Tại sao em lại lựa chọn Kafka làm Message Broker chính cho các sự kiện miền thay vì RabbitMQ hay Redis Pub/Sub?
+
+**Trả lời:**  
+Chúng em lựa chọn Apache Kafka thay vì các giải pháp Message Broker khác vì 3 lý do kỹ thuật quan trọng sau:
+
+1. **Khả năng lưu trữ bền vững (Append-Only Log Persistence):** Khác với Redis Pub/Sub (tin nhắn biến mất lập tức nếu không có người nghe online) hay RabbitMQ (xóa tin nhắn khỏi queue ngay khi consume thành công), Kafka ghi các sự kiện xuống đĩa cứng vật lý và lưu trữ theo thời gian cấu hình (Retention Time). Điều này giúp hệ thống có khả năng chạy lại các sự kiện cũ (**Event Replay**) để phục hồi trạng thái dữ liệu khi có sự cố nghiêm trọng xảy ra.
+2. **Cơ chế kéo dữ liệu (Pull-based Model) hỗ trợ Backpressure:** RabbitMQ hoạt động theo cơ chế Push (đẩy tin nhắn dồn dập về phía nhận). Trong giờ cao điểm của nhà hàng, tốc độ đơn hàng dồn dập có thể làm sập RAM của Kitchen Service. Với Kafka, Kitchen Service sẽ chủ động kéo dữ liệu (Pull), tự điều tiết tốc độ tiêu thụ tin nhắn tùy theo năng lực xử lý thực tế của bếp để tránh tình trạng quá tải hệ thống.
+3. **Mở rộng quy mô linh hoạt (Scalability qua Consumer Groups & Partitions):** Kafka chia topic thành các partition độc lập. Khi quy mô của chuỗi nhà hàng tăng lên (SaaS scaling), chúng em chỉ cần tăng số partition của topic Kafka và chạy song song nhiều instance của Kitchen Service chung một Consumer Group. Kafka sẽ tự động phân chia các partition để xử lý song song mà không lo sợ trùng lặp đơn bếp.
 
 ### Q14. WebSocket có phải nguồn sự thật không?
 
@@ -201,15 +241,74 @@ Client có thể kết nối lại và tải lại ảnh chụp trạng thái hi
 **Trả lời:**  
 Không. Khách hàng vào bằng mã QR và phiên bàn vì bối cảnh nhà hàng cần thao tác nhanh, không bắt khách tạo tài khoản. Nhân viên, chủ quán, quản lý và super admin mới dùng Keycloak với JWT/OIDC. Khách bị giới hạn bởi tenant, bàn và phiên gọi món, chứ không có vai trò RBAC trong Keycloak.
 
+### Q32.1. OIDC và Keycloak được sử dụng như thế nào trong hệ thống? Lý do, ý nghĩa và lợi ích của việc sử dụng nó là gì?
+
+**Trả lời:**  
+Trong QRTable, chúng em áp dụng giải pháp định danh tập trung (Single Sign-On - SSO) sử dụng giao thức **OIDC (OpenID Connect)** thông qua **Keycloak** cho tất cả các tác nhân nội bộ (Staff, Owner, Super Admin).
+
+- **Cách sử dụng trong hệ thống:**
+  1. Khi nhân viên/chủ quán đăng nhập, Keycloak xác thực thông tin và cấp mã thông báo JSON Web Token (JWT).
+  2. Chúng em nhúng thông tin `tenant_id` của nhân viên trực tiếp vào JWT thông qua Keycloak Protocol Mappers.
+  3. BFF chuyển tiếp token này đến dịch vụ `Authorizer` (giao tiếp qua gRPC) để xác minh chữ ký (verify signature) bằng cách lấy khóa công khai từ endpoint JWKS của Keycloak. Kết quả xác thực được cache lại trong **Redis** (TTL 30 phút) để tăng hiệu năng.
+  4. Sau khi token được xác nhận hợp lệ, các Guard tại BFF (`TenantGuard`, `PermissionGuard`) sẽ thực thi kiểm tra quyền hạn trước khi chuyển tiếp yêu cầu vào các domain service.
+
+- **Lý do, Ý nghĩa và Lợi ích:**
+  1. **Bảo mật chuẩn doanh nghiệp (Enterprise Security):** Thay vì tự lập trình hệ thống đăng ký, lưu trữ mật khẩu (dễ có nguy cơ rò rỉ và có lỗ hổng), chúng em sử dụng Keycloak là một giải pháp IAM (Identity & Access Management) chuẩn hóa hàng đầu. Điều này giúp giải quyết trọn vẹn việc quản lý vòng đời tài khoản, hash mật khẩu an toàn, quản lý phiên đăng nhập và khả năng mở rộng (như tích hợp Social Login sau này).
+  2. **Decoupling (Giảm liên kết dịch vụ):** Giao thức OIDC sử dụng cơ chế ký số (asymmetric cryptography). Nhờ đó, dịch vụ `Authorizer` chỉ cần tải public key một lần là có thể tự xác thực mọi token JWT được gửi lên mà không cần gửi request liên tục đến Keycloak trên mỗi API call.
+  3. **Tối ưu hóa cô lập tenant:** Việc lưu `tenant_id` trong JWT custom claims giúp hệ thống ngay lập tức nhận diện được ngữ cảnh tenant của người dùng một cách bảo mật mà không cần truy vấn ngược database của `User-Access` service.
+  4. **Tách biệt ranh giới**: Tách biệt rõ ràng lớp Định danh (Identity - do Keycloak quản lý) và lớp Hồ sơ ứng dụng (Application Profile - do `User-Access` và MongoDB quản lý). Giúp hệ thống linh hoạt khi cần thay đổi nhà cung cấp định danh khác (như Okta, Auth0) mà không làm ảnh hưởng đến business logic của POS.
+
 ### Q33. Phân quyền vai trò khác cô lập tenant thế nào?
 
 **Trả lời:**  
 Phân quyền theo vai trò (RBAC) trả lời câu hỏi "người này có được làm hành động này không". Cô lập theo đơn vị thuê bao (tenant isolation) trả lời câu hỏi "dữ liệu này thuộc nhà hàng nào". Một nhân viên có quyền xem đơn hàng vẫn không được xem đơn của nhà hàng khác.
 
+### Q33.1. Có những phương pháp thiết kế mô hình dữ liệu đa thuê bao (Multi-tenancy) nào trong SaaS, và tại sao em lại lựa chọn mô hình hiện tại cho QRTable?
+
+**Trả lời:**  
+Trong thiết kế hệ thống phần mềm dịch vụ (SaaS), có 3 phương pháp cô lập dữ liệu đa thuê bao (multi-tenancy isolation models) kinh điển ở tầng cơ sở dữ liệu:
+
+1.  **Mô hình Cô lập vật lý hoàn toàn (Silo Model - Database-per-tenant):** Mỗi tenant sở hữu một database instance riêng biệt.
+    - _Ưu điểm:_ Bảo mật vật lý tuyệt đối, dễ backup/restore riêng lẻ, không lo ngại vấn đề "hàng xóm ồn ào" (noisy neighbor) ở tầng DB.
+    - _Nhược điểm:_ Chi phí hạ tầng rất cao, lãng phí tài nguyên và vận hành cực kỳ phức tạp khi số lượng tenant lên tới hàng ngàn.
+2.  **Mô hình Cô lập logic (Bridge Model - Schema-per-tenant):** Các tenant dùng chung một database engine nhưng mỗi tenant có một database schema riêng (ví dụ: PostgreSQL Schema riêng).
+    - _Ưu điểm:_ Cân bằng tốt giữa chi phí và độ cô lập dữ liệu.
+    - _Nhược điểm:_ Vẫn gặp giới hạn về số lượng schema của hệ quản trị cơ sở dữ liệu và khó khăn khi thực hiện di trú dữ liệu (migration).
+3.  **Mô hình Chia sẻ tài nguyên (Pool Model - Shared Database, Shared Schema):** Tất cả các tenant dùng chung database, chung schema và chung bảng. Dữ liệu được phân tách bằng một cột định danh (như `tenant_id`).
+    - _Ưu điểm:_ Tối ưu hóa chi phí hạ tầng tối đa, tận dụng hiệu quả tài nguyên phần cứng, dễ dàng di trú dữ liệu tập trung.
+    - _Nhược điểm:_ Rủi ro rò rỉ dữ liệu cao nhất nếu lập trình thiếu bộ lọc `tenant_id` trong câu lệnh SQL.
+
+**Tại sao QRTable chọn mô hình Pool (Shared Database, Shared Schema + Discriminator Column):**
+
+- **Đặc thù nghiệp vụ F&B (SMBs):** POS F&B phục vụ số lượng lớn các quán ăn nhỏ và vừa với doanh thu và chi phí thuê bao thấp. Việc dùng mô hình Pool giúp giảm tối thiểu chi phí vận hành Cloud của nền tảng để tối ưu hóa bài toán kinh tế.
+- **Độ phức tạp vận hành của Microservices:** Hệ thống đã được chia nhỏ thành các database theo service (Catalog DB, Order DB, Payment DB, SaaS DB). Nếu áp dụng thêm mô hình Database-per-tenant, số lượng database cần quản trị sẽ tăng theo cấp số nhân (ví dụ: 1.000 tenant $\times$ 5 services = 5.000 databases!), gây bất khả thi cho việc bảo trì và chạy migrations. Mô hình Pool giúp chúng em kiểm soát việc di trú dữ liệu tập trung trên đúng 5 database của 5 service.
+- **Giải quyết rủi ro rò rỉ bằng Framework/Middleware:** Chúng em khắc phục nhược điểm lớn nhất của mô hình Pool bằng cách tự động hóa kiểm soát ở mức kiến trúc:
+  - **BFF TenantGuard:** Ép buộc gán `tenant_id` từ JWT được ký số bảo mật của Keycloak vào RequestContext.
+  - **TypeORM Subscriber & Global Filter:** Lập trình viên không phải viết thủ công điều kiện `WHERE tenant_id = ...` trên từng câu query. Framework tự động append điều kiện lọc tenant khi truy vấn và tự động inject `tenant_id` khi ghi dữ liệu. Điều này loại bỏ hoàn toàn lỗi quên lọc do con người.
+
+Nếu sau này có các khách hàng lớn (Enterprise) yêu cầu cô lập vật lý cao, hệ thống của chúng em vẫn có thể mở rộng bằng cách cấu hình định tuyến kết nối động ở SaaS Service để tách riêng database cho tenant đó.
+
 ### Q34. Quyền theo gói dịch vụ khác phân quyền vai trò thế nào?
 
 **Trả lời:**  
 Quyền theo gói dịch vụ (entitlement) là quyền của nhà hàng/tenant theo gói đăng ký, ví dụ có được dùng báo cáo nâng cao hay không. RBAC là quyền của từng người dùng trong tenant đó. Vì vậy một owner có quyền xem báo cáo nhưng tenant không mua tính năng tương ứng thì vẫn bị chặn ở PlanFeatureGuard.
+
+### Q34.1. Em phân quyền theo gói (Plan Entitlement / Subscription Gating) như thế nào? Cơ chế logic ra sao?
+
+**Trả lời:**  
+Trong QRTable, cơ chế phân quyền theo gói được thiết kế tập trung tại lớp **BFF (API Gateway)** thông qua chuỗi Guard và giao tiếp nội bộ qua **TCP** tới **SaaS Service**.
+
+- **Cách áp dụng trên code/hợp đồng API:**
+  Chúng em sử dụng decorator tự chế `@RequiresPlanFeature(PlanFeatureCode.ANALYTICS_BASIC)` tại các endpoint nhạy cảm (ví dụ: các API thống kê báo cáo doanh thu).
+
+- **Cơ chế logic hoạt động (Step-by-Step Request Flow):**
+  1. **Bước 1 (Nạp ngữ cảnh gói đăng ký):** Khi request đi qua BFF, `TenantSubscriptionContextGuard` sẽ chặn lại. Lấy `tenant_id` đã được xác minh trước đó, guard gọi `TenantSubscriptionResolver`.
+  2. **Bước 2 (Truy vấn SaaS Service qua TCP):** Resolver gửi một TCP message `SUBSCRIPTION.GET_CURRENT` tới **SaaS Service** (nơi lưu trữ trạng thái đăng ký thuê bao thực tế). SaaS Service trả về thông tin gói hiện tại của tenant bao gồm: Trạng thái gói (status), Mã gói (planCode) và mảng danh sách tính năng được phép dùng (features - ví dụ: `['analytics_basic', 'staff_limit_10']`).
+  3. **Bước 3 (Đính kèm ngữ cảnh):** Thông tin này được đính kèm trực tiếp vào đối tượng request dưới dạng `request.subscription`.
+  4. **Bước 4 (Kiểm tra điều kiện ở PlanFeatureGuard):** Tiếp theo, `PlanFeatureGuard` dùng NestJS Reflector để lấy mã tính năng yêu cầu từ handler metadata (ví dụ: `analytics_basic`). Guard tiến hành kiểm tra:
+     - Trạng thái thuê bao của tenant có phải là **`ACTIVE`** không?
+     - Danh sách `subscription.features` có chứa tính năng yêu cầu không?
+  5. **Bước 5 (Từ chối hoặc Cho qua):** Nếu không thỏa mãn, guard ném ra ngoại lệ `SAAS_PLAN_FEATURE_REQUIRED` (HTTP 403 Forbidden) đi kèm chi tiết lỗi và đường dẫn chuyển hướng để người dùng nâng cấp gói (`/dashboard/subscription`). Nếu thỏa mãn, request được cho phép đi tiếp vào controller.
 
 ### Q35. Super Admin có phá tenant isolation không?
 

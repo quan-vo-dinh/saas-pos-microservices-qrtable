@@ -1,0 +1,28 @@
+sequenceDiagram
+  autonumber
+  participant Order as Order
+  participant ODB as PostgreSQL<br/>Order DB
+  participant Catalog as Catalog
+  participant CDB as PostgreSQL<br/>Catalog DB
+
+  Order->>Catalog: Deduct stock
+  Catalog->>CDB: Commit RESERVED version 1
+  Catalog-->>Order: APPLIED + reservationVersion
+  Order->>ODB: Save PROCESSING + outbox
+
+  break Order persistence or outbox write fails
+    ODB--xOrder: Roll back Order transaction
+    Order->>Catalog: Release stock<br/>reservationVersion 1
+    Catalog->>CDB: Lock reservation and stock rows
+    alt Matching RESERVED version
+      Catalog->>CDB: Restore stock and mark RELEASED
+      Catalog-->>Order: APPLIED
+    else Same version already RELEASED
+      Catalog-->>Order: REPLAYED<br/>no second restoration
+    else Older release arrives late
+      Catalog-->>Order: STALE<br/>newer reservation remains
+    end
+    Order-->>Order: Preserve original failure
+  end
+
+  Note over Order,Catalog: Compensation is tied to the version returned by Catalog.<br/>A delayed release cannot undo a newer reservation.

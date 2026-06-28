@@ -1,0 +1,27 @@
+sequenceDiagram
+  autonumber
+  actor Staff as Staff / Customer
+  participant Payment as Payment<br/>settlement service
+  participant Order as Order<br/>bill owner
+  participant PDB as PostgreSQL<br/>Payment DB
+
+  Staff->>Payment: Create VietQR or confirm cash
+  Payment->>Order: BILL_GET_PAYMENT_SNAPSHOT
+
+  alt Bill is payable
+    Order-->>Payment: Status + VND rounding snapshot
+    Payment->>Payment: Validate VND rounding snapshot
+
+    alt VietQR request
+      Payment->>PDB: Create or reuse PENDING intent
+      Payment-->>Staff: QR URL + rounded amount
+    else Cash confirmation
+      Payment->>PDB: Lock or create payment row
+      Payment-->>Staff: Ready for cash commit
+    end
+  else Bill is invalid
+    Order-->>Payment: Not payable or invalid snapshot
+    Payment-->>Staff: Reject before Payment DB mutation
+  end
+
+  Note over Payment,PDB: Payment mutates its DB only after Order confirms the payable bill snapshot

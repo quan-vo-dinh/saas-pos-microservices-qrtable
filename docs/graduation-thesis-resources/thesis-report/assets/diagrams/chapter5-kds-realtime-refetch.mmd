@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  participant Kitchen as Kitchen
+  participant Redis as Redis<br/>Pub/Sub
+  participant Sub as BFF<br/>KDS subscriber
+  participant WS as BFF<br/>WebSocket gateway
+  participant UI as KDS client
+  participant API as BFF<br/>HTTP API
+  participant KDS as Kitchen<br/>TCP API
+
+  Kitchen->>Redis: Publish realtime:kds:{tenantId}<br/>kds.queue_changed
+  Redis-->>Sub: Pattern subscription realtime:kds:*
+  Sub->>Sub: Parse payload and validate eventType
+  Sub->>WS: emitKdsQueueChanged(event)
+  WS-->>UI: events.kdsQueueChanged<br/>station room + management room
+  UI->>API: GET /admin/kds/queue?station=...
+  API->>API: Verify JWT, tenant, permission,<br/>station access
+  API->>KDS: TCP GET_QUEUE
+  KDS-->>API: Queue snapshot + revision
+  API-->>UI: Authoritative queue state
+
+  Note over UI,KDS: The WebSocket payload is not the source of truth.<br/>It tells the client which station changed so the client can refetch.

@@ -236,9 +236,9 @@ Mục tiêu duy nhất của session này là tạo/render/chèn Hình 3.1 actor
 
 Output mong muốn:
 
-- Source Mermaid trong `thesis-report/assets/diagrams/`:
-  - `chapter3-actor-use-case-overview.mmd`
-  - `chapter3-business-flow.mmd`
+- Source PlantUML trong `thesis-report/assets/diagrams/`:
+  - `chapter3-actor-use-case-overview.puml`
+  - `chapter3-business-flow.puml`
 - File render PDF/PNG tương ứng trong `thesis-report/assets/figures/`.
 - Hình 3.1 và Hình 3.2 được chèn vào Chương 3 bằng `\includegraphics`, có caption/source/label.
 - Prose dẫn nhập tối thiểu quanh hai hình, đủ để nối với phần yêu cầu hiện có.

@@ -1,0 +1,28 @@
+sequenceDiagram
+  autonumber
+  participant SaaS as SaaS<br/>onboarding saga
+  participant SDB as PostgreSQL<br/>SaaS DB
+  participant Authz as Authorizer
+  participant BFF as BFF
+  actor Admin as Super Admin
+
+  SaaS->>SDB: Create tenant
+  SaaS->>Authz: Create owner identity
+  Authz-->>SaaS: ownerUserId
+
+  alt Failure before subscription
+    SaaS->>Authz: Disable owner identity
+    SaaS->>SDB: Delete partial tenant
+    SaaS-->>BFF: TENANT_ONBOARDING_FAILED
+    BFF-->>Admin: Show failure
+  else Failure after subscription
+    SaaS->>SDB: Assign initial subscription
+    SaaS--xSaaS: Downstream setup fails
+    SaaS->>Authz: Disable owner identity
+    SaaS->>SDB: Delete initial onboarding subscription
+    SaaS->>SDB: Delete partial tenant
+    SaaS-->>BFF: TENANT_ONBOARDING_FAILED
+    BFF-->>Admin: Show failure
+  end
+
+  Note over SaaS,SDB: Compensation is best-effort and scoped to side effects already reached

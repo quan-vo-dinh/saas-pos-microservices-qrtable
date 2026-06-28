@@ -1,0 +1,43 @@
+@startuml chapter4-sepay-payment-architecture
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #374151
+skinparam package {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+
+left to right direction
+
+actor "Khách/POS" as Customer
+actor "Chủ quán" as Owner
+component "BFF\nxác thực và định tuyến webhook" as Bff
+component "SePay/VietQR\nwebhook QRTBL/QRSUB" as Sepay
+
+package "Hóa đơn nhà hàng - QRTBL" as BillLane {
+  component "Order\ntrạng thái hóa đơn/phiên" as Order
+  component "Payment\ngiao dịch, cấu hình,\nkiểm toán" as Payment
+  queue "Kafka\npayment.completed" as Kafka
+}
+
+package "Gói thuê bao nền tảng - QRSUB" as SubscriptionLane {
+  component "SaaS\nhóa đơn gói,\ngói thuê bao,\nquyền theo gói" as Saas
+}
+
+Customer --> Bff : yêu cầu thanh toán hóa đơn
+Owner --> Bff : mua/gia hạn gói
+Bff --> Order : lấy trạng thái hóa đơn
+Bff --> Payment
+Bff --> Saas : tạo/đối soát QRSUB
+Payment --> Sepay : tạo VietQR QRTBL
+Saas --> Sepay : tạo VietQR QRSUB
+Sepay --> Bff : webhook
+Payment --> Order : đánh dấu hóa đơn đã thanh toán
+Payment --> Kafka : phát sự kiện
+@enduml

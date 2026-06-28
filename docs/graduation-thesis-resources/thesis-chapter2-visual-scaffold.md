@@ -6,25 +6,25 @@
 
 ## 1. Nguyên tắc
 
-- Mỗi mục §2.1–§2.8 có **một hình khái niệm** (Hình 2.1–2.8).
-- Source chỉnh sửa: `thesis-report/assets/diagrams/chapter2-*.excalidraw`.
-- File LaTeX chèn: `thesis-report/assets/figures/chapter2-*.png` (export từ Excalidraw, cùng tên base).
+- Mỗi mục §2.1–§2.8 có **một diagram học thuật** (Hình 2.1–2.8).
+- Source chỉnh sửa: `thesis-report/assets/diagrams/chapter2-*.puml`.
+- File LaTeX chèn: `thesis-report/assets/figures/chapter2-*.pdf` (render vector từ PlantUML, cùng tên base).
 - Diagram do tác giả xây dựng ở mức lý thuyết; không mô tả kiến trúc triển khai QRTable chi tiết (để Chương 4–5).
-- Render: `bash thesis-report/tools/render-chapter2-diagrams.sh` (Excalidraw JSON + embedded logos → SVG → PDF). **Không dùng Mermaid.**
-- Icons: `thesis-report/assets/diagrams/chapter2-icons/` (SVG thật, nhúng vào `.excalidraw` qua `files` + `type: image`).
+- Render: `bash thesis-report/tools/render-chapter2-diagrams.sh` (PlantUML → SVG → PDF/PNG).
+- Các file `.excalidraw` và icon cũ là artifact lịch sử, không còn là source canonical.
 
 ## 2. Mapping Hình 2.1–2.8
 
-| ID       | Mục                | Filename PDF                             | Source Excalidraw                               | LaTeX label                              | Owner |
+| ID       | Mục                | Filename PDF                             | Source PlantUML                          | LaTeX label                              | Owner |
 | -------- | ------------------ | ---------------------------------------- | ----------------------------------------------- | ---------------------------------------- | ----- |
-| Hình 2.1 | §2.1 POS F&B       | `chapter2-fnb-pos-lifecycle.png`         | `chapter2-fnb-pos-lifecycle.excalidraw`         | `fig:chapter2-fnb-pos-lifecycle`         | Agent |
-| Hình 2.2 | §2.2 QR ordering   | `chapter2-qr-ordering-flow.png`          | `chapter2-qr-ordering-flow.excalidraw`          | `fig:chapter2-qr-ordering-flow`          | Agent |
-| Hình 2.3 | §2.3 SaaS          | `chapter2-saas-multitenancy.png`         | `chapter2-saas-multitenancy.excalidraw`         | `fig:chapter2-saas-multitenancy`         | Agent |
-| Hình 2.4 | §2.4 Microservices | `chapter2-monolith-vs-microservices.png` | `chapter2-monolith-vs-microservices.excalidraw` | `fig:chapter2-monolith-vs-microservices` | Agent |
-| Hình 2.5 | §2.5 Kafka         | `chapter2-kafka-event-flow.png`          | `chapter2-kafka-event-flow.excalidraw`          | `fig:chapter2-kafka-event-flow`          | Agent |
-| Hình 2.6 | §2.6 Consistency   | `chapter2-outbox-saga-overview.png`      | `chapter2-outbox-saga-overview.excalidraw`      | `fig:chapter2-outbox-saga-overview`      | Agent |
-| Hình 2.7 | §2.7 Realtime      | `chapter2-websocket-hint-refetch.png`    | `chapter2-websocket-hint-refetch.excalidraw`    | `fig:chapter2-websocket-hint-refetch`    | Agent |
-| Hình 2.8 | §2.8 Security      | `chapter2-oidc-rbac-saas-pos.png`        | `chapter2-oidc-rbac-saas-pos.excalidraw`        | `fig:chapter2-oidc-rbac-saas-pos`        | Agent |
+| Hình 2.1 | §2.1 POS F&B       | `chapter2-fnb-pos-lifecycle.pdf`         | `chapter2-fnb-pos-lifecycle.puml`         | `fig:chapter2-fnb-pos-lifecycle`         | Agent |
+| Hình 2.2 | §2.2 QR ordering   | `chapter2-qr-ordering-flow.pdf`          | `chapter2-qr-ordering-flow.puml`          | `fig:chapter2-qr-ordering-flow`          | Agent |
+| Hình 2.3 | §2.3 SaaS          | `chapter2-saas-multitenancy.pdf`         | `chapter2-saas-multitenancy.puml`         | `fig:chapter2-saas-multitenancy`         | Agent |
+| Hình 2.4 | §2.4 Microservices | `chapter2-monolith-vs-microservices.pdf` | `chapter2-monolith-vs-microservices.puml` | `fig:chapter2-monolith-vs-microservices` | Agent |
+| Hình 2.5 | §2.5 Kafka         | `chapter2-kafka-event-flow.pdf`          | `chapter2-kafka-event-flow.puml`          | `fig:chapter2-kafka-event-flow`          | Agent |
+| Hình 2.6 | §2.6 Consistency   | `chapter2-outbox-saga-overview.pdf`      | `chapter2-outbox-saga-overview.puml`      | `fig:chapter2-outbox-saga-overview`      | Agent |
+| Hình 2.7 | §2.7 Realtime      | `chapter2-websocket-hint-refetch.pdf`    | `chapter2-websocket-hint-refetch.puml`    | `fig:chapter2-websocket-hint-refetch`    | Agent |
+| Hình 2.8 | §2.8 Security      | `chapter2-oidc-rbac-saas-pos.pdf`        | `chapter2-oidc-rbac-saas-pos.puml`        | `fig:chapter2-oidc-rbac-saas-pos`        | Agent |
 
 ### Caption và nguồn (bản chính thức — không Placeholder)
 
@@ -69,7 +69,7 @@ File: `thesis-report/chapters/02-co-so-ly-thuyet-va-cong-trinh-lien-quan.tex`
 
 ## 6. Checklist
 
-1. [x] Tạo 8 file `.excalidraw` trong `assets/diagrams/`.
+1. [x] Tạo 8 file `.puml` trong `assets/diagrams/`.
 2. [x] Render 8 file PDF vào `assets/figures/`.
 3. [x] Chèn `figure` + `\ref` trong Chương 2.
 4. [x] Thêm Bảng 2.3.

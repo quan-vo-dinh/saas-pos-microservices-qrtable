@@ -1,0 +1,33 @@
+sequenceDiagram
+  autonumber
+  actor Staff as Staff<br/>POS
+  participant Payment as Payment<br/>settlement owner
+  participant PDB as PostgreSQL<br/>Payment DB
+  participant Order as Order<br/>bill/session owner
+  participant Catalog as Catalog<br/>table state owner
+  participant Kafka as Kafka<br/>payment.completed
+
+  Staff->>Payment: Confirm cash payment
+  Payment->>PDB: Begin transaction
+  Payment->>PDB: Lock payment and verify amount
+
+  alt Amount insufficient or payment not pending
+    Payment->>PDB: Roll back transaction
+    Payment-->>Staff: Reject payment
+  else Payment can be completed
+    Payment->>PDB: Save PAID cash<br/>audit + outbox
+    PDB-->>Payment: Commit Payment transaction
+    Payment->>Order: BILL_MARK_PAID
+
+    alt Bill is already PAID
+      Order-->>Payment: Return current bill
+    else Bill is PENDING_PAYMENT
+      Order->>Order: Mark bill PAID<br/>close active session
+      Order->>Catalog: Move table to CLEANING
+    end
+
+    Payment-->>Kafka: Publish payment.completed
+    Payment-->>Staff: Settlement completed
+  end
+
+  Note over Payment,Order: Payment commit is independent from the follow-up Order call<br/>payment.completed keeps a replay-safe finalization path

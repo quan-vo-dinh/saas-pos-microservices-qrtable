@@ -1,0 +1,46 @@
+@startuml chapter2-saas-multitenancy
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam database {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam queue {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam ArrowColor #374151
+
+rectangle "Tenant A\nNhà hàng A" as TenantA
+rectangle "Tenant B\nNhà hàng B" as TenantB
+rectangle "Tenant C\nNhà hàng C" as TenantC
+
+node "Nền tảng SaaS QRTable dùng chung" as SaaS {
+  component "Ứng dụng web và BFF" as App
+  component "Dịch vụ miền nghiệp vụ" as Services
+  database "CSDL theo dịch vụ\ncó tenant_id" as Db
+  queue "Kafka topics\nkhông phân tách theo tenant" as Kafka
+  database "Redis namespace\ntheo tenant/phiên" as Redis
+}
+
+TenantA --> App : yêu cầu kèm tenant context
+TenantB --> App : yêu cầu kèm tenant context
+TenantC --> App : yêu cầu kèm tenant context
+
+App --> Services : guard xác thực và phân quyền
+Services --> Db : truy vấn có tenant_id
+Services --> Redis : khóa có tenant namespace
+Services --> Kafka : sự kiện miền kèm tenantId
+
+note right of SaaS
+Ranh giới cô lập không chỉ nằm ở database.
+API, cache, event payload, WebSocket room
+và tệp tải lên đều phải mang ngữ cảnh tenant.
+end note
+@enduml

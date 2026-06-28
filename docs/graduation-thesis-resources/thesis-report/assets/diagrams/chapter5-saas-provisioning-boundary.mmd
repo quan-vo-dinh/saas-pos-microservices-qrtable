@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  actor Admin as Super Admin
+  participant BFF as BFF<br/>platform guards
+  participant SaaS as SaaS<br/>onboarding saga
+  participant SDB as PostgreSQL<br/>SaaS DB
+  participant Contracts as External services<br/>Auth/User/Payment
+  participant Kafka as Kafka<br/>tenant.created
+  participant Catalog as Catalog
+
+  Admin->>BFF: POST tenant onboarding
+  BFF->>SaaS: ONBOARD command
+  SaaS->>SDB: Validate plan and slug<br/>create ACTIVE tenant
+  SaaS->>Contracts: Create owner identity<br/>profile + empty payment settings
+  Contracts-->>SaaS: ownerUserId and settings ready
+  SaaS->>SDB: Save ownerId, subscription<br/>and tenant.created outbox
+  SaaS-->>BFF: tenant + ownerUserId
+  BFF-->>Admin: Success
+  SaaS-->>Kafka: Publish tenant.created
+  Kafka-->>Catalog: Create default area if missing
+
+  Note over SaaS,Catalog: tenant.created is an asynchronous side effect<br/>Catalog seeding is idempotent and outside the onboarding commit

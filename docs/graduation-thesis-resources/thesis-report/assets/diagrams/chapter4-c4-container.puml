@@ -1,0 +1,72 @@
+@startuml chapter4-c4-container
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #374151
+skinparam actorStyle awesome
+skinparam package {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+
+left to right direction
+
+actor "Khách tại bàn" as Customer
+actor "Nhân viên/\nChủ quán" as Staff
+actor "Quản trị\nnền tảng" as Admin
+
+package "Ứng dụng web" as Web {
+  component "PWA khách" as CustomerPwa
+  component "Ứng dụng quản trị" as ManagementApp
+}
+
+component "BFF\nAPI Gateway + WebSocket" as Bff
+
+package "Dịch vụ máy chủ" as Backend {
+  component "Nhóm xác thực\nAuthorizer, User-Access" as AuthGroup
+  component "Nhóm vận hành\nSaaS, Catalog, Order" as OpsGroup
+  component "Nhóm xử lý khi vận hành\nKitchen, Payment" as RuntimeGroup
+}
+
+package "Kho dữ liệu và thông điệp" as Stores {
+  database "PostgreSQL\nCSDL theo dịch vụ" as Postgres
+  database "MongoDB\nUser-Access" as Mongo
+  database "Redis\ncache/trạng thái chạy" as Redis
+  queue "Kafka\nsự kiện miền" as Kafka
+}
+
+package "Hệ thống ngoài" as External {
+  component "Keycloak" as Keycloak
+  component "SePay/VietQR" as Sepay
+  component "Cloudinary" as Cloudinary
+}
+
+Customer --> CustomerPwa : đặt món
+Staff --> ManagementApp : vận hành
+Admin --> ManagementApp : quản trị
+
+CustomerPwa --> Bff : HTTPS/WebSocket
+ManagementApp --> Bff : HTTPS/WebSocket
+Bff --> AuthGroup : gRPC/TCP
+Bff --> OpsGroup : TCP
+Bff --> RuntimeGroup : TCP
+
+AuthGroup --> Keycloak : OIDC/Admin API
+AuthGroup --> Mongo
+OpsGroup --> Postgres
+RuntimeGroup --> Postgres
+OpsGroup ..> Redis
+RuntimeGroup ..> Redis
+OpsGroup --> Kafka
+RuntimeGroup --> Kafka
+Kafka --> Bff : cầu nối thời gian thực
+
+Sepay --> Bff : webhook
+RuntimeGroup --> Sepay : API nhà cung cấp
+OpsGroup --> Cloudinary : ảnh món
+@enduml

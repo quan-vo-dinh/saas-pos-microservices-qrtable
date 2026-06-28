@@ -1,0 +1,44 @@
+@startuml chapter4-kds-redis-data-structures
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #374151
+skinparam package {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+
+top to bottom direction
+
+component "Order\nghi dữ liệu và outbox" as Order
+queue "Kafka\norder.confirmed" as Kafka
+component "Kitchen\ntiêu thụ và ghi KDS" as Kitchen
+
+package "Redis KDS" as RedisKds {
+  database "Phiếu và dòng món\nHash" as TicketData
+  database "Chỉ mục tra cứu\nSet" as IndexData
+  database "Hàng đợi bếp/bar\nSorted Set" as QueueData
+  database "SLA, khóa lặp,\nhàng đợi lỗi" as ControlData
+}
+
+component "Redis Pub/Sub\nkds.queue_changed" as PubSub
+component "BFF\ncầu nối thời gian thực" as Bff
+component "Phòng Socket.IO\nKDS/quản trị" as Rooms
+
+Order --> Kafka : sau giao dịch
+Kafka --> Kitchen : tiêu thụ sự kiện
+Kitchen --> TicketData
+Kitchen --> IndexData
+Kitchen --> QueueData
+Kitchen --> ControlData
+TicketData --> PubSub
+QueueData --> PubSub
+ControlData --> PubSub
+PubSub --> Bff : gợi ý
+Bff --> Rooms : phát tín hiệu
+@enduml

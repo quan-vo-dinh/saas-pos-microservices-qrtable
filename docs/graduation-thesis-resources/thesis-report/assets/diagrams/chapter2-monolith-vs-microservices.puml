@@ -1,0 +1,50 @@
+@startuml chapter2-monolith-vs-microservices
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam database {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam ArrowColor #374151
+
+package "Kiến trúc monolith" as Mono {
+  component "Một ứng dụng triển khai chung\nUI + nghiệp vụ + tích hợp" as MonoApp
+  database "Một CSDL dùng chung" as MonoDb
+  MonoApp --> MonoDb : đọc/ghi trực tiếp
+}
+
+package "Kiến trúc microservices" as Micro {
+  component "Catalog Service\nthực đơn, bàn, tồn kho" as Catalog
+  database "CSDL Catalog" as CatalogDb
+  component "Order Service\nphiên, giỏ, đơn, hóa đơn" as Order
+  database "CSDL Order" as OrderDb
+  component "Kitchen Service\nKDS projection" as Kitchen
+  database "Redis KDS" as KitchenRedis
+  component "Payment Service\nthanh toán, đối soát" as Payment
+  database "CSDL Payment" as PaymentDb
+  component "SaaS Service\ntenant, gói thuê bao" as Saas
+  database "CSDL SaaS" as SaasDb
+
+  Catalog --> CatalogDb
+  Order --> OrderDb
+  Kitchen --> KitchenRedis
+  Payment --> PaymentDb
+  Saas --> SaasDb
+}
+
+Order --> Catalog : TCP query/command\nkhi cần phản hồi ngay
+Order ..> Kitchen : Kafka event\nxử lý kéo theo
+Payment ..> Order : Kafka event\nthanh toán hoàn tất
+Saas ..> Payment : sự kiện/hóa đơn gói
+
+note bottom of Micro
+Mỗi dịch vụ sở hữu dữ liệu của mình.
+Không truy cập trực tiếp CSDL của dịch vụ khác.
+end note
+@enduml

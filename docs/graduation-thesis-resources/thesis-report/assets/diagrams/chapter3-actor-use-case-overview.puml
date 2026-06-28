@@ -1,76 +1,60 @@
 @startuml chapter3-actor-use-case-overview
-' Hình 3.1 — Tác nhân và nhóm trường hợp sử dụng chính (sơ đồ UML)
-' Render: java -jar tools/plantuml.jar -charset UTF-8 -tpdf -o assets/figures assets/diagrams/chapter3-actor-use-case-overview.puml
-' (chạy từ thư mục thesis-report)
-
+skinparam backgroundColor #FFFFFF
 skinparam shadowing false
-skinparam backgroundColor white
 skinparam defaultFontName Arial
-skinparam packageStyle rectangle
+skinparam handwritten false
 skinparam usecase {
-  BackgroundColor #f0fdf4
-  BorderColor #16a34a
+  BackgroundColor white
+  BorderColor #374151
 }
 skinparam actor {
-  BackgroundColor #fff7ed
-  BorderColor #d97706
+  BackgroundColor white
+  BorderColor #374151
 }
 skinparam rectangle {
-  BorderColor #334155
-  FontStyle bold
+  BackgroundColor white
+  BorderColor #374151
 }
+skinparam ArrowColor #374151
 
 left to right direction
 
-actor "Quản trị nền tảng\n(Super Admin)\n<<chéo tenant>>" as SuperAdmin
-actor "Chủ nhà hàng\n(Owner)\n<<một tenant>>" as Owner
-actor "Quản lý\n(Manager)\n<<một tenant>>" as Manager
-actor "Phục vụ / POS\n(Waiter)\n<<vận hành sàn>>" as Waiter
-actor "Bếp / pha chế\n(Chef / Barista)\n<<trạm bếp/bar>>" as KitchenStaff
+actor "Quản trị nền tảng\n(Super Admin)" as SuperAdmin
+actor "Nhân sự nhà hàng\n(Owner / Manager / Staff)" as Staff
+actor "Khách hàng\nphiên QR" as Customer
+actor "Webhook SePay" as PaymentWebhook
 
-rectangle "«hệ thống» QRTable" as QRTable {
-  usecase "Quản lý vòng đời SaaS\ntenant · gói · thuê bao · hạn mức" as UC_Platform
-  usecase "Bảng điều khiển và báo cáo\nreport.read_own · report.read_any · analytics_basic" as UC_Reporting
-  usecase "Quản lý thực đơn, bàn và QR\nthực đơn · khu vực · bàn · QR token" as UC_Catalog
-  usecase "Vận hành POS\nxác nhận đơn · hóa đơn · chuyển bàn · yêu cầu hỗ trợ" as UC_Pos
-  usecase "Bếp / KDS\nhàng đợi theo trạm · phiếu · thu hồi · SLA" as UC_Kds
-  usecase "Thanh toán và đối soát\ntiền mặt · VietQR/SePay · lịch sử" as UC_Payment
-  usecase "Phiên, giỏ và đơn của khách\ntham gia phiên · giỏ chung · gửi đơn" as UC_Ordering
+rectangle "QRTable" as QRTable {
+  usecase "Quản lý tenant\nvà gói dịch vụ" as UC_Platform
+  usecase "Quản lý nhà hàng\nthực đơn · bàn · nhân sự" as UC_Restaurant
+  usecase "Thực hiện đặt món QR" as UC_QROrdering
+  usecase "Vận hành đơn hàng POS" as UC_POS
+  usecase "Xử lý phiếu KDS" as UC_KDS
+  usecase "Ghi nhận thanh toán" as UC_Payment
+  usecase "Đối soát webhook VietQR" as UC_Reconcile
+  usecase "Xem báo cáo vận hành" as UC_Report
 }
 
-actor "Khách hàng\n<<phiên QR — không thuộc RBAC DB>>" as Customer
-actor "Webhook SePay\n<<hệ thống ngoài>>\nQRTBL · QRSUB" as Sepay
-
 SuperAdmin --> UC_Platform
-SuperAdmin --> UC_Reporting
+SuperAdmin --> UC_Report
 
-Owner --> UC_Platform
-Owner --> UC_Catalog
-Owner --> UC_Pos
-Owner --> UC_Kds
-Owner --> UC_Payment
-Owner --> UC_Reporting
+Staff --> UC_Restaurant
+Staff --> UC_POS
+Staff --> UC_KDS
+Staff --> UC_Payment
+Staff --> UC_Report
 
-Manager --> UC_Platform : <<xem thuê bao/cài đặt>>
-Manager --> UC_Catalog
-Manager --> UC_Pos
-Manager --> UC_Kds
-Manager --> UC_Payment
-Manager --> UC_Reporting
+Customer --> UC_QROrdering
 
-Waiter --> UC_Pos
-Waiter --> UC_Payment
+PaymentWebhook --> UC_Reconcile
 
-KitchenStaff --> UC_Kds
-
-Customer --> UC_Ordering
-Customer --> UC_Payment : <<yêu cầu hóa đơn · thanh toán>>
-
-Sepay --> UC_Payment : <<webhook đối soát>>
+UC_Reconcile ..> UC_Payment : <<extend>>
 
 note bottom of QRTable
-  **«note»** Cô lập tenant
-  RBAC · quyền sở hữu phiên
+Chi tiết quyền theo Owner, Manager, Waiter và Bếp/Bar
+được trình bày trong bảng tác nhân ngay sau hình.
+Ràng buộc xuyên suốt: cô lập tenant, RBAC cho nhân sự
+và quyền sở hữu phiên QR cho khách.
 end note
 
 @enduml

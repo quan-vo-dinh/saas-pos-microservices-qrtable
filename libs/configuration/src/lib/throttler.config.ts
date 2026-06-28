@@ -6,7 +6,7 @@ export const ThrottlerProvider = ThrottlerModule.forRootAsync({
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: async (configService: ConfigService) => ({
-    throttlers: [{ ttl: 60000, limit: 100 }],
+    throttlers: [{ ttl: 60000, limit: 10000 }],
     errorMessage: 'Too many requests, please try again later.',
     storage: new ThrottlerStorageRedisService({
       host: configService.get('REDIS_CONFIG.HOST'),

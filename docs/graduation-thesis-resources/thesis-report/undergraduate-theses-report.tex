@@ -48,6 +48,10 @@
 
 \BiblatexSplitbibDefernumbersWarningOff
 \addbibresource{references.bib}
+\AtEveryBibitem{%
+  \clearfield{language}%
+  \clearlist{language}%
+}
 \setcounter{biburlnumpenalty}{9000}
 \setcounter{biburlucpenalty}{9000}
 \setcounter{biburllcpenalty}{9000}
@@ -104,6 +108,7 @@
 \newcommand{\thesisstudentid}{22521193}
 \newcommand{\thesisfaculty}{KHOA HỆ THỐNG THÔNG TIN}
 \newcommand{\thesismajor}{HỆ THỐNG THÔNG TIN}
+\newcommand{\thesisdegree}{CỬ NHÂN}
 \newcommand{\thesissupervisor}{TS. NGUYỄN THANH BÌNH}
 \newcommand{\thesisyear}{2026}
 
@@ -117,7 +122,6 @@
 \pagestyle{empty}
 \input{frontmatter/cover}
 \maingeometry
-\input{frontmatter/council}
 \input{frontmatter/acknowledgements}
 
 \cleardoublepage

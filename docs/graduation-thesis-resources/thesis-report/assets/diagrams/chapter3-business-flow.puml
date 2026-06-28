@@ -1,0 +1,27 @@
+@startuml chapter3-business-flow
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam handwritten false
+skinparam componentStyle rectangle
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam ArrowColor #374151
+
+rectangle "Khởi tạo phiên QR\nxác minh tenant/bàn" as Session
+rectangle "Giỏ dùng chung\nnhiều thiết bị cùng bàn" as Cart
+rectangle "Đơn chờ xác nhận\nidempotency key" as Pending
+rectangle "POS xác nhận\nkiểm tra tồn kho" as Confirm
+rectangle "KDS xử lý món\ntheo trạm bếp/bar" as Kds
+rectangle "Hóa đơn và thanh toán\ncash hoặc VietQR/SePay" as Payment
+rectangle "Đóng phiên\nvà dọn bàn" as Close
+
+Session -right-> Cart : tham gia
+Cart -right-> Pending : gửi đơn
+Pending -right-> Confirm : xác nhận
+Confirm -down-> Kds : hợp lệ
+Kds -left-> Payment : phục vụ xong
+Payment -left-> Close : thanh toán
+@enduml

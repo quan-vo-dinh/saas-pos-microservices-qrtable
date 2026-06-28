@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  actor Staff as Staff<br/>POS retry
+  participant Order as Order
+  participant ODB as PostgreSQL<br/>Order DB
+  participant Catalog as Catalog
+  participant CDB as PostgreSQL<br/>Catalog DB
+
+  Staff->>Order: Confirm order
+  Order->>Catalog: Deduct stock<br/>same key + immutable payload
+  Catalog->>CDB: Commit RESERVED version 1
+  Catalog--xOrder: APPLIED response lost
+  Order->>ODB: Roll back transaction<br/>order remains PENDING
+
+  Staff->>Order: Retry confirm command
+  Order->>Catalog: Deduct stock again<br/>same key + payload hash
+  Catalog->>CDB: Lock active reservation
+  CDB-->>Catalog: Stored result and version 1
+  Catalog-->>Order: REPLAYED + reservationVersion
+  Order->>ODB: Commit PROCESSING<br/>+ version + outbox
+  Order-->>Staff: Confirmation success
+
+  Note over Catalog,CDB: Replay does not change stock rows.<br/>The same key and payload turn an ambiguous response into a safe retry.

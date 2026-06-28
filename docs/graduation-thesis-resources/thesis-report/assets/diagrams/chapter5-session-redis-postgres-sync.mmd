@@ -1,0 +1,33 @@
+sequenceDiagram
+  autonumber
+  participant Order as Order<br/>dual-layer
+  participant Redis as Redis<br/>hot path
+  participant ODB as PostgreSQL<br/>durable
+
+  Note over Order,ODB: Session Creation - Both layers
+  Order->>ODB: Create ACTIVE session
+  ODB-->>Order: Session persisted
+  Order->>Redis: Create session cache<br/>with TTL
+  Redis-->>Order: Session cached
+
+  Note over Order,ODB: Cart Update - Redis only
+  Order->>Redis: Update cart snapshot
+  Redis-->>Order: Cart updated
+
+  Note over Order,ODB: Order Submit - Commit to PostgreSQL
+  Order->>Redis: Read cart
+  Redis-->>Order: Cart snapshot
+  Order->>ODB: Create PENDING order<br/>link to session
+  ODB-->>Order: Order committed
+  Order->>Redis: Clear cart
+  Redis-->>Order: Cart deleted
+
+  Note over Order,ODB: Redis Failure - Recovery
+  Order->>Redis: Read session
+  Redis--xOrder: Cache miss
+  Order->>ODB: Find session by<br/>tenant + table
+  ODB-->>Order: Session still ACTIVE
+  Order->>Redis: Rebuild cache
+  Redis-->>Order: Session restored
+
+  Note over Order,ODB: Redis is hot path. PostgreSQL is durable source of truth for session lifecycle.

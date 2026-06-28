@@ -1,0 +1,54 @@
+@startuml chapter4-technology-integration-map
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam ArrowColor #374151
+skinparam package {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+
+top to bottom direction
+
+package "Nền tảng phát triển và đóng gói" as Platform {
+  component "Nx monorepo" as Nx
+  component "TypeScript\nhợp đồng dùng chung" as TypeScript
+  component "Docker Compose\nmôi trường demo" as Docker
+}
+
+package "Ứng dụng người dùng" as Clients {
+  component "PWA khách\nReact/Vite" as Pwa
+  component "Ứng dụng quản trị\nNext.js/React" as Management
+}
+
+package "Lớp biên và dịch vụ miền" as Runtime {
+  component "BFF\nNestJS" as Bff
+  component "Dịch vụ miền\nNestJS microservices" as Services
+}
+
+package "Dữ liệu, cache và sự kiện" as Infra {
+  database "PostgreSQL\nCSDL theo dịch vụ" as Postgres
+  database "MongoDB\nUser-Access" as Mongo
+  database "Redis\ncache/trạng thái chạy" as Redis
+  queue "Kafka\nsự kiện miền" as Kafka
+}
+
+package "Nhà cung cấp ngoài" as Providers {
+  component "Keycloak\nOIDC/JWT" as Keycloak
+  component "SePay/VietQR\nthanh toán" as Sepay
+  component "Cloudinary\nảnh thực đơn" as Cloudinary
+}
+
+Platform ..> Clients : quản lý mã nguồn
+Platform ..> Runtime : hợp đồng và đóng gói
+Clients --> Bff : REST/WebSocket
+Bff --> Services : TCP/gRPC
+Services --> Infra : dữ liệu và sự kiện
+Providers --> Bff : xác thực/webhook
+Services --> Providers : API tích hợp
+@enduml

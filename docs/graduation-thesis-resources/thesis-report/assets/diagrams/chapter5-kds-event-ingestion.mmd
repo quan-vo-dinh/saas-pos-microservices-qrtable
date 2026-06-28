@@ -1,0 +1,32 @@
+sequenceDiagram
+  autonumber
+  participant Kafka as Kafka<br/>order.confirmed
+  participant Consumer as Kitchen<br/>OrderConfirmedConsumer
+  participant Repo as KdsRedisRepository
+  participant Redis as Redis<br/>projection keys
+  participant Pub as KitchenEventsPublisher
+
+  Kafka->>Consumer: Message value
+  Consumer->>Consumer: Parse JSON
+  alt Malformed JSON or invalid schema
+    Consumer-->>Kafka: Ignore and log warning
+  else Valid order.confirmed schema
+    Consumer->>Repo: createTicketsFromConfirmedOrder(event)
+    Repo->>Redis: Claim event dedupe key
+    alt Duplicate eventId
+      Redis-->>Repo: Dedupe key exists
+      Repo-->>Consumer: No queue events
+    else Fresh event
+      Repo->>Repo: Partition items by station
+      alt Item missing station
+        Repo->>Redis: Append dead-letter sample
+      else Valid station items
+        Repo->>Redis: Claim order+station dedupe key
+        Repo->>Redis: Create ticket and item hashes<br/>queue members, SLA, revision
+        Repo-->>Consumer: kds.queue_changed events
+        Consumer->>Pub: publishMany(events)
+      end
+    end
+  end
+
+  Note over Consumer,Redis: Kitchen accepts only the event contract it understands.<br/>Dedupe is by eventId and by order+station identity.

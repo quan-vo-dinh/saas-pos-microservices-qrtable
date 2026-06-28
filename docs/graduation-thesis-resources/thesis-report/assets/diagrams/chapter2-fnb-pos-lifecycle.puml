@@ -1,0 +1,31 @@
+@startuml chapter2-fnb-pos-lifecycle
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam handwritten false
+skinparam ArrowColor #374151
+skinparam activity {
+  BackgroundColor white
+  BorderColor #374151
+  StartColor #111827
+  EndColor #111827
+  DiamondBackgroundColor white
+  DiamondBorderColor #374151
+}
+
+start
+:Bàn sẵn sàng;
+:Khách vào bàn;
+
+repeat
+  :Tiếp nhận món\n(POS hoặc QR);
+  :Xác nhận và chuyển bếp/bar;
+  :Phục vụ tại bàn;
+repeat while (Khách gọi thêm?) is (Có)
+-> Không;
+
+:Lập hóa đơn;
+:Ghi nhận thanh toán;
+:Dọn bàn;
+stop
+@enduml

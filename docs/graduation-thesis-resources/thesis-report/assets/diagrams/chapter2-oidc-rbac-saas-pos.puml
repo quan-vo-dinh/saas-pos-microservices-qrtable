@@ -1,0 +1,44 @@
+@startuml chapter2-oidc-rbac-saas-pos
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+skinparam rectangle {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam component {
+  BackgroundColor white
+  BorderColor #374151
+}
+skinparam ArrowColor #374151
+
+actor "Nhân viên / Chủ quán /\nQuản trị nền tảng" as Staff
+actor "Khách hàng tại bàn" as Customer
+
+component "Identity Provider\n(OpenID Connect)" as Idp
+component "JWT access token" as Jwt
+component "Guard chuỗi kiểm soát\nRBAC + tenant context" as Guard
+component "API nghiệp vụ\nphạm vi tenant" as StaffApi
+
+component "QR token\nphạm vi tenant/bàn" as Qr
+component "Session token\nphạm vi phiên/bàn" as Session
+component "SessionGuard\nquyền sở hữu phiên" as SessionGuard
+component "API khách hàng\nphạm vi phiên" as CustomerApi
+
+Staff --> Idp : đăng nhập
+Idp --> Jwt : cấp token
+Jwt --> Guard : kiểm tra chữ ký, vai trò, tenant
+Guard --> StaffApi : cho phép thao tác theo quyền
+
+Customer --> Qr : quét QR
+Qr --> Session : tạo/tham gia phiên
+Session --> SessionGuard : kiểm tra tenant, bàn, phiên
+SessionGuard --> CustomerApi : cho phép xem menu/gọi món
+
+note bottom
+Nhân viên dùng OIDC/JWT/RBAC.
+Khách không thuộc RBAC DB, chỉ có quyền theo phiên QR.
+Hai lối vào đều phải giữ cô lập tenant.
+end note
+@enduml

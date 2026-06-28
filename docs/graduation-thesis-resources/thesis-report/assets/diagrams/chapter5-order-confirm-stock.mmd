@@ -1,102 +1,31 @@
-
-
+%% Overview only. The focused diagrams next to this figure prove each invariant separately.
 sequenceDiagram
   autonumber
   actor Staff as Staff<br/>POS
-  participant BFF as BFF<br/>auth guards
-  participant Order as Order<br/>orchestrator
-  participant ODB as PostgreSQL<br/>Order DB
+  participant BFF as BFF<br/>guards
+  participant Order as Order<br/>order owner
   participant Catalog as Catalog<br/>stock owner
-  participant CDB as PostgreSQL<br/>Catalog DB
-  participant Outbox as Order<br/>outbox relay
-  participant Kafka as Kafka<br/>order.confirmed
-  participant Kitchen as Kitchen<br/>KDS projection
+  participant Event as Outbox / Kafka / KDS
 
   Staff->>BFF: Confirm pending order
   BFF->>BFF: Verify JWT, tenant, permission
   BFF->>Order: Verified confirm command
-  Order->>ODB: Begin transaction<br/>lock order by tenant
+  Order->>Order: Lock order and bill<br/>inside tenant scope
 
   alt Order already PROCESSING
-    ODB-->>Order: Existing order, items, and bill
-    Order-->>BFF: Return current state<br/>no Catalog call or new outbox
+    Order-->>BFF: Return current state
     BFF-->>Staff: Confirmation already applied
   else Order is PENDING and bill is OPEN
-    Order->>ODB: Load order items and bill<br/>under tenant scope
-    Order->>Catalog: Deduct stock<br/>reservation key + immutable payload
-    Catalog->>CDB: Begin Catalog transaction<br/>claim stock_reservations row FOR UPDATE
-
-    break Reservation key or payload hash conflicts
-      CDB--xCatalog: Roll back Catalog transaction
-      Catalog-->>Order: Stock operation conflict
-      Order->>ODB: Roll back Order transaction
-      Order-->>BFF: Structured conflict error
-      BFF-->>Staff: Show confirmation error
-    end
-
-    alt Active RESERVED version with same key and payload
-      CDB-->>Catalog: Stored deduct result and version
-      Note over Catalog,CDB: No stock row is changed on replay
-      Catalog->>Catalog: Prepare REPLAYED outcome
-    else New or RELEASED reservation
-      Catalog->>CDB: Lock menu-item rows in deterministic order
-      break Item missing or stock insufficient
-        CDB--xCatalog: Roll back reservation and stock transaction
-        Catalog-->>Order: Structured stock error
-        Order->>ODB: Roll back Order transaction
-        Order-->>BFF: Stock conflict or validation failure
-        BFF-->>Staff: Show stock error
-      end
-      Catalog->>CDB: Deduct stock and save RESERVED version<br/>in the same Catalog transaction
-      CDB-->>Catalog: Commit stock + reservation
-      Catalog->>Catalog: Prepare APPLIED outcome
-    end
-
-    alt Catalog response reaches Order
-      Catalog-->>Order: APPLIED / REPLAYED + reservationVersion
-      Order->>ODB: Save PROCESSING, items, version,<br/>and order.confirmed outbox atomically
-      alt Order transaction commits
-        ODB-->>Order: Commit Order transaction
-        Order-->>BFF: Confirmation success
-        BFF-->>Staff: Confirmation success
-        Outbox->>ODB: Poll committed PENDING outbox row
-        Outbox->>Kafka: Publish order.confirmed
-        Kafka-->>Kitchen: Consume order.confirmed
-        Kitchen->>Kitchen: Create KDS ticket
-      else Order persistence or outbox write fails
-        ODB--xOrder: Roll back Order transaction
-        Order->>Catalog: Release stock as compensation<br/>key + reservationVersion
-        Catalog->>CDB: Lock reservation and stock rows
-        alt Matching RESERVED version
-          Catalog->>CDB: Restore stock and save RELEASED<br/>in one Catalog transaction
-          Catalog-->>Order: APPLIED
-        else Same version already RELEASED
-          Catalog-->>Order: REPLAYED<br/>no second stock restoration
-        else Older release version
-          Catalog-->>Order: STALE<br/>newer reservation remains unchanged
-        end
-        Order-->>BFF: Preserve original Order failure
-        BFF-->>Staff: Show confirmation failure
-      end
-    else Catalog commits but TCP response is lost
-      Catalog--xOrder: APPLIED response unavailable
-      Order->>ODB: Roll back and keep order PENDING
-      Note over Staff,Catalog: Recovery requires caller retry with the same key and payload
-      Staff->>BFF: Retry confirmation
-      BFF->>Order: Retry verified command
-      Order->>Catalog: Retry same reservation
-      Catalog->>CDB: Lock active reservation
-      CDB-->>Catalog: Return stored result and version
-      Catalog-->>Order: REPLAYED + reservationVersion
-      Order->>ODB: Commit PROCESSING, version, and outbox
-      Order-->>BFF: Confirmation success
-      BFF-->>Staff: Confirmation success
-      Note over Outbox,Kitchen: The committed outbox continues through Kafka to KDS as in the normal path
-    end
+    Order->>Catalog: Deduct stock<br/>idempotency key + payload hash
+    Catalog-->>Order: APPLIED or REPLAYED<br/>reservationVersion
+    Order->>Order: Commit PROCESSING + items<br/>+ stockReservationVersion + outbox
+    Order-->>BFF: Confirmation success
+    BFF-->>Staff: Confirmation success
+    Order-->>Event: Relay committed order.confirmed
+    Event->>Event: Kitchen creates KDS ticket
   else Invalid order or bill state
-    Order->>ODB: Roll back Order transaction
-    Order-->>BFF: Invalid state response
-    BFF-->>Staff: Show validation error
+    Order-->>BFF: Structured validation error
+    BFF-->>Staff: Show confirmation error
   end
 
-  Note over Order,Catalog: Order never writes Catalog DB directly<br/>Stock mutation and reservation state commit together inside Catalog
+  Note over Order,Catalog: Order never writes Catalog DB directly.<br/>Focused figures below show commit boundary, retry, compensation and async side effect.

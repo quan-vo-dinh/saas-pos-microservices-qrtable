@@ -1,0 +1,33 @@
+@startuml chapter4-security-auth-flow
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam ArrowColor #374151
+skinparam activity {
+  BackgroundColor white
+  BorderColor #374151
+  StartColor #111827
+  EndColor #111827
+  DiamondBackgroundColor white
+  DiamondBorderColor #374151
+}
+
+start
+:Yêu cầu đi vào BFF;
+
+if (Người gọi là nhân sự?) then (Có)
+  :Đăng nhập qua Keycloak;
+  :Ứng dụng quản trị gửi request kèm JWT;
+  :BFF kiểm tra danh tính,\ntenant và quyền;
+  :Authorizer/User-Access\nxác minh token, vai trò và quyền;
+  :Dịch vụ miền xử lý\nvới tenant và quyền hợp lệ;
+else (Không)
+  :Khách quét mã QR bàn;
+  :PWA khách mở hoặc tham gia phiên;
+  :BFF kiểm tra phiên\nvà tenant;
+  :Redis xác nhận ngữ cảnh phiên;
+  :Catalog/Order xử lý\ntrong phạm vi phiên và bàn;
+endif
+
+stop
+@enduml

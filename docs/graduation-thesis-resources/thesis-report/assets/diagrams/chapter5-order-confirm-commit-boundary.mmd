@@ -1,0 +1,20 @@
+sequenceDiagram
+  autonumber
+  participant Order as Order<br/>transaction
+  participant ODB as PostgreSQL<br/>Order DB
+  participant Catalog as Catalog<br/>TCP contract
+  participant CDB as PostgreSQL<br/>Catalog DB
+
+  Order->>ODB: Begin transaction<br/>lock order by tenant
+  Order->>ODB: Load order, bill and items
+  Order->>Catalog: Deduct stock<br/>confirm-order:{orderId}
+  Catalog->>CDB: Begin transaction
+  Catalog->>CDB: Claim stock_reservations row<br/>FOR UPDATE
+  Catalog->>CDB: Lock menu-item rows<br/>deterministic order
+  Catalog->>CDB: Deduct stock and save<br/>RESERVED version
+  CDB-->>Catalog: Commit Catalog transaction
+  Catalog-->>Order: APPLIED + reservationVersion
+  Order->>ODB: Save PROCESSING, item status,<br/>reservationVersion and outbox
+  ODB-->>Order: Commit Order transaction
+
+  Note over ODB,CDB: Two local transactions remain separated by service boundary.<br/>The invariant is preserved by reservationVersion and compensation, not by cross-database writes.
