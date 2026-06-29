@@ -3,30 +3,31 @@ sequenceDiagram
   participant Kafka as Kafka<br/>order.confirmed
   participant Consumer as Kitchen<br/>OrderConfirmedConsumer
   participant Repo as KdsRedisRepository
-  participant Redis as Redis<br/>projection keys
+  participant Redis as Redis<br/>(Các khóa bản chiếu)
   participant Pub as KitchenEventsPublisher
 
-  Kafka->>Consumer: Message value
-  Consumer->>Consumer: Parse JSON
-  alt Malformed JSON or invalid schema
-    Consumer-->>Kafka: Ignore and log warning
-  else Valid order.confirmed schema
+  Kafka->>Consumer: Dữ liệu thông điệp (Value)
+  Consumer->>Consumer: Phân tích cú pháp JSON
+  alt JSON lỗi cú pháp hoặc schema không hợp lệ
+    Consumer-->>Kafka: Bỏ qua và ghi log cảnh báo
+  else Schema order.confirmed hợp lệ
     Consumer->>Repo: createTicketsFromConfirmedOrder(event)
-    Repo->>Redis: Claim event dedupe key
-    alt Duplicate eventId
-      Redis-->>Repo: Dedupe key exists
-      Repo-->>Consumer: No queue events
-    else Fresh event
-      Repo->>Repo: Partition items by station
-      alt Item missing station
-        Repo->>Redis: Append dead-letter sample
-      else Valid station items
-        Repo->>Redis: Claim order+station dedupe key
-        Repo->>Redis: Create ticket and item hashes<br/>queue members, SLA, revision
-        Repo-->>Consumer: kds.queue_changed events
+    Repo->>Redis: Yêu cầu khóa chống trùng sự kiện
+    alt eventId bị trùng lặp
+      Redis-->>Repo: Khóa chống trùng đã tồn tại
+      Repo-->>Consumer: Không phát sự kiện hàng đợi
+    else Sự kiện mới
+      Repo->>Repo: Phân chia món theo trạm chế biến
+      alt Món thiếu thông tin trạm
+        Repo->>Redis: Đưa vào hàng đợi lỗi (dead-letter)
+      else Món có trạm chế biến hợp lệ
+        Repo->>Redis: Yêu cầu khóa chống trùng order+station
+        Repo->>Redis: Tạo ticket và item hash<br/>thành viên hàng đợi, SLA, revision
+        Repo-->>Consumer: các sự kiện kds.queue_changed
         Consumer->>Pub: publishMany(events)
       end
     end
   end
 
-  Note over Consumer,Redis: Kitchen accepts only the event contract it understands.<br/>Dedupe is by eventId and by order+station identity.
+  Note over Consumer,Redis: Kitchen chỉ tiếp nhận hợp đồng sự kiện mà nó hiểu được.<br/>Chống trùng lặp (dedupe) được thực hiện theo eventId và định danh order+station.
+

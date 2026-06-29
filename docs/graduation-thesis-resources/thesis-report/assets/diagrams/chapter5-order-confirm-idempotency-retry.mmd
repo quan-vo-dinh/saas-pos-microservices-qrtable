@@ -1,23 +1,24 @@
 sequenceDiagram
   autonumber
-  actor Staff as Staff<br/>POS retry
+  actor Staff as Nhân viên<br/>(POS Thử lại)
   participant Order as Order
-  participant ODB as PostgreSQL<br/>Order DB
+  participant ODB as PostgreSQL<br/>(CSDL Order)
   participant Catalog as Catalog
-  participant CDB as PostgreSQL<br/>Catalog DB
+  participant CDB as PostgreSQL<br/>(CSDL Catalog)
 
-  Staff->>Order: Confirm order
-  Order->>Catalog: Deduct stock<br/>same key + immutable payload
-  Catalog->>CDB: Commit RESERVED version 1
-  Catalog--xOrder: APPLIED response lost
-  Order->>ODB: Roll back transaction<br/>order remains PENDING
+  Staff->>Order: Xác nhận đơn hàng
+  Order->>Catalog: Trừ tồn kho<br/>cùng key + payload bất biến
+  Catalog->>CDB: Ghi nhận phiên bản RESERVED 1
+  Catalog--xOrder: Phản hồi APPLIED bị thất lạc
+  Order->>ODB: Rollback giao dịch<br/>đơn hàng giữ trạng thái PENDING
 
-  Staff->>Order: Retry confirm command
-  Order->>Catalog: Deduct stock again<br/>same key + payload hash
-  Catalog->>CDB: Lock active reservation
-  CDB-->>Catalog: Stored result and version 1
-  Catalog-->>Order: REPLAYED + reservationVersion
-  Order->>ODB: Commit PROCESSING<br/>+ version + outbox
-  Order-->>Staff: Confirmation success
+  Staff->>Order: Thử lại lệnh xác nhận
+  Order->>Catalog: Trừ tồn kho lần nữa<br/>cùng key + payload hash
+  Catalog->>CDB: Khóa yêu cầu giữ tồn kho đang hoạt động
+  CDB-->>Catalog: Kết quả đã lưu và phiên bản 1
+  Catalog-->>Order: Chạy lại thành công (REPLAYED)<br/>+ reservationVersion
+  Order->>ODB: Ghi nhận ĐANG XỬ LÝ (PROCESSING)<br/>+ phiên bản + outbox
+  Order-->>Staff: Xác nhận thành công
 
-  Note over Catalog,CDB: Replay does not change stock rows.<br/>The same key and payload turn an ambiguous response into a safe retry.
+  Note over Catalog,CDB: Chạy lại (Replay) không thay đổi các dòng tồn kho.<br/>Cùng một key và payload biến phản hồi không rõ ràng thành một lượt thử lại an toàn.
+

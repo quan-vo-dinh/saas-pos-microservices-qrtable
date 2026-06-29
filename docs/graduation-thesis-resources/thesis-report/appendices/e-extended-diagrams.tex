@@ -1,12 +1,118 @@
-\chapter{Diagram mở rộng}
+\chapter{Các sơ đồ bổ sung}
 \label{app:extended-diagrams}
 
-\section{ERD mở rộng}
+\newcommand{\extendeddiagramfigure}[4]{%
+  \begin{figure}[htbp]%
+    \centering%
+    \includegraphics[width=\textwidth,height=#1,keepaspectratio]{#2}%
+    \caption{#3}%
+    \label{#4}%
+  \end{figure}%
+}
 
-\subsection{Sơ đồ database/schema theo service}
+Phụ lục này trình bày các sơ đồ bổ sung cho các luồng triển khai ở Chương~5. Các hình dưới đây mở rộng các nhánh xử lý chi tiết sau phần trình bày chính trong thân bài.
 
-Năm sơ đồ schema per-service (Catalog, Order, Payment, SaaS, User-Access) được trình bày đầy đủ trong mục ``Thiết kế cơ sở dữ liệu theo ranh giới dịch vụ'' của Chương 4, từ Hình~\ref{fig:chapter4-db-catalog-schema} đến Hình~\ref{fig:chapter4-db-user-access-schema}. DBML nguồn nằm tại \path{assets/diagrams/dbml/}; Phụ lục này dành cho diagram mở rộng khác (permission matrix, topology bổ sung) khi chương chính cần rút gọn.
+\section{Sơ đồ triển khai bổ sung cho Chương 5}
 
-\section{Permission matrix}
+\subsection{Phiên QR và giỏ chung}
 
-\section{Architecture diagrams bổ sung}
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-qr-session-init.pdf}
+  {Khởi tạo phiên đặt món từ mã QR với kiểm tra ngữ cảnh đơn vị thuê bao.}
+  {fig:chapter5-qr-session-init}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-shared-cart-version.pdf}
+  {Kiểm soát giỏ chung qua phiên bản lạc quan và phát hiện xung đột cập nhật.}
+  {fig:chapter5-shared-cart-version}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-session-redis-postgres-sync.pdf}
+  {Đồng bộ phiên giữa Redis và PostgreSQL để bảo toàn trạng thái bền vững.}
+  {fig:chapter5-session-redis-postgres-sync}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-cart-submit-order.pdf}
+  {Chuyển giỏ đặt món thành đơn chờ xác nhận và liên kết hóa đơn mở.}
+  {fig:chapter5-cart-submit-order}
+
+\subsection{Order Confirm Saga}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-order-confirm-commit-boundary.pdf}
+  {Ranh giới ghi nhận giao dịch giữa Order và Catalog trong bước xác nhận đơn.}
+  {fig:chapter5-order-confirm-commit-boundary}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-order-confirm-idempotency-retry.pdf}
+  {Gửi lại an toàn khi phản hồi trừ tồn kho từ Catalog bị mất.}
+  {fig:chapter5-order-confirm-idempotency-retry}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-order-confirm-compensation.pdf}
+  {Bù trừ tồn kho theo \texttt{reservationVersion} khi giao dịch Order thất bại.}
+  {fig:chapter5-order-confirm-compensation}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-order-confirm-outbox-kds.pdf}
+  {Từ outbox \texttt{order.confirmed} đến phiếu KDS và gợi ý WebSocket.}
+  {fig:chapter5-order-confirm-outbox-kds}
+
+\subsection{KDS và cơ chế tải lại trạng thái}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-kds-event-ingestion.pdf}
+  {Kitchen tiếp nhận \texttt{order.confirmed} và tạo phiếu KDS theo trạm.}
+  {fig:chapter5-kds-event-ingestion}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-kds-redis-projection.pdf}
+  {Bản chiếu Redis phục vụ hàng đợi KDS theo đơn vị thuê bao và trạm.}
+  {fig:chapter5-kds-redis-projection}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-kds-realtime-refetch.pdf}
+  {Gợi ý WebSocket và tải lại trạng thái hàng đợi KDS từ máy chủ.}
+  {fig:chapter5-kds-realtime-refetch}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-kds-ticket-mutation.pdf}
+  {Thao tác bắt đầu, hoàn tất và bù trừ phiếu KDS.}
+  {fig:chapter5-kds-ticket-mutation}
+
+\subsection{Thanh toán}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-payment-snapshot-intent.pdf}
+  {Payment lấy bản chụp hóa đơn từ Order trước khi tạo hoặc hoàn tất thanh toán.}
+  {fig:chapter5-payment-snapshot-intent}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-payment-cash-commit.pdf}
+  {Ghi nhận thanh toán tiền mặt trong Payment và hoàn tất hóa đơn qua Order.}
+  {fig:chapter5-payment-cash-commit}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-payment-sepay-webhook.pdf}
+  {Xử lý webhook SePay cho hóa đơn nhà hàng với kiểm tra bí mật, tham chiếu và số tiền.}
+  {fig:chapter5-payment-sepay-webhook}
+
+\subsection{SaaS onboarding và subscription}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-saas-provisioning-boundary.pdf}
+  {Ranh giới khởi tạo đơn vị thuê bao, chủ sở hữu, gói ban đầu và dữ liệu mặc định.}
+  {fig:chapter5-saas-provisioning-boundary}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-saas-onboarding-compensation.pdf}
+  {Bù trừ khi khởi tạo đơn vị thuê bao thất bại sau các thao tác phụ thuộc.}
+  {fig:chapter5-saas-onboarding-compensation}
+
+\extendeddiagramfigure{0.72\textheight}
+  {chapter5-saas-subscription-lifecycle.pdf}
+  {Vòng đời hóa đơn gói dịch vụ, thuê bao và cache quyền theo gói.}
+  {fig:chapter5-saas-subscription-lifecycle}
+
+\FloatBarrier
+\clearpage

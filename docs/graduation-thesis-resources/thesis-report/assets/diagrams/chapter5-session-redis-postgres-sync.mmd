@@ -1,33 +1,34 @@
 sequenceDiagram
   autonumber
-  participant Order as Order<br/>dual-layer
-  participant Redis as Redis<br/>hot path
-  participant ODB as PostgreSQL<br/>durable
+  participant Order as Order<br/>(Lớp kép)
+  participant Redis as Redis<br/>(Đường nóng)
+  participant ODB as PostgreSQL<br/>(Bền vững)
 
-  Note over Order,ODB: Session Creation - Both layers
-  Order->>ODB: Create ACTIVE session
-  ODB-->>Order: Session persisted
-  Order->>Redis: Create session cache<br/>with TTL
-  Redis-->>Order: Session cached
+  Note over Order,ODB: Khởi tạo phiên - Cả hai lớp
+  Order->>ODB: Tạo phiên HOẠT ĐỘNG (ACTIVE)
+  ODB-->>Order: Phiên đã lưu bền vững
+  Order->>Redis: Tạo cache phiên<br/>kèm TTL
+  Redis-->>Order: Phiên đã được cache
 
-  Note over Order,ODB: Cart Update - Redis only
-  Order->>Redis: Update cart snapshot
-  Redis-->>Order: Cart updated
+  Note over Order,ODB: Cập nhật giỏ hàng - Chỉ trên Redis
+  Order->>Redis: Cập nhật ảnh chụp giỏ hàng
+  Redis-->>Order: Giỏ hàng đã cập nhật
 
-  Note over Order,ODB: Order Submit - Commit to PostgreSQL
-  Order->>Redis: Read cart
-  Redis-->>Order: Cart snapshot
-  Order->>ODB: Create PENDING order<br/>link to session
-  ODB-->>Order: Order committed
-  Order->>Redis: Clear cart
-  Redis-->>Order: Cart deleted
+  Note over Order,ODB: Gửi đơn hàng - Ghi nhận vào PostgreSQL
+  Order->>Redis: Đọc giỏ hàng
+  Redis-->>Order: Ảnh chụp giỏ hàng
+  Order->>ODB: Tạo đơn PENDING<br/>liên kết với phiên
+  ODB-->>Order: Đơn hàng đã ghi nhận
+  Order->>Redis: Xóa giỏ hàng
+  Redis-->>Order: Giỏ hàng đã xóa
 
-  Note over Order,ODB: Redis Failure - Recovery
-  Order->>Redis: Read session
-  Redis--xOrder: Cache miss
-  Order->>ODB: Find session by<br/>tenant + table
-  ODB-->>Order: Session still ACTIVE
-  Order->>Redis: Rebuild cache
-  Redis-->>Order: Session restored
+  Note over Order,ODB: Sự cố Redis - Phục hồi
+  Order->>Redis: Đọc phiên
+  Redis--xOrder: Cache miss (Lỗi cache)
+  Order->>ODB: Tìm phiên theo<br/>tenant + bàn
+  ODB-->>Order: Phiên vẫn HOẠT ĐỘNG
+  Order->>Redis: Tái dựng cache
+  Redis-->>Order: Phiên được khôi phục
 
-  Note over Order,ODB: Redis is hot path. PostgreSQL is durable source of truth for session lifecycle.
+  Note over Order,ODB: Redis là đường truyền nóng. PostgreSQL là nguồn dữ liệu bền vững đáng tin cậy cho vòng đời phiên.
+

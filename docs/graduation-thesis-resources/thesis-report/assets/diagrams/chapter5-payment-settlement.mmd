@@ -1,32 +1,33 @@
 sequenceDiagram
   autonumber
-  actor Staff as Staff / Customer
-  participant BFF as BFF<br/>Payment edge
-  participant Payment as Payment<br/>owner
-  participant Order as Order<br/>bill/session owner
-  participant Sepay as SePay / Bank
+  actor Staff as Nhân viên / Khách
+  participant BFF as BFF<br/>(Lớp biên Payment)
+  participant Payment as Payment<br/>(Quản lý thanh toán)
+  participant Order as Order<br/>(Quản lý hóa đơn/phiên)
+  participant Sepay as SePay / Ngân hàng
   participant Kafka as Kafka<br/>payment.completed
 
-  Staff->>BFF: Pay by cash or request VietQR
-  BFF->>Payment: Verified payment command
-  Payment->>Order: Read payable bill snapshot
-  Order-->>Payment: Status and rounded total
+  Staff->>BFF: Thanh toán tiền mặt hoặc yêu cầu VietQR
+  BFF->>Payment: Lệnh thanh toán đã xác minh
+  Payment->>Order: Đọc ảnh chụp hóa đơn cần trả
+  Order-->>Payment: Trạng thái và số tiền đã làm tròn
 
-  alt Cash
-    Payment->>Payment: Commit PAID cash<br/>audit + outbox
-    Payment->>Order: Mark bill paid
+  alt Tiền mặt
+    Payment->>Payment: Ghi nhận thanh toán tiền mặt ĐÃ TRẢ<br/>kiểm toán + outbox
+    Payment->>Order: Đánh dấu hóa đơn đã trả
   else VietQR / SePay
-    Payment-->>BFF: QR payload + QRTBL reference
-    BFF-->>Staff: Display VietQR
-    Staff->>Sepay: Bank transfer with bill reference
-    Sepay->>BFF: SePay webhook
-    BFF->>Payment: Webhook payload
-    Payment->>Payment: Validate secret, reference and amount
-    Payment->>Order: Mark bill paid if valid
+    Payment-->>BFF: Dữ liệu QR + tham chiếu QRTBL
+    BFF-->>Staff: Hiển thị mã VietQR
+    Staff->>Sepay: Chuyển khoản kèm tham chiếu hóa đơn
+    Sepay->>BFF: SePay Webhook
+    BFF->>Payment: Dữ liệu webhook
+    Payment->>Payment: Xác minh secret, tham chiếu và số tiền
+    Payment->>Order: Đánh dấu hóa đơn đã thanh toán nếu hợp lệ
   end
 
-  Payment-->>BFF: Payment result
-  BFF-->>Staff: Show result
-  Payment-->>Kafka: Publish payment.completed after commit
+  Payment-->>BFF: Kết quả thanh toán
+  BFF-->>Staff: Hiển thị kết quả
+  Payment-->>Kafka: Phát sự kiện payment.completed sau commit
 
-  Note over Payment,Order: Payment owns payment records and audit logs<br/>Order owns bill, session and table finalization
+  Note over Payment,Order: Payment sở hữu bản ghi thanh toán và nhật ký kiểm toán.<br/>Order sở hữu hóa đơn, phiên hoạt động và dọn bàn/đóng phiên.
+

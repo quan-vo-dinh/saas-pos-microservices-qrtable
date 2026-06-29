@@ -13,7 +13,7 @@ import { reachable } from './helpers/readiness';
 
 /** Matches `tools/dev-seed/constants.js` + `tools/dev-seed/postgres/data.js` */
 const DEV_TENANT_ID = '023772bb-391b-401c-936a-ed7034b69cec';
-const TABLE_A01_ID = '11111111-dddd-4111-8111-111111111111';
+const TABLE_A02_ID = '22222222-dddd-4222-8222-222222222222';
 const TENANT_SLUG = 'pho-viet';
 
 const PWA_BASE = process.env.STEPP27_PWA_BASE_URL ?? 'http://localhost:5173';
@@ -45,8 +45,8 @@ test.describe('Step 2.7 realtime (dev stack)', () => {
       suite: 'E2E / Step 2.7',
     });
 
-    const qrToken = devQrTokenHex(DEV_TENANT_ID, 'A01');
-    const landingUrl = `${PWA_BASE}/landing?tenant=${encodeURIComponent(TENANT_SLUG)}&table=${encodeURIComponent(TABLE_A01_ID)}&token=${encodeURIComponent(qrToken)}`;
+    const qrToken = devQrTokenHex(DEV_TENANT_ID, 'A02');
+    const landingUrl = `${PWA_BASE}/landing?tenant=${encodeURIComponent(TENANT_SLUG)}&table=${encodeURIComponent(TABLE_A02_ID)}&token=${encodeURIComponent(qrToken)}`;
 
     await allure.step('Customer opens QR landing page', async () => {
       const pwaContext = await browser.newContext();
@@ -125,11 +125,11 @@ test.describe('Step 2.7 realtime (dev stack)', () => {
 
         await pwaContext.setOffline(false);
         await pwa.bringToFront();
-        await expect(pwa.getByText(/SERVED|Đã phục vụ/)).toBeVisible({ timeout: 180_000 });
+        await expect(pwa.getByText(/SERVED|Đã phục vụ/).first()).toBeVisible({ timeout: 180_000 });
 
         await pwa.reload({ waitUntil: 'domcontentloaded' });
         await expect(pwa).toHaveURL(trackingUrl);
-        await expect(pwa.getByText(/SERVED|Đã phục vụ/)).toBeVisible({ timeout: 60_000 });
+        await expect(pwa.getByText(/SERVED|Đã phục vụ/).first()).toBeVisible({ timeout: 60_000 });
         await attachPageShot(pwa, testInfo, 'customer served screenshot');
       } finally {
         await pwaContext.setOffline(false).catch(() => undefined);

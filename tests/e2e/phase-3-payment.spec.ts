@@ -12,6 +12,12 @@ import { test, expect } from '@playwright/test';
 import { loginWithKeycloak } from './helpers/auth';
 import { reachable } from './helpers/readiness';
 
+import { devQrTokenHex } from './helpers/qr';
+
+const DEV_TENANT_ID = '023772bb-391b-401c-936a-ed7034b69cec';
+const TABLE_A01_ID = '11111111-dddd-4111-8111-111111111111';
+const TENANT_SLUG = 'pho-viet';
+
 const PWA_BASE = process.env.PHASE3_PWA_BASE_URL ?? 'http://localhost:5173';
 const MGMT_BASE = process.env.PHASE3_MANAGEMENT_BASE_URL ?? 'http://localhost:3000';
 
@@ -25,6 +31,16 @@ const OWNER_PASSWORD = process.env.PHASE3_OWNER_PASSWORD;
 test.describe('Phase 3 payment smoke', () => {
   test('customer payment status screen renders', async ({ page }) => {
     test.skip(process.env.SKIP_PHASE3_PWA_E2E === '1', 'SKIP_PHASE3_PWA_E2E=1');
+
+    // Visit landing page first to establish session (isActive = true)
+    const qrToken = devQrTokenHex(DEV_TENANT_ID, 'A01');
+    const landingUrl = `${PWA_BASE}/landing?tenant=${encodeURIComponent(TENANT_SLUG)}&table=${encodeURIComponent(TABLE_A01_ID)}&token=${encodeURIComponent(qrToken)}`;
+    await page.goto(landingUrl, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('button', { name: 'Vào thực đơn' })).toBeVisible();
+    await page.getByRole('button', { name: 'Vào thực đơn' }).click();
+    await expect(page.getByRole('button', { name: 'Tất cả' })).toBeVisible();
+
+    // Now visit request-payment page
     await page.goto(`${PWA_BASE}/request-payment`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { name: 'Thanh toán' })).toBeVisible();
     await expect(page.locator('body')).toBeVisible();

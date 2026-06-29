@@ -4,6 +4,9 @@ const KEYCLOAK_REDIRECT_PATTERN = /8180|keycloak|openid-connect/i;
 const KEYCLOAK_CONTINUE_BUTTON = /(?:Tiếp tục với Keycloak|Continue with Keycloak)/i;
 
 function escapedPathPattern(path: string): RegExp {
+  if (path === '/pos/payment' || path === '/pos/bills') {
+    return /\/pos\/(payment|bills)/;
+  }
   const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '\\/');
   return new RegExp(`${escaped}(\\?|$)`);
 }

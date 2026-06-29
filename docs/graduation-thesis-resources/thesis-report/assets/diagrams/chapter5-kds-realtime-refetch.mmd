@@ -1,22 +1,23 @@
 sequenceDiagram
   autonumber
   participant Kitchen as Kitchen
-  participant Redis as Redis<br/>Pub/Sub
-  participant Sub as BFF<br/>KDS subscriber
-  participant WS as BFF<br/>WebSocket gateway
-  participant UI as KDS client
-  participant API as BFF<br/>HTTP API
-  participant KDS as Kitchen<br/>TCP API
+  participant Redis as Redis<br/>(Pub/Sub)
+  participant Sub as BFF<br/>(Đăng ký KDS)
+  participant WS as BFF<br/>(WebSocket Gateway)
+  participant UI as Client KDS
+  participant API as BFF<br/>(HTTP API)
+  participant KDS as Kitchen<br/>(TCP API)
 
-  Kitchen->>Redis: Publish realtime:kds:{tenantId}<br/>kds.queue_changed
-  Redis-->>Sub: Pattern subscription realtime:kds:*
-  Sub->>Sub: Parse payload and validate eventType
+  Kitchen->>Redis: Phát realtime:kds:{tenantId}<br/>kds.queue_changed
+  Redis-->>Sub: Đăng ký theo mẫu realtime:kds:*
+  Sub->>Sub: Phân tích payload và xác minh eventType
   Sub->>WS: emitKdsQueueChanged(event)
-  WS-->>UI: events.kdsQueueChanged<br/>station room + management room
+  WS-->>UI: events.kdsQueueChanged<br/>phòng trạm + phòng quản lý
   UI->>API: GET /admin/kds/queue?station=...
-  API->>API: Verify JWT, tenant, permission,<br/>station access
+  API->>API: Xác minh JWT, tenant, quyền,<br/>truy cập trạm
   API->>KDS: TCP GET_QUEUE
-  KDS-->>API: Queue snapshot + revision
-  API-->>UI: Authoritative queue state
+  KDS-->>API: Ảnh chụp hàng đợi + revision
+  API-->>UI: Trạng thái hàng đợi có thẩm quyền
 
-  Note over UI,KDS: The WebSocket payload is not the source of truth.<br/>It tells the client which station changed so the client can refetch.
+  Note over UI,KDS: Dữ liệu truyền tải qua WebSocket không phải là nguồn sự thật.<br/>Nó chỉ báo cho client biết trạm nào thay đổi để client tự tải lại (refetch) snapshot hàng đợi.
+

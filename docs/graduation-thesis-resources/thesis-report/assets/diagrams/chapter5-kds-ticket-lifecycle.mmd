@@ -1,34 +1,34 @@
-%% KDS overview only. Focused diagrams below prove ingestion, Redis projection, realtime hint/refetch, and ticket mutation.
 sequenceDiagram
   autonumber
   participant Kafka as Kafka<br/>order.confirmed
-  participant Kitchen as Kitchen<br/>KDS service
-  participant Redis as Redis<br/>KDS projection
-  participant BFF as BFF<br/>realtime edge
-  participant UI as KDS client
-  actor Chef as Chef / Barista
-  participant Order as Order<br/>item lifecycle
+  participant Kitchen as Kitchen<br/>(Dịch vụ KDS)
+  participant Redis as Redis<br/>(Bản chiếu KDS)
+  participant BFF as BFF<br/>(WebSocket & Edge)
+  participant UI as Client KDS
+  actor Chef as Bếp trưởng / Pha chế
+  participant Order as Order<br/>(Vòng đời dòng món)
 
-  Kafka->>Kitchen: Deliver order.confirmed
-  Kitchen->>Kitchen: Validate contract and split by station
-  Kitchen->>Redis: Create station tickets<br/>queue + revision + SLA
-  Kitchen->>BFF: Publish kds.queue_changed hint
-  BFF-->>UI: WebSocket hint
-  UI->>BFF: Refetch queue snapshot
-  BFF->>Kitchen: TCP get station queue
-  Kitchen->>Redis: Read authoritative projection
-  Kitchen-->>BFF: Queue snapshot
-  BFF-->>UI: Latest KDS state
+  Kafka->>Kitchen: Chuyển sự kiện order.confirmed
+  Kitchen->>Kitchen: Xác minh hợp đồng và chia theo trạm
+  Kitchen->>Redis: Tạo phiếu theo trạm<br/>hàng đợi + revision + SLA
+  Kitchen->>BFF: Phát tín hiệu kds.queue_changed
+  BFF-->>UI: Tín hiệu WebSocket
+  UI->>BFF: Tải lại ảnh chụp hàng đợi
+  BFF->>Kitchen: TCP lấy hàng đợi trạm
+  Kitchen->>Redis: Đọc bản chiếu có thẩm quyền
+  Kitchen-->>BFF: Ảnh chụp hàng đợi
+  BFF-->>UI: Trạng thái KDS mới nhất
 
-  Chef->>UI: Start / mark ready ticket
-  UI->>BFF: Protected KDS command
-  BFF->>Kitchen: TCP ticket mutation
-  Kitchen->>Redis: Update ticket status and revision
-  opt Ticket marked READY
-    BFF->>Order: Sync ready order items
-    Order-->>BFF: Item readiness result
+  Chef->>UI: Bắt đầu / đánh dấu hoàn tất phiếu
+  UI->>BFF: Lệnh KDS được bảo vệ
+  BFF->>Kitchen: TCP cập nhật phiếu
+  Kitchen->>Redis: Cập nhật trạng thái phiếu và revision
+  opt Phiếu được đánh dấu READY
+    BFF->>Order: Đồng bộ dòng món đã chế biến xong
+    Order-->>BFF: Kết quả sẵn sàng của món
   end
-  Kitchen->>BFF: Publish queue changed hint
-  BFF-->>UI: WebSocket hint, client refetches
+  Kitchen->>BFF: Phát tín hiệu hàng đợi thay đổi
+  BFF-->>UI: Gợi ý WebSocket, client tự tải lại
 
-  Note over UI,BFF: WebSocket is only a hint. The client refetches the queue snapshot from the server.
+  Note over UI,BFF: WebSocket chỉ là tín hiệu gợi ý. Client tự tải lại (refetch) snapshot hàng đợi từ máy chủ.
+

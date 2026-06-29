@@ -1,29 +1,30 @@
 
 sequenceDiagram
   autonumber
-  participant Order as Order<br/>transaction
-  participant Redis as Redis<br/>cart state
-  participant ODB as PostgreSQL<br/>Order DB
+  participant Order as Order<br/>(Giao dịch)
+  participant Redis as Redis<br/>(Trạng thái giỏ)
+  participant ODB as PostgreSQL<br/>(CSDL Order)
 
-  Order->>Redis: Read cart and<br/>validate version
-  alt Cart version mismatch or empty
-    Redis-->>Order: Conflict or no items
-    Order-->>Order: Reject submit
-  else Cart valid and version matches
-    Redis-->>Order: Cart snapshot
-    Order->>ODB: Begin transaction
-    Order->>ODB: Lock session by<br/>tenant + sessionId
-    Order->>ODB: Create PENDING order<br/>+ line items from cart
-    alt Open bill exists
-      Order->>ODB: Link order to bill
-    else No open bill
-      Order->>ODB: Create OPEN bill<br/>link order
+  Order->>Redis: Đọc giỏ hàng và<br/>xác minh phiên bản
+  alt Lệch phiên bản giỏ hoặc giỏ rỗng
+    Redis-->>Order: Xung đột hoặc không có món
+    Order-->>Order: Từ chối gửi đơn
+  else Giỏ hợp lệ và trùng khớp phiên bản
+    Redis-->>Order: Ảnh chụp giỏ hàng
+    Order->>ODB: Bắt đầu giao dịch
+    Order->>ODB: Khóa phiên theo<br/>tenant + sessionId
+    Order->>ODB: Tạo đơn PENDING<br/>+ dòng món từ giỏ hàng
+    alt Đã có hóa đơn mở (open bill)
+      Order->>ODB: Liên kết đơn vào hóa đơn
+    else Chưa có hóa đơn mở
+      Order->>ODB: Tạo hóa đơn MỞ (OPEN)<br/>liên kết đơn hàng
     end
-    Order->>ODB: Commit transaction
-    ODB-->>Order: Order committed
-    Order->>Redis: Delete cart
-    Redis-->>Order: Cart cleared
+    Order->>ODB: Ghi nhận giao dịch (Commit)
+    ODB-->>Order: Đơn hàng đã ghi nhận
+    Order->>Redis: Xóa giỏ hàng
+    Redis-->>Order: Giỏ hàng đã xóa
   end
 
-  Note over Order,Redis: Stock NOT deducted here. Order stays PENDING until staff confirms via Order Confirm Saga (Section 5.4).
+  Note over Order,Redis: Tồn kho KHÔNG bị trừ ở bước này. Đơn hàng giữ trạng thái PENDING cho đến khi nhân viên xác nhận qua luồng Order Confirm Saga (Mục 5.4).
+
 

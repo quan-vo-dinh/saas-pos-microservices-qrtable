@@ -1,75 +1,53 @@
-\chapter{Minh chứng kiểm thử và khả năng tái hiện}
+\chapter{Minh chứng kiểm thử bổ sung}
 \label{app:test-evidence}
 
-Phụ lục này trình bày các minh chứng kiểm chứng có tính tái hiện cho hai kết luận quan trọng về Saga ở Chương~6. Nội dung ở đây không thay thế phần đánh giá chính, mà bổ sung dữ liệu kiểm chứng chi tiết để người đọc đối chiếu giữa lệnh kiểm thử, kết quả chạy và kết luận được hỗ trợ. Các ảnh client ở Chương~5 chỉ minh họa luồng nghiệp vụ thành công; các nhánh bù trừ của Saga, khả năng xử lý thao tác lặp và ranh giới dữ liệu được đối chiếu bằng kiểm thử đơn vị và kiểm thử hợp đồng.
+Phụ lục này trình bày các minh chứng kiểm thử bổ sung cho Chương~6. Các hình trong phụ lục cung cấp cơ sở đối chiếu giữa kết quả thực thi và các nhận định đánh giá đã nêu trong thân bài.
 
-\section{Kết quả kiểm thử Saga}
+\section{Kiểm thử E2E toàn luồng}
 
-Hai nhóm kiểm thử dưới đây được chạy với \texttt{NODE\_ENV} đặt là \texttt{test} và \texttt{GLOBAL\_PREFIX} đặt là \texttt{api/v1}. Cách chạy này giới hạn phụ thuộc vào cấu hình khi vận hành của dịch vụ và tập trung vào logic điều phối, hợp đồng phụ thuộc và nhánh bù trừ của từng Saga.
+Các hình trong mục này thuộc cùng một luồng kiểm thử Playwright đã được Chương~6 diễn giải: khách đặt món, POS tiếp nhận, KDS xử lý và khách tải lại trạng thái cuối cùng. Chương~6 trình bày lát cắt đại diện, còn phụ lục bổ sung các hình ghi nhận tiến trình xử lý theo từng chặng.
 
-Lệnh kiểm thử Order Confirm Saga:
+\chapterSixEvidenceFigure[Báo cáo Allure E2E tổng quan]{0.72\textheight}
+  {chapter6-04-e2e-playwright-overview.png}
+  {fig:chapter6-e2e-playwright-overview}
+  {Báo cáo Allure E2E tổng quan cho luồng đặt món tại bàn.}
 
-\begin{quote}
-\small\ttfamily
-NODE\_ENV=test GLOBAL\_PREFIX=api/v1\\
-pnpm exec jest --config apps/order/jest.config.cts --runInBand\\
-apps/order/src/app/modules/order/tests/\\
-order-confirm-saga.service.spec.ts\\
-apps/order/src/app/modules/order/tests/\\
-catalog-stock-gateway.service.spec.ts
-\end{quote}
+\chapterSixEvidencePair[Allure E2E chặng KDS và phục vụ]{0.72\textheight}
+  {chapter6-07-e2e-kds-ticket-finished.png}
+  {chapter6-08-e2e-customer-served-after-reload.png}
+  {fig:chapter6-e2e-kds-served}
+  {Báo cáo chặng bếp hoàn thành món (trái) và khách hàng nhận món thành công (phải).}
+  {fig:chapter6-e2e-kds-ticket-finished}
+  {fig:chapter6-e2e-customer-served-after-reload}
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.42\textheight,keepaspectratio]{appendix-d-01-order-saga-tests.png}
-  \caption[Kiểm thử Order Confirm Saga và hợp đồng tồn kho Catalog.]{Kết quả kiểm thử Order Confirm Saga và hợp đồng tồn kho của Catalog.}
-  \label{fig:appendix-d-order-saga-tests}
-\end{figure}
+\section{Minh chứng kiểm thử Saga}
 
-Kết quả trong Hình~\ref{fig:appendix-d-order-saga-tests} chứng minh Order Confirm Saga bằng kiểm thử đơn vị và kiểm thử hợp đồng: điều phối xác nhận đơn, phát lại khi đơn đã ở trạng thái xử lý, lỗi nghiệp vụ từ Catalog, nhánh bù trừ khi Order commit/outbox thất bại sau khi Catalog đã trừ tồn kho, và hợp đồng TCP trừ và hoàn tồn kho của Catalog. Kết quả này không thay thế kiểm thử tích hợp Order--Catalog trên toàn ngăn xếp; vì vậy Chương~6 kết luận luồng Saga đã có kết quả kiểm chứng tốt ở lớp điều phối và hợp đồng, đồng thời có thêm minh chứng tích hợp có điều kiện.
+Các hình dưới đây bổ sung cho bảng ràng buộc Saga ở Chương~6. Chúng trình bày kết quả thực thi các kịch bản kiểm thử liên quan đến bù trừ, tương tranh, khôi phục sau lỗi truyền thông và kiểm soát thông điệp đến muộn.
 
-Lệnh kiểm thử SaaS Onboarding Mini-Saga:
+\chapterSixEvidenceFigure[Kiểm thử SaaS Onboarding Saga]{0.72\textheight}
+  {chapter6-10-saas-onboarding-saga-tests.png}
+  {fig:chapter6-saas-onboarding-saga-tests}
+  {Kết quả thực thi kiểm thử dịch vụ SaaS và quy trình khởi tạo đơn vị thuê bao hiển thị trên Nx Cloud.}
 
-\begin{quote}
-\small\ttfamily
-NODE\_ENV=test GLOBAL\_PREFIX=api/v1\\
-pnpm exec jest --config apps/saas/jest.config.cts --runInBand\\
-apps/saas/src/services/\\
-onboarding-saga.service.spec.ts\\
-apps/saas/src/services/\\
-onboarding-saga.integration.spec.ts
-\end{quote}
+\chapterSixEvidenceFigure[Nhật ký kiểm thử bù trừ giao dịch]{0.72\textheight}
+  {chapter6-saga-test-compensation.png}
+  {fig:chapter6-saga-test-compensation}
+  {Nhật ký thực thi kịch bản kiểm thử bù trừ giao dịch khi gặp lỗi cơ sở dữ liệu.}
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.42\textheight,keepaspectratio]{appendix-d-02-saas-onboarding-tests.png}
-  \caption{Kết quả kiểm thử SaaS Onboarding Mini-Saga.}
-  \label{fig:appendix-d-saas-onboarding-tests}
-\end{figure}
+\chapterSixEvidenceFigure[Nhật ký kiểm thử tương tranh tồn kho]{0.72\textheight}
+  {chapter6-saga-test-concurrency.png}
+  {fig:chapter6-saga-test-concurrency}
+  {Nhật ký kiểm thử tích hợp xử lý tương tranh khi tồn kho chỉ còn 1.}
 
-Kết quả trong Hình~\ref{fig:appendix-d-saas-onboarding-tests} chứng minh SaaS Onboarding Mini-Saga bằng kiểm thử đơn vị và kiểm thử hợp đồng: điều phối khởi tạo đơn vị thuê bao, tương tác hợp đồng với các dịch vụ phụ thuộc và nhánh bù trừ trong lát cắt có đối tượng giả lập. Kết quả này chưa phải là minh chứng toàn luồng đầy đủ qua Keycloak, User-Access, Payment, Kafka và client; do đó Chương~6 không kết luận luồng khởi tạo SaaS đã được kiểm chứng toàn ngăn xếp.
+\chapterSixEvidenceFigure[Nhật ký kiểm thử khôi phục mất phản hồi mạng]{0.72\textheight}
+  {chapter6-saga-test-lost-response.png}
+  {fig:chapter6-saga-test-lost-response}
+  {Nhật ký kiểm thử tính lặp an toàn khi gặp sự cố mất phản hồi mạng.}
 
-\section{Ý nghĩa của kết quả kiểm thử}
+\chapterSixEvidenceFigure[Nhật ký kiểm thử bỏ qua yêu cầu giải phóng lỗi thời]{0.72\textheight}
+  {chapter6-saga-test-stale-release.png}
+  {fig:chapter6-saga-test-stale-release}
+  {Nhật ký kiểm thử kiểm soát phiên bản đặt trước khi bản tin đến muộn.}
 
-Bảng~\ref{tab:appendix-d-saga-artifact-scope} tóm tắt mỗi kết quả kiểm thử hỗ trợ kết luận nào và phần nào chưa được bao phủ bởi hai minh chứng trong phụ lục. Cách trình bày này giúp tách rõ minh chứng đã có với những kết luận cần thêm kiểm thử toàn luồng ở toàn bộ hệ thống.
-
-\begingroup
-\small
-\setlength{\tabcolsep}{3pt}
-\begin{longtable}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.24\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}}
-  \caption{Kết quả kiểm thử Saga và kết luận tương ứng.}
-  \label{tab:appendix-d-saga-artifact-scope}\\
-  \toprule
-  Luồng kiểm chứng & Minh chứng trong phụ lục & Kết luận được hỗ trợ & Phần chưa bao phủ \\
-  \midrule
-  \endfirsthead
-  \toprule
-  Luồng kiểm chứng & Minh chứng trong phụ lục & Kết luận được hỗ trợ & Phần chưa bao phủ \\
-  \midrule
-  \endhead
-  \bottomrule
-  \endfoot
-  Order Confirm Saga & Hình~\ref{fig:appendix-d-order-saga-tests} và lệnh kiểm thử Order--Catalog. & Có kết quả kiểm chứng cho điều phối, phát lại, lỗi nghiệp vụ từ Catalog, bù trừ ở lớp dịch vụ và hợp đồng TCP trừ/hoàn tồn kho. & Chưa phải minh chứng tiêm lỗi toàn ngăn xếp Order--Catalog với PostgreSQL, Redis và TCP services chạy thật. \\
-  SaaS Onboarding Mini-Saga & Hình~\ref{fig:appendix-d-saas-onboarding-tests} và lệnh kiểm thử SaaS onboarding. & Có kết quả kiểm chứng cho điều phối, đối tượng giả lập theo hợp đồng với phụ thuộc ngoài SaaS và bù trừ trong lớp kiểm thử đơn vị và hợp đồng. & Chưa phải minh chứng toàn luồng qua Keycloak, User-Access, Payment, Kafka và client. \\
-\end{longtable}
-\endgroup
+\FloatBarrier
+\clearpage

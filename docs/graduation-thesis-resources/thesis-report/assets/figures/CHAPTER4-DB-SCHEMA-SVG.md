@@ -8,9 +8,9 @@
 - `chapter4-db-saas-schema.svg`
 - `chapter4-db-user-access-schema.svg`
 
-LaTeX Chương 4 gọi trực tiếp các file này qua `\includesvg{...}`.
+LaTeX Chương 4 gọi trực tiếp các SVG này qua `\includesvg{...}`.
 
-**DBML** tại `assets/diagrams/dbml/` chỉ dùng để audit schema từ codebase và import vào dbdiagram khi cần chỉnh sơ đồ — **không** được script render mặc định ghi đè `.svg` trong thư mục này.
+**DBML** tại `assets/diagrams/dbml/` chỉ dùng để đối chiếu lược đồ từ mã nguồn QRTable và import vào dbdiagram khi cần chỉnh sơ đồ — **không** được script render mặc định ghi đè `.svg` trong thư mục này.
 
 ## Cập nhật sơ đồ
 

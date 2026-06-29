@@ -1,31 +1,31 @@
-%% Overview only. The focused diagrams next to this figure prove each invariant separately.
 sequenceDiagram
   autonumber
-  actor Staff as Staff<br/>POS
-  participant BFF as BFF<br/>guards
-  participant Order as Order<br/>order owner
-  participant Catalog as Catalog<br/>stock owner
+  actor Staff as Nhân viên<br/>(POS)
+  participant BFF as BFF<br/>(Guards)
+  participant Order as Order<br/>(Quản lý đơn hàng)
+  participant Catalog as Catalog<br/>(Quản lý tồn kho)
   participant Event as Outbox / Kafka / KDS
 
-  Staff->>BFF: Confirm pending order
-  BFF->>BFF: Verify JWT, tenant, permission
-  BFF->>Order: Verified confirm command
-  Order->>Order: Lock order and bill<br/>inside tenant scope
+  Staff->>BFF: Xác nhận đơn PENDING
+  BFF->>BFF: Xác minh JWT, tenant, quyền
+  BFF->>Order: Lệnh xác nhận đã xác minh
+  Order->>Order: Khóa đơn hàng và hóa đơn<br/>trong phạm vi tenant
 
-  alt Order already PROCESSING
-    Order-->>BFF: Return current state
-    BFF-->>Staff: Confirmation already applied
-  else Order is PENDING and bill is OPEN
-    Order->>Catalog: Deduct stock<br/>idempotency key + payload hash
-    Catalog-->>Order: APPLIED or REPLAYED<br/>reservationVersion
-    Order->>Order: Commit PROCESSING + items<br/>+ stockReservationVersion + outbox
-    Order-->>BFF: Confirmation success
-    BFF-->>Staff: Confirmation success
-    Order-->>Event: Relay committed order.confirmed
-    Event->>Event: Kitchen creates KDS ticket
-  else Invalid order or bill state
-    Order-->>BFF: Structured validation error
-    BFF-->>Staff: Show confirmation error
+  alt Đơn hàng đã ĐANG XỬ LÝ (PROCESSING)
+    Order-->>BFF: Trả về trạng thái hiện tại
+    BFF-->>Staff: Xác nhận đã được áp dụng
+  else Đơn là PENDING và hóa đơn là MỞ (OPEN)
+    Order->>Catalog: Trừ tồn kho<br/>idempotency key + payload hash
+    Catalog-->>Order: Đã áp dụng (APPLIED) hoặc Chạy lại (REPLAYED)<br/>reservationVersion
+    Order->>Order: Ghi nhận ĐANG XỬ LÝ (PROCESSING)<br/>+ stockReservationVersion + outbox
+    Order-->>BFF: Xác nhận thành công
+    BFF-->>Staff: Xác nhận thành công
+    Order-->>Event: Phát sự kiện order.confirmed đã commit
+    Event->>Event: Kitchen tạo phiếu KDS
+  else Trạng thái đơn hoặc hóa đơn không hợp lệ
+    Order-->>BFF: Lỗi kiểm tra dữ liệu cấu trúc
+    BFF-->>Staff: Hiển thị lỗi xác nhận
   end
 
-  Note over Order,Catalog: Order never writes Catalog DB directly.<br/>Focused figures below show commit boundary, retry, compensation and async side effect.
+  Note over Order,Catalog: Order không bao giờ ghi trực tiếp vào CSDL Catalog.<br/>Các hình tập trung bên dưới minh họa ranh giới commit, cơ chế thử lại, bù trừ và tác dụng phụ bất đồng bộ.
+

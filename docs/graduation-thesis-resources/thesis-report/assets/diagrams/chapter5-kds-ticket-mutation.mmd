@@ -1,37 +1,38 @@
 sequenceDiagram
   autonumber
-  actor Chef as Chef / Barista
-  participant UI as KDS client
-  participant BFF as BFF<br/>guards + station access
-  participant Kitchen as Kitchen<br/>ticket service
-  participant Redis as Redis<br/>KDS projection
-  participant Order as Order<br/>item lifecycle
-  participant WS as Realtime<br/>hint
+  actor Chef as Bếp trưởng / Pha chế
+  participant UI as Client KDS
+  participant BFF as BFF<br/>(Guards & Quyền trạm)
+  participant Kitchen as Kitchen<br/>(Dịch vụ phiếu)
+  participant Redis as Redis<br/>(Bản chiếu KDS)
+  participant Order as Order<br/>(Vòng đời dòng món)
+  participant WS as Realtime<br/>(Gợi ý)
 
-  Chef->>UI: Start ticket
+  Chef->>UI: Bắt đầu phiếu
   UI->>BFF: POST /tickets/{id}/start<br/>requestId
   BFF->>Kitchen: TCP START_TICKET
-  Kitchen->>Redis: Claim command dedupe key
-  alt Fresh request
-    Kitchen->>Redis: PENDING -> PROCESSING<br/>increment revision
-    Kitchen->>WS: Publish TICKET_STARTED
-  else Duplicate requestId
-    Kitchen-->>BFF: Return current ticket<br/>no second event
+  Kitchen->>Redis: Yêu cầu khóa chống trùng lệnh
+  alt Yêu cầu mới
+    Kitchen->>Redis: PENDING -> PROCESSING<br/>tăng revision
+    Kitchen->>WS: Phát sự kiện TICKET_STARTED
+  else requestId bị trùng lặp
+    Kitchen-->>BFF: Trả về phiếu hiện tại<br/>không phát sự kiện lần hai
   end
 
-  Chef->>UI: Mark ticket done
+  Chef->>UI: Đánh dấu hoàn tất phiếu
   UI->>BFF: POST /tickets/{id}/done<br/>requestId
   BFF->>Kitchen: TCP MARK_READY
-  Kitchen->>Redis: PROCESSING -> READY<br/>move active to ready queue
-  Kitchen->>WS: Publish TICKET_READY
-  BFF->>Order: TCP MARK_ITEMS_READY<br/>order item ids
-  alt Order sync succeeds
-    Order-->>BFF: kitchen.item_ready<br/>order status change if any
-    BFF->>WS: Emit staff/customer updates
-  else Order sync fails
-    BFF->>Kitchen: TCP RECALL_TICKET<br/>compensation requestId
-    Kitchen->>Redis: READY -> PROCESSING<br/>within recall window
-    Kitchen->>WS: Publish TICKET_RECALLED
+  Kitchen->>Redis: PROCESSING -> READY<br/>chuyển từ hàng đợi hoạt động sang hàng đợi sẵn sàng
+  Kitchen->>WS: Phát sự kiện TICKET_READY
+  BFF->>Order: TCP MARK_ITEMS_READY<br/>danh sách id dòng món
+  alt Đồng bộ Order thành công
+    Order-->>BFF: kitchen.item_ready<br/>thay đổi trạng thái đơn nếu có
+    BFF->>WS: Phát cập nhật tới nhân viên/khách hàng
+  else Đồng bộ Order thất bại
+    BFF->>Kitchen: TCP RECALL_TICKET<br/>requestId bù trừ
+    Kitchen->>Redis: READY -> PROCESSING<br/>trong cửa sổ thu hồi (recall window)
+    Kitchen->>WS: Phát sự kiện TICKET_RECALLED
   end
 
-  Note over BFF,Order: Kitchen owns KDS ticket state.<br/>Order remains the owner of order item readiness.
+  Note over BFF,Order: Kitchen sở hữu trạng thái phiếu KDS.<br/>Order duy trì quyền sở hữu trạng thái sẵn sàng của dòng món.
+

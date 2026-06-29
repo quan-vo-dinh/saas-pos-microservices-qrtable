@@ -1,4 +1,4 @@
-%% Compact teaching diagram for defense Slide 22. Detailed failure and database boundaries remain in chapter5-order-confirm-stock.mmd.
+%% Compact sequence diagram for the order confirmation stock flow. Detailed failure and database boundaries remain in chapter5-order-confirm-stock.mmd.
 %%{init: {"theme": "base", "sequence": {"showSequenceNumbers": true, "actorMargin": 180, "messageMargin": 36, "mirrorActors": false}, "themeVariables": {"fontFamily": "Arial, sans-serif", "primaryColor": "#eef6ff", "primaryBorderColor": "#2563eb", "actorBkg": "#f0fdf4", "actorBorderColor": "#16a34a", "actorBorder": "#16a34a", "noteBkgColor": "#fff7ed", "noteBorderColor": "#ea580c", "lineColor": "#475569"}}}%%
 sequenceDiagram
   autonumber
@@ -14,7 +14,7 @@ sequenceDiagram
   Order->>Order: Lock and validate order in tenant scope
 
   alt Order already PROCESSING
-    Order-->>BFF: Return current state
+    Order-->>BFF: Trả về trạng thái hiện có
     BFF-->>Staff: Confirmation already applied
   else Order is PENDING and bill is OPEN
     Order->>Catalog: Deduct stock<br/>key + immutable payload

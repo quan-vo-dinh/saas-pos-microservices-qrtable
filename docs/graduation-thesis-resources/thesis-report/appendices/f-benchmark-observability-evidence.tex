@@ -1,0 +1,68 @@
+\chapter{Kết quả đo tải và quan sát vận hành bổ sung}
+\label{app:benchmark-observability-evidence}
+
+Phụ lục này trình bày các hình bổ sung được Chương~6 tham chiếu khi đánh giá kết quả đo tải trong môi trường cục bộ, trạng thái vận hành, khả năng quan sát và quá trình đóng gói triển khai. Các hình phản ánh một lần chạy cụ thể; kết luận chính vẫn nằm trong Chương~6 và phải được đọc cùng các giới hạn đánh giá đã nêu.
+
+\section{Kafka và Redis trong một lần chạy đại diện}
+
+\chapterSixEvidenceFigure[Giám sát sự kiện xác nhận đơn hàng trên Kafka]{0.72\textheight}
+  {chapter6-17-kafkio-topic-event.png}
+  {fig:chapter6-kafkio-topic-event}
+  {Nội dung thông điệp sự kiện xác nhận đơn hàng trên công cụ quản lý Kafka.}
+
+\chapterSixEvidenceFigure[Cấu hình khóa dữ liệu KDS trong Redis]{0.72\textheight}
+  {chapter6-18-redisinsight-kds-projection.png}
+  {fig:chapter6-redisinsight-kds-projection}
+  {Cấu trúc bảng băm lưu trữ trạng thái chế biến trên công cụ RedisInsight.}
+
+\section{Đối chiếu chỉ số sau phiên đo tải k6}
+
+\chapterSixEvidenceFigure[Grafana BFF sau phiên đo tải k6]{0.72\textheight}
+  {chapter6-k6-grafana-bff-drilldown-after-fix.png}
+  {fig:chapter6-k6-grafana-bff-drilldown-after-fix}
+  {Bảng điều khiển dịch vụ BFF sau phiên đo tải k6.}
+
+\chapterSixEvidenceFigure[Prometheus HTTP theo đường dẫn và trạng thái sau phiên đo tải k6]{0.72\textheight}
+  {chapter6-k6-prometheus-http-route-status.png}
+  {fig:chapter6-k6-prometheus-http-route-status}
+  {Kết quả truy vấn Prometheus cho tốc độ yêu cầu HTTP theo dịch vụ, đường dẫn và trạng thái.}
+
+\chapterSixEvidenceFigure[Grafana chỉ số nghiệp vụ sau phiên đo tải k6]{0.72\textheight}
+  {chapter6-k6-grafana-business-metrics.png}
+  {fig:chapter6-k6-grafana-business-metrics}
+  {Bảng điều khiển chỉ số nghiệp vụ sau phiên đo tải k6.}
+
+\chapterSixEvidenceFigure[Prometheus bộ đếm nghiệp vụ sau phiên đo tải k6]{0.72\textheight}
+  {chapter6-k6-prometheus-business-counters.png}
+  {fig:chapter6-k6-prometheus-business-counters}
+  {Kết quả truy vấn Prometheus cho các bộ đếm nghiệp vụ.}
+
+\chapterSixEvidenceFigure[Truy vết Tempo cho mã QR không hợp lệ]{0.72\textheight}
+  {chapter6-k6-tempo-invalid-qr-trace.png}
+  {fig:chapter6-k6-tempo-invalid-qr-trace}
+  {Truy vết đại diện trên Tempo cho đường xử lý mã QR không hợp lệ.}
+
+\section{Monorepo, đóng gói và triển khai}
+
+\chapterSixEvidenceFigure[Biểu tượng công cụ quản lý dự án Nx]{0.22\textheight}
+  {chapter6-20-nx-project-graph.png}
+  {fig:chapter6-nx-project-graph}
+  {Biểu tượng công cụ quản lý dự án Nx Monorepo.}
+
+\chapterSixEvidenceFigure[Quản lý đóng gói container bằng Docker]{0.72\textheight}
+  {chapter6-22-docker-image-or-compose-build.png}
+  {fig:chapter6-docker-image-or-compose-build}
+  {Lịch sử đóng gói các hình ảnh container trên công cụ Docker Desktop.}
+
+\chapterSixEvidenceFigure[Triển khai ứng dụng khách hàng trên Vercel]{0.72\textheight}
+  {chapter6-23a-vercel-customer-pwa.png}
+  {fig:chapter6-vercel-customer-pwa}
+  {Trạng thái triển khai ứng dụng khách hàng lên nền tảng đám mây Vercel.}
+
+\chapterSixEvidenceFigure[Triển khai ứng dụng quản trị trên Vercel]{0.72\textheight}
+  {chapter6-23b-vercel-management-app.png}
+  {fig:chapter6-vercel-management-app}
+  {Trạng thái triển khai ứng dụng quản trị lên nền tảng đám mây Vercel.}
+
+\FloatBarrier
+\clearpage

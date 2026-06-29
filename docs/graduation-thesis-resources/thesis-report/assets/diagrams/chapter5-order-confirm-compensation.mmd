@@ -1,28 +1,29 @@
 sequenceDiagram
   autonumber
   participant Order as Order
-  participant ODB as PostgreSQL<br/>Order DB
+  participant ODB as PostgreSQL<br/>(CSDL Order)
   participant Catalog as Catalog
-  participant CDB as PostgreSQL<br/>Catalog DB
+  participant CDB as PostgreSQL<br/>(CSDL Catalog)
 
-  Order->>Catalog: Deduct stock
-  Catalog->>CDB: Commit RESERVED version 1
-  Catalog-->>Order: APPLIED + reservationVersion
-  Order->>ODB: Save PROCESSING + outbox
+  Order->>Catalog: Trừ tồn kho
+  Catalog->>CDB: Ghi nhận phiên bản RESERVED 1
+  Catalog-->>Order: Áp dụng thành công (APPLIED)<br/>+ reservationVersion
+  Order->>ODB: Lưu ĐANG XỬ LÝ (PROCESSING) + outbox
 
-  break Order persistence or outbox write fails
-    ODB--xOrder: Roll back Order transaction
-    Order->>Catalog: Release stock<br/>reservationVersion 1
-    Catalog->>CDB: Lock reservation and stock rows
-    alt Matching RESERVED version
-      Catalog->>CDB: Restore stock and mark RELEASED
-      Catalog-->>Order: APPLIED
-    else Same version already RELEASED
-      Catalog-->>Order: REPLAYED<br/>no second restoration
-    else Older release arrives late
-      Catalog-->>Order: STALE<br/>newer reservation remains
+  break Lưu trữ Order hoặc ghi outbox thất bại
+    ODB--xOrder: Rollback giao dịch Order
+    Order->>Catalog: Giải phóng tồn kho<br/>reservationVersion 1
+    Catalog->>CDB: Khóa các dòng reservation và tồn kho
+    alt Khớp phiên bản RESERVED
+      Catalog->>CDB: Khôi phục tồn kho và đánh dấu ĐÃ GIẢI PHÓNG (RELEASED)
+      Catalog-->>Order: Áp dụng thành công (APPLIED)
+    else Cùng phiên bản đã ĐÃ GIẢI PHÓNG
+      Catalog-->>Order: Chạy lại (REPLAYED)<br/>không khôi phục lần hai
+    else Yêu cầu giải phóng cũ đến muộn
+      Catalog-->>Order: Cũ (STALE)<br/>giữ nguyên giữ chỗ mới hơn
     end
-    Order-->>Order: Preserve original failure
+    Order-->>Order: Bảo toàn lỗi gốc
   end
 
-  Note over Order,Catalog: Compensation is tied to the version returned by Catalog.<br/>A delayed release cannot undo a newer reservation.
+  Note over Order,Catalog: Cơ chế bù trừ liên kết chặt chẽ với phiên bản do Catalog trả về.<br/>Một yêu cầu giải phóng đến trễ không được hoàn tác một yêu cầu giữ chỗ mới hơn.
+

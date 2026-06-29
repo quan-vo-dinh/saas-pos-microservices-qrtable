@@ -1,58 +1,59 @@
 sequenceDiagram
   autonumber
-  actor Customer as Customer<br/>PWA
+  actor Customer as Khách hàng<br/>(PWA)
   participant BFF as BFF<br/>API Gateway
-  participant Order as Order<br/>session and cart owner
-  participant Catalog as Catalog<br/>Table + Menu
-  participant Redis as Redis<br/>operational state
-  participant ODB as PostgreSQL<br/>Order DB
+  participant Order as Dịch vụ Order<br/>(Quản lý phiên & giỏ)
+  participant Catalog as Dịch vụ Catalog<br/>(Bàn & Thực đơn)
+  participant Redis as Redis<br/>(Trạng thái chạy)
+  participant ODB as PostgreSQL<br/>(CSDL Order)
 
-  Customer->>BFF: Open table QR link
-  BFF->>BFF: Validate QR and session context
-  BFF->>Order: Join or create table session
-  Order->>Catalog: Validate QR token and table
-  Catalog-->>Order: Table snapshot and current status
+  Customer->>BFF: Mở liên kết mã QR tại bàn
+  BFF->>BFF: Xác minh mã QR và ngữ cảnh phiên
+  BFF->>Order: Tham gia hoặc tạo phiên bàn
+  Order->>Catalog: Xác minh QR token và bàn
+  Catalog-->>Order: Ảnh chụp thông tin bàn và trạng thái hiện tại
 
-  alt Table is OCCUPIED with active session
-    Order->>Redis: Read active session state
-    alt Redis hit and not idle
-      Redis-->>Order: Active session snapshot
-      Order->>Redis: Refresh active session lifetime
-      Order-->>BFF: Existing active session
-    else Redis miss or stale
-      Order->>ODB: Find active session by tenant/table
-      Order->>Redis: Rebuild session snapshot
-      Order-->>BFF: Rehydrated active session
+  alt Bàn đang BẬN (OCCUPIED) với phiên hoạt động
+    Order->>Redis: Đọc trạng thái phiên hoạt động
+    alt Redis hit và không rảnh (idle)
+      Redis-->>Order: Ảnh chụp phiên hoạt động
+      Order->>Redis: Làm mới thời gian sống phiên hoạt động
+      Order-->>BFF: Phiên hoạt động hiện có
+    else Redis miss hoặc hết hạn
+      Order->>ODB: Tìm phiên hoạt động theo tenant/bàn
+      Order->>Redis: Tái dựng ảnh chụp phiên
+      Order-->>BFF: Khôi phục phiên hoạt động
     end
-  else Table is AVAILABLE
-    Order->>ODB: Create ACTIVE session row
-    Order->>Redis: Create session snapshot
-    Order->>Catalog: Mark table occupied for the session
-    Catalog-->>Order: Updated table snapshot
-    Order-->>BFF: New session
-  else Idle empty session found
-    Order->>ODB: Close only after durable empty-session checks
-    Order->>Redis: Clear stale session/cart state
-    Order->>Catalog: Mark table available
-    Order->>ODB: Create replacement ACTIVE session
-    Order->>Redis: Create replacement session snapshot
+  else Bàn đang TRỐNG (AVAILABLE)
+    Order->>ODB: Tạo bản ghi phiên HOẠT ĐỘNG (ACTIVE)
+    Order->>Redis: Tạo ảnh chụp phiên
+    Order->>Catalog: Đánh dấu bàn BẬN cho phiên này
+    Catalog-->>Order: Ảnh chụp bàn đã cập nhật
+    Order-->>BFF: Trả về phiên mới
+  else Tìm thấy phiên trống rảnh rỗi (idle)
+    Order->>ODB: Đóng phiên sau khi kiểm tra bền vững phiên trống
+    Order->>Redis: Xóa trạng thái phiên/giỏ hàng hết hạn
+    Order->>Catalog: Đánh dấu bàn TRỐNG
+    Order->>ODB: Tạo phiên HOẠT ĐỘNG thay thế
+    Order->>Redis: Tạo ảnh chụp phiên thay thế
   end
 
-  BFF-->>Customer: Return session context and menu entry data
-  Customer->>BFF: Add or update shared cart item
-  BFF->>Order: Mutate shared cart with expected version
-  Order->>Catalog: Validate item is orderable
-  Catalog-->>Order: Menu item snapshot, price, station
-  Order->>Redis: Compare version and update cart atomically
-  Order-->>BFF: Updated cart snapshot
-  BFF-->>Customer: Updated shared cart
+  BFF-->>Customer: Trả về ngữ cảnh phiên và dữ liệu thực đơn
+  Customer->>BFF: Thêm hoặc cập nhật món trong giỏ chung
+  BFF->>Order: Cập nhật giỏ chung với phiên bản mong đợi
+  Order->>Catalog: Xác minh món có thể đặt
+  Catalog-->>Order: Ảnh chụp món, giá, trạm chế biến
+  Order->>Redis: So sánh phiên bản và cập nhật giỏ nguyên tử
+  Order-->>BFF: Ảnh chụp giỏ đã cập nhật
+  BFF-->>Customer: Trả về giỏ chung đã cập nhật
 
-  Customer->>BFF: Submit order with idempotency key
-  BFF->>Order: Submit order
-  Order->>Redis: Read cart snapshot and validate version
-  Order->>ODB: Lock session, create pending order and open bill
-  Order->>Redis: Clear cart after version check
-  Order-->>BFF: Order and bill snapshot
-  BFF-->>Customer: Order submitted, waiting for staff confirmation
+  Customer->>BFF: Gửi đơn hàng kèm idempotency key
+  BFF->>Order: Gửi đơn hàng
+  Order->>Redis: Đọc ảnh chụp giỏ và xác minh phiên bản
+  Order->>ODB: Khóa phiên, tạo đơn PENDING và hóa đơn mở
+  Order->>Redis: Xóa giỏ sau khi kiểm tra phiên bản
+  Order-->>BFF: Ảnh chụp đơn và hóa đơn
+  BFF-->>Customer: Đơn đã gửi, chờ nhân viên xác nhận
 
-  Note over Order,Redis: Redis supports the hot path and Order DB remains the durable source for session and order decisions
+  Note over Order,Redis: Redis hỗ trợ đường truyền nóng và CSDL Order duy trì nguồn dữ liệu bền vững cho các quyết định phiên và đơn hàng.
+

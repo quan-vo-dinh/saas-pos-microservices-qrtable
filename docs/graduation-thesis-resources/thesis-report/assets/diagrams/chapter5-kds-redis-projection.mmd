@@ -1,29 +1,30 @@
 flowchart LR
-  Event["order.confirmed<br/>tenantId + orderId + items"] --> Split{"Station?"}
+  Event["order.confirmed<br/>tenantId + orderId + items"] --> Split{"Trạm?"}
   Split -->|KITCHEN| KitchenTicket["ticket hash<br/>kds:{tid}:ticket:{order}:KITCHEN"]
   Split -->|BAR| BarTicket["ticket hash<br/>kds:{tid}:ticket:{order}:BAR"]
-  Split -->|missing| Dead["dead-letter list<br/>kds:{tid}:dead-letter:order-confirmed"]
+  Split -->|missing| Dead["danh sách lỗi (dead-letter)<br/>kds:{tid}:dead-letter:order-confirmed"]
 
-  KitchenTicket --> KItems["ticket items set/hash<br/>ticket:{id}:items<br/>ticket-item:{itemId}"]
-  BarTicket --> BItems["ticket items set/hash<br/>ticket:{id}:items<br/>ticket-item:{itemId}"]
+  KitchenTicket --> KItems["set/hash các món của phiếu<br/>ticket:{id}:items<br/>ticket-item:{itemId}"]
+  BarTicket --> BItems["set/hash các món của phiếu<br/>ticket:{id}:items<br/>ticket-item:{itemId}"]
 
-  KitchenTicket --> ActiveK["active sorted set<br/>kds:{tid}:kitchen"]
-  BarTicket --> ActiveB["active sorted set<br/>kds:{tid}:bar"]
-  KitchenTicket --> ReadyK["ready sorted set<br/>station:KITCHEN:READY"]
-  BarTicket --> ReadyB["ready sorted set<br/>station:BAR:READY"]
+  KitchenTicket --> ActiveK["sorted set hoạt động<br/>kds:{tid}:kitchen"]
+  BarTicket --> ActiveB["sorted set hoạt động<br/>kds:{tid}:bar"]
+  KitchenTicket --> ReadyK["sorted set sẵn sàng<br/>station:KITCHEN:READY"]
+  BarTicket --> ReadyB["sorted set sẵn sàng<br/>station:BAR:READY"]
 
-  KitchenTicket --> OrderIndex["order tickets set<br/>order:{orderId}:tickets"]
+  KitchenTicket --> OrderIndex["set phiếu của đơn<br/>order:{orderId}:tickets"]
   BarTicket --> OrderIndex
-  KitchenTicket --> SessionIndex["session tickets set<br/>session:{sessionId}:tickets"]
+  KitchenTicket --> SessionIndex["set phiếu của phiên<br/>session:{sessionId}:tickets"]
   BarTicket --> SessionIndex
 
-  ActiveK --> Revision["station revision<br/>station:{station}:revision"]
+  ActiveK --> Revision["phiên bản trạm (revision)<br/>station:{station}:revision"]
   ActiveB --> Revision
   ReadyK --> Revision
   ReadyB --> Revision
 
-  KitchenTicket --> SLA["SLA hash + global due sorted set<br/>ticket:{id}:sla / kds:sla:due"]
+  KitchenTicket --> SLA["SLA hash + sorted set hạn chót toàn cục<br/>ticket:{id}:sla / kds:sla:due"]
   BarTicket --> SLA
+
 
   classDef event fill:#eef6ff,stroke:#2563eb,color:#0f172a;
   classDef redis fill:#f0fdf4,stroke:#16a34a,color:#14532d;

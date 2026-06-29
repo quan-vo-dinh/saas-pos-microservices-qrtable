@@ -36,9 +36,9 @@
   \end{figure}%
 }
 
-Chương này đánh giá QRTable dựa trên mối liên hệ giữa yêu cầu, thiết kế, phần triển khai và kết quả kiểm chứng. Trọng tâm không phải là liệt kê từng màn hình hay từng đoạn mã, mà là trả lời ba câu hỏi chính: các luồng nghiệp vụ quan trọng có vận hành đúng trong phạm vi kiểm thử hay không; kiến trúc microservices có giữ được ranh giới dữ liệu và trách nhiệm dịch vụ hay không; và những kết luận nào vẫn cần được giới hạn vì chưa có đủ điều kiện kiểm chứng.
+Chương này đánh giá QRTable dựa trên mối liên hệ giữa yêu cầu, thiết kế, phần triển khai và kết quả kiểm chứng. Trọng tâm không phải là liệt kê từng màn hình hay từng đoạn mã, mà là phân tích ba nội dung chính: mức độ vận hành đúng của các luồng nghiệp vụ quan trọng trong phạm vi kiểm thử; khả năng giữ ranh giới dữ liệu và trách nhiệm dịch vụ của kiến trúc microservices; và phạm vi kết luận cần được giới hạn vì chưa có đủ điều kiện kiểm chứng.
 
-Do QRTable là hệ thống phân tán, một kết quả kiểm thử đơn lẻ không đủ để kết luận toàn bộ hệ thống. Vì vậy, chương này kết hợp nhiều loại cơ sở đánh giá: kết quả kiểm thử tự động, ảnh chụp từ luồng nghiệp vụ đại diện, trạng thái quan sát được trên công cụ vận hành và phân tích giới hạn. Cách trình bày này giúp người đọc nhìn thấy cả phần hệ thống đã được kiểm chứng lẫn phần chưa nên mở rộng kết luận.
+Do QRTable là hệ thống phân tán, một kết quả kiểm thử đơn lẻ không đủ để kết luận toàn bộ hệ thống. Vì vậy, chương này kết hợp nhiều loại cơ sở đánh giá: kết quả kiểm thử tự động, hình minh họa từ luồng nghiệp vụ đại diện, trạng thái quan sát được trên công cụ vận hành và phân tích giới hạn. Cách kết hợp bằng chứng này tách rõ phần đã được kiểm chứng với phần chưa đủ điều kiện để mở rộng kết luận.
 
 Cơ sở đối chiếu trực tiếp của chương là các nội dung đã trình bày ở Chương 4 và Chương 5: quyền sở hữu dữ liệu, giao tiếp liên dịch vụ, mô hình phân quyền, các luồng triển khai và bảng tổng hợp kết quả triển khai. Chương này không lặp lại toàn bộ thiết kế, mà tập trung vào mức độ các thiết kế đó được kiểm chứng qua kiểm thử và kết quả quan sát được.
 
@@ -46,7 +46,7 @@ Cơ sở đối chiếu trực tiếp của chương là các nội dung đã tr
 
 Phương pháp đánh giá được tổ chức theo các lớp bằng chứng khác nhau. Lớp thứ nhất là kiểm thử tự động ở mức dịch vụ và luồng nghiệp vụ. Lớp thứ hai là quan sát trực tiếp trên các công cụ như Allure, Kafka, Redis, Docker và Vercel. Lớp thứ ba là phân tích kiến trúc dựa trên ranh giới dịch vụ, quyền sở hữu dữ liệu và cách các thành phần phối hợp với nhau. Lớp cuối cùng là phân tích giới hạn, nhằm tránh biến kết quả kiểm thử đại diện thành những kết luận vượt quá phạm vi của đề tài.
 
-Việc phân lớp này giúp chương đánh giá có giọng điệu thận trọng hơn. Ví dụ, một luồng Playwright đạt trạng thái thành công cho thấy hệ thống xử lý được kịch bản QR--POS--KDS đại diện, nhưng chưa thay thế kiểm thử toàn bộ bề mặt API hoặc kiểm thử tải diện rộng. Tương tự, ảnh Kafka hoặc Redis giúp quan sát trạng thái trong một luồng cụ thể, nhưng không phải bằng chứng cho mọi trường hợp vận hành dài hạn.
+Việc phân lớp bằng chứng tạo cơ sở cho kết luận thận trọng hơn. Ví dụ, một luồng Playwright đạt trạng thái thành công cho thấy hệ thống xử lý được kịch bản QR--POS--KDS đại diện, nhưng chưa thay thế kiểm thử toàn bộ phạm vi API hoặc kiểm thử tải diện rộng. Tương tự, hình minh họa Kafka hoặc Redis phản ánh trạng thái trong một luồng cụ thể, nhưng không phải bằng chứng cho mọi trường hợp vận hành dài hạn.
 
 {\footnotesize\sloppy
 \setlength{\tabcolsep}{3pt}
@@ -64,17 +64,17 @@ Việc phân lớp này giúp chương đánh giá có giọng điệu thận tr
   \bottomrule
   \endfoot
   A -- Kiểm chứng tự động & Kiểm thử chạy thành công theo kịch bản xác định. & Kết luận trong phạm vi kịch bản kiểm thử. & Gửi đơn, thanh toán, KDS, Saga đại diện. \\
-  B -- Quan sát bằng công cụ & Ảnh chụp hoặc báo cáo từ công cụ trong một lần chạy cụ thể. & Cho thấy trạng thái đã được quan sát, không thay thế kiểm thử hồi quy. & Allure, Kafka, Redis, Docker, Vercel. \\
-  C -- Hỗ trợ bởi thiết kế & Sơ đồ, bảng thiết kế, ranh giới dịch vụ và tài liệu kỹ thuật của đề tài. & Kết luận ở mức phù hợp kiến trúc, chưa phải số đo vận hành. & Quyền sở hữu dữ liệu, tổ chức monorepo, khả năng mở rộng. \\
-  D -- Giới hạn hoặc hướng phát triển & Chưa có đủ môi trường, dữ liệu, nhà cung cấp thực tế hoặc số đo định lượng cho phạm vi rộng. & Chưa hình thành kết luận kiểm chứng ngoài phạm vi hiện tại. & Kiểm chứng dài hạn, nhà cung cấp thanh toán thực tế, khả năng quan sát mức sản xuất. \\
+  B -- Quan sát bằng công cụ & Hình minh họa hoặc báo cáo từ công cụ trong một lần chạy cụ thể. & Cho thấy trạng thái đã được quan sát, không thay thế kiểm thử hồi quy. & Allure, Kafka, Redis, Docker, Vercel. \\
+  C -- Hỗ trợ bởi thiết kế & Sơ đồ, bảng thiết kế, ranh giới dịch vụ và mô tả kiến trúc của đề tài. & Kết luận ở mức phù hợp kiến trúc, chưa phải số đo vận hành. & Quyền sở hữu dữ liệu, tổ chức monorepo, khả năng mở rộng. \\
+  D -- Giới hạn hoặc hướng phát triển & Chưa có đủ môi trường, dữ liệu, nhà cung cấp thực tế hoặc số đo định lượng cho phạm vi rộng. & Chưa hình thành kết luận kiểm chứng ngoài phạm vi hiện tại. & Kiểm chứng dài hạn, nhà cung cấp thanh toán thực tế, khả năng quan sát ở môi trường vận hành thực tế. \\
 \end{longtable}
 }
 
-Theo nguyên tắc trên, các kết luận mạnh nhất của QRTable nằm ở các luồng đã có kiểm thử và kết quả quan sát rõ ràng như đặt món qua QR, gửi đơn, xử lý bếp, thanh toán, một số nghiệp vụ SaaS và luồng Saga đại diện. Những nội dung như kiểm thử tải quy mô lớn, kiểm chứng SePay với nhà cung cấp thực tế hoặc vận hành dài hạn trên môi trường công khai chưa đủ cơ sở để viết như kết quả đã hoàn tất; chúng được đưa vào phần giới hạn và hướng phát triển.
+Theo nguyên tắc trên, các kết luận mạnh nhất của QRTable nằm ở các luồng đã có kiểm thử và kết quả quan sát rõ ràng như đặt món qua QR, gửi đơn, xử lý bếp, thanh toán, một số nghiệp vụ SaaS và luồng Saga đại diện. Những nội dung như kiểm thử tải quy mô lớn, kiểm chứng SePay với nhà cung cấp thực tế hoặc vận hành dài hạn trên môi trường triển khai đầy đủ chưa được kết luận là kết quả đã hoàn tất; các nội dung này được xác định là giới hạn và hướng phát triển.
 
 \section{Đối chiếu yêu cầu và kết quả kiểm thử}
 
-Ma trận đối chiếu của QRTable ghi nhận 52 yêu cầu và quy tắc ưu tiên cao. Trong phạm vi chương này, phần lớn yêu cầu đã có kiểm thử hoặc kết quả quan sát đủ rõ để dùng làm kết luận chính; một số yêu cầu còn phụ thuộc dữ liệu khởi tạo, môi trường đầy đủ hoặc nhà cung cấp thực tế nên chỉ được xem là kiểm chứng một phần. Cách trình bày này giúp kết quả đánh giá không chỉ dựa vào tỷ lệ kiểm thử thành công, mà còn gắn từng kết luận với phạm vi bằng chứng tương ứng.
+Ma trận đối chiếu của QRTable ghi nhận 52 yêu cầu và quy tắc ưu tiên cao. Trong phạm vi chương này, phần lớn yêu cầu đã có kiểm thử hoặc kết quả quan sát đủ rõ để dùng làm kết luận chính; một số yêu cầu còn phụ thuộc dữ liệu khởi tạo, môi trường đầy đủ hoặc nhà cung cấp thực tế nên chỉ được xem là kiểm chứng một phần. Vì vậy, kết quả đánh giá không chỉ dựa vào tỷ lệ kiểm thử thành công, mà còn gắn từng kết luận với phạm vi bằng chứng tương ứng.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
@@ -93,14 +93,14 @@ Ma trận đối chiếu của QRTable ghi nhận 52 yêu cầu và quy tắc ư
   \endfoot
   Đã kiểm chứng & 38 & Có kiểm thử hoặc kết quả quan sát đủ rõ để dùng làm kết luận chính. & A/B \\
   Kiểm chứng một phần & 9 & Có cơ sở nền, nhưng còn thiếu môi trường hoặc dữ liệu kiểm chứng đầy đủ. & B/C \\
-  Khoảng trống triển khai & 1 & Chưa đủ cơ sở để xem là kết quả của khóa luận. & D \\
-  Hoãn khỏi phạm vi & 4 & Thuộc nhóm mở rộng hoặc củng cố vận hành sau phạm vi hiện tại. & D \\
+  Chưa đủ cơ sở kết luận & 1 & Chưa đủ cơ sở để xem là kết quả của khóa luận. & D \\
+  Ngoài phạm vi chính & 4 & Thuộc nhóm mở rộng hoặc củng cố vận hành sau phạm vi hiện tại. & D \\
 \end{longtable}
 }
 
 Nhìn theo miền nghiệp vụ, các nhóm có kết quả rõ nhất là đặt món, quản lý giỏ, xác nhận đơn, KDS và thanh toán. Đây là các luồng gắn trực tiếp với trải nghiệm của nhà hàng và khách hàng, đồng thời đi qua nhiều ranh giới dịch vụ. Vòng đời SaaS, báo cáo theo gói và phân quyền cũng có cơ sở đối chiếu, nhưng một số nhánh vẫn phụ thuộc môi trường xác thực và dữ liệu khởi tạo ổn định hơn.
 
-Do đó, chương này không gộp mọi kết quả vào một tỷ lệ thành công chung. Mỗi nhóm kiểm thử được diễn giải theo ý nghĩa nghiệp vụ và đầu ra quan sát được, thay vì đưa các chi tiết triển khai nội bộ vào phần báo cáo chính.
+Do đó, chương này không gộp mọi kết quả vào một tỷ lệ thành công chung. Mỗi nhóm kiểm thử được diễn giải theo ý nghĩa nghiệp vụ và đầu ra quan sát được, thay vì đi quá sâu vào các chi tiết triển khai không trực tiếp phục vụ kết luận đánh giá.
 
 \chapterSixEvidencePair[Tổng quan và danh sách bộ kiểm thử trên Allure]{0.82\textheight}
   {chapter6-01-allure-overview.png}
@@ -110,15 +110,15 @@ Do đó, chương này không gộp mọi kết quả vào một tỷ lệ thàn
   {fig:chapter6-allure-overview}
   {fig:chapter6-allure-critical-suites}
 
-Hình~\ref{fig:chapter6-allure-pair} cho thấy kết quả tổng hợp trên Allure Report. Màn hình tổng quan ghi nhận toàn bộ các ca trong lần chạy này đạt trạng thái thành công; màn hình danh sách bộ kiểm thử cho thấy kết quả được phân nhóm theo các miền nghiệp vụ như đơn hàng, thanh toán, phiên đặt món và tồn kho. Ở mức báo cáo, hình này được dùng để ghi nhận phạm vi kiểm thử nền, còn các luồng nghiệp vụ quan trọng được phân tích thêm ở các mục sau.
+Hình~\ref{fig:chapter6-allure-pair} cho thấy kết quả tổng hợp trên Allure Report. Màn hình tổng quan ghi nhận toàn bộ các ca trong lần chạy này đạt trạng thái thành công; màn hình danh sách bộ kiểm thử cho thấy kết quả được phân nhóm theo các miền nghiệp vụ như đơn hàng, thanh toán, phiên đặt món và tồn kho. Hình này ghi nhận phạm vi kiểm thử nền, còn các luồng nghiệp vụ quan trọng được phân tích thêm ở các mục sau.
 
 \section{Kiểm chứng các luồng nghiệp vụ chính}
 
-Kiểm chứng chức năng được tổ chức theo trường hợp sử dụng thay vì theo từng dịch vụ riêng lẻ. Với người đọc là hội đồng, điều quan trọng không phải là mỗi service có bao nhiêu ca kiểm thử, mà là các luồng nghiệp vụ chính có giữ được trạng thái nhất quán khi đi qua nhiều thành phần hay không.
+Kiểm chứng chức năng được tổ chức theo trường hợp sử dụng thay vì theo từng dịch vụ riêng lẻ. Trọng tâm kiểm chứng không nằm ở số lượng ca kiểm thử của từng dịch vụ, mà ở khả năng giữ trạng thái nhất quán của các luồng nghiệp vụ chính khi đi qua nhiều thành phần.
 
 Kết quả kiểm thử cho thấy các luồng quan trọng đã được bao phủ ở mức đại diện. Khách có thể vào phiên đặt món qua mã QR, xem thực đơn hợp lệ, thao tác với giỏ và gửi đơn. Nhân viên có thể tiếp nhận đơn, bếp có thể xử lý phiếu trên KDS, và trạng thái đơn được phản ánh lại cho khách hàng. Các kiểm thử thanh toán ghi nhận việc đóng hóa đơn đúng điều kiện và xử lý các thông báo lặp trong phạm vi mô phỏng. Với phần SaaS, hệ thống đã có cơ sở đối chiếu cho gói dịch vụ, đơn vị thuê bao, báo cáo và quyền thao tác theo vai trò.
 
-Một số kết quả vẫn cần đọc với phạm vi phù hợp. Kiểm thử hiện tại đủ để đánh giá các luồng chính và một số nhánh lỗi đại diện, nhưng chưa thay thế kiểm thử toàn bộ bề mặt API, kiểm thử tải quy mô lớn hoặc kiểm chứng với nhà cung cấp thanh toán thật.
+Một số kết quả vẫn cần đọc với phạm vi phù hợp. Kiểm thử hiện tại đủ để đánh giá các luồng chính và một số nhánh lỗi đại diện, nhưng chưa thay thế kiểm thử toàn bộ phạm vi API, kiểm thử tải quy mô lớn hoặc kiểm chứng với nhà cung cấp thanh toán thực tế.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{2pt}
@@ -157,7 +157,7 @@ Kịch bản được diễn giải theo các chặng nghiệp vụ chính:
 
 Quy trình trên được dùng để đánh giá một luồng nghiệp vụ đại diện trong môi trường kiểm chứng. Kết quả cho thấy ứng dụng khách hàng, POS và KDS có thể phối hợp qua BFF, WebSocket và các dịch vụ phía sau để giữ trạng thái đơn hàng thống nhất trong một kịch bản có mất kết nối tạm thời.
 
-Báo cáo Allure được kết xuất từ kết quả thực thi kịch bản kiểm thử tích hợp. Các lát chụp trong mục này nên được đọc như những phần khác nhau của cùng một luồng kiểm thử, không phải các kịch bản độc lập:
+Báo cáo Allure được kết xuất từ kết quả thực thi kịch bản kiểm thử tích hợp. Thân bài giữ một phần minh họa đại diện ở Hình~\ref{fig:chapter6-e2e-customer-pos}; các ảnh chi tiết còn lại của cùng luồng được chuyển sang Phụ lục~\ref{app:test-evidence}, Hình~\ref{fig:chapter6-e2e-playwright-overview} và Hình~\ref{fig:chapter6-e2e-kds-served}.
 
 \begin{itemize}
   \item \textbf{Kết quả thực thi tổng quan (Hình~\ref{fig:chapter6-e2e-playwright-overview}):} 
@@ -169,7 +169,7 @@ Báo cáo Allure được kết xuất từ kết quả thực thi kịch bản 
   \item \textbf{Tiến trình đặt món của khách hàng (Hình~\ref{fig:chapter6-e2e-customer-tracking}):}
     \begin{itemize}
       \item Ảnh đính kèm cho thấy khách hàng đã có đơn trên màn hình theo dõi.
-      \item Các thông tin bàn, món và trạng thái giúp đối chiếu đơn của khách với các bước xử lý phía sau.
+      \item Các thông tin bàn, món và trạng thái là cơ sở đối chiếu đơn của khách với các bước xử lý phía sau.
     \end{itemize}
 
   \item \textbf{Tiếp nhận đơn hàng tại quầy POS (Hình~\ref{fig:chapter6-e2e-pos-live-order-accepted}):}
@@ -191,11 +191,6 @@ Báo cáo Allure được kết xuất từ kết quả thực thi kịch bản 
     \end{itemize}
 \end{itemize}
 
-\chapterSixEvidenceFigure[Báo cáo Allure E2E tổng quan]{0.82\textheight}
-  {chapter6-04-e2e-playwright-overview.png}
-  {fig:chapter6-e2e-playwright-overview}
-  {Báo cáo Allure E2E tổng quan cho luồng đặt món tại bàn.}
-
 \chapterSixEvidencePair[Allure E2E chặng khách đặt món và POS]{0.82\textheight}
   {chapter6-05-e2e-customer-tracking.png}
   {chapter6-06-e2e-pos-live-order-accepted.png}
@@ -203,14 +198,6 @@ Báo cáo Allure được kết xuất từ kết quả thực thi kịch bản 
   {Báo cáo chặng khách đặt đơn (trái) và tiếp nhận đơn tại POS (phải).}
   {fig:chapter6-e2e-customer-tracking}
   {fig:chapter6-e2e-pos-live-order-accepted}
-
-\chapterSixEvidencePair[Allure E2E chặng KDS và phục vụ]{0.82\textheight}
-  {chapter6-07-e2e-kds-ticket-finished.png}
-  {chapter6-08-e2e-customer-served-after-reload.png}
-  {fig:chapter6-e2e-kds-served}
-  {Báo cáo chặng bếp hoàn thành món (trái) và khách hàng nhận món thành công (phải).}
-  {fig:chapter6-e2e-kds-ticket-finished}
-  {fig:chapter6-e2e-customer-served-after-reload}
 \section{Saga, xử lý yêu cầu lặp và tính nhất quán liên dịch vụ}
 
 Trong kiến trúc microservices, một thao tác nghiệp vụ thường đi qua nhiều dịch vụ khác nhau. Điều này giúp hệ thống có ranh giới trách nhiệm rõ hơn, nhưng cũng tạo ra rủi ro về tính nhất quán khi một bước thành công còn bước sau thất bại, hoặc khi cùng một yêu cầu được gửi lại. Vì vậy, chương này xem Saga như một cơ chế kiểm soát tính nhất quán liên dịch vụ theo nghĩa đã trình bày trong cơ sở lý thuyết \cite{garcia-molina-sagas-1987,richardson-microservices-patterns-2018}.
@@ -224,26 +211,21 @@ QRTable dùng hai Saga đại diện. Luồng xác nhận đơn bảo vệ quan 
 
 Hình~\ref{fig:chapter6-order-saga-tests} ghi nhận kết quả kiểm thử cho luồng xác nhận đơn hàng trên Nx Cloud. Ảnh cho thấy nhóm kiểm thử liên quan đến xác nhận đơn đã chạy thành công, bao gồm cả đường đi bình thường và một số tình huống lỗi đại diện như thiếu hàng, yêu cầu lặp hoặc cần khôi phục trạng thái.
 
-\chapterSixEvidenceFigure[Kiểm thử SaaS Onboarding Saga]{0.82\textheight}
-  {chapter6-10-saas-onboarding-saga-tests.png}
-  {fig:chapter6-saas-onboarding-saga-tests}
-  {Kết quả thực thi kiểm thử dịch vụ SaaS và quy trình khởi tạo đơn vị thuê bao hiển thị trên Nx Cloud.}
-
-Hình~\ref{fig:chapter6-saas-onboarding-saga-tests} ghi nhận kết quả kiểm thử cho nhóm nghiệp vụ SaaS và quy trình khởi tạo đơn vị thuê bao. Ảnh cho thấy phần lớn bộ kiểm thử đạt trạng thái thành công, đồng thời vẫn có một số cảnh báo nghiệp vụ cần được hiểu là thông tin vận hành trong lần chạy, không phải kết luận về toàn bộ môi trường vận hành thực tế.
+Kết quả chi tiết của kiểm thử SaaS Onboarding Mini-Saga được trình bày tại Phụ lục~\ref{app:test-evidence}, Hình~\ref{fig:chapter6-saas-onboarding-saga-tests}. Kết quả này hỗ trợ kết luận ở mức điều phối đại diện, không mở rộng thành kết luận rằng toàn bộ phụ thuộc bên ngoài đã được kiểm chứng trên môi trường vận hành thực tế.
 
 Đối với luồng xác nhận đơn, ý nghĩa chính của kiểm thử là hệ thống không chỉ xử lý đường đi thành công, mà còn xét đến các tình huống thường gặp trong hệ thống phân tán: yêu cầu được gửi lại, tồn kho không đủ, phản hồi bị mất hoặc cần hoàn tác một bước đã thực hiện. Đây là nhóm rủi ro quan trọng vì sai sót ở đây có thể làm lệch tồn kho hoặc làm đơn hàng vượt trạng thái hợp lệ.
 
-Đối với luồng khởi tạo đơn vị thuê bao, kiểm thử tập trung vào việc tạo đủ dữ liệu nền tảng và xử lý trạng thái dở dang khi lỗi xảy ra giữa chừng. Kết quả này đủ để đánh giá phần điều phối đại diện, nhưng chưa nên mở rộng thành kết luận rằng toàn bộ phụ thuộc bên ngoài đã được kiểm chứng trên môi trường vận hành thực tế.
+Đối với luồng khởi tạo đơn vị thuê bao, kiểm thử tập trung vào việc tạo đủ dữ liệu nền tảng và xử lý trạng thái dở dang khi lỗi xảy ra giữa chừng. Kết quả này đủ để đánh giá phần điều phối đại diện, nhưng chưa đủ để kết luận rằng toàn bộ phụ thuộc bên ngoài đã được kiểm chứng trên môi trường vận hành thực tế.
 
 Để đánh giá Saga xác nhận đơn hàng, hệ thống thực thi các kịch bản kiểm thử nhằm bảo vệ bốn ràng buộc nghiệp vụ trọng yếu:
 \begin{itemize}
   \item \textbf{Bù trừ khi lỗi xảy ra giữa chừng:} nếu một bước liên quan đến tồn kho đã hoàn tất nhưng bước sau thất bại, hệ thống cần đưa trạng thái về mức an toàn.
   \item \textbf{Kiểm soát tranh chấp tồn kho:} khi nhiều yêu cầu cùng cạnh tranh lượng hàng còn ít, chỉ yêu cầu hợp lệ được xử lý.
-  \item \textbf{Khôi phục khi phản hồi bị mất:} khi kết quả xử lý không được trả về đúng lúc, lần gửi lại không được làm phát sinh tác dụng phụ mới.
+  \item \textbf{Khôi phục khi phản hồi bị mất:} khi kết quả xử lý không được trả về đúng lúc, lần gửi lại không được làm phát sinh tác vụ ngoài ý muốn.
   \item \textbf{Bỏ qua thông điệp lỗi thời:} thông điệp đến muộn không được làm thay đổi trạng thái mới hơn.
 \end{itemize}
 
-Các ảnh nhật ký kiểm thử trong mục này được dùng để đối chiếu các ràng buộc trên:
+Các hình minh chứng kiểm thử bổ sung được trình bày tại Phụ lục~\ref{app:test-evidence}, Hình~\ref{fig:chapter6-saga-test-compensation}--\ref{fig:chapter6-saga-test-stale-release}. Phần thân bài diễn giải vai trò của từng hình đối với các ràng buộc nghiệp vụ sau:
 
 \begin{itemize}
   \item \textbf{Kích hoạt giao dịch bù trừ (Hình~\ref{fig:chapter6-saga-test-compensation}):} 
@@ -261,7 +243,7 @@ Các ảnh nhật ký kiểm thử trong mục này được dùng để đối 
   \item \textbf{Khôi phục sau mất phản hồi mạng (Hình~\ref{fig:chapter6-saga-test-lost-response}):}
     \begin{itemize}
       \item Mục tiêu kiểm tra là trường hợp phản hồi từ một bước xử lý không quay về đúng lúc.
-      \item Đầu ra quan sát được là lần gửi lại không tạo thêm tác dụng phụ ngoài ý muốn.
+      \item Đầu ra quan sát được là lần gửi lại không tạo thêm tác vụ ngoài ý muốn.
     \end{itemize}
 
   \item \textbf{Bỏ qua yêu cầu giải phóng lỗi thời (Hình~\ref{fig:chapter6-saga-test-stale-release}):}
@@ -270,26 +252,6 @@ Các ảnh nhật ký kiểm thử trong mục này được dùng để đối 
       \item Đầu ra quan sát được là thông điệp đến muộn bị bỏ qua, nhờ đó trạng thái mới không bị ảnh hưởng.
     \end{itemize}
 \end{itemize}
-
-\chapterSixEvidenceFigure[Nhật ký kiểm thử bù trừ giao dịch]{0.82\textheight}
-  {chapter6-saga-test-compensation.png}
-  {fig:chapter6-saga-test-compensation}
-  {Nhật ký thực thi kịch bản kiểm thử bù trừ giao dịch khi gặp lỗi cơ sở dữ liệu.}
-
-\chapterSixEvidenceFigure[Nhật ký kiểm thử tương tranh tồn kho]{0.82\textheight}
-  {chapter6-saga-test-concurrency.png}
-  {fig:chapter6-saga-test-concurrency}
-  {Nhật ký kiểm thử tích hợp xử lý tương tranh khi tồn kho chỉ còn 1.}
-
-\chapterSixEvidenceFigure[Nhật ký kiểm thử khôi phục mất phản hồi mạng]{0.82\textheight}
-  {chapter6-saga-test-lost-response.png}
-  {fig:chapter6-saga-test-lost-response}
-  {Nhật ký kiểm thử tính lặp an toàn khi gặp sự cố mất phản hồi mạng.}
-
-\chapterSixEvidenceFigure[Nhật ký kiểm thử bỏ qua yêu cầu giải phóng lỗi thời]{0.82\textheight}
-  {chapter6-saga-test-stale-release.png}
-  {fig:chapter6-saga-test-stale-release}
-  {Nhật ký kiểm thử kiểm soát phiên bản đặt trước khi bản tin đến muộn.}
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{2pt}
@@ -308,159 +270,81 @@ Các ảnh nhật ký kiểm thử trong mục này được dùng để đối 
   \endfoot
   Xác nhận đơn & Order -- Catalog -- Kitchen & Trừ tồn kho lặp, phản hồi bị mất hoặc đơn vượt trạng thái hợp lệ. & Xử lý yêu cầu lặp, kiểm soát tồn kho và bù trừ khi cần. & Hình~\ref{fig:chapter6-order-saga-tests}, \ref{fig:chapter6-saga-test-compensation}, \ref{fig:chapter6-saga-test-concurrency}, \ref{fig:chapter6-saga-test-lost-response}, \ref{fig:chapter6-saga-test-stale-release}. \\
   Khởi tạo đơn vị thuê bao & SaaS và các dịch vụ nền tảng & Tạo dữ liệu dở dang hoặc thiếu liên kết giữa các thành phần. & Điều phối thứ tự tạo dữ liệu và xử lý trạng thái dở dang. & Hình~\ref{fig:chapter6-saas-onboarding-saga-tests}. \\
-  Cập nhật KDS & Order -- Kitchen -- client & Phiếu bếp bị lặp hoặc client hiển thị trạng thái cũ. & Cập nhật bản chiếu KDS và gửi gợi ý làm mới tới client. & Hình~\ref{fig:chapter6-kafkio-topic-event}, \ref{fig:chapter6-redisinsight-kds-projection}. \\
+  Cập nhật KDS & Order -- Kitchen -- ứng dụng phía người dùng & Phiếu bếp bị lặp hoặc ứng dụng hiển thị trạng thái cũ. & Cập nhật bản chiếu KDS và gửi gợi ý làm mới tới ứng dụng phía người dùng. & Hình~\ref{fig:chapter6-kafkio-topic-event}, \ref{fig:chapter6-redisinsight-kds-projection}. \\
 \end{longtable}
 }
 
 
-Khả năng xử lý thao tác lặp không chỉ xuất hiện trong Saga, mà còn liên quan đến giỏ hàng, gửi đơn, thanh toán và cập nhật KDS. Kết quả hiện tại đủ để xác nhận các luồng chính trong phạm vi kiểm thử, nhưng chưa nên mở rộng thành kết luận về bảo đảm phân phối tuyệt đối hoặc một cơ chế Saga đã được củng cố cho vận hành dài hạn.
+Khả năng xử lý thao tác lặp không chỉ xuất hiện trong Saga, mà còn liên quan đến giỏ hàng, gửi đơn, thanh toán và cập nhật KDS. Kết quả hiện tại đủ để xác nhận các luồng chính trong phạm vi kiểm thử, nhưng chưa đủ để kết luận về bảo đảm phân phối tuyệt đối hoặc một cơ chế Saga đã được củng cố cho vận hành dài hạn.
 
 \section{Trạng thái khi vận hành của kiến trúc microservices}
 
-Kafka và Redis chỉ có giá trị trong đánh giá khi chúng được gắn với một luận điểm cụ thể. Trong QRTable, Kafka thể hiện việc truyền sự kiện giữa các dịch vụ, còn Redis thể hiện các trạng thái cần truy cập nhanh như phiên, hàng đợi bếp hoặc bản chiếu KDS. Vì vậy, các ảnh ở mục này không nhằm liệt kê toàn bộ cấu hình hạ tầng, mà cho thấy một phần trạng thái của luồng đặt món khi hệ thống đang vận hành.
+Kafka và Redis chỉ có giá trị trong đánh giá khi chúng được gắn với một luận điểm cụ thể. Trong QRTable, Kafka thể hiện việc truyền sự kiện giữa các dịch vụ, còn Redis thể hiện các trạng thái cần truy cập nhanh như phiên, hàng đợi bếp hoặc bản chiếu KDS. Vì vậy, các hình minh chứng bổ sung được đặt ở Phụ lục~\ref{app:benchmark-observability-evidence}, Hình~\ref{fig:chapter6-kafkio-topic-event} và Hình~\ref{fig:chapter6-redisinsight-kds-projection}; phần thân bài diễn giải ý nghĩa của chúng đối với một lần chạy cụ thể.
 
-\chapterSixEvidenceFigure[Giám sát sự kiện xác nhận đơn hàng trên Kafka]{0.82\textheight}
-  {chapter6-17-kafkio-topic-event.png}
-  {fig:chapter6-kafkio-topic-event}
-  {Nội dung thông điệp sự kiện xác nhận đơn hàng trên công cụ quản lý Kafka.}
+Thông điệp Kafka ở Hình~\ref{fig:chapter6-kafkio-topic-event} cho thấy sự kiện xác nhận đơn mang theo thông tin nghiệp vụ của đơn, bàn và món ăn, qua đó hỗ trợ đối chiếu việc truyền trạng thái từ luồng đặt món sang luồng xử lý bếp. Trạng thái Redis ở Hình~\ref{fig:chapter6-redisinsight-kds-projection} cho thấy sau khi sự kiện được xử lý, hệ thống có bản ghi tương ứng cho phiếu bếp để ứng dụng KDS đọc lại trạng thái mới nhất thay vì chỉ phụ thuộc vào thông báo thời gian thực.
 
-Hình~\ref{fig:chapter6-kafkio-topic-event} ghi nhận một thông điệp sự kiện xác nhận đơn hàng trên công cụ giám sát Kafka. Nội dung hiển thị cho thấy sự kiện mang theo thông tin nghiệp vụ của đơn, bàn và món ăn, qua đó hỗ trợ đối chiếu việc truyền trạng thái từ luồng đặt món sang luồng xử lý bếp.
-
-\chapterSixEvidenceFigure[Cấu hình khóa dữ liệu KDS trong Redis]{0.82\textheight}
-  {chapter6-18-redisinsight-kds-projection.png}
-  {fig:chapter6-redisinsight-kds-projection}
-  {Cấu trúc bảng băm lưu trữ trạng thái chế biến trên công cụ RedisInsight.}
-
-Hình~\ref{fig:chapter6-redisinsight-kds-projection} minh họa trạng thái KDS được lưu trong RedisInsight. Ảnh cho thấy sau khi sự kiện được xử lý, hệ thống có bản ghi tương ứng cho phiếu bếp, giúp client KDS đọc lại trạng thái hiện tại thay vì chỉ phụ thuộc vào thông báo thời gian thực.
-
-Như vậy, kiểm thử nghiệp vụ và trạng thái quan sát được bổ sung cho nhau: kiểm thử cho biết logic xử lý có đi đúng nhánh hay không, còn Kafka và Redis giúp đối chiếu trạng thái đã đi qua các thành phần liên quan trong một lần chạy cụ thể.
+Như vậy, kiểm thử nghiệp vụ và trạng thái quan sát được bổ sung cho nhau: kiểm thử cho biết logic xử lý có đi đúng nhánh hay không, còn Kafka và Redis cung cấp trạng thái đối chiếu qua các thành phần liên quan trong một lần chạy cụ thể.
 
 \section{Đánh giá định lượng bằng k6 và khả năng quan sát}
 
-Bên cạnh các kiểm thử chức năng, đề tài thực hiện một phiên đo tải đại diện bằng k6 trên môi trường local QRTable có bật ngăn xếp quan sát của Phase 6. Mục tiêu của phiên đo là bổ sung số liệu về độ trễ, thông lượng, tỷ lệ request lỗi và tỷ lệ check thành công cho một số luồng quan trọng; đồng thời kiểm tra rằng Prometheus/Grafana có thể ghi nhận metric và dashboard, Tempo/OpenTelemetry có thể ghi nhận trace đại diện, còn Loki chỉ được xem xét khi log ứng dụng đủ dữ liệu đối chiếu. Đây là phép đo đại diện trong môi trường phát triển, không phải stress test quy mô lớn và không dùng để kết luận hệ thống đã sẵn sàng vận hành sản xuất.
+Bên cạnh các kiểm thử chức năng, đề tài thực hiện một phiên đo tải đại diện bằng k6 trên môi trường cục bộ của QRTable với lớp quan sát được bật. Mục tiêu của phiên đo là bổ sung số liệu về độ trễ, thông lượng, tỷ lệ yêu cầu lỗi và tỷ lệ kiểm tra thành công cho một số luồng quan trọng; đồng thời kiểm tra rằng Prometheus/Grafana có thể ghi nhận chỉ số và bảng điều khiển, Tempo/OpenTelemetry có thể ghi nhận truy vết đại diện, còn Loki chỉ được xem xét khi nhật ký ứng dụng đủ dữ liệu đối chiếu. Đây là phép đo đại diện trong môi trường phát triển, không phải kiểm thử chịu tải quy mô lớn và không dùng để kết luận hệ thống đã đáp ứng điều kiện vận hành thực tế.
 
-Phiên đo sử dụng dữ liệu seed phát triển của đơn vị thuê bao \texttt{pho-viet}, chạy qua BFF tại \texttt{http://localhost:3300} trong ngày 26/06/2026. Với kịch bản có thao tác ghi, môi trường được reseed trước khi chạy để giảm nhiễu trạng thái. Các kết quả trong Bảng~\ref{tab:chapter6-k6-benchmark-summary} vì vậy chỉ phản ánh một lần chạy local có kiểm soát, phụ thuộc cấu hình máy, Docker runtime, dữ liệu seed và cấu hình VU/duration.
+Phiên đo sử dụng bộ dữ liệu phát triển của đơn vị thuê bao \texttt{pho-viet}, chạy qua BFF tại \texttt{http://localhost:3300} trong ngày 26/06/2026. Với kịch bản có thao tác ghi, dữ liệu được khởi tạo lại trước khi chạy để giảm nhiễu trạng thái. Các kết quả trong Bảng~\ref{tab:chapter6-k6-benchmark-summary} vì vậy chỉ phản ánh một lần chạy cục bộ có kiểm soát, phụ thuộc cấu hình máy, môi trường chạy Docker, dữ liệu ban đầu, số người dùng ảo và thời lượng đo.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{2pt}
 \begin{longtable}{>{\raggedright\arraybackslash}p{0.16\textwidth}>{\raggedright\arraybackslash}p{0.22\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}>{\centering\arraybackslash}p{0.07\textwidth}>{\centering\arraybackslash}p{0.09\textwidth}>{\centering\arraybackslash}p{0.08\textwidth}}
-  \caption{Tổng hợp kết quả benchmark k6 trên môi trường local.}
+  \caption{Tổng hợp kết quả đo tải k6 trên môi trường cục bộ.}
   \label{tab:chapter6-k6-benchmark-summary}\\
   \toprule
-  Kịch bản & Cấu hình tải & Request & RPS & p95 & p99 & Failed rate & Checks \\
+  Kịch bản & Cấu hình tải & Số yêu cầu & RPS & p95 & p99 & Tỷ lệ lỗi & Điều kiện đạt \\
   \midrule
   \endfirsthead
   \toprule
-  Kịch bản & Cấu hình tải & Request & RPS & p95 & p99 & Failed rate & Checks \\
+  Kịch bản & Cấu hình tải & Số yêu cầu & RPS & p95 & p99 & Tỷ lệ lỗi & Điều kiện đạt \\
   \midrule
   \endhead
   \bottomrule
   \endfoot
-  Read baseline & Ramping VU: $5 \rightarrow 15$, steady 2 phút; gồm readiness, tenant resolve, menu và invalid QR path. & 4336 & 26,14 & 24,10 ms & N/A & 0,00\% & 100,00\% \\
-  Customer ordering & Shared iterations: 1 VU, 5 iterations; gồm join session, menu, cart, submit order và list orders. & 30 & 3,41 & 47,37 ms & N/A & 0,00\% & 100,00\% \\
-  Confirm/KDS pulse & Shared iterations: 1 VU, 1 iteration; gồm tạo/xác nhận đơn và snapshot KDS queue. & 6 & 2,84 & 32,98 ms & N/A & 0,00\% & 100,00\% \\
+  Đọc nền & Tải VU tăng dần từ $5 \rightarrow 15$, giữ ổn định 2 phút; gồm kiểm tra sẵn sàng, xác định đơn vị thuê bao, đọc thực đơn và đường xử lý mã QR không hợp lệ. & 4336 & 26,14 & 24,10 ms & N/A & 0,00\% & 100,00\% \\
+  Đặt món của khách & 1 VU, 5 vòng lặp; gồm tham gia phiên, đọc thực đơn, cập nhật giỏ, gửi đơn và liệt kê đơn. & 30 & 3,41 & 47,37 ms & N/A & 0,00\% & 100,00\% \\
+  Xác nhận đơn/KDS & 1 VU, 1 vòng lặp; gồm tạo đơn, xác nhận đơn và đọc trạng thái hàng đợi KDS. & 6 & 2,84 & 32,98 ms & N/A & 0,00\% & 100,00\% \\
 \end{longtable}
 }
 
-Bảng~\ref{tab:chapter6-k6-benchmark-summary} cho thấy cả ba kịch bản đều không ghi nhận failed request và toàn bộ check trong script đều đạt trong lần chạy này. Kịch bản read baseline có số request lớn nhất vì chạy ramping VU trong vài phút, còn customer ordering và confirm/KDS pulse được giữ ở tải thấp để tránh làm nhiễu trạng thái phiên, giỏ hàng, tồn kho và hàng đợi bếp. Trường p99 được ghi là N/A vì file summary sinh ra không xuất giá trị p99; báo cáo không tự suy diễn p99 từ các chỉ số khác.
+Bảng~\ref{tab:chapter6-k6-benchmark-summary} cho thấy cả ba kịch bản đều không ghi nhận yêu cầu thất bại và toàn bộ điều kiện kiểm tra trong kịch bản k6 đều đạt trong lần chạy này. Kịch bản đọc nền có số yêu cầu lớn nhất vì chạy với số VU tăng dần trong vài phút, còn kịch bản đặt món và xác nhận đơn/KDS được giữ ở tải thấp để tránh làm nhiễu trạng thái phiên, giỏ hàng, tồn kho và hàng đợi bếp. Trường p99 được ghi là N/A vì tệp tổng hợp kết quả không xuất giá trị p99; giá trị này không được suy diễn từ các chỉ số khác.
 
-Các hình trong mục này trả lời hai câu hỏi: số liệu từ k6 có được phản ánh ở tầng metric hay không, và khi có nhánh lỗi nghiệp vụ thì hệ thống có đủ tín hiệu để truy vết hay không.
+Các hình trong mục này đối chiếu hai khía cạnh: mức độ phản ánh số liệu k6 ở tầng chỉ số và khả năng truy vết khi xuất hiện nhánh lỗi nghiệp vụ.
 
-Hình~\ref{fig:chapter6-k6-grafana-system-overview-after-fix} trả lời câu hỏi: \textit{khi benchmark chạy, dashboard tổng quan có ghi nhận được tải HTTP, độ trễ và trạng thái scrape của các dịch vụ hay không?}
+Hình~\ref{fig:chapter6-k6-grafana-system-overview-after-fix} thể hiện trạng thái bảng điều khiển tổng quan trong phiên đo tải, gồm tải HTTP, độ trễ và trạng thái thu thập dữ liệu của các dịch vụ.
 
-\chapterSixEvidenceFigure[Grafana System Overview sau benchmark k6]{0.72\textheight}
+\chapterSixEvidenceFigure[Grafana System Overview sau phiên đo tải k6]{0.72\textheight}
   {chapter6-k6-grafana-system-overview-after-fix.png}
   {fig:chapter6-k6-grafana-system-overview-after-fix}
-  {Dashboard System Overview sau benchmark k6.}
+  {Bảng điều khiển System Overview sau phiên đo tải k6.}
 \FloatBarrier
 
 Điểm đối chiếu chính của hình này:
 \begin{itemize}
-  \item request rate tăng theo cửa sổ chạy k6, cho thấy dashboard nhận được tín hiệu HTTP từ BFF;
-  \item panel error ratio không ghi nhận lỗi hệ thống tương ứng với ba kịch bản trong Bảng~\ref{tab:chapter6-k6-benchmark-summary};
-  \item latency p95 được hiển thị cùng thời điểm đo, hỗ trợ đọc kết quả k6 trong bối cảnh quan sát hệ thống;
-  \item trạng thái scrape của các dịch vụ chính ở mức \texttt{up}, giúp tránh diễn giải số liệu khi service không được Prometheus thu thập.
+  \item tốc độ yêu cầu tăng theo cửa sổ chạy k6, cho thấy bảng điều khiển nhận được tín hiệu HTTP từ BFF;
+  \item ô tỷ lệ lỗi không ghi nhận lỗi hệ thống tương ứng với ba kịch bản trong Bảng~\ref{tab:chapter6-k6-benchmark-summary};
+  \item độ trễ p95 được hiển thị cùng thời điểm đo, hỗ trợ đọc kết quả k6 trong bối cảnh quan sát hệ thống;
+  \item trạng thái thu thập dữ liệu của các dịch vụ chính ở mức \texttt{up}, giúp tránh diễn giải số liệu khi dịch vụ không được Prometheus ghi nhận.
 \end{itemize}
 
-Hình~\ref{fig:chapter6-k6-grafana-bff-drilldown-after-fix} trả lời câu hỏi: \textit{BFF ghi nhận route/status của các request benchmark như thế nào?}
+Các hình đối chiếu bổ sung được trình bày tại Phụ lục~\ref{app:benchmark-observability-evidence}. Hình~\ref{fig:chapter6-k6-grafana-bff-drilldown-after-fix} và Hình~\ref{fig:chapter6-k6-prometheus-http-route-status} đối chiếu đường dẫn và mã trạng thái ở BFF/Prometheus, trong đó đường xử lý mã QR không hợp lệ được ghi nhận là phản hồi nghiệp vụ \texttt{403} thay vì lỗi hệ thống \texttt{500}. Hình~\ref{fig:chapter6-k6-grafana-business-metrics} và Hình~\ref{fig:chapter6-k6-prometheus-business-counters} cho thấy các bộ đếm nghiệp vụ như \texttt{orders\_submitted}, \texttt{orders\_confirmed} và \texttt{kds\_tickets\_created} tăng trong cửa sổ đo tải. Hình~\ref{fig:chapter6-k6-tempo-invalid-qr-trace} bổ sung truy vết đại diện cho đường xử lý mã QR không hợp lệ; kết quả này hỗ trợ phân biệt lỗi nghiệp vụ có kiểm soát với lỗi hệ thống, nhưng không chứng minh mọi yêu cầu đều có truy vết đầy đủ.
 
-\chapterSixEvidenceFigure[Grafana BFF drilldown sau benchmark k6]{0.72\textheight}
-  {chapter6-k6-grafana-bff-drilldown-after-fix.png}
-  {fig:chapter6-k6-grafana-bff-drilldown-after-fix}
-  {Dashboard Service Drilldown của BFF sau benchmark k6.}
-\FloatBarrier
-
-Điểm đối chiếu chính của hình này:
-\begin{itemize}
-  \item các route đọc và đặt món chính được ghi nhận theo route/status thay vì chỉ có tổng số request;
-  \item đường dẫn invalid QR được ghi nhận là \texttt{403}, không phải \texttt{500};
-  \item nhánh \texttt{403} là phản hồi mong đợi của đường lỗi nghiệp vụ, nên không được diễn giải như lỗi ổn định của hệ thống;
-  \item panel latency của BFF giúp đối chiếu độ trễ ở lớp biên với kết quả k6.
-\end{itemize}
-
-Hình~\ref{fig:chapter6-k6-prometheus-http-route-status} dùng truy vấn Prometheus để kiểm tra cùng luận điểm ở dạng bảng số liệu: route nào phát sinh request, service nào ghi nhận, và status nào được trả về.
-
-\chapterSixEvidenceFigure[Prometheus HTTP route/status sau benchmark k6]{0.72\textheight}
-  {chapter6-k6-prometheus-http-route-status.png}
-  {fig:chapter6-k6-prometheus-http-route-status}
-  {Kết quả truy vấn Prometheus cho HTTP request rate theo service, route và status.}
-\FloatBarrier
-
-Hình~\ref{fig:chapter6-k6-grafana-business-metrics} và Hình~\ref{fig:chapter6-k6-prometheus-business-counters} trả lời câu hỏi: \textit{các request đặt món và xác nhận đơn có tạo ra tín hiệu nghiệp vụ quan sát được hay không?}
-
-\chapterSixEvidenceFigure[Grafana business metrics sau benchmark k6]{0.72\textheight}
-  {chapter6-k6-grafana-business-metrics.png}
-  {fig:chapter6-k6-grafana-business-metrics}
-  {Dashboard Business Metrics sau benchmark k6.}
-
-\chapterSixEvidenceFigure[Prometheus business counters sau benchmark k6]{0.72\textheight}
-  {chapter6-k6-prometheus-business-counters.png}
-  {fig:chapter6-k6-prometheus-business-counters}
-  {Kết quả truy vấn Prometheus cho các counter nghiệp vụ.}
-\FloatBarrier
-
-Điểm đối chiếu chính của hai hình này:
-\begin{itemize}
-  \item counter \texttt{orders\_submitted} tăng sau kịch bản customer ordering;
-  \item counter \texttt{orders\_confirmed} và \texttt{kds\_tickets\_created} tăng sau confirm/KDS pulse;
-  \item metric nghiệp vụ giúp phân biệt request HTTP thành công với tác động nghiệp vụ thật ở phía sau;
-  \item các giá trị này chỉ đại diện cho cửa sổ benchmark local, không dùng để suy rộng thành thông lượng sản xuất.
-\end{itemize}
-
-Hình~\ref{fig:chapter6-k6-tempo-invalid-qr-trace} trả lời câu hỏi: \textit{khi một request đi vào đường lỗi nghiệp vụ, hệ thống có thể truy vết đường xử lý đại diện hay không?}
-
-\chapterSixEvidenceFigure[Tempo trace cho invalid QR path]{0.72\textheight}
-  {chapter6-k6-tempo-invalid-qr-trace.png}
-  {fig:chapter6-k6-tempo-invalid-qr-trace}
-  {Trace đại diện trên Tempo cho đường xử lý invalid QR.}
-\FloatBarrier
-
-Điểm đối chiếu chính của hình này:
-\begin{itemize}
-  \item trace nối request tại BFF với các span xử lý phía sau trong cùng một đường đi;
-  \item span lỗi nằm trên nhánh invalid QR, phù hợp với phản hồi nghiệp vụ \texttt{403};
-  \item trace giúp phân biệt lỗi nghiệp vụ có kiểm soát với lỗi hệ thống không mong muốn;
-  \item đây là trace đại diện, không chứng minh mọi request trong benchmark đều có trace đầy đủ.
-\end{itemize}
-
-Log correlation bằng Loki không được đưa vào nội dung chính trong lần đánh giá này. Lý do là chỉ log ứng dụng thật có \texttt{traceId} mới đủ mạnh để làm bằng chứng truy vết; log nội bộ của ngăn xếp monitoring không được dùng thay cho log nghiệp vụ.
+Tương quan nhật ký bằng Loki chưa được sử dụng như bằng chứng chính trong lần đánh giá này. Lý do là chỉ nhật ký ứng dụng có \texttt{traceId} mới đủ cơ sở để làm bằng chứng truy vết; nhật ký của các thành phần quan sát không được dùng thay cho nhật ký nghiệp vụ.
 
 \section{Đánh giá kiến trúc và khả năng bảo trì}
 
-Đánh giá kiến trúc xem xét QRTable có giữ được các nguyên tắc đã thiết kế hay không. Các nguyên tắc chính gồm: có điểm vào thống nhất cho client, mỗi dịch vụ chịu trách nhiệm cho miền nghiệp vụ của mình, dữ liệu không bị ghi chéo giữa các dịch vụ, và trạng thái của đơn vị thuê bao được duy trì xuyên suốt các luồng quan trọng. Những nguyên tắc này tương thích với quan điểm microservices có ranh giới dịch vụ và dữ liệu rõ ràng \cite{lewis-fowler-microservices-2014,newman-building-microservices-2021}.
+Đánh giá kiến trúc xem xét QRTable có giữ được các nguyên tắc đã thiết kế hay không. Các nguyên tắc chính gồm: có điểm vào thống nhất cho ứng dụng phía người dùng, mỗi dịch vụ chịu trách nhiệm cho miền nghiệp vụ tương ứng, dữ liệu không bị ghi chéo giữa các dịch vụ, và trạng thái của đơn vị thuê bao được duy trì xuyên suốt các luồng quan trọng. Những nguyên tắc này tương thích với quan điểm microservices có ranh giới dịch vụ và dữ liệu rõ ràng \cite{lewis-fowler-microservices-2014,newman-building-microservices-2021}.
 
 Ở ranh giới dịch vụ và quyền sở hữu dữ liệu, cơ sở đối chiếu rõ ràng nhất đến từ các bảng thiết kế ở Chương 4, các sơ đồ trình tự ở Chương 5 và kết quả kiểm thử ở Chương 6. Các dịch vụ chính được tổ chức theo miền nghiệp vụ như thực đơn, đơn hàng, bếp, thanh toán và SaaS. Các luồng liên dịch vụ đi qua kênh giao tiếp đã thiết kế, thay vì để một dịch vụ ghi trực tiếp vào dữ liệu thuộc trách nhiệm của dịch vụ khác.
 
-Ở giao tiếp liên dịch vụ, QRTable dùng cách tiếp cận chọn lọc. Các yêu cầu cần phản hồi tức thời được xử lý theo kênh đồng bộ, còn các tác vụ lan truyền trạng thái được xử lý bằng sự kiện. WebSocket không thay thế cơ sở dữ liệu hoặc hàng đợi sự kiện; nó chủ yếu giúp client nhận biết khi cần tải lại trạng thái mới nhất. Cách kết hợp này giữ luồng nghiệp vụ dễ theo dõi hơn so với việc dùng một cơ chế giao tiếp cho mọi trường hợp.
+Ở giao tiếp liên dịch vụ, QRTable dùng cách tiếp cận chọn lọc. Các yêu cầu cần phản hồi tức thời được xử lý theo kênh đồng bộ, còn các tác vụ lan truyền trạng thái được xử lý bằng sự kiện. WebSocket không thay thế cơ sở dữ liệu hoặc hàng đợi sự kiện; nó chủ yếu giúp ứng dụng phía người dùng nhận biết khi cần tải lại trạng thái mới nhất. Cách kết hợp này giữ luồng nghiệp vụ dễ theo dõi hơn so với việc dùng một cơ chế giao tiếp cho mọi trường hợp.
 
-Ở khả năng bảo trì, Nx monorepo hỗ trợ tổ chức nhiều ứng dụng và thư viện dùng chung trong cùng một kho dự án. Điều này thuận lợi cho việc chia sẻ kiểu dữ liệu, hằng số, tiện ích và cấu hình kiểm thử. Tuy nhiên, Nx chỉ phản ánh cách tổ chức dự án, chưa đủ để kết luận các dịch vụ vận hành độc lập. Vì vậy, Hình~\ref{fig:chapter6-nx-project-graph} chỉ được dùng như cơ sở hỗ trợ cho nhận định về khả năng bảo trì; luận điểm microservices vẫn phải dựa vào ranh giới dịch vụ, quyền sở hữu dữ liệu, Saga và trạng thái khi vận hành.
-
-\chapterSixEvidenceFigure[Biểu tượng công cụ quản lý dự án Nx]{0.22\textheight}
-  {chapter6-20-nx-project-graph.png}
-  {fig:chapter6-nx-project-graph}
-  {Biểu tượng công cụ quản lý dự án Nx Monorepo.}
-
-Hình~\ref{fig:chapter6-nx-project-graph} chỉ đóng vai trò minh họa cho công cụ quản lý monorepo được sử dụng trong đề tài. Ảnh này không tự xác nhận chất lượng kiến trúc, mà hỗ trợ phần trình bày về cách tổ chức và bảo trì dự án.
+Ở khả năng bảo trì, Nx monorepo hỗ trợ tổ chức nhiều ứng dụng và thư viện dùng chung trong cùng một kho dự án. Điều này thuận lợi cho việc chia sẻ kiểu dữ liệu, hằng số, tiện ích và cấu hình kiểm thử. Tuy nhiên, Nx chỉ phản ánh cách tổ chức dự án, chưa đủ để kết luận các dịch vụ vận hành độc lập. Vì vậy, hình minh họa bổ sung được đặt tại Phụ lục~\ref{app:benchmark-observability-evidence}, Hình~\ref{fig:chapter6-nx-project-graph}; luận điểm microservices vẫn dựa vào ranh giới dịch vụ, quyền sở hữu dữ liệu, Saga và trạng thái khi vận hành.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
@@ -478,41 +362,41 @@ Hình~\ref{fig:chapter6-nx-project-graph} chỉ đóng vai trò minh họa cho c
   \bottomrule
   \endfoot
   Ranh giới dịch vụ & Các dịch vụ chính được tổ chức theo miền nghiệp vụ riêng. & Thiết kế Chương 4, luồng Chương 5 và kiểm thử Chương 6. & Cần thêm kiểm soát tự động để tránh trôi ranh giới theo thời gian. \\
-  Quyền sở hữu dữ liệu & Mỗi nhóm dữ liệu có dịch vụ chịu trách nhiệm chính. & Bảng thiết kế và các luồng kiểm chứng đại diện. & Chưa kết luận toàn bộ bề mặt dữ liệu trên môi trường vận hành thực tế. \\
-  Khả năng bảo trì & Monorepo hỗ trợ chia sẻ phần dùng chung và chạy kiểm thử theo project. & Cấu trúc Nx và kết quả kiểm thử. & Công cụ quản lý dự án không thay thế kiểm chứng vận hành. \\
+  Quyền sở hữu dữ liệu & Mỗi nhóm dữ liệu có dịch vụ chịu trách nhiệm chính. & Bảng thiết kế và các luồng kiểm chứng đại diện. & Chưa kết luận toàn bộ phạm vi dữ liệu trên môi trường vận hành thực tế. \\
+  Khả năng bảo trì & Monorepo hỗ trợ chia sẻ phần dùng chung và chạy kiểm thử theo dự án con. & Cấu trúc Nx và kết quả kiểm thử. & Công cụ quản lý dự án không thay thế kiểm chứng vận hành. \\
 \end{longtable}
 }
 
-\section{Hiệu năng, khả năng mở rộng và vận hành công khai}
+\section{Hiệu năng, khả năng mở rộng và triển khai thử nghiệm}
 
-Bảng~\ref{tab:chapter6-k6-benchmark-summary} cung cấp lát cắt định lượng bằng k6 cho một số luồng đại diện trên môi trường local. Mục này không lặp lại số liệu benchmark, mà diễn giải ý nghĩa của chúng đối với hiệu năng, khả năng mở rộng và vận hành công khai.
+Bảng~\ref{tab:chapter6-k6-benchmark-summary} cung cấp phần đo định lượng bằng k6 cho một số luồng đại diện trên môi trường cục bộ. Mục này không lặp lại số liệu đo tải, mà diễn giải ý nghĩa của chúng đối với hiệu năng, khả năng mở rộng và triển khai thử nghiệm.
 
-Những gì có thể kết luận là trong một lần chạy local, các luồng đọc công khai, đặt món qua QR và pulse xác nhận đơn/KDS đều phản hồi thành công theo check của k6, đồng thời tạo được tín hiệu metric/trace để quan sát. Những gì chưa thể kết luận là sức chứa tối đa, độ ổn định khi tải tăng dài hạn, chi phí tài nguyên, khả năng mở rộng ngang hoặc tính sẵn sàng cao.
+Trong một lần chạy cục bộ, các luồng đọc công khai, đặt món qua QR và xác nhận đơn/KDS đều phản hồi thành công theo kiểm tra của k6, đồng thời tạo được tín hiệu chỉ số và truy vết để quan sát. Tuy nhiên, kết quả này chưa đủ để kết luận sức chứa tối đa, độ ổn định khi tải tăng dài hạn, chi phí tài nguyên, khả năng mở rộng ngang hoặc tính sẵn sàng cao.
 
-Về mặt kiến trúc, QRTable vẫn có cơ sở hợp lý cho mở rộng từng phần: các thành phần có thể được tách theo đặc điểm tải, bộ nhớ đệm hỗ trợ các trạng thái cần truy cập nhanh, và sự kiện bất đồng bộ giúp giảm phụ thuộc trực tiếp giữa một số bước xử lý. Các nhận định này cần được đọc cùng giới hạn của benchmark local, thay vì biến thành cam kết vận hành sản xuất.
+Về mặt kiến trúc, QRTable vẫn có cơ sở hợp lý cho mở rộng từng phần: các thành phần có thể được tách theo đặc điểm tải, bộ nhớ đệm hỗ trợ các trạng thái cần truy cập nhanh, và sự kiện bất đồng bộ giúp giảm phụ thuộc trực tiếp giữa một số bước xử lý. Các nhận định này chỉ có giá trị trong giới hạn của phiên đo tải trong môi trường cục bộ, không phải cam kết vận hành thực tế.
 
-Về vận hành công khai, QRTable đã có kết quả đóng gói container cho các thành phần backend và triển khai độc lập hai ứng dụng frontend lên nền tảng đám mây. Các kết quả này cho thấy hệ thống đã đi qua bước đóng gói và phát hành ở mức thử nghiệm, nhưng chưa tương đương với kiểm chứng vận hành toàn bộ ngăn xếp trong thời gian dài.
+Về triển khai thử nghiệm, QRTable đã có kết quả đóng gói container cho các thành phần phía máy chủ và triển khai độc lập hai ứng dụng phía người dùng lên nền tảng đám mây. Các kết quả này cho thấy hệ thống đã hoàn thành bước đóng gói và phát hành ở mức thử nghiệm. Tuy nhiên, việc đưa toàn bộ lớp backend, cơ sở dữ liệu, hàng đợi thông điệp, định danh, bộ nhớ đệm, reverse proxy và ngăn xếp quan sát lên một môi trường production công khai đòi hỏi nguồn lực hạ tầng và kinh phí triển khai vượt khỏi phạm vi có thể đáp ứng của khóa luận tốt nghiệp. Chỉ riêng các giới hạn bộ nhớ đã khai báo cho PostgreSQL, MongoDB, Redis, Kafka, Keycloak và Caddy đã vào khoảng 3.75 GiB, chưa tính các dịch vụ NestJS, hai ứng dụng phía người dùng, Prometheus, Loki, Tempo, Grafana, hệ điều hành và bộ nhớ đệm của hệ thống tập tin; vì vậy kết quả hiện tại chưa tương đương với kiểm chứng vận hành toàn bộ ngăn xếp trong thời gian dài.
 
 Các hoạt động vận hành và triển khai được đối chiếu qua ba nhóm kết quả:
 \begin{itemize}
-  \item \textbf{Đóng gói container:} các cấu hình backend và frontend được build thành công trên Docker Desktop.
+  \item \textbf{Đóng gói container:} các cấu hình phía máy chủ và ứng dụng phía người dùng được xây dựng thành công trên Docker Desktop.
   \item \textbf{Triển khai ứng dụng khách hàng:} Customer PWA có bản phát hành hoạt động trên Vercel.
   \item \textbf{Triển khai ứng dụng quản trị:} Management App có bản phát hành riêng trên Vercel.
 \end{itemize}
 
-Các kết quả ghi nhận từ công cụ quản lý container và trang quản trị đám mây cung cấp cơ sở đối chiếu cho tiến trình đóng gói và phát hành:
+Các kết quả ghi nhận từ công cụ quản lý container và trang quản trị đám mây cung cấp cơ sở đối chiếu cho tiến trình đóng gói và phát hành. Các hình bổ sung được đặt tại Phụ lục~\ref{app:benchmark-observability-evidence}, Hình~\ref{fig:chapter6-docker-image-or-compose-build}--\ref{fig:chapter6-vercel-management-app}:
 
 \begin{itemize}
   \item \textbf{Quản lý và lịch sử đóng gói container (Hình~\ref{fig:chapter6-docker-image-or-compose-build}):}
     \begin{itemize}
-      \item Bảng điều khiển Docker Desktop ghi nhận các lần build gần nhất đã hoàn thành thành công.
-      \item Các mục build bao gồm ứng dụng khách hàng, ứng dụng quản trị và backend, cho thấy các thành phần có thể được đóng gói tách biệt.
+      \item Bảng điều khiển Docker Desktop ghi nhận các lần xây dựng gần nhất đã hoàn thành thành công.
+      \item Các mục xây dựng bao gồm ứng dụng khách hàng, ứng dụng quản trị và thành phần phía máy chủ, cho thấy các thành phần có thể được đóng gói tách biệt.
     \end{itemize}
 
   \item \textbf{Kết quả triển khai ứng dụng khách hàng trên đám mây Vercel (Hình~\ref{fig:chapter6-vercel-customer-pwa}):}
     \begin{itemize}
       \item Trang quản trị Vercel hiển thị bản phát hành của ứng dụng khách hàng ở trạng thái sẵn sàng.
-      \item Ảnh xem trước cho thấy nội dung ứng dụng đã được xuất bản và có thể truy cập qua tên miền công khai.
+      \item Ảnh xem trước cho thấy nội dung ứng dụng đã được xuất bản và có thể truy cập qua tên miền thử nghiệm.
     \end{itemize}
 
   \item \textbf{Kết quả triển khai ứng dụng quản trị trên đám mây Vercel (Hình~\ref{fig:chapter6-vercel-management-app}):}
@@ -522,30 +406,9 @@ Các kết quả ghi nhận từ công cụ quản lý container và trang quả
     \end{itemize}
 \end{itemize}
 
-\chapterSixEvidenceFigure[Quản lý đóng gói container bằng Docker]{0.82\textheight}
-  {chapter6-22-docker-image-or-compose-build.png}
-  {fig:chapter6-docker-image-or-compose-build}
-  {Lịch sử đóng gói các hình ảnh container trên công cụ Docker Desktop.}
-
-Hình~\ref{fig:chapter6-docker-image-or-compose-build} minh họa lịch sử build trên Docker Desktop, trong đó các cấu hình chính của hệ thống đã hoàn thành thành công.
-
-\chapterSixEvidenceFigure[Triển khai ứng dụng khách hàng trên Vercel]{0.82\textheight}
-  {chapter6-23a-vercel-customer-pwa.png}
-  {fig:chapter6-vercel-customer-pwa}
-  {Trạng thái triển khai ứng dụng khách hàng lên nền tảng đám mây Vercel.}
-
-Hình~\ref{fig:chapter6-vercel-customer-pwa} ghi nhận giao diện quản lý trên Vercel, cho thấy ứng dụng khách hàng đã có bản phát hành trực tuyến ở trạng thái sẵn sàng.
-
-\chapterSixEvidenceFigure[Triển khai ứng dụng quản trị trên Vercel]{0.82\textheight}
-  {chapter6-23b-vercel-management-app.png}
-  {fig:chapter6-vercel-management-app}
-  {Trạng thái triển khai ứng dụng quản trị lên nền tảng đám mây Vercel.}
-
-Hình~\ref{fig:chapter6-vercel-management-app} ghi nhận giao diện điều khiển đám mây, cho thấy ứng dụng quản trị đã được phát hành trực tuyến trong một dự án riêng.
-
 \section{Giới hạn của quá trình đánh giá}
 
-Bảng~\ref{tab:chapter6-limitations} tổng hợp các giới hạn chính. Việc trình bày giới hạn không nhằm làm yếu kết quả của đề tài, mà nhằm xác định chính xác phạm vi suy luận. Đây là yêu cầu quan trọng của một báo cáo học thuật: kết luận phải tương ứng với bằng chứng đã có, còn phần chưa đủ bằng chứng cần được chuyển thành hướng phát triển hoặc kế hoạch kiểm chứng tiếp theo.
+Bảng~\ref{tab:chapter6-limitations} tổng hợp các giới hạn chính. Các giới hạn này xác định phạm vi suy luận của kết quả đánh giá. Kết luận cần tương ứng với bằng chứng đã có; những phần chưa đủ bằng chứng được chuyển thành hướng phát triển hoặc kế hoạch kiểm chứng tiếp theo.
 
 {\scriptsize\sloppy
 \setlength{\tabcolsep}{3pt}
@@ -562,13 +425,13 @@ Bảng~\ref{tab:chapter6-limitations} tổng hợp các giới hạn chính. Vi�
   \endhead
   \bottomrule
   \endfoot
-  Kiểm thử tải quy mô lớn và đo dài hạn. & Benchmark k6 local chỉ cung cấp lát cắt định lượng đại diện; báo cáo không kết luận sức chứa tối đa, khả năng mở rộng ngang hoặc độ ổn định sản xuất. & Bổ sung benchmark lặp lại trên môi trường tách biệt, có theo dõi tài nguyên, tải tăng dần và kịch bản kéo dài. \\
-  Cô lập dữ liệu theo đơn vị thuê bao. & Thiết kế và kiểm thử đại diện cho thấy cơ chế cô lập chính, nhưng chưa chứng minh toàn bộ bề mặt truy vấn, ghi dữ liệu, cache và WebSocket trong vận hành dài hạn. & Chuẩn hóa dữ liệu nhiều đơn vị thuê bao, mở rộng kiểm thử hồi quy và bổ sung kiểm soát tự động ở tầng truy vấn nếu hệ thống phát triển tiếp. \\
-  Phân quyền và dữ liệu vai trò. & Kết quả phụ thuộc vào bộ dữ liệu vai trò và tài khoản kiểm thử; báo cáo chỉ dùng ảnh hoặc kết quả khi dữ liệu được chuẩn hóa. & Cố định seed vai trò, quy trình đăng nhập và bộ kiểm thử quyền cho từng nhóm tác nhân. \\
+  Kiểm thử tải quy mô lớn và đo dài hạn. & Phiên đo tải k6 trong môi trường cục bộ chỉ cung cấp phần đo định lượng đại diện; kết quả đánh giá chưa kết luận sức chứa tối đa, khả năng mở rộng ngang hoặc độ ổn định ở môi trường vận hành thực tế. & Bổ sung phép đo lặp lại trên môi trường tách biệt, có theo dõi tài nguyên, tải tăng dần và kịch bản kéo dài. \\
+  Cô lập dữ liệu theo đơn vị thuê bao. & Thiết kế và kiểm thử đại diện cho thấy cơ chế cô lập chính, nhưng chưa chứng minh toàn bộ phạm vi truy vấn, ghi dữ liệu, bộ nhớ đệm và WebSocket trong vận hành dài hạn. & Chuẩn hóa dữ liệu nhiều đơn vị thuê bao, mở rộng kiểm thử hồi quy và bổ sung kiểm soát tự động ở tầng truy vấn nếu hệ thống phát triển tiếp. \\
+  Phân quyền và dữ liệu vai trò. & Kết quả phụ thuộc vào bộ dữ liệu vai trò và tài khoản kiểm thử; minh chứng chỉ được sử dụng khi dữ liệu đã được chuẩn hóa. & Cố định seed vai trò, quy trình đăng nhập và bộ kiểm thử quyền cho từng nhóm tác nhân. \\
   Saga và lỗi phân tán. & Hai Saga đại diện đã có kiểm thử và kết quả đối chiếu, nhưng chưa được xem là bảo đảm tuyệt đối cho mọi lỗi phân tán trong vận hành dài hạn. & Bổ sung cơ chế thử lại, quan sát lỗi, trạng thái Saga bền vững và kiểm chứng dài hạn. \\
-  Triển khai công khai toàn bộ ngăn xếp. & Docker/Vercel chỉ chứng minh đóng gói hoặc triển khai một phần; báo cáo không kết luận tính sẵn sàng cao của toàn bộ microservices. & Hoàn thiện môi trường triển khai đầy đủ, kiểm tra sức khỏe, rollback và quy trình kiểm chứng sau triển khai. \\
-  Khả năng quan sát. & Dashboard, metric và trace được lấy từ cùng cửa sổ benchmark local; log nội bộ của monitoring không thay thế log ứng dụng có \texttt{traceId}. & Bổ sung log correlation, alerting, retention và dashboard vận hành dài hạn. \\
-  Kiểm chứng SePay thực tế. & Phạm vi hiện tại dùng mô phỏng và kiểm thử hợp đồng; báo cáo không xem kiểm chứng nhà cung cấp là đường chạy tự động mặc định. & Kiểm chứng thủ công với giao dịch thực tế khi có đường gọi lại, thông tin xác thực và dữ liệu đối soát phù hợp. \\
+  Triển khai thử nghiệm toàn bộ ngăn xếp. & Docker/Vercel chỉ chứng minh đóng gói hoặc triển khai một phần; kết quả đánh giá chưa kết luận tính sẵn sàng cao của toàn bộ microservices do mức hạ tầng 2 vCPU, 4 GB RAM và 25 GB lưu trữ chỉ phù hợp làm môi trường thử nghiệm có kiểm soát. & Hoàn thiện môi trường triển khai đầy đủ khi có điều kiện hạ tầng tối thiểu khoảng 4 vCPU, 8 GB RAM và vùng lưu trữ rộng hơn cho image, log, dữ liệu, backup và số liệu quan sát. \\
+  Khả năng quan sát. & Bảng điều khiển, chỉ số và truy vết được lấy từ cùng cửa sổ đo tải cục bộ; nhật ký của các thành phần quan sát không thay thế nhật ký ứng dụng có \texttt{traceId}. & Bổ sung tương quan nhật ký, cảnh báo, lưu giữ dữ liệu và bảng điều khiển vận hành dài hạn. \\
+  Kiểm chứng SePay thực tế. & Phạm vi hiện tại dùng mô phỏng và kiểm thử hợp đồng; kiểm chứng nhà cung cấp chưa phải đường chạy tự động mặc định. & Kiểm chứng thủ công với giao dịch thực tế khi có đường gọi lại, thông tin xác thực và dữ liệu đối soát phù hợp. \\
   Hàng đợi thao tác ngoại tuyến. & Hệ thống mới đánh giá kết nối lại, tải lại và đọc trạng thái mới nhất; chưa kết luận hỗ trợ đầy đủ thao tác ghi khi mất mạng. & Thiết kế cơ chế đồng bộ nền, hàng đợi thao tác và xử lý xung đột. \\
 \end{longtable}
 }
@@ -579,6 +442,6 @@ Kết quả đánh giá cho thấy QRTable đáp ứng phần lớn mục tiêu 
 
 Luận điểm microservices của QRTable rõ nhất khi được nhìn qua các luồng liên dịch vụ. Luồng xác nhận đơn nối đặt món, tồn kho và bếp; luồng khởi tạo đơn vị thuê bao nối dữ liệu nền tảng, chủ sở hữu và gói dịch vụ; luồng phân quyền nối vai trò người dùng với phạm vi thao tác. Mỗi chuỗi này đều thể hiện một đánh đổi thiết kế: chấp nhận phức tạp hơn kiến trúc nguyên khối để đạt ranh giới dữ liệu và khả năng mở rộng tổ chức, nhưng phải bù lại bằng kiểm thử, xử lý thao tác lặp và giới hạn kết luận.
 
-Các giới hạn còn lại chủ yếu nằm ở kiểm chứng vận hành quy mô lớn và kiểm chứng toàn ngăn xếp. Benchmark local giúp có số liệu đại diện, nhưng chưa cho phép kết luận hiệu năng dưới tải lớn hoặc dài hạn; chưa triển khai công khai toàn bộ ngăn xếp thì không kết luận hệ thống đã sẵn sàng vận hành dài hạn; nhà cung cấp thanh toán thật chưa chạy mặc định thì không kết luận kiểm chứng nhà cung cấp đã được tự động hóa. Cách diễn đạt này giúp kết quả của khóa luận giữ được tính thuyết phục: phần đã làm được được trình bày bằng kiểm thử và kết quả quan sát, còn phần chưa đủ bằng chứng được nêu như giới hạn có hướng xử lý.
+Các giới hạn còn lại chủ yếu nằm ở kiểm chứng vận hành quy mô lớn và kiểm chứng toàn ngăn xếp. Phiên đo tải cục bộ cung cấp số liệu đại diện, nhưng chưa cho phép kết luận hiệu năng dưới tải lớn hoặc dài hạn; khi chưa triển khai đầy đủ toàn bộ ngăn xếp, hệ thống chưa được kết luận là sẵn sàng vận hành dài hạn; khi nhà cung cấp thanh toán thực tế chưa chạy mặc định, kiểm chứng nhà cung cấp chưa được xem là đã tự động hóa. Vì vậy, các hạng mục đã có bằng chứng được đối chiếu bằng kiểm thử và kết quả quan sát, còn các hạng mục chưa đủ bằng chứng được xác định là giới hạn có hướng xử lý.
 
-Nhìn tổng thể, QRTable cho thấy tính khả thi của một nền tảng POS theo mô hình SaaS tích hợp đặt món qua mã QR dựa trên kiến trúc microservices có kiểm soát. Giá trị của hệ thống nằm ở cách các luồng nghiệp vụ chính được nối với ranh giới dịch vụ, quyền sở hữu dữ liệu, kiểm thử, Saga, phân quyền, benchmark local và kết quả quan sát được. Đây là cơ sở để Chương 7 tổng hợp đóng góp của đề tài và đề xuất các hướng nâng cấp về kiểm thử tải quy mô lớn, triển khai công khai, quan sát hệ thống, củng cố Saga và mở rộng sản phẩm.
+Nhìn tổng thể, QRTable cho thấy tính khả thi của một nền tảng POS theo mô hình SaaS tích hợp đặt món qua mã QR dựa trên kiến trúc microservices có kiểm soát. Giá trị của hệ thống nằm ở cách các luồng nghiệp vụ chính được nối với ranh giới dịch vụ, quyền sở hữu dữ liệu, kiểm thử, Saga, phân quyền, kết quả đo tải cục bộ và kết quả quan sát được. Đây là cơ sở để Chương 7 tổng hợp đóng góp của đề tài và đề xuất các hướng nâng cấp về kiểm thử tải quy mô lớn, triển khai toàn bộ ngăn xếp, quan sát hệ thống, củng cố Saga và mở rộng sản phẩm.

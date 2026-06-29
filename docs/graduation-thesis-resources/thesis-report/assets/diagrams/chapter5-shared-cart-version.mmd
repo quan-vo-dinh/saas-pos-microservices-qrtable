@@ -1,31 +1,32 @@
 
 sequenceDiagram
   autonumber
-  actor Device1 as Device 1<br/>cartVersion: 5
-  actor Device2 as Device 2<br/>cartVersion: 5
-  participant Order as Order<br/>cart version check
-  participant Redis as Redis<br/>cart state + version
+  actor Device1 as Thiết bị 1<br/>cartVersion: 5
+  actor Device2 as Thiết bị 2<br/>cartVersion: 5
+  participant Order as Order<br/>(Kiểm tra phiên bản giỏ)
+  participant Redis as Redis<br/>(Trạng thái & phiên bản giỏ)
 
-  Device1->>Order: Add item to cart<br/>expected version: 5
-  Order->>Redis: Compare and update
-  Redis->>Redis: Version matches<br/>apply change v5 → v6
-  Redis-->>Order: Updated cart v6
-  Order-->>Device1: Success, cart v6
+  Device1->>Order: Thêm món vào giỏ<br/>phiên bản mong đợi: 5
+  Order->>Redis: So sánh và cập nhật
+  Redis->>Redis: Trùng khớp phiên bản<br/>áp dụng thay đổi v5 → v6
+  Redis-->>Order: Giỏ hàng đã cập nhật v6
+  Order-->>Device1: Thành công, giỏ v6
 
-  Device2->>Order: Add different item<br/>expected version: 5 (stale)
-  Order->>Redis: Compare and update
-  Redis-->>Order: Version mismatch<br/>expected 5, actual 6
-  Order-->>Device2: 409 CONFLICT<br/>+ current cart v6
+  Device2->>Order: Thêm món khác<br/>phiên bản mong đợi: 5 (cũ)
+  Order->>Redis: So sánh và cập nhật
+  Redis-->>Order: Lệch phiên bản<br/>mong đợi 5, hiện tại 6
+  Order-->>Device2: 409 CONFLICT<br/>+ giỏ hàng hiện tại v6
 
-  Device2->>Order: Refetch cart state
-  Order->>Redis: Read current cart
-  Redis-->>Order: Cart v6
-  Order-->>Device2: Cart v6
+  Device2->>Order: Tải lại trạng thái giỏ hàng
+  Order->>Redis: Đọc giỏ hàng hiện tại
+  Redis-->>Order: Giỏ v6
+  Order-->>Device2: Giỏ v6
 
-  Device2->>Order: Retry with version 6
-  Order->>Redis: Compare and update
-  Redis->>Redis: Version matches<br/>apply change v6 → v7
-  Redis-->>Order: Updated cart v7
-  Order-->>Device2: Success, cart v7
+  Device2->>Order: Thử lại với phiên bản 6
+  Order->>Redis: So sánh và cập nhật
+  Redis->>Redis: Trùng khớp phiên bản<br/>áp dụng thay đổi v6 → v7
+  Redis-->>Order: Giỏ hàng đã cập nhật v7
+  Order-->>Device2: Thành công, giỏ v7
 
-  Note over Order,Redis: Optimistic version prevents lost updates.<br/>Client must retry with the version received from the conflict response.
+  Note over Order,Redis: Kiểm soát phiên bản lạc quan ngăn chặn mất cập nhật (lost update).<br/>Client phải thử lại bằng phiên bản nhận được từ phản hồi xung đột (conflict).
+

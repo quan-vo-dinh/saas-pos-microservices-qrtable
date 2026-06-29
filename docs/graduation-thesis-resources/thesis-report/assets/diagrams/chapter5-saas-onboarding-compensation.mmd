@@ -1,28 +1,29 @@
 sequenceDiagram
   autonumber
-  participant SaaS as SaaS<br/>onboarding saga
-  participant SDB as PostgreSQL<br/>SaaS DB
+  participant SaaS as SaaS<br/>(Saga khởi tạo)
+  participant SDB as PostgreSQL<br/>(CSDL SaaS)
   participant Authz as Authorizer
   participant BFF as BFF
   actor Admin as Super Admin
 
-  SaaS->>SDB: Create tenant
-  SaaS->>Authz: Create owner identity
+  SaaS->>SDB: Tạo tenant
+  SaaS->>Authz: Tạo tài khoản định danh chủ sở hữu
   Authz-->>SaaS: ownerUserId
 
-  alt Failure before subscription
-    SaaS->>Authz: Disable owner identity
-    SaaS->>SDB: Delete partial tenant
+  alt Thất bại trước khi tạo subscription
+    SaaS->>Authz: Vô hiệu hóa tài khoản định danh chủ sở hữu
+    SaaS->>SDB: Xóa tenant dở dang
     SaaS-->>BFF: TENANT_ONBOARDING_FAILED
-    BFF-->>Admin: Show failure
-  else Failure after subscription
-    SaaS->>SDB: Assign initial subscription
-    SaaS--xSaaS: Downstream setup fails
-    SaaS->>Authz: Disable owner identity
-    SaaS->>SDB: Delete initial onboarding subscription
-    SaaS->>SDB: Delete partial tenant
+    BFF-->>Admin: Hiển thị lỗi thất bại
+  else Thất bại sau khi tạo subscription
+    SaaS->>SDB: Gán gói thuê bao ban đầu
+    SaaS--xSaaS: Thiết lập downstream thất bại
+    SaaS->>Authz: Vô hiệu hóa tài khoản định danh chủ sở hữu
+    SaaS->>SDB: Xóa subscription khởi tạo ban đầu
+    SaaS->>SDB: Xóa tenant dở dang
     SaaS-->>BFF: TENANT_ONBOARDING_FAILED
-    BFF-->>Admin: Show failure
+    BFF-->>Admin: Hiển thị lỗi thất bại
   end
 
-  Note over SaaS,SDB: Compensation is best-effort and scoped to side effects already reached
+  Note over SaaS,SDB: Bù trừ (Compensation) theo cơ chế nỗ lực tối đa (best-effort) và chỉ áp dụng cho các tác dụng phụ đã xảy ra.
+

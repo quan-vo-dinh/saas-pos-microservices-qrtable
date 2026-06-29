@@ -1,29 +1,30 @@
 sequenceDiagram
   autonumber
-  actor Admin as Super Admin<br/>Management App
-  participant BFF as BFF<br/>Platform API
-  participant SaaS as SaaS<br/>tenant/subscription owner
-  participant Authz as Authorizer<br/>identity contract
-  participant UserAccess as User-Access<br/>profile contract
-  participant Payment as Payment<br/>settings owner
+  actor Admin as Super Admin<br/>(Ứng dụng quản trị)
+  participant BFF as BFF<br/>(Platform API)
+  participant SaaS as SaaS<br/>(Quản lý tenant/subscription)
+  participant Authz as Authorizer<br/>(Hợp đồng định danh)
+  participant UserAccess as User-Access<br/>(Hợp đồng hồ sơ)
+  participant Payment as Payment<br/>(Thiết lập thanh toán)
   participant Kafka as Kafka<br/>tenant.created
-  participant Catalog as Catalog<br/>tenant seed consumer
+  participant Catalog as Catalog<br/>(Khởi tạo dữ liệu mẫu)
 
-  Admin->>BFF: Onboard tenant
-  BFF->>SaaS: Verified onboarding command
-  SaaS->>SaaS: Create tenant<br/>and initial subscription
-  SaaS->>Authz: Create owner identity
-  SaaS->>UserAccess: Upsert owner profile and roles
-  SaaS->>Payment: Create empty payment settings
-  SaaS-->>BFF: Tenant and owner created
-  BFF-->>Admin: Onboarding success
-  SaaS-->>Kafka: Publish tenant.created after commit
-  Kafka-->>Catalog: Seed default tenant data idempotently
+  Admin->>BFF: Khởi tạo đơn vị thuê bao (Onboard tenant)
+  BFF->>SaaS: Lệnh khởi tạo đã xác minh
+  SaaS->>SaaS: Tạo tenant<br/>và gói thuê bao ban đầu
+  SaaS->>Authz: Tạo tài khoản định danh cho chủ sở hữu
+  SaaS->>UserAccess: Cập nhật hồ sơ và vai trò của chủ sở hữu
+  SaaS->>Payment: Khởi tạo thiết lập thanh toán rỗng
+  SaaS-->>BFF: Đã tạo tenant và chủ sở hữu
+  BFF-->>Admin: Khởi tạo thành công
+  SaaS-->>Kafka: Phát sự kiện tenant.created sau commit
+  Kafka-->>Catalog: Khởi tạo dữ liệu mặc định của tenant theo cơ chế idempotent
 
-  opt Failure after side effects
-    SaaS->>Authz: Disable owner identity
-    SaaS->>SaaS: Remove initial subscription<br/>and partial tenant
-    SaaS-->>BFF: Onboarding failed
+  opt Thất bại sau khi phát sinh tác dụng phụ (side effects)
+    SaaS->>Authz: Vô hiệu hóa tài khoản định danh chủ sở hữu
+    SaaS->>SaaS: Xóa gói thuê bao ban đầu<br/>và thông tin tenant đang dở dang
+    SaaS-->>BFF: Khởi tạo thất bại
   end
 
-  Note over SaaS,Payment: SaaS coordinates by contract<br/>It does not write Authorizer, User-Access, Payment or Catalog databases directly
+  Note over SaaS,Payment: SaaS điều phối thông qua hợp đồng API.<br/>Nó không ghi trực tiếp vào các cơ sở dữ liệu của Authorizer, User-Access, Payment hay Catalog.
+

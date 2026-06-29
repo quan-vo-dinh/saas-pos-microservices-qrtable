@@ -1,33 +1,34 @@
 sequenceDiagram
   autonumber
-  actor Staff as Staff<br/>POS
-  participant Payment as Payment<br/>settlement owner
-  participant PDB as PostgreSQL<br/>Payment DB
-  participant Order as Order<br/>bill/session owner
-  participant Catalog as Catalog<br/>table state owner
+  actor Staff as Nhân viên<br/>(POS)
+  participant Payment as Payment<br/>(Quyết toán)
+  participant PDB as PostgreSQL<br/>(CSDL Payment)
+  participant Order as Order<br/>(Quản lý hóa đơn/phiên)
+  participant Catalog as Catalog<br/>(Quản lý bàn)
   participant Kafka as Kafka<br/>payment.completed
 
-  Staff->>Payment: Confirm cash payment
-  Payment->>PDB: Begin transaction
-  Payment->>PDB: Lock payment and verify amount
+  Staff->>Payment: Xác nhận thanh toán tiền mặt
+  Payment->>PDB: Bắt đầu giao dịch
+  Payment->>PDB: Khóa bản ghi thanh toán và xác minh số tiền
 
-  alt Amount insufficient or payment not pending
-    Payment->>PDB: Roll back transaction
-    Payment-->>Staff: Reject payment
-  else Payment can be completed
-    Payment->>PDB: Save PAID cash<br/>audit + outbox
-    PDB-->>Payment: Commit Payment transaction
+  alt Số tiền thiếu hoặc trạng thái không phải pending
+    Payment->>PDB: Rollback giao dịch
+    Payment-->>Staff: Từ chối thanh toán
+  else Thanh toán hợp lệ
+    Payment->>PDB: Lưu ĐÃ THANH TOÁN (PAID)<br/>kiểm toán + outbox
+    PDB-->>Payment: Ghi nhận giao dịch Payment
     Payment->>Order: BILL_MARK_PAID
 
-    alt Bill is already PAID
-      Order-->>Payment: Return current bill
-    else Bill is PENDING_PAYMENT
-      Order->>Order: Mark bill PAID<br/>close active session
-      Order->>Catalog: Move table to CLEANING
+    alt Hóa đơn đã ở trạng thái ĐÃ THANH TOÁN (PAID)
+      Order-->>Payment: Trả về hóa đơn hiện tại
+    else Hóa đơn là CHỜ THANH TOÁN (PENDING_PAYMENT)
+      Order->>Order: Đánh dấu hóa đơn ĐÃ THANH TOÁN (PAID)<br/>đóng phiên hoạt động
+      Order->>Catalog: Cập nhật bàn thành ĐANG DỌN (CLEANING)
     end
 
-    Payment-->>Kafka: Publish payment.completed
-    Payment-->>Staff: Settlement completed
+    Payment-->>Kafka: Phát sự kiện payment.completed
+    Payment-->>Staff: Quyết toán hoàn tất
   end
 
-  Note over Payment,Order: Payment commit is independent from the follow-up Order call<br/>payment.completed keeps a replay-safe finalization path
+  Note over Payment,Order: Ghi nhận giao dịch của Payment độc lập với lời gọi Order tiếp theo.<br/>Sự kiện payment.completed duy trì lộ trình đóng hóa đơn an toàn khi chạy lại (replay-safe).
+

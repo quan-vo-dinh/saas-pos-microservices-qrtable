@@ -1,22 +1,23 @@
 sequenceDiagram
   autonumber
-  participant Order as Order<br/>domain owner
-  participant ODB as PostgreSQL<br/>Order DB
-  participant Outbox as Outbox relay
+  participant Order as Order<br/>(Chủ miền nghiệp vụ)
+  participant ODB as PostgreSQL<br/>(CSDL Order)
+  participant Outbox as Bộ truyền Outbox
   participant Kafka as Kafka<br/>order.confirmed
-  participant Kitchen as Kitchen<br/>consumer
-  participant Redis as Redis<br/>KDS projection
-  participant BFF as BFF<br/>WebSocket hint
+  participant Kitchen as Kitchen<br/>(Consumer)
+  participant Redis as Redis<br/>(Bản chiếu KDS)
+  participant BFF as BFF<br/>(WebSocket gợi ý)
   participant KDS as KDS client
 
-  Order->>ODB: Commit order PROCESSING<br/>and PENDING outbox row atomically
-  Outbox->>ODB: Poll pending outbox rows
-  Outbox->>Kafka: Publish order.confirmed
-  Kafka-->>Kitchen: Consume event
-  Kitchen->>Kitchen: Validate schema and contract
-  Kitchen->>Redis: Create station tickets<br/>and queue projection
-  Kitchen->>BFF: Publish kds.queue_changed hint
-  BFF-->>KDS: WebSocket hint
-  KDS->>BFF: Refetch latest KDS state
+  Order->>ODB: Commit đơn PROCESSING<br/>và dòng outbox PENDING nguyên tử
+  Outbox->>ODB: Quét các dòng outbox đang chờ (PENDING)
+  Outbox->>Kafka: Phát sự kiện order.confirmed
+  Kafka-->>Kitchen: Tiêu thụ sự kiện
+  Kitchen->>Kitchen: Xác minh schema và hợp đồng
+  Kitchen->>Redis: Tạo phiếu theo trạm<br/>và bản chiếu hàng đợi
+  Kitchen->>BFF: Phát tín hiệu kds.queue_changed
+  BFF-->>KDS: Tín hiệu WebSocket
+  KDS->>BFF: Tải lại trạng thái KDS mới nhất
 
-  Note over Order,KDS: Staff confirmation does not wait for KDS ticket creation.<br/>Kafka and WebSocket carry side effects after the Order commit.
+  Note over Order,KDS: Xác nhận của nhân viên không cần chờ tạo phiếu KDS.<br/>Kafka và WebSocket truyền tải các tác dụng phụ (side effects) sau khi Order commit.
+

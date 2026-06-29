@@ -1,37 +1,38 @@
 sequenceDiagram
   autonumber
-  actor Bank as Bank / SePay
-  participant BFF as BFF<br/>webhook edge
-  participant Payment as Payment<br/>webhook service
-  participant PDB as PostgreSQL<br/>Payment DB
-  participant Order as Order<br/>bill owner
+  actor Bank as Ngân hàng / SePay
+  participant BFF as BFF<br/>(Lớp biên Webhook)
+  participant Payment as Payment<br/>(Dịch vụ Webhook)
+  participant PDB as PostgreSQL<br/>(CSDL Payment)
+  participant Order as Order<br/>(Quản lý hóa đơn)
   participant Kafka as Kafka<br/>payment.completed
 
-  Bank->>BFF: POST tenant SePay webhook
+  Bank->>BFF: POST Webhook SePay của tenant
   BFF->>Payment: tenantSlug, secret, payload
-  Payment->>Payment: Verify tenant secret<br/>and extract QRTBL reference
+  Payment->>Payment: Xác minh tenant secret<br/>và trích xuất tham chiếu QRTBL
 
-  alt Invalid secret or tenant mismatch
-    Payment-->>BFF: Reject before mutation
-    BFF-->>Bank: Error response
-  else No payable QRTBL transfer
-    Payment-->>BFF: success without mutation
-    BFF-->>Bank: success
-  else Matched pending payment
-    Payment->>PDB: Lock payment by reference
+  alt Secret không hợp lệ hoặc tenant không khớp
+    Payment-->>BFF: Từ chối trước khi ghi nhận
+    BFF-->>Bank: Phản hồi lỗi
+  else Không phải giao dịch chuyển khoản QRTBL hợp lệ
+    Payment-->>BFF: thành công (không ghi nhận)
+    BFF-->>Bank: thành công (success)
+  else Khớp thanh toán đang chờ
+    Payment->>PDB: Khóa bản ghi thanh toán theo tham chiếu
 
-    alt Duplicate, after-paid, or underpaid
-      Payment->>PDB: Save audit only
-      Payment-->>BFF: success
-    else Amount is sufficient
-      Payment->>PDB: Save PAID VietQR<br/>metadata + outbox
-      PDB-->>Payment: Commit Payment transaction
+    alt Thanh toán lặp, trả sau, hoặc thiếu tiền
+      Payment->>PDB: Chỉ lưu nhật ký kiểm toán (audit)
+      Payment-->>BFF: thành công
+    else Số tiền thanh toán đầy đủ
+      Payment->>PDB: Lưu ĐÃ THANH TOÁN (PAID) VietQR<br/>metadata + outbox
+      PDB-->>Payment: Ghi nhận giao dịch Payment
       Payment->>Order: BILL_MARK_PAID
-      Payment-->>Kafka: Publish payment.completed
+      Payment-->>Kafka: Phát sự kiện payment.completed
     end
 
-    Payment-->>BFF: success
-    BFF-->>Bank: success
+    Payment-->>BFF: thành công
+    BFF-->>Bank: thành công
   end
 
-  Note over Payment,PDB: Duplicate, after-paid, and underpaid webhooks are audited<br/>but they do not complete the bill again
+  Note over Payment,PDB: Các webhook lặp, thanh toán sau, hoặc thiếu tiền đều được kiểm toán<br/>nhưng chúng không hoàn tất hóa đơn thêm một lần nào nữa.
+

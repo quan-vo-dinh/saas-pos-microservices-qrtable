@@ -1,23 +1,24 @@
 sequenceDiagram
   autonumber
-  participant BFF as BFF<br/>QR validation
-  participant Order as Order<br/>session owner
-  participant Catalog as Catalog<br/>table owner
-  participant ODB as PostgreSQL<br/>Order DB
+  participant BFF as BFF<br/>Xác minh QR
+  participant Order as Order<br/>(Quản lý phiên)
+  participant Catalog as Catalog<br/>(Quản lý bàn)
+  participant ODB as PostgreSQL<br/>(CSDL Order)
 
-  BFF->>BFF: Validate QR signature<br/>extract tenantId + tableId
-  BFF->>Order: Join or create session
-  Order->>Catalog: Validate table ownership<br/>via TCP contract
-  Catalog-->>Order: Table belongs to tenant<br/>current status AVAILABLE
+  BFF->>BFF: Xác minh chữ ký QR<br/>trích xuất tenantId + tableId
+  BFF->>Order: Tham gia hoặc tạo phiên
+  Order->>Catalog: Xác minh quyền sở hữu bàn<br/>qua hợp đồng TCP
+  Catalog-->>Order: Bàn thuộc về tenant<br/>trạng thái hiện tại TRỐNG (AVAILABLE)
 
-  Order->>ODB: Check active session<br/>by tenant + table
-  alt No active session found
-    Order->>ODB: Create ACTIVE session row
-    Order->>Catalog: Update table to OCCUPIED
-    Catalog-->>Order: Table updated
-    Order-->>BFF: New session created
-  else Active session exists
-    Order-->>BFF: Return existing session
+  Order->>ODB: Kiểm tra phiên hoạt động<br/>theo tenant + bàn
+  alt Không tìm thấy phiên hoạt động
+    Order->>ODB: Tạo bản ghi phiên HOẠT ĐỘNG (ACTIVE)
+    Order->>Catalog: Cập nhật bàn thành BẬN (OCCUPIED)
+    Catalog-->>Order: Bàn đã cập nhật
+    Order-->>BFF: Đã tạo phiên mới
+  else Phiên hoạt động đã tồn tại
+    Order-->>BFF: Trả về phiên hiện có
   end
 
-  Note over Order,Catalog: Session creation requires: valid QR, table belongs to tenant, no duplicate active session for that table.
+  Note over Order,Catalog: Yêu cầu tạo phiên: mã QR hợp lệ, bàn thuộc về tenant, không có phiên hoạt động trùng lặp cho bàn đó.
+

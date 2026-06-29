@@ -8,21 +8,21 @@ Các luồng gồm phiên đặt món qua mã QR và giỏ dùng chung; xác nh�
 
 Các luồng triển khai tuân theo ba nguyên tắc từ Chương 4: cơ sở dữ liệu được tách theo ranh giới dịch vụ, BFF là điểm vào của ứng dụng và WebSocket chỉ phát tín hiệu làm mới. Trọng tâm của chương là cách từng luồng duy trì quyền sở hữu dữ liệu và các ràng buộc nghiệp vụ trong quá trình phối hợp liên dịch vụ.
 
-Phạm vi trình bày gồm cấu trúc dịch vụ, đăng ký mô-đun, thực thể và lược đồ dữ liệu, hợp đồng TCP/Kafka, kiểm thử đơn vị, kiểm thử hợp đồng, kiểm thử tích hợp có điều kiện, sơ đồ luồng và ảnh giao diện. Ảnh chụp thể hiện bề mặt vận hành; mã nguồn, kiểm thử và sơ đồ làm rõ ranh giới giao dịch, xử lý thao tác lặp an toàn, lọc theo đơn vị thuê bao và cơ chế bù trừ.
+Phạm vi trình bày gồm cấu trúc dịch vụ, đăng ký mô-đun, thực thể và lược đồ dữ liệu, hợp đồng TCP/Kafka, kiểm thử đơn vị, kiểm thử hợp đồng, kiểm thử tích hợp có điều kiện, sơ đồ luồng và ảnh giao diện. Ảnh giao diện minh họa kết quả vận hành ở phía người dùng; mã nguồn, kiểm thử và sơ đồ làm rõ ranh giới giao dịch, xử lý thao tác lặp an toàn, lọc theo đơn vị thuê bao và cơ chế bù trừ.
 
-Chương 5 tập trung vào cấu trúc và kết quả triển khai. Chương 6 tiếp tục kiểm chứng các kết quả này bằng kiểm thử tự động, kiểm thử có điều kiện với SePay, benchmark k6 đại diện, số liệu quan sát và minh chứng vận hành trên môi trường công khai.
+Chương 5 tập trung vào cấu trúc và kết quả triển khai. Chương 6 tiếp tục kiểm chứng các kết quả này bằng kiểm thử tự động, kiểm thử có điều kiện với SePay, phiên đo tải k6 đại diện, số liệu quan sát vận hành và minh chứng trên môi trường triển khai thử nghiệm.
 
 \section{Nền tảng triển khai và ranh giới trách nhiệm}
 
 QRTable được triển khai trong Nx monorepo gồm các ứng dụng phía người dùng, BFF và dịch vụ nghiệp vụ. PWA khách phục vụ quy trình đặt món tại bàn qua mã QR; ứng dụng quản trị phục vụ nhân viên, bếp, quầy bar, chủ quán, quản lý và quản trị viên nền tảng. Cả hai ứng dụng đi qua BFF để sử dụng thống nhất chuỗi guard, ngữ cảnh đơn vị thuê bao, phân quyền và cổng WebSocket.
 
-Ở lớp dịch vụ, Authorizer xác minh JWT/OIDC và tích hợp Keycloak; User-Access lưu hồ sơ ứng dụng và vai trò nghiệp vụ; Catalog sở hữu thực đơn, bàn, token QR và tồn kho; Order sở hữu phiên, giỏ, đơn, dòng đơn, hóa đơn và yêu cầu phục vụ; Kitchen sở hữu bản chiếu KDS khi vận hành; Payment sở hữu giao dịch, nhật ký kiểm toán và cấu hình thanh toán; SaaS sở hữu đơn vị thuê bao, gói giá, thuê bao, hóa đơn thuê bao và quyền theo gói. Các bảng/bộ sưu tập tương ứng đã được trình bày ở Bảng~\ref{tab:chapter4-data-ownership-schema}; Chương 5 chỉ nhắc lại dữ liệu khi nó giúp giải thích một luồng cụ thể.
+Ở lớp dịch vụ, Authorizer xác minh JWT/OIDC và tích hợp Keycloak; User-Access lưu hồ sơ ứng dụng và vai trò nghiệp vụ; Catalog sở hữu thực đơn, bàn, token QR và tồn kho; Order sở hữu phiên, giỏ, đơn, dòng đơn, hóa đơn và yêu cầu phục vụ; Kitchen sở hữu bản chiếu KDS khi vận hành; Payment sở hữu giao dịch, nhật ký kiểm toán và cấu hình thanh toán; SaaS sở hữu đơn vị thuê bao, gói giá, thuê bao, hóa đơn thuê bao và quyền theo gói. Các bảng/bộ sưu tập tương ứng đã được trình bày ở Bảng~\ref{tab:chapter4-data-ownership-schema}; Chương 5 chỉ nhắc lại dữ liệu khi cần giải thích một luồng cụ thể.
 
 Các thư viện dùng chung trong monorepo tạo lớp hợp đồng giữa các phần của hệ thống. Dịch vụ có thể dùng chung DTO, enum, token tích hợp, bộ dựng khóa Redis, bộ dựng phòng WebSocket, guard và kiểu dữ liệu phía ứng dụng. Dữ liệu thuộc ngữ cảnh nghiệp vụ khác được truy cập qua TCP/gRPC hoặc Kafka. Nhờ đó, Nx hỗ trợ tính nhất quán của hợp đồng mà không làm mất ranh giới dữ liệu.
 
 \section{Phiên đặt món qua mã QR và giỏ đặt món dùng chung}
 
-Hình~\ref{fig:chapter5-qr-ordering-overview} trình bày bức tranh tổng quan của luồng quản lý phiên QR. Các hình tiếp theo tách luồng này theo từng câu hỏi kỹ thuật cần chứng minh: khởi tạo phiên an toàn, quản lý giỏ chung với kiểm soát phiên bản, đồng bộ Redis và PostgreSQL, và xử lý xung đột cập nhật đồng thời.
+Hình~\ref{fig:chapter5-qr-ordering-overview} trình bày tổng quan luồng quản lý phiên QR. Các sơ đồ chi tiết về khởi tạo phiên, quản lý giỏ chung, đồng bộ Redis--PostgreSQL và gửi đơn được đặt tại Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-qr-session-init}--\ref{fig:chapter5-cart-submit-order}.
 
 \begin{figure}[H]
   \centering
@@ -45,14 +45,7 @@ Các bất biến chính của luồng gồm:
 
 \subsection{Khởi tạo phiên từ mã QR}
 
-Hình~\ref{fig:chapter5-qr-session-init} trả lời câu hỏi: \textit{hệ thống đảm bảo khách chỉ mở phiên hợp lệ theo đơn vị thuê bao và bàn bằng cách nào?}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-qr-session-init.pdf}
-  \caption{Khởi tạo phiên đặt món từ mã QR với kiểm tra ngữ cảnh đơn vị thuê bao.}
-  \label{fig:chapter5-qr-session-init}
-\end{figure}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-qr-session-init}, làm rõ cơ chế đảm bảo khách chỉ mở phiên hợp lệ theo đơn vị thuê bao và bàn.
 
 Luồng bắt đầu khi khách quét mã QR tại bàn. Token QR mang theo \texttt{tenantId}, \texttt{tableId} và chữ ký xác thực. BFF kiểm tra chữ ký, tra cứu thông tin đơn vị thuê bao và chuyển yêu cầu đã xác thực sang Order.
 
@@ -69,76 +62,55 @@ Nhờ đó, phiên chỉ được tạo khi token hợp lệ, bàn thuộc đún
 
 \subsection{Quản lý giỏ đặt món dùng chung với phiên bản lạc quan}
 
-Hình~\ref{fig:chapter5-shared-cart-version} trả lời câu hỏi: \textit{nhiều thiết bị cập nhật cùng lúc thì hệ thống phát hiện xung đột bằng cách nào?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-shared-cart-version}, làm rõ cách phát hiện xung đột khi nhiều thiết bị cập nhật giỏ đồng thời.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-shared-cart-version.pdf}
-  \caption{Kiểm soát giỏ chung qua phiên bản lạc quan và phát hiện xung đột cập nhật.}
-  \label{fig:chapter5-shared-cart-version}
-\end{figure}
-
-Giỏ đặt món được lưu trong Redis với khóa theo phiên và đi kèm số phiên bản. Mỗi khi khách thêm hoặc bỏ món, client gửi yêu cầu kèm phiên bản hiện tại mà thiết bị đang giữ.
+Giỏ đặt món được lưu trong Redis với khóa theo phiên và đi kèm số phiên bản. Mỗi khi khách thêm hoặc bỏ món, ứng dụng phía khách gửi yêu cầu kèm phiên bản hiện tại mà thiết bị đang giữ.
 
 Order kiểm tra phiên bản:
 
 \begin{itemize}
   \item nếu phiên bản khớp, Order áp dụng thay đổi, tăng phiên bản lên 1 và trả về giỏ mới;
-  \item nếu phiên bản không khớp, Order trả về mã xung đột và yêu cầu client tải lại giỏ từ máy chủ;
-  \item sau khi client nhận giỏ mới, client có thể thử lại thao tác với phiên bản đã cập nhật.
+  \item nếu phiên bản không khớp, Order trả về mã xung đột và yêu cầu ứng dụng phía khách tải lại giỏ từ máy chủ;
+  \item sau khi ứng dụng phía khách nhận giỏ mới, khách có thể thử lại thao tác với phiên bản đã cập nhật.
 \end{itemize}
 
 Cơ chế này tránh mất thao tác khi nhiều khách cùng bàn thêm món đồng thời, đồng thời không cần khóa bi quan làm chậm trải nghiệm khách.
 
 \subsection{Đồng bộ Redis và PostgreSQL cho phiên}
 
-Hình~\ref{fig:chapter5-session-redis-postgres-sync} trả lời câu hỏi: \textit{nếu Redis mất dữ liệu thì phiên và giỏ có bị mất không?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-session-redis-postgres-sync}, làm rõ mối quan hệ giữa trạng thái phiên bền vững trong PostgreSQL và bản sao nhanh trong Redis.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-session-redis-postgres-sync.pdf}
-  \caption{Đồng bộ phiên giữa Redis và PostgreSQL để bảo toàn trạng thái bền vững.}
-  \label{fig:chapter5-session-redis-postgres-sync}
-\end{figure}
-
-Order giữ trạng thái phiên bền vững trong PostgreSQL và bản sao nhanh trong Redis. Khi tạo phiên, Order ghi vào cả hai. Khi cập nhật giỏ, Order ghi vào Redis trước để phục vụ đọc nhanh; các điểm quan trọng như gửi đơn hoặc đóng phiên sẽ commit vào PostgreSQL.
+Order giữ trạng thái phiên bền vững trong PostgreSQL và bản sao nhanh trong Redis. Khi tạo phiên, Order ghi vào cả hai. Khi cập nhật giỏ, Order ghi vào Redis trước để phục vụ đọc nhanh; các điểm quan trọng như gửi đơn hoặc đóng phiên sẽ được ghi nhận vào PostgreSQL.
 
 Nếu Redis hết hạn hoặc mất dữ liệu:
 
 \begin{itemize}
   \item Order kiểm tra PostgreSQL để xác định phiên còn hợp lệ hay không;
-  \item nếu phiên còn \texttt{ACTIVE}, Order khôi phục bản sao Redis từ snapshot bền vững;
-  \item khách có thể tiếp tục thao tác; giỏ đặt món chưa gửi có thể bị mất nếu chưa commit, nhưng phiên vẫn giữ nguyên.
+  \item nếu phiên còn \texttt{ACTIVE}, Order khôi phục bản sao Redis từ trạng thái bền vững;
+  \item khách có thể tiếp tục thao tác; giỏ đặt món chưa gửi có thể bị mất nếu chưa được ghi bền vững, nhưng phiên vẫn giữ nguyên.
 \end{itemize}
 
-Thiết kế này cho phép Redis phục vụ đường xử lý tần suất cao mà vẫn giữ PostgreSQL làm nguồn sự thật cuối cùng.
+Thiết kế này cho phép Redis phục vụ đường xử lý tần suất cao mà vẫn giữ PostgreSQL làm nguồn dữ liệu có thẩm quyền cuối cùng.
 
 \subsection{Gửi đơn từ giỏ chung}
 
-Hình~\ref{fig:chapter5-cart-submit-order} trả lời câu hỏi: \textit{khi khách gửi đơn, Order xử lý giỏ và tạo đơn như thế nào?}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-cart-submit-order.pdf}
-  \caption{Chuyển giỏ đặt món thành đơn chờ xác nhận và liên kết hóa đơn mở.}
-  \label{fig:chapter5-cart-submit-order}
-\end{figure}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-cart-submit-order}, thể hiện cách Order chuyển giỏ dùng chung thành đơn chính thức.
 
 Khi khách gửi đơn, Order thực hiện các bước sau trong giao dịch PostgreSQL:
 
 \begin{itemize}
   \item khóa phiên theo \texttt{sessionId} và \texttt{tenantId};
-  \item kiểm tra phiên bản giỏ từ client khớp với phiên bản hiện tại trong Redis;
+  \item kiểm tra phiên bản giỏ từ ứng dụng phía khách khớp với phiên bản hiện tại trong Redis;
   \item tạo đơn với trạng thái \texttt{PENDING}, tạo các dòng món từ giỏ;
   \item tìm hóa đơn mở của phiên hoặc tạo hóa đơn mới nếu chưa có, liên kết đơn với hóa đơn;
-  \item commit giao dịch vào PostgreSQL và xóa giỏ khỏi Redis sau khi thành công.
+  \item ghi nhận giao dịch vào PostgreSQL và xóa giỏ khỏi Redis sau khi thành công.
 \end{itemize}
 
 Tồn kho chưa được trừ ở bước này. Catalog chỉ trừ tồn kho khi nhân viên xác nhận đơn trong luồng Order Confirm Saga (Mục~5.4). Nhờ đó, đơn chưa xác nhận không khóa tồn kho, giảm rủi ro thiếu hàng do khách gửi đơn nhưng không thanh toán.
 
 Phiên đặt món qua QR trong phạm vi hiện tại hỗ trợ phiên trực tuyến, kiểm soát phiên bản lạc quan, đồng bộ Redis--PostgreSQL và xử lý xung đột cập nhật. Hàng đợi thao tác ngoại tuyến đầy đủ, đồng bộ nền tự động và cơ chế giải quyết xung đột phức tạp thuộc hướng phát triển.
 
-Hình~\ref{fig:chapter5-screenshot-customer-pwa-ordering} minh họa ba bước trên PWA khách: tham gia phiên từ mã QR, duyệt thực đơn và gửi đơn từ giỏ chung. Ảnh giao diện thể hiện bề mặt vận hành; kiểm thử Order đối chiếu phiên bản giỏ và trạng thái phiên (Bảng~\ref{tab:chapter5-implemented-evidence}).
+Hình~\ref{fig:chapter5-screenshot-customer-pwa-ordering} minh họa ba bước trên PWA khách: tham gia phiên từ mã QR, duyệt thực đơn và gửi đơn từ giỏ chung. Ảnh giao diện thể hiện kết quả vận hành ở phía khách; kiểm thử Order đối chiếu phiên bản giỏ và trạng thái phiên (Bảng~\ref{tab:chapter5-implemented-evidence}).
 
 \clearpage
 \screenshotpwafigurethree{PWA khách — tham gia phiên QR, duyệt thực đơn và gửi đơn từ giỏ chung.}{fig:chapter5-screenshot-customer-pwa-ordering}{chapter5-01-customer-qr-session.png}{chapter5-02-customer-menu-browsing.png}{chapter5-03-customer-cart-submit.png}
@@ -148,7 +120,7 @@ Hình~\ref{fig:chapter5-screenshot-customer-pwa-ordering} minh họa ba bước 
 
 \section{Xác nhận đơn hàng và bảo toàn tồn kho theo Order Confirm Saga}
 
-Hình~\ref{fig:chapter5-order-confirm-stock} trình bày bức tranh tổng quan của Order Confirm Saga. Các hình tiếp theo tách luồng này theo từng câu hỏi kỹ thuật cần chứng minh: ranh giới commit, xử lý thao tác lặp, bù trừ tồn kho và tác dụng phụ bất đồng bộ sang KDS.
+Hình~\ref{fig:chapter5-order-confirm-stock} trình bày tổng quan Order Confirm Saga. Các sơ đồ chi tiết về ranh giới ghi nhận giao dịch, gửi lại an toàn, bù trừ tồn kho và outbox sang KDS được đặt tại Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-order-confirm-commit-boundary}--\ref{fig:chapter5-order-confirm-outbox-kds}.
 
 \begin{figure}[H]
   \centering
@@ -164,21 +136,14 @@ Các bất biến chính của luồng gồm:
 \begin{itemize}
   \item Catalog là dịch vụ duy nhất được ghi tồn kho; Order không ghi trực tiếp vào cơ sở dữ liệu Catalog.
   \item Order sở hữu vòng đời đơn, dòng đơn, hóa đơn và outbox \texttt{order.confirmed}.
-  \item Xác nhận lặp lại hoặc retry sau lỗi vận chuyển không được trừ tồn kho lần thứ hai.
-  \item Nếu Catalog đã trừ tồn kho nhưng Order không commit được trạng thái đơn và outbox, Order phải yêu cầu Catalog hoàn tồn kho theo đúng phiên bản reservation.
-  \item Kitchen/KDS chỉ là tác dụng phụ sau khi Order đã commit; phản hồi cho nhân viên không phụ thuộc vào thời điểm Kitchen tạo phiếu bếp.
+  \item Xác nhận lặp lại hoặc gửi lại sau lỗi vận chuyển không được trừ tồn kho lần thứ hai.
+  \item Nếu Catalog đã trừ tồn kho nhưng Order không ghi nhận được trạng thái đơn và outbox, Order phải yêu cầu Catalog hoàn tồn kho theo đúng phiên bản reservation.
+  \item Kitchen/KDS chỉ là tác vụ phát sinh sau khi Order đã ghi nhận giao dịch; phản hồi cho nhân viên không phụ thuộc vào thời điểm Kitchen tạo phiếu bếp.
 \end{itemize}
 
-\subsection{Ranh giới commit giữa Order và Catalog}
+\subsection{Ranh giới ghi nhận giao dịch giữa Order và Catalog}
 
-Hình~\ref{fig:chapter5-order-confirm-commit-boundary} trả lời câu hỏi: \textit{hệ thống commit dữ liệu ở đâu và vì sao không cần ghi chéo cơ sở dữ liệu?}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-order-confirm-commit-boundary.pdf}
-  \caption{Ranh giới commit giữa Order và Catalog trong bước xác nhận đơn.}
-  \label{fig:chapter5-order-confirm-commit-boundary}
-\end{figure}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-order-confirm-commit-boundary}, làm rõ ranh giới ghi nhận dữ liệu giữa Order và Catalog, qua đó tránh ghi chéo cơ sở dữ liệu.
 
 Luồng bắt đầu khi nhân viên xác nhận đơn từ POS. BFF kiểm tra JWT, ngữ cảnh đơn vị thuê bao và quyền thao tác trước khi gửi lệnh đã xác thực sang Order. Order khóa đơn trong phạm vi đơn vị thuê bao, kiểm tra đơn còn ở trạng thái \texttt{PENDING}, hóa đơn còn \texttt{OPEN}, rồi gọi Catalog qua hợp đồng TCP để trừ tồn kho.
 
@@ -186,40 +151,26 @@ Catalog thực hiện phần thay đổi tồn kho trong giao dịch cục bộ 
 
 \begin{itemize}
   \item khóa dòng \texttt{stock\_reservations} theo \texttt{tenantId} và \texttt{orderId};
-  \item kiểm tra \texttt{reservationKey} và hash của payload;
+  \item kiểm tra \texttt{reservationKey} và hash của nội dung đặt trước;
   \item khóa các dòng món theo thứ tự ổn định để giảm rủi ro deadlock;
   \item trừ tồn kho và lưu trạng thái \texttt{RESERVED} cùng \texttt{reservationVersion}.
 \end{itemize}
 
-Sau khi Catalog trả về \texttt{APPLIED} hoặc \texttt{REPLAYED}, Order mới lưu trạng thái đơn, trạng thái dòng món, version reservation của tồn kho và outbox xác nhận đơn trong cùng giao dịch Order. Điểm quan trọng là QRTable không dùng giao dịch phân tán giữa hai cơ sở dữ liệu; hệ thống dùng reservation version và bù trừ để nối hai giao dịch cục bộ.
+Sau khi Catalog trả về \texttt{APPLIED} hoặc \texttt{REPLAYED}, Order mới lưu trạng thái đơn, trạng thái dòng món, phiên bản reservation của tồn kho và outbox xác nhận đơn trong cùng giao dịch Order. Điểm quan trọng là QRTable không dùng giao dịch phân tán giữa hai cơ sở dữ liệu; hệ thống dùng phiên bản reservation và bù trừ để nối hai giao dịch cục bộ.
 
-\subsection{Xử lý retry và thao tác lặp an toàn}
+\subsection{Xử lý gửi lại và thao tác lặp an toàn}
 
-Hình~\ref{fig:chapter5-order-confirm-idempotency-retry} trả lời câu hỏi: \textit{nếu Catalog đã trừ tồn kho nhưng phản hồi TCP bị mất thì lần xác nhận sau có trừ tồn kho thêm không?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-order-confirm-idempotency-retry}, thể hiện cơ chế xử lý gửi lại khi phản hồi TCP sau thao tác trừ tồn kho bị mất.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-order-confirm-idempotency-retry.pdf}
-  \caption{Retry an toàn khi phản hồi trừ tồn kho từ Catalog bị mất.}
-  \label{fig:chapter5-order-confirm-idempotency-retry}
-\end{figure}
+Trường hợp lỗi vận chuyển là nhánh dễ gây nhầm lẫn nhất. Nếu Catalog đã ghi nhận \texttt{RESERVED} nhưng phản hồi \texttt{APPLIED} không đến được Order, Order không tự động gọi hoàn tồn kho vì nó chưa biết chắc Catalog đã áp dụng thay đổi hay chưa. Giao dịch Order bị hoàn tác và đơn vẫn ở trạng thái \texttt{PENDING}.
 
-Trường hợp lỗi vận chuyển là nhánh dễ gây nhầm lẫn nhất. Nếu Catalog đã commit \texttt{RESERVED} nhưng phản hồi \texttt{APPLIED} không đến được Order, Order không tự động gọi hoàn tồn kho vì nó chưa biết chắc Catalog đã áp dụng thay đổi hay chưa. Giao dịch Order bị rollback và đơn vẫn ở trạng thái \texttt{PENDING}.
+Khi nhân viên hoặc ứng dụng khách gửi lại cùng lệnh xác nhận, Order gửi lại cùng khóa reservation và nội dung bất biến. Catalog khóa reservation hiện có, thấy cùng hash nội dung và trả về \texttt{REPLAYED} cùng phiên bản đã lưu. Không có dòng tồn kho nào bị trừ lần thứ hai. Order sau đó có đủ thông tin để ghi trạng thái đơn và outbox.
 
-Khi nhân viên hoặc client retry cùng lệnh xác nhận, Order gửi lại cùng khóa reservation và payload bất biến. Catalog khóa reservation hiện có, thấy cùng hash payload và trả về \texttt{REPLAYED} cùng version đã lưu. Không có dòng tồn kho nào bị trừ lần thứ hai. Order sau đó có đủ thông tin để commit trạng thái đơn và outbox.
+\subsection{Bù trừ khi Order không ghi nhận được giao dịch}
 
-\subsection{Bù trừ khi Order không commit được}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-order-confirm-compensation}, mô tả cơ chế bù trừ khi Catalog đã trừ tồn kho nhưng Order không ghi nhận được giao dịch.
 
-Hình~\ref{fig:chapter5-order-confirm-compensation} trả lời câu hỏi: \textit{nếu Catalog đã trừ tồn kho nhưng Order thất bại khi lưu trạng thái hoặc outbox thì hệ thống phục hồi bằng cách nào?}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-order-confirm-compensation.pdf}
-  \caption{Bù trừ tồn kho theo \texttt{reservationVersion} khi giao dịch Order thất bại.}
-  \label{fig:chapter5-order-confirm-compensation}
-\end{figure}
-
-Sau khi nhận \texttt{APPLIED} từ Catalog, Order có thể gặp lỗi khi lưu trạng thái đơn, trạng thái dòng món hoặc outbox. Khi đó Order rollback giao dịch cục bộ của mình và gọi Catalog bằng đường \texttt{releaseForOrder}. Yêu cầu hoàn tồn kho mang theo \texttt{reservationVersion} đã nhận trước đó.
+Sau khi nhận \texttt{APPLIED} từ Catalog, Order có thể gặp lỗi khi lưu trạng thái đơn, trạng thái dòng món hoặc outbox. Khi đó Order hoàn tác giao dịch cục bộ của Order và gọi Catalog bằng đường \texttt{releaseForOrder}. Yêu cầu hoàn tồn kho mang theo \texttt{reservationVersion} đã nhận trước đó.
 
 Catalog dùng version để bảo vệ ba trường hợp:
 
@@ -231,25 +182,18 @@ Catalog dùng version để bảo vệ ba trường hợp:
 
 Nhờ đó, bù trừ không phá vỡ reservation mới hơn và cũng không làm tăng tồn kho sai khi cùng yêu cầu release bị gửi lại.
 
-\subsection{Outbox và tác dụng phụ sang KDS}
+\subsection{Outbox và tác vụ phát sinh sang KDS}
 
-Hình~\ref{fig:chapter5-order-confirm-outbox-kds} trả lời câu hỏi: \textit{điểm nào đánh dấu xác nhận đơn hoàn tất và Kitchen nhận phiếu bếp như thế nào?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-order-confirm-outbox-kds}, làm rõ điểm hoàn tất xác nhận đơn và cách Kitchen nhận phiếu bếp từ outbox/Kafka.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-order-confirm-outbox-kds.pdf}
-  \caption{Từ outbox \texttt{order.confirmed} đến phiếu KDS và gợi ý WebSocket.}
-  \label{fig:chapter5-order-confirm-outbox-kds}
-\end{figure}
+Order ghi outbox xác nhận đơn cùng giao dịch với trạng thái chế biến của đơn. Sau khi giao dịch được ghi nhận, outbox relay đọc các dòng \texttt{PENDING}, xuất bản sự kiện sang Kafka và đánh dấu đã phát khi gửi thành công. Kitchen tiêu thụ sự kiện, kiểm tra lược đồ, tạo phiếu theo trạm trong Redis và phát \texttt{kds.queue\_changed} như gợi ý WebSocket để ứng dụng KDS tải lại trạng thái mới nhất.
 
-Order ghi outbox xác nhận đơn cùng giao dịch với trạng thái chế biến của đơn. Sau commit, outbox relay đọc các dòng \texttt{PENDING}, xuất bản sự kiện sang Kafka và đánh dấu đã phát khi gửi thành công. Kitchen tiêu thụ sự kiện, kiểm tra schema, tạo phiếu theo trạm trong Redis và phát \texttt{kds.queue\_changed} như gợi ý WebSocket để client KDS tải lại trạng thái mới nhất.
-
-Thiết kế này tách rõ điểm hoàn tất nghiệp vụ và tác dụng phụ:
+Thiết kế này tách rõ điểm hoàn tất nghiệp vụ và các tác vụ phát sinh:
 
 \begin{itemize}
-  \item nhân viên nhận phản hồi xác nhận sau khi Order commit, không chờ Kitchen xử lý xong;
-  \item Kafka truyền sự kiện liên miền sau commit, không thay thế cơ sở dữ liệu Order;
-  \item WebSocket chỉ là tín hiệu làm mới, không phải nguồn sự thật của trạng thái KDS.
+  \item nhân viên nhận phản hồi xác nhận sau khi Order ghi nhận giao dịch, không chờ Kitchen xử lý xong;
+  \item Kafka truyền sự kiện liên miền sau khi giao dịch được ghi nhận, không thay thế cơ sở dữ liệu Order;
+  \item WebSocket chỉ là tín hiệu làm mới, không phải nguồn trạng thái có thẩm quyền của KDS.
 \end{itemize}
 
 Order Confirm Saga trong phạm vi hiện tại phối hợp giao dịch cục bộ, reservation version, outbox và cơ chế bù trừ. Trạng thái Saga bền vững, CDC và phân phối chính xác một lần nằm ngoài phạm vi triển khai hiện tại.
@@ -261,7 +205,7 @@ Hình~\ref{fig:chapter5-screenshot-staff-table-map} và Hình~\ref{fig:chapter5-
 
 \section{Điều phối KDS cho bếp và cập nhật thời gian thực}
 
-Hình~\ref{fig:chapter5-kds-ticket-lifecycle} mô tả bức tranh tổng quan của luồng KDS. Các hình sau tách luồng này theo từng câu hỏi kỹ thuật: Kitchen nhận sự kiện như thế nào, Redis giữ bản chiếu KDS ra sao, WebSocket có vai trò gì và thao tác bếp cập nhật Order bằng cơ chế nào.
+Hình~\ref{fig:chapter5-kds-ticket-lifecycle} mô tả tổng quan luồng KDS. Các sơ đồ chi tiết về tiếp nhận sự kiện, bản chiếu Redis, gợi ý WebSocket và cập nhật trạng thái phiếu được đặt tại Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-kds-event-ingestion}--\ref{fig:chapter5-kds-ticket-mutation}.
 
 \begin{figure}[H]
   \centering
@@ -270,95 +214,67 @@ Hình~\ref{fig:chapter5-kds-ticket-lifecycle} mô tả bức tranh tổng quan c
   \label{fig:chapter5-kds-ticket-lifecycle}
 \end{figure}
 
-Mục tiêu nghiệp vụ của luồng này là đưa món đã xác nhận đến đúng trạm bếp hoặc bar, hỗ trợ cập nhật trạng thái phiếu bếp và phản ánh thay đổi cho client KDS gần thời gian thực.
+Mục tiêu nghiệp vụ của luồng này là đưa món đã xác nhận đến đúng trạm bếp hoặc bar, hỗ trợ cập nhật trạng thái phiếu bếp và phản ánh thay đổi cho ứng dụng KDS gần thời gian thực.
 
 Các bất biến chính của luồng gồm:
 
 \begin{itemize}
   \item Kitchen sở hữu bản chiếu KDS khi vận hành; Order vẫn sở hữu vòng đời đơn và dòng món.
-  \item Kafka \texttt{order.confirmed} chỉ kích hoạt tạo phiếu sau khi Order đã commit.
-  \item Redis là bản chiếu phục vụ hàng đợi, revision, SLA và khôi phục; WebSocket không phải nguồn sự thật.
-  \item Mỗi thao tác thay đổi phiếu dùng \texttt{requestId} để tránh phát lại lệnh gây tác dụng phụ lần hai.
+  \item Kafka \texttt{order.confirmed} chỉ kích hoạt tạo phiếu sau khi Order đã ghi nhận giao dịch.
+  \item Redis là bản chiếu phục vụ hàng đợi, revision, SLA và khôi phục; WebSocket không phải nguồn trạng thái có thẩm quyền.
+  \item Mỗi thao tác thay đổi phiếu dùng \texttt{requestId} để tránh phát lại lệnh gây tác vụ phát sinh lần hai.
   \item Khi phiếu chuyển sang sẵn sàng, BFF đồng bộ trạng thái dòng món về Order; nếu đồng bộ thất bại, BFF yêu cầu Kitchen recall phiếu như bù trừ.
 \end{itemize}
 
 \subsection{Nhận sự kiện xác nhận đơn}
 
-Hình~\ref{fig:chapter5-kds-event-ingestion} trả lời câu hỏi: \textit{Kitchen biến sự kiện \texttt{order.confirmed} thành phiếu bếp như thế nào và tránh tạo trùng ra sao?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-kds-event-ingestion}, mô tả cách Kitchen chuyển sự kiện \texttt{order.confirmed} thành phiếu bếp và tránh tạo trùng.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-kds-event-ingestion.pdf}
-  \caption{Kitchen tiếp nhận \texttt{order.confirmed} và tạo phiếu KDS theo trạm.}
-  \label{fig:chapter5-kds-event-ingestion}
-\end{figure}
-
-Kitchen tiêu thụ topic Kafka \texttt{order.confirmed}. Consumer chỉ xử lý payload thỏa hợp đồng: có \texttt{eventType}, \texttt{schemaVersion}, \texttt{tenantId}, \texttt{orderId}, thông tin bàn, thời điểm xác nhận và danh sách món. Payload sai định dạng hoặc không đúng schema bị bỏ qua và ghi cảnh báo.
+Kitchen tiêu thụ topic Kafka \texttt{order.confirmed}. Bộ xử lý sự kiện chỉ xử lý thông điệp thỏa hợp đồng: có \texttt{eventType}, \texttt{schemaVersion}, \texttt{tenantId}, \texttt{orderId}, thông tin bàn, thời điểm xác nhận và danh sách món. Thông điệp sai định dạng hoặc không đúng lược đồ bị bỏ qua và ghi cảnh báo.
 
 Khi sự kiện hợp lệ, Kitchen thực hiện ba bước:
 
 \begin{itemize}
-  \item claim khóa chống trùng theo \texttt{eventId};
-  \item tách dòng món theo trạm \texttt{KITCHEN} hoặc \texttt{BAR}, đồng thời đưa dòng thiếu trạm vào dead-letter list;
-  \item claim khóa chống trùng theo cặp order--station trước khi tạo ticket.
+  \item ghi nhận khóa chống trùng theo \texttt{eventId};
+  \item tách dòng món theo trạm \texttt{KITCHEN} hoặc \texttt{BAR}, đồng thời đưa dòng thiếu trạm vào danh sách lỗi chờ xử lý;
+  \item ghi nhận khóa chống trùng theo cặp order--station trước khi tạo phiếu.
 \end{itemize}
 
 Nhờ đó, cùng một sự kiện hoặc cùng một order được phát lại không tạo nhiều phiếu cho cùng một trạm.
 
 \subsection{Bản chiếu Redis của KDS}
 
-Hình~\ref{fig:chapter5-kds-redis-projection} trả lời câu hỏi: \textit{Redis lưu những gì để client KDS có thể đọc hàng đợi nhanh mà vẫn giữ đúng ranh giới dữ liệu?}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-kds-redis-projection.pdf}
-  \caption{Bản chiếu Redis phục vụ hàng đợi KDS theo đơn vị thuê bao và trạm.}
-  \label{fig:chapter5-kds-redis-projection}
-\end{figure}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-kds-redis-projection}, làm rõ dữ liệu Redis được dùng để đọc hàng đợi KDS nhanh trong khi vẫn giữ ranh giới dữ liệu.
 
 Kitchen không có cơ sở dữ liệu nghiệp vụ bền vững riêng trong phạm vi hiện tại. Redis giữ bản chiếu khi vận hành cho KDS, gồm:
 
 \begin{itemize}
-  \item hash của ticket và item để đọc chi tiết phiếu;
-  \item sorted set theo trạm cho hàng đợi đang xử lý và hàng đợi đã sẵn sàng;
-  \item set phụ theo order, session và source event để hỗ trợ cập nhật hoặc khôi phục;
-  \item khóa revision theo trạm để client biết trạng thái đã thay đổi;
-  \item metadata SLA và dead-letter list cho payload thiếu thông tin trạm.
+  \item hash của phiếu và dòng món để đọc chi tiết phiếu;
+  \item cấu trúc sorted set theo trạm cho hàng đợi đang xử lý và hàng đợi đã sẵn sàng;
+  \item tập phụ theo order, session và sự kiện nguồn để hỗ trợ cập nhật hoặc khôi phục;
+  \item khóa phiên bản theo trạm để ứng dụng KDS biết trạng thái đã thay đổi;
+  \item dữ liệu SLA và danh sách lỗi chờ xử lý cho thông điệp thiếu thông tin trạm.
 \end{itemize}
 
 Các khóa đều gắn \texttt{tenantId}, nên bản chiếu KDS vẫn tuân thủ cô lập đơn vị thuê bao. Redis trong luồng này là bản chiếu phục vụ vận hành, không thay thế Order như nguồn sở hữu vòng đời đơn.
 
 \subsection{WebSocket chỉ phát gợi ý làm mới}
 
-Hình~\ref{fig:chapter5-kds-realtime-refetch} trả lời câu hỏi: \textit{client KDS nhận cập nhật gần thời gian thực bằng cách nào mà không biến WebSocket thành nguồn sự thật?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-kds-realtime-refetch}, làm rõ cơ chế cập nhật gần thời gian thực của KDS mà không xem WebSocket là nguồn trạng thái có thẩm quyền.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-kds-realtime-refetch.pdf}
-  \caption{Gợi ý WebSocket và tải lại snapshot hàng đợi KDS từ máy chủ.}
-  \label{fig:chapter5-kds-realtime-refetch}
-\end{figure}
+Sau mỗi thay đổi, Kitchen phát sự kiện \texttt{kds.queue\_changed} lên kênh realtime trong phạm vi \texttt{tenantId}. BFF lắng nghe mẫu kênh này, kiểm tra nội dung thông điệp rồi phát sự kiện WebSocket đến phòng KDS theo trạm và phòng quản trị của đơn vị thuê bao.
 
-Sau mỗi thay đổi, Kitchen phát sự kiện \texttt{kds.queue\_changed} lên kênh realtime nội bộ theo \texttt{tenantId}. BFF subscribe mẫu kênh này, kiểm tra payload rồi phát sự kiện WebSocket đến phòng KDS theo trạm và phòng quản trị của đơn vị thuê bao.
-
-Client không dùng payload WebSocket để thay thế toàn bộ trạng thái. Payload chỉ cho biết hàng đợi đã thay đổi; client gọi lại API KDS để lấy snapshot mới nhất. BFF vẫn kiểm tra JWT, đơn vị thuê bao, quyền và quyền truy cập trạm trước khi gọi Kitchen qua TCP. Vì vậy, trạng thái có thẩm quyền vẫn nằm ở phía máy chủ.
+Ứng dụng KDS không dùng nội dung sự kiện WebSocket để thay thế toàn bộ trạng thái. Sự kiện chỉ cho biết hàng đợi đã thay đổi; ứng dụng gọi lại API KDS để lấy trạng thái mới nhất. BFF vẫn kiểm tra JWT, đơn vị thuê bao, quyền và quyền truy cập trạm trước khi gọi Kitchen qua TCP. Vì vậy, trạng thái có thẩm quyền vẫn nằm ở phía máy chủ.
 
 \subsection{Cập nhật trạng thái phiếu bếp}
 
-Hình~\ref{fig:chapter5-kds-ticket-mutation} trả lời câu hỏi: \textit{khi đầu bếp bắt đầu hoặc hoàn tất phiếu, Kitchen và Order phối hợp như thế nào?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-kds-ticket-mutation}, mô tả cách Kitchen và Order phối hợp khi phiếu bếp bắt đầu hoặc hoàn tất.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-kds-ticket-mutation.pdf}
-  \caption{Thao tác bắt đầu, hoàn tất và bù trừ phiếu KDS.}
-  \label{fig:chapter5-kds-ticket-mutation}
-\end{figure}
+Khi đầu bếp bắt đầu phiếu, BFF kiểm tra quyền \texttt{KITCHEN\_UPDATE\_TICKET} và quyền truy cập trạm, sau đó gửi lệnh sang Kitchen. Kitchen ghi nhận \texttt{requestId}; nếu đây là lần gọi đầu tiên, phiếu chuyển từ \texttt{PENDING} sang \texttt{PROCESSING} và phiên bản tăng. Nếu cùng \texttt{requestId} được gửi lại, Kitchen trả về trạng thái hiện tại và không phát thêm sự kiện.
 
-Khi đầu bếp bắt đầu phiếu, BFF kiểm tra quyền \texttt{KITCHEN\_UPDATE\_TICKET} và quyền truy cập trạm, sau đó gửi lệnh sang Kitchen. Kitchen claim \texttt{requestId}; nếu đây là lần gọi đầu tiên, ticket chuyển từ \texttt{PENDING} sang \texttt{PROCESSING} và revision tăng. Nếu cùng \texttt{requestId} được gửi lại, Kitchen trả về trạng thái hiện tại và không phát thêm sự kiện.
+Khi phiếu được đánh dấu xong, Kitchen chuyển phiếu sang \texttt{READY}, đưa phiếu khỏi hàng đợi đang xử lý, thêm vào hàng đợi sẵn sàng và phát thay đổi hàng đợi. BFF sau đó gọi Order để cập nhật các dòng món tương ứng. Order là dịch vụ sở hữu trạng thái dòng món và có thể phát sự kiện cập nhật cho nhân viên hoặc khách nếu trạng thái đơn thay đổi.
 
-Khi phiếu được đánh dấu xong, Kitchen chuyển ticket sang \texttt{READY}, đưa ticket khỏi active queue, thêm vào ready queue và phát thay đổi hàng đợi. BFF sau đó gọi Order để cập nhật các dòng món tương ứng. Order là dịch vụ sở hữu trạng thái dòng món và có thể phát sự kiện cập nhật cho nhân viên hoặc khách nếu trạng thái đơn thay đổi.
-
-Nếu bước đồng bộ sang Order thất bại sau khi Kitchen đã chuyển ticket sang \texttt{READY}, BFF gọi lại Kitchen bằng lệnh recall bù trừ. Ticket được đưa về trạng thái \texttt{PROCESSING} trong cửa sổ recall, tránh để client KDS và Order lệch trạng thái lâu dài.
+Nếu bước đồng bộ sang Order thất bại sau khi Kitchen đã chuyển phiếu sang \texttt{READY}, BFF gọi lại Kitchen bằng lệnh thu hồi bù trừ. Phiếu được đưa về trạng thái \texttt{PROCESSING} trong cửa sổ thu hồi, tránh để ứng dụng KDS và Order lệch trạng thái lâu dài.
 
 KDS trong Chương 5 được trình bày như bản chiếu vận hành gần thời gian thực cho bếp/bar. Lịch sử bếp dài hạn hoặc phân tích chuyên sâu phù hợp hơn với bản chiếu bền vững hoặc kho phân tích trong hướng phát triển.
 
@@ -369,7 +285,7 @@ Hình~\ref{fig:chapter5-screenshot-kds-queue} và Hình~\ref{fig:chapter5-screen
 
 \section{Ghi nhận thanh toán tiền mặt, VietQR và SePay}
 
-Hình~\ref{fig:chapter5-payment-settlement} mô tả bức tranh tổng quan của luồng thanh toán. Các hình sau tách luồng này theo từng câu hỏi kỹ thuật: Payment xác nhận hóa đơn có thể thanh toán như thế nào, tiền mặt được commit ra sao, webhook SePay xử lý lặp và thiếu tiền bằng cơ chế nào.
+Hình~\ref{fig:chapter5-payment-settlement} mô tả tổng quan luồng thanh toán. Các sơ đồ chi tiết về bản ghi nhận trạng thái hóa đơn, ghi nhận thanh toán tiền mặt và webhook SePay được đặt tại Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-payment-snapshot-intent}--\ref{fig:chapter5-payment-sepay-webhook}.
 
 \begin{figure}[H]
   \centering
@@ -386,75 +302,54 @@ Các bất biến chính của luồng gồm:
   \item Payment sở hữu bản ghi thanh toán, nhật ký kiểm toán, cấu hình thanh toán và outbox \texttt{payment.completed}.
   \item Order sở hữu hóa đơn, phiên và bước hoàn tất phiên sau thanh toán.
   \item Catalog sở hữu trạng thái bàn; Order chỉ yêu cầu Catalog chuyển bàn sau khi hóa đơn đã được đánh dấu trả tiền.
-  \item Tất cả nhánh thanh toán đều bắt đầu bằng bản chụp hóa đơn từ Order và kiểm tra snapshot làm tròn VND.
+  \item Tất cả nhánh thanh toán đều bắt đầu bằng bản chụp hóa đơn từ Order và kiểm tra dữ liệu làm tròn VND.
   \item Webhook VietQR/SePay chỉ hoàn tất hóa đơn khi khớp tham chiếu \texttt{QRTBL}, đúng bí mật đơn vị thuê bao và số tiền đủ.
   \item Dòng tiền hóa đơn nhà hàng \texttt{QRTBL} và hóa đơn gói nền tảng \texttt{QRSUB} được tách riêng.
 \end{itemize}
 
-\subsection{Bản chụp hóa đơn và payment intent}
+\subsection{Bản chụp hóa đơn và ý định thanh toán}
 
-Hình~\ref{fig:chapter5-payment-snapshot-intent} trả lời câu hỏi: \textit{Payment dựa vào dữ liệu nào để quyết định một hóa đơn có thể thanh toán?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-payment-snapshot-intent}, làm rõ dữ liệu Payment dùng để xác định điều kiện thanh toán của một hóa đơn.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-payment-snapshot-intent.pdf}
-  \caption{Payment lấy bản chụp hóa đơn từ Order trước khi tạo hoặc hoàn tất thanh toán.}
-  \label{fig:chapter5-payment-snapshot-intent}
-\end{figure}
-
-Điểm chứng minh của diagram này:
+Các điểm đối chiếu chính gồm:
 
 \begin{itemize}
   \item Payment không tự suy luận số tiền phải trả từ dữ liệu của Order.
-  \item Trước khi tạo VietQR hoặc xác nhận tiền mặt, Payment lấy snapshot gồm trạng thái hóa đơn, tổng tiền gốc, tổng tiền đã làm tròn và phần chênh lệch làm tròn.
-  \item Nếu hóa đơn không ở trạng thái \texttt{PENDING\_PAYMENT} hoặc snapshot làm tròn không hợp lệ, Payment dừng trước khi ghi vào cơ sở dữ liệu của mình.
-  \item Với VietQR, Payment tạo hoặc tái sử dụng payment intent \texttt{PENDING} theo khóa duy nhất của \texttt{tenantId} và \texttt{billId}.
-  \item Nếu có race trên khóa này, service đọc lại bản ghi hiện có thay vì tạo thêm payment intent.
-  \item Với tiền mặt, Payment khóa hoặc tạo bản ghi thanh toán rồi kiểm tra số tiền nhận được trước khi đi vào commit.
+  \item Trước khi tạo VietQR hoặc xác nhận tiền mặt, Payment lấy bản chụp gồm trạng thái hóa đơn, tổng tiền gốc, tổng tiền đã làm tròn và phần chênh lệch làm tròn.
+  \item Nếu hóa đơn không ở trạng thái \texttt{PENDING\_PAYMENT} hoặc dữ liệu làm tròn không hợp lệ, Payment dừng trước khi ghi vào cơ sở dữ liệu Payment.
+  \item Với VietQR, Payment tạo hoặc tái sử dụng ý định thanh toán \texttt{PENDING} theo khóa duy nhất của \texttt{tenantId} và \texttt{billId}.
+  \item Nếu có tranh chấp trên khóa này, Payment đọc lại bản ghi hiện có thay vì tạo thêm ý định thanh toán.
+  \item Với tiền mặt, Payment khóa hoặc tạo bản ghi thanh toán rồi kiểm tra số tiền nhận được trước khi ghi nhận giao dịch.
 \end{itemize}
 
-\subsection{Commit tiền mặt và hoàn tất hóa đơn}
+\subsection{Ghi nhận tiền mặt và hoàn tất hóa đơn}
 
-Hình~\ref{fig:chapter5-payment-cash-commit} trả lời câu hỏi: \textit{ghi nhận tiền mặt được commit ở đâu và Order được cập nhật bằng cách nào?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-payment-cash-commit}, mô tả nơi ghi nhận thanh toán tiền mặt và cách Order cập nhật trạng thái hóa đơn.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-payment-cash-commit.pdf}
-  \caption{Commit thanh toán tiền mặt trong Payment và hoàn tất hóa đơn qua Order.}
-  \label{fig:chapter5-payment-cash-commit}
-\end{figure}
-
-Điểm chứng minh của diagram này:
+Các điểm đối chiếu chính gồm:
 
 \begin{itemize}
-  \item Payment mở giao dịch trên cơ sở dữ liệu của mình, khóa bản ghi thanh toán theo hóa đơn và kiểm tra số tiền nhận được.
-  \item Nếu số tiền đủ, Payment ghi trạng thái đã trả bằng tiền mặt, audit xác nhận tiền mặt, audit hoàn tất thanh toán và outbox \texttt{payment.completed} trong cùng giao dịch.
-  \item Sau khi Payment commit, service gọi Order bằng hợp đồng \texttt{BILL\_MARK\_PAID}.
+  \item Payment mở giao dịch trên cơ sở dữ liệu Payment, khóa bản ghi thanh toán theo hóa đơn và kiểm tra số tiền nhận được.
+  \item Nếu số tiền đủ, Payment ghi trạng thái đã trả bằng tiền mặt, các nhật ký kiểm toán cần thiết và outbox \texttt{payment.completed} trong cùng giao dịch.
+  \item Sau khi Payment ghi nhận giao dịch, dịch vụ gọi Order để đánh dấu hóa đơn đã thanh toán.
   \item Order khóa hóa đơn và phiên, đánh dấu hóa đơn \texttt{PAID}, đóng phiên còn hoạt động và yêu cầu Catalog chuyển bàn sang trạng thái cần dọn.
   \item Nếu cùng sự kiện hoặc lệnh hoàn tất được phát lại, Order trả về trạng thái đã thanh toán thay vì hoàn tất lại lần hai.
-  \item Outbox \texttt{payment.completed} vẫn được phát qua Kafka để giữ đường đồng bộ bất đồng bộ và hỗ trợ replay an toàn.
+  \item Outbox \texttt{payment.completed} vẫn được phát qua Kafka để giữ đường đồng bộ bất đồng bộ và hỗ trợ phát lại an toàn.
 \end{itemize}
 
 \subsection{Webhook SePay, giao dịch lặp và giao dịch thiếu tiền}
 
-Hình~\ref{fig:chapter5-payment-sepay-webhook} trả lời câu hỏi: \textit{Payment xử lý webhook SePay như thế nào để không hoàn tất nhầm hóa đơn?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-payment-sepay-webhook}, làm rõ cơ chế Payment xử lý webhook SePay để tránh hoàn tất nhầm hóa đơn.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-payment-sepay-webhook.pdf}
-  \caption{Xử lý webhook SePay cho hóa đơn nhà hàng với kiểm tra bí mật, tham chiếu và số tiền.}
-  \label{fig:chapter5-payment-sepay-webhook}
-\end{figure}
-
-Điểm chứng minh của diagram này:
+Các điểm đối chiếu chính gồm:
 
 \begin{itemize}
-  \item Webhook hóa đơn nhà hàng đi qua BFF, sau đó được chuyển đến Payment cùng \texttt{tenantSlug}, bí mật webhook và payload chuyển khoản.
-  \item Payment giải mã bí mật của đơn vị thuê bao, so sánh hằng thời gian và kiểm tra tenant trước khi khóa bất kỳ bản ghi thanh toán nào.
-  \item Nếu bí mật thiếu, sai hoặc tenant không khớp, Payment từ chối trước khi thay đổi trạng thái.
-  \item Payment chỉ xử lý tham chiếu \texttt{QRTBL}; payload không khớp hoặc chuyển khoản không phải chiều vào được trả về thành công nhưng không làm thay đổi thanh toán.
-  \item Với payment đã khóa, service ghi audit cho webhook trùng, webhook đến sau khi hóa đơn đã trả tiền hoặc chuyển khoản thiếu tiền.
-  \item Chỉ khi số tiền đủ và payment còn \texttt{PENDING}, Payment mới lưu trạng thái \texttt{PAID VIETQR}, metadata SePay, audit hoàn tất và outbox \texttt{payment.completed}, rồi yêu cầu Order đánh dấu hóa đơn đã thanh toán.
+  \item Webhook hóa đơn nhà hàng đi qua BFF, sau đó được chuyển đến Payment cùng \texttt{tenantSlug}, bí mật webhook và nội dung chuyển khoản.
+  \item Payment giải mã bí mật của đơn vị thuê bao, so sánh hằng thời gian và kiểm tra đơn vị thuê bao trước khi khóa bất kỳ bản ghi thanh toán nào.
+  \item Nếu bí mật thiếu, sai hoặc đơn vị thuê bao không khớp, Payment từ chối trước khi thay đổi trạng thái.
+  \item Payment chỉ xử lý tham chiếu \texttt{QRTBL}; nội dung không khớp hoặc chuyển khoản không phải chiều vào được trả về thành công nhưng không làm thay đổi thanh toán.
+  \item Với bản ghi thanh toán đã khóa, Payment ghi nhật ký kiểm toán cho webhook trùng, webhook đến sau khi hóa đơn đã trả tiền hoặc chuyển khoản thiếu tiền.
+  \item Chỉ khi số tiền đủ và bản ghi thanh toán còn \texttt{PENDING}, Payment mới lưu trạng thái \texttt{PAID VIETQR}, dữ liệu mô tả SePay, nhật ký kiểm toán hoàn tất và outbox \texttt{payment.completed}, rồi yêu cầu Order đánh dấu hóa đơn đã thanh toán.
 \end{itemize}
 
 Hình~\ref{fig:chapter5-screenshot-customer-payment-flow} minh họa nhánh khách của luồng thanh toán (Hình~\ref{fig:chapter5-payment-settlement}): theo dõi tiến độ đơn và yêu cầu thanh toán VietQR tại bàn. Chương~6 đối chiếu thêm webhook SePay và khả năng xử lý thao tác lặp khi ghi nhận thanh toán với kiểm thử tương ứng.
@@ -465,7 +360,7 @@ Hình~\ref{fig:chapter5-screenshot-customer-payment-flow} minh họa nhánh khá
 
 \section{Khởi tạo đơn vị thuê bao và vòng đời gói dịch vụ}
 
-Hình~\ref{fig:chapter5-saas-onboarding-saga} mô tả bức tranh tổng quan của luồng khởi tạo đơn vị thuê bao và vòng đời gói dịch vụ. Các hình sau tách luồng này theo từng câu hỏi kỹ thuật: SaaS gọi các dịch vụ phụ thuộc qua ranh giới nào, bù trừ khi onboarding lỗi ra sao và gói dịch vụ được gia hạn hoặc hết hạn bằng cơ chế nào.
+Hình~\ref{fig:chapter5-saas-onboarding-saga} mô tả tổng quan luồng khởi tạo đơn vị thuê bao và vòng đời gói dịch vụ. Các sơ đồ chi tiết về ranh giới khởi tạo, bù trừ trong quá trình khởi tạo và vòng đời thuê bao được đặt tại Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-saas-provisioning-boundary}--\ref{fig:chapter5-saas-subscription-lifecycle}.
 
 \begin{figure}[H]
   \centering
@@ -482,76 +377,55 @@ Các bất biến chính của luồng gồm:
   \item SaaS sở hữu đơn vị thuê bao, gói giá, thuê bao, hóa đơn thuê bao và outbox \texttt{tenant.created}.
   \item Authorizer/Keycloak sở hữu định danh đăng nhập; User-Access sở hữu hồ sơ ứng dụng và vai trò.
   \item Payment sở hữu cấu hình thanh toán của đơn vị thuê bao, bao gồm OAuth SePay và webhook.
-  \item SaaS điều phối qua TCP/Kafka contract, không ghi trực tiếp vào cơ sở dữ liệu của dịch vụ khác.
-  \item Onboarding có bù trừ theo bước đã đi qua; trạng thái Saga bền vững và retry độc lập là hướng củng cố.
-  \item Quyền theo gói được lưu bền vững trong SaaS và cache ngắn hạn trong Redis để guard đọc nhanh.
+  \item SaaS điều phối qua hợp đồng TCP/Kafka, không ghi trực tiếp vào cơ sở dữ liệu của dịch vụ khác.
+  \item Quá trình khởi tạo có bù trừ theo bước đã đi qua; trạng thái Saga bền vững và tiến trình thử lại độc lập là hướng củng cố.
+  \item Quyền theo gói được lưu bền vững trong SaaS và bộ nhớ đệm ngắn hạn trong Redis để guard đọc nhanh.
 \end{itemize}
 
 \subsection{Ranh giới khởi tạo đơn vị thuê bao}
 
-Hình~\ref{fig:chapter5-saas-provisioning-boundary} trả lời câu hỏi: \textit{một đơn vị thuê bao mới được tạo qua những service boundary nào?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-saas-provisioning-boundary}, mô tả các service boundary tham gia khi tạo một đơn vị thuê bao mới.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-saas-provisioning-boundary.pdf}
-  \caption{Ranh giới khởi tạo đơn vị thuê bao, chủ sở hữu, gói ban đầu và dữ liệu mặc định.}
-  \label{fig:chapter5-saas-provisioning-boundary}
-\end{figure}
-
-Điểm chứng minh của diagram này:
+Các điểm đối chiếu chính gồm:
 
 \begin{itemize}
   \item BFF kiểm tra quyền \texttt{TENANT\_ONBOARD} trước khi gọi SaaS.
-  \item SaaS yêu cầu plan ban đầu rõ ràng, chuẩn hóa slug, kiểm tra trùng slug và tạo tenant ở trạng thái \texttt{ACTIVE} trong cơ sở dữ liệu SaaS.
+  \item SaaS yêu cầu gói ban đầu rõ ràng, chuẩn hóa mã định danh đường dẫn (slug), kiểm tra trùng slug và tạo đơn vị thuê bao ở trạng thái \texttt{ACTIVE} trong cơ sở dữ liệu SaaS.
   \item SaaS gọi Authorizer để tạo định danh chủ sở hữu, gọi User-Access để tạo hồ sơ và role mapping, rồi cập nhật \texttt{ownerId}.
-  \item SaaS gán gói ban đầu trong cơ sở dữ liệu của mình và gọi Payment để tạo cấu hình thanh toán rỗng.
+  \item SaaS gán gói ban đầu trong cơ sở dữ liệu SaaS và gọi Payment để tạo cấu hình thanh toán rỗng.
   \item Khi các bước phụ thuộc thành công, SaaS ghi outbox \texttt{tenant.created}.
-  \item Catalog tiêu thụ \texttt{tenant.created} để tạo dữ liệu mặc định như khu vực chính; bước này là side effect bất đồng bộ và được xử lý lặp an toàn.
+  \item Catalog tiêu thụ \texttt{tenant.created} để tạo dữ liệu mặc định như khu vực chính; bước này là tác vụ phát sinh bất đồng bộ và được xử lý lặp an toàn.
 \end{itemize}
 
 \subsection{Bù trừ trong SaaS Onboarding Mini-Saga}
 
-Hình~\ref{fig:chapter5-saas-onboarding-compensation} trả lời câu hỏi: \textit{khi một bước phụ thuộc thất bại, SaaS dọn trạng thái trung gian như thế nào?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-saas-onboarding-compensation}, mô tả cơ chế bù trừ trạng thái trung gian khi một bước phụ thuộc trong onboarding thất bại.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-saas-onboarding-compensation.pdf}
-  \caption{Bù trừ khi khởi tạo đơn vị thuê bao thất bại sau các tác dụng phụ.}
-  \label{fig:chapter5-saas-onboarding-compensation}
-\end{figure}
-
-Điểm chứng minh của diagram này:
+Các điểm đối chiếu chính gồm:
 
 \begin{itemize}
   \item Nếu lỗi xảy ra trước khi tạo định danh chủ sở hữu, SaaS trả lỗi xác thực hoặc lỗi dữ liệu đầu vào và không cần bù trừ bên ngoài.
-  \item Nếu Authorizer đã tạo chủ sở hữu nhưng User-Access thất bại, SaaS vô hiệu hóa định danh vừa tạo và xóa tenant còn dang dở.
-  \item Nếu lỗi xảy ra sau khi gói ban đầu đã được gán, SaaS xóa subscription khởi tạo, làm sạch cache gói hiện tại nếu có, xóa tenant và vô hiệu hóa chủ sở hữu.
-  \item Bù trừ chỉ giới hạn sai lệch ở các side effect đã đi qua, không biến onboarding thành giao dịch phân tán tuyệt đối.
-  \item Báo cáo chỉ xem đây là mini-saga đại diện đã triển khai, không claim đã có durable saga state hoặc retry worker độc lập.
+  \item Nếu Authorizer đã tạo chủ sở hữu nhưng User-Access thất bại, SaaS vô hiệu hóa định danh vừa tạo và xóa đơn vị thuê bao còn dang dở.
+  \item Nếu lỗi xảy ra sau khi gói ban đầu đã được gán, SaaS xóa gói thuê bao khởi tạo, làm sạch bộ nhớ đệm gói hiện tại nếu có, xóa đơn vị thuê bao và vô hiệu hóa chủ sở hữu.
+  \item Bù trừ chỉ giới hạn sai lệch ở các tác vụ phát sinh đã đi qua, không biến onboarding thành giao dịch phân tán tuyệt đối.
+  \item Trong phạm vi khóa luận, đây là mini-saga đại diện đã triển khai; kết quả này chưa kết luận rằng hệ thống đã có trạng thái Saga bền vững hoặc tiến trình thử lại độc lập.
 \end{itemize}
 
 \subsection{Vòng đời gói dịch vụ và entitlement}
 
-Hình~\ref{fig:chapter5-saas-subscription-lifecycle} trả lời câu hỏi: \textit{gói dịch vụ được mua, xác nhận và phản ánh vào quyền truy cập như thế nào?}
+Phụ lục~\ref{app:extended-diagrams}, Hình~\ref{fig:chapter5-saas-subscription-lifecycle}, làm rõ vòng đời mua gói, xác nhận thanh toán và phản ánh quyền truy cập theo gói dịch vụ.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth,height=0.72\textheight,keepaspectratio]{chapter5-saas-subscription-lifecycle.pdf}
-  \caption{Vòng đời hóa đơn gói dịch vụ, thuê bao và cache quyền theo gói.}
-  \label{fig:chapter5-saas-subscription-lifecycle}
-\end{figure}
-
-Điểm chứng minh của diagram này:
+Các điểm đối chiếu chính gồm:
 
 \begin{itemize}
-  \item Chủ quán tạo hóa đơn gói từ màn hình subscription; BFF kiểm tra quyền checkout gói trước khi chuyển lệnh.
+  \item Chủ quán tạo hóa đơn gói từ màn hình gói thuê bao; BFF kiểm tra quyền thanh toán gói trước khi chuyển lệnh.
   \item SaaS tải plan đang hoạt động, tính số tiền VND đã làm tròn và tạo hóa đơn đang chờ thanh toán.
   \item Hóa đơn gói dùng tham chiếu \texttt{QRSUB} và trả QR thanh toán nếu có cấu hình tài khoản nền tảng.
   \item Với webhook nền tảng, SaaS kiểm tra bí mật, khóa hóa đơn theo tham chiếu \texttt{QRSUB}, bỏ qua hóa đơn không còn \texttt{PENDING} và ghi nhận thiếu tiền nếu cần.
-  \item Khi đủ tiền, SaaS đánh dấu hóa đơn \texttt{PAID}, supersede subscription cũ, tạo subscription \texttt{ACTIVE} mới và cập nhật cache Redis chứa plan, giới hạn và danh sách feature.
-  \item Trường hợp thanh toán ngoài luồng, quản trị viên nền tảng có thể xác nhận thủ công hóa đơn kèm ghi chú; nhánh này cũng dùng cùng cơ chế assign plan.
-  \item Vòng đời gói còn có hủy hóa đơn đang chờ, tự hết hạn QR quá hạn và cron tạm ngưng tenant khi subscription đã hết hạn quá thời gian ân hạn.
-  \item Trạng thái tenant \texttt{SUSPENDED} hoặc \texttt{CLOSED} vẫn thuộc SaaS; Redis chỉ hỗ trợ guard đọc nhanh trạng thái và quyền theo gói.
+  \item Khi đủ tiền, SaaS đánh dấu hóa đơn \texttt{PAID}, thay thế gói thuê bao cũ, tạo gói thuê bao mới ở trạng thái \texttt{ACTIVE} và cập nhật bộ nhớ đệm Redis chứa thông tin gói, giới hạn và danh sách tính năng.
+  \item Trường hợp thanh toán ngoài luồng, quản trị viên nền tảng có thể xác nhận thủ công hóa đơn kèm thông tin giải trình; nhánh này cũng dùng cùng cơ chế gán gói thuê bao.
+  \item Vòng đời gói còn có hủy hóa đơn đang chờ, tự hết hạn QR quá hạn và tiến trình định kỳ tạm ngưng đơn vị thuê bao khi gói thuê bao đã hết hạn quá thời gian ân hạn.
+  \item Trạng thái đơn vị thuê bao \texttt{SUSPENDED} hoặc \texttt{CLOSED} vẫn thuộc SaaS; Redis chỉ hỗ trợ guard đọc nhanh trạng thái và quyền theo gói.
 \end{itemize}
 
 Hình~\ref{fig:chapter5-screenshot-admin-tenant-onboarding}, Hình~\ref{fig:chapter5-screenshot-owner-payment-settings} và Hình~\ref{fig:chapter5-screenshot-owner-subscription} minh họa các bước sau SaaS Onboarding Mini-Saga: quản trị viên nền tảng tạo đơn vị thuê bao, chủ quán cấu hình thanh toán và xem gói đang hoạt động. Phần điều phối cùng bù trừ được đối chiếu với kiểm thử ở Chương~6 tại Hình~\ref{fig:chapter6-saas-onboarding-saga-tests}.
@@ -575,13 +449,13 @@ Hình~\ref{fig:chapter5-screenshot-owner-menu-management} và Hình~\ref{fig:cha
 \screenshotfiguremgmt{chapter5-13-owner-dashboard-reporting.png}{Ứng dụng quản trị — bảng điều khiển doanh thu và đơn hàng của nhà hàng.}{fig:chapter5-screenshot-owner-dashboard-reporting}
 \screenshotfiguremgmt{chapter5-14-admin-platform-analytics.png}{Ứng dụng quản trị — số liệu đơn vị thuê bao, gói dịch vụ và doanh thu SaaS.}{fig:chapter5-screenshot-admin-platform-analytics}
 
-\section{Đóng gói và vận hành trên môi trường công khai}
+\section{Đóng gói và triển khai thử nghiệm}
 
-QRTable được đóng gói bằng Docker/Docker Compose cùng các thành phần PostgreSQL, MongoDB, Redis, Kafka, Keycloak, BFF, ứng dụng phía người dùng và lớp quan sát gồm Prometheus, Grafana, Tempo/OpenTelemetry và Loki. Môi trường công khai bổ sung URL hoặc tên miền, HTTPS/TLS, cấu hình kết nối dịch vụ, đường gọi lại webhook SePay, kiểm tra sức khỏe và kiểm tra vận hành cơ bản cho các luồng phiên QR, xác nhận đơn, KDS, thanh toán và khởi tạo đơn vị thuê bao.
+QRTable được đóng gói bằng Docker/Docker Compose cùng các thành phần PostgreSQL, MongoDB, Redis, Kafka, Keycloak, BFF, ứng dụng phía người dùng và lớp quan sát gồm Prometheus, Grafana, Tempo/OpenTelemetry và Loki. Môi trường triển khai thử nghiệm bổ sung URL hoặc tên miền, HTTPS/TLS, cấu hình kết nối dịch vụ, đường gọi lại webhook SePay, kiểm tra tình trạng dịch vụ và kiểm tra vận hành cơ bản cho các luồng phiên QR, xác nhận đơn, KDS, thanh toán và khởi tạo đơn vị thuê bao.
 
-Trong phạm vi khóa luận, Prometheus và Grafana hỗ trợ đọc metric và dashboard; Tempo/OpenTelemetry hỗ trợ truy vết request đại diện; Loki được xem là thành phần log correlation khi log ứng dụng có \texttt{traceId} phù hợp. k6 không thuộc luồng vận hành thường trực, nhưng được dùng ở Chương 6 để tạo tải đại diện và đối chiếu với lớp quan sát.
+Trong phạm vi khóa luận, Prometheus và Grafana hỗ trợ đọc chỉ số và bảng điều khiển; Tempo/OpenTelemetry hỗ trợ truy vết yêu cầu đại diện; Loki được xem là thành phần tương quan nhật ký khi nhật ký ứng dụng có \texttt{traceId} phù hợp. k6 không thuộc luồng vận hành thường trực, nhưng được dùng ở Chương 6 để tạo tải đại diện và đối chiếu với lớp quan sát.
 
-Minh chứng vận hành gồm kết quả kiểm tra sức khỏe, nhật ký rút gọn, kiểm tra vận hành cơ bản, cấu hình đường gọi lại, phiên bản phát hành và thông tin mã nguồn tương ứng. Nhóm minh chứng này phục vụ đánh giá khả năng đóng gói và vận hành các dịch vụ chính. Tính sẵn sàng cao, tự động hoàn tác và khả năng chịu tải cần quy trình kiểm chứng riêng.
+Minh chứng vận hành gồm kết quả kiểm tra tình trạng dịch vụ, nhật ký rút gọn, kiểm tra vận hành cơ bản, cấu hình đường gọi lại, phiên bản phát hành và thông tin mã nguồn tương ứng. Nhóm minh chứng này phục vụ đánh giá khả năng đóng gói và vận hành các dịch vụ chính. Tính sẵn sàng cao, tự động hoàn tác và khả năng chịu tải cần quy trình kiểm chứng riêng.
 
 \section{Tổng hợp kết quả triển khai}
 
@@ -605,10 +479,10 @@ Bảng~\ref{tab:chapter5-implemented-evidence} tổng hợp các luồng chính 
   Phiên QR và giỏ chung & Khách vào phiên từ QR, dùng chung giỏ và gửi đơn. & Order sở hữu phiên, giỏ và đơn; Catalog sở hữu bàn và thực đơn; Redis hỗ trợ đường xử lý tần suất cao. & Hình~\ref{fig:chapter5-qr-ordering-overview}; kiểm thử phiên, giỏ và gửi đơn của Order. & Phiên trực tuyến, kết nối lại và tải trạng thái mới nhất; hàng đợi ngoại tuyến đầy đủ là hướng mở rộng. \\
   Xác nhận đơn và tồn kho & Nhân viên xác nhận đơn khi đủ tồn kho. & Catalog sở hữu tồn kho; Order sở hữu đơn; xác nhận lặp không trừ tồn kho lần hai. & Hình~\ref{fig:chapter5-order-confirm-stock}; kiểm thử đơn vị, hợp đồng và tích hợp có điều kiện cho Order Confirm Saga. & Saga đại diện đã được triển khai; trạng thái Saga bền vững, CDC và phân phối chính xác một lần là hướng củng cố. \\
   KDS & Phiếu bếp hoặc bar xuất hiện sau khi đơn được xác nhận và ứng dụng cập nhật gần thời gian thực. & Kitchen sở hữu bản chiếu Redis; Order sở hữu vòng đời đơn và dòng đơn; WebSocket gợi ý làm mới. & Hình~\ref{fig:chapter5-kds-ticket-lifecycle}; kiểm thử bộ tiêu thụ Kitchen/KDS. & Bản chiếu phục vụ vận hành; lịch sử KDS dài hạn cần kho bền vững riêng. \\
-  Thanh toán & Ghi nhận tiền mặt hoặc VietQR/SePay và hoàn tất hóa đơn, phiên. & Payment sở hữu bản ghi thanh toán; Order sở hữu hóa đơn và phiên; webhook trùng hoặc thiếu được xử lý lặp an toàn. & Hình~\ref{fig:chapter5-payment-settlement}; kiểm thử ghi nhận thanh toán và webhook. & Kiểm thử nội bộ xác nhận khả năng xử lý giao dịch hoặc thông báo lặp; kiểm chứng nhà cung cấp cần đường gọi lại và dữ liệu giao dịch thực tế. \\
+  Thanh toán & Ghi nhận tiền mặt hoặc VietQR/SePay và hoàn tất hóa đơn, phiên. & Payment sở hữu bản ghi thanh toán; Order sở hữu hóa đơn và phiên; webhook trùng hoặc thiếu được xử lý lặp an toàn. & Hình~\ref{fig:chapter5-payment-settlement}; kiểm thử ghi nhận thanh toán và webhook. & Kiểm thử trong phạm vi hệ thống xác nhận khả năng xử lý giao dịch hoặc thông báo lặp; kiểm chứng nhà cung cấp cần đường gọi lại và dữ liệu giao dịch thực tế. \\
   Khởi tạo SaaS & Tạo đơn vị thuê bao, chủ sở hữu, thuê bao và cấu hình thanh toán. & SaaS sở hữu đơn vị thuê bao/thuê bao; Authorizer/User-Access/Payment chỉ qua hợp đồng; có bù trừ. & Hình~\ref{fig:chapter5-saas-onboarding-saga}; kiểm thử khởi tạo với cơ sở dữ liệu/Payment có điều kiện. & Chứng minh mini-saga đại diện; kiểm chứng toàn luồng qua mọi phụ thuộc thuộc nhóm minh chứng toàn ngăn xếp. \\
-  Bảng điều khiển và báo cáo & Chủ quán, quản lý và quản trị viên nền tảng xem báo cáo đúng phạm vi quyền và gói. & BFF không truy vấn kết hợp trực tiếp cơ sở dữ liệu; Payment, Order, Catalog và SaaS cung cấp mô hình đọc của dữ liệu mình sở hữu. & Bộ điều khiển báo cáo BFF, dịch vụ báo cáo và kiểm thử ứng dụng quản trị. & Mô hình đọc vận hành và quyền theo gói; phân tích nâng cao và kho dữ liệu thuộc hướng mở rộng. \\
-  Đóng gói, quan sát và triển khai công khai & Vận hành các dịch vụ chính và có tín hiệu quan sát phục vụ kiểm chứng. & Đánh giá dựa trên URL, kiểm tra sức khỏe, kiểm tra vận hành cơ bản, đường gọi lại webhook, metric/dashboard và trace đại diện. & Docker, Docker Compose, Prometheus, Grafana, Tempo/OpenTelemetry, Loki, cấu hình môi trường và minh chứng vận hành. & Tính sẵn sàng cao, tự động hoàn tác, log correlation đầy đủ và chịu tải dài hạn cần minh chứng riêng. \\
+  Bảng điều khiển và báo cáo & Chủ quán, quản lý và quản trị viên nền tảng xem báo cáo đúng phạm vi quyền và gói. & BFF không truy vấn kết hợp trực tiếp cơ sở dữ liệu; Payment, Order, Catalog và SaaS cung cấp mô hình đọc của dữ liệu do từng dịch vụ sở hữu. & Bộ điều khiển báo cáo BFF, dịch vụ báo cáo và kiểm thử ứng dụng quản trị. & Mô hình đọc vận hành và quyền theo gói; phân tích nâng cao và kho dữ liệu thuộc hướng mở rộng. \\
+  Đóng gói, quan sát và triển khai thử nghiệm & Vận hành các dịch vụ chính và có tín hiệu quan sát phục vụ kiểm chứng. & Đánh giá dựa trên URL, kiểm tra tình trạng dịch vụ, kiểm tra vận hành cơ bản, đường gọi lại webhook, chỉ số, bảng điều khiển và truy vết đại diện. & Docker, Docker Compose, Prometheus, Grafana, Tempo/OpenTelemetry, Loki, cấu hình môi trường và minh chứng vận hành. & Tính sẵn sàng cao, tự động hoàn tác, tương quan nhật ký đầy đủ và chịu tải dài hạn cần minh chứng riêng. \\
 \end{longtable}
 }
 
@@ -630,7 +504,7 @@ Bảng~\ref{tab:chapter5-representative-sagas} so sánh Saga xác nhận đơn c
   \bottomrule
   \endfoot
   Order Confirm Saga & Xác nhận đơn tại POS và bảo toàn tồn kho. & BFF, Order, Catalog, outbox Order, Kafka và Kitchen. & Ghi nhận khi Order lưu trạng thái \texttt{PROCESSING} cùng outbox \texttt{order.confirmed}; nếu bước này thất bại sau khi Catalog đã trừ tồn kho, Order yêu cầu Catalog hoàn tồn kho. & Kiểm thử đơn vị và hợp đồng đã bao phủ luồng chính; tích hợp tồn kho có điều kiện; tiêm lỗi toàn ngăn xếp là hướng củng cố. \\
-  SaaS Onboarding Mini-Saga & Khởi tạo đơn vị thuê bao có chủ sở hữu, gói ban đầu và cấu hình thanh toán. & BFF, SaaS, Authorizer, Keycloak, User-Access, Payment, outbox SaaS và bộ tiêu thụ Catalog. & Ghi nhận khi SaaS tạo đơn vị thuê bao, gói thuê bao, cấu hình thanh toán và outbox \texttt{tenant.created}; lỗi sau tác dụng phụ kích hoạt bù trừ và vô hiệu hóa chủ sở hữu khi cần. & Tích hợp cơ sở dữ liệu và Payment TCP đã bao phủ một phần; Authorizer, Keycloak và User-Access cần kiểm chứng toàn ngăn xếp. \\
+  SaaS Onboarding Mini-Saga & Khởi tạo đơn vị thuê bao có chủ sở hữu, gói ban đầu và cấu hình thanh toán. & BFF, SaaS, Authorizer, Keycloak, User-Access, Payment, outbox SaaS và bộ tiêu thụ Catalog. & Ghi nhận khi SaaS tạo đơn vị thuê bao, gói thuê bao, cấu hình thanh toán và outbox \texttt{tenant.created}; lỗi sau tác vụ phụ thuộc kích hoạt bù trừ và vô hiệu hóa chủ sở hữu khi cần. & Tích hợp cơ sở dữ liệu và Payment TCP đã bao phủ một phần; Authorizer, Keycloak và User-Access cần kiểm chứng toàn ngăn xếp. \\
 \end{longtable}
 }
 

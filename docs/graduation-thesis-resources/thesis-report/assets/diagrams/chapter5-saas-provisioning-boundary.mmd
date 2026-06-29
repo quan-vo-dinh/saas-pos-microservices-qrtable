@@ -1,22 +1,23 @@
 sequenceDiagram
   autonumber
   actor Admin as Super Admin
-  participant BFF as BFF<br/>platform guards
-  participant SaaS as SaaS<br/>onboarding saga
-  participant SDB as PostgreSQL<br/>SaaS DB
-  participant Contracts as External services<br/>Auth/User/Payment
+  participant BFF as BFF<br/>(Platform Guards)
+  participant SaaS as SaaS<br/>(Saga khởi tạo)
+  participant SDB as PostgreSQL<br/>(CSDL SaaS)
+  participant Contracts as Dịch vụ liên quan<br/>Auth/User/Payment
   participant Kafka as Kafka<br/>tenant.created
   participant Catalog as Catalog
 
-  Admin->>BFF: POST tenant onboarding
-  BFF->>SaaS: ONBOARD command
-  SaaS->>SDB: Validate plan and slug<br/>create ACTIVE tenant
-  SaaS->>Contracts: Create owner identity<br/>profile + empty payment settings
-  Contracts-->>SaaS: ownerUserId and settings ready
-  SaaS->>SDB: Save ownerId, subscription<br/>and tenant.created outbox
+  Admin->>BFF: POST Khởi tạo tenant
+  BFF->>SaaS: Lệnh ONBOARD
+  SaaS->>SDB: Xác minh gói và slug<br/>tạo tenant HOẠT ĐỘNG (ACTIVE)
+  SaaS->>Contracts: Tạo tài khoản định danh chủ sở hữu<br/>hồ sơ + thiết lập thanh toán trống
+  Contracts-->>SaaS: ownerUserId và thiết lập đã sẵn sàng
+  SaaS->>SDB: Lưu ownerId, subscription<br/>và outbox tenant.created
   SaaS-->>BFF: tenant + ownerUserId
-  BFF-->>Admin: Success
-  SaaS-->>Kafka: Publish tenant.created
-  Kafka-->>Catalog: Create default area if missing
+  BFF-->>Admin: Thành công
+  SaaS-->>Kafka: Phát sự kiện tenant.created
+  Kafka-->>Catalog: Khởi tạo khu vực mặc định nếu thiếu
 
-  Note over SaaS,Catalog: tenant.created is an asynchronous side effect<br/>Catalog seeding is idempotent and outside the onboarding commit
+  Note over SaaS,Catalog: Sự kiện tenant.created là một tác dụng phụ bất đồng bộ.<br/>Khởi tạo dữ liệu Catalog (Catalog seeding) có tính idempotent và nằm ngoài commit của luồng onboard.
+

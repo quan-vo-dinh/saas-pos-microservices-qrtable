@@ -1,27 +1,28 @@
 sequenceDiagram
   autonumber
-  actor Staff as Staff / Customer
-  participant Payment as Payment<br/>settlement service
-  participant Order as Order<br/>bill owner
-  participant PDB as PostgreSQL<br/>Payment DB
+  actor Staff as Nhân viên / Khách
+  participant Payment as Payment<br/>(Dịch vụ quyết toán)
+  participant Order as Order<br/>(Quản lý hóa đơn)
+  participant PDB as PostgreSQL<br/>(CSDL Payment)
 
-  Staff->>Payment: Create VietQR or confirm cash
+  Staff->>Payment: Tạo VietQR hoặc xác nhận tiền mặt
   Payment->>Order: BILL_GET_PAYMENT_SNAPSHOT
 
-  alt Bill is payable
-    Order-->>Payment: Status + VND rounding snapshot
-    Payment->>Payment: Validate VND rounding snapshot
+  alt Hóa đơn có thể thanh toán
+    Order-->>Payment: Trạng thái + ảnh chụp làm tròn VND
+    Payment->>Payment: Xác minh ảnh chụp làm tròn VND
 
-    alt VietQR request
-      Payment->>PDB: Create or reuse PENDING intent
-      Payment-->>Staff: QR URL + rounded amount
-    else Cash confirmation
-      Payment->>PDB: Lock or create payment row
-      Payment-->>Staff: Ready for cash commit
+    alt Yêu cầu VietQR
+      Payment->>PDB: Tạo hoặc dùng lại yêu cầu PENDING
+      Payment-->>Staff: Đường dẫn QR + số tiền làm tròn
+    else Xác nhận tiền mặt
+      Payment->>PDB: Khóa hoặc tạo dòng thanh toán
+      Payment-->>Staff: Sẵn sàng ghi nhận tiền mặt
     end
-  else Bill is invalid
-    Order-->>Payment: Not payable or invalid snapshot
-    Payment-->>Staff: Reject before Payment DB mutation
+  else Hóa đơn không hợp lệ
+    Order-->>Payment: Không thể thanh toán hoặc ảnh chụp không hợp lệ
+    Payment-->>Staff: Từ chối trước khi thay đổi CSDL Payment
   end
 
-  Note over Payment,PDB: Payment mutates its DB only after Order confirms the payable bill snapshot
+  Note over Payment,PDB: Payment chỉ ghi nhận vào CSDL sau khi Order xác nhận ảnh chụp hóa đơn hợp lệ.
+

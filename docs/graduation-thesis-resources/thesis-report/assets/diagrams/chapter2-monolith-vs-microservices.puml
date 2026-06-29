@@ -44,7 +44,7 @@ Payment ..> Order : Kafka event\nthanh toán hoàn tất
 Saas ..> Payment : sự kiện/hóa đơn gói
 
 note bottom of Micro
-Mỗi dịch vụ sở hữu dữ liệu của mình.
+Mỗi dịch vụ sở hữu dữ liệu thuộc miền nghiệp vụ riêng.
 Không truy cập trực tiếp CSDL của dịch vụ khác.
 end note
 @enduml
