@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '@einvoice/frontend-utils';
 import { QrCode, CheckCircle2, XCircle, Users } from 'lucide-react';
 import {
@@ -12,8 +11,8 @@ import {
   Skeleton,
 } from '@einvoice/frontend-ui';
 import { useVerifyQrMutation } from '@/features/landing/hooks/use-verify-qr';
+import { useJoinSessionMutation } from '@/features/landing/hooks/use-join-session';
 import { sessionEntityToInfo, useSession } from '@/features/session/context/session-provider';
-import { sessionService } from '@/features/landing/services/session.service';
 import { ROUTES } from '@/constants/routes';
 import { useResolveTenantQuery } from '@/features/landing/hooks/use-resolve-tenant';
 import { setCustomerTenantId } from '@/lib/api-client';
@@ -70,21 +69,22 @@ export function QrLandingCard() {
     verifyMutation,
   ]);
 
-  const joinMutation = useMutation({
-    mutationFn: () => sessionService.joinSession({ tableId: table!, qrToken: token! }),
-  });
+  const joinMutation = useJoinSessionMutation();
 
   const handleEnterMenu = (): void => {
     if (!table || !token) return;
-    joinMutation.mutate(undefined, {
-      onSuccess: (sess) => {
-        const tableLabel = verifyMutation.data?.name ?? sess.tableName;
-        startSession({
-          ...sessionEntityToInfo(sess, tableLabel, tenantSlug?.trim() || undefined),
-        });
-        navigate(ROUTES.MENU);
+    joinMutation.mutate(
+      { tableId: table, qrToken: token },
+      {
+        onSuccess: (sess) => {
+          const tableLabel = verifyMutation.data?.name ?? sess.tableName;
+          startSession({
+            ...sessionEntityToInfo(sess, tableLabel, tenantSlug?.trim() || undefined),
+          });
+          navigate(ROUTES.MENU);
+        },
       },
-    });
+    );
   };
 
   if (!table || !token) {
