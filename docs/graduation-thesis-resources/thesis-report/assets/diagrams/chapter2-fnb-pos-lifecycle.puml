@@ -1,31 +1,61 @@
 @startuml chapter2-fnb-pos-lifecycle
-skinparam backgroundColor #FFFFFF
-skinparam shadowing false
-skinparam defaultFontName Arial
-skinparam handwritten false
-skinparam ArrowColor #374151
-skinparam activity {
-  BackgroundColor white
-  BorderColor #374151
-  StartColor #111827
-  EndColor #111827
-  DiamondBackgroundColor white
-  DiamondBorderColor #374151
-}
+' Hình 2.1 — UML Activity Diagram khái quát vòng đời phục vụ một bàn trong POS F&B
+' Render: java -jar tools/plantuml.jar -charset UTF-8 -tpdf -o assets/figures assets/diagrams/chapter2-fnb-pos-lifecycle.puml
 
+skinparam shadowing false
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam monochrome true
+
+|Khách hàng|
 start
-:Bàn sẵn sàng;
-:Khách vào bàn;
+:Đến nhà hàng và nhận bàn;
+
+|Hệ thống POS F&B|
+:Cập nhật bàn đang phục vụ;
 
 repeat
-  :Tiếp nhận món\n(POS hoặc QR);
-  :Xác nhận và chuyển bếp/bar;
-  :Phục vụ tại bàn;
-repeat while (Khách gọi thêm?) is (Có)
--> Không;
+  |Khách hàng|
+  if (Hình thức gọi món?) then (Qua nhân viên)
+    |Nhân viên phục vụ|
+    :Tiếp nhận yêu cầu gọi món;
+    :Nhập món vào POS;
+  else (Qua mã QR)
+    |Khách hàng|
+    :Quét mã QR tại bàn;
+    :Tự chọn món trên thực đơn số;
+    :Gửi yêu cầu gọi món;
+  endif
 
-:Lập hóa đơn;
+  |Hệ thống POS F&B|
+  :Ghi nhận đơn gọi món;
+  :Chuyển yêu cầu đến bếp / quầy bar;
+
+  |Bếp / Quầy bar|
+  :Chuẩn bị món;
+
+  |Nhân viên phục vụ|
+  :Phục vụ món tại bàn;
+
+  |Khách hàng|
+repeat while (Khách gọi thêm món?) is (Có) not (Không)
+
+|Hệ thống POS F&B|
+:Tổng hợp hóa đơn cuối phiên phục vụ;
+
+|Khách hàng|
+:Thanh toán;
+
+|Hệ thống POS F&B|
 :Ghi nhận thanh toán;
+:Cập nhật trạng thái bàn sau thanh toán;
+
+|Nhân viên phục vụ|
 :Dọn bàn;
+
+|Hệ thống POS F&B|
+:Cập nhật bàn sẵn sàng phục vụ khách mới;
+
 stop
+
 @enduml

@@ -15,8 +15,8 @@ describe('RealtimeStatusPill', () => {
     expect(screen.getByText('Lỗi phiên realtime')).toBeTruthy();
   });
 
-  it('renders degraded state', () => {
-    render(<RealtimeStatusPill status="degraded" />);
-    expect(screen.getByText('Realtime gián đoạn')).toBeTruthy();
+  it('does not render for degraded state', () => {
+    const { container } = render(<RealtimeStatusPill status="degraded" />);
+    expect(container.textContent).toBe('');
   });
 });

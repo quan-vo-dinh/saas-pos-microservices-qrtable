@@ -1,0 +1,10 @@
+PASS Customer Socket.IO client connected to BFF-B /orders namespace
+PASS BFF-A accepted customer cart mutation with shared Order/Redis state
+PASS BFF-B socket received events.cartUpdated emitted by BFF-A through Redis Adapter
+PASS BFF customer session continuity works across BFF-A and BFF-B
+INFO Skipping staff auth continuity: set SCALE_TEST_STAFF_TOKEN to enable it
+PASS BFF functional scale-out smoke completed
+PASS Order cart/session continuity works across Order-A and Order-B
+PASS Order idempotency/replay works across Order-A and Order-B
+PASS Order command concurrency works across Order-A and Order-B
+PASS Order functional scale-out smoke completed

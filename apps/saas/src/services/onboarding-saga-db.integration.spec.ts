@@ -68,16 +68,18 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
   });
 
   it('persists tenant, initial subscription, payment-settings call, and tenant.created outbox on success', async () => {
+    console.log('\n  [ONBOARDING TEST 1.1] 🚀 Starting Integration Flow: Tenant creation success path');
     await ensureHarnessReady();
     const h = await getHarness();
     const planCode = nextPlanCode();
-    const slug = `phase5-onboarding-success-${randomUUID()}`;
+    const slug = `pho-ha-noi-success-${randomUUID()}`;
     currentPlanCode = planCode;
     currentSlug = slug;
     await seedPlan(h, planCode);
     const clients = createTcpClients();
     const service = createService(h, clients);
 
+    console.log('  [ONBOARDING TEST 1.1] 🔄 Step 1: Call onboard() for Pho Ha Noi...');
     const result = await service.onboard({
       tenantName: 'Phase 5 Onboarding Success',
       slug,
@@ -90,16 +92,19 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
     });
     currentTenantId = result.tenant.id;
 
+    console.log('  [ONBOARDING TEST 1.1] ✅ Step 2: Verify Tenant is saved in DB as ACTIVE');
     await expect(h.tenantRepo.findOneByOrFail({ id: result.tenant.id })).resolves.toMatchObject({
       slug,
       status: TenantStatus.ACTIVE,
       isActive: true,
     });
+    console.log('  [ONBOARDING TEST 1.1] ✅ Step 3: Verify Subscription is assigned');
     await expect(h.subscriptionRepo.findOneByOrFail({ tenantId: result.tenant.id })).resolves.toMatchObject({
       status: SubscriptionStatus.ACTIVE,
       source: 'INITIAL_ONBOARDING',
       planCodeSnapshot: planCode,
     });
+    console.log('  [ONBOARDING TEST 1.1] ✅ Step 4: Verify Outbox event tenant.created is pending');
     await expect(h.outboxRepo.findOneByOrFail({ tenantId: result.tenant.id })).resolves.toMatchObject({
       eventType: SAAS_EVENTS.TENANT_CREATED,
       status: 'PENDING',
@@ -111,6 +116,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
         correlationId: 'phase5-onboarding-success',
       }),
     });
+    console.log('  [ONBOARDING TEST 1.1] ✅ Step 5: Verify downstream Keycloak, User profile, and Payment calls');
     expect(clients.authorizerClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.KEYCLOAK.CREATE_TENANT_OWNER,
       expect.objectContaining({
@@ -129,9 +135,11 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
       TCP_REQUEST_MESSAGE.PAYMENT_SETTINGS.CREATE_EMPTY,
       expect.objectContaining({ data: { tenantId: result.tenant.id }, processId: 'phase5-onboarding-success' }),
     );
+    console.log('  [ONBOARDING TEST 1.1] 🎉 Test Case 1.1 PASSED!');
   });
 
   it('compensates tenant and Keycloak owner when profile upsert fails before subscription assignment', async () => {
+    console.log('\n  [ONBOARDING TEST 1.2] 🚀 Starting Integration Flow: Compensate when owner profile upsert fails');
     await ensureHarnessReady();
     const h = await getHarness();
     const planCode = nextPlanCode();
@@ -142,6 +150,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
     const clients = createTcpClients({ userError: new Error('user profile unavailable') });
     const service = createService(h, clients);
 
+    console.log('  [ONBOARDING TEST 1.2] 🔄 Step 1: Call onboard() -> Profile service returns error');
     await expect(
       service.onboard({
         tenantName: 'Phase 5 Onboarding Profile Failure',
@@ -155,9 +164,12 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
 
     const tenantId = extractCreatedTenantId(clients);
     currentTenantId = tenantId;
+    console.log('  [ONBOARDING TEST 1.2] ✅ Step 2: Verify Tenant is deleted (Rolled back)');
     await expect(h.tenantRepo.findOneBy({ id: tenantId })).resolves.toBeNull();
+    console.log('  [ONBOARDING TEST 1.2] ✅ Step 3: Verify Subscription and Outbox count is 0');
     await expect(h.subscriptionRepo.countBy({ tenantId })).resolves.toBe(0);
     await expect(h.outboxRepo.countBy({ tenantId })).resolves.toBe(0);
+    console.log('  [ONBOARDING TEST 1.2] ✅ Step 4: Verify Keycloak Owner User is disabled (Compensated)');
     expect(clients.authorizerClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.KEYCLOAK.DISABLE_USER,
       expect.objectContaining({
@@ -166,9 +178,13 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
       }),
     );
     expect(clients.paymentClient.send).not.toHaveBeenCalled();
+    console.log('  [ONBOARDING TEST 1.2] 🎉 Test Case 1.2 PASSED!');
   });
 
   it('compensates initial subscription, tenant, and Keycloak owner when payment settings fails after subscription assignment', async () => {
+    console.log(
+      '\n  [ONBOARDING TEST 1.3] 🚀 Starting Integration Flow: Compensate when payment settings fails after subscription',
+    );
     await ensureHarnessReady();
     const h = await getHarness();
     const planCode = nextPlanCode();
@@ -179,6 +195,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
     const clients = createTcpClients({ paymentError: new Error('payment settings unavailable') });
     const service = createService(h, clients);
 
+    console.log('  [ONBOARDING TEST 1.3] 🔄 Step 1: Call onboard() -> Payment settings service returns error');
     await expect(
       service.onboard({
         tenantName: 'Phase 5 Onboarding Payment Failure',
@@ -192,9 +209,12 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
 
     const tenantId = extractCreatedTenantId(clients);
     currentTenantId = tenantId;
+    console.log('  [ONBOARDING TEST 1.3] ✅ Step 2: Verify Tenant is deleted (Rolled back)');
     await expect(h.tenantRepo.findOneBy({ id: tenantId })).resolves.toBeNull();
+    console.log('  [ONBOARDING TEST 1.3] ✅ Step 3: Verify Subscription and Outbox count is 0 (Compensated)');
     await expect(h.subscriptionRepo.countBy({ tenantId })).resolves.toBe(0);
     await expect(h.outboxRepo.countBy({ tenantId })).resolves.toBe(0);
+    console.log('  [ONBOARDING TEST 1.3] ✅ Step 4: Verify Keycloak Owner User is disabled (Compensated)');
     expect(clients.authorizerClient.send).toHaveBeenCalledWith(
       TCP_REQUEST_MESSAGE.KEYCLOAK.DISABLE_USER,
       expect.objectContaining({
@@ -202,6 +222,7 @@ maybeDescribe('Phase 5 P0-SAAS-ONBOARDING-SAGA PostgreSQL integration', () => {
         processId: 'phase5-onboarding-payment-fail',
       }),
     );
+    console.log('  [ONBOARDING TEST 1.3] 🎉 Test Case 1.3 PASSED!');
   });
 
   async function getHarness(): Promise<Harness> {

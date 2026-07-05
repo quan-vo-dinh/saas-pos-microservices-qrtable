@@ -1,0 +1,227 @@
+{
+  "root_group": {
+    "checks": {},
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": {
+      "readiness": {
+        "groups": {},
+        "checks": {
+          "ready status is 200": {
+            "passes": 1080,
+            "fails": 0,
+            "name": "ready status is 200",
+            "path": "::readiness::ready status is 200",
+            "id": "98c5eaabd040fca55a56bbd5bc707773"
+          },
+          "ready body has status": {
+            "name": "ready body has status",
+            "path": "::readiness::ready body has status",
+            "id": "51fea4fb402420458602bd2ab2829962",
+            "passes": 1080,
+            "fails": 0
+          }
+        },
+        "name": "readiness",
+        "path": "::readiness",
+        "id": "6e1ff8a95eb5b473cc94f8709093b0df"
+      },
+      "tenant_resolve": {
+        "groups": {},
+        "checks": {
+          "tenant resolve status is 200": {
+            "passes": 1080,
+            "fails": 0,
+            "name": "tenant resolve status is 200",
+            "path": "::tenant_resolve::tenant resolve status is 200",
+            "id": "e58657314bc4bf1e30c4c49672b5d2d8"
+          },
+          "tenant slug is present": {
+            "id": "aa283fd40c1a9b57af67f99701993ef9",
+            "passes": 1080,
+            "fails": 0,
+            "name": "tenant slug is present",
+            "path": "::tenant_resolve::tenant slug is present"
+          }
+        },
+        "name": "tenant_resolve",
+        "path": "::tenant_resolve",
+        "id": "68b8d4b59c083a42fe112c317979fdfe"
+      },
+      "public_menu": {
+        "name": "public_menu",
+        "path": "::public_menu",
+        "id": "6d956077d298bcda5d83000a92f0fea9",
+        "groups": {},
+        "checks": {
+          "menu status is 200": {
+            "name": "menu status is 200",
+            "path": "::public_menu::menu status is 200",
+            "id": "ab32f4c1253ffa28507e8bb80c886ac8",
+            "passes": 1080,
+            "fails": 0
+          }
+        }
+      },
+      "invalid_qr_error_path": {
+        "name": "invalid_qr_error_path",
+        "path": "::invalid_qr_error_path",
+        "id": "e89b1c802e2264e63f019b76e6672751",
+        "groups": {},
+        "checks": {
+          "invalid QR is rejected safely": {
+            "passes": 1080,
+            "fails": 0,
+            "name": "invalid QR is rejected safely",
+            "path": "::invalid_qr_error_path::invalid QR is rejected safely",
+            "id": "3011e20f2e058cd33c459a95d0336420"
+          },
+          "invalid QR response is scoped to tenant": {
+            "id": "9e4656b2efec30eaf6994ee1dca9f3fa",
+            "passes": 1080,
+            "fails": 0,
+            "name": "invalid QR response is scoped to tenant",
+            "path": "::invalid_qr_error_path::invalid QR response is scoped to tenant"
+          }
+        }
+      }
+    }
+  },
+  "metrics": {
+    "http_req_connecting": {
+      "max": 2.548,
+      "p(90)": 0,
+      "p(95)": 0,
+      "avg": 0.0037745370370370363,
+      "min": 0,
+      "med": 0
+    },
+    "data_received": {
+      "count": 3947366,
+      "rate": 23689.964553748767
+    },
+    "http_req_failed": {
+      "passes": 0,
+      "fails": 4320,
+      "thresholds": {
+        "rate<0.05": false
+      },
+      "value": 0
+    },
+    "vus": {
+      "value": 1,
+      "min": 1,
+      "max": 15
+    },
+    "group_duration": {
+      "avg": 14.76916210578701,
+      "min": 2.802333,
+      "med": 9.552688,
+      "max": 639.243958,
+      "p(90)": 20.3792458,
+      "p(95)": 27.226839549999998
+    },
+    "iterations": {
+      "count": 1080,
+      "rate": 6.481578277273673
+    },
+    "http_req_duration": {
+      "p(95)": 27.028499999999983,
+      "avg": 14.596415972222186,
+      "min": 2.741,
+      "med": 9.4085,
+      "max": 639.118,
+      "p(90)": 20.2154
+    },
+    "http_reqs": {
+      "count": 4320,
+      "rate": 25.926313109094693
+    },
+    "http_req_duration{expected_response:true}": {
+      "avg": 14.596415972222186,
+      "min": 2.741,
+      "med": 9.4085,
+      "max": 639.118,
+      "p(90)": 20.2154,
+      "p(95)": 27.028499999999983
+    },
+    "checks": {
+      "passes": 7560,
+      "fails": 0,
+      "thresholds": {
+        "rate>0.95": false
+      },
+      "value": 1
+    },
+    "http_req_blocked": {
+      "avg": 0.011415740740740853,
+      "min": 0.001,
+      "med": 0.004,
+      "max": 9.309,
+      "p(90)": 0.009,
+      "p(95)": 0.011
+    },
+    "iteration_duration": {
+      "avg": 1961.393115066665,
+      "min": 1918.613334,
+      "med": 1946.1634374999999,
+      "max": 2583.005333,
+      "p(90)": 1973.3372081,
+      "p(95)": 2017.5059583499997
+    },
+    "http_req_tls_handshaking": {
+      "avg": 0,
+      "min": 0,
+      "med": 0,
+      "max": 0,
+      "p(90)": 0,
+      "p(95)": 0
+    },
+    "http_req_sending": {
+      "avg": 0.024968287037037327,
+      "min": 0.002,
+      "med": 0.013,
+      "max": 8.905,
+      "p(90)": 0.031,
+      "p(95)": 0.041
+    },
+    "vus_max": {
+      "value": 15,
+      "min": 15,
+      "max": 15
+    },
+    "data_sent": {
+      "count": 730080,
+      "rate": 4381.546915437003
+    },
+    "http_req_waiting": {
+      "avg": 14.52266388888889,
+      "min": 2.711,
+      "med": 9.348500000000001,
+      "max": 639.08,
+      "p(90)": 20.1475,
+      "p(95)": 26.97219999999998
+    },
+    "http_req_receiving": {
+      "p(95)": 0.09204999999999981,
+      "avg": 0.04878379629629617,
+      "min": 0.007,
+      "med": 0.037,
+      "max": 11.04,
+      "p(90)": 0.077
+    },
+    "http_req_duration{scenario:read_baseline}": {
+      "avg": 14.596415972222186,
+      "min": 2.741,
+      "med": 9.4085,
+      "max": 639.118,
+      "p(90)": 20.2154,
+      "p(95)": 27.028499999999983,
+      "thresholds": {
+        "p(95)<500": false,
+        "p(99)<1200": false
+      }
+    }
+  }
+}

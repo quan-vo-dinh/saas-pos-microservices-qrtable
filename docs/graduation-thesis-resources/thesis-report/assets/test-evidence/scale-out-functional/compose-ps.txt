@@ -1,0 +1,12 @@
+NAME                       IMAGE                                                      COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+qrtable-infra-bff-a-1      registry.digitalocean.com/qrtable/qrtable:bff-v1.0.0       "docker-entrypoint.s…"   bff-a      15 minutes ago   Up 15 minutes (healthy)   0.0.0.0:3300->3300/tcp, [::]:3300->3300/tcp
+qrtable-infra-bff-b-1      registry.digitalocean.com/qrtable/qrtable:bff-v1.0.0       "docker-entrypoint.s…"   bff-b      15 minutes ago   Up 15 minutes (healthy)   0.0.0.0:3302->3300/tcp, [::]:3302->3300/tcp
+qrtable-infra-catalog-1    registry.digitalocean.com/qrtable/qrtable:catalog-v1.0.0   "docker-entrypoint.s…"   catalog    15 minutes ago   Up 15 minutes (healthy)   0.0.0.0:3205->3205/tcp, [::]:3205->3205/tcp, 0.0.0.0:3305->3305/tcp, [::]:3305->3305/tcp
+qrtable-infra-kafka-1      apache/kafka:4.3.0                                         "/__cacert_entrypoin…"   kafka      17 minutes ago   Up 17 minutes (healthy)   127.0.0.1:19092->9092/tcp
+qrtable-infra-keycloak-1   quay.io/keycloak/keycloak:26.6.2                           "/opt/keycloak/bin/k…"   keycloak   2 weeks ago      Up 5 days (healthy)       8080/tcp, 8443/tcp, 9000/tcp
+qrtable-infra-mongodb-1    mongo:7.0.31                                               "docker-entrypoint.s…"   mongodb    2 weeks ago      Up 5 days (healthy)       27017/tcp
+qrtable-infra-order-a-1    registry.digitalocean.com/qrtable/qrtable:order-v1.0.0     "docker-entrypoint.s…"   order-a    15 minutes ago   Up 15 minutes (healthy)   0.0.0.0:3201->3201/tcp, [::]:3201->3201/tcp, 0.0.0.0:3301->3301/tcp, [::]:3301->3301/tcp
+qrtable-infra-order-b-1    registry.digitalocean.com/qrtable/qrtable:order-v1.0.0     "docker-entrypoint.s…"   order-b    15 minutes ago   Up 15 minutes (healthy)   0.0.0.0:3211->3211/tcp, [::]:3211->3211/tcp, 0.0.0.0:3311->3311/tcp, [::]:3311->3311/tcp
+qrtable-infra-postgres-1   postgres:16.13                                             "docker-entrypoint.s…"   postgres   16 minutes ago   Up 16 minutes (healthy)   127.0.0.1:15432->5432/tcp
+qrtable-infra-redis-1      redis:7.4.9                                                "docker-entrypoint.s…"   redis      17 minutes ago   Up 17 minutes (healthy)   127.0.0.1:16379->6379/tcp
+qrtable-infra-saas-1       registry.digitalocean.com/qrtable/qrtable:saas-v1.0.0      "docker-entrypoint.s…"   saas       15 minutes ago   Up 15 minutes (healthy)   0.0.0.0:3206->3206/tcp, [::]:3206->3206/tcp, 0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp

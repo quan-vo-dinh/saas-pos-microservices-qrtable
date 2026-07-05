@@ -6,7 +6,6 @@ type Props = {
 
 const labelByStatus: Partial<Record<CustomerRealtimeStatus, string>> = {
   reconnecting: 'Đang kết nối lại',
-  degraded: 'Realtime gián đoạn',
   'auth-error': 'Lỗi phiên realtime',
 };
 

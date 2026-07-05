@@ -92,11 +92,11 @@ Trong seed local, `STAFF_TOKEN` dùng user `WAITER` để confirm order; `KDS_TO
 
 ## 3. Mở công cụ observability
 
-| Tool | URL |
-| --- | --- |
-| Grafana | `http://localhost:3001` |
-| Prometheus | `http://localhost:9090` |
-| Loki Explore | `http://localhost:3001/explore` chọn datasource Loki |
+| Tool          | URL                                                   |
+| ------------- | ----------------------------------------------------- |
+| Grafana       | `http://localhost:3001`                               |
+| Prometheus    | `http://localhost:9090`                               |
+| Loki Explore  | `http://localhost:3001/explore` chọn datasource Loki  |
 | Tempo Explore | `http://localhost:3001/explore` chọn datasource Tempo |
 
 Grafana local mặc định:
@@ -112,11 +112,11 @@ password: admin
 
 Vào Grafana `http://localhost:3001` -> **Dashboards** và mở các dashboard đã provision sẵn:
 
-| Dashboard | Panel nên chụp | Ý nghĩa trong Chương 6 |
-| --- | --- | --- |
-| `QRTable System Overview` | `HTTP Request Rate (RED — Rate)`, `HTTP Error Ratio (RED — Errors)`, `HTTP Latency P95 (RED — Duration)`, `Business Throughput` | Toàn cảnh hệ thống trong lúc chạy k6: request tăng, lỗi thấp, latency được đo |
-| `QRTable Service Drilldown` | `HTTP rate by method / route / status`, `TCP rate by pattern`, `HTTP latency P95`, `TCP latency P95 by pattern`, `Recent traces (Tempo)` | Chứng minh request đi qua BFF và TCP patterns của các service phía sau |
-| `QRTable Business Metrics` | `Orders submitted / s`, `Orders confirmed / s`, `Order throughput (1m rate)`, `KDS tickets created / s by station` | Chứng minh luồng nghiệp vụ order/confirm/KDS tạo metric riêng |
+| Dashboard                   | Panel nên chụp                                                                                                                           | Ý nghĩa trong Chương 6                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `QRTable System Overview`   | `HTTP Request Rate (RED — Rate)`, `HTTP Error Ratio (RED — Errors)`, `HTTP Latency P95 (RED — Duration)`, `Business Throughput`          | Toàn cảnh hệ thống trong lúc chạy k6: request tăng, lỗi thấp, latency được đo |
+| `QRTable Service Drilldown` | `HTTP rate by method / route / status`, `TCP rate by pattern`, `HTTP latency P95`, `TCP latency P95 by pattern`, `Recent traces (Tempo)` | Chứng minh request đi qua BFF và TCP patterns của các service phía sau        |
+| `QRTable Business Metrics`  | `Orders submitted / s`, `Orders confirmed / s`, `Order throughput (1m rate)`, `KDS tickets created / s by station`                       | Chứng minh luồng nghiệp vụ order/confirm/KDS tạo metric riêng                 |
 
 Cách chụp đẹp hơn:
 
@@ -127,13 +127,13 @@ Cách chụp đẹp hơn:
 
 Ảnh visual chính nên có:
 
-| Screenshot | Nên lấy từ dashboard/panel |
-| --- | --- |
-| `chapter6-k6-grafana-system-overview-after-fix.png` | `QRTable System Overview`, chụp RED panels + business throughput sau khi đã restart BFF và không còn `validate-qr 500` |
-| `chapter6-k6-grafana-bff-drilldown-after-fix.png` | `QRTable Service Drilldown`, service `bff`, chụp HTTP route/status + latency panels sau khi metric invalid QR là `403` |
-| `chapter6-k6-grafana-business-metrics.png` | `QRTable Business Metrics`, chụp order submitted/confirmed + KDS tickets |
-| `chapter6-k6-prometheus-http-route-status.png` | Prometheus table `sum(rate(qrtable_http_requests_total[5m])) by (service, route, status)` nếu dashboard chưa đủ rõ status |
-| `chapter6-k6-prometheus-business-counters.png` | Prometheus `increase(qrtable_orders_submitted_total[5m])`, `increase(qrtable_orders_confirmed_total[5m])`, `increase(qrtable_kds_tickets_created_total[5m])` |
+| Screenshot                                          | Nên lấy từ dashboard/panel                                                                                                                                   |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `chapter6-k6-grafana-system-overview-after-fix.png` | `QRTable System Overview`, chụp RED panels + business throughput sau khi đã restart BFF và không còn `validate-qr 500`                                       |
+| `chapter6-k6-grafana-bff-drilldown-after-fix.png`   | `QRTable Service Drilldown`, service `bff`, chụp HTTP route/status + latency panels sau khi metric invalid QR là `403`                                       |
+| `chapter6-k6-grafana-business-metrics.png`          | `QRTable Business Metrics`, chụp order submitted/confirmed + KDS tickets                                                                                     |
+| `chapter6-k6-prometheus-http-route-status.png`      | Prometheus table `sum(rate(qrtable_http_requests_total[5m])) by (service, route, status)` nếu dashboard chưa đủ rõ status                                    |
+| `chapter6-k6-prometheus-business-counters.png`      | Prometheus `increase(qrtable_orders_submitted_total[5m])`, `increase(qrtable_orders_confirmed_total[5m])`, `increase(qrtable_kds_tickets_created_total[5m])` |
 
 ## 5. Prometheus/Grafana queries để kiểm tra số liệu
 
@@ -200,17 +200,17 @@ Không cần chứng minh mọi request đều có trace. Chỉ cần một trac
 
 ## 8. Mapping screenshot -> writing plan
 
-| Screenshot file | Placeholder trong writing plan |
-| --- | --- |
-| `chapter6-k6-grafana-system-overview-after-fix.png` | C6-K6-01 |
-| `chapter6-k6-grafana-bff-drilldown-after-fix.png` | C6-K6-02 |
-| `chapter6-k6-prometheus-http-route-status.png` | C6-K6-03 |
-| `chapter6-k6-grafana-business-metrics.png` | C6-K6-04 |
-| `chapter6-k6-prometheus-business-counters.png` | C6-K6-05 |
-| `chapter6-k6-tempo-invalid-qr-trace.png` | C6-K6-06 |
-| `chapter6-k6-tempo-order-submit-trace.png` hoặc `chapter6-k6-tempo-order-confirm-trace.png` | C6-K6-07 optional |
-| `chapter6-k6-loki-traceid-log.png` | C6-K6-08 optional |
-| `chapter6-k6-terminal-summary.png` | C6-K6-09 optional |
+| Screenshot file                                                                             | Placeholder trong writing plan |
+| ------------------------------------------------------------------------------------------- | ------------------------------ |
+| `chapter6-k6-grafana-system-overview-after-fix.png`                                         | C6-K6-01                       |
+| `chapter6-k6-grafana-bff-drilldown-after-fix.png`                                           | C6-K6-02                       |
+| `chapter6-k6-prometheus-http-route-status.png`                                              | C6-K6-03                       |
+| `chapter6-k6-grafana-business-metrics.png`                                                  | C6-K6-04                       |
+| `chapter6-k6-prometheus-business-counters.png`                                              | C6-K6-05                       |
+| `chapter6-k6-tempo-invalid-qr-trace.png`                                                    | C6-K6-06                       |
+| `chapter6-k6-tempo-order-submit-trace.png` hoặc `chapter6-k6-tempo-order-confirm-trace.png` | C6-K6-07 optional              |
+| `chapter6-k6-loki-traceid-log.png`                                                          | C6-K6-08 optional              |
+| `chapter6-k6-terminal-summary.png`                                                          | C6-K6-09 optional              |
 
 ## 9. Tự thay ảnh vào LaTeX sau khi đã capture
 

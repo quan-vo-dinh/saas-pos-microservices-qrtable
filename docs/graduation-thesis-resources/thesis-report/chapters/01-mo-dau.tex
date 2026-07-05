@@ -107,7 +107,7 @@ Bước thứ ba là thiết kế kiến trúc. Hệ thống được tổ chứ
 
 Bước thứ tư là triển khai hệ thống. QRTable được xây dựng trong Nx monorepo với các dịch vụ phía máy chủ, PWA khách, ứng dụng quản trị và thành phần phụ trợ. Mỗi luồng được mô tả theo mục tiêu nghiệp vụ, ràng buộc nghiệp vụ, dịch vụ sở hữu dữ liệu, kết quả triển khai, kiểm thử, sơ đồ trình tự và ảnh minh họa kết quả vận hành.
 
-Bước thứ năm là kiểm chứng và đánh giá. Khóa luận kết hợp kiểm thử tự động, kiểm thử có điều kiện, phiên đo tải k6 đại diện, số liệu quan sát từ Prometheus, Grafana và Tempo, kiểm chứng kiến trúc, ma trận đối chiếu và ảnh minh họa. Mỗi kết luận được gắn với loại minh chứng tương ứng để phân biệt kết quả đã kiểm chứng, kết quả được đo trong phạm vi cục bộ, kết quả được hỗ trợ bởi thiết kế và nội dung cần tiếp tục phát triển. Cách tiếp cận này phù hợp với đặc điểm của đề tài xây dựng hệ thống phần mềm và giới hạn các nhận định về hiệu năng, khả năng mở rộng và vận hành trong phạm vi đã đánh giá.
+Bước thứ năm là kiểm chứng và đánh giá. Khóa luận kết hợp kiểm thử tự động (bao gồm cả kịch bản đa thực thể để kiểm chứng thực nghiệm khả năng mở rộng ngang ở mức chức năng), kiểm thử có điều kiện, phiên đo tải k6 đại diện, số liệu quan sát từ Prometheus, Grafana và Tempo, kiểm chứng kiến trúc, ma trận đối chiếu và ảnh minh họa. Mỗi kết luận được gắn với loại minh chứng tương ứng để phân biệt kết quả đã kiểm chứng, kết quả được đo trong phạm vi cục bộ, kết quả được hỗ trợ bởi thiết kế và nội dung cần tiếp tục phát triển. Cách tiếp cận này phù hợp với đặc điểm của đề tài xây dựng hệ thống phần mềm và giới hạn các nhận định về hiệu năng, khả năng mở rộng và vận hành trong phạm vi đã đánh giá.
 
 \section{Đóng góp của đề tài}
 
@@ -125,7 +125,7 @@ Bước thứ năm là kiểm chứng và đánh giá. Khóa luận kết hợp 
 
 Đóng góp thứ bảy là hiện thực hóa hạ tầng trung gian thanh toán song tầng và cơ chế ủy quyền an toàn từ bên thứ ba trong phạm vi QRTable. Ở tầng vận hành nhà hàng, hệ thống kết nối SePay/VietQR với hóa đơn POS, webhook và xử lý lặp an toàn. Ở tầng nền tảng, các luồng gói dịch vụ và đăng ký được tổ chức tách biệt với giao dịch hóa đơn nhà hàng. Cách phân tầng này giúp phân định rõ trách nhiệm giữa thanh toán vận hành và thanh toán SaaS, đồng thời đặt Payment Adapter vào đúng vai trò trung gian tích hợp.
 
-Đóng góp thứ tám là xây dựng phương pháp luận đánh giá hệ thống dựa trên cơ sở thực nghiệm. Khóa luận không chỉ mô tả hệ thống đã xây dựng, mà còn liên kết yêu cầu, thiết kế, triển khai, kiểm thử, phiên đo tải đại diện, số liệu quan sát, sơ đồ và ảnh minh họa thành một mạch lập luận thống nhất. Các công cụ như Allure/Nx Cloud, k6, Prometheus, Grafana và Tempo được dùng như nguồn minh chứng ở Chương 6, từ đó gắn mỗi kết luận với loại bằng chứng tương ứng.
+Đóng góp thứ tám là xây dựng phương pháp luận đánh giá hệ thống dựa trên cơ sở thực nghiệm. Khóa luận không chỉ mô tả hệ thống đã xây dựng, mà còn liên kết yêu cầu, thiết kế, triển khai, kiểm thử (bao gồm kịch bản mở rộng ngang chéo thực thể), phiên đo tải đại diện, số liệu quan sát, sơ đồ và ảnh minh họa thành một mạch lập luận thống nhất. Các công cụ như Allure/Nx Cloud, k6, Prometheus, Grafana và Tempo được dùng như nguồn minh chứng ở Chương 6, từ đó gắn mỗi kết luận với loại bằng chứng tương ứng.
 
 \section{Cấu trúc khóa luận}
 

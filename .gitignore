@@ -44,6 +44,7 @@ Thumbs.db
 .github/instructions/nx.instructions.md
 
 .env
+docker/env/*.local
 
 # Ignore docker data
 docker/**/docker_data/
@@ -84,5 +85,5 @@ docs/graduation-thesis-resources/thesis-report/*.toc
 docs/graduation-thesis-resources/thesis-report/*.xdv
 
 # Allure Report
-/allure-results/
-/allure-report/
+/allure-results*
+/allure-report*

@@ -3,7 +3,11 @@
 % !TeX encoding = UTF-8
 % Main LaTeX file for the QRTable undergraduate thesis.
 % Build from this directory with: xelatex undergraduate-theses-report.tex
-\documentclass[12pt,a4paper,oneside]{report}
+\ifdefined\ThesisDuplex
+  \documentclass[12pt,a4paper,twoside,openany]{report}
+\else
+  \documentclass[12pt,a4paper,oneside]{report}
+\fi
 
 \usepackage{iftex}
 \ifPDFTeX
@@ -17,7 +21,11 @@
   \setmainfont{TeX Gyre Termes}
 }
 
-\usepackage[a4paper,top=3cm,bottom=3.5cm,left=3.5cm,right=2cm,headheight=14pt,footskip=1.2cm]{geometry}
+\ifdefined\ThesisDuplex
+  \usepackage[a4paper,top=3cm,bottom=3.5cm,inner=3.5cm,outer=2cm,headheight=14pt,footskip=1.2cm]{geometry}
+\else
+  \usepackage[a4paper,top=3cm,bottom=3.5cm,left=3.5cm,right=2cm,headheight=14pt,footskip=1.2cm]{geometry}
+\fi
 \usepackage{setspace}
 \usepackage{fancyhdr}
 \usepackage{titlesec}
@@ -113,14 +121,26 @@
 \newcommand{\thesisyear}{2026}
 
 \newcommand{\covergeometry}{\newgeometry{top=2cm,right=2cm,bottom=1.5cm,left=2.54cm,headheight=14pt,footskip=0.7cm}}
-\newcommand{\maingeometry}{\newgeometry{top=3cm,bottom=3.5cm,left=3.5cm,right=2cm,headheight=14pt,footskip=1.2cm}}
+\ifdefined\ThesisDuplex
+  \newcommand{\maingeometry}{\newgeometry{top=3cm,bottom=3.5cm,inner=3.5cm,outer=2cm,headheight=14pt,footskip=1.2cm}}
+\else
+  \newcommand{\maingeometry}{\newgeometry{top=3cm,bottom=3.5cm,left=3.5cm,right=2cm,headheight=14pt,footskip=1.2cm}}
+\fi
 \newcommand{\centerbold}[2]{{\centering\fontsize{#1}{#1}\selectfont\bfseries #2\par}}
+
+\ifdefined\ThesisDuplex
+  % Avoid stretching vertical gaps around large figures in the duplex build.
+  \raggedbottom
+\fi
 
 \begin{document}
 
 \pagenumbering{gobble}
 \pagestyle{empty}
 \input{frontmatter/cover}
+\ifdefined\ThesisDuplex
+  \setcounter{page}{3}
+\fi
 \maingeometry
 \input{frontmatter/acknowledgements}
 

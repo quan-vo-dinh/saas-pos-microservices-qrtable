@@ -7,20 +7,28 @@ sequenceDiagram
   actor Admin as Super Admin
 
   SaaS->>SDB: Tạo tenant
+  Note over SaaS,SDB: [Local Tx 1] Tạo Tenant & Commit
   SaaS->>Authz: Tạo tài khoản định danh chủ sở hữu
+  Note over Authz: [Local Tx 2] Tạo Owner User & Commit (Keycloak)
   Authz-->>SaaS: ownerUserId
 
   alt Thất bại trước khi tạo subscription
     SaaS->>Authz: Vô hiệu hóa tài khoản định danh chủ sở hữu
+    Note over Authz: [Compensating Tx] Vô hiệu hóa Owner User (Keycloak)
     SaaS->>SDB: Xóa tenant dở dang
+    Note over SaaS,SDB: [Compensating Tx] Xóa Tenant & Commit
     SaaS-->>BFF: TENANT_ONBOARDING_FAILED
     BFF-->>Admin: Hiển thị lỗi thất bại
   else Thất bại sau khi tạo subscription
     SaaS->>SDB: Gán gói thuê bao ban đầu
+    Note over SaaS,SDB: [Local Tx 3] Gán Subscription & Commit
     SaaS--xSaaS: Thiết lập downstream thất bại
     SaaS->>Authz: Vô hiệu hóa tài khoản định danh chủ sở hữu
+    Note over Authz: [Compensating Tx] Vô hiệu hóa Owner User (Keycloak)
     SaaS->>SDB: Xóa subscription khởi tạo ban đầu
+    Note over SaaS,SDB: [Compensating Tx] Xóa Subscription & Commit
     SaaS->>SDB: Xóa tenant dở dang
+    Note over SaaS,SDB: [Compensating Tx] Xóa Tenant & Commit
     SaaS-->>BFF: TENANT_ONBOARDING_FAILED
     BFF-->>Admin: Hiển thị lỗi thất bại
   end

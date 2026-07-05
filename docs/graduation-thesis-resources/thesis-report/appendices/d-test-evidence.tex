@@ -49,5 +49,25 @@ Các hình dưới đây bổ sung cho bảng ràng buộc Saga ở Chương~6. 
   {fig:chapter6-saga-test-stale-release}
   {Nhật ký kiểm thử kiểm soát phiên bản đặt trước khi bản tin đến muộn.}
 
+\section{Kiểm chứng khả năng mở rộng ngang (Horizontal Scaling)}
+
+Các hình dưới đây là minh chứng kiểm chứng cho kịch bản chạy đa thực thể (multi-instance) của dịch vụ BFF và dịch vụ Order, hiển thị trên giao diện của báo cáo Allure Report.
+
+\chapterSixEvidenceFigure[Sơ đồ cấu hình đa thực thể trên Allure Report]{0.72\textheight}
+  {chapter6-31-allure-topology.png}
+  {fig:chapter6-allure-topology}
+  {Sơ đồ topology phân phối tải tự động giữa các thực thể BFF và Order trong môi trường Docker.}
+
+\chapterSixEvidenceFigure[Kết quả truyền tin real-time chéo thực thể BFF]{0.72\textheight}
+  {chapter6-32-allure-bff-realtime.png}
+  {fig:chapter6-allure-bff-realtime}
+  {Kết quả kiểm thử ghi nhận thông tin sự kiện cập nhật giỏ hàng được đồng bộ chéo thực thể qua Redis Adapter.}
+
+\chapterSixEvidenceFigure[Kiểm chứng tính nhất quán và chống trùng lặp đơn hàng]{0.72\textheight}
+  {chapter6-33-allure-order-consistency.png}
+  {fig:chapter6-allure-order-consistency}
+  {Dữ liệu kiểm thử ghi nhận tính nhất quán kho hàng và chống trùng lặp đơn hàng khi gửi yêu cầu đồng thời.}
+
 \FloatBarrier
 \clearpage
+
