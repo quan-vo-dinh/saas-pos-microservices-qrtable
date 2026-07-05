@@ -1,13 +1,10 @@
 import { QrLandingCard } from '@/features/landing/components/qr-landing-card';
 import { SessionTimer } from '@/components/session/session-timer';
-import { PresenceAvatars } from '@/components/session/presence-avatars';
 import { useSession } from '@/features/session/context/session-provider';
 import { usePwaMockStore } from '@/mocks/store';
 
 export function LandingPage(): React.ReactElement {
   const { session } = useSession();
-  const presence = usePwaMockStore((s) => s.presence);
-  const activityFeed = usePwaMockStore((s) => s.activityFeed);
   const mockSession = usePwaMockStore((s) => s.session);
 
   const tableLabel = session?.tableName ?? mockSession.tableName;
@@ -24,7 +21,6 @@ export function LandingPage(): React.ReactElement {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <SessionTimer startedAt={startedAtMs} />
-          <PresenceAvatars presence={presence} activity={activityFeed} />
         </div>
       </div>
       <QrLandingCard />

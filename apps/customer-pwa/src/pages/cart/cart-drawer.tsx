@@ -19,7 +19,6 @@ import {
   Separator,
   Textarea,
 } from '@einvoice/frontend-ui';
-import { PresenceAvatars } from '@/components/session/presence-avatars';
 import { ROUTES } from '@/constants/routes';
 import {
   useCartMutations,
@@ -27,7 +26,6 @@ import {
   useSubmitOrderMutation,
 } from '@/features/order/hooks/use-order-query';
 import { createAndPersistIdempotencyKey } from '@/lib/idempotency';
-import { usePwaMockStore } from '@/mocks/store';
 import { useTenantStatus } from '@/features/tenant/use-tenant-status';
 
 const NOTE_CHIPS = ['Không cay', 'Ít muối', 'Không hành'] as const;
@@ -44,9 +42,6 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
   const submitOrder = useSubmitOrderMutation();
   const { canOrder } = useTenantStatus();
   const orderBlocked = !canOrder;
-
-  const presence = usePwaMockStore((s) => s.presence);
-  const activityFeed = usePwaMockStore((s) => s.activityFeed);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const submitInFlightRef = useRef(false);
@@ -79,20 +74,15 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps): React.React
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent className="max-h-[88vh] bg-background">
-          <DrawerHeader className="flex flex-col gap-3 text-left">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <DrawerTitle>Giỏ hàng</DrawerTitle>
-                <DrawerDescription>
-                  {orderBlocked
-                    ? 'Cửa hàng tạm không nhận đơn mới — bạn vẫn xem được giỏ đã chọn.'
-                    : isLoading
-                      ? 'Đang tải…'
-                      : `${totalItems} món · ${formatCurrency(totalAmount)}`}
-                </DrawerDescription>
-              </div>
-              <PresenceAvatars presence={presence} activity={activityFeed} />
-            </div>
+          <DrawerHeader className="text-left">
+            <DrawerTitle>Giỏ hàng</DrawerTitle>
+            <DrawerDescription>
+              {orderBlocked
+                ? 'Cửa hàng tạm không nhận đơn mới — bạn vẫn xem được giỏ đã chọn.'
+                : isLoading
+                  ? 'Đang tải…'
+                  : `${totalItems} món · ${formatCurrency(totalAmount)}`}
+            </DrawerDescription>
           </DrawerHeader>
 
           {isLoading ? (

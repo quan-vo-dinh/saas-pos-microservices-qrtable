@@ -55,7 +55,7 @@ export function SessionTimer({
           {Math.round(idleMs / 60_000)} phút, phiên có thể tự đóng theo chính sách nhà hàng.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Gợi ý: còn khoảng {Math.max(0, Math.floor(remainingMs / 60_000))} phút trong khung 2 giờ demo.
+          Gợi ý: còn khoảng {Math.max(0, Math.floor(remainingMs / 60_000))} phút trong khung 2 giờ.
         </p>
       </PopoverContent>
     </Popover>
