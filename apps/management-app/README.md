@@ -6,7 +6,7 @@
 
 ## 1. Architectural Overview
 
-The **Management App** is built on **Next.js App Router (v15)**, serving as the dashboard and operations system for three user groups:
+The **Management App** is built on **Next.js App Router (v15)** and **React 19**, serving as the dashboard and operations system for three user groups:
 
 1.  **Super Admin (SaaS Admin)**: Manages restaurants (Tenants), subscription plans (Subscriptions), payments, and system-wide revenue.
 2.  **Restaurant Owner / Manager**: Manages menus, table layouts, staff, and VietQR payment configurations for individual restaurants.
@@ -40,14 +40,48 @@ apps/management-app/src/
 │   └── utils.ts                # Shared utility functions
 ├── features/                   # Modular independent business features
 │   ├── saas/                   # Subscription, Tenant, and Plan Management
-│   ├── kds/                    # Real-time Kitchen Display System
-│   ├── pos/                    # Point of Sale (POS) operations and cart
-│   ├── order/                  # Order list and details management
 │   ├── tenant/                 # Restaurant profile configurations, SePay bank accounts
-│   ├── tables/                 # Areas & tables layouts + QR Generator
-│   └── staff/                  # Staff management & permission accounts
+│   ├── menu/                   # Menu categories, dishes CRUD, and modifiers
+│   ├── tables/                 # Area & table layouts layout configuration + QR code token generation
+│   ├── order/                  # Order life-cycle state machine, order lists & invoice logs
+│   ├── pos/                    # Counter POS, point of sale cart and checkout flows
+│   ├── kds/                    # Real-time Kitchen/Bar Display queues with Socket.io cache invalidation
+│   ├── staff/                  # Employee accounts management & Role-Based permissions (RBAC)
+│   ├── payment/                # SePay webhook processing, cash log verifications
+│   ├── reports/                # Revenue, service performance analytics, and order reports
+│   ├── service-requests/       # Real-time guest help/call dashboard
+│   └── landing/                # SaaS POS introduction homepage
 └── components/                 # Shared UI components across the application (Shadcn-based)
 ```
+
+#### Detailed Page Routes Map (`src/app/`)
+
+- **`(admin)` (SaaS Control Panel):**
+  - `/admin/tenants`: List, create, and manage registered restaurants (Tenants) on the SaaS platform.
+  - `/admin/plans`: Create and edit SaaS subscription plans (pricing, limits).
+  - `/admin/billing`: Track transactions, invoice status, and system-wide revenue reports.
+  - `/admin/analytics`: General platform growth charts.
+- **`(dashboard)` (Restaurant Portal):**
+  - `/dashboard/menu`: Manage restaurant menus (dishes CRUD, categories, options).
+  - `/dashboard/tables`: Setup dining areas and tables layout; print/export QR codes.
+  - `/dashboard/staff`: Manage restaurant employees, roles, and SSO credentials.
+  - `/dashboard/orders`: View historical invoices, dining room orders, and payment audits.
+  - `/dashboard/payment-settings`: Setup bank account integrations (SePay API/webhooks) for VietQR.
+  - `/dashboard/subscription`: Check current pricing plan, usage, and billing history.
+- **`(kds)` (Kitchen/Bar Display Screen):**
+  - `/kds/kitchen`: Real-time active food items queue for Chefs.
+  - `/kds/bar`: Real-time active drinks queue for Baristas.
+- **`(pos)` (Cashier Desk):**
+  - `/pos/tables`: Visual table status grid, order placement, checkout processing, and cash billing desk.
+
+#### Modular Feature Folders (`src/features/`)
+
+To keep the codebase scalable, all business logic is separated into domains inside `features/`. Every directory uses the following conventions:
+
+- `features/{domain}/api.ts`: API services integrated with react-query.
+- `features/{domain}/types.ts`: TypeScript interfaces representing the domain model.
+- `features/{domain}/components/`: Local components used only by this feature.
+- `features/{domain}/hooks/`: Custom state or query hooks (e.g., `use-kds-realtime.ts`).
 
 ---
 
@@ -55,7 +89,7 @@ apps/management-app/src/
 
 This application utilizes a modern frontend stack to deliver a premium, responsive user experience:
 
-- **Frontend Framework**: **Next.js 16 (App Router)** & **React 19**
+- **Frontend Framework**: **Next.js 15 (App Router)** & **React 19**
   - Leverages Server and Client Components to optimize SSR and client-side interactions.
   - Configured for `standalone` output and uses `Turbopack` for fast development cycles.
 - **Styling & UI**: **Tailwind CSS v4** & **Shadcn UI**
@@ -152,29 +186,82 @@ As this app is part of an **Nx Monorepo**, use the root package scripts or targe
 
 ## 5. Authentication & State Synchronization Management
 
-One of the most critical designs in `management-app` is the synchronization of login credentials from the **Server-side (NextAuth)** to the **Client-side (Zustand)** to optimize performance and secure the APIs:
+In a Next.js App Router architecture, the **Server environment (Node.js)** and the **Client environment (Browser)** are physically and logically separate. They do not share memory space or runtime states. Therefore, this app uses a structured token synchronization flow:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as User
-    participant NextAuth as NextAuth.js (Server)
-    participant Hydrator as AuthSessionHydrator (Client)
-    participant APIProxy as NextJS API Route (/api/internal/me)
-    participant BFF as Backend Gateway (BFF)
-    participant Zustand as Zustand Store (useAuthStore)
+    actor User as User (Browser)
+    participant Client as React App (Next.js Client-side)
+    participant NextServer as Next.js Server-side (Auth.js)
+    participant Keycloak as Keycloak SSO Server (IdP)
+    participant BFF as Backend BFF Gateway
 
-    User->>NextAuth: Log in successfully via Keycloak
-    NextAuth-->>User: Set Session Cookie containing JWT
-    Note over User, NextAuth: Render Client App & mounted Providers
-    Hydrator->>NextAuth: Get accessToken from Client Session Hook
-    Hydrator->>APIProxy: GET /api/internal/me (With Cookie)
-    APIProxy->>BFF: GET /customer/authorizer/me (Bearer Token)
-    BFF-->>APIProxy: Return User Profile & Permissions details
-    APIProxy-->>Hydrator: Return Profile JSON
-    Hydrator->>Zustand: setAccessToken(token) & setProfile(profile)
-    Note over Zustand: Hydrated state = true. Ready to call APIs.
+    %% Phase 1: Login & Redirect
+    rect rgb(240, 248, 255)
+        note right of User: Phase 1: Login & Keycloak Redirect
+        User->>Client: Click "Tiếp tục với Keycloak"
+        Client->>NextServer: Form Action: signIn("keycloak")
+        NextServer-->>User: Return HTTP 302 Redirect to Keycloak login page
+        User->>Keycloak: Authenticate (Username/Password)
+        Keycloak-->>User: HTTP 302 Redirect back with Authorization Code (?code=xxx)
+    end
+
+    %% Phase 2: Exchange Code & Create Session Cookie
+    rect rgb(245, 245, 245)
+        note right of NextServer: Phase 2: Token Exchange & Create Session Cookie
+        User->>NextServer: GET /api/auth/callback/keycloak?code=xxx
+        NextServer->>Keycloak: POST /protocol/openid-connect/token (Exchange Code)
+        Keycloak-->>NextServer: Return tokens (access_token, refresh_token)
+
+        note over NextServer: NextAuth triggers callback: jwt({ token, account })
+        NextServer->>BFF: GET /customer/authorizer/me (Bearer access_token for profile)
+        BFF-->>NextServer: Return User Profile & Permissions
+        note over NextServer: NextAuth encrypts token object using AUTH_SECRET (JWE)
+        NextServer-->>User: Set-Cookie (HTTP-only Session Cookie)
+    end
+
+    %% Phase 3: Sync Session to Client (Hydration)
+    rect rgb(240, 255, 240)
+        note right of Client: Phase 3: Client-side Session Hydration
+        User->>Client: Redirect to Dashboard, React App mounts
+        Client->>NextServer: useSession() sends GET /api/auth/session (Cookie attached)
+        note over NextServer: NextServer decrypts Cookie & triggers callback: session({ session, token })
+        NextServer-->>Client: Return Session JSON (accessToken, basic profile)
+
+        Client->>Client: Hydrator calls fetch("/api/internal/me")
+        Client->>NextServer: GET /api/internal/me (Next.js Internal API Route)
+        NextServer->>BFF: GET /customer/authorizer/me (Get full profile)
+        BFF-->>NextServer: Return full Profile JSON
+        NextServer-->>Client: Return Profile JSON
+        note over Client: Save accessToken & Profile to Zustand Store (useAuthStore)
+    end
+
+    %% Phase 4: API Calls & Background Token Rotation
+    rect rgb(255, 240, 245)
+        note right of Client: Phase 4: Business API Calls & Background Token Rotation
+        Client->>BFF: GET /api/v1/menu (Header: Authorization: Bearer accessToken)
+        BFF-->>Client: Return Menu Data
+
+        opt When Access Token is expired (or close to expiring)
+            Client->>NextServer: useSession() polls session status (Cookie attached)
+            note over NextServer: jwt() callback detects accessToken is expiring soon based on TOKEN_REFRESH_BUFFER_MS
+            NextServer->>Keycloak: POST /openid-connect/token (grant_type=refresh_token using old refreshToken)
+            Keycloak-->>NextServer: Return new tokens (accessToken & refreshToken)
+            NextServer->>BFF: GET /customer/authorizer/me (Get updated profile)
+            BFF-->>NextServer: Return updated Profile
+            note over NextServer: Re-encrypt token object
+            NextServer-->>User: Set-Cookie (Update HTTP-only Session Cookie in browser)
+            NextServer-->>Client: Return new Session JSON
+        end
+    end
 ```
+
+### Why is this synchronization design necessary?
+
+1.  **Server-Side Routing Protection**: As the user navigates, the Next.js Server intercepts page requests and reads the HttpOnly session cookie inside [middleware.ts](./src/middleware.ts) to authorize access. For maximum security against Cross-Site Scripting (XSS) attacks, Javascript code on the browser is forbidden from reading this cookie.
+2.  **Client-Side API Requests**: When running interactive React components on the browser, Javascript needs to read the raw Keycloak Access Token to attach it as a Bearer header (`Authorization: Bearer <token>`) when calling the BFF backend.
+3.  **Synchronization Bridge**: [auth-session-hydrator.tsx](./src/components/auth/auth-session-hydrator.tsx) acts as the bridge. It extracts the token safely from NextAuth, calls the local Next.js proxy route `/api/internal/me` to get the employee's profile details, and saves them into the client-side Zustand store [auth-store.ts](./src/lib/auth/auth-store.ts). Once hydrated, the API client [authenticated-client.ts](./src/lib/api/authenticated-client.ts) reads from the store synchronously to sign outgoing API requests instantly.
 
 ### Key files involved in this flow:
 
@@ -248,36 +335,37 @@ To quickly grasp and master the codebase of the management application, you shou
 
 ### Step 1: Authentication & Login Flow
 
-Learn how the system authenticates users and manages permissions.
+_Understand how the system secures the application before exploring UI files._
 
-- **[auth.ts](./src/auth.ts)**: NextAuth and Keycloak configuration.
+- **[auth.ts](./src/auth.ts)**: NextAuth and Keycloak configuration, token rotation handling.
 - **[middleware.ts](./src/middleware.ts)** and **[role-routing.ts](./src/lib/auth/role-routing.ts)**: Route interception mechanisms and role-based redirection.
 - **[auth-session-hydrator.tsx](./src/components/auth/auth-session-hydrator.tsx)**: How to sync Server Session into Client State (Zustand).
 
 ### Step 2: API Client & Core Utilities
 
-Learn how APIs are called from the client to the backend.
+_Understand how client requests are signed with token and tenant headers._
 
 - **[authenticated-client.ts](./src/lib/api/authenticated-client.ts)**: How tokens and tenant IDs are automatically attached to headers.
 
 ### Step 3: Basic Features Comprehension (SaaS & Tenant)
 
-Understand how to build a complete CRUD module using React Query.
+_Understand how to write a standard CRUD module using React Query._
 
 - **[features/saas/README.md](./src/features/saas/README.md)**: Monorepo layering rules regarding status badges and display text.
 - **[features/saas/api.ts](./src/features/saas/api.ts)**: Inspect API service structuring integrated with pagination (`normalizePaginated`).
 
 ### Step 4: Real-time Kitchen (KDS) & Point of Sale (POS)
 
-Explore more complex interactive features combining Socket.io.
+_Explore complex features combining React Query cache invalidation with Socket.io._
 
 - **[features/kds/hooks/use-kds-realtime.ts](./src/features/kds/hooks/use-kds-realtime.ts)**: How to listen to kitchen queue events and invalidate cache.
 - **`features/pos/`**: Grasp the flow of counter ordering, table status updates, and invoice processing.
 
 ### Step 5: Understanding App Layouts & Pages
 
-After mastering the business logic and states above, see how the UI is assembled in Next.js pages:
+_See how Next.js App Router hooks Server and Client components together to render the UI._
 
+- Global layouts and context shell: [layout.tsx](./src/app/layout.tsx) and [providers.tsx](./src/app/providers.tsx).
 - System admin pages: `src/app/(admin)/admin/tenants/page.tsx`
 - Restaurant management dashboard: `src/app/(dashboard)/dashboard/menu/page.tsx`
 - Kitchen KDS screen: `src/app/(kds)/kds/kitchen/page.tsx`
@@ -295,3 +383,4 @@ When developing new features or refactoring the code in `management-app`, always
     - Create React Query custom hooks placed in the `features/{feature}/hooks/` directory instead of writing inline `useQuery` inside the Page/Component file.
     - Avoid excessively large components (> 300 lines); decompose them into localized subcomponents.
 4.  **Always attach `x-tenant-id`**: For tenant-scoped APIs, ensure the client utilizes the correct `authApiClient` wrapper to prevent cross-tenant data leakage (Tenant Isolation).
+5.  **VND Rounding Rule**: Every payment amount must go through the `roundVnd` formatting helper from `@qrtable/utils`.
