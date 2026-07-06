@@ -1,96 +1,96 @@
 # QRTable Management Application (management-app)
 
-> Tài liệu này cung cấp hướng dẫn chi tiết về cấu trúc mã nguồn, kiến trúc hệ thống, cơ chế quản lý state, bảo mật, và đưa ra lộ trình đọc hiểu source code một cách tối ưu cho lập trình viên.
+> This document provides a detailed guide on the source code structure, system architecture, state management mechanisms, security, and outlines an optimal roadmap for developers to understand the source code.
 
 ---
 
-## 1. Tổng quan Kiến trúc
+## 1. Architectural Overview
 
-Ứng dụng **Management App** được xây dựng trên nền tảng **Next.js App Router (v15)**, đóng vai trò là bảng điều khiển và hệ thống vận hành dành cho 3 nhóm đối tượng:
+The **Management App** is built on **Next.js App Router (v15)**, serving as the dashboard and operations system for three user groups:
 
-1.  **Super Admin (SaaS Admin)**: Quản lý các nhà hàng (Tenants), các gói dịch vụ (Subscriptions), thanh toán & doanh thu toàn hệ thống.
-2.  **Restaurant Owner / Manager**: Quản lý thực đơn, sơ đồ bàn ăn, nhân sự, cấu hình thanh toán VietQR tại từng nhà hàng.
-3.  **Staff (Waiter, Chef, Barista)**: Thực hiện bán hàng (POS), xem yêu cầu hỗ trợ từ bàn ăn, và chuẩn bị món ăn tại bếp/quầy nước (KDS).
+1.  **Super Admin (SaaS Admin)**: Manages restaurants (Tenants), subscription plans (Subscriptions), payments, and system-wide revenue.
+2.  **Restaurant Owner / Manager**: Manages menus, table layouts, staff, and VietQR payment configurations for individual restaurants.
+3.  **Staff (Waiter, Chef, Barista)**: Handles point-of-sale (POS) operations, views table support requests, and prepares items at the kitchen/bar (KDS).
 
-### Bản đồ cấu trúc thư mục chính (`src/`)
+### Main Directory Structure (`src/`)
 
 ```text
 apps/management-app/src/
 ├── app/                        # Next.js App Router
-│   ├── (admin)/                # Route Group dành cho Super Admin (/admin)
-│   ├── (auth)/                 # Đăng nhập Keycloak (/login)
-│   ├── (dashboard)/            # Dashboard quản lý nhà hàng (/dashboard)
-│   ├── (kds)/                  # Màn hình bếp/bar dành cho Chef/Barista (/kds)
-│   ├── (pos)/                  # Điểm bán hàng tại quầy dành cho Waiter (/pos)
-│   ├── api/                    # Cục bộ API Routes (Auth callbacks, Session sync proxy)
+│   ├── (admin)/                # Route Group for Super Admin (/admin)
+│   ├── (auth)/                 # Keycloak Login (/login)
+│   ├── (dashboard)/            # Restaurant Management Dashboard (/dashboard)
+│   ├── (kds)/                  # Kitchen/Bar Display Screen for Chefs/Baristas (/kds)
+│   ├── (pos)/                  # Counter Point of Sale for Waiters (/pos)
+│   ├── api/                    # Local API Routes (Auth callbacks, Session sync proxy)
 │   ├── layout.tsx              # Root Layout
-│   └── providers.tsx           # Bọc các global providers (React Query, NextAuth, Theme)
-├── auth.ts                     # Cấu hình NextAuth v5 tích hợp Keycloak (OIDC/OAuth)
-├── middleware.ts               # Next.js Middleware kiểm soát bảo vệ route & phân quyền (RBAC)
+│   └── providers.tsx           # Wrappers for global providers (React Query, NextAuth, Theme)
+├── auth.ts                     # NextAuth v5 configuration integrated with Keycloak (OIDC/OAuth)
+├── middleware.ts               # Next.js Middleware to control route protection & role-based access control (RBAC)
 ├── constants/
-│   ├── api.ts                  # Đầu mút API BFF và cài đặt cache
-│   └── routes.ts               # Hằng số định nghĩa toàn bộ đường dẫn của ứng dụng
+│   ├── api.ts                  # BFF API endpoints and cache configuration
+│   └── routes.ts               # Constants defining all application routes
 ├── lib/
 │   ├── api/
-│   │   └── authenticated-client.ts # API Client tự động inject Keycloak Bearer Token & Tenant Headers
+│   │   └── authenticated-client.ts # API Client that automatically injects Keycloak Bearer Token & Tenant Headers
 │   ├── auth/
-│   │   ├── auth-store.ts       # Zustand Store lưu trữ client-side profile và token
-│   │   ├── bff-server.ts       # API gọi trực tiếp từ server-side Next.js lên BFF
-│   │   └── role-routing.ts     # Ánh xạ vai trò (AppRole) với quyền truy cập trang
-│   └── utils.ts                # Các hàm tiện ích dùng chung
-├── features/                   # Mô-đun hóa các tính năng nghiệp vụ độc lập
-│   ├── saas/                   # Quản lý Đăng ký gói (Subscription), Tenants, Plans
-│   ├── kds/                    # Real-time Kitchen Display System (Bếp hiển thị)
-│   ├── pos/                    # Điểm bán hàng, giỏ hàng POS
-│   ├── order/                  # Quản lý danh sách, chi tiết đơn hàng
-│   ├── tenant/                 # Cấu hình thông tin nhà hàng, tài khoản ngân hàng SePay
-│   ├── tables/                 # Sơ đồ khu vực (Areas) & bàn ăn (Tables) + QR Generator
-│   └── staff/                  # Quản lý nhân viên & tài khoản phân quyền
-└── components/                 # Các UI component dùng chung toàn ứng dụng (Shadcn-based)
+│   │   ├── auth-store.ts       # Zustand Store for client-side profiles and tokens
+│   │   ├── bff-server.ts       # Direct API calls from Next.js server-side to the BFF
+│   │   └── role-routing.ts     # Mapping application roles (AppRole) to page access permissions
+│   └── utils.ts                # Shared utility functions
+├── features/                   # Modular independent business features
+│   ├── saas/                   # Subscription, Tenant, and Plan Management
+│   ├── kds/                    # Real-time Kitchen Display System
+│   ├── pos/                    # Point of Sale (POS) operations and cart
+│   ├── order/                  # Order list and details management
+│   ├── tenant/                 # Restaurant profile configurations, SePay bank accounts
+│   ├── tables/                 # Areas & tables layouts + QR Generator
+│   └── staff/                  # Staff management & permission accounts
+└── components/                 # Shared UI components across the application (Shadcn-based)
 ```
 
 ---
 
-## 2. Quản lý Authentication & State Synchronization
+## 2. Authentication & State Synchronization Management
 
-Một trong những thiết kế quan trọng nhất của `management-app` là cách đồng bộ thông tin đăng nhập từ **Server-side (NextAuth)** xuống **Client-side (Zustand)** để tối ưu hoá hiệu năng và bảo vệ API:
+One of the most critical designs in `management-app` is the synchronization of login credentials from the **Server-side (NextAuth)** to the **Client-side (Zustand)** to optimize performance and secure the APIs:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Người dùng
+    actor User as User
     participant NextAuth as NextAuth.js (Server)
     participant Hydrator as AuthSessionHydrator (Client)
     participant APIProxy as NextJS API Route (/api/internal/me)
     participant BFF as Backend Gateway (BFF)
     participant Zustand as Zustand Store (useAuthStore)
 
-    User->>NextAuth: Đăng nhập thành công qua Keycloak
-    NextAuth-->>User: Thiết lập Session Cookie chứa JWT
+    User->>NextAuth: Log in successfully via Keycloak
+    NextAuth-->>User: Set Session Cookie containing JWT
     Note over User, NextAuth: Render Client App & mounted Providers
-    Hydrator->>NextAuth: Lấy accessToken từ Client Session Hook
-    Hydrator->>APIProxy: GET /api/internal/me (Mang theo Cookie)
+    Hydrator->>NextAuth: Get accessToken from Client Session Hook
+    Hydrator->>APIProxy: GET /api/internal/me (With Cookie)
     APIProxy->>BFF: GET /customer/authorizer/me (Bearer Token)
-    BFF-->>APIProxy: Trả về chi tiết User Profile & Permissions
-    APIProxy-->>Hydrator: Trả về Profile JSON
+    BFF-->>APIProxy: Return User Profile & Permissions details
+    APIProxy-->>Hydrator: Return Profile JSON
     Hydrator->>Zustand: setAccessToken(token) & setProfile(profile)
-    Note over Zustand: Trạng thái Hydrated = true. Sẵn sàng gọi API.
+    Note over Zustand: Hydrated state = true. Ready to call APIs.
 ```
 
-### Các file cấu trúc chính trong luồng này:
+### Key files involved in this flow:
 
 1.  **[auth.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/auth.ts)**:
-    - Tích hợp Keycloak Provider.
-    - Đăng ký callback `jwt()` để giải mã các trường `realm_access.roles` và gọi BFF fetch profile.
-    - Hỗ trợ tự động làm mới token (`refreshAccessToken`) ở background khi token sắp hết hạn bằng offline access/refresh token.
+    - Integrates the Keycloak Provider.
+    - Registers the `jwt()` callback to decode the `realm_access.roles` field and calls the BFF to fetch the profile.
+    - Supports automatic token refreshing (`refreshAccessToken`) in the background via offline access/refresh token when it is close to expiring.
 2.  **[auth-session-hydrator.tsx](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/components/auth/auth-session-hydrator.tsx)**:
-    - Lắng nghe thay đổi trạng thái đăng nhập từ NextAuth `useSession()`.
-    - Nếu phát hiện token hết hạn và không thể tự làm mới (`RefreshAccessTokenError`), tự động điều hướng người dùng đăng nhập lại qua SSO.
-    - Gọi API route trung gian `/api/internal/me` trên Next.js Server để lấy profile đầy đủ và đồng bộ dữ liệu vào `useAuthStore`.
+    - Listens to login state changes from NextAuth `useSession()`.
+    - If a token is expired and cannot be refreshed (`RefreshAccessTokenError`), automatically redirects the user to log in again via SSO.
+    - Calls the intermediate API route `/api/internal/me` on the Next.js Server to retrieve the full profile and synchronizes the data into `useAuthStore`.
 3.  **[auth-store.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/lib/auth/auth-store.ts)**:
-    - Store Zustand gọn nhẹ lưu trạng thái `profile`, `accessToken` và trạng thái sẵn sàng của client (`hydrated`).
+    - A lightweight Zustand store that holds the `profile`, `accessToken`, and client readiness state (`hydrated`).
 4.  **[authenticated-client.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/lib/api/authenticated-client.ts)**:
-    - API Client wrapper `authApiClient`. Nó tự động kéo token và `tenantId` từ Zustand Store để gắn vào tiêu đề:
+    - The API Client wrapper `authApiClient`. It automatically pulls the token and `tenantId` from the Zustand Store to attach to headers:
       ```typescript
       headers['Authorization'] = `Bearer ${accessToken}`;
       headers['x-tenant-id'] = tenantId;
@@ -98,101 +98,101 @@ sequenceDiagram
 
 ---
 
-## 3. Phân Quyền Người Dùng (Role-Based Access Control - RBAC)
+## 3. Role-Based Access Control (RBAC)
 
-Hệ thống phân quyền được thực thi chặt chẽ ở cả **mức định tuyến (Routing)** và **mức API**:
+The permission system is strictly enforced at both the **Routing level** and the **API level**:
 
-### Phân tuyến qua Next.js Middleware
+### Routing via Next.js Middleware
 
-File **[middleware.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/middleware.ts)** chạy trước mọi request để kiểm tra quyền truy cập:
+The **[middleware.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/middleware.ts)** file runs before every request to verify access permissions:
 
-- **Trang công cộng (`/`)**: Nếu người dùng đã đăng nhập, tự động chuyển hướng họ vào trang chủ tương ứng với vai trò của họ thông qua hàm `getRoleHomeRoute(roles)`.
-- **Route bảo vệ (`/dashboard`, `/pos`, `/kds`, `/admin`)**:
-  - Nếu chưa đăng nhập: Chuyển hướng tới `/login`, lưu lại link cũ vào tham số query `?next=...` để redirect lại sau.
-  - Nếu đã đăng nhập: Gọi hàm `hasAccessToPath(pathname, roles)` từ **[role-routing.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/lib/auth/role-routing.ts)** để kiểm tra. Nếu không có quyền, tự động điều hướng về Home Route hợp lệ gần nhất.
+- **Public page (`/`)**: If the user is already logged in, they are automatically redirected to their respective home page corresponding to their role via the `getRoleHomeRoute(roles)` function.
+- **Protected routes (`/dashboard`, `/pos`, `/kds`, `/admin`)**:
+  - If not logged in: Redirects to `/login`, saving the original path in the `?next=...` query parameter to redirect back after login.
+  - If logged in: Calls the `hasAccessToPath(pathname, roles)` function from **[role-routing.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/lib/auth/role-routing.ts)** to verify access. If unauthorized, automatically redirects the user to the closest valid Home Route.
 
-### Bảng cấu hình vai trò & Quyền hạn truy cập:
+### Role Configuration & Access Permissions Mapping:
 
-- `SUPER_ADMIN` $\rightarrow$ `/admin` (Quản lý toàn bộ SaaS POS).
-- `OWNER` / `MANAGER` $\rightarrow$ `/dashboard` (Quản lý Menu, nhân viên, doanh thu, sơ đồ bàn của nhà hàng).
-- `WAITER` $\rightarrow$ `/pos` (Tạo đơn hàng nhanh tại bàn, ghi nhận yêu cầu hỗ trợ).
-- `CHEF` $\rightarrow$ `/kds/kitchen` (Xem danh sách món ăn cần chế biến của bếp).
-- `BARISTA` $\rightarrow$ `/kds/bar` (Xem danh sách đồ uống cần pha chế của quầy bar).
+- `SUPER_ADMIN` $\rightarrow$ `/admin` (Manages the entire SaaS POS platform).
+- `OWNER` / `MANAGER` $\rightarrow$ `/dashboard` (Manages menus, staff, revenues, and table layouts of the restaurant).
+- `WAITER` $\rightarrow$ `/pos` (Creates quick table orders, records support requests).
+- `CHEF` $\rightarrow$ `/kds/kitchen` (Views the kitchen's list of food items to prepare).
+- `BARISTA` $\rightarrow$ `/kds/bar` (Views the bar's list of beverages to prepare).
 
 ---
 
-## 4. Quản lý State & Cơ chế Real-time Cache Invalidation
+## 4. State Management & Real-time Cache Invalidation
 
-Giống như Customer PWA, Next.js Management App sử dụng cơ chế **WebSocket Invalidation Hints** để kết hợp giữa ưu điểm của REST API (dễ quản lý, bảo mật, cache tốt) với WebSockets (thời gian thực):
+Similar to the Customer PWA, the Next.js Management App uses the **WebSocket Invalidation Hints** mechanism to combine the benefits of REST APIs (easy to manage, secure, cacheable) with WebSockets (real-time):
 
-1.  **REST Fetching**: Giao diện hiển thị sử dụng React Query (`useQuery`) để gọi dữ liệu từ BFF.
-2.  **WebSocket Listener**: Khi có thay đổi xảy ra trên hệ thống (ví dụ: khách đặt món mới, khách xin thanh toán, món ăn nấu xong), BFF bắn event thời gian thực thông qua Socket.io.
-3.  **Invalidate Cache**: Các custom hook realtime lắng nghe sự kiện và chỉ thực hiện xoá cache của React Query (`queryClient.invalidateQueries`).
-4.  **Auto Re-fetch**: React Query phát hiện cache bị xoá sẽ tự động gọi lại API REST ở background để tải dữ liệu mới và cập nhật UI.
+1.  **REST Fetching**: The UI uses React Query (`useQuery`) to fetch data from the BFF.
+2.  **WebSocket Listener**: When changes occur in the system (e.g., guest places a new order, guest requests payment, food preparation is completed), the BFF emits a real-time event via Socket.io.
+3.  **Invalidate Cache**: Custom real-time hooks listen to events and simply invalidate React Query cache (`queryClient.invalidateQueries`).
+4.  **Auto Re-fetch**: React Query detects that the cache is invalidated and automatically triggers background REST API calls to fetch fresh data and update the UI.
 
-### Ví dụ tiêu biểu: KDS Realtime Queue
+### Typical Example: KDS Real-time Queue
 
-Màn hình nhà bếp lắng nghe sự kiện qua hook **[use-kds-realtime.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/kds/hooks/use-kds-realtime.ts)**:
+The kitchen display screen listens to events via the **[use-kds-realtime.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/kds/hooks/use-kds-realtime.ts)** hook:
 
-- Nhân viên bếp đăng nhập, chọn station (ví dụ: Bếp hoặc Quầy bar).
-- Hook sẽ kết nối socket với JWT auth token, và gửi tín hiệu tham gia phòng bếp/bar tương ứng:
+- Kitchen staff logs in and selects a station (e.g., Kitchen or Bar).
+- The hook connects to the socket using the JWT auth token and sends a signal to subscribe to the respective kitchen/bar room:
   ```typescript
   socket.emit('subscribe.kds', { station });
   ```
-- Lắng nghe các sự kiện `events.kdsQueueChanged`, `events.kitchenItemReady`, `events.kitchenSlaWarning` và dọn cache React Query tương ứng với station đó để cập nhật hàng đợi món ăn.
+- Listens to events like `events.kdsQueueChanged`, `events.kitchenItemReady`, and `events.kitchenSlaWarning`, then invalidates the React Query cache corresponding to that station to refresh the food queue.
 
 ---
 
-## 5. Chiến lược & Thứ tự Đọc mã nguồn (Roadmap)
+## 5. Source Code Navigation Roadmap
 
-Để nhanh chóng nắm bắt và làm chủ codebase của ứng dụng quản lý, bạn nên tiếp cận theo trình tự 5 bước dưới đây:
+To quickly grasp and master the codebase of the management application, you should approach it in the following 5-step order:
 
-### Bước 1: Luồng Authentication & Đăng nhập
+### Step 1: Authentication & Login Flow
 
-Tìm hiểu cách hệ thống xác thực người dùng và phân quyền.
+Learn how the system authenticates users and manages permissions.
 
-- **[auth.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/auth.ts)**: Cấu hình NextAuth và Keycloak.
-- **[middleware.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/middleware.ts)** và **[role-routing.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/lib/auth/role-routing.ts)**: Cơ chế chặn route và điều hướng theo phân quyền.
-- **[auth-session-hydrator.tsx](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/components/auth/auth-session-hydrator.tsx)**: Cách đồng bộ Session thành Client State (Zustand).
+- **[auth.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/auth.ts)**: NextAuth and Keycloak configuration.
+- **[middleware.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/middleware.ts)** and **[role-routing.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/lib/auth/role-routing.ts)**: Route interception mechanisms and role-based redirection.
+- **[auth-session-hydrator.tsx](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/components/auth/auth-session-hydrator.tsx)**: How to sync Server Session into Client State (Zustand).
 
-### Bước 2: API Client & Các Tiện ích Core
+### Step 2: API Client & Core Utilities
 
-Tìm hiểu cách gọi API từ client lên backend.
+Learn how APIs are called from the client to the backend.
 
-- **[authenticated-client.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/lib/api/authenticated-client.ts)**: Cách token và tenant ID tự động đính kèm vào headers.
+- **[authenticated-client.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/lib/api/authenticated-client.ts)**: How tokens and tenant IDs are automatically attached to headers.
 
-### Bước 3: Đọc hiểu Feature cơ bản (SaaS & Tenant)
+### Step 3: Basic Features Comprehension (SaaS & Tenant)
 
-Tìm hiểu cách viết một module CRUD hoàn chỉnh bằng React Query.
+Understand how to build a complete CRUD module using React Query.
 
-- **[features/saas/README.md](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/saas/README.md)**: Quy tắc phân lớp monorepo đối với các badge trạng thái và text hiển thị.
-- **[features/saas/api.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/saas/api.ts)**: Xem cách tổ chức API service tích hợp phân trang (`normalizePaginated`).
+- **[features/saas/README.md](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/saas/README.md)**: Monorepo layering rules regarding status badges and display text.
+- **[features/saas/api.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/saas/api.ts)**: Inspect API service structuring integrated with pagination (`normalizePaginated`).
 
-### Bước 4: Màn hình Real-time Bếp (KDS) & Bán hàng (POS)
+### Step 4: Real-time Kitchen (KDS) & Point of Sale (POS)
 
-Tìm hiểu các tính năng tương tác phức tạp hơn có sự kết hợp của Socket.io.
+Explore more complex interactive features combining Socket.io.
 
-- **[features/kds/hooks/use-kds-realtime.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/kds/hooks/use-kds-realtime.ts)**: Cách lắng nghe sự kiện hàng đợi bếp và invalidate cache.
-- **`features/pos/`**: Đọc hiểu luồng tạo order trực tiếp tại quầy, cập nhật bàn ăn và xử lý hóa đơn.
+- **[features/kds/hooks/use-kds-realtime.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/kds/hooks/use-kds-realtime.ts)**: How to listen to kitchen queue events and invalidate cache.
+- **`features/pos/`**: Grasp the flow of counter ordering, table status updates, and invoice processing.
 
-### Bước 5: Tìm hiểu App Layouts & Pages
+### Step 5: Understanding App Layouts & Pages
 
-Sau khi nắm chắc logic nghiệp vụ và state ở trên, bắt đầu xem cách lắp ráp UI vào trang Next.js:
+After mastering the business logic and states above, see how the UI is assembled in Next.js pages:
 
-- Màn hình admin hệ thống: `src/app/(admin)/admin/tenants/page.tsx`
-- Màn hình quản lý nhà hàng: `src/app/(dashboard)/dashboard/menu/page.tsx`
-- Màn hình KDS: `src/app/(kds)/kds/kitchen/page.tsx`
-- Màn hình POS: `src/app/(pos)/pos/tables/page.tsx`
+- System admin pages: `src/app/(admin)/admin/tenants/page.tsx`
+- Restaurant management dashboard: `src/app/(dashboard)/dashboard/menu/page.tsx`
+- Kitchen KDS screen: `src/app/(kds)/kds/kitchen/page.tsx`
+- POS screen: `src/app/(pos)/pos/tables/page.tsx`
 
 ---
 
-## 6. Tiêu chuẩn viết code (Development Guidelines)
+## 6. Development Guidelines
 
-Khi phát triển thêm tính năng hoặc refactor mã nguồn trong `management-app`, luôn tuân thủ các quy tắc sau:
+When developing new features or refactoring the code in `management-app`, always comply with the following rules:
 
-1.  **Không gọi `process.env` trực tiếp trong business component**: Luôn lấy biến môi trường từ cấu hình chung hoặc các server-side files an toàn.
-2.  **Không hardcode nhãn hiển thị trực tiếp**: Dùng các helper map ngôn ngữ (ví dụ: `billingPeriodVi`, `subscriptionStatusVi` từ `@einvoice/shared-constants`) để giữ tính nhất quán đa ngôn ngữ Việt - Anh.
-3.  **Tách biệt UI và Data Fetching**:
-    - Tạo các custom hook React Query đặt trong thư mục `features/{feature}/hooks/` thay vì viết `useQuery` inline trực tiếp trong file Page/Component.
-    - Tránh các component quá lớn (> 300 dòng), hãy phân rã thành các component con cục bộ.
-4.  **Luôn đính kèm `x-tenant-id`**: Với các API thuộc phạm vi tenant, luôn chắc chắn client sử dụng đúng hàm `authApiClient` để tránh rò rỉ dữ liệu chéo giữa các nhà hàng (Tenant Isolation).
+1.  **Do not call `process.env` directly in business components**: Always retrieve environment variables from the shared configuration or secure server-side files.
+2.  **Do not hardcode display labels directly**: Use language mapping helpers (e.g., `billingPeriodVi`, `subscriptionStatusVi` from `@einvoice/shared-constants`) to maintain bilingual Vietnamese-English consistency.
+3.  **Separate UI and Data Fetching**:
+    - Create React Query custom hooks placed in the `features/{feature}/hooks/` directory instead of writing inline `useQuery` inside the Page/Component file.
+    - Avoid excessively large components (> 300 lines); decompose them into localized subcomponents.
+4.  **Always attach `x-tenant-id`**: For tenant-scoped APIs, ensure the client utilizes the correct `authApiClient` wrapper to prevent cross-tenant data leakage (Tenant Isolation).
