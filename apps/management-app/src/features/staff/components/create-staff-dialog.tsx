@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -100,10 +101,10 @@ export function CreateStaffDialog({ currentRoles }: CreateStaffDialogProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Thêm nhân viên</DialogTitle>
+          <DialogDescription>
+            Hệ thống không gửi email trong luồng hiện tại. Hãy chuyển mật khẩu ban đầu cho nhân viên qua kênh nội bộ.
+          </DialogDescription>
         </DialogHeader>
-        <p className="text-muted-foreground text-sm">
-          Hệ thống không gửi email trong luồng hiện tại. Hãy chuyển mật khẩu ban đầu cho nhân viên qua kênh nội bộ.
-        </p>
         <div className="grid gap-3 py-2">
           <div className="grid gap-1.5">
             <Label htmlFor="staff-create-email">Email</Label>

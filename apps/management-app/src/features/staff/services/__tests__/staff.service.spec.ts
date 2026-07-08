@@ -4,16 +4,16 @@ jest.mock('@/lib/api/authenticated-client', () => ({
   authApiClient: (...args: unknown[]) => mockAuthApiClient(...args),
 }));
 
-import { staffApi } from '../api';
+import { staffService } from '../staff.service';
 
-describe('staffApi', () => {
+describe('staffService', () => {
   beforeEach(() => {
     mockAuthApiClient.mockReset();
     mockAuthApiClient.mockResolvedValue({});
   });
 
   it('list serializes search, role, status, page, and limit', async () => {
-    await staffApi.list({
+    await staffService.list({
       search: 'nguyen',
       roleName: 'WAITER',
       status: 'ACTIVE',
@@ -27,7 +27,7 @@ describe('staffApi', () => {
   });
 
   it('list omits query string when filters are empty', async () => {
-    await staffApi.list({});
+    await staffService.list({});
     expect(mockAuthApiClient).toHaveBeenCalledWith('/dashboard/staff');
   });
 
@@ -41,7 +41,7 @@ describe('staffApi', () => {
       requirePasswordUpdate: true,
     };
 
-    await staffApi.create(payload);
+    await staffService.create(payload);
 
     expect(mockAuthApiClient).toHaveBeenCalledWith('/dashboard/staff', {
       method: 'POST',
@@ -50,7 +50,7 @@ describe('staffApi', () => {
   });
 
   it('changeRole sends PATCH /dashboard/staff/:userId/role', async () => {
-    await staffApi.changeRole('staff-1', 'CHEF');
+    await staffService.changeRole('staff-1', 'CHEF');
 
     expect(mockAuthApiClient).toHaveBeenCalledWith('/dashboard/staff/staff-1/role', {
       method: 'PATCH',
@@ -59,7 +59,7 @@ describe('staffApi', () => {
   });
 
   it('disable sends POST /dashboard/staff/:userId/disable', async () => {
-    await staffApi.disable('staff-1', 'left restaurant');
+    await staffService.disable('staff-1', 'left restaurant');
 
     expect(mockAuthApiClient).toHaveBeenCalledWith('/dashboard/staff/staff-1/disable', {
       method: 'POST',
@@ -68,7 +68,7 @@ describe('staffApi', () => {
   });
 
   it('enable sends POST /dashboard/staff/:userId/enable', async () => {
-    await staffApi.enable('staff-1', 're-enabled');
+    await staffService.enable('staff-1', 're-enabled');
 
     expect(mockAuthApiClient).toHaveBeenCalledWith('/dashboard/staff/staff-1/enable', {
       method: 'POST',
