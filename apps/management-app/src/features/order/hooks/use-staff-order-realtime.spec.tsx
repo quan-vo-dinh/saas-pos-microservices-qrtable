@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
-import { paymentQueryKeys } from '@/features/payment/hooks/use-payment';
-import { tableKeys } from '@/features/tables/hooks/use-tables-query';
-import { serviceRequestKeys } from '@/features/service-requests/hooks/use-service-request-query';
-import { billKeys } from './use-bill-query';
-import { orderKeys } from './use-order-query';
+import { billKeys } from '@/features/order/bill-keys';
+import { orderKeys } from '@/features/order/order-keys';
+import { paymentKeys } from '@/features/payment/payment-keys';
+import { serviceRequestKeys } from '@/features/service-requests/service-request-keys';
+import { tableKeys } from '@/features/tables/table-keys';
 import { useStaffOrderRealtime } from './use-staff-order-realtime';
 
 const ioMock = jest.fn();
@@ -147,7 +147,7 @@ describe('useStaffOrderRealtime', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: orderKeys.details() });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: billKeys.lists() });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: tableKeys.all });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: paymentQueryKeys.history('bill-1') });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: paymentKeys.history('bill-1') });
   });
 
   it('invalidates service-request lists for matching service request events only', () => {

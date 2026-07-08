@@ -5,7 +5,8 @@ import { getErrorDisplayMessage, successMessage } from '@einvoice/frontend-utils
 import { OrderStatus } from '@einvoice/types';
 import { toast } from 'sonner';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
-import { tableKeys } from '@/features/tables/hooks/use-tables-query';
+import { tableKeys } from '@/features/tables/table-keys';
+import { orderKeys } from '../order-keys';
 import {
   orderService,
   type OrderListParams,
@@ -15,14 +16,6 @@ import {
 
 const ORDER_LIST_REALTIME_FALLBACK_POLL_MS = 15_000;
 const ORDER_DETAIL_POLL_MS = 4_000;
-
-export const orderKeys = {
-  all: ['admin-orders'] as const,
-  lists: () => [...orderKeys.all, 'list'] as const,
-  list: (params?: OrderListParams) => [...orderKeys.lists(), params ?? {}] as const,
-  details: () => [...orderKeys.all, 'detail'] as const,
-  detail: (id: string) => [...orderKeys.all, 'detail', id] as const,
-};
 
 type CancelOrderInput = {
   orderId: string;

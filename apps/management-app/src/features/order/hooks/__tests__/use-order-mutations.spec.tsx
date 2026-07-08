@@ -35,8 +35,8 @@ jest.mock('../../services/order.service', () => ({
   },
 }));
 
+import { orderKeys } from '../../order-keys';
 import {
-  orderKeys,
   useCancelOrderMutation,
   useConfirmOrderMutation,
   useMarkOrderServedMutation,

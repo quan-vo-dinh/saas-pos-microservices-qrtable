@@ -15,11 +15,11 @@ import type {
 } from '@einvoice/types';
 import { API_CONFIG } from '@/constants/api';
 import { useAuthStore } from '@/lib/auth/auth-store';
-import { tableKeys } from '@/features/tables/hooks/use-tables-query';
-import { serviceRequestKeys } from '@/features/service-requests/hooks/use-service-request-query';
-import { paymentQueryKeys } from '@/features/payment/hooks/use-payment';
-import { billKeys } from '@/features/order/hooks/use-bill-query';
-import { orderKeys } from './use-order-query';
+import { billKeys } from '@/features/order/bill-keys';
+import { orderKeys } from '@/features/order/order-keys';
+import { paymentKeys } from '@/features/payment/payment-keys';
+import { serviceRequestKeys } from '@/features/service-requests/service-request-keys';
+import { tableKeys } from '@/features/tables/table-keys';
 
 export type StaffRealtimeStatus = 'idle' | 'connected' | 'reconnecting' | 'degraded' | 'auth-error';
 
@@ -71,7 +71,7 @@ export function useStaffOrderRealtime(): StaffRealtimeStatus {
     const invalidatePaymentState = (billId?: string): void => {
       void queryClient.invalidateQueries({ queryKey: billKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: tableKeys.all });
-      void queryClient.invalidateQueries({ queryKey: paymentQueryKeys.history(billId) });
+      void queryClient.invalidateQueries({ queryKey: paymentKeys.history(billId) });
     };
 
     const onConnect = (): void => {
