@@ -6,7 +6,7 @@
 
 ## 1. Architectural Overview
 
-The **Management App** is built on **Next.js App Router (v15)** and **React 19**, serving as the dashboard and operations system for three user groups:
+The **Management App** is built on **Next.js App Router (v16.1.7)** and **React 19**, serving as the dashboard and operations system for three user groups:
 
 1.  **Super Admin (SaaS Admin)**: Manages restaurants (Tenants), subscription plans (Subscriptions), payments, and system-wide revenue.
 2.  **Restaurant Owner / Manager**: Manages menus, table layouts, staff, and VietQR payment configurations for individual restaurants.
@@ -26,7 +26,7 @@ apps/management-app/src/
 │   ├── layout.tsx              # Root Layout
 │   └── providers.tsx           # Wrappers for global providers (React Query, NextAuth, Theme)
 ├── auth.ts                     # NextAuth v5 configuration integrated with Keycloak (OIDC/OAuth)
-├── middleware.ts               # Next.js Middleware to control route protection & role-based access control (RBAC)
+├── proxy.ts                    # Next.js Proxy to control route protection & role-based access control (RBAC)
 ├── constants/
 │   ├── api.ts                  # BFF API endpoints and cache configuration
 │   └── routes.ts               # Constants defining all application routes
@@ -72,13 +72,18 @@ apps/management-app/src/
   - `/kds/kitchen`: Real-time active food items queue for Chefs.
   - `/kds/bar`: Real-time active drinks queue for Baristas.
 - **`(pos)` (Cashier Desk):**
+  - `/pos`: Live order queue and order operations.
   - `/pos/tables`: Visual table status grid, order placement, checkout processing, and cash billing desk.
+  - `/pos/service-requests`: Guest call/payment/help requests from tables.
+  - `/pos/payment`: Payment operations shortcut.
+  - `/pos/bills`: Open and historical bill list.
 
 #### Modular Feature Folders (`src/features/`)
 
 To keep the codebase scalable, all business logic is separated into domains inside `features/`. Every directory uses the following conventions:
 
-- `features/{domain}/api.ts`: API services integrated with react-query.
+- `features/{domain}/services/{domain}.service.ts`: REST API service functions backed by `authApiClient`.
+- `features/{domain}/{domain}-keys.ts`: React Query key factories used by hooks, mutations, and realtime invalidation.
 - `features/{domain}/types.ts`: TypeScript interfaces representing the domain model.
 - `features/{domain}/components/`: Local components used only by this feature.
 - `features/{domain}/hooks/`: Custom state or query hooks (e.g., `use-kds-realtime.ts`).
@@ -89,7 +94,7 @@ To keep the codebase scalable, all business logic is separated into domains insi
 
 This application utilizes a modern frontend stack to deliver a premium, responsive user experience:
 
-- **Frontend Framework**: **Next.js 15 (App Router)** & **React 19**
+- **Frontend Framework**: **Next.js 16.1.7 (App Router)** & **React 19**
   - Leverages Server and Client Components to optimize SSR and client-side interactions.
   - Configured for `standalone` output and uses `Turbopack` for fast development cycles.
 - **Styling & UI**: **Tailwind CSS v4** & **Shadcn UI**
@@ -164,7 +169,7 @@ As this app is part of an **Nx Monorepo**, use the root package scripts or targe
 
 - **Nx Shell Application Template**:
   - Acts as the shell dashboard that imports and aggregates UI components and utilities from shared libraries (`libs/frontend/ui/`, `libs/shared/types/`, etc.).
-  - Contains the routing shell, NextAuth configurations, global middleware, and next configuration (`next.config.ts`).
+  - Contains the routing shell, NextAuth configurations, global proxy, and next configuration (`next.config.ts`).
 - **Modular Feature-Based Architecture (`src/features/`)**:
   Instead of scattering files by types, this app organizes business logic into modular feature folders:
   ```text
@@ -173,7 +178,9 @@ As this app is part of an **Nx Monorepo**, use the root package scripts or targe
   │   └── data-table.tsx
   ├── hooks/              # Custom React Query / WebSocket hooks
   │   └── use-saas-queries.ts
-  ├── api.ts              # API calls (REST services)
+  ├── services/           # API calls (REST services)
+  │   └── {feature-name}.service.ts
+  ├── {feature-name}-keys.ts # React Query key factory
   ├── types.ts            # Local type definitions
   └── utils.ts            # Local utility functions
   ```
@@ -259,7 +266,7 @@ sequenceDiagram
 
 ### Why is this synchronization design necessary?
 
-1.  **Server-Side Routing Protection**: As the user navigates, the Next.js Server intercepts page requests and reads the HttpOnly session cookie inside [middleware.ts](./src/middleware.ts) to authorize access. For maximum security against Cross-Site Scripting (XSS) attacks, Javascript code on the browser is forbidden from reading this cookie.
+1.  **Server-Side Routing Protection**: As the user navigates, the Next.js Server intercepts page requests and reads the HttpOnly session cookie inside [proxy.ts](./src/proxy.ts) to authorize access. For maximum security against Cross-Site Scripting (XSS) attacks, Javascript code on the browser is forbidden from reading this cookie.
 2.  **Client-Side API Requests**: When running interactive React components on the browser, Javascript needs to read the raw Keycloak Access Token to attach it as a Bearer header (`Authorization: Bearer <token>`) when calling the BFF backend.
 3.  **Synchronization Bridge**: [auth-session-hydrator.tsx](./src/components/auth/auth-session-hydrator.tsx) acts as the bridge. It extracts the token safely from NextAuth, calls the local Next.js proxy route `/api/internal/me` to get the employee's profile details, and saves them into the client-side Zustand store [auth-store.ts](./src/lib/auth/auth-store.ts). Once hydrated, the API client [authenticated-client.ts](./src/lib/api/authenticated-client.ts) reads from the store synchronously to sign outgoing API requests instantly.
 
@@ -288,9 +295,9 @@ sequenceDiagram
 
 The permission system is strictly enforced at both the **Routing level** and the **API level**:
 
-### Routing via Next.js Middleware
+### Routing via Next.js Proxy
 
-The **[middleware.ts](./src/middleware.ts)** file runs before every request to verify access permissions:
+The **[proxy.ts](./src/proxy.ts)** file runs before every matched page request to verify access permissions:
 
 - **Public page (`/`)**: If the user is already logged in, they are automatically redirected to their respective home page corresponding to their role via the `getRoleHomeRoute(roles)` function.
 - **Protected routes (`/dashboard`, `/pos`, `/kds`, `/admin`)**:
@@ -321,7 +328,7 @@ Similar to the Customer PWA, the Next.js Management App uses the **WebSocket Inv
 The kitchen display screen listens to events via the **[use-kds-realtime.ts](./src/features/kds/hooks/use-kds-realtime.ts)** hook:
 
 - Kitchen staff logs in and selects a station (e.g., Kitchen or Bar).
-- The hook connects to the socket using the JWT auth token and sends a signal to subscribe to the respective kitchen/bar room:
+- The hook connects to the socket using the JWT auth token. Rooms are assigned server-side from staff roles; when a screen explicitly enables station subscription, the hook also sends:
   ```typescript
   socket.emit('subscribe.kds', { station });
   ```
@@ -338,7 +345,7 @@ To quickly grasp and master the codebase of the management application, you shou
 _Understand how the system secures the application before exploring UI files._
 
 - **[auth.ts](./src/auth.ts)**: NextAuth and Keycloak configuration, token rotation handling.
-- **[middleware.ts](./src/middleware.ts)** and **[role-routing.ts](./src/lib/auth/role-routing.ts)**: Route interception mechanisms and role-based redirection.
+- **[proxy.ts](./src/proxy.ts)** and **[role-routing.ts](./src/lib/auth/role-routing.ts)**: Route interception mechanisms and role-based redirection.
 - **[auth-session-hydrator.tsx](./src/components/auth/auth-session-hydrator.tsx)**: How to sync Server Session into Client State (Zustand).
 
 ### Step 2: API Client & Core Utilities
@@ -352,7 +359,8 @@ _Understand how client requests are signed with token and tenant headers._
 _Understand how to write a standard CRUD module using React Query._
 
 - **[features/saas/README.md](./src/features/saas/README.md)**: Monorepo layering rules regarding status badges and display text.
-- **[features/saas/api.ts](./src/features/saas/api.ts)**: Inspect API service structuring integrated with pagination (`normalizePaginated`).
+- **[features/saas/services/saas.service.ts](./src/features/saas/services/saas.service.ts)**: Inspect API service structuring integrated with pagination (`normalizePaginated`).
+- **[features/saas/saas-keys.ts](./src/features/saas/saas-keys.ts)**: Inspect the canonical React Query key factory pattern used across features.
 
 ### Step 4: Real-time Kitchen (KDS) & Point of Sale (POS)
 
@@ -381,6 +389,8 @@ When developing new features or refactoring the code in `management-app`, always
 2.  **Do not hardcode display labels directly**: Use language mapping helpers (e.g., `billingPeriodVi`, `subscriptionStatusVi` from `@einvoice/shared-constants`) to maintain bilingual Vietnamese-English consistency.
 3.  **Separate UI and Data Fetching**:
     - Create React Query custom hooks placed in the `features/{feature}/hooks/` directory instead of writing inline `useQuery` inside the Page/Component file.
+    - Put REST calls in `features/{feature}/services/{feature}.service.ts`; do not add new feature-level `api.ts` files.
+    - Put cache keys in `features/{feature}/{feature}-keys.ts`; avoid inline `queryKey: [...]` arrays in components/pages.
     - Avoid excessively large components (> 300 lines); decompose them into localized subcomponents.
 4.  **Always attach `x-tenant-id`**: For tenant-scoped APIs, ensure the client utilizes the correct `authApiClient` wrapper to prevent cross-tenant data leakage (Tenant Isolation).
 5.  **VND Rounding Rule**: Every payment amount must go through the `roundVnd` formatting helper from `@qrtable/utils`.
