@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ROUTES } from '@/constants/routes';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import {
   TenantAuditTab,
   TenantBillingLinkTab,
@@ -27,8 +28,8 @@ export default function AdminTenantDetailPage() {
   const authReady = useAuthReadyForBff();
 
   const tenantQuery = useQuery({
-    queryKey: ['admin-tenant', id],
-    queryFn: () => saasApi.getTenant(id),
+    queryKey: saasKeys.tenant(id),
+    queryFn: () => saasService.getTenant(id),
     enabled: authReady && Boolean(id),
   });
 

@@ -34,9 +34,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ROUTES } from '@/constants/routes';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
 import { formatDateTime } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
+import { saasKeys } from '@/features/saas/saas-keys';
 import type { TenantListItem } from '@/features/saas/types';
 import { TenantStatusBadge } from '@/features/saas/components/badges';
 
@@ -68,16 +69,16 @@ export function TenantsTable({
   const statusMutation = useMutation({
     mutationFn: async ({ id, action, reason }: { id: string; action: 'SUSPEND' | 'ACTIVATE'; reason?: string }) => {
       if (action === 'SUSPEND') {
-        await saasApi.updateTenantStatus(id, { action: 'SUSPEND', reason });
+        await saasService.updateTenantStatus(id, { action: 'SUSPEND', reason });
       } else {
-        await saasApi.updateTenantStatus(id, { action: 'ACTIVATE' });
+        await saasService.updateTenantStatus(id, { action: 'ACTIVATE' });
       }
     },
     onSuccess: async () => {
       toast.success('Đã cập nhật trạng thái tenant');
       setSuspendTarget(null);
       setSuspendReason('');
-      await qc.invalidateQueries({ queryKey: ['admin-tenants'] });
+      await qc.invalidateQueries({ queryKey: saasKeys.tenants() });
     },
     onError: (e: unknown) => {
       const msg = e instanceof ApiError ? e.serverMessage : 'Cập nhật thất bại';

@@ -7,7 +7,8 @@ import { ApiError } from '@einvoice/frontend-utils';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import { SubscriptionStatusBadge } from '@/features/saas/components/badges';
 import { formatDateTime } from '@/features/saas/formatters';
 import type { BillingPeriod } from '@/features/saas/types';
@@ -28,14 +29,14 @@ export default function DashboardSubscriptionPage() {
   const authReady = useAuthReadyForBff();
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('MONTHLY');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [pendingInvoice, setPendingInvoice] = useState<Awaited<ReturnType<typeof saasApi.checkoutSubscription>> | null>(
+  const [pendingInvoice, setPendingInvoice] = useState<Awaited<ReturnType<typeof saasService.checkoutSubscription>> | null>(
     null,
   );
   const [busyCode, setBusyCode] = useState<string | null>(null);
 
   const sub = useQuery({
-    queryKey: ['dashboard-subscription'],
-    queryFn: () => saasApi.getDashboardSubscription(),
+    queryKey: saasKeys.dashboardSubscription(),
+    queryFn: () => saasService.getDashboardSubscription(),
     enabled: authReady,
   });
 
@@ -43,7 +44,7 @@ export default function DashboardSubscriptionPage() {
     async (planCode: string) => {
       setBusyCode(planCode);
       try {
-        const inv = await saasApi.checkoutSubscription({ planCode, billingPeriod });
+        const inv = await saasService.checkoutSubscription({ planCode, billingPeriod });
         setPendingInvoice(inv);
         setCheckoutOpen(true);
       } catch (e) {
@@ -132,7 +133,7 @@ export default function DashboardSubscriptionPage() {
         open={checkoutOpen}
         onOpenChange={setCheckoutOpen}
         invoice={pendingInvoice}
-        onPaid={() => void qc.invalidateQueries({ queryKey: ['dashboard-subscription'] })}
+        onPaid={() => void qc.invalidateQueries({ queryKey: saasKeys.dashboardSubscription() })}
       />
     </div>
   );

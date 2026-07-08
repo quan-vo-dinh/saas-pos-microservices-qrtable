@@ -9,7 +9,8 @@ import { OnboardTenantDialog } from '@/features/saas/admin-tenants/onboard-tenan
 import { TenantFilters } from '@/features/saas/admin-tenants/tenant-filters';
 import { TenantsTable } from '@/features/saas/admin-tenants/tenants-table';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 
 function AdminTenantsClient() {
@@ -32,9 +33,9 @@ function AdminTenantsClient() {
   );
 
   const tenantsQuery = useQuery({
-    queryKey: ['admin-tenants', query],
+    queryKey: saasKeys.tenantsList(query),
     queryFn: () =>
-      saasApi.listAdminTenants({
+      saasService.listAdminTenants({
         search: query.search,
         status: query.status || undefined,
         planCode: query.planCode,
@@ -46,8 +47,8 @@ function AdminTenantsClient() {
   });
 
   const plansQuery = useQuery({
-    queryKey: ['admin-plans', 'codes'],
-    queryFn: () => saasApi.listPlansAdmin(),
+    queryKey: saasKeys.planCodes(),
+    queryFn: () => saasService.listPlansAdmin(),
     enabled: authReady,
   });
 

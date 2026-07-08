@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
 import { toast } from 'sonner';
 import { ApiError } from '@einvoice/frontend-utils';
 
@@ -23,7 +23,7 @@ export function SepayConnectButton({
       className={className}
       onClick={async () => {
         try {
-          const { authorizeUrl } = await saasApi.getSepayAuthorizeUrl();
+          const { authorizeUrl } = await saasService.getSepayAuthorizeUrl();
           window.location.href = authorizeUrl;
         } catch (e) {
           toast.error(e instanceof ApiError ? e.serverMessage : 'Không lấy được URL SePay');

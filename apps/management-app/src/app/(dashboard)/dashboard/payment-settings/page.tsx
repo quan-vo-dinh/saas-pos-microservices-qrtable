@@ -6,7 +6,8 @@ import { PaymentSettingsSummary } from '@/features/saas/payment-settings/payment
 import { DisconnectSepayDialog } from '@/features/saas/payment-settings/disconnect-sepay-dialog';
 import { PaymentSettingsShell } from '@/features/saas/payment-settings/payment-settings-shell';
 import { PaymentPartnershipHero } from '@/features/saas/payment-settings/payment-partnership-hero';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
@@ -20,8 +21,8 @@ export default function DashboardPaymentSettingsPage() {
   const qc = useQueryClient();
 
   const q = useQuery({
-    queryKey: ['dashboard-payment-settings'],
-    queryFn: () => saasApi.getDashboardPaymentSettings(),
+    queryKey: saasKeys.dashboardPaymentSettings(),
+    queryFn: () => saasService.getDashboardPaymentSettings(),
     enabled: authReady,
   });
 
@@ -45,7 +46,9 @@ export default function DashboardPaymentSettingsPage() {
         {canUpdate && q.data?.connectionStatus === 'CONNECTED' ? (
           <>
             <SepayConnectButton label="Đổi / kết nối lại SePay" variant="outline" />
-            <DisconnectSepayDialog onDisconnected={() => void qc.invalidateQueries({ queryKey: ['dashboard-payment-settings'] })} />
+            <DisconnectSepayDialog
+              onDisconnected={() => void qc.invalidateQueries({ queryKey: saasKeys.dashboardPaymentSettings() })}
+            />
           </>
         ) : null}
         {!canUpdate ? (

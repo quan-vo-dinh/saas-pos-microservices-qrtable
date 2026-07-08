@@ -8,7 +8,8 @@ import { ApiError } from '@einvoice/frontend-utils';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/constants/routes';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import { billingPeriodVi } from '@einvoice/shared-constants';
 import { InvoiceStatusBadge } from '@/features/saas/components/badges';
 import { formatDateTime, formatVnd } from '@/features/saas/formatters';
@@ -21,16 +22,16 @@ export default function DashboardBillingInvoicePage() {
   const authReady = useAuthReadyForBff();
 
   const inv = useQuery({
-    queryKey: ['dashboard-invoice', id],
-    queryFn: () => saasApi.getDashboardInvoice(id),
+    queryKey: saasKeys.dashboardInvoice(id),
+    queryFn: () => saasService.getDashboardInvoice(id),
     enabled: authReady && Boolean(id),
   });
 
   const cancel = async () => {
     try {
-      await saasApi.cancelDashboardInvoice(id);
+      await saasService.cancelDashboardInvoice(id);
       toast.success('Đã huỷ hóa đơn');
-      await qc.invalidateQueries({ queryKey: ['dashboard-invoice', id] });
+      await qc.invalidateQueries({ queryKey: saasKeys.dashboardInvoice(id) });
     } catch (e) {
       toast.error(e instanceof ApiError ? e.serverMessage : 'Huỷ thất bại');
     }
@@ -75,8 +76,8 @@ export default function DashboardBillingInvoicePage() {
           <InvoiceStatusPoller
             invoiceId={row.id}
             enabled={row.status === 'PENDING'}
-            onPaid={() => void qc.invalidateQueries({ queryKey: ['dashboard-invoice', id] })}
-            onTerminal={() => void qc.invalidateQueries({ queryKey: ['dashboard-invoice', id] })}
+            onPaid={() => void qc.invalidateQueries({ queryKey: saasKeys.dashboardInvoice(id) })}
+            onTerminal={() => void qc.invalidateQueries({ queryKey: saasKeys.dashboardInvoice(id) })}
           />
         </div>
       ) : null}

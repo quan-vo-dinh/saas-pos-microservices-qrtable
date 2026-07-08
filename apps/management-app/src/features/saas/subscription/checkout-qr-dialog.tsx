@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
 import { formatVnd } from '@/features/saas/formatters';
 import type { SubscriptionInvoice } from '@/features/saas/types';
 import { InvoiceStatusPoller } from './invoice-status-poller';
@@ -94,7 +94,7 @@ export function CheckoutQrDialog({ open, onOpenChange, invoice, onPaid }: Checko
                 }
                 setCanceling(true);
                 try {
-                  await saasApi.cancelDashboardInvoice(invoice.id);
+                  await saasService.cancelDashboardInvoice(invoice.id);
                   toast.success('Đã huỷ thanh toán');
                   onOpenChange(false);
                 } catch (e) {

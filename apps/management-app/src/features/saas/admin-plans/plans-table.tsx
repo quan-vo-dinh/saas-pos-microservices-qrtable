@@ -25,9 +25,10 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { billingPeriodVi } from '@einvoice/shared-constants';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
 import { formatQuota, formatVnd } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
+import { saasKeys } from '@/features/saas/saas-keys';
 import type { PricingPlan } from '@/features/saas/types';
 
 type PlansTableProps = {
@@ -41,11 +42,11 @@ export function PlansTable({ data, permissions, onEdit }: PlansTableProps) {
   const [statusTarget, setStatusTarget] = useState<{ plan: PricingPlan; nextActive: boolean } | null>(null);
   const updateStatus = useMutation({
     mutationFn: ({ plan, nextActive }: { plan: PricingPlan; nextActive: boolean }) =>
-      nextActive ? saasApi.updatePlan(plan.id, { isActive: true }) : saasApi.deletePlan(plan.id),
+      nextActive ? saasService.updatePlan(plan.id, { isActive: true }) : saasService.deletePlan(plan.id),
     onSuccess: async (_data, variables) => {
       toast.success(variables.nextActive ? 'Đã bán lại gói' : 'Đã ngừng bán gói');
       setStatusTarget(null);
-      await qc.invalidateQueries({ queryKey: ['admin-plans'] });
+      await qc.invalidateQueries({ queryKey: saasKeys.plans() });
     },
     onError: (e: unknown) => toast.error(e instanceof ApiError ? e.serverMessage : 'Thao tác thất bại'),
   });

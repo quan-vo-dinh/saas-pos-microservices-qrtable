@@ -14,9 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@einvoice/frontend-ui';
 import { ROUTES } from '@/constants/routes';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
 import { formatDateTime } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
+import { saasKeys } from '@/features/saas/saas-keys';
 import type { TenantDetail, TenantStatus } from '@/features/saas/types';
 import { getActivePlanOptions, getNextPlanCode } from './plan-options';
 import { tenantTypeVi } from '@einvoice/shared-constants';
@@ -30,12 +31,12 @@ export function TenantDetailHeader({ tenant, permissions }: { tenant: TenantDeta
 
   const invalidate = () =>
     void qc
-      .invalidateQueries({ queryKey: ['admin-tenant', tenant.id] })
-      .then(() => qc.invalidateQueries({ queryKey: ['admin-tenants'] }));
+      .invalidateQueries({ queryKey: saasKeys.tenant(tenant.id) })
+      .then(() => qc.invalidateQueries({ queryKey: saasKeys.tenants() }));
 
   const statusMutation = useMutation({
     mutationFn: async (input: { action: 'SUSPEND' | 'ACTIVATE' | 'CLOSE'; reason?: string }) => {
-      await saasApi.updateTenantStatus(tenant.id, input);
+      await saasService.updateTenantStatus(tenant.id, input);
     },
     onSuccess: async (_, v) => {
       toast.success(v.action === 'CLOSE' ? 'Tenant đã đóng' : 'Đã cập nhật trạng thái');
@@ -165,27 +166,27 @@ export function TenantSubscriptionsTab({
   const qc = useQueryClient();
   const authReady = useAuthReadyForBff();
   const list = useQuery({
-    queryKey: ['admin-tenant-subs', tenantId],
-    queryFn: () => saasApi.listTenantSubscriptions(tenantId),
+    queryKey: saasKeys.tenantSubscriptions(tenantId),
+    queryFn: () => saasService.listTenantSubscriptions(tenantId),
     enabled: authReady,
   });
   const [planCode, setPlanCode] = useState('');
   const [billingPeriod, setBillingPeriod] = useState<'MONTHLY' | 'YEARLY'>('MONTHLY');
   const [effectiveAt] = useState(() => new Date().toISOString());
   const plans = useQuery({
-    queryKey: ['admin-plans', 'assign-options'],
-    queryFn: () => saasApi.listPlansAdmin(),
+    queryKey: saasKeys.planAssignOptions(),
+    queryFn: () => saasService.listPlansAdmin(),
     enabled: authReady,
   });
   const activePlanOptions = useMemo(() => getActivePlanOptions(plans.data), [plans.data]);
   const selectedPlanCode = getNextPlanCode({ plans: plans.data, currentPlanCode: planCode });
 
   const assign = useMutation({
-    mutationFn: () => saasApi.assignTenantSubscription(tenantId, { planCode: selectedPlanCode, billingPeriod }),
+    mutationFn: () => saasService.assignTenantSubscription(tenantId, { planCode: selectedPlanCode, billingPeriod }),
     onSuccess: async () => {
       toast.success('Đã gán gói');
-      await qc.invalidateQueries({ queryKey: ['admin-tenant-subs', tenantId] });
-      await qc.invalidateQueries({ queryKey: ['admin-tenant', tenantId] });
+      await qc.invalidateQueries({ queryKey: saasKeys.tenantSubscriptions(tenantId) });
+      await qc.invalidateQueries({ queryKey: saasKeys.tenant(tenantId) });
     },
     onError: (e: unknown) => toast.error(e instanceof ApiError ? e.serverMessage : 'Gán gói thất bại'),
   });
@@ -305,8 +306,8 @@ function QuotaBar({ label, used, max }: { label: string; used: number; max: numb
 export function TenantUsageTab({ tenantId }: { tenantId: string }) {
   const authReady = useAuthReadyForBff();
   const usage = useQuery({
-    queryKey: ['admin-tenant-usage', tenantId],
-    queryFn: () => saasApi.getTenantUsage(tenantId),
+    queryKey: saasKeys.tenantUsage(tenantId),
+    queryFn: () => saasService.getTenantUsage(tenantId),
     enabled: authReady,
     refetchInterval: authReady ? 30_000 : false,
   });
@@ -323,8 +324,8 @@ export function TenantUsageTab({ tenantId }: { tenantId: string }) {
 export function TenantAuditTab({ tenantId }: { tenantId: string }) {
   const authReady = useAuthReadyForBff();
   const audit = useQuery({
-    queryKey: ['admin-tenant-audit', tenantId],
-    queryFn: () => saasApi.getTenantAudit(tenantId),
+    queryKey: saasKeys.tenantAudit(tenantId),
+    queryFn: () => saasService.getTenantAudit(tenantId),
     enabled: authReady,
   });
   return (

@@ -1,5 +1,3 @@
-'use client';
-
 import { authApiClient, type AuthClientOptions } from '@/lib/api/authenticated-client';
 import type {
   AdminInvoiceQuery,
@@ -22,7 +20,7 @@ import type {
   TenantUsageSnapshot,
   UpdatePlanPayload,
   UpdateTenantStatusPayload,
-} from './types';
+} from '../types';
 
 function toSearchParams(record: Record<string, string | number | undefined>): string {
   const params = new URLSearchParams();
@@ -72,7 +70,7 @@ function normalizeDashboardSubscription(raw: unknown): DashboardSubscription {
   };
 }
 
-export const saasApi = {
+export const saasService = {
   listAdminTenants: async (query: AdminTenantQuery): Promise<Paginated<TenantListItem>> => {
     const data = await authApiClient<unknown>(
       `/admin/tenants${toSearchParams({

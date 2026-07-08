@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
 import type { OnboardTenantPayload, PricingPlan } from '@/features/saas/types';
 import { ApiError } from '@einvoice/frontend-utils';
 import { toast } from 'sonner';
@@ -94,7 +94,7 @@ export function OnboardTenantDialog({
 
     setSubmitting(true);
     try {
-      await saasApi.onboardTenant(payload);
+      await saasService.onboardTenant(payload);
       onCreated();
       onOpenChange(false);
       reset();

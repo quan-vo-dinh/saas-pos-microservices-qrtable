@@ -6,7 +6,8 @@ import { Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/constants/routes';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import { SepayBankPicker } from '@/features/saas/payment-settings/sepay-bank-picker';
 
 function SepayCallbackInner() {
@@ -16,8 +17,8 @@ function SepayCallbackInner() {
   const state = sp.get('state') ?? '';
 
   const q = useQuery({
-    queryKey: ['sepay-oauth-callback', code, state],
-    queryFn: () => saasApi.handleSepayCallback({ code, state }),
+    queryKey: saasKeys.sepayOauthCallback(code, state),
+    queryFn: () => saasService.handleSepayCallback({ code, state }),
     enabled: Boolean(code && state),
     retry: false,
   });

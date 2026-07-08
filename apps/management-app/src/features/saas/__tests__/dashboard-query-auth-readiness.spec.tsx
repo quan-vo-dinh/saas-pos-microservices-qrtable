@@ -20,8 +20,8 @@ jest.mock('next-auth/react', () => ({
   useSession: () => mockUseSession(),
 }));
 
-jest.mock('@/features/saas/api', () => ({
-  saasApi: {
+jest.mock('@/features/saas/services/saas.service', () => ({
+  saasService: {
     checkoutSubscription: jest.fn(),
     getDashboardSubscription: () => mockGetDashboardSubscription(),
     getDashboardPaymentSettings: () => mockGetDashboardPaymentSettings(),
@@ -54,6 +54,7 @@ jest.mock('@/features/saas/payment-settings/disconnect-sepay-dialog', () => ({
 
 import DashboardPaymentSettingsPage from '@/app/(dashboard)/dashboard/payment-settings/page';
 import DashboardSubscriptionPage from '@/app/(dashboard)/dashboard/subscription/page';
+import { saasKeys } from '@/features/saas/saas-keys';
 
 describe('Phase 4B dashboard query auth readiness', () => {
   beforeEach(() => {
@@ -75,7 +76,7 @@ describe('Phase 4B dashboard query auth readiness', () => {
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: ['dashboard-subscription'],
+        queryKey: saasKeys.dashboardSubscription(),
         enabled: false,
       }),
     );
@@ -89,7 +90,7 @@ describe('Phase 4B dashboard query auth readiness', () => {
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: ['dashboard-payment-settings'],
+        queryKey: saasKeys.dashboardPaymentSettings(),
         enabled: false,
       }),
     );
@@ -104,13 +105,13 @@ describe('Phase 4B dashboard query auth readiness', () => {
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: ['dashboard-subscription'],
+        queryKey: saasKeys.dashboardSubscription(),
         enabled: true,
       }),
     );
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: ['dashboard-payment-settings'],
+        queryKey: saasKeys.dashboardPaymentSettings(),
         enabled: true,
       }),
     );

@@ -20,9 +20,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
 import { formatDateTime, formatVnd } from '@/features/saas/formatters';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
+import { saasKeys } from '@/features/saas/saas-keys';
 import type { InvoiceStatus, SubscriptionInvoice } from '@/features/saas/types';
 
 const INVOICE_STATUS_OPTIONS: InvoiceStatus[] = ['PENDING', 'PAID', 'UNDERPAID', 'EXPIRED', 'CANCELED'];
@@ -58,9 +59,9 @@ export function AdminBillingClient() {
   };
 
   const list = useQuery({
-    queryKey: ['admin-billing', filters],
+    queryKey: saasKeys.invoicesList(filters),
     queryFn: () =>
-      saasApi.listAdminInvoices({
+      saasService.listAdminInvoices({
         status: filters.status || undefined,
         tenantId: filters.tenantId || undefined,
         planCode: filters.planCode || undefined,
@@ -74,9 +75,9 @@ export function AdminBillingClient() {
 
   const cancelInvoice = async (inv: SubscriptionInvoice) => {
     try {
-      await saasApi.cancelAdminInvoice(inv.id);
+      await saasService.cancelAdminInvoice(inv.id);
       toast.success('Đã huỷ hóa đơn');
-      await qc.invalidateQueries({ queryKey: ['admin-billing'] });
+      await qc.invalidateQueries({ queryKey: saasKeys.invoices() });
     } catch (e) {
       toast.error(e instanceof ApiError ? e.serverMessage : 'Huỷ hóa đơn thất bại');
     }
@@ -87,9 +88,9 @@ export function AdminBillingClient() {
       return;
     }
     try {
-      await saasApi.manualConfirmInvoice(manual.id, { note });
+      await saasService.manualConfirmInvoice(manual.id, { note });
       toast.success('Đã xác nhận hóa đơn');
-      await qc.invalidateQueries({ queryKey: ['admin-billing'] });
+      await qc.invalidateQueries({ queryKey: saasKeys.invoices() });
     } catch (e) {
       toast.error(e instanceof ApiError ? e.serverMessage : 'Xác nhận thất bại');
       throw e;

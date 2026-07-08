@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
 import { ApiError } from '@einvoice/frontend-utils';
 import { toast } from 'sonner';
 
@@ -25,7 +25,7 @@ export function DisconnectSepayDialog({ onDisconnected }: { onDisconnected: () =
   const submit = async () => {
     setBusy(true);
     try {
-      await saasApi.disconnectSepay();
+      await saasService.disconnectSepay();
       toast.success('Đã ngắt kết nối SePay');
       setOpen(false);
       setTyped('');

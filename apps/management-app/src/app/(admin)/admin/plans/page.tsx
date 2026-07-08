@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { PlanFormDialog } from '@/features/saas/admin-plans/plan-form-dialog';
 import { PlansTable } from '@/features/saas/admin-plans/plans-table';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import { phase4bPermissions, hasPermission } from '@/features/saas/permissions';
 import type { CreatePlanPayload, PricingPlan, UpdatePlanPayload } from '@/features/saas/types';
 
@@ -22,18 +23,18 @@ export default function AdminPlansPage() {
   const [editing, setEditing] = useState<PricingPlan | null>(null);
 
   const plansQuery = useQuery({
-    queryKey: ['admin-plans'],
-    queryFn: () => saasApi.listPlansAdmin(),
+    queryKey: saasKeys.plans(),
+    queryFn: () => saasService.listPlansAdmin(),
     enabled: authReady,
   });
 
   const handleSubmit = async (values: CreatePlanPayload) => {
     try {
       if (mode === 'create') {
-        await saasApi.createPlan(values);
+        await saasService.createPlan(values);
         toast.success('Đã tạo gói');
       } else if (editing) {
-        await saasApi.updatePlan(editing.id, toUpdatePlanPayload(values));
+        await saasService.updatePlan(editing.id, toUpdatePlanPayload(values));
         toast.success('Đã cập nhật gói');
       }
       await plansQuery.refetch();

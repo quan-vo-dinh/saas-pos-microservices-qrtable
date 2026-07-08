@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
 import type { SepayBankAccountOption } from '@/features/saas/types';
 import { toast } from 'sonner';
 import { ApiError } from '@einvoice/frontend-utils';
@@ -26,7 +26,7 @@ export function SepayBankPicker({
     }
     setBusy(true);
     try {
-      await saasApi.selectSepayBank({
+      await saasService.selectSepayBank({
         bankAccountUuid: bank.uuid,
         accountNumber: bank.accountNumber,
         accountHolder: bank.accountHolder,

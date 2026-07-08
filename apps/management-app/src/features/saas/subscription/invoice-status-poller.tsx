@@ -3,7 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import type { InvoiceStatus } from '@/features/saas/types';
 
 type InvoiceStatusPollerProps = {
@@ -22,8 +23,8 @@ export function InvoiceStatusPoller({ invoiceId, enabled, onPaid, onTerminal }: 
   }, [invoiceId]);
 
   const query = useQuery({
-    queryKey: ['dashboard-invoice-status', invoiceId],
-    queryFn: () => (invoiceId ? saasApi.getDashboardInvoiceStatus(invoiceId) : Promise.resolve({ status: '' })),
+    queryKey: saasKeys.dashboardInvoiceStatus(invoiceId ?? ''),
+    queryFn: () => (invoiceId ? saasService.getDashboardInvoiceStatus(invoiceId) : Promise.resolve({ status: '' })),
     enabled: authReady && Boolean(invoiceId) && enabled,
     refetchInterval: authReady && enabled && invoiceId ? 5000 : false,
   });
