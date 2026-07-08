@@ -1,6 +1,6 @@
 'use client';
 
-import { categoryStatusVi, menuItemStatusVi } from '@einvoice/shared-constants';
+import { menuItemStatusVi } from '@einvoice/shared-constants';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Badge } from '@einvoice/frontend-ui';
 import { ImageIcon } from 'lucide-react';

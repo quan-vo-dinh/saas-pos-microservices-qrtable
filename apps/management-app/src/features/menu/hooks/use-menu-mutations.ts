@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { successMessage, getErrorDisplayMessage } from '@einvoice/frontend-utils';
 import type { MenuItem } from '../data/schema';
 import { menuService } from '../services/menu.service';
-import { menuKeys } from './use-menu-query';
+import { menuKeys } from '../menu-keys';
 
 // ─── Category Mutations ─────────────────────────────
 
@@ -131,7 +131,7 @@ export function useClearMenuItemImageMutation() {
     mutationFn: (id: string) => menuService.clearMenuItemImage(id),
     onSuccess: (_data, id) => {
       queryClient.setQueryData<MenuItem>(menuKeys.item(id), (old) => (old ? { ...old, imageUrl: null } : old));
-      queryClient.setQueriesData<MenuItem[]>({ queryKey: [...menuKeys.all, 'items'] }, (old) =>
+      queryClient.setQueriesData<MenuItem[]>({ queryKey: menuKeys.itemsRoot() }, (old) =>
         old?.map((item) => (item.id === id ? { ...item, imageUrl: null } : item)),
       );
       void queryClient.invalidateQueries({ queryKey: menuKeys.all });
@@ -152,7 +152,7 @@ export function useUploadMenuItemImageMutation() {
       queryClient.setQueryData<MenuItem>(menuKeys.item(variables.id), (old) =>
         old ? { ...old, imageUrl: data.imageUrl } : old,
       );
-      queryClient.setQueriesData<MenuItem[]>({ queryKey: [...menuKeys.all, 'items'] }, (old) =>
+      queryClient.setQueriesData<MenuItem[]>({ queryKey: menuKeys.itemsRoot() }, (old) =>
         old?.map((item) => (item.id === variables.id ? { ...item, imageUrl: data.imageUrl } : item)),
       );
       void queryClient.invalidateQueries({ queryKey: menuKeys.all });
