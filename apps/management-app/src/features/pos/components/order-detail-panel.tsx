@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CancelOrderDialog } from '@/components/pos/cancel-order-dialog';
+import { CancelOrderDialog } from '@/features/pos/components/cancel-order-dialog';
 import {
   useConfirmOrderMutation,
   useMarkOrderServedMutation,

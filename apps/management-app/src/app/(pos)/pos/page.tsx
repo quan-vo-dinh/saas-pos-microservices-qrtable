@@ -1,4 +1,4 @@
-import { LiveOrdersTable } from '@/components/pos/live-orders-table';
+import { LiveOrdersTable } from '@/features/pos/components/live-orders-table';
 
 export default function PosPage() {
   return <LiveOrdersTable />;

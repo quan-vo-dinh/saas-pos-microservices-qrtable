@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { TableMapGrid } from '@/components/pos/table-map-grid';
+import { TableMapGrid } from '@/features/pos/components/table-map-grid';
 import { ROUTES } from '@/constants/routes';
 
 export default function PosTablesPage() {

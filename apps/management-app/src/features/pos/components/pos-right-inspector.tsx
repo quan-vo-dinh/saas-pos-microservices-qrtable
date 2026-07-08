@@ -4,8 +4,8 @@ import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import { ROUTES } from '@/constants/routes';
 import { useOrderUiState } from '@/features/order/hooks/use-order-ui-state';
-import { OrderDetailPanel } from '@/components/pos/order-detail-panel';
-import { NonOrderRightInspector } from '@/components/pos/non-order-right-inspector';
+import { OrderDetailPanel } from '@/features/pos/components/order-detail-panel';
+import { NonOrderRightInspector } from '@/features/pos/components/non-order-right-inspector';
 
 function EmptyState({ message }: { message: string }) {
   return (

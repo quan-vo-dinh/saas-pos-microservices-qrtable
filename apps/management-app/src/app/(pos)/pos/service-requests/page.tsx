@@ -1,4 +1,4 @@
-import { ServiceRequestTable } from '@/components/pos/service-request-table';
+import { ServiceRequestTable } from '@/features/pos/components/service-request-table';
 
 export default function PosServiceRequestsPage() {
   return <ServiceRequestTable />;

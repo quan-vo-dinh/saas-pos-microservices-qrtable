@@ -6,9 +6,9 @@ import { ROUTES } from '@/constants/routes';
 import { usePosServiceRequestUiState } from '@/features/tables/hooks/use-pos-service-request-ui-state';
 import { useBillsQuery } from '@/features/order/hooks/use-bill-query';
 import { usePosTableUiState } from '@/features/tables/hooks/use-pos-table-ui-state';
-import { TableDetailPanel } from '@/components/pos/table-detail-panel';
-import { CashBillPanel } from '@/components/pos/cash-bill-panel';
-import { ServiceRequestDetailPanel } from '@/components/pos/service-request-detail-panel';
+import { TableDetailPanel } from '@/features/pos/components/table-detail-panel';
+import { CashBillPanel } from '@/features/pos/components/cash-bill-panel';
+import { ServiceRequestDetailPanel } from '@/features/pos/components/service-request-detail-panel';
 
 function EmptyState({ message }: { message: string }) {
   return (

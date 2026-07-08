@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { TransferTableDialog } from '@/components/pos/transfer-table-dialog';
+import { TransferTableDialog } from '@/features/pos/components/transfer-table-dialog';
 import { formatVnd } from '@/lib/format-vnd';
 import { orderStatusVi, tableStatusVi } from '@einvoice/shared-constants';
 import { OrderStatus, type Order } from '@einvoice/types';

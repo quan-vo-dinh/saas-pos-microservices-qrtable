@@ -25,7 +25,7 @@ jest.mock('@/features/order/hooks/use-order-query', () => ({
   }),
 }));
 
-jest.mock('@/components/pos/transfer-table-dialog', () => ({
+jest.mock('@/features/pos/components/transfer-table-dialog', () => ({
   TransferTableDialog: ({
     fromTableId,
     sessionId,

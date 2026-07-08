@@ -41,7 +41,7 @@ jest.mock('@tanstack/react-virtual', () => ({
   }),
 }));
 
-jest.mock('@/components/pos/order-row-context-menu', () => ({
+jest.mock('@/features/pos/components/order-row-context-menu', () => ({
   OrderRowContextMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 

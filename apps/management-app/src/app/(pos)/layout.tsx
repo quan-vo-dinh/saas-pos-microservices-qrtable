@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { PosAppShell } from '@/components/pos/pos-app-shell';
+import { PosAppShell } from '@/features/pos/components/pos-app-shell';
 
 export default function PosLayout({ children }: { children: ReactNode }) {
   return (

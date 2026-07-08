@@ -16,11 +16,12 @@ jest.mock('framer-motion', () => ({
   AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
-jest.mock('@/components/pos/cancel-order-dialog', () => ({
+jest.mock('@/features/pos/components/cancel-order-dialog', () => ({
   CancelOrderDialog: () => null,
 }));
 
 jest.mock('@einvoice/frontend-ui', () => ({
+  ...jest.requireActual('@einvoice/frontend-ui'),
   Avatar: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AvatarFallback: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AvatarImage: (props: ComponentProps<'img'>) => createElement('img', { alt: '', ...props }),
