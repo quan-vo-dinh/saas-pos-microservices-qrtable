@@ -14,7 +14,7 @@ function buildSignInRedirect(request: NextRequest): URL {
   return url;
 }
 
-export default auth((request) => {
+export const proxy = auth((request) => {
   const { pathname } = request.nextUrl;
   const roles = parseRoles(request.auth?.user?.roles);
 
