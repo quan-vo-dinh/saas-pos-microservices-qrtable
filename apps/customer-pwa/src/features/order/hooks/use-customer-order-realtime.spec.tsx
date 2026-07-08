@@ -297,4 +297,17 @@ describe('useCustomerOrderRealtime', () => {
     expect(managerOffMock).toHaveBeenCalled();
     expect(disconnectMock).toHaveBeenCalled();
   });
+
+  it('does not initialize socket connection when enabled is false', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const { result } = renderHook(() => useCustomerOrderRealtime({ enabled: false }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(ioMock).not.toHaveBeenCalled();
+    expect(result.current).toBe('idle');
+  });
 });

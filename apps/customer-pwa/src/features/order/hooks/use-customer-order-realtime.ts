@@ -27,7 +27,28 @@ function socketNamespaceUrl(apiBaseUrl: string): string {
   }
 }
 
-export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
+function invalidateSessionScope(
+  queryClient: ReturnType<typeof useQueryClient>,
+  tenantId: string,
+  sessionId: string,
+): void {
+  void queryClient.invalidateQueries({ queryKey: cartKeys.snapshot(tenantId, sessionId) });
+  void queryClient.invalidateQueries({ queryKey: billKeys.current(tenantId, sessionId) });
+  void queryClient.invalidateQueries({ queryKey: orderKeys.all });
+}
+
+function invalidateOrder(
+  queryClient: ReturnType<typeof useQueryClient>,
+  tenantId: string,
+  sessionId: string,
+  orderId: string,
+): void {
+  invalidateSessionScope(queryClient, tenantId, sessionId);
+  void queryClient.invalidateQueries({ queryKey: orderKeys.detail(tenantId, sessionId, orderId) });
+}
+
+export function useCustomerOrderRealtime(options?: { enabled?: boolean }): CustomerRealtimeStatus {
+  const enabledHook = options?.enabled !== false;
   const queryClient = useQueryClient();
   const { session, patchTenantLifecycle } = useSession();
   const tenantId = session?.tenantId;
@@ -36,81 +57,79 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
   const [status, setStatus] = useState<CustomerRealtimeStatus>('idle');
 
   useEffect(() => {
+    if (!enabledHook) {
+      return;
+    }
     if (!tenantId || !sessionId) {
       return;
     }
 
-    const socket: Socket = io(socketNamespaceUrl(API_CONFIG.DEFAULT_BASE_URL), {
-      auth: {
-        tenantId,
-        sessionId,
-        ...(tenantSlug?.trim() ? { tenantSlug: tenantSlug.trim() } : {}),
-      },
-      autoConnect: true,
-      reconnection: true,
-      timeout: 10_000,
-    });
+    let socket: Socket | undefined;
 
-    const invalidateSessionScope = (): void => {
-      void queryClient.invalidateQueries({ queryKey: cartKeys.snapshot(tenantId, sessionId) });
-      void queryClient.invalidateQueries({ queryKey: billKeys.current(tenantId, sessionId) });
-      void queryClient.invalidateQueries({ queryKey: orderKeys.all });
-    };
-
-    const invalidateOrder = (orderId: string): void => {
-      invalidateSessionScope();
-      void queryClient.invalidateQueries({ queryKey: orderKeys.detail(tenantId, sessionId, orderId) });
-    };
+    try {
+      socket = io(socketNamespaceUrl(API_CONFIG.DEFAULT_BASE_URL), {
+        auth: {
+          tenantId,
+          sessionId,
+          ...(tenantSlug?.trim() ? { tenantSlug: tenantSlug.trim() } : {}),
+        },
+        autoConnect: true,
+        reconnection: true,
+        timeout: 10_000,
+      });
+    } catch {
+      return;
+    }
 
     const onConnect = (): void => {
       setStatus('connected');
-      invalidateSessionScope();
+      invalidateSessionScope(queryClient, tenantId, sessionId);
     };
     const onDisconnect = (): void => setStatus('degraded');
     const onAuthError = (): void => setStatus('auth-error');
     const onReconnectAttempt = (): void => setStatus('reconnecting');
     const onReconnect = (): void => {
       setStatus('connected');
-      invalidateSessionScope();
+      invalidateSessionScope(queryClient, tenantId, sessionId);
     };
     const onReconnectError = (): void => setStatus('degraded');
     const onReconnectFailed = (): void => setStatus('degraded');
     const onBrowserRecovery = (): void => {
-      invalidateSessionScope();
+      invalidateSessionScope(queryClient, tenantId, sessionId);
     };
     const onVisibilityChange = (): void => {
       if (document.visibilityState === 'visible') {
-        invalidateSessionScope();
+        invalidateSessionScope(queryClient, tenantId, sessionId);
       }
     };
 
     const onCartUpdated = (event: CartUpdatedEvent): void => {
       if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
-      invalidateSessionScope();
+      invalidateSessionScope(queryClient, tenantId, sessionId);
     };
     const onOrderCreated = (event: OrderCreatedEvent): void => {
       if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
-      invalidateOrder(event.orderId);
+      invalidateOrder(queryClient, tenantId, sessionId, event.orderId);
     };
     const onOrderStatusChanged = (event: OrderStatusChangedEvent): void => {
       if (event.tenantId !== tenantId) return;
-      invalidateOrder(event.orderId);
+      invalidateOrder(queryClient, tenantId, sessionId, event.orderId);
     };
     const onBillRequested = (event: BillRequestedEvent): void => {
       if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
-      invalidateSessionScope();
+      invalidateSessionScope(queryClient, tenantId, sessionId);
     };
     const onTableTransferred = (event: TableTransferredEvent): void => {
       if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
-      invalidateSessionScope();
+      invalidateSessionScope(queryClient, tenantId, sessionId);
     };
     const onKitchenItemReady = (event: KitchenItemReadyEvent): void => {
       if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
-      invalidateOrder(event.orderId);
+      invalidateOrder(queryClient, tenantId, sessionId, event.orderId);
     };
     const onPaymentCompleted = (event: PaymentCompletedRealtimeEvent): void => {
       if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
-      invalidateSessionScope();
+      invalidateSessionScope(queryClient, tenantId, sessionId);
     };
 
     type TenantLifecyclePayload = {
@@ -157,6 +176,8 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
+      setStatus('idle');
+      if (!socket) return;
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('events.authError', onAuthError);
@@ -179,7 +200,7 @@ export function useCustomerOrderRealtime(): CustomerRealtimeStatus {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       socket.disconnect();
     };
-  }, [queryClient, sessionId, tenantId, tenantSlug, patchTenantLifecycle]);
+  }, [enabledHook, queryClient, sessionId, tenantId, tenantSlug, patchTenantLifecycle]);
 
   return status;
 }

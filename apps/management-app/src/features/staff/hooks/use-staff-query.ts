@@ -1,14 +1,17 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { staffKeys } from '../staff-keys';
 import { staffService } from '../services/staff.service';
 import type { CreateStaffPayload, StaffListQuery, StaffRoleName } from '../types';
 
 export function useStaffListQuery(query: StaffListQuery) {
+  const authReady = useAuthReadyForBff();
   return useQuery({
     queryKey: staffKeys.list(query),
     queryFn: () => staffService.list(query),
+    enabled: authReady,
   });
 }
 
