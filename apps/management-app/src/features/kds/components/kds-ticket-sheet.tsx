@@ -36,7 +36,7 @@ import { useMockStore } from '@/mocks/store';
 import type { KDSTicketMock, KDSStation } from '@/mocks/kds-ticket';
 
 const KdsSlaRadial = dynamic(
-  () => import('@/components/kds/kds-sla-radial').then((m) => m.KdsSlaRadial),
+  () => import('@/features/kds/components/kds-sla-radial').then((m) => m.KdsSlaRadial),
   { ssr: false, loading: () => <div className="h-44 animate-pulse rounded-md bg-muted" aria-hidden /> },
 );
 

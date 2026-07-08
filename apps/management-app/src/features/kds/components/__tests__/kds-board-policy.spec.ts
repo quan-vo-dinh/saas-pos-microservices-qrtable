@@ -9,8 +9,11 @@ describe('KDS board policy', () => {
   const dndSource = readFileSync(join(kdsDir, 'kds-dnd-wrapper.tsx'), 'utf8');
   const headerSource = readFileSync(join(kdsDir, 'kds-header.tsx'), 'utf8');
   const sheetSource = readFileSync(join(kdsDir, 'kds-ticket-sheet.tsx'), 'utf8');
-  const storeSource = readFileSync(join(kdsDir, '../../mocks/store.ts'), 'utf8');
-  const realtimePillSource = readFileSync(join(kdsDir, '../realtime/realtime-status-pill.tsx'), 'utf8');
+  const storeSource = readFileSync(join(kdsDir, '../../../mocks/store.ts'), 'utf8');
+  const realtimePillSource = readFileSync(
+    join(kdsDir, '../../../components/realtime/realtime-status-pill.tsx'),
+    'utf8',
+  );
 
   const legacyPanelFilename = ['kds-', 'batch', 'ing', '-panel.tsx'].join('');
   const legacyPanelComponent = ['Kds', 'Batch', 'ing', 'Panel'].join('');

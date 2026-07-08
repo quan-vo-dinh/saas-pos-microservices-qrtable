@@ -150,13 +150,13 @@ Hãy đọc mã nguồn theo trình tự 5 bước dưới đây để không b�
 ### Bước 2: Đọc Hook quản lý Bếp/Bar (KDS)
 
 - **File cần đọc**: [use-kds-realtime.ts](./src/features/kds/hooks/use-kds-realtime.ts)
-- **Mục tiêu**: Xem cách gửi dữ liệu lên server bằng lệnh `socket.emit('subscribe.kds', { station })` khi kết nối thành công (`onConnect`) để server phân phối đúng sự kiện của riêng Trạm bếp (Kitchen) hoặc Trạm bar (Barista).
+- **Mục tiêu**: Xem cách hook kết nối bằng JWT, lọc event theo `tenantId + station`, và chỉ gửi `socket.emit('subscribe.kds', { station })` khi màn hình bật `subscribeStation` để đăng ký station rõ ràng.
 
 ### Bước 3: Đọc nơi tích hợp Hook vào Giao diện (UI Components)
 
 - **File cần đọc**:
-  1.  [pos-app-shell.tsx](./src/components/pos/pos-app-shell.tsx) (Dòng 17, 29): Xem cách gọi `useStaffOrderRealtime()` để kích hoạt lắng nghe toàn cục tại khu vực bán hàng POS.
-  2.  [kds-board.tsx](./src/components/kds/kds-board.tsx) (Dòng 30, 64): Xem cách trạm bếp gọi `useKdsRealtime(stationEnum)` để đồng bộ trạng thái đơn nấu ăn.
+  1.  [pos-app-shell.tsx](./src/features/pos/components/pos-app-shell.tsx): Xem cách gọi `useStaffOrderRealtime()` để kích hoạt lắng nghe toàn cục tại khu vực bán hàng POS.
+  2.  [kds-board.tsx](./src/features/kds/components/kds-board.tsx): Xem cách trạm bếp gọi `useKdsRealtime(stationEnum, { subscribeStation })` để đồng bộ trạng thái đơn nấu ăn.
 
 ### Bước 4: Xem cầu nối REST Queries liên quan
 
