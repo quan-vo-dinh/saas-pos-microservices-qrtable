@@ -22,7 +22,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { RouteBreadcrumb } from '@/components/layout/route-breadcrumb';
 import { ModeToggle } from '@/components/layout/mode-toggle';
 import { useAuthStore } from '@/lib/auth/auth-store';
-import { NotificationsPopover } from '@/components/pos/notifications-popover';
+import { NotificationsPopover } from '@/features/pos/components/notifications-popover';
 import { ROUTES } from '@/constants/routes';
 
 type AppTopbarProps = {

@@ -5,7 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Building2 } from 'lucide-react';
 import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { ROUTES } from '@/constants/routes';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import { useAuthStore } from '@/lib/auth/auth-store';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
 import { parseRoles } from '@/lib/auth/role-routing';
@@ -19,8 +20,8 @@ export function TenantSwitcherPopover() {
   const isPlatformAdmin = roles.includes('SUPER_ADMIN');
 
   const subscriptionQuery = useQuery({
-    queryKey: ['dashboard', 'subscription'],
-    queryFn: () => saasApi.getDashboardSubscription(),
+    queryKey: saasKeys.dashboardSubscription(),
+    queryFn: () => saasService.getDashboardSubscription(),
     enabled: authReady && !isPlatformAdmin,
   });
 

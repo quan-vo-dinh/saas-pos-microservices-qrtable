@@ -1,14 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
+import { tableKeys } from '../table-keys';
 import { tablesService } from '../services/tables.service';
-
-export const tableKeys = {
-  all: ['tables'] as const,
-  areas: () => [...tableKeys.all, 'areas'] as const,
-  area: (id: string) => [...tableKeys.areas(), id] as const,
-  tables: (areaId?: string) => [...tableKeys.all, 'list', { areaId }] as const,
-  table: (id: string) => [...tableKeys.all, 'detail', id] as const,
-};
 
 export function useAreasQuery() {
   const authReady = useAuthReadyForBff();

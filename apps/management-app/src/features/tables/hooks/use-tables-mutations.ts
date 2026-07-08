@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { successMessage, getErrorDisplayMessage } from '@einvoice/frontend-utils';
 import { tablesService } from '../services/tables.service';
-import { tableKeys } from './use-tables-query';
+import { tableKeys } from '../table-keys';
 
 // ─── Area Mutations ─────────────────────────────────
 

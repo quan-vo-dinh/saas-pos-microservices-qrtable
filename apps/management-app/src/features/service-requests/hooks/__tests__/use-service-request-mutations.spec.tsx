@@ -26,11 +26,8 @@ jest.mock('../../services/service-request.service', () => ({
   },
 }));
 
-import {
-  serviceRequestKeys,
-  useAcknowledgeServiceRequestMutation,
-  useResolveServiceRequestMutation,
-} from '../use-service-request-query';
+import { serviceRequestKeys } from '../../service-request-keys';
+import { useAcknowledgeServiceRequestMutation, useResolveServiceRequestMutation } from '../use-service-request-query';
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: PropsWithChildren) {

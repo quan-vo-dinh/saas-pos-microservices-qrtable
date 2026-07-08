@@ -4,15 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getErrorDisplayMessage, successMessage } from '@einvoice/frontend-utils';
 import { toast } from 'sonner';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
+import { serviceRequestKeys } from '../service-request-keys';
 import { serviceRequestService, type ServiceRequestListParams } from '../services/service-request.service';
 
 const SERVICE_REQUEST_LIST_POLL_MS = 15_000;
-
-export const serviceRequestKeys = {
-  all: ['admin-service-requests'] as const,
-  lists: () => [...serviceRequestKeys.all, 'list'] as const,
-  list: (params?: ServiceRequestListParams) => [...serviceRequestKeys.lists(), params ?? {}] as const,
-};
 
 async function invalidateServiceRequestQueries(queryClient: ReturnType<typeof useQueryClient>) {
   await queryClient.invalidateQueries({ queryKey: serviceRequestKeys.lists() });

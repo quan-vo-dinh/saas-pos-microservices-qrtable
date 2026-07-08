@@ -18,7 +18,8 @@ jest.mock('../../services/service-request.service', () => ({
 }));
 
 import { ServiceRequestStatus } from '@einvoice/types';
-import { serviceRequestKeys, useServiceRequestsQuery } from '../use-service-request-query';
+import { serviceRequestKeys } from '../../service-request-keys';
+import { useServiceRequestsQuery } from '../use-service-request-query';
 
 describe('service request query polling', () => {
   beforeEach(() => {
