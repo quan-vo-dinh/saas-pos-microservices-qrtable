@@ -11,10 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatVnd } from '@/lib/format-vnd';
 import { cn } from '@/lib/utils';
-import { billKeys } from '@/features/order/hooks/use-bill-query';
+import { billKeys } from '@/features/order/bill-keys';
+import { paymentKeys } from '@/features/payment/payment-keys';
 import { paymentService } from '@/features/payment/services/payment.service';
-import { paymentQueryKeys, usePaymentHistoryQuery } from '@/features/payment/hooks/use-payment';
-import { tableKeys } from '@/features/tables/hooks/use-tables-query';
+import { usePaymentHistoryQuery } from '@/features/payment/hooks/use-payment';
+import { tableKeys } from '@/features/tables/table-keys';
 
 const schema = z.object({
   received: z
@@ -62,7 +63,7 @@ export function BillSettlementPanel({ bill }: { bill: Bill }) {
   useEffect(() => {
     if (!qrUrl || bill.status !== BillStatus.PENDING_PAYMENT || terminalFromHistory) return;
     const t = setInterval(() => {
-      void queryClient.invalidateQueries({ queryKey: paymentQueryKeys.history(billId) });
+      void queryClient.invalidateQueries({ queryKey: paymentKeys.history(billId) });
     }, 3000);
     return () => clearInterval(t);
   }, [qrUrl, billId, bill.status, terminalFromHistory, queryClient]);
@@ -163,7 +164,7 @@ export function BillSettlementPanel({ bill }: { bill: Bill }) {
                   await paymentService.confirmCash(bill.id, parsed.data.received);
                   await Promise.all([
                     queryClient.invalidateQueries({ queryKey: billKeys.lists() }),
-                    queryClient.invalidateQueries({ queryKey: paymentQueryKeys.history(bill.id) }),
+                    queryClient.invalidateQueries({ queryKey: paymentKeys.history(bill.id) }),
                     queryClient.invalidateQueries({ queryKey: tableKeys.all }),
                   ]);
                   toast.success('Đã thu — đóng phiên');
@@ -189,7 +190,7 @@ export function BillSettlementPanel({ bill }: { bill: Bill }) {
                 try {
                   const res = await paymentService.createVietQr(bill.id);
                   setQrUrl(res.qrUrl);
-                  await queryClient.invalidateQueries({ queryKey: paymentQueryKeys.history(bill.id) });
+                  await queryClient.invalidateQueries({ queryKey: paymentKeys.history(bill.id) });
                   toast.success('Đã tạo mã VietQR');
                 } catch (e) {
                   toast.error((e as Error).message || 'Không tạo được VietQR');

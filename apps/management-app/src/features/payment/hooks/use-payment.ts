@@ -1,10 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuthReadyForBff } from '@/lib/auth/use-auth-ready';
+import { paymentKeys } from '../payment-keys';
 import { paymentService, type StaffPaymentRecord } from '../services/payment.service';
-
-export const paymentQueryKeys = {
-  history: (billId?: string) => ['payment', 'history', billId ?? 'all'] as const,
-};
 
 function hasPendingForBill(rows: StaffPaymentRecord[] | undefined, billId: string): boolean {
   return (rows ?? []).some((r) => r.billId === billId && r.status === 'PENDING');
@@ -18,7 +15,7 @@ export function usePaymentHistoryQuery(billId: string | undefined) {
   const authReady = useAuthReadyForBff();
 
   return useQuery({
-    queryKey: paymentQueryKeys.history(billId),
+    queryKey: paymentKeys.history(billId),
     queryFn: () => paymentService.history(billId),
     enabled: authReady,
     refetchInterval: (query) => {

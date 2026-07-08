@@ -15,7 +15,8 @@ jest.mock('../../services/payment.service', () => ({
   },
 }));
 
-import { paymentQueryKeys, usePaymentHistoryQuery } from '../use-payment';
+import { paymentKeys } from '../../payment-keys';
+import { usePaymentHistoryQuery } from '../use-payment';
 
 describe('usePaymentHistoryQuery', () => {
   beforeEach(() => {
@@ -27,7 +28,7 @@ describe('usePaymentHistoryQuery', () => {
     usePaymentHistoryQuery(undefined);
 
     const config = mockUseQuery.mock.calls[0][0];
-    expect(config.queryKey).toEqual(paymentQueryKeys.history(undefined));
+    expect(config.queryKey).toEqual(paymentKeys.history(undefined));
     expect(config.enabled).toBe(true);
     expect(config.queryFn()).toBe(mockHistory.mock.results[0].value);
     expect(mockHistory).toHaveBeenCalledWith(undefined);

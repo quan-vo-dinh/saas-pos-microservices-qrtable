@@ -1,17 +1,15 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BillStatus } from '@einvoice/types';
-import { billKeys } from '@/features/order/hooks/use-bill-query';
+import { billKeys } from '@/features/order/bill-keys';
+import { paymentKeys } from '@/features/payment/payment-keys';
 import { paymentService } from '@/features/payment/services/payment.service';
-import { tableKeys } from '@/features/tables/hooks/use-tables-query';
+import { tableKeys } from '@/features/tables/table-keys';
 import { BillSettlementPanel } from '../bill-settlement-panel';
 
 const mockUsePaymentHistoryQuery = jest.fn();
 
 jest.mock('@/features/payment/hooks/use-payment', () => ({
-  paymentQueryKeys: {
-    history: (billId?: string) => ['payment', 'history', billId ?? 'all'],
-  },
   usePaymentHistoryQuery: (...args: unknown[]) => mockUsePaymentHistoryQuery(...args),
 }));
 
@@ -100,7 +98,7 @@ describe('BillSettlementPanel', () => {
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: billKeys.lists() });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['payment', 'history', 'bill-real-1'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: paymentKeys.history('bill-real-1') });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: tableKeys.all });
   });
 
