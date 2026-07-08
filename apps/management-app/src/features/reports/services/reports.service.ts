@@ -1,7 +1,5 @@
-'use client';
-
 import { authApiClient } from '@/lib/api/authenticated-client';
-import type { CatalogTableReport, OrderReport, PaymentRevenueReport, PlatformReport, ReportRangeQuery } from './types';
+import type { CatalogTableReport, OrderReport, PaymentRevenueReport, PlatformReport, ReportRangeQuery } from '../types';
 
 function toSearchParams(query: ReportRangeQuery): string {
   const params = new URLSearchParams();
@@ -21,7 +19,7 @@ function unwrap<T>(raw: unknown): T {
   return raw as T;
 }
 
-export const reportsApi = {
+export const reportsService = {
   getTenantRevenue: async (query: ReportRangeQuery) =>
     unwrap<PaymentRevenueReport>(await authApiClient(`/dashboard/reports/revenue${toSearchParams(query)}`)),
 

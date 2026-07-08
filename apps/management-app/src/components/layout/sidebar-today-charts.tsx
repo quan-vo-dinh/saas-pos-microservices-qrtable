@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { TodayMiniCharts } from '@/components/pos/today-mini-charts';
+import { TodayMiniCharts } from '@/features/pos/components/today-mini-charts';
 
 export function SidebarTodayCharts() {
   const pathname = usePathname();

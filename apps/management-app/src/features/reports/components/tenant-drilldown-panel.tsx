@@ -3,7 +3,8 @@
 import { planFeatureVi, subscriptionStatusVi, tenantStatusVi } from '@einvoice/shared-constants';
 import { useMemo, useState } from 'react';
 import { formatVnd } from '@/lib/format-vnd';
-import { saasApi } from '@/features/saas/api';
+import { saasService } from '@/features/saas/services/saas.service';
+import { saasKeys } from '@/features/saas/saas-keys';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,6 +14,7 @@ import {
   useAdminTenantRevenueReport,
   useAdminTenantTableReport,
 } from '../hooks/use-report-query';
+import { reportsKeys } from '../reports-keys';
 import type { ReportRangeQuery } from '../types';
 import { ReportMetricCard } from './report-metric-card';
 import { RevenueTrendChart } from './revenue-trend-chart';
@@ -26,8 +28,8 @@ type Props = {
 export function TenantDrilldownPanel({ query }: Props) {
   const [tenantId, setTenantId] = useState<string>('');
   const tenantsQuery = useQuery({
-    queryKey: ['reports', 'admin', 'tenant-options'],
-    queryFn: () => saasApi.listAdminTenants({ page: 1, limit: 50 }),
+    queryKey: reportsKeys.adminTenantOptions(),
+    queryFn: () => saasService.listAdminTenants({ page: 1, limit: 50 }),
   });
 
   const selectedTenant = useMemo(
@@ -36,8 +38,8 @@ export function TenantDrilldownPanel({ query }: Props) {
   );
 
   const plansQuery = useQuery({
-    queryKey: ['admin', 'plans'],
-    queryFn: () => saasApi.listPlansAdmin(),
+    queryKey: saasKeys.plans(),
+    queryFn: () => saasService.listPlansAdmin(),
   });
 
   const tenantPlanFeatures = useMemo(() => {

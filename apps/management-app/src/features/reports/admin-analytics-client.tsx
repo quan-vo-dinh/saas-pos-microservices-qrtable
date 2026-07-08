@@ -1,14 +1,13 @@
 'use client';
 
 import { invoiceStatusVi, tenantStatusVi } from '@einvoice/shared-constants';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { formatVnd } from '@/lib/format-vnd';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ReportMetricCard } from './components/report-metric-card';
 import { ReportErrorState, ReportLoadingGrid } from './components/report-state';
 import { ReportRangeFilter } from './components/report-range-filter';
-import { RevenueTrendChart } from './components/revenue-trend-chart';
 import { TenantDrilldownPanel } from './components/tenant-drilldown-panel';
 import { buildDefaultReportQuery } from './utils/default-report-query';
 import { usePlatformAnalyticsReport } from './hooks/use-report-query';
@@ -17,15 +16,6 @@ import type { ReportRangeQuery } from './types';
 export function AdminAnalyticsClient() {
   const [query, setQuery] = useState<ReportRangeQuery>(() => buildDefaultReportQuery());
   const platform = usePlatformAnalyticsReport(query);
-
-  const revenueSeries = useMemo(
-    () =>
-      (platform.data?.revenueSeries ?? []).map((row) => ({
-        label: row.label,
-        platformRevenueVnd: row.platformRevenueVnd,
-      })),
-    [platform.data],
-  );
 
   return (
     <div className="flex flex-1 flex-col gap-6">
