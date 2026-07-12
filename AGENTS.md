@@ -113,8 +113,8 @@ User-Access → TCP: User profile, roles, staff. DB: qrtable_auth (MongoDB).
 
 **Giao tiếp inter-service:**
 
-- Sync → TCP call qua `@qrtable/providers`
-- Async side-effects → Kafka event qua `@qrtable/queue`
+- Sync → TCP hoặc gRPC qua contract và configuration của service sở hữu, ví dụ `@common/configuration/tcp.config` hoặc `@common/configuration/grpc.config`
+- Async side-effects → Kafka event dùng topic từ `@common/constants/kafka-topic.constants`; transport setup theo module/configuration đang tồn tại của service
 - Auth check → gRPC tới Authorizer (đã được wrap trong Guards)
 - ❌ TUYỆT ĐỐI KHÔNG import entity/repository của service khác trực tiếp
 
@@ -127,28 +127,40 @@ User-Access → TCP: User profile, roles, staff. DB: qrtable_auth (MongoDB).
 
 ### Backend Shared
 
-| Path                  | Import alias             | Chứa gì                                       |
-| --------------------- | ------------------------ | --------------------------------------------- |
-| `libs/configuration/` | `@qrtable/configuration` | ConfigModule, typed AppConfig, env validation |
-| `libs/constants/`     | `@qrtable/constants`     | Kafka topics, enums, domain constants         |
-| `libs/schemas/`       | `@qrtable/schemas`       | TypeORM entities, Mongoose schemas            |
-| `libs/dtos/`          | `@qrtable/dtos`          | Validated DTOs (request/response)             |
-| `libs/guards/`        | `@qrtable/guards`        | UserGuard, TenantGuard, SessionGuard          |
-| `libs/interceptors/`  | `@qrtable/interceptors`  | Exception filter, Logging, TCP logging        |
-| `libs/middlewares/`   | `@qrtable/middlewares`   | Logger middleware, Tenant injection           |
-| `libs/providers/`     | `@qrtable/providers`     | TCP, gRPC, Mongo, Postgres, Redis providers   |
-| `libs/queue/`         | `@qrtable/queue`         | Kafka producer/consumer modules               |
-| `libs/common/`        | `@qrtable/common`        | Utilities, decorators, shared helpers         |
+Các alias dưới đây là toàn bộ mapping hiện có trong `tsconfig.base.json`. Alias có `/*` bắt buộc dùng subpath cụ thể; không có bare alias tương ứng.
+
+| Path                                   | Import alias                       | Chứa gì                                                                |
+| -------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------- |
+| `libs/constants/src/lib/`              | `@common/constants/*`              | Kafka topics, enums, Redis keys, WebSocket rooms, và domain constants. |
+| `libs/configuration/src/lib/`          | `@common/configuration/*`          | Shared configuration factories và transport/database providers.        |
+| `libs/middlewares/src/lib/`            | `@common/middlewares/*`            | Logger và tenant middleware.                                           |
+| `libs/utils/src/lib/`                  | `@common/utils/*`                  | Shared utilities, bao gồm VND rounding.                                |
+| `libs/interfaces/src/lib/`             | `@common/interfaces/*`             | Shared request, response, và transport interfaces.                     |
+| `libs/interceptors/src/lib/`           | `@common/interceptors/*`           | Exception và logging interceptors.                                     |
+| `libs/decorators/src/lib/`             | `@common/decorators/*`             | Shared decorators.                                                     |
+| `libs/schemas/src/lib/`                | `@common/schemas/*`                | Mongoose schemas.                                                      |
+| `libs/entities/src/lib/`               | `@common/entities/*`               | TypeORM entities.                                                      |
+| `libs/guards/src/lib/`                 | `@common/guards/*`                 | Auth, session, tenant, và plan guards.                                 |
+| `libs/error-messages/src/lib/`         | `@common/error-messages/*`         | Business exceptions và error codes.                                    |
+| `libs/observability/src/index.ts`      | `@common/observability`            | Public observability module exports.                                   |
+| `libs/observability/src/lib/`          | `@common/observability/*`          | Observability internals.                                               |
+| `libs/providers/cloudinary/src/lib/`   | `@common/providers/cloudinary/*`   | Cloudinary provider code.                                              |
+| `libs/providers/redis-client/src/lib/` | `@common/providers/redis-client/*` | Redis client module and service.                                       |
 
 ### Cross-Platform & Frontend
 
-| Path                     | Import alias                                 | Chứa gì                                                                      |
-| ------------------------ | -------------------------------------------- | ---------------------------------------------------------------------------- |
-| `libs/shared/types/`     | `@qrtable/types`                             | TypeScript interfaces, DTOs (FE + BE)                                        |
-| `libs/shared/constants/` | `@einvoice/shared-constants` (repo hiện tại) | `vi-domain-labels` (\*Vi), `saas-wire-types` (SaaS wire enums), query config |
-| `libs/shared/utils/`     | `@qrtable/utils`                             | Pure functions, formatters (incl. `roundVnd`)                                |
-| `libs/frontend/ui/`      | `@qrtable/ui`                                | Shadcn-based UI components                                                   |
-| `libs/frontend/hooks/`   | `@qrtable/hooks`                             | React Query hooks, WebSocket hooks                                           |
+`@einvoice/*` là legacy workspace naming, nhưng vẫn là alias hợp lệ hiện tại và phải được dùng đúng như `tsconfig.base.json` khai báo.
+
+| Path                                 | Import alias                 | Chứa gì                                                              |
+| ------------------------------------ | ---------------------------- | -------------------------------------------------------------------- |
+| `libs/shared/types/src/index.ts`     | `@einvoice/types`            | Cross-platform TypeScript types.                                     |
+| `libs/shared/constants/src/index.ts` | `@einvoice/shared-constants` | `vi-domain-labels` (`*Vi`), SaaS wire types, và query configuration. |
+| `libs/frontend/ui/src/index.ts`      | `@einvoice/frontend-ui`      | Shared Shadcn-based UI components.                                   |
+| `libs/frontend/hooks/src/index.ts`   | `@einvoice/frontend-hooks`   | Shared React hooks.                                                  |
+| `libs/frontend/utils/src/index.ts`   | `@einvoice/frontend-utils`   | Shared frontend utilities.                                           |
+| `libs/shared/mock-data/src/index.ts` | `@einvoice/mock-data`        | Shared mock data.                                                    |
+
+Library directories không có mapping ở trên không có generic alias. Follow relative import hoặc existing local barrel trong project đang sở hữu code; không tự tạo import alias cho queue, provider, DTO, hoặc common code chưa được khai báo trong `tsconfig.base.json`.
 
 ### Tài liệu canonical (đồng bộ với code)
 
@@ -172,19 +184,19 @@ Trước khi đổi webhook SePay, OAuth, enum hiển thị UI, hoặc cấu tr�
 ```
 
 ❌ process.env.XYZ trong business logic
-→ Dùng ConfigService từ @qrtable/configuration
+→ Dùng `ConfigService` từ `@nestjs/config`; shared config factory/provider dùng concrete path dưới `@common/configuration/*`
 
 ❌ Định nghĩa lại thứ đã có trong libs/
-→ Import từ @qrtable/\* tương ứng
+→ Import từ mapping thật trong bảng trên, hoặc local/relative import khi library không có alias
 
 ❌ Kafka topic string hardcode cục bộ
-→ Import KafkaTopic từ @qrtable/constants
+→ Import `KafkaTopic` từ `@common/constants/kafka-topic.constants`
 
 ❌ Redis key tạo tùy tiện inline (key = `menu_${id}`)
-→ Dùng RedisKey builder từ @qrtable/common
+→ Dùng `RedisKey` từ `@common/constants/redis-key.constants`
 
 ❌ WebSocket room string tạo tùy tiện
-→ Dùng WsRoom builder từ @qrtable/common
+→ Dùng `WsRoom` từ `@common/constants/ws-room.constants`
 
 ❌ Cross-service truy cập DB trực tiếp
 → Giao tiếp qua TCP hoặc Kafka event
@@ -205,7 +217,7 @@ Trước khi đổi webhook SePay, OAuth, enum hiển thị UI, hoặc cấu tr�
 → Dùng generic hoặc unknown + type guard
 
 ❌ Copy-paste logic xuất hiện 3+ lần
-→ Extract thành utility trong @qrtable/common hoặc local util/
+→ Extract thành utility ở `libs/utils/src/lib/` khi nhiều project dùng, hoặc local `util/` khi chỉ thuộc một project
 
 ❌ console.log trong production code
 → NestJS Logger với context (Logger.log / .warn / .error)
@@ -234,7 +246,7 @@ Mọi số tiền VND phải được làm tròn lên đến nghìn đồng.
 const total = price * qty;
 
 // ✅
-import { roundVnd } from '@qrtable/utils';
+import { roundVnd } from '@common/utils/vnd-rounding.util';
 const total = roundVnd(price * qty);
 // roundVnd = (amount: number) => Math.ceil(amount / 1000) * 1000
 ```
@@ -242,15 +254,10 @@ const total = roundVnd(price * qty);
 ### Tenant Isolation (Principle #2)
 
 ```typescript
-// Mọi entity có phạm vi tenant PHẢI có tenant_id
-// TypeORM Subscriber trong @qrtable/schemas tự inject — không set thủ công trong service
-
-// TenantGuard inject tenantId vào RequestContext
-// Global Query Filter tự append WHERE tenant_id = :tid
-// Service chỉ việc nhận tenantId từ context và truyền vào repository
-
-// ❌ Không skip tenant_id filter kể cả query "nội bộ"
-// ❌ Không set tenant_id thủ công trong service
+// TenantMiddleware và tenant guards establish tenant context.
+// Mọi tenant-scoped repository/query phải nhận tenantId và apply explicit predicate.
+// Internal request (TCP/Kafka) cũng phải truyền tenantId; không được bỏ qua nó.
+// Không set tenant_id/tenantId tùy ý ngoài entity/flow convention đang tồn tại.
 ```
 
 ### Redis Key Pattern
@@ -258,42 +265,36 @@ const total = roundVnd(price * qty);
 ```typescript
 // Pattern: {entity}:{tenant_id}:{resource_id}
 // ❌ key = `menu_${tenantId}_cat_${catId}`
-// ✅ RedisKey.menu.category(tenantId, catId)
+// ✅ RedisKey.menu.public(tenantId)
 
-// Nếu RedisKey builder chưa có trong @qrtable/common → tạo ở đó, không tạo local
-export const RedisKey = {
-  menu: {
-    categories: (tid: string) => `menu:${tid}:categories`,
-    item: (tid: string, id: string) => `menu:${tid}:item:${id}`,
-  },
-  session: {
-    data: (tid: string, sid: string) => `session:${tid}:${sid}`,
-  },
-  token: {
-    user: (uid: string) => `token:user:${uid}`,
-  },
-} as const;
+// API hiện có nằm trong @common/constants/redis-key.constants:
+import { RedisKey } from '@common/constants/redis-key.constants';
+const menuKey = RedisKey.menu.public(tenantId);
+const sessionKey = RedisKey.session.data(tenantId, sessionId);
+const cartKey = RedisKey.cart.data(tenantId, sessionId);
+
+// Nếu cần builder mới, thêm function đúng domain vào libs/constants/src/lib/redis-key.constants.ts
+// và dùng function đó sau khi được review; không tạo key string inline.
 ```
 
 ### Kafka Topic Naming
 
 ```typescript
 // Pattern: {domain}.{event} — không per-tenant, không per-instance
-// Tất cả topics phải đến từ @qrtable/constants
-import { KafkaTopic } from '@qrtable/constants';
-// KafkaTopic.ORDER_CREATED      → 'order.created'
-// KafkaTopic.ORDER_CONFIRMED    → 'order.confirmed'
-// KafkaTopic.PAYMENT_COMPLETED  → 'payment.completed'
-// KafkaTopic.KITCHEN_SLA_WARN   → 'kitchen.sla_warning'
+// Tất cả topics phải đến từ @common/constants/kafka-topic.constants
+import { KafkaTopic } from '@common/constants/kafka-topic.constants';
+// KafkaTopic.OrderConfirmed    → 'order.confirmed'
+// KafkaTopic.PaymentCompleted  → 'payment.completed'
+// KafkaTopic.KitchenSlaWarning → 'kitchen.sla_warning'
 ```
 
 ### WebSocket Room Naming
 
 ```typescript
 // Pattern: tenant:{id}:{role_group}
-import { WsRoom } from '@qrtable/common';
+import { WsRoom } from '@common/constants/ws-room.constants';
 socket.join(WsRoom.staff(tenantId)); // tenant:{tid}:staff
-socket.join(WsRoom.kds(tenantId, 'kitchen')); // tenant:{tid}:kds:kitchen
+socket.join(WsRoom.kds(tenantId, 'KITCHEN')); // tenant:{tid}:kds:kitchen
 socket.join(WsRoom.customer(sessionId)); // session:{sid}:customer
 ```
 
@@ -355,7 +356,7 @@ throw new Error('not found');
 throw new NotFoundException(`Order #${id} not found`);
 throw new ConflictException(`Session ${sid} already exists`);
 
-// ✅ Global exception filter trong @qrtable/interceptors xử lý unexpected errors
+// ✅ ExceptionInterceptor từ @common/interceptors/exception.interceptor xử lý unexpected errors
 ```
 
 ### Type Safety
@@ -378,9 +379,9 @@ function parse<T>(data: unknown): T {
 process.env.TYPEORM_HOST
 process.env.KAFKA_BROKER
 
-// ✅ ConfigService từ @qrtable/configuration (isGlobal: true — inject trực tiếp)
-constructor(private readonly config: ConfigService<AppConfig>) {}
-this.config.get('TYPEORM_HOST', { infer: true });
+// ✅ ConfigService từ @nestjs/config. Service config được load trong apps/<service>/src/configuration.
+constructor(private readonly config: ConfigService) {}
+this.config.get<string>('TYPEORM_HOST');
 ```
 
 ---
@@ -393,8 +394,8 @@ this.config.get('TYPEORM_HOST', { infer: true });
 
 ```
 Observed in [service]:
-├── DTO location: local dto/ | @qrtable/dtos
-├── Constants: local | @qrtable/constants
+├── DTO/interface location: local dto/ | @common/interfaces/*
+├── Constants: local | @common/constants/*
 ├── Repository: tách file | inline trong service
 └── Naming: [pattern đang dùng]
 → Tôi sẽ follow patterns này. Deviation sẽ được giải thích rõ.
@@ -448,13 +449,13 @@ Trước khi finalize bất kỳ output nào, tự hỏi:
 
 - Không có `process.env.*` trong business logic?
 - Không có định nghĩa lại thứ đã có trong `libs/`?
-- Kafka topics đến từ `@qrtable/constants`?
+- Kafka topics đến từ `@common/constants/kafka-topic.constants`?
 - Redis keys dùng builder pattern?
 - WebSocket rooms dùng builder pattern?
 - Cross-service communication qua TCP hoặc Kafka (không phải direct import)?
 - VND amounts đi qua `roundVnd()`?
 - Timestamps là server-side (`Date.now()` / `new Date()`)?
-- Mọi tenant-scoped entity có `tenant_id` (auto-inject qua Subscriber)?
+- Tenant-scoped repository/query có nhận `tenantId` và apply explicit predicate?
 - Write operations có idempotency key?
 - Không có `any` type không có lý do?
 - Không có magic numbers/strings inline?

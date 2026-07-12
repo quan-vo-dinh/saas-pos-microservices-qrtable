@@ -1,82 +1,70 @@
-# Einvoice
+# QRTable
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+QRTable is a multi-tenant SaaS POS platform for food and beverage businesses. It supports QR-based table ordering, kitchen operations, payments, and restaurant management through an event-driven microservices architecture in an Nx monorepo.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
+## Product Overview
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/nest?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+The platform combines NestJS services, a management application, and a customer-facing PWA. PostgreSQL, MongoDB, Redis, Kafka, Keycloak, and Socket.IO support its domain services, real-time workflows, identity, and operational state.
 
-## Finish your CI setup
+## Workspace Topology
 
-[Click here to finish setting up your workspace!](https://cloud.nx.app/connect/uqwYkduJu3)
+| Path                                  | Purpose                                                                                           |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `apps/`                               | Backend services and frontend applications.                                                       |
+| `libs/`                               | Shared TypeScript code, schemas, entities, interfaces, configuration, and frontend packages.      |
+| `docs/`                               | Canonical product, architecture, status, phase, and operational documentation.                    |
+| `docker/` and `docker-compose.*.yaml` | Container images, environment examples, Compose definitions, monitoring, and proxy configuration. |
+| `tools/`                              | Database, Kafka, deployment, seed, verification, and test tooling.                                |
 
+## Applications and Services
 
-## Run tasks
+| Area                     | Projects                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| API and backend services | `bff`, `authorizer`, `catalog`, `order`, `kitchen`, `payment`, `saas`, `user-access` |
+| Frontend applications    | `management-app`, `customer-pwa`                                                     |
+| Identity presentation    | `keycloak-theme`                                                                     |
 
-To run the dev server for your app, use:
+The BFF is the client entry point. Each backend service owns its domain data and communicates with other services through the defined synchronous transport contracts or Kafka events.
 
-```sh
-npx nx serve invoice
-```
+## Local Prerequisites
 
-To create a production bundle:
+- Node.js and pnpm.
+- Docker Engine with the Docker Compose plugin for local dependencies and container workflows.
+- A local configuration based on the repository environment examples; keep credentials out of version control.
 
-```sh
-npx nx build invoice
-```
-
-To see all available targets to run for a project, run:
-
-```sh
-npx nx show project invoice
-```
-
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-Use the plugin's generator to create new projects.
-
-To generate a new application, use:
+Install workspace dependencies with:
 
 ```sh
-npx nx g @nx/nest:app demo
+pnpm install
 ```
 
-To generate a new library, use:
+Discover the available Nx projects and their targets before running a project task:
 
 ```sh
-npx nx g @nx/node:lib mylib
+pnpm nx show projects
+pnpm nx show project <name>
 ```
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+## Common Validation Commands
 
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```sh
+pnpm verify:doc-anchors
+pnpm db:verify:ownership
+pnpm db:test
+pnpm e2e:demo
+pnpm scale-test
+pnpm theme:build
+```
 
+Run only the commands appropriate to your local dependencies and change scope. Use the Nx discovery commands above for project-specific tasks.
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## Documentation Map
 
-## Install Nx Console
+- [Documentation index](docs/README.md)
+- [Project status](docs/project-status.md)
+- [Business logic](docs/business-logic.md)
+- [Technical architecture](docs/technical-architecture.md)
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+## Deployment Status
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/nx-api/nest?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+Docker, Compose, and Caddy deployment artifacts are present. Phase 7 public deployment remains pending: the repository does not record the public-environment evidence required to claim that the full platform is deployed.
