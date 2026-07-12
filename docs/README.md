@@ -17,7 +17,7 @@ If current code and an accepted spec disagree, verify the behavior in code first
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `business-logic.md`                 | Current cross-phase business logic and domain rules.                                                 |
 | `technical-architecture.md`         | Current architecture, service ownership, data ownership, Redis/Kafka/TCP/auth/frontend architecture. |
-| `implementation_plan.md`            | Current roadmap/status after Phase 4D.1 dashboard reporting and entitlement synchronization.         |
+| `project-status.md`                 | Current evidence-based project status, roadmap, and deferred work.                                   |
 | `phases/`                           | Final phase records after implementation and audit.                                                  |
 | `architecture/permission-matrix.md` | RBAC source of truth after verification with code.                                                   |
 
@@ -32,8 +32,10 @@ If current code and an accepted spec disagree, verify the behavior in code first
 | `guides/production-deployment-checklist.md` | Short human approval checklist and redacted handoff template for the production deployment session.                                                                                                                                                                             |
 | `references/`                               | Long-form references that are too detailed for core docs but still current and linked from canonical docs when relevant.                                                                                                                                                        |
 | `specs/`                                    | Accepted specs that still add detail not yet absorbed into phase or core docs.                                                                                                                                                                                                  |
-| `testing/`                                  | Testing execution plans, traceability matrices, handoff notes, and focused evidence strategies such as [Phase 5 Saga validation](testing/phase-5/saga-validation-strategy.md).                                                                                                  |
+| `testing/`                                  | Testing execution plans, traceability matrices, handoff notes, and focused evidence strategies such as [Saga validation](testing/saga-validation-strategy.md).                                                                                                                  |
 | `presentations/`                            | Thesis and presentation assets; not an engineering source of truth.                                                                                                                                                                                                             |
+
+For this canonicalization pass, `docs/guides/` is out of scope and must not be changed.
 
 ## English Writing Standard
 
@@ -43,7 +45,7 @@ Use Vietnamese business examples only when the example itself needs local contex
 
 ## Execution Artifacts Policy
 
-`docs/superpowers/` is not a canonical documentation store. If temporary execution artifacts are generated there during future work, they must not become the place readers use to understand current product behavior, architecture, or roadmap.
+`docs/superpowers/` contains only temporary execution artifacts. It is not a canonical documentation store and must not become the place readers use to understand current product behavior, architecture, roadmap, or status.
 
 Prompts, batch handoffs, old plans, old audits, and old reports should be deleted after their valuable decisions are absorbed into the core docs, phase docs, or long-lived supporting docs. Do not archive old prompts or handoffs inside the repo.
 
@@ -61,7 +63,7 @@ Each file in `docs/phases/*.md` should act as the final record for that phase an
 - Acceptance Evidence
 - Handoff / Deferred Work
 
-Phase docs should capture phase-specific final behavior and link back to `business-logic.md`, `technical-architecture.md`, `implementation_plan.md`, and `architecture/permission-matrix.md` instead of duplicating large shared sections.
+Phase docs should capture phase-specific final behavior and link back to `business-logic.md`, `technical-architecture.md`, `project-status.md`, and `architecture/permission-matrix.md` instead of duplicating large shared sections.
 
 ## Update Rule
 
@@ -71,7 +73,7 @@ If a rule affects cross-phase business behavior, update `business-logic.md`.
 
 If a rule affects architecture, service ownership, data ownership, Redis, Kafka, TCP, auth, or frontend architecture, update `technical-architecture.md`.
 
-If roadmap, status, sequencing, or deferred work changes, update `implementation_plan.md`.
+If roadmap, status, sequencing, or deferred work changes, update `project-status.md`.
 
 If permissions or roles change, update `architecture/permission-matrix.md` and verify the change against code.
 
