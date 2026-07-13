@@ -92,8 +92,8 @@ Việc phân chia cơ sở dữ liệu dựa trên đặc thù nghiệp vụ và
 
 - PostgreSQL: `qrtable_catalog`, `qrtable_order`, `qrtable_payment`, `qrtable_saas`.
 - MongoDB: `qrtable_auth` (User-Access).
-- Redis KDS: [kds-redis.repository.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts)
-- Redis Cache: [redis.provider.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/libs/providers/src/lib/redis.provider.ts)
+- Redis KDS: [`kds-redis.repository.ts`](../../apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts)
+- Redis Cache: [`redis-client.service.ts`](../../libs/providers/redis-client/src/lib/redis-client.service.ts)
 
 ### Không nói
 

@@ -622,8 +622,8 @@ Chi phí phân tán → phải giải bằng 5 cơ chế (ACT 3)
 ② BFF Gateway: Đối chiếu chéo thông tin danh tính với metadata của phiên gọi món để chặn đứng
                yêu cầu sai lệch tenant ngay tại biên.
 ③ Mạng nội bộ: Tự động inject tenant_id đã được làm sạch vào header TCP / Kafka event payload.
-④ Điểm sử dụng: Áp dụng tự động filter tenant_id tại Repository qua TypeORM Subscriber/Filter
-                và phân vùng key tại Redis/WebSocket room.
+④ Điểm sử dụng: Repository/service của domain owner áp dụng explicit tenant_id predicate
+                cho mọi query tenant-scoped, đồng thời Redis/WebSocket room được phân vùng theo tenant.
 ```
 
 ### Bố cục / hình ảnh

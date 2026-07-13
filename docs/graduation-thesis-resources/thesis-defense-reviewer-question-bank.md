@@ -282,9 +282,9 @@ Trong thiết kế hệ thống phần mềm dịch vụ (SaaS), có 3 phương 
 
 - **Đặc thù nghiệp vụ F&B (SMBs):** POS F&B phục vụ số lượng lớn các quán ăn nhỏ và vừa với doanh thu và chi phí thuê bao thấp. Việc dùng mô hình Pool giúp giảm tối thiểu chi phí vận hành Cloud của nền tảng để tối ưu hóa bài toán kinh tế.
 - **Độ phức tạp vận hành của Microservices:** Hệ thống đã được chia nhỏ thành các database theo service (Catalog DB, Order DB, Payment DB, SaaS DB). Nếu áp dụng thêm mô hình Database-per-tenant, số lượng database cần quản trị sẽ tăng theo cấp số nhân (ví dụ: 1.000 tenant $\times$ 5 services = 5.000 databases!), gây bất khả thi cho việc bảo trì và chạy migrations. Mô hình Pool giúp chúng em kiểm soát việc di trú dữ liệu tập trung trên đúng 5 database của 5 service.
-- **Giải quyết rủi ro rò rỉ bằng Framework/Middleware:** Chúng em khắc phục nhược điểm lớn nhất của mô hình Pool bằng cách tự động hóa kiểm soát ở mức kiến trúc:
-  - **BFF TenantGuard:** Ép buộc gán `tenant_id` từ JWT được ký số bảo mật của Keycloak vào RequestContext.
-  - **TypeORM Subscriber & Global Filter:** Lập trình viên không phải viết thủ công điều kiện `WHERE tenant_id = ...` trên từng câu query. Framework tự động append điều kiện lọc tenant khi truy vấn và tự động inject `tenant_id` khi ghi dữ liệu. Điều này loại bỏ hoàn toàn lỗi quên lọc do con người.
+- **Giải quyết rủi ro rò rỉ bằng guard và invariant rõ ràng:** Chúng em giảm nhược điểm lớn nhất của mô hình Pool bằng cách kiểm soát tenant context tại các boundary:
+  - **BFF TenantGuard:** Xác thực và truyền tenant context đáng tin cậy từ JWT/phiên vào domain boundary.
+  - **Repository/service của domain owner:** Mọi repository/query tenant-scoped phải nhận `tenantId` và áp dụng explicit `WHERE tenant_id = :tenantId`; code review và test kiểm tra invariant này. Redis và WebSocket room cũng được namespace theo tenant. Cách này không dựa vào TypeORM Subscriber, global query filter, hoặc auto-injection ở framework.
 
 Nếu sau này có các khách hàng lớn (Enterprise) yêu cầu cô lập vật lý cao, hệ thống của chúng em vẫn có thể mở rộng bằng cách cấu hình định tuyến kết nối động ở SaaS Service để tách riêng database cho tenant đó.
 

@@ -287,7 +287,7 @@ Các câu hỏi này chính là cấu trúc của các phần sau: kiến trúc 
   - _Tại sao chọn Pool cho QRTable:_
     1. **Tối ưu tài nguyên/chi phí**: POS F&B chủ yếu phục vụ quán vừa và nhỏ (SMBs) có chi phí thuê bao thấp, mô hình Pool giúp chia sẻ tài nguyên phần cứng tốt nhất để tiết kiệm chi phí hạ tầng.
     2. **Độ phức tạp vận hành**: Với 5 microservices có DB riêng, nếu nhân thêm số lượng tenant theo mô hình Silo thì số database tăng vọt ($N \text{ tenants} \times 5 \text{ DBs}$), gây quá tải cho việc chạy migrations. Mô hình Pool giúp chúng em chỉ chạy migration trên đúng 5 DB của 5 service.
-    3. **Độ tin cậy bảo mật**: Khắc phục điểm yếu rò rỉ dữ liệu bằng cách tự động hóa ở mức kiến trúc: **BFF TenantGuard** và **TypeORM Subscriber & Global Filter** (tự động append `WHERE tenant_id = :tid` ở mức framework), giảm thiểu tối đa lỗi con người khi code.
+    3. **Độ tin cậy bảo mật**: Giảm rủi ro rò rỉ dữ liệu bằng **BFF TenantGuard** và invariant ở service owner: mọi repository/query tenant-scoped phải nhận `tenantId` và áp dụng explicit predicate. Điều này giúp review/test phát hiện query thiếu tenant scope.
 
 ---
 

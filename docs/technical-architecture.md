@@ -1566,7 +1566,7 @@ docker compose -f docker-compose.proxy.yaml up -d  # Proxy after DNS/firewall re
 
 ### 15.2 Deployment Priorities (Phased)
 
-The order below is the canonical roadmap after closing Phase 4D.1; When detailed status is needed, use `docs/implementation_plan.md` as the truth source.
+The order below is the canonical roadmap after closing Phase 4D.1; when detailed status is needed, use [project status](project-status.md) as the truth source.
 
 ```txt
 Phase 0 — Foundation / setup:

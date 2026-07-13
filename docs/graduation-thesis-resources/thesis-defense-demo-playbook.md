@@ -5,7 +5,7 @@
 > 1. **Video Demo 90 giây (Screen Recording & Edit):** Nhịp độ cực nhanh, tập trung cắt bỏ thao tác thừa, zoom vào bằng chứng kỹ thuật (Redis, Kafka, DB).
 > 2. **Demo trực tiếp trước Hội đồng (5 phút Live):** Mạch thuyết trình học thuật, kết hợp thao tác giao diện song song với trình chiếu trạng thái hạ tầng thực tế.
 >
-> **Tài liệu tham chiếu thiết kế:** [thesis-defense-slide-refactor-v2.md](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/docs/graduation-thesis-resources/thesis-defense-slide-refactor-v2.md) và [kafka-qrtable.md](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/docs/guides/kafka-qrtable.md).
+> **Tài liệu tham chiếu thiết kế:** [thesis-defense-slide-refactor-v2.md](thesis-defense-slide-refactor-v2.md) và [kafka-qrtable.md](../guides/kafka-qrtable.md).
 
 ---
 
