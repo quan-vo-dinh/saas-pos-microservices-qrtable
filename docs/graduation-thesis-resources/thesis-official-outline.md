@@ -3,7 +3,7 @@
 > Tài liệu làm việc phục vụ viết bản khóa luận tiếng Việt.
 > Ngày lập: 2026-05-28.
 > Nguồn nền: `thesis-evidence-map.md`, `presentation-format-graduation-thesis.md`, `docs/README.md`, `docs/technical-architecture.md`, `docs/business-logic.md`, `docs/testing/traceability-matrix.md`.
-> Nếu tiếp tục công việc sau khi mất/compact context, đọc `thesis-workflow-plan.md` trước.
+> Nếu tiếp tục công việc sau khi mất/compact context, đọc `thesis-workflow.md` trước.
 
 ## 1. Mục đích tài liệu
 
@@ -11,9 +11,7 @@ Tài liệu này là bản khung chính thức để chuyển từ bản đồ b
 
 Tài liệu này không phải bản khóa luận hoàn chỉnh. Khi bắt đầu viết từng chương, cần quay lại `thesis-evidence-map.md` để kiểm tra nguồn bằng chứng, trạng thái implementation nội bộ và chính sách tránh overclaim.
 
-Ghi chú cập nhật 2026-06-01: technical docs đã bổ sung Phase 4D kỹ thuật về Dashboard & Reporting và Phase 4D.1 về dashboard entitlement/UI polish. Outline này giữ vai trò chỉ dẫn report; sau Plan A và Plan B ngày 2026-06-04, phần còn lại trước bản nộp cuối tập trung vào Chương 1, Abstract/phụ lục, screenshot/demo thật và artifact production/pilot nếu có.
-
-Ghi chú sync 2026-06-04: Chương 3 đã backfill yêu cầu Dashboard/Reporting và staff management, đổi tên thành `Từ vận hành F&B đến yêu cầu hệ thống QRTable`, cập nhật Hình 3.1 và build LaTeX pass. Chương 4 đã được polish theo hướng `Thiết kế kiến trúc và quyết định công nghệ cho QRTable`, bổ sung bảng quyết định công nghệ, bảng thiết kế dữ liệu theo ranh giới dịch vụ và Hình 4.1-4.10. Chương 5 đã đổi hướng thành `Hiện thực các luồng vận hành cốt lõi của QRTable`, gộp evidence theo luồng ở Bảng 5.1 và bỏ bảng shared libraries độc lập. Plan B/Chương 6-7 đã được audit/rerun sau Plan A: Chương 6 đổi thành `Kiểm chứng và đánh giá hệ thống QRTable`, phản ánh Dashboard/Reporting, entitlement, production/pilot claim policy và tham chiếu trực tiếp tới Bảng 4.3/4.4/4.5, Hình 5.1-Hình 5.5, Bảng 5.1; Chương 7 đã có nội dung kết luận/hướng phát triển thật. Phần còn lại trước bản nộp cuối là Chương 1, Abstract/phụ lục, screenshot/demo thật và artifact production/pilot nếu có.
+Current baseline: the LaTeX report contains all seven chapters, appendices, and a 200-page rendered PDF. This outline is a report-maintenance aid; use `thesis-workflow.md` and `thesis-artifact-register.md` for current status and maintained evidence.
 
 ## 2. Nguyên tắc viết khóa luận
 
@@ -83,7 +81,7 @@ Mục tiêu thực tế cho bản nháp đầu: khoảng 105-130 trang nội dun
 | Chương 6. Đánh giá                                               | 14-20          | Đánh giá chức năng, kiến trúc và NFR với claim policy an toàn.                          |
 | Chương 7. Kết luận và hướng phát triển                           | 5-7            | Tổng kết đóng góp, hạn chế và hướng phát triển.                                         |
 
-Tổng mục tiêu cho nội dung chính: khoảng 102-137 trang tùy mức chi tiết. Bản nháp nên hướng tới 105-130 trang để có dáng của một báo cáo khóa luận đầy đủ; các phần mở rộng nên tập trung vào Chương 2, Chương 4, Chương 5 và Chương 6 thay vì kéo dài phần mở đầu hoặc kết luận.
+The 200-page rendered report is the accepted baseline. The former 105–130-page drafting target is superseded and is not an acceptance criterion without a current institutional requirement.
 
 ## 6. Mục lục chi tiết đề xuất
 
