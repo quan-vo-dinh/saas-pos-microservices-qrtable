@@ -125,11 +125,11 @@ Nguồn ưu tiên theo loại câu hỏi:
 
 Các tài liệu evidence đọc khi slide chạm đúng chủ đề:
 
-- `docs/testing/phase-5/traceability-matrix.md`
+- `docs/testing/traceability-matrix.md`
   - Dùng khi đánh giá mức cover hoặc thiết kế slide bằng chứng.
   - Không tự suy diễn rằng mọi phần đều đã cover.
 
-- `docs/testing/phase-5/saga-validation-strategy.md`
+- `docs/testing/saga-validation-strategy.md`
   - Dùng khi thảo luận Saga, compensation, consistency hoặc failure path.
 
 - `docs/phases/phase-5-testing.md`, `docs/phases/phase-6-observability.md`, `docs/phases/phase-7-deployment.md`
@@ -720,7 +720,7 @@ const assets = {
       'docs/graduation-thesis-resources/thesis-report/assets/diagrams/chapter5-order-confirm-stock.mmd',
       'docs/graduation-thesis-resources/thesis-report/assets/figures/chapter5-order-confirm-stock.pdf',
       'docs/graduation-thesis-resources/thesis-report/assets/test-evidence/appendix-d-order-saga-tests.txt',
-      'docs/testing/phase-5/saga-validation-strategy.md',
+      'docs/testing/saga-validation-strategy.md',
     ],
     replacementOwner: 'user',
     replacementInstructions:
@@ -875,8 +875,8 @@ Sau ba file bắt buộc, chỉ đọc thêm theo câu hỏi đang xử lý:
   - apps/management-app/src/features/landing/payment-section.tsx
 
 - Khi cần đánh giá mức bằng chứng:
-  - docs/testing/phase-5/traceability-matrix.md
-  - docs/testing/phase-5/saga-validation-strategy.md nếu liên quan Saga/consistency/failure.
+  - docs/testing/traceability-matrix.md
+  - docs/testing/saga-validation-strategy.md nếu liên quan Saga/consistency/failure.
   - docs/phases/phase-5-testing.md, docs/phases/phase-6-observability.md, hoặc docs/phases/phase-7-deployment.md nếu liên quan implementation gap, deferred scope hoặc trạng thái tương ứng.
 
 - Khi cần nội dung học thuật, citation, phạm vi hoặc visual đã có trong report, chỉ đọc chương LaTeX liên quan:

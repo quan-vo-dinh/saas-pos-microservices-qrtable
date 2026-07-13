@@ -141,8 +141,8 @@ flowchart TB
 Read in this order of priority:
 
 1. Current code and tests.
-2. `docs/README.md`, accepted phase records, accepted specs.
-3. `docs/testing/phase-5/*` if tracing test coverage.
+2. `docs/README.md`, canonical business/technical docs, and accepted phase records.
+3. `docs/testing/README.md` and the traceability matrix if tracing test coverage.
 4. Legacy guides in `docs/guides/*`.
 5. README boilerplate, generated output, build folders.
 
@@ -159,8 +159,8 @@ Read these files to acquire context:
 | `docs/technical-architecture.md`                  | Microservices, database per service, Redis, Kafka, WebSocket rooms. |
 | `docs/business-logic.md`                          | State machine, business rules, business edge cases.                 |
 | `docs/architecture/permission-matrix.md`          | Roles and permissions before reading admin, POS, and KDS.           |
-| `docs/testing/phase-5/traceability-matrix.md`     | Mapping requirements -> unit/integration/e2e tests.                 |
-| `docs/testing/phase-5/phase-5-handoff.md`         | Latest test/refactor handoff status.                                |
+| `docs/testing/README.md`                          | Taxonomy, gate policy, and how to read evidence.                    |
+| `docs/testing/traceability-matrix.md`             | Mapping requirements to unit/integration/E2E tests and status.      |
 | `docs/guides/react-nextjs-qrtable.md`             | Read when tracing frontend React/Next.js.                           |
 | `docs/guides/kafka-qrtable.md`                    | Read when extending event-driven flows.                             |
 | `docs/guides/redis-qrtable.md`                    | Read when looking into Redis keys/sessions/carts/KDS.               |
@@ -1297,13 +1297,9 @@ Analyze test structures by business flow, rather than looking at all tests at on
 
 Read also:
 
-- `docs/testing/phase-5/README.md`
-- `docs/testing/phase-5/traceability-matrix.md`
-- `docs/testing/phase-5/01-traceability-inventory-plan.md`
-- `docs/testing/phase-5/02-unit-contract-hardening-plan.md`
-- `docs/testing/phase-5/03-integration-boundary-plan.md`
-- `docs/testing/phase-5/04-playwright-e2e-plan.md`
-- `docs/testing/phase-5/05-ci-gates-and-handoff-plan.md`
+- `docs/testing/README.md`
+- `docs/testing/traceability-matrix.md`
+- `docs/testing/saga-validation-strategy.md` when a flow touches consistency or compensation
 
 Key commands to run:
 

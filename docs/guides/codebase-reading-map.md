@@ -141,8 +141,8 @@ flowchart TB
 Đọc theo thứ tự ưu tiên này:
 
 1. Current code và tests.
-2. `docs/README.md`, accepted phase records, accepted specs.
-3. `docs/testing/phase-5/*` nếu đang trace test coverage.
+2. `docs/README.md`, canonical business/technical docs và accepted phase records.
+3. `docs/testing/README.md` và traceability matrix nếu đang trace test coverage.
 4. Guides cũ trong `docs/guides/*`.
 5. README boilerplate, generated output, folder build.
 
@@ -159,8 +159,8 @@ Lưu ý quan trọng: `AGENTS.md` mô tả target standards của dự án. Tron
 | `docs/technical-architecture.md`                  | Microservices, database per service, Redis, Kafka, WebSocket rooms. |
 | `docs/business-logic.md`                          | State machine, business rules, edge cases nghiệp vụ.                |
 | `docs/architecture/permission-matrix.md`          | Role/permission trước khi đọc admin, POS, KDS.                      |
-| `docs/testing/phase-5/traceability-matrix.md`     | Mapping requirement -> unit/integration/e2e tests.                  |
-| `docs/testing/phase-5/phase-5-handoff.md`         | Trạng thái handoff test/refactor mới nhất.                          |
+| `docs/testing/README.md`                          | Taxonomy, gate policy và cách đọc evidence.                         |
+| `docs/testing/traceability-matrix.md`             | Mapping requirement -> unit/integration/e2e tests và trạng thái.    |
 | `docs/guides/react-nextjs-qrtable.md`             | Nên đọc kèm khi trace frontend React/Next.js.                       |
 | `docs/guides/kafka-qrtable.md`                    | Đọc khi cần mở rộng event-driven flow.                              |
 | `docs/guides/redis-qrtable.md`                    | Đọc khi cần nắm Redis key/session/cart/KDS.                         |
@@ -1298,13 +1298,9 @@ Frontend nên tách UI state và server state. Server state nên đi qua TanStac
 
 Đọc thêm:
 
-- `docs/testing/phase-5/README.md`
-- `docs/testing/phase-5/traceability-matrix.md`
-- `docs/testing/phase-5/01-traceability-inventory-plan.md`
-- `docs/testing/phase-5/02-unit-contract-hardening-plan.md`
-- `docs/testing/phase-5/03-integration-boundary-plan.md`
-- `docs/testing/phase-5/04-playwright-e2e-plan.md`
-- `docs/testing/phase-5/05-ci-gates-and-handoff-plan.md`
+- `docs/testing/README.md`
+- `docs/testing/traceability-matrix.md`
+- `docs/testing/saga-validation-strategy.md` khi flow chạm consistency hoặc compensation
 
 Lệnh tham khảo:
 

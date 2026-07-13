@@ -35,7 +35,7 @@ Yêu cầu chung:
 - Không revert thay đổi không do bạn tạo.
 - Nếu cần tài liệu framework/library/API/cloud hiện tại, dùng Context7/ctx7 trước.
 - Nếu cần kiểm tra UI/screenshot/local app, dùng Browser, trừ Phase 5D scaffold/manual capture handoff vì phase đó cố ý không chụp UI tự động.
-- Nếu phase chạm Saga, consistency hoặc Chương 5/6, đọc `docs/testing/phase-5/saga-validation-strategy.md` và không claim full production-grade Saga hardening.
+- Nếu phase chạm Saga, consistency hoặc Chương 5/6, đọc `docs/testing/saga-validation-strategy.md` và không claim full production-grade Saga hardening.
 - Cuối session, chạy verification phù hợp và cập nhật `thesis-workflow-plan.md`.
 ```
 
@@ -76,7 +76,7 @@ Tiếp tục Phase 3A: Audit source/docs cho Chương 3 - Phân tích yêu cầu
 
 Mục tiêu duy nhất là tạo requirement evidence matrix cho Chương 3, chưa viết nội dung chương dài.
 
-Đọc workflow plan trước, sau đó đọc tối thiểu: `thesis-official-outline.md`, `thesis-evidence-map.md`, `docs/business-logic.md`, `docs/architecture/permission-matrix.md`, `docs/testing/phase-5/traceability-matrix.md`, và các specs/phase docs liên quan nếu cần.
+Đọc workflow plan trước, sau đó đọc tối thiểu: `thesis-official-outline.md`, `thesis-evidence-map.md`, `docs/business-logic.md`, `docs/architecture/permission-matrix.md`, `docs/testing/traceability-matrix.md`, và các canonical/phase docs liên quan nếu cần.
 
 Output mong muốn:
 - Một section hoặc file audit ngắn cho Chương 3, ví dụ `docs/graduation-thesis-resources/chapter-03-requirement-evidence.md`.
@@ -273,7 +273,7 @@ Tiếp tục Phase 5A: Audit implementation evidence cho Chương 5.
 
 Mục tiêu duy nhất là tạo implemented evidence table, runtime flow evidence, sequence diagram plan và screenshot/demo artifact plan cho Chương 5, chưa viết chương dài.
 
-Đọc workflow plan, evidence map, official outline, `docs/DOC-CODE-ANCHORS.md`, `docs/business-logic.md`, `docs/technical-architecture.md`, `docs/testing/phase-5/saga-validation-strategy.md`, source code liên quan trong `apps/` và `libs/`.
+Đọc workflow plan, evidence map, official outline, `docs/DOC-CODE-ANCHORS.md`, `docs/business-logic.md`, `docs/technical-architecture.md`, `docs/testing/saga-validation-strategy.md`, source code liên quan trong `apps/` và `libs/`.
 
 Output mong muốn:
 
@@ -352,7 +352,7 @@ Mục tiêu duy nhất là viết bản nháp Chương 5 vào `thesis-report/cha
 Yêu cầu:
 
 - Chứng minh hệ thống được hiện thực hóa bằng code/docs/tests/evidence (không chỉ mô tả cấu trúc).
-- Khi viết Saga, dùng `docs/testing/phase-5/saga-validation-strategy.md`: chỉ claim hai luồng đại diện Order Confirm Saga và SaaS Onboarding Mini-Saga, không claim durable saga state/CDC/exactly-once/full hardening.
+- Khi viết Saga, dùng `docs/testing/saga-validation-strategy.md`: chỉ claim hai luồng đại diện Order Confirm Saga và SaaS Onboarding Mini-Saga, không claim durable saga state/CDC/exactly-once/full hardening.
 - Không biến Chương 5 thành README hoặc user manual.
 - Chỉ đưa implementation detail khi phục vụ claim kỹ thuật.
 - Giữ nguyên Hình 5.1–5.5 đã chèn từ Phase 5B; chỉ bổ sung prose giải thích và bảng evidence.
@@ -372,7 +372,7 @@ Tiếp tục Phase 5D: Screenshot/demo scaffold và manual capture handoff.
 
 Mục tiêu duy nhất là dựng khung screenshot/demo artifact cho Chương 5 và Phụ lục A: xác định ảnh cần có từ tài liệu dự án/source code, tạo mapping/ref/caption, tạo file ảnh placeholder trắng đúng tên/vị trí, chèn khung vào LaTeX và build verify. Không chụp UI tự động trong phase này.
 
-Đọc workflow plan trước, sau đó đọc tối thiểu: `thesis-artifact-backlog.md` §5, `thesis-phase5a-evidence-audit.md` §4, `docs/testing/phase-5/saga-validation-strategy.md`, `thesis-report/chapters/05-trien-khai-he-thong.tex`, `thesis-report/appendices/a-ui-gallery.tex`, `docs/business-logic.md` và source path cần thiết để hiểu màn hình tương ứng.
+Đọc workflow plan trước, sau đó đọc tối thiểu: `thesis-artifact-backlog.md` §5, `thesis-phase5a-evidence-audit.md` §4, `docs/testing/saga-validation-strategy.md`, `thesis-report/chapters/05-trien-khai-he-thong.tex`, `thesis-report/appendices/a-ui-gallery.tex`, `docs/business-logic.md` và source path cần thiết để hiểu màn hình tương ứng.
 
 Output mong muốn:
 
@@ -414,7 +414,7 @@ Tiếp tục Phase 6A: Build evaluation tables/claim policy.
 
 Mục tiêu duy nhất là chuẩn bị bảng/ma trận đánh giá cho Chương 6, chưa viết Chương 6 dài.
 
-Đọc workflow plan, evidence map, traceability matrix, phase-5 handoff, `docs/testing/phase-5/saga-validation-strategy.md`, tests/docs cần thiết.
+Đọc workflow plan, evidence map, `docs/testing/README.md`, traceability matrix, `docs/testing/saga-validation-strategy.md`, tests/docs cần thiết.
 
 Output mong muốn:
 

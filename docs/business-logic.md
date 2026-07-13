@@ -5,7 +5,7 @@
 
 This document describes in detail the core business flows, from initial setup to daily restaurant operations, focusing on the QR-based table ordering (QR-based table ordering) model.
 
-When there are conflicts, prioritize in this order: current code/tests, accepted specs in `docs/specs/`, phase records in `docs/phases/`, then this overview document. The detailed RBAC matrix is ​​located at `docs/architecture/permission-matrix.md`.
+When there are conflicts, prioritize in this order: current code/tests, canonical business and technical documents, phase records in `docs/phases/`, then supporting evidence. The detailed RBAC matrix is ​​located at `docs/architecture/permission-matrix.md`.
 
 ---
 
@@ -538,7 +538,7 @@ Offline conflict resolution, client-side retry policy, and automatic synchroniza
 
 Manage order status from creation to completion.
 
-> **Step 2.4 specification (canonical Q1–Q12):** [Step 2.4 business specification](specs/business-logic-step-2.4-spec.md) — additional ownership service, bill request explicit, transfer saga, RBAC cancel permission separation. Section §8 serves as an overview; When deviating, prioritize Step 2.4 specification.
+> **Canonical rule:** The ownership boundaries, explicit bill request, table-transfer flow, and cancellation permissions in this section are interpreted with `technical-architecture.md`, `architecture/permission-matrix.md`, the relevant phase records, and current code/tests. No separate specification overrides those sources.
 
 > **Enum casing convention:** The diagram + rules below use **Title Case** (`Draft`, `Pending`, `Processing`, `Ready`, `Served`, `Completed`, `Canceled`) for readability. Enum values ​​canonical are **UPPERCASE** (`DRAFT`, `PENDING`, ...) — see `libs/shared/types/src/lib/order.types.ts` and `docs/phases/phase-2a-order-kafka.md` Step 2.3. One-to-one mapping (`Draft` ↔ `DRAFT`, etc.).
 

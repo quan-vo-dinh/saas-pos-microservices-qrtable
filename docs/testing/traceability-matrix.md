@@ -9,7 +9,7 @@
 ## Status definitions
 
 - **`covered`** — Existing tests protect the target layer for this rule.
-- **`partial`** — Existing tests cover part of the rule; a siner layer, fixture, live stack proof, or edge case is still needed.
+- **`partial`** — Existing tests cover part of the rule; a finer-grained layer, fixture, live-stack proof, or edge case is still needed.
 - **`missing`** — Behavior appears implemented or is the current contract, but no adequate test was found.
 - **`implementation-gap`** — Canonical docs describe a rule that is not clearly implemented; do not add tests until behavior is built or the spec changes.
 - **`security-gap`** — Security hardening is insufficient for production or demo-public exposure; current tests may only cover route shape or presence.
@@ -23,6 +23,8 @@
 - Browser E2E today is limited to `tests/e2e/step-2.7-realtime.spec.ts` and `tests/e2e/phase-3-payment.spec.ts`.
 - **Stack-dependent** items need PostgreSQL, Redis, Kafka, Keycloak, frontend dev servers, or provider credentials when noted.
 - **No test file found** means the inventory did not locate an adequate spec for that rule; it does not mean the rule is unimportant.
+
+**Current verification sync (2026-06-01):** `pnpm nx test frontend-utils` is green with runtime-dependent integration suites skipped, `pnpm exec nx run-many -t test --parallel=3` is green for all 23 projects after the M1 stale-expectation fixes, and the M2 seeded integration gates are green for Order, Payment, Kitchen, SaaS, frontend-utils live BFF/Keycloak, and the permission-matrix smoke. The latest saved Playwright artifact is still red because the Customer PWA was not running. Do not treat browser E2E as green until rerun against a live full stack.
 
 **How test locations are written:** Paths are given as bullets under each rule so they wrap in the editor. The first path segment is the app or library root; deeper paths follow in the same bullet where helpful.
 
@@ -188,13 +190,13 @@
 
 **Requirement:** Staff confirm is orchestrated by `OrderConfirmSagaService`: lock/validate order and bill, ensure a durable versioned Catalog stock reservation, commit Order rows plus the returned version and `order.confirmed` outbox, replay already-`PROCESSING` orders, and release the matching reservation version if Order commit/outbox fails after Catalog acknowledges deduct.
 
-**Sources:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); `phase-2a-order-kafka` accepted decisions; `phase-4a-saga-hardening`; `phase-5-p0-order-stock-confirmation-spec`.
+**Sources:** `business-logic` (4.B, 8.B); `technical-architecture` (12.1); `phase-2a-order-kafka` accepted decisions; `phase-4a-saga-hardening`.
 
 **Tests:** `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`; `apps/order/src/app/modules/order/tests/catalog-stock-gateway.service.spec.ts`; `apps/catalog/src/app/modules/menu-item/tests/stock-reservation.service.spec.ts`; Order service delegate spec; Catalog menu-item repository spec; order-confirmed payload spec; opt-in external-stack specs `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts` and `order-stock-concurrency.integration.spec.ts`.
 
 **Target layer:** integration. **Stack:** PostgreSQL, Catalog TCP, Kafka or outbox harness.
 
-**Notes:** Unit-contract coverage proves Saga orchestration, versioned deduct/release contracts, Order version/outbox persistence, replay, timeout handling, compensation timing, and original-error preservation. On 2026-06-20, the opt-in PostgreSQL plus Catalog TCP slice passed duplicate deduct, discarded successful response followed by retry, compensation/reconfirm to version 2, and stale version-1 release; the existing live Order/Catalog contention slice also passed one success, one `CATALOG_STOCK_INSUFFICIENT`, final stock zero, and one outbox. Recovery from a discarded response requires retrying the original confirm; no autonomous recovery worker or exactly-once delivery is claimed. The thesis evidence strategy is captured in `docs/testing/phase-5/saga-validation-strategy.md`.
+**Notes:** Unit-contract coverage proves Saga orchestration, versioned deduct/release contracts, Order version/outbox persistence, replay, timeout handling, compensation timing, and original-error preservation. On 2026-06-20, the opt-in PostgreSQL plus Catalog TCP slice passed duplicate deduct, discarded successful response followed by retry, compensation/reconfirm to version 2, and stale version-1 release; the existing live Order/Catalog contention slice also passed one success, one `CATALOG_STOCK_INSUFFICIENT`, final stock zero, and one outbox. Recovery from a discarded response requires retrying the original confirm; no autonomous recovery worker or exactly-once delivery is claimed. The thesis evidence strategy is captured in `docs/testing/saga-validation-strategy.md`.
 
 ---
 
@@ -436,7 +438,7 @@
 
 **Requirement:** Phase 4B tenant and platform `x-secret-key` webhooks must validate the value against the stored tenant or platform secret before production or demo-public exposure.
 
-**Sources:** `business-logic` (6.A); `phase-4b-saas-onboarding` handoff; `docs/specs/business-logic-phase-4b-spec.md` webhook note.
+**Sources:** `business-logic` (6.A); `phase-4b-saas-onboarding`; `guides/sepay-configuration-guide-phase3.md`.
 
 **Tests:** BFF SePay webhook controller spec (SaaS module); Payment service settlement spec; SaaS subscription invoice service spec; TCP logging interceptor redaction spec.
 
@@ -562,7 +564,7 @@
 
 **Target layer:** unit-contract. **Stack:** Redis for OAuth state; local mock SePay only if exercising provider exchange.
 
-**Notes:** Tests cover authorize URL, secret encryption, and BFF callback forwarding; add service-level tests for Redis state TTL, consume, and replay rejection. Provider-facing tests must follow `docs/testing/phase-5/specs/phase-5-sepay-local-mock-testing-policy.md`; live SePay is manual opt-in only.
+**Notes:** Tests cover authorize URL, secret encryption, and BFF callback forwarding; add service-level tests for Redis state TTL, consume, and replay rejection. Provider-facing tests follow the mock-first policy in `docs/testing/README.md`; live SePay is manual opt-in only.
 
 ---
 
@@ -576,7 +578,7 @@
 
 **Target layer:** unit-contract. **Stack:** none for unit; local mock SePay for integration around bank list or webhook upsert.
 
-**Notes:** Do not require real SePay, Vercel redirect URI, or a public tunnel for default tests. Use `docs/testing/phase-5/specs/phase-5-sepay-local-mock-testing-policy.md` for payment-settings integration and E2E coverage.
+**Notes:** Do not require real SePay, Vercel redirect URI, or a public tunnel for default tests. The mock-first policy in `docs/testing/README.md` applies to payment-settings integration and E2E coverage.
 
 ---
 

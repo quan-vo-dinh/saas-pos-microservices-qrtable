@@ -739,7 +739,7 @@ Responsibility:
 - Session Management: durable session in PostgreSQL (Order DB); Redis is active cache/TTL for fast path
 - Empty session recovery: Order owns stale/closed empty-session release and the staff `release_empty_table_session` command; Catalog only updates the table after Order validates tenant/table/session ownership, `orderCount == 0`, no bill and no persisted orders
 - Shared Cart: multi-device cart through Redis Hash + global cart version (optimistic concurrency)
-- Order State Machine: persist from `PENDING` or higher; `DRAFT` refers to cart/UI — see docs/specs/business-logic-step-2.4-spec.md §3.1
+- Order State Machine: persist from `PENDING` or higher; `DRAFT` refers to cart/UI. The matching business rules and accepted Order behavior are recorded in `business-logic.md` and `phases/phase-2a-order-kafka.md`.
 - Stock: Order service **does not** mutate Catalog tables; when confirming (`PENDING → PROCESSING`), it asks Catalog to ensure a versioned reservation and stores the returned version.
   - Order cancellation persists cancellation state, actor, reason, and timestamp in the Order flow; there is no generic Order audit-log implementation. RBAC cancellation is state-specific — permission-matrix §6.1
 - Bill is an Order service entity. It is tenant- and session-scoped and aggregates its included `orderIds`; it is not a separate Payment or Catalog aggregate.
@@ -1398,7 +1398,7 @@ SaaS onboarding is the second representative saga-style flow. `OnboardingSagaSer
 
 Payment completion is currently documented as settlement + outbox + idempotent retry/finalization baseline. It is not claimed as a full Payment Complete Saga with durable saga state and compensation for every session/table failure mode.
 
-**Validation strategy for thesis evidence:** Saga verification is multi-layered rather than a single browser proof. Order Confirm uses unit/contract tests for orchestration and every reservation state transition. Opt-in PostgreSQL plus Catalog TCP tests prove duplicate deduct, discarded-response retry, versioned compensation/reconfirm, stale release, and two-order contention. SaaS onboarding uses unit/contract tests for rollback rules, opt-in PostgreSQL integration for tenant/subscription/outbox persistence and rollback, and opt-in live Payment TCP integration for Payment-owned settings creation. UI screenshots, DB rows, outbox rows, and logs are supporting artifacts; they do not replace automated tests. The canonical evidence guide is `docs/testing/phase-5/saga-validation-strategy.md`.
+**Validation strategy for thesis evidence:** Saga verification is multi-layered rather than a single browser proof. Order Confirm uses unit/contract tests for orchestration and every reservation state transition. Opt-in PostgreSQL plus Catalog TCP tests prove duplicate deduct, discarded-response retry, versioned compensation/reconfirm, stale release, and two-order contention. SaaS onboarding uses unit/contract tests for rollback rules, opt-in PostgreSQL integration for tenant/subscription/outbox persistence and rollback, and opt-in live Payment TCP integration for Payment-owned settings creation. UI screenshots, DB rows, outbox rows, and logs are supporting artifacts; they do not replace automated tests. The canonical evidence guide is `docs/testing/saga-validation-strategy.md`.
 
 ### 12.2 Idempotency
 

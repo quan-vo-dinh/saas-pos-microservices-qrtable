@@ -165,7 +165,7 @@ Không claim:
 | Saga implementation    | `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`            |
 | Catalog stock gateway  | `apps/order/src/app/modules/order/services/catalog-stock-gateway.service.ts`         |
 | Saga tests             | `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`          |
-| Saga evidence strategy | `docs/testing/phase-5/saga-validation-strategy.md`                                   |
+| Saga evidence strategy | `docs/testing/saga-validation-strategy.md`                                           |
 | Report implementation  | `docs/graduation-thesis-resources/thesis-report/chapters/05-trien-khai-he-thong.tex` |
 
 Claim an toàn:
@@ -225,8 +225,8 @@ Không claim:
 
 | Chủ đề              | Anchor                                                                                                        |
 | ------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Traceability matrix | `docs/testing/phase-5/traceability-matrix.md`                                                                 |
-| Saga validation     | `docs/testing/phase-5/saga-validation-strategy.md`                                                            |
+| Traceability matrix | `docs/testing/traceability-matrix.md`                                                                         |
+| Saga validation     | `docs/testing/saga-validation-strategy.md`                                                                    |
 | Phase 5-7 status    | `docs/phases/phase-5-testing.md`, `docs/phases/phase-6-observability.md`, `docs/phases/phase-7-deployment.md` |
 | Report evaluation   | `docs/graduation-thesis-resources/thesis-report/chapters/06-danh-gia.tex`                                     |
 

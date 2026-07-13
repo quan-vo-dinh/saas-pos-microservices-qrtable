@@ -31,7 +31,7 @@ IMPLEMENTED + VERIFIED for the accepted thesis scope.
 ## Acceptance Evidence
 
 - SaaS entities, services, controllers/contracts, guards, BFF routes, Management App onboarding/settings surfaces, Customer PWA suspension behavior, and focused tests are present.
-- Phase 5 traceability and saga-validation artifacts cover lifecycle, plan/feature gating, payment-reference separation, and the accepted onboarding evidence.
+- [Testing evidence](../testing/README.md), traceability, and Saga-validation artifacts cover lifecycle, plan/feature gating, payment-reference separation, and the accepted onboarding evidence.
 
 ## Deferred Work
 

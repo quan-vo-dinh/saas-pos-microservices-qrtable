@@ -2,7 +2,7 @@
 
 > Tài liệu làm việc phục vụ viết bản khóa luận tiếng Việt.
 > Ngày lập: 2026-05-28.
-> Nguồn nền: `thesis-evidence-map.md`, `presentation-format-graduation-thesis.md`, `docs/README.md`, `docs/technical-architecture.md`, `docs/business-logic.md`, `docs/testing/phase-5/traceability-matrix.md`.
+> Nguồn nền: `thesis-evidence-map.md`, `presentation-format-graduation-thesis.md`, `docs/README.md`, `docs/technical-architecture.md`, `docs/business-logic.md`, `docs/testing/traceability-matrix.md`.
 > Nếu tiếp tục công việc sau khi mất/compact context, đọc `thesis-workflow-plan.md` trước.
 
 ## 1. Mục đích tài liệu
@@ -270,7 +270,7 @@ Vai trò: Chuyển bối cảnh và lý thuyết thành yêu cầu cụ thể ch
 - Không claim production-grade observability/deployment nếu chỉ có thiết kế hoặc demo giới hạn.
 - Không đưa các module mở rộng như HRM/payroll/shift scheduling, CRM, BI/AI nâng cao, warehouse/OLAP, scheduled export, staff performance analytics, forecasting/anomaly, native mobile hoặc advanced inventory/BOM vào phạm vi kết quả chính nếu chưa có evidence.
 
-Nguồn chính: `docs/business-logic.md`, `docs/architecture/permission-matrix.md`, phase records, `docs/specs/*`.
+Nguồn chính: `docs/business-logic.md`, `docs/technical-architecture.md`, `docs/architecture/permission-matrix.md`, và phase records.
 
 Artifact nên có:
 
@@ -465,7 +465,7 @@ Vai trò: Chứng minh hệ thống đã được hiện thực hóa, nhưng kh�
 - Bảng evidence ngắn theo luồng: mục tiêu, bất biến/ranh giới, bằng chứng và giới hạn.
 - Chỉ đưa screenshot đại diện cho luồng chính; gallery đầy đủ để phụ lục.
 
-Nguồn chính: source code trong `apps/`, `libs/`, phase records, `docs/guides/*`, `docs/testing/phase-5/*`.
+Nguồn chính: source code trong `apps/`, `libs/`, phase records, `docs/guides/*`, và `docs/testing/*`.
 
 Artifact nên có:
 
@@ -549,7 +549,7 @@ Vai trò: Đánh giá khách quan dựa trên bằng chứng, không overclaim.
 - Những gì chưa thể kết luận.
 - Tác động thực tiễn và bài học kỹ thuật.
 
-Nguồn chính: `docs/testing/phase-5/traceability-matrix.md`, `docs/testing/phase-5/phase-5-handoff.md`, tests trong `apps/**`, `libs/**`, `tests/e2e`, demo artifacts.
+Nguồn chính: `docs/testing/README.md`, `docs/testing/traceability-matrix.md`, tests trong `apps/**`, `libs/**`, `tests/e2e`, demo artifacts.
 
 Artifact nên có:
 

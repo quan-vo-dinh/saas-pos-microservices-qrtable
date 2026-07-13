@@ -11,7 +11,7 @@ Chương 6 cần đánh giá hệ thống dựa trên bằng chứng đã có, k
 Thứ tự ưu tiên bằng chứng:
 
 1. Source code và tests hiện tại trong `apps/`, `libs/`, `tests/`.
-2. `docs/testing/phase-5/traceability-matrix.md` và `docs/testing/phase-5/phase-5-handoff.md`.
+2. `docs/testing/README.md` và `docs/testing/traceability-matrix.md`.
 3. Canonical docs: `docs/README.md`, `docs/DOC-CODE-ANCHORS.md`, `docs/technical-architecture.md`, `docs/business-logic.md`, `docs/architecture/permission-matrix.md`.
 4. Audit khóa luận đã hoàn tất: `chapter-03-requirement-evidence.md`, `chapter-04-architecture-evidence.md`, `thesis-phase5a-evidence-audit.md`.
 5. Thesis outline/evidence map để kiểm soát phạm vi và overclaim.
@@ -39,7 +39,7 @@ Sync 2026-06-04 sau Plan B: Chương 6 đã được refactor thành `Kiểm ch�
 
 ## 3. Requirement traceability summary
 
-Nguồn chính: `docs/testing/phase-5/traceability-matrix.md` và `docs/testing/phase-5/phase-5-handoff.md`.
+Nguồn chính: `docs/testing/README.md` và `docs/testing/traceability-matrix.md`.
 
 ### 3.1 Tổng quan trạng thái
 
@@ -76,7 +76,7 @@ Traceability handoff ghi nhận lệnh default `pnpm exec nx run-many -t test --
 
 ### 3.4 Saga evidence strategy
 
-Nguồn chính: `docs/testing/phase-5/saga-validation-strategy.md`.
+Nguồn chính: `docs/testing/saga-validation-strategy.md`.
 
 Chương 6 nên chứng minh Saga bằng chuỗi bằng chứng nhiều lớp, không chỉ dựa vào tên service:
 

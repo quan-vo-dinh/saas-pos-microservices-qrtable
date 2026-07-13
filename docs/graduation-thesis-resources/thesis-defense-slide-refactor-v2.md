@@ -328,7 +328,7 @@ Slide này giúp Hội đồng thấy ngay lập tức tính chuẩn mực học
 ### Nguồn
 
 - `thesis-report/chapters/01-mo-dau.tex`
-- `docs/testing/phase-5/traceability-matrix.md`
+- `docs/testing/traceability-matrix.md`
 - References: NIST SP 800-145, RFC 7519, OWASP ASVS, Garcia-Molina 1987, Fowler 2017, Richardson 2018
 
 ---

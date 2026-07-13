@@ -65,9 +65,9 @@ Nguồn tài liệu đã đối chiếu:
 - `docs/graduation-thesis-resources/thesis-defense-slide-builder-script.md`, đặc biệt slide 24-34
 - `docs/graduation-thesis-resources/thesis-report/chapters/06-danh-gia.tex`
 - `docs/graduation-thesis-resources/thesis-report/appendices/d-test-evidence.tex`
-- `docs/testing/phase-5/traceability-matrix.md`
-- `docs/testing/phase-5/phase-5-handoff.md`
-- `docs/testing/phase-5/saga-validation-strategy.md`
+- `docs/testing/traceability-matrix.md`
+- `docs/testing/README.md`
+- `docs/testing/saga-validation-strategy.md`
 - `docs/phases/phase-5-testing.md`
 - `docs/phases/phase-6-observability.md`
 - `docs/phases/phase-7-deployment.md`
@@ -453,7 +453,7 @@ Thay đổi LaTeX ở phiên sau:
 
 ### Checkpoint 1 - Resync số liệu traceability
 
-- Đối chiếu `docs/phases/phase-5-testing.md`, `docs/testing/phase-5/traceability-matrix.md`, `docs/testing/phase-5/phase-5-handoff.md`.
+- Đối chiếu `docs/phases/phase-5-testing.md`, `docs/testing/README.md`, `docs/testing/traceability-matrix.md`.
 - Chốt một snapshot duy nhất. Khả năng cao: `52 total / 38 covered / 9 partial / 1 implementation gap / 4 deferred`.
 - Không đưa số permission/role nếu chưa chốt theo current code/artifact.
 

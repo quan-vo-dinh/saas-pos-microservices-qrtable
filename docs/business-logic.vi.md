@@ -5,7 +5,7 @@
 
 Tài liệu này mô tả chi tiết các luồng nghiệp vụ cốt lõi, từ thiết lập ban đầu đến vận hành hàng ngày của nhà hàng, tập trung vào mô hình đặt món tại bàn qua mã QR (QR-based table ordering).
 
-Khi có sự xung đột thông tin, ưu tiên áp dụng theo thứ tự: mã nguồn/test hiện tại, spec đã được chấp nhận trong `docs/specs/`, tài liệu ghi chép phase trong `docs/phases/`, sau đó mới đến tài liệu tổng quan này. Ma trận RBAC chi tiết nằm tại [permission-matrix.md](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/docs/architecture/permission-matrix.md).
+Khi có sự xung đột thông tin, ưu tiên áp dụng theo thứ tự: mã nguồn/test hiện tại, tài liệu business/technical canonical, tài liệu ghi chép phase trong `docs/phases/`, sau đó mới đến bằng chứng hỗ trợ. Ma trận RBAC chi tiết nằm tại [permission-matrix.md](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/docs/architecture/permission-matrix.md).
 
 ---
 
@@ -564,7 +564,7 @@ Chính sách gửi lại (Retry Policy):
 
 Quản lý các bước chuyển đổi trạng thái của đơn hàng từ lúc khởi tạo đến khi hoàn tất.
 
-> **Đặc tả chi tiết Step 2.4 (đồng bộ Q1–Q12):** Xem thêm tại [business-logic-step-2.4-spec.md](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/docs/specs/business-logic-step-2.4-spec.md) để biết thêm về phân chia sở hữu dịch vụ, yêu cầu bill tường minh, luồng chuyển bàn saga và phân quyền hủy đơn. Phần §8 này đóng vai trò mô tả tổng quan; khi có sự sai lệch, ưu tiên áp dụng theo đặc tả Step 2.4.
+> **Quy tắc canonical:** Phân chia sở hữu dịch vụ, yêu cầu bill tường minh, luồng chuyển bàn và phân quyền hủy đơn trong phần này phải được đối chiếu với `technical-architecture.md`, `architecture/permission-matrix.md`, phase record liên quan và code/test hiện tại. Không có tài liệu spec tách rời nào thay thế các nguồn đó.
 
 > **Quy ước đặt tên Enum:** Sơ đồ và quy tắc dưới đây sử dụng định dạng **Title Case** (`Draft`, `Pending`, `Processing`, `Ready`, `Served`, `Completed`, `Canceled`) để dễ đọc. Các giá trị Enum thực tế trong code (canonical) phải viết chữ **IN HOA** (`DRAFT`, `PENDING`, ...) — xem chi tiết tại `libs/shared/types/src/lib/order.types.ts` và tài liệu phase `docs/phases/phase-2a-order-kafka.md` Step 2.3. Quy đổi tương ứng 1-1 (Ví dụ: `Draft` ↔ `DRAFT`).
 

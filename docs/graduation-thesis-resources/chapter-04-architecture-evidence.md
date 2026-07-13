@@ -10,7 +10,7 @@ Thứ tự ưu tiên nguồn trong audit này:
 
 1. Source code và tests hiện tại trong `apps/`, `libs/`, `tests/`.
 2. Canonical docs nội bộ: `docs/README.md`, `docs/DOC-CODE-ANCHORS.md`, `docs/technical-architecture.md`, `docs/business-logic.md`, `docs/architecture/permission-matrix.md`.
-3. Phase records và traceability: `docs/phases/*`, `docs/testing/phase-5/traceability-matrix.md`, accepted specs.
+3. Phase records và traceability: `docs/phases/*`, `docs/testing/traceability-matrix.md`, canonical business/technical docs.
 4. Thesis resources: `thesis-official-outline.md`, `thesis-evidence-map.md`, `thesis-artifact-backlog.md`.
 
 Cần lưu ý tránh nhầm lẫn: "Phase 4A" trong workflow khóa luận là audit Chương 4. Trong implementation docs, `docs/phases/phase-4a-saga-hardening.md` xác nhận representative saga slices, không phải full hardening. Khi viết Chương 4, có thể mô tả outbox/idempotency/saga baseline đã có bằng chứng, nhưng không được claim full saga hardening, CDC/Debezium hay observability của implementation Phase 4A đã hoàn tất.

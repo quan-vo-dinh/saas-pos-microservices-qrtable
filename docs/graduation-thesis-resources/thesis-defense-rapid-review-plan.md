@@ -69,8 +69,8 @@ Tài liệu nền đã đối chiếu:
 - `docs/DOC-CODE-ANCHORS.md`
 - `docs/technical-architecture.md`
 - `docs/business-logic.md`
-- `docs/testing/phase-5/traceability-matrix.md`
-- `docs/testing/phase-5/saga-validation-strategy.md`
+- `docs/testing/traceability-matrix.md`
+- `docs/testing/saga-validation-strategy.md`
 - `docs/guides/sepay-configuration-guide-phase3.md`
 
 Context7/ctx7 đã dùng cho Apache Kafka (`/apache/kafka`) để kiểm tra vocabulary hiện hành quanh topic, partition, producer/consumer, consumer group, at-least-once, idempotent producer và transaction semantics. Không thêm nguồn mới vào bibliography.
@@ -173,7 +173,7 @@ Luyện trả lời 5 câu:
 
 Đọc cheat sheet mục Saga và Order Confirm Saga. Sau đó mở thêm:
 
-- `docs/testing/phase-5/saga-validation-strategy.md`
+- `docs/testing/saga-validation-strategy.md`
 - `docs/graduation-thesis-resources/thesis-report/chapters/05-trien-khai-he-thong.tex` mục Order Confirm Saga nếu cần.
 
 Nói lại theo 6 bước:

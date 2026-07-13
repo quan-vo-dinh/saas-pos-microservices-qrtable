@@ -93,16 +93,16 @@ Nếu tự vẽ lại, giữ phong cách diagram sạch, không biến thành �
 
 ### Chương 2: sơ đồ lý thuyết và nền tảng
 
-| Asset                                                                 | Nội dung                                                                  | Vị trí sử dụng                                     |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
-| `thesis-report/assets/figures/chapter2-fnb-pos-lifecycle.png`         | UML activity diagram vòng đời POS F&B từ bàn, order, bếp đến thanh toán.  | Slide 3 nếu muốn mở bài bằng bối cảnh vận hành.    |
-| `thesis-report/assets/figures/chapter2-qr-ordering-flow.png`          | UML sequence diagram luồng QR/session/giỏ/submit idempotent.              | Slide 4 hoặc slide demo.                           |
-| `thesis-report/assets/figures/chapter2-saas-multitenancy.png`         | Component/deployment-style diagram SaaS đa tenant và ranh giới cô lập.    | Slide 10 hoặc 19 nếu cần giải thích tenant.        |
-| `thesis-report/assets/figures/chapter2-monolith-vs-microservices.png` | UML component diagram so sánh monolith và microservices.                  | Slide 11.                                          |
-| `thesis-report/assets/figures/chapter2-kafka-event-flow.png`          | Component/topology diagram topic, partition, consumer group.              | Slide 15 nếu cần minh họa giao tiếp bất đồng bộ.   |
-| `thesis-report/assets/figures/chapter2-outbox-saga-overview.png`      | UML sequence diagram Outbox và Saga ở mức khái niệm.                      | Slide 19 hoặc 21.                                  |
-| `thesis-report/assets/figures/chapter2-websocket-hint-refetch.png`    | UML sequence diagram WebSocket hint và API snapshot.                      | Slide 16 hoặc 25.                                  |
-| `thesis-report/assets/figures/chapter2-oidc-rbac-saas-pos.png`        | Component diagram tách OIDC/JWT/RBAC và QR session.                       | Slide 17.                                          |
+| Asset                                                                 | Nội dung                                                                 | Vị trí sử dụng                                   |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------ |
+| `thesis-report/assets/figures/chapter2-fnb-pos-lifecycle.png`         | UML activity diagram vòng đời POS F&B từ bàn, order, bếp đến thanh toán. | Slide 3 nếu muốn mở bài bằng bối cảnh vận hành.  |
+| `thesis-report/assets/figures/chapter2-qr-ordering-flow.png`          | UML sequence diagram luồng QR/session/giỏ/submit idempotent.             | Slide 4 hoặc slide demo.                         |
+| `thesis-report/assets/figures/chapter2-saas-multitenancy.png`         | Component/deployment-style diagram SaaS đa tenant và ranh giới cô lập.   | Slide 10 hoặc 19 nếu cần giải thích tenant.      |
+| `thesis-report/assets/figures/chapter2-monolith-vs-microservices.png` | UML component diagram so sánh monolith và microservices.                 | Slide 11.                                        |
+| `thesis-report/assets/figures/chapter2-kafka-event-flow.png`          | Component/topology diagram topic, partition, consumer group.             | Slide 15 nếu cần minh họa giao tiếp bất đồng bộ. |
+| `thesis-report/assets/figures/chapter2-outbox-saga-overview.png`      | UML sequence diagram Outbox và Saga ở mức khái niệm.                     | Slide 19 hoặc 21.                                |
+| `thesis-report/assets/figures/chapter2-websocket-hint-refetch.png`    | UML sequence diagram WebSocket hint và API snapshot.                     | Slide 16 hoặc 25.                                |
+| `thesis-report/assets/figures/chapter2-oidc-rbac-saas-pos.png`        | Component diagram tách OIDC/JWT/RBAC và QR session.                      | Slide 17.                                        |
 
 ### Chương 3: yêu cầu, tác nhân và luồng nghiệp vụ
 
@@ -452,7 +452,7 @@ Từ điểm khác biệt này, slide tiếp theo trình bày luồng nghiệp v
 ### Nguồn / bằng chứng
 
 - `docs/graduation-thesis-resources/thesis-report/chapters/03-phan-tich-yeu-cau.tex`
-- `docs/testing/phase-5/traceability-matrix.md`
+- `docs/testing/traceability-matrix.md`
 
 ### Không nói quá
 
@@ -1222,7 +1222,7 @@ Với giỏ món dùng chung (shared cart) của nhóm khách tại bàn, chúng
 
 ### Nguồn / bằng chứng
 
-- `docs/testing/phase-5/traceability-matrix.md`
+- `docs/testing/traceability-matrix.md`
 - `apps/order/src/app/modules/order/services/cart.service.ts`
 - `apps/order/src/app/modules/order/services/order-submit.service.ts`
 - `apps/order/src/app/modules/order/tests/order-submit-cart.integration.spec.ts`
@@ -1358,7 +1358,7 @@ Lựa chọn này không có nghĩa choreography luôn kém phù hợp hoặc to
 
 ### Nguồn / bằng chứng
 
-- `docs/testing/phase-5/saga-validation-strategy.md`
+- `docs/testing/saga-validation-strategy.md`
 - `docs/graduation-thesis-resources/thesis-report/chapters/05-trien-khai-he-thong.tex`
 - `docs/graduation-thesis-resources/thesis-report/chapters/06-danh-gia.tex`
 
@@ -1494,8 +1494,8 @@ Phân tích nhánh lỗi cho thấy Saga không chỉ được hiểu ở luồn
 - `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`
 - `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts`
 - `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`
-- `docs/testing/phase-5/saga-validation-strategy.md`
-- `docs/testing/phase-5/traceability-matrix.md`
+- `docs/testing/saga-validation-strategy.md`
+- `docs/testing/traceability-matrix.md`
 - `docs/graduation-thesis-resources/thesis-report/assets/screenshots/appendix-d-01-order-saga-tests.png`
 
 ### Không nói quá
@@ -2111,8 +2111,8 @@ Không đưa SaaS onboarding vào appendix của deck này theo scope hiện t�
 
 - Source:
   - `docs/graduation-thesis-resources/thesis-report/chapters/06-danh-gia.tex`
-  - `docs/testing/phase-5/traceability-matrix.md`
-  - `docs/testing/phase-5/saga-validation-strategy.md`
+  - `docs/testing/traceability-matrix.md`
+  - `docs/testing/saga-validation-strategy.md`
 
 ### Phụ lục I. Hỏi đáp theo góc nhìn kinh doanh và phản biện
 

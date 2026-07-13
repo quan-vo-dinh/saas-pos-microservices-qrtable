@@ -29,7 +29,7 @@ IMPLEMENTED + VERIFIED for the accepted thesis scope.
 
 ## Acceptance Evidence
 
-- `docs/testing/phase-5/` contains the traceability matrix, test inventory, handoff, and saga-validation strategy.
+- `docs/testing/README.md`, `docs/testing/traceability-matrix.md`, and `docs/testing/saga-validation-strategy.md` contain the durable taxonomy, rule-to-test evidence, and representative Saga validation strategy.
 - Recorded gates include the full `nx run-many -t test --parallel=3` suite, frontend-utils deterministic/runtime-aware suite, seeded integration/permission smoke, and browser E2E inventory.
 - The matrix records the remaining evidence limits rather than claiming unrun public-provider/browser stack scenarios as passed.
 

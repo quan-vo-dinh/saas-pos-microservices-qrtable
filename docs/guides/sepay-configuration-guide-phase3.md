@@ -2,7 +2,7 @@
 
 This document describes **from start to finish** the steps needed **outside the codebase** (SePay dashboard, bank account, public URL, environment variables) so QRTable can receive Bank Hub webhooks and run **Tier 1 OAuth Connect** (tenant bill payments) and **Tier 2 subscription** (platform `QRSUB`) flows.
 
-**Internal references:** [phase-3-payment.md](../phases/phase-3-payment.md), [phase-4b-saas-onboarding.md](../phases/phase-4b-saas-onboarding.md), [phase-5-sepay-local-mock-testing-policy.md](../testing/phase-5/specs/phase-5-sepay-local-mock-testing-policy.md), [tools/sepay/README.md](../../tools/sepay/README.md) (manual OAuth smoke before go-live).
+**Internal references:** [phase-3-payment.md](../phases/phase-3-payment.md), [phase-4b-saas-onboarding.md](../phases/phase-4b-saas-onboarding.md), [testing evidence](../testing/README.md), [tools/sepay/README.md](../../tools/sepay/README.md) (manual OAuth smoke before go-live).
 
 **SePay technical reference:** [developer.sepay.vn](https://developer.sepay.vn) — Bank Hub webhook, OAuth2 Connect, sandbox transaction API.
 

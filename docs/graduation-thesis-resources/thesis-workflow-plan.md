@@ -32,9 +32,9 @@ Nếu công việc liên quan đến implementation, architecture hoặc evaluat
 - `docs/technical-architecture.md`
 - `docs/business-logic.md`
 - `docs/architecture/permission-matrix.md`
-- `docs/testing/phase-5/traceability-matrix.md`
-- `docs/testing/phase-5/phase-5-handoff.md`
-- `docs/testing/phase-5/saga-validation-strategy.md` nếu công việc chạm đến Saga, consistency hoặc Chương 5/6.
+- `docs/testing/README.md`
+- `docs/testing/traceability-matrix.md`
+- `docs/testing/saga-validation-strategy.md` nếu công việc chạm đến Saga, consistency hoặc Chương 5/6.
 - `docs/guides/sepay-configuration-guide-phase3.md`
 
 ## 3. Nguyên tắc không được quên
@@ -203,7 +203,7 @@ Ngày 2026-06-05, plan P1 cho phần security/auth/RBAC tại `docs/graduation-t
 
 Phase 7A và Phase 7B đã hoàn tất sau Phase 6B. Theo yêu cầu phiên 2026-05-29, workflow đã **thực hiện Phase 6A và Phase 6B trước Phase 5D**, sau đó tiếp tục Phase 7A và Phase 7B. Phase 5D scaffold đã hoàn tất ngày 2026-06-05; phần còn lại là thay ảnh thật thủ công và cập nhật trạng thái `captured`/`verified`. Ngày 2026-06-04, Plan A đã hoàn tất cho Chương 4-5. Sau đó Plan B đã được audit/rerun trên nền output Plan A: phần partial Chương 6-7 từ session song song được đọc lại, giữ phần khớp plan, bổ sung tham chiếu tới Bảng 4.3/4.4/4.5, Hình 5.1-Hình 5.5 và Bảng 5.1, rồi build XeLaTeX/TeX Live pass. Sau Plan 2, bước tiếp theo đúng là capture ảnh demo thật, triển khai Phase 7 production/pilot, polish Abstract/phụ lục hoặc thu D-SAGA-3 đến D-SAGA-6 nếu muốn làm sâu bằng chứng Saga.
 
-Ngày 2026-05-31, bộ tài liệu hỗ trợ viết luận văn đã bổ sung chiến lược kiểm chứng Saga tại `docs/testing/phase-5/saga-validation-strategy.md` và đồng bộ các tài liệu Chương 5/6 theo hướng: QRTable chứng minh Saga bằng hai luồng đại diện là Order Confirm Saga và SaaS Onboarding Mini-Saga. Khi viết khóa luận, không gọi đây là full production-grade Saga hardening; chỉ trình bày bằng chứng theo các lớp unit/contract, integration opt-in, fault injection ở service layer, UI happy path, log và snapshot DB/outbox.
+Ngày 2026-05-31, bộ tài liệu hỗ trợ viết luận văn đã bổ sung chiến lược kiểm chứng Saga tại `docs/testing/saga-validation-strategy.md` và đồng bộ các tài liệu Chương 5/6 theo hướng: QRTable chứng minh Saga bằng hai luồng đại diện là Order Confirm Saga và SaaS Onboarding Mini-Saga. Khi viết khóa luận, không gọi đây là full production-grade Saga hardening; chỉ trình bày bằng chứng theo các lớp unit/contract, integration opt-in, fault injection ở service layer, UI happy path, log và snapshot DB/outbox.
 
 Ngày 2026-06-01, technical docs đã bổ sung Phase 4D kỹ thuật về Dashboard & Reporting và Phase 4D.1 về dashboard entitlement/UI polish. Ngày 2026-06-04, Chương 3 đã được backfill ở mức yêu cầu: đổi tên chương/mục, bổ sung Owner/Manager dashboard reporting, Super Admin analytics, `report.read_own`, `report.read_any`, `analytics_basic`, staff management, scope exclusion mới và render lại Hình 3.1. Cùng ngày, Chương 4 đã backfill ở mức kiến trúc: BFF/guard/mô hình đọc reporting, technology decision table và diagram con cho Nx, giao tiếp, Redis, bảo mật và thanh toán. Plan A sau đó đã refactor Chương 5 theo luồng vận hành cốt lõi và rút gọn 5 diagram Chương 5. Plan B sau đó đã audit/rerun Chương 6-7, đồng bộ Dashboard/Reporting, entitlement, production/pilot claim policy và output Plan A. Phase 7B Chương 1 và Plan 2 scope-tone refactor đã xong; trước Phase 8 polish/nộp bản cuối vẫn còn screenshot/demo thật, production/pilot artifact từ Phase 7, Abstract/phụ lục và audit toàn PDF.
 
@@ -324,7 +324,7 @@ Done criteria Phase 2B:
 Phase 3A đã hoàn tất:
 
 1. Đã tạo/cập nhật `docs/graduation-thesis-resources/chapter-03-requirement-evidence.md`.
-2. Đã audit actor/use case/domain requirement/NFR dựa trên `docs/business-logic.md`, `docs/architecture/permission-matrix.md`, `docs/testing/phase-5/traceability-matrix.md`, phase records và specs liên quan.
+2. Đã audit actor/use case/domain requirement/NFR dựa trên `docs/business-logic.md`, `docs/architecture/permission-matrix.md`, `docs/testing/traceability-matrix.md`, phase records và canonical docs liên quan.
 3. Đã phân biệt các mức evidence: `Mạnh`, `Một phần`, `Giới hạn/Hướng phát triển`.
 4. Đã ghi rõ các điểm không được overclaim trước khi viết Chương 3: Manager không checkout subscription/update payment settings, Customer không dùng Keycloak, WebSocket không là source of truth, SePay live provider validation còn manual/opt-in, offline queue/Notification/observability production-grade là giới hạn hoặc hướng phát triển.
 5. Đã gợi ý artifact P0 cho Chương 3 theo `thesis-artifact-backlog.md`: actor/use-case overview, functional requirement table, NFR table, business flow, actor-permission table.

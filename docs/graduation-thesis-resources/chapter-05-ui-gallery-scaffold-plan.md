@@ -12,7 +12,7 @@
 - **Agent Phase 5D không** mở Browser, không chụp UI, không yêu cầu stack demo đang chạy để hoàn tất scaffold.
 - Không invent route, claim production-ready, benchmark, hoặc nguồn citation giả.
 - Placeholder trắng **không** được ghi `captured`/`verified` trong backlog; caption/đoạn dẫn phải ghi rõ “khung bản nháp” cho đến khi thay ảnh thật.
-- Compensation của Saga **không** chứng minh bằng screenshot; dùng Phụ lục D (test/log/DB snapshot) theo `docs/testing/phase-5/saga-validation-strategy.md`.
+- Compensation của Saga **không** chứng minh bằng screenshot; dùng Phụ lục D (test/log/DB snapshot) theo `docs/testing/saga-validation-strategy.md`.
 - Cuối session thực thi scaffold: build LaTeX từ `thesis-report/`, cập nhật `thesis-artifact-backlog.md` và `thesis-workflow-plan.md`.
 
 Skills gợi ý: `Writing Plans`, `Grill with Docs` (audit overclaim), `Zoom Out` (giữ Chương 5 là luồng, không user manual).
@@ -393,12 +393,12 @@ Coi Phase 5D scaffold **hoàn tất** khi:
 
 ## 13. Tham chiếu chéo
 
-| Tài liệu                                           | Vai trò                         |
-| -------------------------------------------------- | ------------------------------- |
-| `thesis-workflow-plan.md` §6.1                     | Quy trình Phase 5D              |
-| `thesis-artifact-backlog.md` §5                    | Backlog trạng thái              |
-| `thesis-phase5d-screenshot-scaffold.md`            | Mapping ngắn + checklist        |
-| `thesis-phase5a-evidence-audit.md`                 | Evidence luồng Chương 5         |
-| `thesis-official-outline.md` §7.3                  | Nguyên tắc phân tầng UI         |
-| `docs/testing/phase-5/saga-validation-strategy.md` | Giới hạn UI vs test evidence    |
-| `docs/phases/phase-4d-dashboard-reporting.md`      | Reporting / entitlement screens |
+| Tài liệu                                      | Vai trò                         |
+| --------------------------------------------- | ------------------------------- |
+| `thesis-workflow-plan.md` §6.1                | Quy trình Phase 5D              |
+| `thesis-artifact-backlog.md` §5               | Backlog trạng thái              |
+| `thesis-phase5d-screenshot-scaffold.md`       | Mapping ngắn + checklist        |
+| `thesis-phase5a-evidence-audit.md`            | Evidence luồng Chương 5         |
+| `thesis-official-outline.md` §7.3             | Nguyên tắc phân tầng UI         |
+| `docs/testing/saga-validation-strategy.md`    | Giới hạn UI vs test evidence    |
+| `docs/phases/phase-4d-dashboard-reporting.md` | Reporting / entitlement screens |

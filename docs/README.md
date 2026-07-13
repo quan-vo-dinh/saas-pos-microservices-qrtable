@@ -31,11 +31,10 @@ If current code and an accepted spec disagree, verify the behavior in code first
 | `guides/production-deployment-runbook.md`   | Task 11 production provisioning, preflight, startup, HTTPS verification, rollback, and troubleshooting procedure.                                                                                                                                                               |
 | `guides/production-deployment-checklist.md` | Short human approval checklist and redacted handoff template for the production deployment session.                                                                                                                                                                             |
 | `references/`                               | Long-form references that are too detailed for core docs but still current and linked from canonical docs when relevant.                                                                                                                                                        |
-| `specs/`                                    | Accepted specs that still add detail not yet absorbed into phase or core docs.                                                                                                                                                                                                  |
-| `testing/`                                  | Testing execution plans, traceability matrices, handoff notes, and focused evidence strategies such as [Saga validation](testing/saga-validation-strategy.md).                                                                                                                  |
+| `testing/`                                  | Durable [testing evidence](testing/README.md), traceability, and representative Saga validation.                                                                                                                                                                                |
 | `presentations/`                            | Thesis and presentation assets; not an engineering source of truth.                                                                                                                                                                                                             |
 
-For this canonicalization pass, `docs/guides/` is out of scope and must not be changed.
+Guides remain operational references; update one only when a canonical behavior or route it documents changes.
 
 ## English Writing Standard
 

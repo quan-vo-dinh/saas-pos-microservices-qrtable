@@ -17,7 +17,7 @@ Phase 5D không dùng Browser, không mở local app và không yêu cầu demo 
 
 File placeholder trắng không phải demo evidence. Trạng thái đúng trong `thesis-artifact-backlog.md` là `placeholder`. Chỉ chuyển sang `captured` khi người viết thay bằng screenshot thật; chỉ chuyển sang `verified` sau khi build PDF và kiểm tra ảnh thật render đúng.
 
-Với Saga, Phase 5D chỉ dựng bằng chứng nhìn thấy được của happy path. Các nhánh compensation như Catalog release stock hoặc SaaS rollback không nên chứng minh bằng screenshot UI; phần đó phải dựa vào test output, log và snapshot DB/outbox theo `docs/testing/phase-5/saga-validation-strategy.md`.
+Với Saga, Phase 5D chỉ dựng bằng chứng nhìn thấy được của happy path. Các nhánh compensation như Catalog release stock hoặc SaaS rollback không nên chứng minh bằng screenshot UI; phần đó phải dựa vào test output, log và snapshot DB/outbox theo `docs/testing/saga-validation-strategy.md`.
 
 Addendum 2026-06-01: technical Phase 4D Dashboard & Reporting được bổ sung sau khi scaffold 12 ảnh ban đầu được lập. Nếu dùng file này cho bản cuối, cần bổ sung screenshot Owner dashboard reporting theo entitlement và Super Admin platform analytics; placeholder không được tính là demo evidence.
 
@@ -92,7 +92,7 @@ Khi build với placeholder, mỗi cụm UI trong Chương 5 / Phụ lục A có
 
 **Capture thật (người viết):**
 
-1. Đọc `chapter-05-ui-gallery-scaffold-plan.md` §8 và `docs/testing/phase-5/saga-validation-strategy.md` trước caption Saga.
+1. Đọc `chapter-05-ui-gallery-scaffold-plan.md` §8 và `docs/testing/saga-validation-strategy.md` trước caption Saga.
 2. Chụp ảnh, thay file cùng tên trong `assets/screenshots/` (không đổi filename).
 3. Trong `undergraduate-theses-report.tex` hoặc `screenshot-scaffold.tex`: `\screenshotplaceholderfalse`.
 4. Cập nhật backlog `captured` → build PDF → `verified`.

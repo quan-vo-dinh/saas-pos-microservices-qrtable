@@ -183,7 +183,7 @@ Gửi lại (retry) là hành vi của bên gọi; tính lũy đẳng là cách 
 
 - `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`
 - `apps/kitchen/src/app/modules/kitchen/repositories/kds-ticket-store.repository.ts`
-- `docs/testing/phase-5/traceability-matrix.md`
+- `docs/testing/traceability-matrix.md`
 
 ### Không nói
 
@@ -203,7 +203,7 @@ QRTable dùng Saga điều phối tập trung (orchestration Saga) ở hai luồ
 
 ### Anchor QRTable
 
-- `docs/testing/phase-5/saga-validation-strategy.md`
+- `docs/testing/saga-validation-strategy.md`
 - `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`
 - `apps/saas/src/services/onboarding-saga.service.ts`
 
@@ -242,7 +242,7 @@ Nhánh lỗi quan trọng:
 
 - `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`
 - `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`
-- `docs/testing/phase-5/saga-validation-strategy.md`
+- `docs/testing/saga-validation-strategy.md`
 - Report: Chương 5 mục "Xác nhận đơn hàng và bảo toàn tồn kho theo Order Confirm Saga".
 
 ### Không nói
@@ -378,8 +378,8 @@ Khi thầy hỏi "đã chứng minh chưa", trả lời theo mức bằng chứn
 
 ### Anchor QRTable
 
-- `docs/testing/phase-5/traceability-matrix.md`
-- `docs/testing/phase-5/saga-validation-strategy.md`
+- `docs/testing/traceability-matrix.md`
+- `docs/testing/saga-validation-strategy.md`
 - `docs/graduation-thesis-resources/thesis-report/chapters/06-danh-gia.tex`
 
 ### Không nói

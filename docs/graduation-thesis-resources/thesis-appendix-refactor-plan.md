@@ -149,7 +149,7 @@ Khi noi dung lien quan den technical claim, doc them:
 - `docs/technical-architecture.md`
 - `docs/business-logic.md`
 - `docs/phases/*.md` lien quan
-- `docs/testing/phase-5/traceability-matrix.md`
+- `docs/testing/traceability-matrix.md`
 - `docs/architecture/permission-matrix.md`
 
 ### Su dung skills

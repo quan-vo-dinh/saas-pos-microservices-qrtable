@@ -1,6 +1,6 @@
 # Kiểm thử SePay OAuth2 (Client ID / Secret) trước khi chốt Phase 4B
 
-Tham chiếu nội bộ: `docs/specs/business-logic-phase-4b-spec.md` (Tier 1 OAuth2 Connect, Q23/Q25 scopes) và `docs/phases/phase-4b-saas-onboarding.md`.
+Tham chiếu nội bộ: `docs/guides/sepay-configuration-guide-phase3.md`, `docs/testing/README.md` và `docs/phases/phase-4b-saas-onboarding.md`.
 Tài liệu SePay (đã đối chiếu Context7): [Bắt đầu nhanh OAuth2](https://developer.sepay.vn/vi/sepay-oauth2/bat-dau-nhanh), [Luồng xác thực](https://developer.sepay.vn/vi/sepay-oauth2/luong-xac-thuc).
 
 ## Điều kiện
