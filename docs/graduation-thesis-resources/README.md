@@ -7,6 +7,7 @@ This directory contains the submission-facing thesis sources and the evidence us
 - [LaTeX entry point](thesis-report/undergraduate-theses-report.tex) is the canonical report source.
 - `thesis-report/undergraduate-theses-report.pdf` is the latest rendered baseline. It contains seven chapters and the current appendices.
 - [References](thesis-report/references.bib), chapter sources, and the report asset registry are authoritative for material cited in the PDF.
+- `thesis-report/frontmatter/council.tex` is an institutional template and remains excluded until the university provides complete council decision and date information.
 
 ## Current Workflow
 
