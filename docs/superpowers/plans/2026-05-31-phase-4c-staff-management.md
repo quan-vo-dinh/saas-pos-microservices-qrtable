@@ -286,7 +286,7 @@ Implement Task 7 from docs/superpowers/plans/2026-05-31-phase-4c-staff-managemen
 Scope:
 - Verification commands from Task 7.
 - docs/phases/phase-4c-staff-management.md
-- docs/phases/phase-4c-staff-management.vi.md
+- docs/phases/phase-4c-staff-management.md
 
 Goal:
 - Collect focused backend and frontend test evidence.
@@ -296,7 +296,7 @@ Goal:
 
 Verification:
 - pnpm verify:doc-anchors
-- pnpm exec prettier --check docs/phases/phase-4c-staff-management.md docs/phases/phase-4c-staff-management.vi.md docs/superpowers/specs/2026-05-31-phase-4c-staff-management-design.md docs/superpowers/plans/2026-05-31-phase-4c-staff-management.md
+- pnpm exec prettier --check docs/phases/phase-4c-staff-management.md docs/superpowers/specs/2026-05-31-phase-4c-staff-management-design.md docs/superpowers/plans/2026-05-31-phase-4c-staff-management.md
 ```
 
 ### Acceptance Mapping
@@ -1650,7 +1650,7 @@ git commit -m "feat(management): add staff management screen"
 **Files:**
 
 - Modify: `docs/phases/phase-4c-staff-management.md`
-- Modify: `docs/phases/phase-4c-staff-management.vi.md`
+- Modify: `docs/phases/phase-4c-staff-management.md` (canonical record)
 - Modify if needed: `docs/architecture/permission-matrix.md`
 - Modify if needed: `docs/technical-architecture.md`
 
@@ -1730,7 +1730,7 @@ Expected: PASS.
 - [ ] **Step 7: Final commit**
 
 ```bash
-git add docs/phases/phase-4c-staff-management.md docs/phases/phase-4c-staff-management.vi.md
+git add docs/phases/phase-4c-staff-management.md
 git commit -m "docs(phase-4c): record staff management completion evidence"
 ```
 

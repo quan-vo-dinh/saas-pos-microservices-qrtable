@@ -178,7 +178,7 @@ Sau đó đọc phase records theo thứ tự:
 5. `docs/phases/phase-3-payment.md`
 6. `docs/phases/phase-4a-saga-hardening.md`
 7. `docs/phases/phase-4b-saas-onboarding.md`
-8. `docs/phases/phase-5-7-finalization.md`
+8. `docs/phases/phase-5-testing.md`, `docs/phases/phase-6-observability.md`, and `docs/phases/phase-7-deployment.md`
 
 ## Round 1: Nx Workspace Và Aliases
 

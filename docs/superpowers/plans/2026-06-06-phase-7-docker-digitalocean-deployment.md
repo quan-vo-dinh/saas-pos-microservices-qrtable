@@ -5,7 +5,7 @@
 > **Refactored:** 2026-06-07
 >
 > This is an execution plan, not a canonical product specification. Final implemented behavior must
-> be absorbed into `docs/phases/phase-5-7-finalization.md`, `docs/technical-architecture.md`, and the
+> be absorbed into `docs/phases/phase-7-deployment.md`, `docs/technical-architecture.md`, and the
 > deployment guide.
 
 ## 1. Goal and Operating Context
@@ -66,7 +66,7 @@ production Compose files existed.
 - `docs/README.md`
 - `docs/business-logic.md`
 - `docs/technical-architecture.md`
-- `docs/phases/phase-5-7-finalization.md`
+- `docs/phases/phase-7-deployment.md`
 - this plan and its Vietnamese translation
 
 Relevant architecture facts:

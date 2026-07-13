@@ -2,7 +2,7 @@
 
 **Scope:** P0 and P1 rules only. This inventory maps canonical rules from `docs/business-logic.md`, `docs/technical-architecture.md`, completed phase records (1, 2A, 2B, 3, the 4A representative Saga slice, 4B), and `docs/architecture/permission-matrix.md` to existing tests. It does not add or require new business behavior.
 
-**Phase context:** Phases 0, 1, 2A, 2B, 3, and 4B are complete. Phase 4A has an implemented Order Confirm Saga representative slice; full Phase 4A operational hardening remains future work. Phase 4C Staff Management is not started. Former Step 4.5 Notification Service is removed from the current scope.
+**Phase context:** Phases 0, 1, 2A, 2B, 3, 4B, and [4C Staff Management](../../phases/phase-4c-staff-management.md) are IMPLEMENTED + VERIFIED for accepted scope. Phase 4A has an implemented Order Confirm Saga representative slice; full Phase 4A operational hardening remains future work. Advanced HRM and the former Step 4.5 Notification Service remain outside the current scope.
 
 ---
 
@@ -13,7 +13,7 @@
 - **`missing`** — Behavior appears implemented or is the current contract, but no adequate test was found.
 - **`implementation-gap`** — Canonical docs describe a rule that is not clearly implemented; do not add tests until behavior is built or the spec changes.
 - **`security-gap`** — Security hardening is insufficient for production or demo-public exposure; current tests may only cover route shape or presence.
-- **`deferred-by-phase`** — Rule belongs to full Phase 4A operational hardening, Phase 4C Staff Management, or explicit post-thesis/future hardening scope.
+- **`deferred-by-phase`** — Rule belongs to full Phase 4A operational hardening, advanced Phase 4C HRM, or explicit post-thesis/future hardening scope.
 
 ---
 
@@ -450,7 +450,7 @@
 
 **Requirement:** Browser E2E should prove payment close-session: bill immutable, session closed, table moves to Cleaning after cash or VietQR.
 
-**Sources:** `phase-5-7-finalization` Step 5.4; `phase-3-payment` acceptance evidence.
+**Sources:** `phase-5-testing` browser-E2E scope; `phase-3-payment` acceptance evidence.
 
 **Tests:** `tests/e2e/phase-3-payment.spec.ts` only.
 
@@ -584,7 +584,7 @@
 
 **Requirement:** Public landing, `/admin/tenants`, `/admin/plans`, `/admin/billing`, `/dashboard/subscription`, `/dashboard/payment-settings`, and OAuth invalid-state must not blank, 401, or 500 with seeded roles; SaaS/dashboard UI must not render raw wire enum or plan feature codes.
 
-**Sources:** `phase-4b-saas-onboarding` UI surfaces; `phase-5-7-finalization` Step 5.4.
+**Sources:** `phase-4b-saas-onboarding` UI surfaces; `phase-5-testing` browser-E2E scope.
 
 **Tests:** BFF Phase 4B contract spec; SaaS controller specs; shared-constants label tests; management-app dashboard query auth readiness spec; Playwright route smoke `tests/e2e/phase-5-admin-dashboard-routes.spec.ts`.
 
@@ -640,7 +640,7 @@
 
 **Requirement:** Kafka topic registry is exactly the current domain topics: `order.confirmed`, `order.status_changed`, `payment.completed`, `kitchen.sla_warning`, `tenant.created`; no UI-only Kafka topics.
 
-**Sources:** `technical-architecture` (7.2, 7.4); `phase-5-7-finalization` architecture anchors.
+**Sources:** `technical-architecture` (7.2, 7.4); `phase-5-testing` architecture anchors.
 
 **Tests:** BFF Phase 5 architecture contracts static spec; shared types enum completeness spec for event payload types; SaaS constants spec for `tenant.created` and prefix constants.
 
@@ -654,7 +654,7 @@
 
 **Requirement:** Redis access is limited to BFF, Order, Kitchen, WebSocket adapter, SaaS, and Payment OAuth state; Catalog, Authorizer, and User-Access must not add direct Redis use.
 
-**Sources:** `technical-architecture` (11.2); `phase-5-7-finalization` architecture anchors.
+**Sources:** `technical-architecture` (11.2); `phase-5-testing` architecture anchors.
 
 **Tests:** BFF Phase 5 architecture contracts static spec; Order cart service spec; Kitchen KDS keys spec; SaaS tenant status cache service spec (allowed users only).
 
@@ -698,7 +698,7 @@
 
 **Requirement:** Full IndexedDB offline action queue, background sync, conflict resolver, and long network loss auto-sync for POS, KDS, and customer.
 
-**Sources:** `business-logic` (7); `technical-architecture` (16); `phase-5-7-finalization` out of scope.
+**Sources:** `business-logic` (7); `technical-architecture` (16); `phase-5-testing` deferred scope.
 
 **Tests:** Customer PWA and management-app realtime status pill specs only.
 
@@ -712,7 +712,7 @@
 
 **Requirement:** Durable CDC or Debezium, full transactional outbox hardening, deep saga observability, and replay dashboards.
 
-**Sources:** `technical-architecture` (12); `phase-5-7-finalization` prerequisites and out of scope.
+**Sources:** `technical-architecture` (12); `phase-5-testing` scope and deferred work.
 
 **Tests:** none.
 
@@ -760,5 +760,5 @@ Ordered by urgency; each line is **priority**, **rule id**, **status**, and **ne
 
 - Every required Phase 5 anchor has at least one entry: Catalog and QR, Order and cart and session, Kitchen and realtime, Payment settlement and history, SaaS 4B, RBAC and auth, and architecture invariants.
 - Every P0 entry either names concrete test locations in prose (app or lib plus spec purpose) or states a concrete `notes` or next action when tests are absent.
-- Full Phase 4A hardening and Phase 4C Staff Management items are explicitly marked `deferred-by-phase`; the implemented Order Confirm Saga is not deferred. Notification/email is outside current scope.
+- Full Phase 4A hardening and advanced Phase 4C HRM items are explicitly marked `deferred-by-phase`; the implemented Order Confirm Saga and accepted Staff Management scope are not deferred. Notification/email is outside current scope.
 - This document does not include test implementation steps or code.

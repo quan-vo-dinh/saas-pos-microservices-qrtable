@@ -1,6 +1,6 @@
 # Phase 5 Testing Execution Plan
 
-> Working plan for implementing Phase 5 testing after the Phase 4A representative Saga slice and Phase 4B stabilization. Canonical scope lives in `docs/phases/phase-5-7-finalization.md`; these files are execution plans for future sessions.
+> Working plan for implementing Phase 5 testing after the Phase 4A representative Saga slice and Phase 4B stabilization. Canonical scope lives in `docs/phases/phase-5-testing.md`; these files are execution plans for future sessions.
 
 ## Goal
 
@@ -61,7 +61,7 @@ flowchart TD
 
 ## Session Handoff Rules
 
-- Start every session by reading this README, the specific plan file being executed, and `docs/phases/phase-5-7-finalization.md`.
+- Start every session by reading this README, the specific plan file being executed, and `docs/phases/phase-5-testing.md`.
 - Check `git status --short` before editing. The workspace may already contain unrelated work; do not revert it.
 - Keep traceability status current as tests land. A test without a matrix row is easy to lose; a matrix row without a test path is not proof.
 - Prefer `rg`/`rg --files` for inventory. Use Playwright browser work only for actual UI verification, not for unit-level behavior.

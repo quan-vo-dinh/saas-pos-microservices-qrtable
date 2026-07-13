@@ -6,7 +6,7 @@
 > **Refactor:** 2026-06-07
 >
 > Đây là execution plan, không phải product specification canonical. Sau khi triển khai, hành vi cuối
-> cùng phải được đồng bộ vào `docs/phases/phase-5-7-finalization.md`,
+> cùng phải được đồng bộ vào `docs/phases/phase-7-deployment.md`,
 > `docs/technical-architecture.md` và deployment guide.
 
 ## 1. Mục tiêu và bối cảnh vận hành
@@ -66,7 +66,7 @@ tồn tại.
 - `docs/README.md`
 - `docs/business-logic.md`
 - `docs/technical-architecture.md`
-- `docs/phases/phase-5-7-finalization.md`
+- `docs/phases/phase-7-deployment.md`
 - plan này và bản tiếng Anh
 
 Các sự kiện kiến trúc liên quan:

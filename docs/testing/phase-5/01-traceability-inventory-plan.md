@@ -6,7 +6,7 @@ Create the rule-to-test matrix that decides what Phase 5 must test, what is alre
 
 ## Inputs
 
-- `docs/phases/phase-5-7-finalization.md`
+- `docs/phases/phase-5-testing.md`
 - `docs/business-logic.md`
 - `docs/technical-architecture.md`
 - `docs/architecture/permission-matrix.md`

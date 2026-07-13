@@ -178,7 +178,7 @@ Then read phase records in chronological order:
 5. `docs/phases/phase-3-payment.md`
 6. `docs/phases/phase-4a-saga-hardening.md`
 7. `docs/phases/phase-4b-saas-onboarding.md`
-8. `docs/phases/phase-5-7-finalization.md`
+8. `docs/phases/phase-5-testing.md`, `docs/phases/phase-6-observability.md`, and `docs/phases/phase-7-deployment.md`
 
 ## Round 1: Nx Workspace and Aliases
 
@@ -264,21 +264,21 @@ The guard chain resolves cross-cutting concerns: authentication, session validat
 
 Read in order:
 
-| Layer       | Files                                                                                                                                            |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Customer UI | [landing-page.tsx](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/customer-pwa/src/pages/landing-page.tsx) |
-| Customer UI | `apps/customer-pwa/src/features/landing/services/session.service.ts`                                                                             |
-| Customer UI | `apps/customer-pwa/src/features/landing/services/tenant.service.ts`                                                                              |
-| Customer UI | `apps/customer-pwa/src/features/session/context/session-provider.tsx`                                                                            |
-| Customer UI | `apps/customer-pwa/src/features/menu/hooks/use-menu-query.ts`                                                                                    |
-| Customer UI | [api-client.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/customer-pwa/src/lib/api-client.ts)         |
-| BFF         | `apps/bff/src/app/modules/catalog/controllers/menu.controller.ts`                                                                                |
-| BFF         | `apps/bff/src/app/modules/order/controllers/customer-session.controller.ts`                                                                      |
-| Catalog     | `apps/catalog/src/app/modules/table/controllers/table.controller.ts`                                                                             |
-| Catalog     | `apps/catalog/src/app/modules/table/services/table.service.ts`                                                                                   |
-| Catalog     | `apps/catalog/src/app/modules/menu/services/menu.service.ts`                                                                                     |
-| Order       | `apps/order/src/app/modules/order/services/order.service.ts` method `joinSession`                                                                |
-| Order       | `apps/order/src/app/modules/order/services/session.service.ts`                                                                                   |
+| Layer       | Files                                                                             |
+| ----------- | --------------------------------------------------------------------------------- |
+| Customer UI | [landing-page.tsx](../../apps/customer-pwa/src/pages/landing-page.tsx)            |
+| Customer UI | `apps/customer-pwa/src/features/landing/services/session.service.ts`              |
+| Customer UI | `apps/customer-pwa/src/features/landing/services/tenant.service.ts`               |
+| Customer UI | `apps/customer-pwa/src/features/session/context/session-provider.tsx`             |
+| Customer UI | `apps/customer-pwa/src/features/menu/hooks/use-menu-query.ts`                     |
+| Customer UI | [api-client.ts](../../apps/customer-pwa/src/lib/api-client.ts)                    |
+| BFF         | `apps/bff/src/app/modules/catalog/controllers/menu.controller.ts`                 |
+| BFF         | `apps/bff/src/app/modules/order/controllers/customer-session.controller.ts`       |
+| Catalog     | `apps/catalog/src/app/modules/table/controllers/table.controller.ts`              |
+| Catalog     | `apps/catalog/src/app/modules/table/services/table.service.ts`                    |
+| Catalog     | `apps/catalog/src/app/modules/menu/services/menu.service.ts`                      |
+| Order       | `apps/order/src/app/modules/order/services/order.service.ts` method `joinSession` |
+| Order       | `apps/order/src/app/modules/order/services/session.service.ts`                    |
 
 Sequence of events:
 

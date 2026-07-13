@@ -223,12 +223,12 @@ Không claim:
 
 ### 6.6. Evaluation và evidence
 
-| Chủ đề              | Anchor                                                                    |
-| ------------------- | ------------------------------------------------------------------------- |
-| Traceability matrix | `docs/testing/phase-5/traceability-matrix.md`                             |
-| Saga validation     | `docs/testing/phase-5/saga-validation-strategy.md`                        |
-| Phase 5-7 status    | `docs/phases/phase-5-7-finalization.md`                                   |
-| Report evaluation   | `docs/graduation-thesis-resources/thesis-report/chapters/06-danh-gia.tex` |
+| Chủ đề              | Anchor                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Traceability matrix | `docs/testing/phase-5/traceability-matrix.md`                                                                 |
+| Saga validation     | `docs/testing/phase-5/saga-validation-strategy.md`                                                            |
+| Phase 5-7 status    | `docs/phases/phase-5-testing.md`, `docs/phases/phase-6-observability.md`, `docs/phases/phase-7-deployment.md` |
+| Report evaluation   | `docs/graduation-thesis-resources/thesis-report/chapters/06-danh-gia.tex`                                     |
 
 Claim an toàn:
 

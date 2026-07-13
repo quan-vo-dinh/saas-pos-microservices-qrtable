@@ -68,8 +68,9 @@ Nguồn tài liệu đã đối chiếu:
 - `docs/testing/phase-5/traceability-matrix.md`
 - `docs/testing/phase-5/phase-5-handoff.md`
 - `docs/testing/phase-5/saga-validation-strategy.md`
-- `docs/phases/phase-5-7-finalization.md`
-- `docs/phases/phase-6-observability-plan.md`
+- `docs/phases/phase-5-testing.md`
+- `docs/phases/phase-6-observability.md`
+- `docs/phases/phase-7-deployment.md`
 - `docs/superpowers/plans/2026-06-06-phase-7-docker-digitalocean-deployment.md`
 - `docs/guides/production-deployment-runbook.md`
 - `docs/DOC-CODE-ANCHORS.md`
@@ -452,7 +453,7 @@ Thay đổi LaTeX ở phiên sau:
 
 ### Checkpoint 1 - Resync số liệu traceability
 
-- Đối chiếu `docs/phases/phase-5-7-finalization.md`, `docs/testing/phase-5/traceability-matrix.md`, `docs/testing/phase-5/phase-5-handoff.md`.
+- Đối chiếu `docs/phases/phase-5-testing.md`, `docs/testing/phase-5/traceability-matrix.md`, `docs/testing/phase-5/phase-5-handoff.md`.
 - Chốt một snapshot duy nhất. Khả năng cao: `52 total / 38 covered / 9 partial / 1 implementation gap / 4 deferred`.
 - Không đưa số permission/role nếu chưa chốt theo current code/artifact.
 

@@ -132,7 +132,7 @@ Các tài liệu evidence đọc khi slide chạm đúng chủ đề:
 - `docs/testing/phase-5/saga-validation-strategy.md`
   - Dùng khi thảo luận Saga, compensation, consistency hoặc failure path.
 
-- `docs/phases/phase-5-7-finalization.md`
+- `docs/phases/phase-5-testing.md`, `docs/phases/phase-6-observability.md`, `docs/phases/phase-7-deployment.md`
   - Dùng khi cần hiểu trạng thái hoàn thiện, implementation gap hoặc deferred scope.
 
 ### 3.3. Vai trò của LaTeX report
@@ -877,7 +877,7 @@ Sau ba file bắt buộc, chỉ đọc thêm theo câu hỏi đang xử lý:
 - Khi cần đánh giá mức bằng chứng:
   - docs/testing/phase-5/traceability-matrix.md
   - docs/testing/phase-5/saga-validation-strategy.md nếu liên quan Saga/consistency/failure.
-  - docs/phases/phase-5-7-finalization.md nếu liên quan implementation gap, deferred scope hoặc trạng thái Phase 5-7.
+  - docs/phases/phase-5-testing.md, docs/phases/phase-6-observability.md, hoặc docs/phases/phase-7-deployment.md nếu liên quan implementation gap, deferred scope hoặc trạng thái tương ứng.
 
 - Khi cần nội dung học thuật, citation, phạm vi hoặc visual đã có trong report, chỉ đọc chương LaTeX liên quan:
   - docs/graduation-thesis-resources/thesis-report/chapters/01-mo-dau.tex
