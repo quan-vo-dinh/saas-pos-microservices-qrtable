@@ -83,7 +83,7 @@ Các claim cần tránh trong phần kết quả/đánh giá nếu chưa có b�
 | Auth/RBAC                                 | `docs/architecture/permission-matrix.md`; `docs/references/auth-system-reference.md`; `apps/authorizer`; `apps/user-access`; BFF guards                                                                        | Cao                                              | Staff/admin dùng Keycloak/JWT; customer dùng anonymous QR/session flow.                                                                                                                                                                          |
 | Testing/evaluation                        | `docs/testing/README.md`; `docs/testing/traceability-matrix.md`; `tests/e2e`; app specs                                                                                                                        | Trung bình - cao                                 | Có bằng chứng unit/contract khá mạnh, nhưng một số full-stack/browser/live-provider gates vẫn partial/manual.                                                                                                                                    |
 | Deployment/observability                  | `docker-compose.provider.yaml`; `docs/phases/phase-6-observability.md`; `docs/phases/phase-7-deployment.md`; package scripts                                                                                   | Có baseline local; public evidence pending       | Có thể claim baseline observability/local packaging đã được verify; trace/dashboard public, deploy public, backup và rollback vẫn cần bằng chứng riêng.                                                                                          |
-| Diagram và presentation assets            | `docs/presentations/*`; `docs/architecture/erd.*`; `docs/architecture/erd_explanation.md`                                                                                                                      | Trung bình                                       | Dùng tốt cho diagram báo cáo, nhưng không phải engineering source of truth.                                                                                                                                                                      |
+| Diagram và presentation assets            | `docs/presentations/*`; `thesis-report/assets/figures/`; `assets/diagrams/dbml/`                                                                                                                                | Trung bình                                       | Dùng tốt cho diagram báo cáo, nhưng không phải engineering source of truth.                                                                                                                                                                      |
 
 ## 5. Snapshot implementation nội bộ
 
@@ -405,8 +405,8 @@ Nên lưu artifact theo hướng ổn định trong LaTeX project, ví dụ:
 
 Nên tái sử dụng tài nguyên hiện có khi phù hợp:
 
-- `docs/architecture/erd.png`
-- `docs/architecture/erd.mmd`
+- `thesis-report/assets/figures/chapter4-db-*-schema.svg`
+- `assets/diagrams/dbml/`
 - `docs/presentations/qrtable-thesis-slide-brief.md`
 - `docs/presentations/qrtable-architecture-presentation-script.md`
 

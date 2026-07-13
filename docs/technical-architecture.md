@@ -1344,7 +1344,7 @@ QR URL Format:
 
 ## 11. CANONICAL REDIS OWNERSHIP
 
-This section intentionally records only key builders and behavior present in the current source. It replaces the broader historical inventory in `redis-usage-analysis.md`; that file is retained only until Task 7 removes it.
+This section intentionally records only key builders and behavior present in the current source.
 
 | Owner           | Current key / state                                                                   | TTL                                                           | Invalidation or lifecycle                                                                                                                                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

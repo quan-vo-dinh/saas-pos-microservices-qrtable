@@ -48,11 +48,7 @@ Nguồn sự thật bắt buộc:
 
 Không dùng làm nguồn sự thật:
 
-- `docs/architecture/erd.dbml`.
-- `docs/architecture/erd.mmd`.
-- `docs/architecture/erd_explanation.md`.
-- `docs/architecture/erd.png`.
-- DBML/ERD cũ chưa regenerate từ code.
+- Các DBML/ERD legacy đã retire hoặc chưa regenerate từ code.
 
 Nguyên tắc khi vẽ:
 

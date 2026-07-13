@@ -57,11 +57,7 @@ Nguồn code ưu tiên cho database/schema:
 
 Không dùng làm source of truth:
 
-- `docs/architecture/erd.dbml`.
-- `docs/architecture/erd.mmd`.
-- `docs/architecture/erd_explanation.md`.
-- `docs/architecture/erd.png`.
-- Bất kỳ DBML/ERD cũ nào chưa regenerate từ code.
+- Các DBML/ERD legacy đã retire hoặc chưa regenerate từ code.
 
 Nếu DBML/ERD cũ mâu thuẫn với entity/schema/module registration, codebase hiện tại thắng.
 

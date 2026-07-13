@@ -31,7 +31,7 @@ IMPLEMENTED + VERIFIED for the accepted thesis scope.
 
 - Nx applications and shared libraries exist in the repository; BFF, Catalog, SaaS, Customer PWA, and Management App project configuration is present.
 - Guard, middleware, Keycloak, and User-Access implementations establish the authenticated tenant/role boundary used by later phases.
-- `docs/architecture/erd.png` and the architecture documentation retain the initial system model.
+- Canonical architecture documentation and the source tree retain the initial system model.
 
 ## Deferred Work
 
