@@ -1,6 +1,6 @@
 # Permission Matrix — QRTable
 
-> **Status:** Active after Phase 4D.1 · static-verified against `PERMISSION` enum and `role.json` on 2026-06-01
+> **Status:** Implementation-reconciled against `PERMISSION`, `role.json`, BFF guards, and report controllers.
 > **Version:** 2.1
 > **Single source of truth:** RBAC documentation is derived from `libs/constants/src/lib/enum/role.enum.ts` and `apps/user-access/src/seeder/role.json`.
 
@@ -22,6 +22,7 @@ Design principles:
 - SUPER_ADMIN receives every permission in the enum and bypasses tenant scoping for platform administration.
 - `SAAS_*` permissions are legacy aliases kept for backward compatibility; Phase 4B uses `TENANT_*`, `SUBSCRIPTION_*`, `PLAN_*`, and `PAYMENT_SETTINGS_*`.
 - Report permissions are RBAC capabilities only. SaaS plan feature entitlements such as `analytics_basic` are enforced separately by `PlanFeatureGuard` on feature-gated tenant report routes.
+- `PermissionGuard` requires every permission declared by the endpoint. `TenantGuard` establishes the request tenant and rejects a non-Super-Admin claim that disagrees with it; downstream tenant-scoped queries must still predicate that `tenantId` explicitly.
 
 ## 2. Glossary
 
@@ -200,7 +201,7 @@ Legend: `✅` = granted; blank = not granted.
 - WAITER has catalog read, plan read, order confirm/cancel pending/read, payment create/cash/history, table transfer/status, and service-request handling.
 - CHEF and BARISTA have catalog read, plan read, and KDS queue/update/recall. They do not have `kitchen.set_priority`.
 - `order.cancel_pending` is granted to OWNER, MANAGER, and WAITER; `order.cancel_processing` is restricted to OWNER and MANAGER.
-- `report.read_own` permits the tenant dashboard route family, but tenant report data also requires an active subscription and the relevant SaaS plan feature. Current tenant report routes require `analytics_basic`.
+- `report.read_own` permits the tenant dashboard route family, but each current tenant report route additionally declares `@RequiresPlanFeature(analytics_basic)`. `PlanFeatureGuard` requires an active subscription containing that feature.
 - `report.read_any` permits Super Admin platform analytics and explicit tenant drilldown. It is not gated by the selected tenant's SaaS plan.
 
 ## 8. CUSTOMER Actor
@@ -229,7 +230,7 @@ CUSTOMER has no DB role. Customer actions are guarded by session/ownership check
 ### 9.2 Re-seed MongoDB
 
 ```bash
-MONGODB_URI='mongodb://root:password@localhost:27017/?authSource=admin' \
+MONGODB_URI='mongodb://<username>:<redacted-password>@localhost:27017/?authSource=admin' \
 MONGO_DB_NAME='qrtable' \
 node tools/seed.js apps/user-access/src/seeder prune
 ```

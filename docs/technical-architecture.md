@@ -11,22 +11,22 @@
 ## TABLE OF CONTENTS
 
 1. [System Overview](#1-system-overview)
-2. [Architectural Principles](#2-architectural-principles)
+2. [Principles of Architecture](#2-principles-of-architecture)
 3. [Overall Architecture](#3-overall-architecture)
 4. [Technology Stack](#4-technology-stack)
-5. [Multi-tenancy strategy](#5-multi-tenancy strategy)
-6. [Microservices Decomposition](#6-microservices-decomposition)
+5. [Multi-tenancy strategy](#5-multi-tenancy-strategy)
+6. [Declaration of Microservices](#6-declaration-of-microservices)
 
 7. [Inter-service Communication](#7-inter-service-communication)
 8. [Authentication & Authorization](#8-authentication--authorization)
 9. [Real-time & WebSocket](#9-real-time--websocket)
 10. [Payment Integration](#10-payment-integration)
-11. [Caching Strategy](#11-caching-strategy)
+11. [Canonical Redis Ownership](#11-canonical-redis-ownership)
 12. [Distributed Transaction Processing](#12-distributed-transaction-processing)
 13. [Observability & Monitoring](#13-observability--monitoring)
-14. [Deployment Strategy](#14-deployment-strategy)
+14. [Implementation Strategy](#14-implementation-strategy)
 15. [Technical Challenges](#15-technical-challenges)
-16. [Offline & Synchronization Strategy](#16-offline-strategy-sync-offline--sync-strategy)
+16. [Offline & Sync Strategy](#16-offline--sync-strategy)
 
 ---
 
@@ -49,29 +49,29 @@ QRTable is a SaaS (Software as a service) platform serving the F&B industry, all
 
 ### 1.3 Actors
 
-| Actor                   | Scope             | Authentication            | Main interface  |
-| ----------------------- | ----------------- | ------------------------- | --------------- |
-| **Super Admin**         | Cross-tenant      | JWT (Keycloak)            | Admin Dashboard |
-| **Restaurant Owner**    | Private tenant(s) | JWT (Keycloak)            | Management App  |
-| **Staff** (Waiter/Chef) | Assigned tenant   | JWT (Keycloak)            | POS / KDS       |
-| **Customer** (Guest)    | Session/Table     | Anonymous Session (Redis) | PWA via QR      |
+| Actor                   | Scope             | Authentication                                                            | Main interface  |
+| ----------------------- | ----------------- | ------------------------------------------------------------------------- | --------------- |
+| **Super Admin**         | Cross-tenant      | JWT (Keycloak)                                                            | Admin Dashboard |
+| **Restaurant Owner**    | Private tenant(s) | JWT (Keycloak)                                                            | Management App  |
+| **Staff** (Waiter/Chef) | Assigned tenant   | JWT (Keycloak)                                                            | POS / KDS       |
+| **Customer** (Guest)    | Session/Table     | Header-based anonymous session (`x-tenant-id`; `x-session-id` after join) | PWA via QR      |
 
 ---
 
 ## 2. PRINCIPLES OF ARCHITECTURE
 
-| #   | Principles                      | Apply                                                                                            |
-| --- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| 1   | **Database per service**        | Each microservice owns its own schema/table, does not directly access other service DB           |
-| 2   | **tenant Isolation by Default** | Every entity contains `tenant_id`; middleware automatically injects filter into every query      |
-| 3   | **Event-Driven Decoupling**     | Async communication via Kafka events; service does not call each other directly for side-effects |
-| 4   | **API Gateway as Single Entry** | The BFF service is the single entry point from the client, handling auth/routing/rate-limit      |
-| 5   | **Cache-First for Hot Data**    | Menu, table status, user token are cached in Redis; reduce DB load                               |
-| 6   | **Fail-Safe & Idempotent**      | Every write operation has an idempotency key; Saga compensation for distributed tx               |
-| 7   | **Observe Everything**          | Centralized logging (Loki), metrics (Prometheus), tracing (Tempo)                                |
-| 8   | **Server Timestamp (UTC)**      | Every timestamp uses `server UTC` (`Date.now()`); DO NOT use client timestamp                    |
-| 9   | **VND Rounding Convention**     | All VND amounts rounded to thousands: `Math.ceil(amount / 1000) * 1000`                          |
-| 10  | **Session Lifecycle**           | Session lifetime = 2 hours (max), idle timeout = 30 minutes (auto-close if inactive)             |
+| #   | Principles                            | Apply                                                                                                                                |
+| --- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | **Database per service**              | Each microservice owns its own schema/table, does not directly access other service DB                                               |
+| 2   | **tenant Isolation by Default**       | Tenant middleware/guards establish context; every tenant-scoped repository/query explicitly receives `tenantId` and predicates on it |
+| 3   | **Event-Driven Decoupling**           | Async communication via Kafka events; service does not call each other directly for side-effects                                     |
+| 4   | **API Gateway as Single Entry**       | The BFF service is the single entry point from the client, handling auth/routing/rate-limit                                          |
+| 5   | **Cache-First for Verified Hot Data** | Redis is used only for current, source-backed cache and ephemeral-state ownership; see §11                                           |
+| 6   | **Fail-Safe & Idempotent**            | Every write operation has an idempotency key; Saga compensation for distributed tx                                                   |
+| 7   | **Observe Everything**                | Centralized logging (Loki), metrics (Prometheus), tracing (Tempo)                                                                    |
+| 8   | **Server Timestamp (UTC)**            | Every timestamp uses `server UTC` (`Date.now()`); DO NOT use client timestamp                                                        |
+| 9   | **VND Rounding Convention**           | All VND amounts rounded to thousands: `Math.ceil(amount / 1000) * 1000`                                                              |
+| 10  | **Session Lifecycle**                 | Session lifetime = 2 hours (max), idle timeout = 30 minutes (auto-close if inactive)                                                 |
 
 ---
 
@@ -90,7 +90,7 @@ QRTable is a SaaS (Software as a service) platform serving the F&B industry, all
              ▼               ▼                  ▼              ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                     🚪 BFF SERVICE (API Gateway)                        │
-│                        Port 3000 — HTTP REST                            │
+│       Configurable HTTP REST (`PORT`; source default 3000; Compose 3300)│
 │                                                                         │
 │  ┌──────────┐  ┌──────────────┐  ┌────────────┐  ┌──────────────────┐  │
 │  │ Swagger  │  │ Rate Limiter │  │ Guard Chain│  │ WebSocket Gateway│  │
@@ -163,9 +163,9 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
                     └── Publish internal KDS invalidation hint after Redis write → BFF WebSocket → KDS screens
     │
 └──→ Payment service (TCP): settle payment (VietQR or cash)
-├── In the same transaction: ghi payment + outbox row `payment.completed` (Payment DB)
-├── Sau commit: optional TCP Order `BILL_MARK_PAID` (fast path, idempotent); Kafka publish from outbox = recovery/fan-out
-└── Phase 3 baseline: POS/Customer **polling/refetch**; push WebSocket qua bridge Kafka→BFF is follow-up (xem decision D5)
+├── In the same transaction: persist payment + outbox row `payment.completed` (Payment DB)
+├── After commit: optional TCP Order `BILL_MARK_PAID` (fast path, idempotent); Kafka publication from the outbox supports recovery/fan-out
+└── Phase 3 baseline: POS/Customer **polling/refetch**; WebSocket push through a Kafka→BFF bridge is a follow-up (see decision D5)
 ```
 
 ---
@@ -179,7 +179,7 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
 | **Framework**            | NestJS + TypeScript                    | Backend framework for all microservices            | Enterprise-grade, good DI, supports TCP/gRPC/Kafka/WS native        |
 | **Monorepo**             | Nx                                     | Organize source code, shared libs, task pipeline   | Dependency graph, affected builds, code generation                  |
 | **Database (main)**      | PostgreSQL + TypeORM                   | Persistent storage for business data               | ACID, Pessimistic Locking, suitable for relational model F&B        |
-| **Database (secondary)** | MongoDB + Mongoose                     | Audit log, analytics, flexible schema data         | Schema-less for log/event data, time-series friendly                |
+| **Database (secondary)** | MongoDB + Mongoose                     | User-Access user profiles and role mappings        | Flexible document storage for the User-Access bounded context       |
 | **Cache**                | Redis                                  | Token cache, session store, menu cache, rate limit | Sub-millisecond latency, Sorted Set for FIFO, Pub/Sub               |
 | **Message Broker**       | Apache Kafka                           | Event streaming, async decoupling                  | High-throughput, consumer groups, at-least-once delivery            |
 | **Identity**             | Keycloak                               | User management, OAuth 2.0/OIDC, SSO               | Enterprise IAM, realm/client model, social login                    |
@@ -277,7 +277,8 @@ Diagram §4.2 above describes the **objective** of “FE & BE joint contract”.
 │  │  ├── Order Tracking  │   │  Shared Features:            │    │
 │  │  └── Payment Request │   │  ├── WebSocket (real-time)   │    │
 │  │                      │   │  ├── Role-gated pages        │    │
-│  │  Offline: SW + IDB   │   │  └── Tenant context          │    │
+│  │  Offline writes:     │   │  └── Tenant context          │    │
+│  │  deferred            │   │                              │    │
 │  └──────────────────────┘   └──────────────────────────────┘    │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐    │
@@ -290,7 +291,7 @@ Diagram §4.2 above describes the **objective** of “FE & BE joint contract”.
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐    │
 │  │  Data Layer: React Query (REST) + Socket.io (Real-time)   │    │
-│  │  Cache Layer: IndexedDB (offline queue) + SW cache        │    │
+│  │  Data Layer: React Query + Socket.io; offline writes deferred │    │
 │  └──────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -302,7 +303,7 @@ Diagram §4.2 above describes the **objective** of “FE & BE joint contract”.
 - **Decentralization layer (temporary, Phase 2.x):** UI (`management-app`) uses **role → route area + sidebar**; BFF still enforces **permission per API** (canonical matrix). Details: [permission matrix](architecture/permission-matrix.md) §9.
 - **BFF as single API**: all requests go through BFF, do not call microservices directly.
 - **Real-time first**: staff/kitchen prioritize WebSocket, customers prioritize REST + cache.
-- **Offline-first (Customer PWA)**: cache menu + offline action queue.
+- **Customer PWA offline writes:** IndexedDB/Background Sync action queues are deferred. Do not describe automatic order replay as current behavior.
 - **tenant routing**: subdomain `{slug}.qrtable.io` resolve tenant_id before rendering.
 - **Shared Libraries**: UI components, hooks, types are shared between 2 apps via Nx libs.
 
@@ -328,10 +329,10 @@ Backend and JSON responses keep **English enum wire values** (`OrderStatus.PENDI
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | **Actor**         | Customer / Guest (anonymous)                                                                                                       |
 | **Entry point**   | QR Scan → `https://{slug}.qrtable.io?table={id}&token={hmac}`                                                                      |
-| **Auth**          | Session-based (Redis) — no login required                                                                                          |
+| **Auth**          | Header-based anonymous session — the PWA sends `x-tenant-id` and, once joined, `x-session-id`; no login required                   |
 | **Tech**          | React + Vite + TypeScript + service Worker                                                                                         |
 | **Core features** | Menu browsing, shared cart, order submission, order tracking, payment request; When tenant `SUSPENDED` only read/pay bills created |
-| **Offline**       | service Worker cache (menu), IndexedDB queue (pending orders), auto-retry sync                                                     |
+| **Offline**       | Offline write queue and automatic replay are deferred; current order writes require an online retry                                |
 | **Real-time**     | Socket.io → room `session:{sid}:customer` (order status, menu updates)                                                             |
 
 #### App 2: Management App (Role-based)
@@ -384,8 +385,7 @@ Platform Ops
   ├── /plans (Pricing Plan Management)
   ├── /billing (Subscription invoices reconciliation)
   ├── /analytics (Platform subscription analytics + explicit tenant drilldown)
-  ├── /health (System Health: services, Kafka lag, error rate)
-  └── /support (Support Tools: impersonate tenant, audit logs)
+  └── /health (System Health: services, Kafka lag, error rate)
 ```
 
 **Route `/pos/*` — Staff (Waiter):**
@@ -502,10 +502,9 @@ Database Level:
   - USER_ACCESS_MONGO_DB_NAME=qrtable_auth
 - Schema lifecycle uses per-service TypeORM migrations; TYPEORM_SYNCHRONIZE=false
 - Every tenant-scoped entity: tenant_id UUID NOT NULL
-  - Composite indexes: (tenant_id, id), (tenant_id, created_at)
-- Unique constraints include tenant_id: UNIQUE(tenant_id, table_name)
-  - TypeORM Entity Subscriber: auto-set tenant_id on INSERT
-  - Global Query Filter: auto-append WHERE tenant_id = :tid
+  - Tenant middleware and guards establish the request context.
+  - There is no TypeORM `EntitySubscriberInterface` / `@EventSubscriber` implementation and no global query filter in the current source.
+  - Every tenant-scoped repository/query receives `tenantId` and applies an explicit tenant predicate.
 - Cross-service data: MUST be over TCP/Kafka, NOT direct DB access
 
 Cache Level (Redis):
@@ -515,7 +514,7 @@ Cache Level (Redis):
 
 Event Level (Kafka):
 - Message payload always contains tenant_id
-  - Consumer filter/route theo tenant_id
+  - Consumers filter/route by tenant_id
 - Topic naming: domain-level (order.created), NOT per tenant
 
 WebSocket Level:
@@ -540,21 +539,20 @@ File Storage Level:
 │  → UserGuard: verify JWT (Keycloak + Redis cache)               │
 │  → TenantGuard: extract tenant_id from JWT custom claims        │
 │  → Inject tenant_id into RequestContext                          │
-│  → Repository auto-filter WHERE tenant_id = :tid                │
+│  → Service/repository query receives tenantId and predicates it explicitly │
 │                                                                 │
 │  [Customer / Guest]                                             │
-│  Cookie: session_id=xxx                                         │
+│  Headers: x-tenant-id; x-session-id after the customer joins    │
 │  URL: https://{slug}.qrtable.io?table={id}&token={hmac}        │
-│  → SessionGuard: validate session_id in Redis                │
+│  → SessionGuard: validate session_id in Redis                   │
 │  → Validate HMAC token → extract tenant_id from store mapping     │
 │  → Inject tenant_id into RequestContext                          │
-│  → Repository auto-filter WHERE tenant_id = :tid                │
+│  → Service/repository query receives tenantId and predicates it explicitly │
 │                                                                 │
 │  [Super Admin]                                                  │
 │  Header: Authorization: Bearer <JWT>                            │
 │  → UserGuard: verify JWT, assert role = SUPER_ADMIN             │
-│  → Does not inject tenant_id (cross-tenant access)                 │
-│  → Or query param ?tenant_id=xxx for debug mode               │
+│  → TenantGuard bypasses tenant-equality enforcement; platform endpoints still require their declared permissions │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -704,7 +702,7 @@ Responsibility:
     + Transformation: auto format, quality auto, max width 800px
 + Delete old image when update, keep the image when soft delete (audit)
   - Table & Area Management: Area CRUD, Table CRUD
-  - QR Token: sinh HMAC-SHA256 token, validate, re-generate
+  - QR Token: generate, validate, and regenerate HMAC-SHA256 tokens
   - Table State Machine: Available → Occupied → Billing → Cleaning
   - Sort ordering (drag & drop), time-based category visibility
 - **Stock mutations for orders:** versioned TCP reservation/deduct/release commands; the reservation transition and `menu_items` mutation share one Catalog transaction. Order service **does not** write directly to Catalog tables.
@@ -714,7 +712,7 @@ Responsibility:
 with status IN (Pending, Processing, Ready) links to that menu_item_id
 → Do not allow table deletion if the table has an active session or Pending/Processing order
 → Soft delete: set deleted_at instead of permanently deleting, retaining data for audit
-- Export QR as PDF/image for printing (QR template rendering)
+- QR PDF/template export is deferred; the current source has no QR PDF export flow.
 
 Entities (PostgreSQL):
   - categories: id, tenant_id, name, sort_order, time_start, time_end, status
@@ -730,8 +728,8 @@ BFF Direct Side-Effects (AP1 — without Kafka, see §7.3):
   - Table status change response → BFF emit WebSocket broadcast to staff
 
 Caching (Redis):
-  - menu:{tenant_id} → full menu JSON (TTL: 10 min, invalidate on change)
-  - table:{tenant_id}:{table_id}:status → current status (TTL: none, explicit update)
+  - `menu:{tenantId}` is the current public-menu cache (600 seconds). BFF invalidates it after menu-item/category writes.
+  - A table-status Redis cache is deferred; table status remains Catalog-owned data.
 ```
 
 #### 6.2.5 Order Service
@@ -743,8 +741,8 @@ Responsibility:
 - Shared Cart: multi-device cart through Redis Hash + global cart version (optimistic concurrency)
 - Order State Machine: persist from `PENDING` or higher; `DRAFT` refers to cart/UI — see docs/specs/business-logic-step-2.4-spec.md §3.1
 - Stock: Order service **does not** mutate Catalog tables; when confirming (`PENDING → PROCESSING`), it asks Catalog to ensure a versioned reservation and stores the returned version.
-  - Order cancellation (soft delete + audit log); RBAC cancel theo state — permission-matrix §6.1
-- Bill aggregation: one bill/session; created in the first submitted order; `OPEN → PENDING_PAYMENT` in Step 2.4; `PAID` → Phase 3
+  - Order cancellation persists cancellation state, actor, reason, and timestamp in the Order flow; there is no generic Order audit-log implementation. RBAC cancellation is state-specific — permission-matrix §6.1
+- Bill is an Order service entity. It is tenant- and session-scoped and aggregates its included `orderIds`; it is not a separate Payment or Catalog aggregate.
 - service Request: receive service requests from customers (call staff, request payment, support); bill request is an explicit command, `REQUEST_BILL` can be a side effect notification
 
 Validation Rules:
@@ -754,7 +752,7 @@ Validation Rules:
 - Stock deduct + pessimistic rules **in Catalog** at the time of staff confirmation
 
 Entities (PostgreSQL):
-  - sessions: durable session rows (tenant_id, table_id, …) — canonical theo Step 2.4
+  - sessions: durable session rows (tenant_id, table_id, …) — canonical according to Step 2.4
   - orders: id, tenant_id, table_id, session_id, status, total_amount,
             idempotency_key, stock_reservation_version, created_at, updated_at, deleted_at
   - order_items: id, order_id, menu_item_id, quantity, price, note, status
@@ -774,7 +772,7 @@ Redis (active cache — synchronized with durable session):
     → TTL: bound to session TTL
 
 Events emitted (Kafka):
-  - order.confirmed → Kitchen Service (P1+P2); publish qua simplified outbox — implementation_plan §4
+  - order.confirmed → Kitchen Service (P1+P2); publish through the simplified outbox — implementation_plan §4
   - order.status_changed → durable Order status-change stream via outbox (P4); immediate UI still uses BFF Direct
   - order.completed → analytics pipeline (future)
 
@@ -823,12 +821,11 @@ Responsibility:
   - Status update: Pending → Processing → Ready
 - Recall: rollback Ready → Processing (manual mistake)
 - Priority flagging: push tickets to the top of the queue
-- Redis data access is exposed through `KdsRedisRepository` as the façade; ticket, SLA and recovery responsibilities live in `KdsTicketStoreRepository`, `KdsSlaStoreRepository` and `KdsRecoveryStoreRepository`.
+- Kitchen owns no relational database. Its KDS state is Redis-only; the Redis repositories own ticket, SLA, recovery, and queue operations.
 
-Data Store (Redis — no need for separate PostgreSQL):
-  - kds:{tenant_id}:kitchen → Sorted Set { ticket_id: timestamp }
-  - kds:{tenant_id}:bar → Sorted Set { ticket_id: timestamp }
-  - kds:{tenant_id}:ticket:{ticket_id} → Hash { order_id, table_name, items, status, created_at }
+Data Store (Redis — no relational database):
+  - `kds:{tenantId}:{station}` is the active Sorted Set queue.
+  - `kds:{tenantId}:ticket:{ticketId}` is a ticket hash; related item, SLA, order, session, revision, and dedupe keys are defined with it in `kds-keys.ts`.
 
 Events emitted (Kafka):
 - kitchen.sla_warning → trigger manager alert (P2: generated by the internal timer)
@@ -887,7 +884,7 @@ VietQR Flow (SePay):
   6. SePay → BFF webhook:
      - Direct Phase 3 route: POST /api/v1/payment/sepay/webhook with `X-SePay-Signature` + `X-SePay-Timestamp`
      - Phase 4B tenant route: POST /payment/sepay/webhook/:tenantSlug with `x-secret-key`
-  7. BFF validates webhook auth for the selected route and validates body theo DTO runtime (class-validator)
+  7. BFF validates webhook authentication for the selected route and validates the body with runtime DTO validation (class-validator)
 8. Payment service: match billReference in code/content; if amount < rounded_total → keep PENDING + audit SEPAY_WEBHOOK_UNDERPAID; if amount ≥ rounded_total → PAID, save paidAmount = actual amount received (overpaid accepted)
 9. Save sepay_transaction_id; After committing, you can call Order TCP (BILL_MARK_PAID) as a synchronous fast path; Kafka payment.completed is still recovery/fan-out
 10. Write outbox in the same DB transaction → publish Kafka: payment.completed
@@ -982,18 +979,18 @@ BFF Controller (pseudo-code):
   return response;
 ```
 
-| Trigger (TCP response at BFF) | WebSocket Room                                  | Cache Action                      |
-| ----------------------------- | ----------------------------------------------- | --------------------------------- |
-| Order created                 | `tenant:{tid}:staff`                            | —                                 |
-| Order status changed          | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                                 |
-| Cart updated / conflict       | `session:{sid}:customer`                        | —                                 |
-| Bill requested (explicit)     | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                                 |
-| Table transferred             | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                                 |
-| Menu item CRUD                | `tenant:{tid}:*` (broadcast all customers)      | `DEL menu:{tid}`                  |
-| Table status changed          | `tenant:{tid}:staff`                            | `SET table:{tid}:{id}:status`     |
-| Kitchen item ready            | `tenant:{tid}:staff` + `session:{sid}:customer` | —                                 |
-| service requested             | `tenant:{tid}:staff`                            | —                                 |
-| tenant suspended              | —                                               | `SET tenant:{tenantId}:suspended` |
+| Trigger (TCP response at BFF) | WebSocket Room                                  | Cache Action                          |
+| ----------------------------- | ----------------------------------------------- | ------------------------------------- |
+| Order created                 | `tenant:{tid}:staff`                            | —                                     |
+| Order status changed          | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                                     |
+| Cart updated / conflict       | `session:{sid}:customer`                        | —                                     |
+| Bill requested (explicit)     | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                                     |
+| Table transferred             | `tenant:{tid}:staff`, `session:{sid}:customer`  | —                                     |
+| Menu item CRUD                | `tenant:{tid}:*` (broadcast all customers)      | `DEL menu:{tid}`                      |
+| Table status changed          | `tenant:{tid}:staff`                            | No table-status Redis cache; deferred |
+| Kitchen item ready            | `tenant:{tid}:staff` + `session:{sid}:customer` | —                                     |
+| service requested             | `tenant:{tid}:staff`                            | —                                     |
+| tenant suspended              | —                                               | `SET tenant:{tenantId}:suspended`     |
 
 **Design rationale (AP1):** BFF is the only API Gateway. When the BFF calls TCP and receives the response, it already has enough information to perform UI side-effects. Using Kafka as an intermediary for single-consumer UI events violates AP1 — adding latency, complexity, and infrastructure cost without solving any domain problems.
 
@@ -1091,11 +1088,11 @@ Important conclusion:
 ┌────────────────────────────────────────────────────────┐
 │  FLOW 2: Session Authentication (Customer / Guest)    │
 │                                                        │
-│  Client → Cookie: session_id + URL: ?table&token       │
+│  Client → x-tenant-id; x-session-id after join + URL: ?table&token │
 │  BFF → SessionGuard:                                   │
 │    1. Validate HMAC token: verify(table_id, token, sk) │
 │    2. Resolve tenant_id from table → tenant mapping    │
-│    3. Get/create session in Redis:                     │
+│    3. Resolve the joined session through Order/Redis:  │
 │       session:{tenant_id}:{session_id}                 │
 │    4. Verify session.table_id matches request          │
 │    5. Inject { sessionId, tenantId, tableId } → ctx    │
@@ -1149,7 +1146,7 @@ Request
 [PlanFeatureGuard] ← Package feature: "Does the plan unlock this feature?"
   │
   ▼
-Controller → Service → Repository (auto-filtered by tenant_id)
+Controller → Service → Repository (explicit tenantId predicate)
 ```
 
 ### 8.3 Keycloak JWT Custom Claims
@@ -1201,7 +1198,7 @@ Configure via Keycloak **Protocol Mapper** (type: User Attribute → Token Claim
 │  │                                          │    │
 │  │  Connection Auth:                        │    │
 │  │    → JWT handshake (Staff/Owner)         │    │
-│  │    → Session cookie (Customer)           │    │
+│  │    → x-tenant-id / x-session-id (Customer) │  │
 │  │                                          │    │
 │  │  Room Assignment on Connect:             │    │
 │  │    Staff  → tenant:{tid}:staff           │    │
@@ -1314,10 +1311,10 @@ Synchronize room state between instances
 Environment Variables:
   SEPAY_WEBHOOK_SECRET: "your_secret_key"   # Direct Phase 3 HMAC webhook secret
   SEPAY_PLATFORM_WEBHOOK_SECRET: "your_platform_secret"  # Phase 4B platform subscription webhook secret (QRSUB)
-BFF_PAYMENT_TCP_TIMEOUT_MS: 5000           # BFF waits for Payment service qua TCP
+BFF_PAYMENT_TCP_TIMEOUT_MS: 5000           # BFF waits for Payment service over TCP
 PAYMENT_SEPAY_QR_ACCOUNT: "0010000000355" # Receiving bank account number
 PAYMENT_SEPAY_QR_BANK: "Vietcombank" # SePay-compatible bank name
-PAYMENT_ORDER_TCP_TIMEOUT_MS: 5000         # Payment service waits for Order service qua TCP
+PAYMENT_ORDER_TCP_TIMEOUT_MS: 5000         # Payment service waits for Order service over TCP
 BILL_REF_PREFIX: "QRTBL" # Identification prefix in CK content
 PAYMENT_TYPEORM_DATABASE: "qrtable_payment"  # Required staging/production; dedicated default in development
 
@@ -1345,66 +1342,21 @@ QR URL Format:
 
 ---
 
-## 11. CACHING STRATEGY
+## 11. CANONICAL REDIS OWNERSHIP
 
-### 11.1 Cache Layers
+This section intentionally records only key builders and behavior present in the current source. It replaces the broader historical inventory in `redis-usage-analysis.md`; that file is retained only until Task 7 removes it.
 
-| Layer                    | Key Pattern                           | Data                                        | TTL                | Invalidation                                                              |
-| ------------------------ | ------------------------------------- | ------------------------------------------- | ------------------ | ------------------------------------------------------------------------- |
-| **Token Cache**          | `user-token:{sha256(jwt)}`            | User data + permissions                     | 30 min             | Token expiry / logout                                                     |
-| **Menu Cache**           | `menu:{tenant_id}`                    | Full menu JSON                              | 10 min             | Explicit invalidation on menu write                                       |
-| **Table Status**         | `table:{tenant_id}:{table_id}:status` | Status enum                                 | No expire          | Explicit update on change                                                 |
-| **Session**              | `session:{tenant_id}:{session_id}`    | Session metadata + last_activity            | 2 hours (lifetime) | On session close, idle empty-session close, or safe empty-session release |
-| **Cart**                 | `cart:{tenant_id}:{session_id}`       | Hash of cart items                          | 2 hours            | Bound to session TTL; delete on close/release                             |
-| **Rate Limit**           | `rl:{endpoint}:{ip/token}`            | Request count                               | Window (s)         | Auto-expire                                                               |
-| **KDS Queue**            | `kds:{tenant_id}:{station}`           | Sorted Set of tickets                       | No expire          | On ticket complete/remove                                                 |
-| **Tenant Suspend**       | `tenant:{tenantId}:suspended`         | Suspend edge flag                           | No expire          | SaaS lifecycle activate/close                                             |
-| **Current Subscription** | `subscription:{tenantId}`             | Current plan/subscription/features snapshot | 5 min              | SaaS subscription changes                                                 |
-| **Payment OAuth State**  | `oauth_state:{state}`                 | SePay OAuth CSRF/tenant binding             | 5 min              | Callback consumes key                                                     |
+| Owner           | Current key / state                                                                   | TTL                                                           | Invalidation or lifecycle                                                                                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BFF public menu | `menu:{tenantId}` via `RedisKey.menu.public()`                                        | 600 seconds                                                   | `MenuPublicController` caches the public menu; menu-item and category writes delete this key.                                                                                                                                               |
+| Order           | `session:{tenantId}:{sessionId}` and `cart:{tenantId}:{sessionId}` via `RedisKey`     | 2 hours (`SESSION_POLICY.TTL_MS`)                             | Session/cart writes refresh the TTL. Payment close and safe empty-session release delete both keys. Empty active sessions are eligible for the source-defined 30-minute idle-close rule.                                                    |
+| Order quota     | `quota:{tenantId}:orders:{YYYY-MM-DD}`                                                | 48 hours                                                      | Increment sets the expiry only for a new counter; the date uses `Asia/Ho_Chi_Minh`.                                                                                                                                                         |
+| SaaS            | `subscription:{tenantId}`                                                             | 300 seconds                                                   | SaaS writes the current-subscription snapshot and clears it on subscription lifecycle changes.                                                                                                                                              |
+| SaaS / BFF      | `tenant:{tenantId}:suspended`                                                         | none set by the writer                                        | SaaS sets it to `1` on suspension and deletes it on activation; BFF's customer lifecycle guard reads it.                                                                                                                                    |
+| Payment         | `oauth_state:{state}`                                                                 | 300 seconds                                                   | The OAuth callback reads and deletes the key; in-memory fallback exists only when the Redis client is absent.                                                                                                                               |
+| Kitchen         | `kds:{tenantId}:{station}` active queue; ticket-related keys under `kds:{tenantId}:*` | active queues/tickets have no blanket TTL in the key registry | Kitchen is Redis-only. Dedupe event/ticket keys expire after 14 days, command dedupe after 24 hours, dead-letter order-confirmed after 7 days, SLA claims after 30 seconds, SLA dedupe after 24 hours, and rebuild locks after 120 seconds. |
 
-### 11.2 Redis Access Policy
-
-Redis is used in a controlled manner according to the **Tiered Access model**. Not all microservices are allowed to connect to Redis — only those that have a legitimate architectural need for ephemeral state or cache.
-
-| service               | Phase    | Redis Use Case                                                                                      | Key Pattern                                                         |
-| --------------------- | -------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| **BFF**               | Phase 0  | Edge cache, auth cache, menu cache, rate limit, session validation, suspended-tenant guard fallback | `user-token:*`, `menu:*`, `rl:*`, `session:*`, `tenant:*:suspended` |
-| **Order service**     | Phase 2A | Session state, shared cart, idempotency                                                             | `session:*`, `cart:*`, `idem:*`                                     |
-| **Kitchen service**   | Phase 2B | KDS FIFO queue (Redis-only, not DB)                                                                 | `kds:*`, `lock:kds:*`, `realtime:kds:*`                             |
-| **WebSocket Gateway** | Phase 2B | Socket.io Redis Adapter (multi-instance sync)                                                       | `socket.io-adapter:*`                                               |
-| **SaaS service**      | Phase 4B | tenant suspend flag writer, current subscription cache                                              | `tenant:*:suspended`, `subscription:*`                              |
-| **Payment service**   | Phase 4B | SePay OAuth state cache for tenant payment settings flow                                            | `oauth_state:*`                                                     |
-
-**Services without verified Redis permissions in current anchors:** Catalog, Authorizer, User-Access. `Notification` does not exist in current `apps/*`; if introduced later, Redis access must be declared separately with a legitimate use case.
-
-**Reason:**
-
-- **BFF (Tier 1):** Edge layer needs low-latency for auth/cache/rate-limit. All data is just cache — the source of truth is still at Keycloak/PostgreSQL.
-- **Order service (Tier 2):** Session and Cart are **ephemeral state in the Order domain** — not cache. Direct access is needed to ensure optimistic locking and TTL/idle management.
-- **Kitchen service (Tier 3):** Redis is the **primary data store** for KDS queue (Sorted Set FIFO). This service does not have its own database — Redis-only by design. Queue operations require O(log N) access, cannot be proxied over TCP.
-- **WebSocket Gateway (Tier 4):** Socket.io multi-instance requires shared pub/sub adapter — this is a technical requirement of the library, not business logic.
-- **SaaS service (Tier 5):** PostgreSQL is still the source of truth for tenants/subscriptions. Redis only keeps the suspend edge flag and current subscription snapshot so BFF/guards respond quickly; SaaS is a writer for lifecycle/cache invalidation.
-- **Payment service (Tier 6):** PostgreSQL `tenant_payment_settings` is still the source of truth. Redis only keeps OAuth `state` short-term for anti-replay/CSRF callbacks and mapping to tenant/Owner.
-
-### 11.3 Cache-Aside Pattern (Menu Example)
-
-```
-GET /menu?tenant_id=t-001
-
-1. Check Redis: GET menu:t-001
-   → HIT: return cached JSON (< 1ms)
-   → MISS: continue to step 2
-
-2. Query PostgreSQL: SELECT categories, items WHERE tenant_id = 't-001'
-3. Serialize → JSON
-4. SET Redis: menu:t-001, TTL = 600s
-5. Return JSON
-
-On Menu Update (admin changes price/availability):
-1. Write to PostgreSQL
-2. DELETE Redis: menu:t-001 (invalidate)
-3. No current Kafka/WS `menu.updated`; clients refetch via normal query lifecycle.
-```
+No table-status Redis cache exists in the current source; do not introduce or document a `table:{tenantId}:{tableId}:status` key as current behavior.
 
 ---
 
@@ -1469,7 +1421,7 @@ Implementation:
 
 ## 13. OBSERVABILITY & MONITORING
 
-### 13.1 Three Pillars of Observability
+### 13.1 Implemented Application Observability
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -1513,21 +1465,17 @@ Each service expose health endpoint checks:
 | SaaS Mgmt   | PostgreSQL connection, Redis suspend/subscription cache                           |
 | User-Access | MongoDB connection                                                                |
 
-### 13.3 Alerting Rules (Grafana)
+### 13.3 Alerting
 
-| Alert                     | Condition                             | Severity |
-| ------------------------- | ------------------------------------- | -------- |
-| Service Down              | Health check fails > 3 consecutive    | Critical |
-| Kafka Consumer Lag > 1000 | Consumer offset lag exceeds threshold | Warning  |
-| KDS SLA Breach            | Ticket waiting > 20 min               | High     |
-| Error Rate > 5%           | HTTP 5xx / total requests > 0.05      | High     |
-| Redis Memory > 80 percent | Used memory exceeds threshold         | Warning  |
+Alert thresholds, routing, and delivery are deployment configuration rather than application facts; they are not asserted here as active monitoring behavior.
 
 ---
 
 ## 14. IMPLEMENTATION STRATEGY
 
-### 14.1 Docker Compose Architecture
+### 14.1 Docker Compose Configuration
+
+The following is repository configuration, not evidence of a deployed or publicly reachable environment. Public exposure, monitoring access control, retention, alert routing, and operational capacity require separate deployment verification.
 
 ```yaml
 # docker-compose.infra.yaml — Datastores and identity
@@ -1552,7 +1500,7 @@ services:
   management-app: # HTTP 3000 — authenticated frontend
   customer-pwa:   # HTTP 80 — customer frontend
 
-# docker-compose.monitoring.yaml — Private observability
+# docker-compose.monitoring.yaml — observability configuration
 services:
   grafana:      # HTTP 3000, qrtable-observability
   loki:         # HTTP 3100, private
@@ -1560,21 +1508,12 @@ services:
   prometheus:   # HTTP 9090, private
   tempo:        # HTTP 3200 / OTLP 4318, private
 
-# docker-compose.proxy.yaml — The only public container
+# docker-compose.proxy.yaml — reverse-proxy configuration
 services:
   caddy:        # publishes 80/tcp, 443/tcp, 443/udp
 ```
 
-Caddy joins `qrtable-edge`, `qrtable-identity`, and `qrtable-observability`, but not the datastore
-network `qrtable-data`. It routes the API prefix and Socket.IO to `bff:3300`, the two frontends to
-their Docker service names, Keycloak to `keycloak:8080`, and protected Grafana to `grafana:3000`.
-Automatic HTTPS state is persisted in named Caddy data/config volumes. Keycloak management port
-`9000`, Prometheus, Loki, Tempo, and all datastores remain private.
-
-The initial production capacity profile is one 2 vCPU / 4 GiB RAM / 25 GB Droplet with 2–4 GiB
-swap. Kafka uses a 512 MiB heap inside a 1 GiB container limit, and Keycloak uses a 384 MiB heap
-inside a 768 MiB limit. Images are built and pushed off-host; the Droplet only pulls immutable tags.
-An 8 GiB resize is temporary and evidence-driven, not the default architecture.
+The Compose files define service/network relationships and ports. They do not by themselves prove that Caddy, Grafana, Prometheus, Loki, or Tempo are deployed, reachable, secured, or monitored in an environment.
 
 ### 14.2 Build Pipeline
 
@@ -1615,13 +1554,13 @@ docker compose -f docker-compose.proxy.yaml up -d  # Proxy after DNS/firewall re
 | #   | Challenge                                                                   | Solution                                                                                                                                         | Complexity |
 | --- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
 | 1   | **Real-time multi-client sync** (KDS, order tracking, payment/tenant hints) | NestJS WebSocket Gateway + Socket.io + Kafka/internal hints → WS bridge + Redis Adapter for horizontal scale                                     | Cao        |
-| 2   | **Multi-tenant data isolation**                                             | Discriminator column + TypeORM Subscriber + Guard middleware auto-inject                                                                         | Cao        |
+| 2   | **Multi-tenant data isolation**                                             | Tenant middleware/guards establish context; tenant-scoped repositories and queries explicitly predicate `tenantId`                               | Cao        |
 | 3   | **Shared Cart concurrent modification**                                     | Redis Hash + Optimistic Concurrency (version field) + WebSocket broadcast on change                                                              | Medium     |
 | 4   | **Stock race condition** (many people order the same dish)                  | Catalog service owns `menu_items`: lock + deduct in transaction Catalog; Order calls TCP idempotent when confirming (see Step 2.4 specification) | Average    |
 | 5   | **KDS FIFO/Priority + SLA**                                                 | Redis Sorted Set (score=priority/time) + ticket/item snapshots + scheduled SLA check; no batching/GROUP BY                                       | Medium     |
 | 6   | **Anonymous Customer auth** (zero-friction)                                 | Session-based auth via Redis + HMAC token validation + separate Guard chain                                                                      | Medium     |
 | 7   | **Session lifecycle** (dual timeout, multi-device)                          | Session lifetime = 2h (Redis TTL), idle timeout = 30min (cron check `last_activity`) + cart sync via WebSocket                                   | Medium     |
-| 8   | **Offline resilience** (PWA for customer & POS)                             | service Worker + IndexedDB queue + idempotency key + exponential backoff retry                                                                   | Cao        |
+| 8   | **Offline writes** (Customer PWA/POS)                                       | Deferred: no source-backed IndexedDB/Background Sync write queue or automatic replay                                                             | Planned    |
 | 9   | **Distributed transaction** (order confirm saga)                            | Saga Orchestration pattern + compensation steps + idempotent operations                                                                          | Medium     |
 | 10  | **Subscription feature gating**                                             | SaaS plan features + subscription cache + BFF `PlanFeatureGuard` for package-gated routes                                                        | Small      |
 
@@ -1652,7 +1591,7 @@ Phase 4B — SaaS + Tenant Onboarding:
 └── Completed.
 
 Phase 4C — Staff Management:
-└── Not started yet. Former Step 4.5 Notification Service is removed from current scope.
+└── Accepted scope: tenant staff create/update/enable-disable/role-change/delete according to RBAC. Payroll, scheduling, and attendance are deferred. Former Step 4.5 Notification Service is removed from current scope.
 
 Phase 4D — Dashboard + Reporting:
 └── Completed. Includes report permissions, source-owner reporting read models, package feature gating, and dashboard UI polish.
@@ -1667,85 +1606,15 @@ Phase 5 + Phase 7 — Testing + Deploy:
 
 ### 16.1 Client-side Offline (Customer PWA)
 
-```yaml
-Scenario 1: Customers scan QR when offline
-  Detection: navigator.onLine == false
-  Behavior:
-- Show toast "No network connection"
-- Load cached menu from service Worker cache (if ever accessed)
-- Disable "Add to cart" button
-- Show "Watch only, can't order offline"
-
-Scenario 2: Lost your life midway while browsing the menu
-  Detection: WebSocket disconnect event
-  Behavior:
-- Show warning banner "Connection lost, trying to reconnect..."
-- Retry with exponential backoff (2s, 4s, 8s, max 30s)
-- Keep cart in localStorage
-    - Disable submit order button
-
-Scenario 3: Loss of life when submitting order
-Detection: HTTP request timeout or network error
-  Behavior:
-- Show error "Unable to submit order"
-- Queue order in IndexedDB with idempotency key
-- When the network comes back → auto retry submit
-- Show sync indicator: "Synchronizing orders..."
-```
+Customer order writes are online-only. IndexedDB/Background Sync write queues, automatic order replay, and a sync indicator are deferred; a network failure requires an explicit retry after connectivity returns.
 
 ### 16.2 Staff-side Offline (POS/KDS)
 
-```yaml
-Scenario 1: POS loses connection when confirming order
-  Behavior:
-- Queue confirmation action into local storage
-- Show "Offline — Operations will be synchronized when the network is available"
-- Save to local queue with timestamp
-- Auto sync when reconnect
-    - Prevent duplicate submission (idempotency key)
-
-Scenario 2: KDS lost connection
-  Behavior:
-- Continue showing existing orders from cache
-    - Queue status updates (Processing/Ready)
-    - Show offline indicator
-- Auto sync all queued actions when reconnect
-    - Conflict resolution: Server state wins
-
-Scenario 3: Payment terminal offline
-  Behavior:
-    - Allow cash payment only
-    - Disable VietQR payment button
-    - Queue payment record
-- Manual reconciliation when online
-```
+No source-backed staff/POS/KDS offline write queue is documented as current behavior. Any future queue must preserve tenant context and use the owning write flow's idempotency contract.
 
 ### 16.3 Sync & Conflict Resolution Strategy
 
-```yaml
-Conflict Resolution Rules:
-  IF local_timestamp < server_timestamp THEN
-    server_state_wins()
-    discard_local_changes()
-notify_user("Updated from server")
-
-  IF action == "order_submission" THEN
-    use_idempotency_key(session_id + timestamp + hash)
-    prevent_duplicate_order()
-
-Retry Policy:
-  max_retries: 3
-  backoff: exponential (2^n seconds, max 30s)
-  IF retry_count > max_retries THEN
-show_error("Unable to sync")
-    log_to_error_tracking()
-
-Tech Stack:
-  - Service Worker: cache menu assets, API responses (Cache-First)
-  - IndexedDB: offline order queue, pending actions
-  - Background Sync API: auto-retry when there is a network
-  - Idempotency Keys: PostgreSQL UNIQUE/replay today; Redis SET NX remains optional hardening
-```
+Offline conflict resolution and Background Sync retry policy are deferred with the write-queue feature; they are not current architecture contracts.
 
 ---
 

@@ -136,7 +136,7 @@ THEN auto_close_session()
 
 ```
 
-- **QR Publishing:** Allows exporting image/PDF files of QR codes according to templates for synchronous printing.
+- **QR Publishing:** QR PDF/template export is deferred. The current source does not implement a QR PDF export flow.
 
 ### C. Table State Management Logic
 
@@ -267,6 +267,7 @@ The process from the moment the customer scans the QR until the order is sent to
 1. **Session Initiation:**
    - Customers scan the QR code, the Menu interface opens (Progressive Web App).
    - The system identifies `Store_ID`, `Table_ID`, and authenticates `Token`.
+   - The Customer PWA carries its joined tenant and active Order session in the `x-tenant-id` and `x-session-id` request headers. This client flow is header-based; it does not rely on a session cookie.
    - **Session Management:**
 
      ```txt
@@ -302,11 +303,10 @@ The process from the moment the customer scans the QR until the order is sent to
 5. **Confirmation & Routing:**
    - Staff checks and clicks "Confirm".
    - Order moved to `Processing` (Processing).
-   - **Kitchen Coordination:** Automatic ordering system: Dishes -> Kitchen screen; Drinks -> Bar Screen.
-   - Automatically print Kitchen Order Ticket (KOT) if there is a printer.
+   - **Kitchen Coordination:** Confirmed items are routed to Kitchen or Bar KDS according to `MenuItem.station`.
 
 6. **Order Tracking:**
-   - Customer interface status updates: "Order sent" -> "Processing" -> "Delivery ready".
+   - Customer interface status updates: "Order sent" -> "Processing" -> "Ready to serve".
    - Customers can order new items (Additional Order) without affecting the old order.
 
 ### B. Key Business Rules
@@ -339,7 +339,7 @@ If the Catalog response is lost after its commit, Order remains `PENDING`. Retry
 
 If not enough inventory → structured error for staff (previously submitted customer is only pending)
 
-Stock/menu visibility: Catalog/BFF invalidate cache/query theo write path; not claim menu realtime WS.
+Stock/menu visibility: Catalog/BFF invalidate cache/query through the write path; do not claim menu real-time WebSocket updates.
 
 ```
 
@@ -443,9 +443,8 @@ Webhook SePay → BFF → Payment matches billReference (code or regex on conten
 
 > **Architecture note (2026-05):** Transfer payments are processed via **SePay + Dynamic VietQR** — QR code embedded inline in POS/PWA (no redirect). The Phase 3 direct webhook route now verifies HMAC raw-body; The Phase 4B tenant/platform route uses its own `x-secret-key` path and needs hardening value verification before production. See `technical-architecture.md` §6.2.7 and phase record `docs/phases/phase-3-payment.md`.
 
-4. **Print Invoice & Clear Desk (Closing):**
-  - Print paper invoices.
-  - **After successful payment:** According to the table state machine, the table moves `Billing` → `Cleaning`; The employee then marks `Cleaning` → `Available` when finished cleaning. Do not describe “jump straight Available” immediately upon checkout.
+4. **Clear Desk (Closing):**
+   - **After successful payment:** According to the table state machine, the table moves `Billing` → `Cleaning`; The employee then marks `Cleaning` → `Available` when finished cleaning. Do not describe “jump straight Available” immediately upon checkout.
 
 5. **Financial Reconciliation:**
   - At the end of the day/month, the system summarizes revenue by method (Cash, Transfer...).
@@ -473,15 +472,16 @@ THEN disable all edit operations
 
 - **Round money:** Round to thousands (VND). For example: 127,500 VND → 128,000 VND.
 
-- **Audit Log required:**
+- **Cancellation fields:**
 
 ```
 
 IF bill_status changed to "Canceled" AND any_item.status IN ["Processing", "Ready"]
 THEN require: - canceled_by (user_id) - cancel_reason (text) - canceled_at (timestamp)
-AND log to audit_trail table
 
 ```
+
+- **Bounded audit records:** There is no current platform-wide audit table. Payment owns `audit_payments` for payment actions, including cash confirmation and SePay webhook outcomes. SaaS records subscription-invoice underpayment through the `UNDERPAID` state on its own invoice record. Any broader order/admin audit record remains future scope.
 
 - **Block payment when the order is not completed:**
 ```
@@ -509,71 +509,28 @@ Behavior:
 - Disable "Add to cart" button
 - Show "Watch only, can't order offline"
 
-Scenario 2: Lost your life midway while browsing the menu
+Scenario 2: Connection loss while browsing the menu
 Detection: WebSocket disconnect event
 Behavior:
 - Show warning banner "Connection lost, trying to reconnect..."
 - Retry connection with exponential backoff (2s, 4s, 8s...)
-- Keep cart in localStorage
-  - Disable submit order button
+- Disable order submission until connectivity returns
 
-Scenario 3: Loss of life while submitting order
+Scenario 3: Loss of connection while submitting an order
 Detection: HTTP request timeout or network error
 Behavior:
 - Show error "Unable to send order, please check connection"
-- Queue order in IndexedDB
-- When the network comes back → Auto retry submit
-- Show sync indicator: "Synchronizing orders..."
+- Keep the submission online-only and require the customer to retry after connectivity returns.
+- IndexedDB/Background Sync write queues and automatic order replay are deferred; they are not current Customer PWA behavior.
 ````
 
 ### B. Offline Scenario - Employee Side (POS/KDS)
 
-```yaml
-Scenario 1: POS loses connection when confirming order
-  Behavior:
-    - Queue confirmation action
-- Show "Offline - Operations will be synchronized when the network is available"
-    - Save to local queue with timestamp
-- Auto sync when reconnect
-    - Prevent duplicate submission (use idempotency key)
-
-Scenario 2: KDS lost connection
-  Behavior:
-    - Continue showing existing orders from cache
-    - Queue status updates (mark as Processing/Ready)
-    - Show offline indicator
-    - Auto sync all queued actions when reconnect
-    - Resolve conflicts: Server state wins
-
-Scenario 3: Payment terminal offline
-  Behavior:
-    - Allow cash payment only
-    - Disable bank transfer QR generation
-    - Queue payment record
-- Manual reconciliation when online
-```
+POS confirmation, KDS status updates, and payment writes require the online owning-service flow. The current source does not establish an IndexedDB, Background Sync, or local write queue for these actions; automatic synchronization and replay are deferred.
 
 ### C. Sync Strategy
 
-```typescript
-Conflict Resolution Rules:
-  IF local_timestamp < server_timestamp THEN
-    server_state_wins()
-    discard_local_changes()
-notify_user("Data has been updated from the server")
-
-  IF action == "order_submission" THEN
-    use_idempotency_key(order_id + session_id)
-    prevent_duplicate_order()
-
-Retry Policy:
-  max_retries = 3
-  backoff = exponential (2^n seconds)
-
-  IF retry_count > max_retries THEN
-show_error("Unable to synchronize, please contact administrator")
-    log_to_error_tracking()
-```
+Offline conflict resolution, client-side retry policy, and automatic synchronization are deferred with the write-queue feature. Current online write flows retain their server-side idempotency and tenant-isolation requirements.
 
 ---
 
@@ -655,7 +612,6 @@ Actor: Staff, Manager (RBAC details: permission-matrix §6 / §6.1)
     - Persist Catalog reservation version on the order
     - Update order_status = "Processing"
 - Route to KDS (Kafka order.confirmed + station from `MenuItem.station`)
-    - Print KOT if printer connected
   Compensation:
     - If Catalog acknowledged stock deduction but Order commit/outbox fails, release the matching reservation version
 
@@ -672,7 +628,7 @@ Pending → Canceled:
     - Notify customer
 
 Processing → Canceled:
-  Trigger: Manager cancel (+ Owner); optional policy restore stock qua Catalog
+  Trigger: Manager cancel (+ Owner); optional policy restores stock through Catalog
   Actor: Manager / Owner (`order.cancel_processing`)
   Condition:
     - order_status == "Processing"
@@ -745,11 +701,11 @@ Clearly define the authority of each role in the SaaS Multi-tenant system.
 
 **Scope:** Tenants they own
 
-- **Role:** Restaurant Owner — full operational authority + HR (including deleting employees)
+- **Role:** Restaurant Owner — full operational authority, including the accepted Staff Management scope (create, update, enable/disable, role change, and delete staff where permitted).
 - **Keycloak role:** `Owner`
 - **Permissions:** full operational (CRUD menu, tables, orders, payment, KDS), HR delete (`user.delete`), own-tenant SaaS visibility/checkout (`subscription.checkout`), update payment settings (`payment_settings.update_own`), and own tenant reporting (`report.read_own`, gated by package features).
 
-**Microservice mapping:** User-Access service, Catalog service, Order service, Payment service, SaaS service
+**Microservice mapping:** User-Access service, Catalog service, Order service, Payment service, SaaS service. Advanced HRM (payroll, scheduling, and attendance) is deferred.
 
 ---
 
@@ -757,9 +713,9 @@ Clearly define the authority of each role in the SaaS Multi-tenant system.
 
 **Scope:** tenant to which they are assigned
 
-- **Role:** Shift operations manager — similar to Owner in operations but without the sensitive financial/HR rights.
+- **Role:** Shift operations manager — operational access includes the accepted Staff Management actions `user.create` and `user.update`; `user.delete` remains Owner-only.
 - **Keycloak role:** `MANAGER`
-- **Different from Owner:** cannot delete users, create/cancel subscription checkout, or update SePay/payment settings; can view tenant subscription/plan/payment settings and own tenant reporting (`report.read_own`, gated by package features).
+- **Different from Owner:** cannot delete users, create subscription checkout, or update SePay/payment settings; can view tenant subscription/plan/payment settings and own tenant reporting (`report.read_own`, gated by package features).
 
 **Corresponding microservice:** Same as Owner for operations, plus permission to view SaaS/Payment settings within the tenant
 
@@ -813,35 +769,35 @@ Clearly define the authority of each role in the SaaS Multi-tenant system.
 
 > **Canonical source:** Full details of 6 roles × 62 permissions see [permission matrix](architecture/permission-matrix.md#6-canonical-permission-matrix-6-roles--62-permissions). The table below is the **business-language summary** for the 5 actor groups, NOT the source of truth for the RBAC guard check.
 
-| Features                             | Super Admin               | Restaurant Owner             | Staff (Waiter) | Staff (Chef/Bar) | Customers |
-| ------------------------------------ | ------------------------- | ---------------------------- | -------------- | ---------------- | --------- |
-| **Platform Management**              |                           |                              |                |                  |           |
-| Tenants Management (Approve/Lock)    | ✅                        | ❌                           | ❌             | ❌               | ❌        |
-| Create Subscription Plans            | ✅                        | ❌                           | ❌             | ❌               | ❌        |
-| View all Tenants                     | ✅                        | ❌                           | ❌             | ❌               | ❌        |
-| Configure Payment Gateway            | ✅                        | ❌                           | ❌             | ❌               | ❌        |
-| Checkout subscription tenant         | ❌                        | ✅ (Owner only)              | ❌             | ❌               | ❌        |
-| View tenant packages/subscriptions   | ✅                        | ✅                           | ❌             | ❌               | ❌        |
-| Update SePay tenant                  | ❌                        | ✅ (Owner only)              | ❌             | ❌               | ❌        |
-| **Restaurant Management**            |                           |                              |                |                  |           |
-| Menu Management (CRUD)               | ✅ (Debug)                | ✅                           | ❌             | ❌               | ❌        |
-| Manage Tables & QR                   | ❌                        | ✅                           | ⚠️ (View only) | ❌               | ❌        |
-| Staff Management                     | ❌                        | ✅                           | ❌             | ❌               | ❌        |
-| See Analytics/Revenue                | ✅ (Platform + drilldown) | ✅ (Own only, package-gated) | ❌             | ❌               | ❌        |
-| Configure Restaurant Settings        | ❌                        | ✅                           | ❌             | ❌               | ❌        |
-| **Order Operations**                 |                           |                              |                |                  |           |
-| Scan QR & View Menu                  | ❌                        | ✅                           | ✅             | ❌               | ✅        |
-| Order via QR                         | ❌                        | ❌                           | ❌             | ❌               | ✅        |
-| Order confirmation (Pending → Proc.) | ❌                        | ✅                           | ✅             | ❌               | ❌        |
-| Cancel unconfirmed order             | ❌                        | ✅                           | ✅             | ❌               | ✅ (Own)  |
-| Cancel order already in the kitchen  | ❌                        | ✅ (Manager)                 | ❌             | ❌               | ❌        |
-| KDS Update (Ready/Processing)        | ❌                        | ✅                           | ❌             | ✅               | ❌        |
-| View order status                    | ✅ (Debug)                | ✅ (All orders)              | ✅ (All)       | ✅ (KDS only)    | ✅ (Own)  |
-| **Table & Payment**                  |                           |                              |                |                  |           |
-| Table Transfer                       | ❌                        | ✅                           | ✅             | ❌               | ❌        |
-| Payment Processing                   | ❌                        | ✅                           | ✅             | ❌               | ❌        |
-| Request payment                      | ❌                        | ❌                           | ❌             | ❌               | ✅        |
-| Mark clean desk                      | ❌                        | ✅                           | ✅             | ❌               | ❌        |
+| Features                             | Super Admin               | Restaurant Owner             | Staff (Waiter)                | Staff (Chef/Bar) | Customers |
+| ------------------------------------ | ------------------------- | ---------------------------- | ----------------------------- | ---------------- | --------- |
+| **Platform Management**              |                           |                              |                               |                  |           |
+| Tenants Management (Approve/Lock)    | ✅                        | ❌                           | ❌                            | ❌               | ❌        |
+| Create Subscription Plans            | ✅                        | ❌                           | ❌                            | ❌               | ❌        |
+| View all Tenants                     | ✅                        | ❌                           | ❌                            | ❌               | ❌        |
+| Configure Payment Gateway            | ✅                        | ❌                           | ❌                            | ❌               | ❌        |
+| Checkout subscription tenant         | ❌                        | ✅ (Owner only)              | ❌                            | ❌               | ❌        |
+| View tenant packages/subscriptions   | ✅                        | ✅                           | ❌                            | ❌               | ❌        |
+| Update SePay tenant                  | ❌                        | ✅ (Owner only)              | ❌                            | ❌               | ❌        |
+| **Restaurant Management**            |                           |                              |                               |                  |           |
+| Menu Management (CRUD)               | ✅ (Debug)                | ✅                           | ❌                            | ❌               | ❌        |
+| Manage Tables & QR                   | ❌                        | ✅                           | ⚠️ (View only)                | ❌               | ❌        |
+| Staff Management                     | ❌                        | ✅ (including delete)        | ✅ (create/update; no delete) | ❌               | ❌        |
+| See Analytics/Revenue                | ✅ (Platform + drilldown) | ✅ (Own only, package-gated) | ❌                            | ❌               | ❌        |
+| Configure Restaurant Settings        | ❌                        | ✅                           | ❌                            | ❌               | ❌        |
+| **Order Operations**                 |                           |                              |                               |                  |           |
+| Scan QR & View Menu                  | ❌                        | ✅                           | ✅                            | ❌               | ✅        |
+| Order via QR                         | ❌                        | ❌                           | ❌                            | ❌               | ✅        |
+| Order confirmation (Pending → Proc.) | ❌                        | ✅                           | ✅                            | ❌               | ❌        |
+| Cancel unconfirmed order             | ❌                        | ✅                           | ✅                            | ❌               | ✅ (Own)  |
+| Cancel order already in the kitchen  | ❌                        | ✅ (Manager)                 | ❌                            | ❌               | ❌        |
+| KDS Update (Ready/Processing)        | ❌                        | ✅                           | ❌                            | ✅               | ❌        |
+| View order status                    | ✅ (Debug)                | ✅ (All orders)              | ✅ (All)                      | ✅ (KDS only)    | ✅ (Own)  |
+| **Table & Payment**                  |                           |                              |                               |                  |           |
+| Table Transfer                       | ❌                        | ✅                           | ✅                            | ❌               | ❌        |
+| Payment Processing                   | ❌                        | ✅                           | ✅                            | ❌               | ❌        |
+| Request payment                      | ❌                        | ❌                           | ❌                            | ❌               | ✅        |
+| Mark clean desk                      | ❌                        | ✅                           | ✅                            | ❌               | ❌        |
 
 ---
 
@@ -866,8 +822,8 @@ Multi-Tenant Authorization Middleware:
 
       user = decode_jwt(token)
     ELSE
-# Customer can be anonymous or have session_id
-      session = request.cookies.session_id OR generate_guest_session()
+# Customer can be anonymous and supplies the active session through x-session-id.
+      session = request.headers['x-session-id'] OR generate_guest_session()
 
   STEP 3: Check Actor Permissions
     IF required_actor == "Super Admin" THEN
@@ -883,8 +839,9 @@ Multi-Tenant Authorization Middleware:
       IF user.tenant_id != requested_resource.tenant_id THEN
         RETURN 403 Forbidden "Cannot access other restaurant's data"
 
+    # Supported role enum: SUPER_ADMIN, OWNER, MANAGER, WAITER, CHEF, BARISTA
     IF required_actor == "Staff" THEN
-      IF user.role NOT IN ["STAFF", "WAITER", "CHEF", "BARISTA"] THEN
+      IF user.role NOT IN ["WAITER", "CHEF", "BARISTA"] THEN
         RETURN 403 Forbidden
       # Check staff assignment
       IF user.tenant_id != requested_resource.tenant_id THEN
@@ -905,14 +862,7 @@ Multi-Tenant Authorization Middleware:
       IF !request.body.cancel_reason THEN
         RETURN 400 Bad Request "Cancellation reason required"
 
-      # Log audit trail
-      audit_log.create({
-        actor: user.id,
-        action: "cancel_order",
-        resource: order.id,
-        reason: request.body.cancel_reason,
-        timestamp: now()
-      })
+      # The current source does not provide a global order audit table.
 ```
 
 ---
@@ -934,23 +884,16 @@ Database Level Isolation:
     WHERE tables.tenant_id = orders.tenant_id
 
 API Level Isolation:
-# Middleware automatically injects tenant_id
-  IF user.role == "SUPER_ADMIN" THEN
-# Super Admin can query cross-tenant using query param
-    tenant_id = request.query.tenant_id OR NULL
-  ELSE
-# All other actors only see their tenant
-    tenant_id = user.tenant_id
+# Tenant middleware/guards establish request context.
+# Every tenant-scoped repository/query receives tenantId and applies an explicit predicate.
+  query.where('tenant_id = :tenantId', { tenantId })
 
-# Override all filters from the client
-  query.where('tenant_id', tenant_id)
+# Super Admin platform/report routes retain their declared permission checks;
+# the current source does not document arbitrary tenant override injection.
 
 Session/Cache Isolation:
-# Cache key must include tenant_id
-  cache_key = "menu:#{tenant_id}:#{category_id}"
-
-# Session storage must isolated
-  redis.setex("session:#{tenant_id}:#{session_id}", data)
+# The current public-menu cache pattern is menu:{tenantId}.
+# Its TTL/invalidation behavior is owned by the BFF/Catalog write path.
 
 File Storage Isolation:
 # Upload files to separate folders by tenant
@@ -965,53 +908,13 @@ File Storage Isolation:
 
 ### E. Special Authorization Cases
 
-#### **Case 1: Manager Override Staff Actions**
+#### **Case 1: Manager Cancellation Scope**
 
-```yaml
-Scenario: Manager wants to cancel the order that Staff has confirmed
+Managers may cancel a processing order only within their tenant, through the `order.cancel_processing` permission. The current source does not establish a generic manager-override audit table.
 
-  IF user.role == "MANAGER" AND action == "override_staff_action" THEN
-    original_action = audit_log.find(action_id)
+#### **Case 2: Super Admin Platform And Report Access**
 
-# Manager can only override within the same tenant
-    IF original_action.tenant_id != user.tenant_id THEN
-      RETURN 403 Forbidden
-
-    # Log override action
-    audit_log.create({
-      actor: user.id,
-      action: "override",
-      original_action: action_id,
-      reason: request.body.reason
-    })
-
-# Perform new action
-    PROCEED with requested change
-```
-
-#### **Case 2: Super Admin Debug Mode**
-
-```yaml
-Scenario: Super Admin needs to see a tenant's data for support
-
-  IF user.role == "SUPER_ADMIN" AND request.query.debug_mode == true THEN
-    tenant_id = request.query.tenant_id
-
-    # Log debug access (for compliance)
-    admin_audit_log.create({
-      admin_id: user.id,
-      action: "debug_access",
-      tenant_id: tenant_id,
-      reason: request.query.reason,
-      ip_address: request.ip
-    })
-
-    # Temporary impersonation
-    context.set_tenant(tenant_id)
-    context.set_actor("SUPER_ADMIN_DEBUG")
-
-    PROCEED with READ-ONLY access
-```
+Super Admin platform analytics and explicit tenant report drilldown require `report.read_any`. The current source does not establish debug-mode tenant impersonation; any such support workflow is deferred until it has a defined authorization and audit contract.
 
 #### **Case 3: Customer Self-Service Cancellation**
 
@@ -1037,19 +940,18 @@ Scenario: Customer cancels the order he just placed
 
 ### F. Actor Mapping to Microservices
 
-| Actor                | Primary Microservices                               | Authentication Method |
-| -------------------- | --------------------------------------------------- | --------------------- |
-| **Super Admin**      | Authorizer, User-Access, SaaS, BFF                  | JWT (Session-based)   |
-| **Restaurant Owner** | Catalog, User-Access, Order, Kitchen, Payment, SaaS | JWT (Session-based)   |
-| **Staff**            | Catalog, Order, Kitchen, Payment                    | JWT (Session-based)   |
-| **Customer**         | Catalog/Menu, Order, Payment                        | Session ID (Guest)    |
-| **External System**  | Payment Gateway, Printing, Delivery Integration     | API Key + Webhook     |
+| Actor                | Primary Microservices                               | Authentication Method                                           |
+| -------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
+| **Super Admin**      | Authorizer, User-Access, SaaS, BFF                  | Keycloak JWT                                                    |
+| **Restaurant Owner** | Catalog, User-Access, Order, Kitchen, Payment, SaaS | Keycloak JWT                                                    |
+| **Staff**            | Catalog, Order, Kitchen, Payment                    | Keycloak JWT (`WAITER`, `CHEF`, or `BARISTA`)                   |
+| **Customer**         | Catalog/Menu, Order, Payment                        | Header-based anonymous session (`x-tenant-id` / `x-session-id`) |
 
 ---
 
-##III. EXTENDED FEATURES
+## III. EXTENDED FEATURES
 
-- **Human Resources Management:** Set up a detailed decentralization system (Admin, Management, service, Kitchen).
+- **Staff Management:** Accepted scope includes tenant staff creation, role change, enable/disable, and deletion through User-Access/BFF. Advanced HRM—payroll, scheduling, and attendance—is deferred.
 - **Manage service requests** Customers can send additional requests (Order additional dishes, Call for payment) or request assistance from service staff via Web-app.
 - **Revenue Report (Analytics):** Detailed statistics by time, best-selling items, peak hours.
-- **Simple Inventory Management (Inventory):** Set the quantity of ingredients for the dish (For example: 1 bowl of pho contains 200g of meat), automatically deduct inventory when an order is generated.
+- **Menu-item stock:** Catalog owns menu-item stock. It performs a versioned reservation/deduction only when staff confirms an order from `PENDING` to `PROCESSING`; ingredient-level inventory deduction is deferred.
