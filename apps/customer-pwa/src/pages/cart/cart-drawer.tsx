@@ -20,11 +20,8 @@ import {
   Textarea,
 } from '@einvoice/frontend-ui';
 import { ROUTES } from '@/constants/routes';
-import {
-  useCartMutations,
-  useCustomerCartQuery,
-  useSubmitOrderMutation,
-} from '@/features/order/hooks/use-order-query';
+import { useCartMutations, useCustomerCartQuery } from '@/features/order/hooks/use-cart-query';
+import { useSubmitOrderMutation } from '@/features/order/hooks/use-order-query';
 import { createAndPersistIdempotencyKey } from '@/lib/idempotency';
 import { useTenantStatus } from '@/features/tenant/use-tenant-status';
 

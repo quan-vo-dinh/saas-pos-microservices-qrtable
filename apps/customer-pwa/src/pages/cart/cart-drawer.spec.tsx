@@ -5,7 +5,7 @@ import { CartDrawer } from './cart-drawer';
 const useCustomerCartQueryMock = jest.fn();
 const useTenantStatusMock = jest.fn();
 
-jest.mock('@/features/order/hooks/use-order-query', () => ({
+jest.mock('@/features/order/hooks/use-cart-query', () => ({
   useCustomerCartQuery: () => useCustomerCartQueryMock(),
   useCartMutations: () => ({
     setQuantity: jest.fn(),
@@ -14,6 +14,9 @@ jest.mock('@/features/order/hooks/use-order-query', () => ({
     clearCart: jest.fn(),
     isUpdating: false,
   }),
+}));
+
+jest.mock('@/features/order/hooks/use-order-query', () => ({
   useSubmitOrderMutation: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 

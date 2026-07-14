@@ -1,7 +1,7 @@
 import { ChevronUp } from 'lucide-react';
 import { formatCurrency } from '@einvoice/frontend-utils';
 import { Button } from '@einvoice/frontend-ui';
-import { useCustomerCartQuery } from '@/features/order/hooks/use-order-query';
+import { useCustomerCartQuery } from '@/features/order/hooks/use-cart-query';
 
 type CartPillProps = {
   drawerOpen: boolean;
