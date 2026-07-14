@@ -3,25 +3,22 @@ import { MemoryRouter } from 'react-router-dom';
 import type { CartSnapshot } from '@einvoice/types';
 import { BillStatus, PaymentStatus } from '@einvoice/types';
 import { RequestPaymentPage } from './request-payment-page';
-import { paymentService } from '@/features/payment/services/payment.service';
 
 const useSessionMock = jest.fn();
 const useCurrentBillQueryMock = jest.fn();
+const mutateAsyncMock = jest.fn();
 
 jest.mock('@/features/session/context/session-provider', () => ({
   useSession: () => useSessionMock(),
 }));
 
-jest.mock('@/features/order/hooks/use-order-query', () => ({
+jest.mock('@/features/order/hooks/use-bill-query', () => ({
   useCurrentBillQuery: () => useCurrentBillQueryMock(),
   useRequestBillMutation: () => ({ mutateAsync: jest.fn(), isPending: false }),
 }));
 
-jest.mock('@/features/payment/services/payment.service', () => ({
-  paymentService: {
-    createVietQrForCurrentBill: jest.fn(),
-    requestBill: jest.fn(),
-  },
+jest.mock('@/features/payment/hooks/use-create-vietqr-mutation', () => ({
+  useCreateVietQrMutation: () => ({ mutateAsync: mutateAsyncMock, isPending: false }),
 }));
 
 function makeCart(overrides: Partial<CartSnapshot> = {}): CartSnapshot {
@@ -39,7 +36,7 @@ function makeCart(overrides: Partial<CartSnapshot> = {}): CartSnapshot {
 describe('RequestPaymentPage', () => {
   beforeEach(() => {
     useSessionMock.mockReturnValue({ isActive: true });
-    jest.mocked(paymentService.createVietQrForCurrentBill).mockReset();
+    mutateAsyncMock.mockReset();
   });
 
   afterEach(() => {
@@ -79,7 +76,7 @@ describe('RequestPaymentPage', () => {
   });
 
   it('creates and renders VietQR for pending bill', async () => {
-    jest.mocked(paymentService.createVietQrForCurrentBill).mockResolvedValue({
+    mutateAsyncMock.mockResolvedValue({
       id: 'pay-1',
       tenantId: 'tenant-1',
       billId: 'bill-1',
@@ -136,7 +133,7 @@ describe('RequestPaymentPage', () => {
       isActive: true,
       session: { tenantStatus: 'SUSPENDED', tenantStatusReason: 'SUBSCRIPTION_EXPIRED' },
     });
-    jest.mocked(paymentService.createVietQrForCurrentBill).mockResolvedValue({
+    mutateAsyncMock.mockResolvedValue({
       id: 'pay-1',
       tenantId: 'tenant-1',
       billId: 'bill-1',

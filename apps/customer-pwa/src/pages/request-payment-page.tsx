@@ -7,11 +7,9 @@ import { Button } from '@einvoice/frontend-ui';
 import { useSession } from '@/features/session/context/session-provider';
 import { useTenantStatus } from '@/features/tenant/use-tenant-status';
 import { ROUTES } from '@/constants/routes';
-import { useCurrentBillQuery, useRequestBillMutation } from '@/features/order/hooks/use-order-query';
-import {
-  paymentService,
-  type CustomerVietQrResponse,
-} from '@/features/payment/services/payment.service';
+import { useCurrentBillQuery, useRequestBillMutation } from '@/features/order/hooks/use-bill-query';
+import type { CustomerVietQrResponse } from '@/features/payment/services/payment.service';
+import { useCreateVietQrMutation } from '@/features/payment/hooks/use-create-vietqr-mutation';
 
 function formatVnd(amount: number): string {
   return `${new Intl.NumberFormat('vi-VN').format(amount)} đ`;
@@ -32,8 +30,8 @@ export function RequestPaymentPage() {
   const { canOrder } = useTenantStatus();
   const { data, isLoading, isError, refetch } = useCurrentBillQuery();
   const requestBill = useRequestBillMutation();
+  const createVietQr = useCreateVietQrMutation();
   const [vietQr, setVietQr] = useState<CustomerVietQrResponse | null>(null);
-  const [vietQrBusy, setVietQrBusy] = useState(false);
 
   const bill = data?.bill ?? null;
   const cart = data?.cart;
@@ -54,16 +52,13 @@ export function RequestPaymentPage() {
   };
 
   const onCreateVietQr = async (): Promise<void> => {
-    if (!billPending || vietQrBusy) return;
-    setVietQrBusy(true);
+    if (!billPending || createVietQr.isPending) return;
     try {
-      const res = await paymentService.createVietQrForCurrentBill();
+      const res = await createVietQr.mutateAsync();
       setVietQr(res);
       toast.success('Đã tạo mã VietQR');
     } catch (err) {
       toast.error((err as Error).message || 'Không thể tạo mã VietQR.');
-    } finally {
-      setVietQrBusy(false);
     }
   };
 
@@ -145,9 +140,9 @@ export function RequestPaymentPage() {
             variant="secondary"
             type="button"
             onClick={() => void onCreateVietQr()}
-            disabled={vietQrBusy}
+            disabled={createVietQr.isPending}
           >
-            {vietQrBusy ? 'Đang tạo mã…' : vietQr ? 'Làm mới mã VietQR' : 'Thanh toán bằng VietQR'}
+            {createVietQr.isPending ? 'Đang tạo mã…' : vietQr ? 'Làm mới mã VietQR' : 'Thanh toán bằng VietQR'}
           </Button>
           {vietQr ? (
             <div className="rounded-lg border border-border/80 p-4">
