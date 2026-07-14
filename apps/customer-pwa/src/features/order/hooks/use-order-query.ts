@@ -1,89 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError } from '@einvoice/frontend-utils';
-import type { Bill, CartSnapshot, PublicMenuItem, ServiceRequestType } from '@einvoice/types';
-import { BillStatus } from '@einvoice/types';
+import type { ServiceRequestType } from '@einvoice/types';
 import { useSession } from '@/features/session/context/session-provider';
 import { createAndPersistIdempotencyKey } from '@/lib/idempotency';
-import { orderService, type CartMutateOperation } from '../services/order.service';
-
-export const cartKeys = {
-  all: ['customer-cart'] as const,
-  snapshot: (tenantId: string, sessionId: string) => [...cartKeys.all, tenantId, sessionId] as const,
-};
-
-export const orderKeys = {
-  all: ['customer-orders'] as const,
-  list: (tenantId: string, sessionId: string) => [...orderKeys.all, 'list', tenantId, sessionId] as const,
-  detail: (tenantId: string, sessionId: string, orderId: string) =>
-    [...orderKeys.all, 'detail', tenantId, sessionId, orderId] as const,
-};
-
-export const billKeys = {
-  all: ['customer-bill'] as const,
-  current: (tenantId: string, sessionId: string) => [...billKeys.all, 'current', tenantId, sessionId] as const,
-};
-
-export type CurrentBillQueryData = {
-  bill: Bill | null;
-  cart: CartSnapshot;
-};
-
-/** Exported for unit tests — polling baseline while chờ thanh toán. */
-export function resolveCurrentBillPollingInterval(data: CurrentBillQueryData | undefined): number | false {
-  if (!data) return false;
-  const { bill, cart } = data;
-  if (bill?.status === BillStatus.PENDING_PAYMENT || cart?.status === 'LOCKED') {
-    return 3000;
-  }
-  return false;
-}
-
-function isCartConflict(err: unknown): boolean {
-  return err instanceof ApiError && (err.status === 409 || err.errorCode === 'CART_VERSION_CONFLICT');
-}
-
-function invalidateOrderDomainQueries(queryClient: ReturnType<typeof useQueryClient>): void {
-  void queryClient.invalidateQueries({ queryKey: cartKeys.all });
-  void queryClient.invalidateQueries({ queryKey: orderKeys.all });
-  void queryClient.invalidateQueries({ queryKey: billKeys.all });
-}
-
-async function ensureCartSnapshot(
-  queryClient: ReturnType<typeof useQueryClient>,
-  key: ReturnType<typeof cartKeys.snapshot>,
-): Promise<CartSnapshot> {
-  const cached = queryClient.getQueryData<CartSnapshot>(key);
-  if (cached) {
-    return cached;
-  }
-
-  return queryClient.fetchQuery({
-    queryKey: key,
-    queryFn: () => orderService.getCart(),
-  });
-}
-
-export function useCustomerCartQuery() {
-  const { session } = useSession();
-  const tenantId = session?.tenantId;
-  const sessionId = session?.sessionId;
-  const key = cartKeys.snapshot(tenantId ?? '', sessionId ?? '');
-
-  return useQuery({
-    queryKey: key,
-    queryFn: () => orderService.getCart(),
-    enabled: !!tenantId && !!sessionId,
-  });
-}
+import { orderService } from '../services/order.service';
+import { getOrFetchCartSnapshot } from './cart-query-cache';
+import { invalidateOrderDomainQueries } from './order-query-cache';
+import { billKeys, cartKeys, orderKeys } from './order-query-keys';
 
 export function useOrderDetailQuery(orderId?: string) {
   const { session } = useSession();
   const tenantId = session?.tenantId;
   const sessionId = session?.sessionId;
-  const key = orderKeys.detail(tenantId ?? '', sessionId ?? '', orderId ?? '');
 
   return useQuery({
-    queryKey: key,
+    queryKey: orderKeys.detail(tenantId ?? '', sessionId ?? '', orderId ?? ''),
     queryFn: () => orderService.getOrderById(orderId ?? ''),
     enabled: !!tenantId && !!sessionId && !!orderId,
   });
@@ -93,137 +23,15 @@ export function useCustomerOrdersQuery() {
   const { session } = useSession();
   const tenantId = session?.tenantId;
   const sessionId = session?.sessionId;
-  const key = orderKeys.list(tenantId ?? '', sessionId ?? '');
 
   return useQuery({
-    queryKey: key,
+    queryKey: orderKeys.list(tenantId ?? '', sessionId ?? ''),
     queryFn: () => orderService.getOrders(),
     enabled: !!tenantId && !!sessionId,
   });
 }
 
-export function useCurrentBillQuery() {
-  const { session } = useSession();
-  const tenantId = session?.tenantId;
-  const sessionId = session?.sessionId;
-  const key = billKeys.current(tenantId ?? '', sessionId ?? '');
-
-  return useQuery({
-    queryKey: key,
-    queryFn: () => orderService.getCurrentBill(),
-    enabled: !!tenantId && !!sessionId,
-    refetchInterval: (query) => resolveCurrentBillPollingInterval(query.state.data as CurrentBillQueryData | undefined),
-  });
-}
-
-type PatchVars = {
-  operation: CartMutateOperation;
-  menuItemId?: string;
-  cartLineId?: string;
-  quantity?: number;
-  note?: string;
-  /** Used only for optimistic ADD_ITEM UI */
-  menuItem?: PublicMenuItem;
-};
-
-function normalizeCartNote(note?: string): string | undefined {
-  const trimmed = note?.trim();
-  return trimmed ? trimmed.slice(0, 255) : undefined;
-}
-
-function optimisticPatch(prev: CartSnapshot, vars: PatchVars): CartSnapshot {
-  const items = [...prev.items];
-  const now = new Date().toISOString();
-
-  switch (vars.operation) {
-    case 'ADD_ITEM': {
-      const mi = vars.menuItem;
-      const qty = vars.quantity ?? 1;
-      if (!mi || !vars.menuItemId) return prev;
-      const note = normalizeCartNote(vars.note);
-      const idx = items.findIndex((l) => l.menuItemId === mi.id && normalizeCartNote(l.note) === note);
-      if (idx >= 0) {
-        const line = items[idx];
-        items[idx] = {
-          ...line,
-          menuItemName: mi.name,
-          menuItemImageUrl: mi.imageUrl ?? null,
-          quantity: line.quantity + qty,
-          unitPrice: mi.price,
-          note,
-          lineVersion: line.lineVersion + 1,
-        };
-      } else {
-        items.push({
-          cartLineId: `optimistic-${globalThis.crypto?.randomUUID?.() ?? String(Date.now())}`,
-          menuItemId: mi.id,
-          menuItemName: mi.name,
-          menuItemImageUrl: mi.imageUrl ?? null,
-          quantity: qty,
-          unitPrice: mi.price,
-          note,
-          lineVersion: 1,
-        });
-      }
-      break;
-    }
-    case 'SET_QUANTITY': {
-      if (!vars.cartLineId || vars.quantity === undefined) return prev;
-      const idx = items.findIndex((l) => l.cartLineId === vars.cartLineId);
-      if (idx < 0) return prev;
-      if (vars.quantity <= 0) {
-        items.splice(idx, 1);
-      } else {
-        const line = items[idx];
-        items[idx] = {
-          ...line,
-          quantity: vars.quantity,
-          lineVersion: line.lineVersion + 1,
-        };
-      }
-      break;
-    }
-    case 'UPDATE_NOTE': {
-      if (!vars.cartLineId) return prev;
-      const idx = items.findIndex((l) => l.cartLineId === vars.cartLineId);
-      if (idx < 0) return prev;
-      const line = items[idx];
-      items[idx] = {
-        ...line,
-        note: normalizeCartNote(vars.note),
-        lineVersion: line.lineVersion + 1,
-      };
-      break;
-    }
-    case 'REMOVE_LINE': {
-      if (!vars.cartLineId) return prev;
-      return {
-        ...prev,
-        items: items.filter((l) => l.cartLineId !== vars.cartLineId),
-        updatedAt: now,
-      };
-    }
-    case 'CLEAR':
-      return {
-        ...prev,
-        items: [],
-        updatedAt: now,
-      };
-    default:
-      return prev;
-  }
-
-  return {
-    ...prev,
-    items,
-    updatedAt: now,
-  };
-}
-
-type SubmitOrderVars = {
-  notes?: string;
-  idempotencyKey?: string;
-};
+type SubmitOrderVars = { notes?: string; idempotencyKey?: string };
 
 export function useSubmitOrderMutation() {
   const queryClient = useQueryClient();
@@ -235,9 +43,9 @@ export function useSubmitOrderMutation() {
 
   return useMutation({
     mutationFn: async (vars: SubmitOrderVars) => {
-      const snap = await ensureCartSnapshot(queryClient, cartKey);
+      const snapshot = await getOrFetchCartSnapshot(queryClient, cartKey);
       return orderService.submitOrder({
-        expectedCartVersion: snap.cartVersion,
+        expectedCartVersion: snapshot.cartVersion,
         idempotencyKey: vars.idempotencyKey ?? createAndPersistIdempotencyKey(),
         notes: vars.notes,
       });
@@ -251,10 +59,7 @@ export function useSubmitOrderMutation() {
   });
 }
 
-type CancelOrderVars = {
-  orderId: string;
-  reason?: string;
-};
+type CancelOrderVars = { orderId: string; reason?: string };
 
 export function useCancelCustomerOrderMutation() {
   const queryClient = useQueryClient();
@@ -271,124 +76,12 @@ export function useCancelCustomerOrderMutation() {
   });
 }
 
-type CreateServiceRequestVars = {
-  type: ServiceRequestType;
-  note?: string;
-};
+type CreateServiceRequestVars = { type: ServiceRequestType; note?: string };
 
 export function useCreateServiceRequestMutation() {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: (payload: CreateServiceRequestVars) => orderService.createServiceRequest(payload),
-    onSuccess: () => {
-      invalidateOrderDomainQueries(queryClient);
-    },
+    onSuccess: () => invalidateOrderDomainQueries(queryClient),
   });
-}
-
-export function useRequestBillMutation() {
-  const queryClient = useQueryClient();
-  const { session } = useSession();
-  const tenantId = session?.tenantId ?? '';
-  const sessionId = session?.sessionId ?? '';
-  const cartKey = cartKeys.snapshot(tenantId, sessionId);
-  const currentBillKey = billKeys.current(tenantId, sessionId);
-
-  return useMutation({
-    mutationFn: () => orderService.requestBill(),
-    onSuccess: (data) => {
-      queryClient.setQueryData<CartSnapshot>(cartKey, data.cart);
-      queryClient.setQueryData<{ bill: Bill; cart: CartSnapshot }>(currentBillKey, {
-        bill: data.bill,
-        cart: data.cart,
-      });
-      invalidateOrderDomainQueries(queryClient);
-    },
-  });
-}
-
-export function useCartMutations() {
-  const queryClient = useQueryClient();
-  const { session } = useSession();
-  const tenantId = session?.tenantId ?? '';
-  const sessionId = session?.sessionId ?? '';
-  const key = cartKeys.snapshot(tenantId, sessionId);
-
-  const patchCart = useMutation({
-    mutationFn: async (vars: PatchVars) => {
-      const snap = await ensureCartSnapshot(queryClient, key);
-      return orderService.mutateCart({
-        operation: vars.operation,
-        menuItemId: vars.menuItemId,
-        cartLineId: vars.cartLineId,
-        quantity: vars.quantity,
-        note: vars.note,
-        expectedCartVersion: snap.cartVersion,
-      });
-    },
-    onMutate: async (vars) => {
-      await queryClient.cancelQueries({ queryKey: key });
-      const prev = queryClient.getQueryData<CartSnapshot>(key);
-      if (!prev) return { prev };
-      const next = optimisticPatch(prev, vars);
-      queryClient.setQueryData(key, next);
-      return { prev };
-    },
-    onError: (err, _vars, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData(key, ctx.prev);
-      }
-      if (isCartConflict(err)) {
-        void queryClient.invalidateQueries({ queryKey: key });
-      }
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData(key, data);
-    },
-  });
-
-  const clearCart = useMutation({
-    mutationFn: async () => {
-      const snap = await ensureCartSnapshot(queryClient, key);
-      return orderService.clearCart(snap.cartVersion);
-    },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey: key });
-      const prev = queryClient.getQueryData<CartSnapshot>(key);
-      if (!prev) return { prev };
-      queryClient.setQueryData(key, optimisticPatch(prev, { operation: 'CLEAR' }));
-      return { prev };
-    },
-    onError: (err, _vars, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData(key, ctx.prev);
-      }
-      if (isCartConflict(err)) {
-        void queryClient.invalidateQueries({ queryKey: key });
-      }
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData(key, data);
-    },
-  });
-
-  const pending = patchCart.isPending || clearCart.isPending;
-
-  return {
-    addItem: (menuItem: PublicMenuItem, quantity = 1, note?: string) =>
-      patchCart.mutate({
-        operation: 'ADD_ITEM',
-        menuItemId: menuItem.id,
-        quantity,
-        note,
-        menuItem,
-      }),
-    setQuantity: (cartLineId: string, quantity: number) =>
-      patchCart.mutate({ operation: 'SET_QUANTITY', cartLineId, quantity }),
-    updateNote: (cartLineId: string, note: string) => patchCart.mutate({ operation: 'UPDATE_NOTE', cartLineId, note }),
-    removeLine: (cartLineId: string) => patchCart.mutate({ operation: 'REMOVE_LINE', cartLineId }),
-    clearCart: () => clearCart.mutate(),
-    isUpdating: pending,
-  };
 }

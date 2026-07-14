@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import type { Socket } from 'socket.io-client';
 import { useCustomerOrderRealtime } from './use-customer-order-realtime';
-import { billKeys, cartKeys, orderKeys } from './use-order-query';
+import { billKeys, cartKeys, orderKeys } from './order-query-keys';
 
 const ioMock = jest.fn();
 const onMock = jest.fn();

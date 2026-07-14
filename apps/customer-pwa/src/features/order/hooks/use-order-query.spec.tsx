@@ -3,13 +3,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { CartSnapshot, PublicMenuItem } from '@einvoice/types';
 import { BillStatus } from '@einvoice/types';
 import {
-  useCartMutations,
   useCustomerOrdersQuery,
   useSubmitOrderMutation,
-  cartKeys,
-  resolveCurrentBillPollingInterval,
-  type CurrentBillQueryData,
 } from './use-order-query';
+import { useCartMutations } from './use-cart-query';
+import { resolveCurrentBillPollingInterval, type CurrentBillQueryData } from './use-bill-query';
+import { cartKeys } from './order-query-keys';
 
 const submitOrderMock = jest.fn();
 const getCartMock = jest.fn();

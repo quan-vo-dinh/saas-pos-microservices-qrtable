@@ -14,7 +14,7 @@ import { io } from 'socket.io-client';
 import { API_CONFIG } from '@/constants/api';
 import { TENANT_LIFECYCLE_SOCKET_EVENTS } from '@/constants/tenant-lifecycle';
 import { useSession } from '@/features/session/context/session-provider';
-import { billKeys, cartKeys, orderKeys } from './use-order-query';
+import { billKeys, cartKeys, orderKeys } from './order-query-keys';
 
 export type CustomerRealtimeStatus = 'idle' | 'connected' | 'reconnecting' | 'degraded' | 'auth-error';
 
