@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { PreparationStation } from '@einvoice/types';
 import { ApiError } from '@einvoice/frontend-utils';
@@ -31,8 +31,6 @@ export interface KdsBoardActions {
  */
 export interface KdsBoardData {
   tickets: KDSTicketMock[];
-  /** Sync read of latest tickets — used inside keyboard-shortcut effect to bypass stale closure. */
-  getAllTickets: () => KDSTicketMock[];
   selectedTicketId: string | null;
   selectTicket: (id: string | null) => void;
   /** For keyboard shortcuts (1 = advance, 3 = recall). */
@@ -108,11 +106,6 @@ export function useKdsBoardAdapter(
     () => (snapshot?.tickets?.length ? mapSnapshotToBoardTickets(snapshot.tickets, station) : []),
     [snapshot, station],
   );
-
-  // Stable ref so getAllTickets() always reads the latest slice without stale closure.
-  const ticketsRef = useRef<KDSTicketMock[]>([]);
-  ticketsRef.current = useMock ? mockTickets : liveTickets;
-  const getAllTickets = useCallback(() => ticketsRef.current, []);
 
   const invalidateQueue = useCallback(() => {
     if (tenantId) {
@@ -217,7 +210,6 @@ export function useKdsBoardAdapter(
   if (useMock) {
     return {
       tickets: mockTickets,
-      getAllTickets,
       selectedTicketId: mockSelectedTicketId,
       selectTicket: mockSelectKdsTicket,
       advanceTicket: mockAdvanceTicket,
@@ -236,7 +228,6 @@ export function useKdsBoardAdapter(
 
   return {
     tickets: liveTickets,
-    getAllTickets,
     selectedTicketId: liveSelectedTicketId,
     selectTicket: setLiveSelectedTicketId,
     advanceTicket: liveAdvanceTicket,

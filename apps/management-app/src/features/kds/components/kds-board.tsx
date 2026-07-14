@@ -79,6 +79,8 @@ export function KdsBoard({ station }: { station: KDSStation }) {
 
   const byColumn = (c: ColumnStatus) => mine.filter((t) => t.columnStatus === c);
 
+  const { selectedTicketId, advanceTicket, recallTicket, tickets } = board;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
@@ -88,27 +90,26 @@ export function KdsBoard({ station }: { station: KDSStation }) {
 
       if (!['1', '2', '3'].includes(e.key)) return;
 
-      const sid = board.selectedTicketId;
+      const sid = selectedTicketId;
       if (!sid) return;
 
-      const all = board.getAllTickets();
-      const tix = all.find((t) => t.ticketId === sid && t.station === station);
+      const tix = tickets.find((t) => t.ticketId === sid && t.station === station);
       if (!tix) return;
 
       if (e.key === '1' && tix.columnStatus === 'WAITING') {
         e.preventDefault();
-        board.advanceTicket(sid);
+        advanceTicket(sid);
       } else if (e.key === '2' && tix.columnStatus === 'IN_PROGRESS') {
         e.preventDefault();
-        board.advanceTicket(sid);
+        advanceTicket(sid);
       } else if (e.key === '3' && tix.columnStatus === 'DONE') {
         e.preventDefault();
-        board.recallTicket(sid, 'Phím tắt recall', userId, userName);
+        recallTicket(sid, 'Phím tắt recall', userId, userName);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [board.selectedTicketId, board.advanceTicket, board.recallTicket, board.getAllTickets, station, userId, userName]);
+  }, [selectedTicketId, advanceTicket, recallTicket, tickets, station, userId, userName]);
 
   // -------------------------------------------------------------------------
   // Live-mode guards (skipped in mock mode)
