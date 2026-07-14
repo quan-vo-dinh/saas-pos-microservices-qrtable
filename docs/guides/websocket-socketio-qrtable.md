@@ -1,64 +1,64 @@
-# WebSocket & Socket.IO: In-depth Theory — For QRTable
+# WebSocket & Socket.IO: Lý thuyết chuyên sâu — Dành cho QRTable
 
-> **Document philosophy:** Understand the _why_ before the _how_. Every concept is anchored in context
-> QRTable's specifics so you don't learn abstract theory but learn to apply it immediately.
+> **Triết lý tài liệu:** Hiểu rõ _tại sao (why)_ trước khi học _như thế nào (how)_. Mọi khái niệm đều được gắn kết với bối cảnh cụ thể của QRTable để bạn không chỉ học lý thuyết suông mà có thể áp dụng được ngay lập tức.
 >
-> **Current code status (2026-05-14):** This document is a supporting guide. QRTable uses Socket.IO `4.8.3` via NestJS BFF Gateway namespace `/orders`. BFF assigns rooms themselves from JWT staff or verified customer sessions — clients are not allowed to choose rooms themselves. The frontend receives the event as _invalidation hint_ (refresh hint), then TanStack Query refetch REST snapshot. BFF uses Socket.IO Redis Adapter to fan-out when running multiple instances. There is no durable replay for clients that have lost connection — reconnection must be accompanied by a refetch snapshot.
+> **Trạng thái code hiện tại (14-05-2026):** Tài liệu này đóng vai trò là hướng dẫn hỗ trợ. QRTable sử dụng Socket.IO `4.8.3` thông qua BFF Gateway namespace `/orders`. BFF sẽ tự động chỉ định các room dựa trên JWT staff hoặc session customer đã được xác thực — client không được phép tự chọn room. Frontend nhận event dưới dạng _invalidation hint_ (gợi ý làm mới), sau đó dùng TanStack Query để refetch REST snapshot. BFF sử dụng Socket.IO Redis Adapter để fan-out khi chạy nhiều instance. Không có durable replay (phát lại tin nhắn) cho client bị mất kết nối — khi kết nối lại (reconnection) bắt buộc phải refetch REST snapshot.
 
 ---
 
-## Table of Contents
+## Mục lục
 
-1. [Socket.IO Problem Solved](#1-socketio-problem-solved)
-2. [Nature of Socket.IO - Not Pure WebSocket](#2-nature-socketio - not-pure-websocket)
-3. [Anatomy of a Realtime Event](#3-anatomy-of-an-event-realtime)
-4. [Realtime Architecture: BFF Is The Only Edge](#4-realtime-architecture-bff-is-the-only-edge)
-5. [Namespace, Room and Server-Derived Assignment](#5-namespace-room-and-server-derived-assignment)
-6. [Event Registry — List and Meaning](#6-event-registry--list-and-meaning)
-7. [Frontend Contract — Hint, Not Source of Truth](#7-frontend-contract--hint-not-source-of-truth)
-8. [Redis Adapter — Scale Multiple BFF Instances](#8-redis-adapter--scale-multiple-bff-instances)
-9. [Architectural Decision: Socket.IO vs Kafka vs Redis Pub/Sub vs Polling](#9-architectural-decision-socketio-vs-kafka-vs-redis-pubsub-vs-polling)
-10. [Configuration and Operational](#10-configuration-and-operational)
-11. [Summary Mental Model](#11-summary-mental-model)
+1. [Vấn đề mà Socket.IO giải quyết](#1-van-de-ma-socketio-giai-quyet)
+2. [Bản chất của Socket.IO - Không phải WebSocket thuần túy](#2-ban-chat-cua-socketio---khong-phai-websocket-thuan-tuy)
+3. [Giải phẫu của một Realtime Event](#3-giai-phau-cua-mot-realtime-event)
+4. [Kiến trúc Realtime: BFF là Edge duy nhất](#4-kien-truc-realtime-bff-la-edge-duy-nhat)
+5. [Namespace, Room và việc gán Room từ Server](#5-namespace-room-va-viec-gan-room-tu-server)
+6. [Event Registry — Danh sách và Ý nghĩa](#6-event-registry--danh-sach-va-y-nghia)
+7. [Frontend Contract — Chỉ là Hint, không phải Source of Truth](#7-frontend-contract--chi-la-hint-khong-phai-source-of-truth)
+8. [Redis Adapter — Scale nhiều BFF Instance](#8-redis-adapter--scale-nhieu-bff-instance)
+9. [Quyết định kiến trúc: Socket.IO vs Kafka vs Redis Pub/Sub vs Polling](#9-quyet-dinh-kien-truc-socketio-vs-kafka-vs-redis-pubsub-vs-polling)
+10. [Cấu hình và Vận hành](#10-cau-hinh-va-van-hanh)
+11. [Lộ trình đọc hiểu mã nguồn & Giải thích cấu hình thực tế](#11-lo-trinh-doc-hieu-ma-nguon-va-giai-thich-cau-hinh-thuc-te)
+12. [Tóm tắt Mental Model](#12-tom-tat-mental-model)
 
 ---
 
-## 1. Socket.IO Problem Solved
+## 1. Vấn đề mà Socket.IO giải quyết
 
-Before learning what Socket.IO is, you need to understand what problem it was created to solve in QRTable. If you skip this part, you will tend to use Socket.IO as a second Kafka, or vice versa, not knowing when you really need it.
+Trước khi tìm hiểu Socket.IO là gì, bạn cần hiểu rõ vấn đề mà nó giải quyết trong QRTable. Nếu bỏ qua phần này, bạn sẽ có xu hướng sử dụng Socket.IO như một Kafka thứ hai hoặc ngược lại, mà không biết khi nào thực sự cần đến nó.
 
-### 1.1 Original Problem: Multiple Screens, One Restaurant, Data Must Match
+### 1.1 Vấn đề gốc rễ: Nhiều màn hình, Một nhà hàng, Dữ liệu phải đồng nhất
 
-QRTable is a restaurant operations system — not a once-hourly statistics page. At any given time during a shift, there are multiple screens open simultaneously:
+QRTable là một hệ thống vận hành nhà hàng — không phải là một trang thống kê số liệu cập nhật mỗi giờ một lần. Tại bất kỳ thời điểm nào trong ca làm việc, có rất nhiều màn hình đang mở đồng thời:
 
-- Customer PWA on the customer's phone 5
-- The POS of the waiter is holding a tablet
-- KDS on kitchen screen
-- KDS on bar screen
+- Customer PWA trên điện thoại của khách hàng bàn 5
+- POS của nhân viên phục vụ đang cầm máy tính bảng
+- KDS trên màn hình nhà bếp (kitchen)
+- KDS trên màn hình quầy pha chế (bar)
 
-When customer table 5 clicks "Submit Order", what happens? The employee's POS needs to know to confirm. The kitchen's KDS needs to know to start processing. If the system doesn't have realtime, the other two screens sit waiting for the next polling — maybe 3 seconds, maybe 10 seconds.
+Khi khách hàng bàn 5 nhấn "Gửi đơn hàng" (Submit Order), điều gì xảy ra? POS của nhân viên cần biết để xác nhận. KDS của nhà bếp cần biết để bắt đầu chế biến. Nếu hệ thống không có realtime, hai màn hình còn lại sẽ phải ngồi đợi lượt polling tiếp theo — có thể là 3 giây, có thể là 10 giây.
 
-Without realtime, the system still _correct_ but feels slow to operate. In a crowded restaurant, a 5-second delay can mean the staff is working on old data and the kitchen starts making the wrong dish.
+Không có realtime, hệ thống vẫn _chính xác (correct)_ nhưng vận hành sẽ cho cảm giác chậm chạp. Trong một nhà hàng đông khách, sự chậm trễ 5 giây có thể khiến nhân viên làm việc trên dữ liệu cũ và nhà bếp bắt đầu làm sai món.
 
-#### Diagram: QRTable Without Realtime — Polling Problem
+#### Sơ đồ: QRTable khi không có Realtime — Vấn đề của Polling
 
-> Illustration of three screens polling independently. Each screen asks the backend at its own intervals — consuming requests even when there are no changes, and still reacting slowly when there are real changes.
+> Minh họa ba màn hình thực hiện polling độc lập. Mỗi màn hình hỏi backend theo các khoảng thời gian riêng — tiêu thụ request ngay cả khi không có thay đổi nào, và vẫn phản ứng chậm khi có thay đổi thực tế.
 
 ```mermaid
 graph TB
-subgraph "❌ Only HTTP Polling — Three Problems"
+subgraph "❌ Chỉ dùng HTTP Polling — Ba vấn đề lớn"
         PWA["📱 Customer PWA\npolling 5s"]
         POS["💼 Management POS\npolling 3s"]
         KDS["🖥️ Kitchen KDS\npolling 3s"]
         BFF["BFF"]
 
-PWA -->|"GET /orders every 5s<br/>even though nothing changes"| BFF
-POS -->|"GET /admin/orders every 3 seconds<br/>even though nothing changes"| BFF
-KDS -->|"GET /kds/queue every 3s<br/>even though nothing changes"| BFF
+PWA -->|"GET /orders mỗi 5s<br/>ngay cả khi không có gì thay đổi"| BFF
+POS -->|"GET /admin/orders mỗi 3s<br/>ngay cả khi không có gì thay đổi"| BFF
+KDS -->|"GET /kds/queue mỗi 3s<br/>ngay cả khi không có gì thay đổi"| BFF
 
-P1["🔴 Unnecessary requests\nwhen there are no changes"]
-P2["🔴 Customer submits order 10:00:01\nPOS knows at 10:00:03 (best case)\nor 10:00:13 (worst case)"]
-P3["🔴 All clients poll independently\nthere is no way for the server to proactively notify"]
+P1["🔴 Các request không cần thiết\nkhi không có thay đổi"]
+P2["🔴 Khách gửi đơn lúc 10:00:01\nPOS biết lúc 10:00:03 (tốt nhất)\nhoặc 10:00:13 (tệ nhất)"]
+P3["🔴 Tất cả client poll độc lập\nserver không có cách nào chủ động báo tin"]
     end
 
     style P1 fill:#ff6b6b,stroke:#333,color:#fff
@@ -66,13 +66,13 @@ P3["🔴 All clients poll independently\nthere is no way for the server to proac
     style P3 fill:#ff6b6b,stroke:#333,color:#fff
 ```
 
-#### Diagram: Yes Socket.IO — Server Proactively Alerts
+#### Sơ đồ: Có Socket.IO — Server chủ động thông báo (Push Invalidation Hint)
 
-> With Socket.IO, the server does not wait for the client to ask. When the state changes, BFF emits the event to the correct room. Related screens receive hints immediately and refetch REST snapshots. There is no pointless polling when there are no changes.
+> Với Socket.IO, server không đợi client hỏi. Khi trạng thái thay đổi, BFF emit event tới đúng room. Các màn hình liên quan nhận được hint ngay lập tức và tiến hành refetch REST snapshot. Không còn polling vô nghĩa khi không có thay đổi.
 
 ```mermaid
 graph LR
-subgraph "✅ With Socket.IO — Push Invalidation Hint"
+subgraph "✅ Có Socket.IO — Push Invalidation Hint"
         OS["Order Service"]
         BFF["BFF\n(realtime edge)"]
         WS["Socket.IO\nnamespace /orders"]
@@ -92,43 +92,43 @@ subgraph "✅ With Socket.IO — Push Invalidation Hint"
     style OS fill:#51cf66,stroke:#333,color:#fff
 ```
 
-Socket.IO solves this problem by proactively reversing: **the server notifies the client when there are changes, instead of the client asking periodically**. This reduces useless requests and reduces delay to nearly zero.
+Socket.IO giải quyết vấn đề này bằng cách đảo ngược quy trình: **server chủ động thông báo cho client khi có thay đổi, thay vì client phải hỏi định kỳ**. Điều này giúp giảm các request vô ích và giảm độ trễ xuống gần như bằng không.
 
-### 1.2 When Socket.IO is NOT the Solution
+### 1.2 Khi nào Socket.IO KHÔNG phải là giải pháp
 
-Socket.IO is not the answer to all realtime needs. Knowing when _not_ to use it is just as important as knowing when to use it:
+Socket.IO không phải là câu trả lời cho mọi nhu cầu realtime. Việc biết khi nào _không_ nên dùng nó cũng quan trọng như biết khi nào nên dùng:
 
-**Do not use Socket.IO for business commands:** Submit order, confirm/cancel order, start/done KDS ticket, transfer table — all going through REST → BFF → TCP service. Do not use WebSocket to mutate because it requires guard, DTO validation, transaction, audit, and idempotency. Socket.IO is a notification channel, not a mutation API.
+**Không dùng Socket.IO cho các business command:** Gửi order (submit order), xác nhận/hủy order, bắt đầu/hoàn thành KDS ticket, chuyển bàn — tất cả phải đi qua REST → BFF → TCP service. Không dùng WebSocket cho các mutation vì chúng yêu cầu guard, validation DTO, transaction, audit log, và tính idempotency. Socket.IO là một kênh thông báo (notification channel), không phải là một API mutation.
 
-**Do not use Socket.IO instead of Kafka:** When Kitchen service needs to react after an Order service commit, it is a domain event between services. Kafka is right. WebSocket is an edge UI — not a message bus backend.
+**Không dùng Socket.IO thay thế cho Kafka:** Khi Kitchen service cần phản ứng sau khi Order service commit, đó là một domain event giữa các service. Kafka mới là lựa chọn đúng đắn. WebSocket là một edge UI — không phải là một message bus ở backend.
 
-**Do not use Socket.IO when durable replay is needed:** Event Socket.IO is fire-and-forget. If the client is offline when the event is triggered, the event is lost forever. For domain events, it is necessary to ensure processing even if the consumer goes down, using Kafka/outbox.
+**Không dùng Socket.IO khi cần durable replay (lưu trữ và phát lại tin nhắn):** Event Socket.IO hoạt động theo cơ chế fire-and-forget (gửi và quên). Nếu client đang offline khi event được kích hoạt, event đó sẽ bị mất vĩnh viễn. Đối với các domain event backend, cần đảm bảo xử lý ngay cả khi consumer bị sập, sử dụng Kafka/outbox.
 
-**Do not use Socket.IO to hide source of truth errors:** If the REST snapshot returns incorrect results, do not fix it by patching the UI from the realtime payload. Must edit service Owner.
+**Không dùng Socket.IO để che giấu lỗi của source of truth:** Nếu REST snapshot trả về kết quả sai, đừng sửa nó bằng cách vá (patch) giao diện trực tiếp từ payload của realtime event. Bạn phải sửa ở service Owner chịu trách nhiệm về dữ liệu đó.
 
 ---
 
-## 2. Nature of Socket.IO — Not Pure WebSocket
+## 2. Bản chất của Socket.IO — Không phải WebSocket thuần túy
 
-### 2.1 Common Misunderstanding: Socket.IO ≠ WebSocket
+### 2.1 Hiểu lầm phổ biến: Socket.IO ≠ WebSocket
 
-The most common mistake is to think of Socket.IO as "WebSocket with sugar syntax". Socket.IO is actually a realtime library that runs on **Engine.IO**, a separate transport layer — and WebSocket is just _one of the transports_ that Engine.IO can use.
+Sai lầm phổ biến nhất là nghĩ Socket.IO chỉ là "WebSocket với cú pháp dễ dùng hơn". Socket.IO thực chất là một thư viện realtime chạy trên **Engine.IO**, một lớp transport riêng biệt — và WebSocket chỉ là _một trong những transport_ mà Engine.IO có thể sử dụng.
 
-When the client connects, Socket.IO does not go directly to WebSocket. It starts with **HTTP long-polling**, exchanges information about capabilities, then _upgrades_ to WebSocket if both ends support it. This process is called transport negotiation.
+Khi client kết nối, Socket.IO không đi thẳng vào WebSocket ngay. Nó bắt đầu bằng **HTTP long-polling**, trao đổi thông tin về khả năng kết nối (capabilities), sau đó mới _nâng cấp (upgrade)_ lên WebSocket nếu cả hai đầu đều hỗ trợ. Quá trình này được gọi là transport negotiation (đàm phán phương thức truyền tải).
 
 ```txt
-1. Client sends an HTTP GET polling request
-2. Server returns session information (sid, upgrades, pingInterval...)
-3. Client sends a few more polling requests to set up
-4. If WebSocket is available → upgrade (HTTP → WS)
-5. After upgrade, use WebSocket for all subsequent messages
+1. Client gửi request HTTP GET polling
+2. Server trả về thông tin session (sid, upgrades, pingInterval...)
+3. Client gửi thêm vài request polling để thiết lập
+4. Nếu có hỗ trợ WebSocket → upgrade (HTTP → WS)
+5. Sau khi upgrade, sử dụng WebSocket cho tất cả các message tiếp theo
 ```
 
-Understanding this is important because: if a proxy/firewall blocks WebSocket upgrade, Socket.IO still works via long-polling — slower but not completely blocked.
+Hiểu được điều này rất quan trọng vì: nếu một proxy/firewall chặn upgrade WebSocket, Socket.IO vẫn hoạt động được qua long-polling — chậm hơn nhưng không bị chặn hoàn toàn.
 
-#### Diagram: Transport Negotiation — From Polling to WebSocket
+#### Sơ đồ: Transport Negotiation — Từ Polling nâng cấp lên WebSocket
 
-> Each Socket.IO connection starts with HTTP polling to negotiate, then upgrades to WebSocket. If the upgrade fails (the proxy blocks), Socket.IO stays long-polling — degraded but still functional. This is why Socket.IO is more robust than pure WebSocket in real environments.
+> Mỗi kết nối Socket.IO bắt đầu bằng HTTP polling để thương lượng, sau đó nâng cấp lên WebSocket. Nếu quá trình nâng cấp thất bại (do proxy chặn), Socket.IO duy trì kết nối ở dạng HTTP long-polling — hiệu năng giảm nhưng vẫn hoạt động. Đây là lý do Socket.IO hoạt động bền bỉ hơn WebSocket thuần túy trong các môi trường thực tế.
 
 ```mermaid
 sequenceDiagram
@@ -141,87 +141,87 @@ sequenceDiagram
     S-->>C: {sid, upgrades:["websocket"], pingInterval:25000}
 
 C->>P: GET /orders/?transport=polling (a few requests)
-Note over C,S: Establishing session via polling
+Note over C,S: Thiết lập session qua polling
 
     C->>P: GET /orders/?transport=websocket (Upgrade: websocket)
-    alt WebSocket available
+    alt Hỗ trợ WebSocket
         P->>S: WebSocket upgrade ✓
         S-->>C: HTTP 101 Switching Protocols
-Note over C,S: WebSocket connection — used for all subsequent messages
-else Proxy blocks WebSocket
-P-->>C: Upgrade failed
-Note over C,S: Keep HTTP long-polling — slower but still works
+Note over C,S: Kết nối WebSocket — dùng cho tất cả message sau đó
+else Proxy chặn WebSocket
+P-->>C: Upgrade thất bại
+Note over C,S: Giữ HTTP long-polling — chậm hơn nhưng vẫn chạy
     end
 ```
 
-### 2.2 What does Socket.IO add compared to pure WebSocket
+### 2.2 Socket.IO bổ sung những gì so với WebSocket thuần túy
 
-WebSocket is purely a two-way connection protocol — no rooms, no namespaces, no automatic reconnection, no fallbacks. If QRTable uses pure WebSocket, the team must build it all themselves:
+WebSocket thuần túy chỉ là một giao thức kết nối hai chiều — không có room, không có namespace, không tự động reconnect, không có fallback. Nếu QRTable dùng WebSocket thuần túy, đội ngũ phát triển phải tự xây dựng lại tất cả:
 
-| Features                    | Pure WebSocket | Socket.IO               |
-| --------------------------- | -------------- | ----------------------- |
-| Reconnect automatically     | Build your own | Available, configurable |
-| Fallback transportation     | None           | Automatic long-polling  |
-| Rooms (socket group)        | Build your own | Available               |
-| Namespaces                  | None           | Available               |
-| Acknowledgements (callback) | Build your own | Available               |
-| Multi-server adapter        | Build your own | Redis Adapter           |
-| Binary/JSON encoding        | Craft          | Available               |
+| Tính năng                  | WebSocket thuần túy | Socket.IO                 |
+| -------------------------- | ------------------- | ------------------------- |
+| Tự động reconnect          | Tự xây dựng         | Có sẵn, cấu hình được     |
+| Fallback transport         | Không có            | Tự động dùng long-polling |
+| Room (nhóm socket)         | Tự xây dựng         | Có sẵn                    |
+| Namespace                  | Không có            | Có sẵn                    |
+| Acknowledgement (callback) | Tự xây dựng         | Có sẵn                    |
+| Multi-server adapter       | Tự xây dựng         | Redis Adapter             |
+| Mã hóa Binary/JSON         | Tự xử lý thủ công   | Có sẵn                    |
 
-QRTable needs rooms (decentralized by tenant/role/station), namespaces (realtime domain separation), reconnect (when network is down), and Redis Adapter (when running multiple BFF instances). Use Socket.IO to have these available instead of building your own.
+QRTable cần các tính năng như room (phân quyền theo tenant/role/station), namespace (phân tách các domain realtime), reconnect (khi mạng chập chờn), và Redis Adapter (khi chạy nhiều BFF instance). Sử dụng Socket.IO giúp chúng ta có sẵn các tính năng này thay vị tự viết lại.
 
-### 2.3 What Socket.IO DOES NOT Provide
+### 2.3 Những gì Socket.IO KHÔNG cung cấp
 
-Socket.IO is not a universal solution. It's important to understand what Socket.IO _does_ guarantee:
+Socket.IO không phải là một giải pháp vạn năng. Điều quan trọng cần hiểu là những giới hạn của nó:
 
-**There is no durable message storage:** Messages are emitted and gone — not saved for offline clients to read later. This is a fundamental difference with Kafka.
+**Không lưu trữ tin nhắn bền vững (durable message storage):** Các event sau khi emit đi là xong — không được lưu lại để các client offline có thể đọc sau. Đây là điểm khác biệt cốt lõi so với Kafka.
 
-**No exactly-once delivery:** Socket.IO has at-most-once semantics for regular emit. Acknowledgment helps know one party has received, but does not guarantee the entire system.
+**Không đảm bảo phân phát chính xác một lần (no exactly-once delivery):** Socket.IO sử dụng cơ chế at-most-once (tối đa một lần) cho các emit thông thường. Acknowledgment giúp biết một bên đã nhận, nhưng không đảm bảo trạng thái cho toàn bộ hệ thống.
 
-**No built-in authorization:** Room assignment, auth handshake, tenant isolation — all the responsibility of the application code, not Socket.IO.
+**Không tích hợp sẵn phân quyền (no built-in authorization):** Gán room, handshake xác thực, cô lập tenant (tenant isolation) — tất cả đều là trách nhiệm của mã nguồn ứng dụng, không phải của Socket.IO.
 
-QRTable accepts at-most-once for UI hints because: **losing events does not corrupt the data — the client is just slower to know, and will refetch correctly when reconnecting/focusing**.
+QRTable chấp nhận cơ chế at-most-once cho UI hint vì: **việc mất event không làm hỏng dữ liệu — client chỉ cập nhật chậm hơn một chút, và sẽ refetch dữ liệu chính xác khi kết nối lại hoặc khi người dùng quay lại ứng dụng**.
 
 ---
 
-## 3. Anatomy of a Realtime Event
+## 3. Giải phẫu của một Realtime Event
 
-All communication in Socket.IO QRTable has a clear structure. Understanding each layer helps debug faster and design new events more accurately.
+Mọi giao tiếp trong Socket.IO của QRTable đều có cấu trúc rõ ràng. Hiểu rõ từng lớp giúp debug nhanh hơn và thiết kế các event mới chính xác hơn.
 
-### 3.1 Four Layers of an Event
+### 3.1 Bốn lớp của một Event
 
 ```txt
 Namespace   : /orders
-The realtime space contains all QRTable communications
+Không gian realtime chứa toàn bộ giao tiếp của QRTable
 
 Room        : tenant:t1:staff
-The socket group receives the event — the server infers it, the client does not choose it
+Nhóm socket nhận event — server tự suy luận ra, client không được tự chọn
 
 Event name  : events.orderCreated
-String name for the client to register as a listener
+Tên chuỗi để client đăng ký lắng nghe (listener)
 
 Payload     : { tenantId, orderId, sessionId, tableNumber, ... }
-Data for the client to filter and know which queries need to be invalidated
+Dữ liệu để client filter và biết query nào cần được invalidate
 ```
 
-#### Diagram: Structure Of An Emit From BFF
+#### Sơ đồ: Cấu trúc của một lệnh Emit từ BFF
 
-> Four levels of an emit: BFF calls `server.to(room).emit(eventName, payload)`. Redis Adapter ensures fan-out room across all instances. Client receives and uses payload to filter + invalidate query.
+> Bốn cấp độ của một lệnh emit: BFF gọi `server.to(room).emit(eventName, payload)`. Redis Adapter đảm bảo fan-out room qua tất cả instance. Client nhận event và sử dụng payload để lọc + invalidate query.
 
 ```mermaid
 graph TB
     subgraph EMIT["🔵 BFF emit — events.orderCreated"]
-NS["Namespace: /orders\n(entire QRTable realtime)"]
-RM["Room: tenant:t1:staff\n(employee of tenant t1)"]
+NS["Namespace: /orders\n(toàn bộ realtime của QRTable)"]
+RM["Room: tenant:t1:staff\n(nhân viên của tenant t1)"]
         EN["Event: events.orderCreated"]
         PL["Payload: {tenantId, orderId,\nsessionId, tableNumber}"]
 
         NS --> RM --> EN --> PL
     end
 
-subgraph RECV["🟡 Frontend receives"]
-F1["Filter: tenantId matches?"]
-F2["Filter: sessionId matches? (PWA)"]
+subgraph RECV["🟡 Frontend nhận"]
+F1["Lọc: tenantId khớp không?"]
+F2["Lọc: sessionId khớp không? (PWA)"]
         F3["Invalidate TanStack Query"]
         F4["REST refetch snapshot"]
 
@@ -238,69 +238,69 @@ F2["Filter: sessionId matches? (PWA)"]
     style F4 fill:#339af0,stroke:#333,color:#fff
 ```
 
-### 3.2 Payload is used for filtering, not for rendering
+### 3.2 Payload chỉ dùng để lọc, không dùng để render UI
 
-This is the most important principle of the entire realtime QRTable design:
+Đây là nguyên tắc quan trọng nhất trong toàn bộ thiết kế realtime của QRTable:
 
-**Payload event is for deciding _whether to refetch_ and which _refetch query_ — not to render UI directly.**
+**Payload event chỉ dùng để quyết định _có refetch hay không_ và quyết định _query nào cần refetch_ — không dùng để render trực tiếp lên UI.**
 
-Reason: the payload may miss (connection lost), late (arrive after the state has changed again), or missing fields (schema changed). The REST snapshot from the service Owner is always the ultimate source of truth.
+Lý do: payload có thể bị thất lạc (mất kết nối), đến muộn (sau khi trạng thái đã thay đổi lần nữa), hoặc thiếu trường (khi thay đổi schema). REST snapshot từ service Owner luôn là source of truth cuối cùng và an toàn nhất.
 
 ```txt
-✅ Correct:
+✅ Đúng:
   socket.on('events.orderCreated', (payload) => {
-    if (payload.tenantId !== myTenantId) return;  // filter
-    queryClient.invalidateQueries(['orders', tenantId]);  // trigger refetch
+    if (payload.tenantId !== myTenantId) return;  // lọc
+    queryClient.invalidateQueries(['orders', tenantId]);  // kích hoạt refetch
   });
 
 ❌ Sai:
   socket.on('events.orderCreated', (payload) => {
-setOrders(prev => [...prev, payload.order]);  // render from payload
+    setOrders(prev => [...prev, payload.order]);  // render trực tiếp từ payload
   });
 ```
 
-### 3.3 Delivery Semantics — Why Events Can Be Lost
+### 3.3 Khả năng phân phát (Delivery Semantics) — Tại sao event có thể bị mất
 
-Socket.IO with default configuration has **at-most-once** semantics: events are emitted once, maybe to the client, maybe not. There is no automatic retry for normal emit.
+Socket.IO với cấu hình mặc định có ngữ nghĩa **at-most-once** (tối đa một lần): các event được emit đi một lần, client có thể nhận được hoặc không. Không có cơ chế tự động gửi lại (retry) cho các emit thông thường.
 
-Situations where the event may not reach the client:
+Các tình huống event có thể không đến được client:
 
-| Situation                        | Consequences                        | How to handle QRTable             |
-| -------------------------------- | ----------------------------------- | --------------------------------- |
-| Client offline when emit         | Event lost forever                  | Reconnect → refetch active domain |
-| Client reconnecting              | Event emit in this interval takes   | Post-reconnect refetch            |
-| Network glitch                   | Packet loss → event not arriving    | Socket.IO reconnect → refetch     |
-| BFF instance emit false instance | Redis Adapter fan-out without cover | Redis Adapter fixes this issue    |
+| Tình huống                     | Hệ quả                               | Cách xử lý của QRTable                 |
+| ------------------------------ | ------------------------------------ | -------------------------------------- |
+| Client offline khi emit        | Event bị mất vĩnh viễn               | Kết nối lại → refetch active domain    |
+| Client đang reconnect          | Event emit trong lúc này bị trôi qua | Refetch sau khi kết nối lại thành công |
+| Mạng chập chờn                 | Mất gói tin → event không đến được   | Socket.IO reconnect → refetch          |
+| BFF instance emit sai instance | Redis Adapter fan-out không bao phủ  | Redis Adapter giải quyết vấn đề này    |
 
-The design of QRTable accepts at-most-once because every state has a REST snapshot as a safety net. Missing event → UI is a bit slow to update, but not wrong.
+Thiết kế của QRTable chấp nhận cơ chế at-most-once vì mọi trạng thái đều có một REST snapshot làm điểm tựa an toàn. Mất event → UI chỉ cập nhật chậm hơn một chút, chứ không bị sai dữ liệu.
 
 ---
 
-## 4. Realtime Architecture: BFF Is the Only Edge
+## 4. Kiến trúc Realtime: BFF là Edge duy nhất
 
-### 4.1 Why BFF Is The Only Point Emit About Browser
+### 4.1 Tại sao BFF là điểm duy nhất kết nối trực tiếp tới Browser
 
-In QRTable, there is no service other than BFF that talks directly to the browser via WebSocket. Kitchen service, Order service, Payment service — all go through BFF.
+Trong QRTable, không có service nào khác ngoài BFF được phép giao tiếp trực tiếp với browser qua WebSocket. Kitchen service, Order service, Payment service — tất cả đều phải thông qua BFF.
 
-Architectural reasons:
+Lý do kiến trúc:
 
-**Security boundary:** BFF is the only place that has context to verify JWT, resolve session, and know which room is suitable for the connecting client. If Kitchen service emits directly, it needs to know each client's socket ID — this breaks separation of concerns.
+**Ranh giới bảo mật (Security boundary):** BFF là nơi duy nhất có đầy đủ ngữ cảnh để xác thực JWT, phân giải session, và biết room nào phù hợp với client đang kết nối. Nếu Kitchen service emit trực tiếp, nó sẽ phải biết socket ID của từng client — điều này vi phạm nguyên tắc phân tách trách nhiệm (separation of concerns).
 
-**Enrichment:** Kafka event from Payment service contains `paymentId`, but the browser needs `sessionId` to know which room to emit to. BFF is the only place that can be enriched by calling Order service — Kitchen or Payment should not know about the session contract.
+**Làm giàu dữ liệu (Enrichment):** Kafka event từ Payment service chỉ chứa `paymentId`, nhưng browser cần có `sessionId` để biết cần emit vào room nào. BFF là nơi duy nhất có thể làm giàu dữ liệu bằng cách gọi Order service — các service như Kitchen hay Payment không cần biết về cấu trúc của session.
 
-**Decoupling:** If Socket.IO is replaced with another technology in the future, only BFF needs to change. The remaining services do not know anything about browser protocols.
+**Giảm phụ thuộc (Decoupling):** Nếu sau này chúng ta thay thế Socket.IO bằng một công nghệ khác, chúng ta chỉ cần sửa ở BFF. Các service còn lại không cần biết gì về các giao thức truyền thông với browser.
 
-### 4.2 Three Different Trigger Emit Sources
+### 4.2 Ba luồng kích hoạt Emit khác nhau
 
-Not all events have the same origin. QRTable has three different patterns depending on the type of event:
+Không phải mọi event đều có cùng nguồn gốc. QRTable áp dụng ba pattern khác nhau tùy thuộc vào loại event:
 
-#### Diagram: Three Emit Streams — BFF Direct, Kafka Bridge, Redis Pub/Sub
+#### Sơ đồ: Ba luồng Emit — BFF Direct, Kafka Bridge, Redis Pub/Sub
 
-> Three different emit streams serve three different types of events. Common point: they all go through BFF before going to the browser. Another point: the trigger source and emit time are different.
+> Ba luồng emit khác nhau phục vụ cho ba loại event khác nhau. Điểm chung: đều đi qua BFF trước khi đến browser. Điểm khác biệt: nguồn kích hoạt và thời điểm emit khác nhau.
 
 ```mermaid
 graph TB
-subgraph "Flow 1: BFF Direct (sau TCP success)"
+subgraph "Luồng 1: BFF Direct (sau khi TCP thành công)"
         FE1["Frontend\nREST command"]
         BFF1["BFF Controller"]
         SVC1["Order/Kitchen Service\n(TCP)"]
@@ -312,10 +312,10 @@ subgraph "Flow 1: BFF Direct (sau TCP success)"
         BFF1 -->|"events.orderCreated / events.orderStatusChanged"| WS1
     end
 
-subgraph "Flow 2: Kafka Bridge (domain events)"
+subgraph "Luồng 2: Kafka Bridge (domain events)"
         KFK["Kafka\npayment.completed\nkitchen.sla_warning"]
         BFF2["BFF Kafka Bridge"]
-ENR["Enrich: call Order\nget sessionId"]
+        ENR["Enrich: call Order\nđể lấy sessionId"]
         WS2["Socket.IO emit"]
 
         KFK -->|"consume"| BFF2
@@ -323,7 +323,7 @@ ENR["Enrich: call Order\nget sessionId"]
         ENR -->|"events.paymentCompleted\nevents.kitchenSlaWarning"| WS2
     end
 
-subgraph "Flow 3: Redis Pub/Sub (KDS internal)"
+subgraph "Luồng 3: Redis Pub/Sub (KDS nội bộ)"
         KS["Kitchen Service"]
         RKV["Redis KDS State\n(ghi ticket/queue)"]
         RPB["Redis Pub/Sub\nrealtime:kds:{tenantId}"]
@@ -343,68 +343,68 @@ subgraph "Flow 3: Redis Pub/Sub (KDS internal)"
     style RPB fill:#339af0,stroke:#333,color:#fff
 ```
 
-### 4.3 Why KDS Doesn't Use Kafka Directly to Emit
+### 4.3 Tại sao KDS không dùng Kafka trực tiếp để emit event
 
-Natural question: why doesn't KDS use Kafka `order.confirmed` to emit `events.kdsQueueChanged` too? Why go through Redis Pub/Sub?
+Một câu hỏi tự nhiên: tại sao KDS không dùng event Kafka `order.confirmed` để emit luôn `events.kdsQueueChanged`? Tại sao phải đi vòng qua Redis Pub/Sub?
 
-**Reason:** When BFF consumes `order.confirmed` from Kafka, Kitchen service _may not have finished processing_ — has not yet written the KDS ticket to Redis. If BFF emits `events.kdsQueueChanged` right now, the frontend refetch but does not see the new ticket in the queue. **State hint must be played after the state actually exists.**
+**Lý do:** Khi BFF consume `order.confirmed` từ Kafka, Kitchen service _có thể chưa hoàn thành việc xử lý_ — tức là chưa kịp ghi dữ liệu KDS ticket vào Redis. Nếu BFF emit `events.kdsQueueChanged` ngay lúc này, frontend sẽ refetch dữ liệu nhưng chưa thấy ticket mới trong queue. **State hint chỉ được phát sau khi state thực tế đã tồn tại.**
 
-Correct flow: Kitchen consume Kafka → write Redis KDS → publish Redis Pub/Sub → BFF emit → frontend refetch (now the ticket is already in Redis).
+Luồng xử lý đúng: Kitchen consume Kafka → ghi KDS vào Redis → publish qua Redis Pub/Sub → BFF emit event → frontend refetch (lúc này ticket chắc chắn đã nằm trong Redis).
 
 ---
 
-## 5. Namespace, Room and Server-Derived Assignment
+## 5. Namespace, Room và việc gán Room từ Server
 
-### 5.1 Namespace /orders — Unique Space
+### 5.1 Namespace `/orders` — Không gian duy nhất
 
-QRTable uses a single namespace:
+QRTable sử dụng một namespace duy nhất:
 
 ```txt
 /orders
 ```
 
-Current Gateway:
+Cấu hình Gateway hiện tại:
 
 ```ts
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/orders' })
 export class OrderEventsGateway implements OnGatewayConnection {}
 ```
 
-Frontend gets namespace URL from BFF origin:
+Frontend lấy URL namespace dựa trên BFF origin:
 
 ```ts
 // REST base:   http://localhost:3300/api/v1
-// Socket URL: http://localhost:3300/orders ← no /api/v1
+// Socket URL: http://localhost:3300/orders ← không có /api/v1
 const url = new URL(API_CONFIG.DEFAULT_BFF_URL);
 const socketUrl = `${url.origin}/orders`;
 ```
 
-**Common error:** Using `http://localhost:3300/api/v1/orders` — will result in a 404 because the namespace does not have the prefix `/api/v1`. Namespace is a private route, not a REST route.
+**Lỗi thường gặp:** Sử dụng `http://localhost:3300/api/v1/orders` — sẽ bị lỗi 404 vì namespace không có tiền tố `/api/v1`. Namespace là một route kết nối realtime riêng, không phải REST route.
 
-There are no plans to create a separate `/kds` namespace — KDS uses the same `/orders` namespace and delegates permissions using rooms + event filters.
+Hệ thống không có kế hoạch tạo thêm namespace riêng biệt cho `/kds` — KDS sử dụng chung namespace `/orders` và phân quyền dựa trên room + filter của event.
 
-### 5.2 Rooms — Server Inferred, Client Not Selected
+### 5.2 Room — Server tự suy luận, Client không tự chọn
 
-Room is a socket group for BFF to emit to the correct recipient. Immutable principle: **client does not send room name, server deduces it from verified data**.
+Room là nhóm socket để BFF emit tới đúng đối tượng nhận. Nguyên tắc bất di bất dịch: **client không gửi lên tên room, server tự suy luận ra từ dữ liệu đã xác thực**.
 
-Why not trust the client? If a client is allowed to join room `tenant:other-tenant:staff`, that client will receive events from other tenants — this is a serious security hole in a multi-tenant environment.
+Tại sao không tin tưởng client? Nếu client được phép gửi tên room `tenant:other-tenant:staff` để join, họ sẽ nhận được toàn bộ event của các tenant khác — đây là lỗ hổng bảo mật nghiêm trọng trong kiến trúc multi-tenant.
 
-Room assignment occurs in `handleConnection` after a successful auth handshake:
+Quá trình gán room diễn ra trong `handleConnection` sau khi handshake xác thực thành công:
 
-#### Diagram: Room Assignment By Role
+#### Sơ đồ: Gán Room dựa trên Role
 
-> Server joins socket to rooms immediately upon connection, based on verified role/session. The client does not send any room name. Legacy events `join.staff` and `join.session` were rejected.
+> Server tự động gán socket vào các room ngay sau khi kết nối dựa trên role/session đã xác thực. Client không gửi bất kỳ tên room nào. Các event cũ như `join.staff` hay `join.session` đều bị từ chối.
 
 ```mermaid
 graph TB
 subgraph "handleConnection — Server Auto-Assign Room"
         CONN["Socket connect"]
-        AUTH["Auth Handshake\nverify JWT / session"]
+        AUTH["Auth Handshake\nxác thực JWT / session"]
 
         CONN --> AUTH
 
-        AUTH -->|"staff token"| STAFF["Verify Authorizer gRPC\n→ tenantId + roles"]
-        AUTH -->|"customer session"| CUST["Verify Redis session\n→ tenantId + sessionId"]
+        AUTH -->|"staff token"| STAFF["Xác thực qua gRPC tới Authorizer\n→ tenantId + roles"]
+        AUTH -->|"customer session"| CUST["Kiểm tra Redis session\n→ tenantId + sessionId"]
 
         STAFF -->|"WAITER"| R1["tenant:{tid}:staff"]
         STAFF -->|"CHEF"| R2["tenant:{tid}:staff\ntenant:{tid}:kds:kitchen"]
@@ -413,7 +413,7 @@ subgraph "handleConnection — Server Auto-Assign Room"
 
         CUST --> R5["session:{sid}:customer\ntenant:{tid}:customers\ntenant-slug:{slug}:customers"]
 
-        AUTH -->|"invalid"| ERR["events.authError\n→ disconnect"]
+        AUTH -->|"không hợp lệ"| ERR["events.authError\n→ ngắt kết nối"]
     end
 
     style ERR fill:#ff6b6b,stroke:#333,color:#fff
@@ -424,20 +424,20 @@ subgraph "handleConnection — Server Auto-Assign Room"
     style R5 fill:#339af0,stroke:#333,color:#fff
 ```
 
-Full table of rooms by actor:
+Bảng phân bổ room chi tiết cho từng actor:
 
-| Actor / Role               | Rooms are joined                                                                                             |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Customer sessions          | `session:{sessionId}:customer`, `tenant:{tenantId}:customers`, optional `tenant-slug:{tenantSlug}:customers` |
-| WAITER                     | `tenant:{tenantId}:staff`                                                                                    |
-| CHEF                       | `tenant:{tenantId}:staff`, `tenant:{tenantId}:kds:kitchen`                                                   |
-| BARISTA                    | `tenant:{tenantId}:staff`, `tenant:{tenantId}:kds:bar`                                                       |
-| Owner / MANAGER            | `tenant:{tenantId}:staff`, `tenant:{tenantId}:management`                                                    |
-| Owner / MANAGER opt-in KDS | `tenant:{tenantId}:kds:kitchen` or `tenant:{tenantId}:kds:bar` via `subscribe.kds`                           |
+| Actor / Role               | Các Room được join                                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Customer sessions          | `session:{sessionId}:customer`, `tenant:{tenantId}:customers`, optionally `tenant-slug:{tenantSlug}:customers` |
+| WAITER                     | `tenant:{tenantId}:staff`                                                                                      |
+| CHEF                       | `tenant:{tenantId}:staff`, `tenant:{tenantId}:kds:kitchen`                                                     |
+| BARISTA                    | `tenant:{tenantId}:staff`, `tenant:{tenantId}:kds:bar`                                                         |
+| Owner / MANAGER            | `tenant:{tenantId}:staff`, `tenant:{tenantId}:management`                                                      |
+| Owner / MANAGER opt-in KDS | `tenant:{tenantId}:kds:kitchen` hoặc `tenant:{tenantId}:kds:bar` thông qua `subscribe.kds`                     |
 
 ### 5.3 Auth Handshake: Staff vs Customer
 
-**Staff (Management App)** sends JWT in `auth`:
+**Staff (Management App)** gửi kèm JWT trong trường `auth`:
 
 ```ts
 io('http://localhost:3300/orders', {
@@ -446,9 +446,9 @@ io('http://localhost:3300/orders', {
 });
 ```
 
-BFF verifies token via Authorizer gRPC, caches results in Redis, infers `tenantId` and roles.
+BFF xác thực token thông qua gRPC tới Authorizer, cache kết quả trong Redis, suy luận ra `tenantId` và danh sách roles.
 
-**Customer (PWA)** sends session identity:
+**Customer (PWA)** gửi thông tin session định danh:
 
 ```ts
 io('http://localhost:3300/orders', {
@@ -456,115 +456,115 @@ io('http://localhost:3300/orders', {
 });
 ```
 
-BFF checks the Redis session key exists according to `tenantId`. If does not exist → emit `events.authError` → disconnect.
+BFF kiểm tra key session trong Redis theo `tenantId`. Nếu không tồn tại → emit `events.authError` → ngắt kết nối.
 
-BFF also supports fallback headers (`Authorization: Bearer` / `x-tenant-id` / `x-session-id`) for cases where `auth` fails to transmit, but canonical is Socket.IO `auth`.
+BFF cũng hỗ trợ fallback headers (`Authorization: Bearer` / `x-tenant-id` / `x-session-id`) cho các trường hợp cấu hình `auth` gặp sự cố, nhưng Socket.IO `auth` vẫn là kênh chính quy (canonical).
 
-### 5.4 subscription.kds — Opt-in For Owner/MANAGER
+### 5.4 `subscribe.kds` — Đăng ký thêm (Opt-in) cho Owner/MANAGER
 
-`subscribe.kds` is the only event sent by the client (other than auth), for the Owner/MANAGER who wants to see a specific KDS station:
+`subscribe.kds` là event duy nhất được gửi từ phía client (ngoài handshake xác thực), dành cho các Owner/MANAGER muốn theo dõi một KDS station cụ thể:
 
 ```ts
 socket.emit('subscribe.kds', { station: 'KITCHEN' | 'BAR' });
 ```
 
-Required conditions:
+Điều kiện tiên quyết:
 
-- Socket already has `tenantId` from auth handshake.
-- Role is `SUPER_ADMIN`, `Owner`, or `MANAGER`.
-- CHEF/BARISTA cannot use `subscribe.kds` to access other stations.
+- Socket đã có `tenantId` từ handshake xác thực trước đó.
+- Role phải thuộc nhóm `SUPER_ADMIN`, `Owner`, hoặc `MANAGER`.
+- CHEF/BARISTA không được phép dùng `subscribe.kds` để đăng ký xem các station khác.
 
 ---
 
-## 6. Event Registry — List and Meaning
+## 6. Event Registry — Danh sách và Ý nghĩa
 
-### 6.1 Naming Principles
+### 6.1 Quy tắc đặt tên
 
-The current event uses two styles:
+Các event hiện tại sử dụng hai phong cách:
 
 ```txt
-events.orderCreated          ← domain events, prefixed "events."
-tenant.suspended             ← lifecycle events, domain prefix
+events.orderCreated          ← domain event, bắt đầu bằng "events."
+tenant.suspended             ← lifecycle event, tiền tố là tên domain tương ứng
 ```
 
-Don't add name variations for the same meaning. Before adding a new event, the spec must be finalized according to the procedure at [Section 10.3](#103-rules-for-adding-new-event).
+Không tự ý thêm các biến thể tên khác nhau cho cùng một ý nghĩa. Trước khi thêm một event mới, đặc tả (spec) của nó phải được phê duyệt theo quy trình tại [Mục 10.3](#103-quy-tac-khi-them-event-moi).
 
-### 6.2 Events Order / Session / Bill
+### 6.2 Các Event về Order / Session / Bill
 
-| Events                      | Source                                 | Rooms receive                                  | Frontend action                           |
-| --------------------------- | -------------------------------------- | ---------------------------------------------- | ----------------------------------------- |
-| `events.cartUpdated`        | BFF after Order TCP                    | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate cart/bill/order domain         |
-| `events.orderCreated`       | BFF after submitting order             | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate order list/detail, table state |
-| `events.orderStatusChanged` | BFF after status change                | `tenant:{tid}:staff`, optional session         | Invalidate order/table domain             |
-| `events.serviceRequested`   | BFF after service request              | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate service requests               |
-| `events.billRequested`      | BFF after bill request                 | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate bill/cart/order/service        |
-| `events.tableTransferred`   | BFF after transfer saga                | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate session/order/table            |
-| `events.paymentCompleted`   | Kafka `payment.completed` → BFF bridge | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate payment/order/bill             |
+| Event                       | Nguồn kích hoạt                        | Các Room nhận                                  | Hành động ở Frontend                       |
+| --------------------------- | -------------------------------------- | ---------------------------------------------- | ------------------------------------------ |
+| `events.cartUpdated`        | BFF sau khi gọi Order TCP              | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate domain cart/bill/order          |
+| `events.orderCreated`       | BFF sau khi submit order               | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate danh sách/chi tiết order, table |
+| `events.orderStatusChanged` | BFF sau khi thay đổi trạng thái        | `tenant:{tid}:staff`, optional session         | Invalidate domain order/table              |
+| `events.serviceRequested`   | BFF sau khi yêu cầu dịch vụ            | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate danh sách yêu cầu dịch vụ       |
+| `events.billRequested`      | BFF sau khi yêu cầu thanh toán         | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate bill/cart/order/service         |
+| `events.tableTransferred`   | BFF sau khi thực hiện saga chuyển bàn  | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate session/order/table             |
+| `events.paymentCompleted`   | Kafka `payment.completed` → BFF bridge | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate payment/order/bill              |
 
-### 6.3 Events KDS
+### 6.3 Các Event về KDS
 
-| Events                     | Source                                   | Rooms receive                                             | Frontend action                                             |
-| -------------------------- | ---------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- |
-| `events.kdsQueueChanged`   | Kitchen Redis Pub/Sub → BFF              | `tenant:{tid}:kds:kitchen/bar`, `tenant:{tid}:management` | Filter tenant/station → invalidate queue                    |
-| `events.kitchenItemReady`  | BFF Kitchen controller after Order sync  | `tenant:{tid}:staff`, `session:{sid}:customer`            | POS/PWA invalidate order; KDS invalidate if station matches |
-| `events.kitchenSlaWarning` | Kafka `kitchen.sla_warning` → BFF bridge | Station room, `tenant:{tid}:management`                   | Filter tenant/station → invalidate queue                    |
+| Event                      | Nguồn kích hoạt                          | Các Room nhận                                             | Hành động ở Frontend                                      |
+| -------------------------- | ---------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------- |
+| `events.kdsQueueChanged`   | Kitchen Redis Pub/Sub → BFF              | `tenant:{tid}:kds:kitchen/bar`, `tenant:{tid}:management` | Lọc tenant/station → invalidate queue                     |
+| `events.kitchenItemReady`  | BFF Kitchen controller sau khi đồng bộ   | `tenant:{tid}:staff`, `session:{sid}:customer`            | POS/PWA invalidate order; KDS invalidate nếu khớp station |
+| `events.kitchenSlaWarning` | Kafka `kitchen.sla_warning` → BFF bridge | Station room, `tenant:{tid}:management`                   | Lọc tenant/station → invalidate queue                     |
 
-KDS payload has `eventId`, `eventType`, `schemaVersion`, `tenantId`, `station`, `revision`, `occurredAt`. If the frontend tracks revision and detects a gap → refetch snapshot.
+Payload của KDS chứa đầy đủ các trường: `eventId`, `eventType`, `schemaVersion`, `tenantId`, `station`, `revision`, `occurredAt`. Nếu frontend theo dõi số `revision` và phát hiện có khoảng hụt (gap) → thực hiện refetch snapshot ngay lập tức.
 
-### 6.4 Events Tenant Lifecycle
+### 6.4 Các Event về Vòng đời Tenant (Tenant Lifecycle)
 
-| Events             | Source               | Rooms receive                                            | Frontend actions                         |
-| ------------------ | -------------------- | -------------------------------------------------------- | ---------------------------------------- |
-| `tenant.suspended` | BFF admin controller | `tenant:{tid}:customers`, `tenant-slug:{slug}:customers` | Patch tenant status, block customer flow |
-| `tenant.activated` | BFF admin controller | `tenant:{tid}:customers`, `tenant-slug:{slug}:customers` | Patch tenant status active               |
-| `tenant.closed`    | BFF admin controller | `tenant:{tid}:customers`, `tenant-slug:{slug}:customers` | Patch tenant status closed               |
+| Event              | Nguồn kích hoạt      | Các Room nhận                                            | Hành động ở Frontend                          |
+| ------------------ | -------------------- | -------------------------------------------------------- | --------------------------------------------- |
+| `tenant.suspended` | BFF admin controller | `tenant:{tid}:customers`, `tenant-slug:{slug}:customers` | Patch trạng thái tenant, chặn luồng của khách |
+| `tenant.activated` | BFF admin controller | `tenant:{tid}:customers`, `tenant-slug:{slug}:customers` | Patch trạng thái tenant thành active          |
+| `tenant.closed`    | BFF admin controller | `tenant:{tid}:customers`, `tenant-slug:{slug}:customers` | Patch trạng thái tenant thành closed          |
 
-### 6.5 Events Do Not Exist
+### 6.5 Các Event KHÔNG tồn tại
 
-Do not claim the following events if there is no spec:
+Không được tự ý định nghĩa và sử dụng các event sau nếu chưa có spec:
 
 ```txt
-events.menuUpdated ← menu uses cache/REST invalidation, no WS events
+events.menuUpdated  ← Menu sử dụng cơ chế cache/REST invalidation, không dùng event WS
 events.menu.updated
-(payment.refunded is not in the approved Kafka registry)
-generic notification stream
+(payment.refunded chưa có trong Kafka registry được duyệt)
+Luồng notification chung (generic notification stream)
 ```
 
 ---
 
-## 7. Frontend Contract — Hint, Not Source of Truth
+## 7. Frontend Contract — Chỉ là Hint, không phải Source of Truth
 
-### 7.1 Core Rules
+### 7.1 Quy tắc cốt lõi
 
-The entire QRTable realtime frontend is built on a single principle:
+Toàn bộ hệ thống frontend realtime của QRTable được xây dựng dựa trên một nguyên tắc duy nhất:
 
 ```txt
 WebSocket event is hint.
 REST snapshot is source of truth.
 ```
 
-Event Socket.IO is only used to: filter to see if the event is related to you → trigger TanStack Query invalidate → React Query automatically refetch REST snapshot. Never render important domain state solely from the payload event.
+Event Socket.IO chỉ được dùng để: lọc xem event có liên quan đến mình hay không → kích hoạt TanStack Query invalidate → React Query tự động refetch REST snapshot. Tuyệt đối không dùng payload của event để cập nhật trực tiếp trạng thái hiển thị quan trọng trên UI.
 
-#### Diagram: Anti-Pattern vs Correct — Render From Payload vs Refetch
+#### Sơ đồ: Anti-Pattern vs Đúng — Render trực tiếp từ Payload vs Refetch
 
-> Two ways to handle events: wrong is to render directly from the payload (can be stale, missing fields, or miss event); It's true that using the event is only to trigger invalidate TanStack Query and then let React Query refetch REST snapshot.
+> Hai cách xử lý event: sai là vẽ lại giao diện trực tiếp từ dữ liệu payload (dễ bị cũ, thiếu trường hoặc mất event); đúng là chỉ dùng event để báo hiệu invalidate TanStack Query rồi để React Query tự đi refetch REST snapshot mới nhất.
 
 ```mermaid
 graph TB
-subgraph "❌ WRONG: Render from payload"
+subgraph "❌ SAI: Render từ payload"
         EW["events.orderCreated\n{order: {...full data...}}"]
         RW["setOrders(prev => [...prev, payload.order])"]
-UW["UI rendering from local state\n← may be stale/missing/missing"]
+UW["UI render từ local state\n← dễ bị cũ/thiếu/mất"]
 
         EW --> RW --> UW
     end
 
-    subgraph "✅ RIGHT: Invalidate → Refetch"
+    subgraph "✅ ĐÚNG: Invalidate → Refetch"
         ER["events.orderCreated\n{tenantId, orderId, sessionId}"]
-FR["filter: tenantId matches?"]
+FR["lọc: tenantId khớp?"]
         IR["queryClient.invalidateQueries(\n  ['orders', tenantId]\n)"]
         RR["TanStack Query refetch\nGET /admin/orders"]
-UR["UI render from REST snapshot\n← always latest"]
+UR["UI render từ REST snapshot\n← luôn mới nhất"]
 
         ER --> FR --> IR --> RR --> UR
     end
@@ -574,54 +574,54 @@ UR["UI render from REST snapshot\n← always latest"]
     style IR fill:#339af0,stroke:#333,color:#fff
 ```
 
-### 7.2 Socket Lifecycle Ownership Hook
+### 7.2 Quản lý vòng đời Socket thông qua Hook
 
-Each hook socket is responsible for the entire lifecycle:
+Mỗi hook socket chịu trách nhiệm quản lý toàn bộ vòng đời kết nối của nó:
 
 ```txt
-useCustomerOrderRealtime()  ← Customer PWA
-useStaffOrderRealtime()     ← Management POS
-useKdsRealtime(station)     ← Management KDS
+useCustomerOrderRealtime()  ← Dành cho Customer PWA
+useStaffOrderRealtime()     ← Dành cho Management POS
+useKdsRealtime(station)     ← Dành cho Management KDS
 ```
 
-Each hook must:
+Mỗi hook phải đảm bảo:
 
-- Create socket instance when enough auth/session.
-- Register listeners **outside** `connect` event — do not register in `connect` because reconnecting will create duplicate listeners.
-- Filter payload by tenant/session/station before invalidating.
-- Cleanup with `socket.off(...)` and `socket.disconnect()` when unmounting.
+- Khởi tạo socket instance khi có đầy đủ auth/session.
+- Đăng ký lắng nghe các event **bên ngoài** callback của event `connect` — không đăng ký bên trong `connect` để tránh việc tạo ra nhiều listener trùng lặp khi reconnect.
+- Lọc payload theo tenant/session/station trước khi gọi invalidate.
+- Dọn dẹp listener bằng `socket.off(...)` và ngắt kết nối bằng `socket.disconnect()` khi hook unmount.
 
-**Common error — Duplicate listeners:**
+**Lỗi thường gặp — Lắng nghe event bị nhân bản (Duplicate listeners):**
 
 ```ts
-// ❌ Wrong: register in connect, reconnect = 2nd registration
+// ❌ Sai: đăng ký bên trong connect, mỗi lần reconnect sẽ đăng ký thêm 1 lần
 socket.on('connect', () => {
-  socket.on('events.orderCreated', handler); // duplicate after reconnect
+  socket.on('events.orderCreated', handler); // bị trùng lặp sau khi reconnect
 });
 
-// ✅ Correct: register outside connect
+// ✅ Đúng: đăng ký bên ngoài connect
 socket.on('events.orderCreated', handler);
 socket.on('connect', () => {
-  // only refetch active domain after reconnect
+  // chỉ thực hiện refetch lại domain hiện tại sau khi reconnect thành công
   queryClient.invalidateQueries(['orders', tenantId]);
 });
 ```
 
-### 7.3 Required Filter By tenant/Session/Station
+### 7.3 Bắt buộc lọc theo tenant/session/station
 
-Not every event in the room belongs to me. A room `tenant:{tid}:staff` contains all tenant employees — POS receives KDS events, KDS receives POS events. Filter is the final layer of protection:
+Không phải mọi event truyền đến room đều thuộc về component hiện tại. Room `tenant:{tid}:staff` chứa toàn bộ nhân viên của tenant đó — POS nhận cả event KDS, KDS nhận cả event POS. Bộ lọc (filter) là chốt chặn cuối cùng:
 
-| Hook                       | Required filter         |
+| Hook                       | Bộ lọc bắt buộc cần có  |
 | -------------------------- | ----------------------- |
 | `useCustomerOrderRealtime` | `tenantId`, `sessionId` |
 | `useStaffOrderRealtime`    | `tenantId`              |
 | `useKdsRealtime(station)`  | `tenantId`, `station`   |
 
-### 7.4 Reconnect Strategy — Don't Let the UI Stuck
+### 7.4 Chiến lược Reconnect — Tránh việc giao diện bị đơ
 
-#### Diagram: Reconnect Flow and Post-Reconnect Refetch
+#### Sơ đồ: Luồng Reconnect và việc Refetch sau Reconnect
 
-> When the network goes down, Socket.IO tries to reconnect itself. After successfully reconnecting, the hook must refetch the active domain because many events may have been missed since the connection was lost. Do not rely on "will receive all events after reconnecting".
+> Khi mất kết nối mạng, Socket.IO tự động thử kết nối lại. Khi kết nối lại thành công, hook bắt buộc phải refetch domain hiện tại vì rất nhiều event đã bị bỏ lỡ trong khoảng thời gian mất mạng. Đừng tự tin rằng "mạng có lại thì sẽ nhận được đầy đủ event".
 
 ```mermaid
 sequenceDiagram
@@ -629,87 +629,87 @@ sequenceDiagram
     participant S as Socket.IO Server
     participant Q as TanStack Query
 
-Note over C,S: Network is broken
+Note over C,S: Mạng bị mất kết nối
     C->>C: status = "reconnecting"
 
-    loop Exponential backoff
-C->>S: Try reconnect...
-        S-->>C: fail
+    loop Thử lại theo Exponential backoff
+        C->>S: Gửi yêu cầu reconnect...
+        S-->>C: thất bại
     end
 
-C->>S: Reconnect successfully ✓
+C->>S: Reconnect thành công ✓
     C->>C: status = "connected"
-    C->>Q: invalidateQueries(active domain)
+    C->>Q: invalidateQueries(domain hiện tại)
     Q->>S: GET /admin/orders (refetch REST snapshot)
-Note over Q: UI updated to the latest status
-Note over C: Any event misses during connection loss are compensated by refetch
+Note over Q: UI cập nhật theo trạng thái mới nhất
+Note over C: Băng kỳ event nào bị mất trong lúc offline đều được bù đắp bởi lệnh refetch này
 ```
 
-Event triggers refetch active domain:
+Các sự kiện kích hoạt refetch lại domain hiện tại để phòng ngừa:
 
-- `connect` (first connection)
-- `connect` after reconnecting
-- Visibility change tab (visibility API)
-- Window focus
+- `connect` (kết nối đầu tiên)
+- `connect` sau khi reconnect thành công
+- Thay đổi trạng thái hiển thị của tab (Visibility API)
+- Sự kiện focus lại cửa sổ trình duyệt (window focus)
 
-These four triggers are a safety net that ensures the UI is never stuck in the same state.
+Bốn sự kiện này tạo nên một hệ thống lưới an toàn, đảm bảo giao diện người dùng không bao giờ bị kẹt lại ở một trạng thái cũ.
 
-### 7.5 Connection Status — UX Degraded
+### 7.5 Trạng thái kết nối — Giảm cấp trải nghiệm người dùng (UX Degraded)
 
-| Status         | Meaning                              | Action UX                               |
-| -------------- | ------------------------------------ | --------------------------------------- |
-| `idle`         | Not eligible to connect              | Wait for auth/session to be ready       |
-| `connected`    | Socket connection is successful      | Realtime works normally                 |
-| `reconnecting` | Socket.IO is trying to reconnect     | Displays "reconnecting..."              |
-| `degraded`     | Realtime decline, use polling/manual | Show banner + increase polling interval |
-| `auth-error`   | Invalid token/session                | Redirect login / refresh session        |
+| Trạng thái     | Ý nghĩa                            | Cách hiển thị trên giao diện (UX)                    |
+| -------------- | ---------------------------------- | ---------------------------------------------------- |
+| `idle`         | Chưa đủ điều kiện kết nối          | Chờ thông tin auth/session sẵn sàng                  |
+| `connected`    | Kết nối socket thành công          | Giao diện realtime hoạt động bình thường             |
+| `reconnecting` | Socket.IO đang cố gắng reconnect   | Hiển thị trạng thái "đang kết nối lại..."            |
+| `degraded`     | Mất realtime, chuyển sang dự phòng | Hiện banner báo lỗi + tăng tần suất polling thủ công |
+| `auth-error`   | Token/session không hợp lệ         | Chuyển hướng đăng nhập / xử lý hết hạn session       |
 
-`auth-error` should not create a toast loop. If you receive `events.authError`, lead the user to reload/refresh token/session expired flow depending on the app.
+Lưu ý: `auth-error` không được tạo ra một vòng lặp thông báo toast liên tục. Khi nhận event `events.authError`, hãy dẫn hướng người dùng sang luồng reload hoặc luồng hết hạn tùy theo ứng dụng.
 
 ---
 
-## 8. Redis Adapter — Scale Multiple BFF Instances
+## 8. Redis Adapter — Scale nhiều BFF Instance
 
-### 8.1 Problems Without Adapter
+### 8.1 Vấn đề khi không có Adapter
 
-Socket.IO uses in-memory adapters by default — rooms and socket connections only exist in a process's memory. When BFF runs an instance, emit to room works perfectly.
+Mặc định, Socket.IO sử dụng adapter lưu trữ trong bộ nhớ (in-memory adapter) — các room và kết nối socket chỉ tồn tại trên RAM của chính tiến trình đó. Khi BFF chạy duy nhất một instance, việc emit đến các room hoạt động hoàn hảo.
 
-When scaling to two BFF instances, the problem appears:
+Nhưng khi chạy từ hai instance BFF trở lên, vấn đề sẽ phát sinh:
 
 ```txt
-Client A connects to BFF Instance 1 → belongs to room "tenant:t1:staff" at Instance 1
-Client B connects to BFF Instance 2 → belongs to room "tenant:t1:staff" at Instance 2
+Client A kết nối vào BFF Instance 1 → thuộc room "tenant:t1:staff" trên Instance 1
+Client B kết nối vào BFF Instance 2 → thuộc room "tenant:t1:staff" trên Instance 2
 
-Event occurs → Instance 1 emit "tenant:t1:staff"
-→ Client A receives ✓ (same instance)
-→ Client B DOES NOT receive ✗ (different instance, Instance 2 does not know about this emit)
+Sự kiện xảy ra → Instance 1 emit dữ liệu tới room "tenant:t1:staff"
+→ Client A nhận được ✓ (vì chung instance)
+→ Client B KHÔNG nhận được ✗ (khác instance, Instance 2 hoàn toàn không biết gì về lệnh emit này)
 ```
 
-#### Diagram: No Adapter vs Redis Adapter
+#### Sơ đồ: Khi không có Adapter vs Khi có Redis Adapter
 
-> Without Redis Adapter, emit from an instance points to the socket connecting to that instance. The Redis Adapter uses Redis Pub/Sub to forward emit between instances — every client receives the event regardless of which instance it is connected to.
+> Khi không có Redis Adapter, lệnh emit từ một instance chỉ tới được socket đang kết nối trực tiếp vào instance đó. Redis Adapter sử dụng Redis Pub/Sub để truyền lệnh emit qua lại giữa các instance — mọi client đều nhận được dữ liệu bất kể họ đang kết nối vào instance nào.
 
 ```mermaid
 graph TB
-subgraph "❌ In-Memory Adapter — Client B ignored"
-EVENT1["Event occurred"]
+subgraph "❌ In-Memory Adapter — Client B bị bỏ sót"
+        EVENT1["Sự kiện xảy ra"]
         I1["BFF Instance 1\nRoom: tenant:t1:staff"]
         I2["BFF Instance 2\nRoom: tenant:t1:staff"]
-C1["Client A ✓ received"]
-C2["Client B ✗ does not accept"]
+        C1["Client A ✓ nhận được"]
+        C2["Client B ✗ không nhận được"]
 
         EVENT1 --> I1
         I1 --> C1
-I2 -.->|"don't know about emit"| C2
+        I2 -.->|"không biết có emit"| C2
     end
 
-subgraph "✅ Redis Adapter — Every Client Gets"
-EVENT2["Event occurred"]
+subgraph "✅ Redis Adapter — Mọi Client đều nhận được"
+        EVENT2["Sự kiện xảy ra"]
         I3["BFF Instance 1"]
-        REDIS["⚡ Redis\n(Pub/Sub channel)"]
+        REDIS["⚡ Redis\n(Kênh Pub/Sub)"]
         I4["BFF Instance 2"]
-C3["Client A ✓ received"]
-C4["Client B ✓ received"]
+        C3["Client A ✓ nhận được"]
+        C4["Client B ✓ nhận được"]
 
         EVENT2 --> I3
         I3 -->|"publish room emit"| REDIS
@@ -724,68 +724,68 @@ C4["Client B ✓ received"]
     style C4 fill:#51cf66,stroke:#333,color:#fff
 ```
 
-### 8.2 What is Redis Adapter
+### 8.2 Bản chất của Redis Adapter
 
-Redis Adapter replaces the in-memory adapter with a layer that uses Redis Pub/Sub to synchronize room emit between instances. When Instance 1 calls `server.to(room).emit(...)`, the Redis Adapter publishes to the Redis channel. All BFF instances subscribing to that channel receive and forward the emit to their socket.
+Redis Adapter thay thế bộ nhớ RAM cục bộ bằng một lớp trung gian sử dụng cơ chế Redis Pub/Sub để đồng bộ hóa các lệnh emit giữa các instance. Khi Instance 1 gọi `server.to(room).emit(...)`, Redis Adapter sẽ publish một tin nhắn tới Redis channel. Tất cả các instance BFF khác đang subscribe channel đó sẽ nhận được và phát tiếp tới các kết nối socket thuộc quyền quản lý của mình.
 
-The Redis Adapter **doesn't** store persistent events — it's just a real-time relay. If the client is offline, the event is still lost as with the in-memory adapter. Redis Adapter only solves the multi-instance problem, not durable delivery.
+Redis Adapter **không** lưu trữ tin nhắn bền vững — nó chỉ làm nhiệm vụ chuyển tiếp tin nhắn thời gian thực. Nếu client offline, tin nhắn vẫn bị mất y như in-memory adapter. Redis Adapter chỉ xử lý vấn đề scale nhiều instance, chứ không giải quyết vấn đề durable delivery.
 
-Setup in BFF:
+Cấu hình trong BFF:
 
 ```txt
 apps/bff/src/app/modules/realtime/adapters/redis-io.adapter.ts
 apps/bff/src/main.ts
 
-Startup flow:
+Luồng khởi động:
 NestFactory.create(AppModule)
   → RedisIoAdapter.connectToRedis(redis://host:port)
   → app.useWebSocketAdapter(redisIoAdapter)
   → app.listen(PORT)
 ```
 
-If Redis is not running, BFF may not be able to start the correct realtime path. **Check Redis before debugging Socket.IO.**
+Nếu Redis không chạy, BFF có thể không khởi động được luồng realtime đúng cách. **Hãy luôn kiểm tra Redis hoạt động trước khi tiến hành debug Socket.IO.**
 
-### 8.3 Sticky Session — While Still Using Long-Polling
+### 8.3 Sticky Session — Khi vẫn dùng phương thức dự phòng Long-Polling
 
-Redis Adapter solves room emit, but there is an independent problem: **HTTP long-polling requests from the same Socket.IO session must arrive at the same BFF instance**.
+Redis Adapter giải quyết được việc emit chéo giữa các instance, nhưng vẫn có một vấn đề khác: **các request HTTP long-polling từ cùng một phiên Socket.IO phải luôn đi đến đúng một instance BFF duy nhất**.
 
-Socket.IO uses session ID (`sid`) to identify the client. With WebSocket, the connection is persistent — no problem. With long-polling, each poll is a new HTTP request. If the load balancer routes these requests to another instance, the other instance does not know `sid` → HTTP 400 `Session ID unknown`.
+Socket.IO sử dụng ID session (`sid`) để nhận diện client. Với WebSocket, kết nối là duy nhất và liên tục nên không gặp vấn đề gì. Nhưng với long-polling, mỗi lần poll là một request HTTP độc lập. Nếu bộ cân bằng tải (load balancer) điều hướng request này sang instance khác, instance đó sẽ không nhận ra `sid` → trả về lỗi HTTP 400 `Session ID unknown`.
 
-Two solutions:
+Hai hướng giải quyết:
 
-| Solution                          | When using                                       | Trade-off                                                |
-| --------------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
-| Sticky session (IP hash / cookie) | Still want fallback long-polling                 | Load balancer is more complicated                        |
-| WebSocket-only transport          | Tested and believe WebSocket is always available | It's possible that the environment is blocking WebSocket |
+| Giải pháp                         | Khi nào áp dụng                               | Đánh đổi                                                |
+| --------------------------------- | --------------------------------------------- | ------------------------------------------------------- |
+| Sticky session (IP hash / cookie) | Muốn duy trì cơ chế dự phòng long-polling     | Cấu hình load balancer phức tạp hơn                     |
+| Chỉ cho phép WebSocket            | Đảm bảo môi trường mạng luôn hỗ trợ WebSocket | Rủi ro nếu client nằm trong mạng chặn kết nối WebSocket |
 
-Staff/KDS hooks declare `transports: ['websocket', 'polling']` — if deploying multiple instances, consider sticky session or switching to WebSocket-only after testing the real proxy.
+Hiện tại staff/KDS hook khai báo `transports: ['websocket', 'polling']` — nếu deploy nhiều instance, hãy cân nhắc cấu hình sticky session hoặc chuyển hẳn sang WebSocket-only sau khi đã kiểm tra kỹ môi trường proxy thực tế.
 
 ---
 
-## 9. Architecture Decision: Socket.IO vs Kafka vs Redis Pub/Sub vs Polling
+## 9. Quyết định kiến trúc: Socket.IO vs Kafka vs Redis Pub/Sub vs Polling
 
-### 9.1 Decision Tree — Which Type of Change Uses Which Channel?
+### 9.1 Sơ đồ quyết định — Thay đổi trạng thái đi qua kênh nào?
 
-This is the most practical question when adding new features to QRTable.
+Đây là câu hỏi thực tế nhất khi bạn phát triển tính năng mới cho hệ thống QRTable.
 
-#### Diagram: Decision Tree — Select Notification Channel
+#### Sơ đồ: Quyết định chọn kênh truyền thông báo
 
-> The decision tree starts with the question "Who needs to know about this change?" — browser or other service. If browser → Socket.IO. If service → Kafka. If only internal BFF → Redis Pub/Sub. If not needed immediately → polling.
+> Sơ đồ quyết định bắt đầu bằng câu hỏi: "Ai cần nhận thông báo về sự thay đổi này?" — trình duyệt hay một service khác. Nếu trình duyệt → dùng Socket.IO. Nếu service → dùng Kafka. Nếu chỉ dùng nội bộ tiến trình BFF → dùng Redis Pub/Sub. Nếu không cần ngay lập tức → dùng polling.
 
 ```mermaid
 flowchart TD
-START(["The backend status has just changed\nWho needs to be notified?"]) --> Q1{"Browser (UI) needs to know?"}
+START(["Trạng thái backend vừa thay đổi\nAi là đối tượng cần nhận tin?"]) --> Q1{"Trình duyệt (giao diện) cần biết?"}
 
-Q1 -->|"No"| Q2{"Other services need\nbusiness response?"}
-Q2 -->|"Yes"| KAFKA["📋 Kafka\nDomain event"]
-Q2 -->|"No — only internal"| REDIS_PUB["⚡ Redis Pub/Sub\nInternal runtime hint"]
+Q1 -->|"Không"| Q2{"Các service khác có cần\nphản ứng nghiệp vụ?"}
+Q2 -->|"Có"| KAFKA["📋 Kafka\nDomain event"]
+Q2 -->|"Không — chỉ nội bộ"| REDIS_PUB["⚡ Redis Pub/Sub\nBáo hiệu runtime nội bộ"]
 
-Q1 -->|"Yes"| Q3{"Emit only after\nBFF has enough context?"}
-Q3 -->|"Yes — BFF knows right after TCP"| DIRECT["✅ BFF Direct\nEmit after TCP success"]
+Q1 -->|"Có"| Q3{"Chỉ emit event sau khi\nBFF có đầy đủ ngữ cảnh?"}
+Q3 -->|"Có — BFF tự biết sau khi gọi TCP"| DIRECT["✅ BFF Direct\nEmit ngay sau khi TCP thành công"]
 
-Q3 -->|"No — need enrichment\nfrom other services"| Q4{"The source is a Kafka event\nfrom a domain service?"}
-Q4 -->|"Yes"| BRIDGE["✅ BFF Kafka Bridge\nConsume → Enrich → Emit"]
-Q4 -->|"No — KDS state\nneeds Redis ready first"| REDISPUB2["✅ Redis Pub/Sub\nKitchen → BFF → Socket.IO"]
+Q3 -->|"Không — cần thêm dữ liệu\ntừ các service khác"| Q4{"Nguồn gốc là một Kafka event\ntừ các domain service?"}
+Q4 -->|"Có"| BRIDGE["✅ BFF Kafka Bridge\nConsume → Làm giàu dữ liệu → Emit"]
+Q4 -->|"Không — trạng thái KDS\ncần ghi Redis trước"| REDISPUB2["✅ Redis Pub/Sub\nKitchen → BFF → Socket.IO"]
 
     style KAFKA fill:#51cf66,stroke:#333,color:#fff
     style REDIS_PUB fill:#339af0,stroke:#333,color:#fff
@@ -795,46 +795,46 @@ Q4 -->|"No — KDS state\nneeds Redis ready first"| REDISPUB2["✅ Redis Pub/Sub
     style START fill:#e8e8e8,stroke:#333
 ```
 
-### 9.2 Anti-Pattern — Using Socket.IO As Command Bus
+### 9.2 Anti-Pattern — Sử dụng Socket.IO như một Command Bus
 
-Adding mutations via WebSocket is the path to an architecture that is difficult to maintain. The current REST command has:
+Việc đưa các lệnh ghi dữ liệu (mutation) chạy qua kết nối WebSocket là cách nhanh nhất để tạo ra một hệ thống cực kỳ khó bảo trì. Các REST command hiện tại của chúng ta đã được tích hợp sẵn:
 
-- Guard and permission validation in HTTP middleware
-- DTO automatic validation
-- Transaction in service Owner
-- Audit log is clear
-- Idempotency key support
+- Guard và phân quyền thông qua HTTP middleware
+- Tự động validation DTO
+- Đảm bảo transaction ở service Owner quản lý dữ liệu
+- Cơ chế ghi audit log rõ ràng
+- Hỗ trợ khóa chống trùng lặp (Idempotency key)
 
-If you turn an event into a mutation command via WebSocket, you have to rebuild all of the above yourself. **There is no benefit to justify that cost in the current scope.**
+Nếu bạn biến một event thành một lệnh thay đổi dữ liệu (mutation command) qua WebSocket, bạn sẽ phải tự mình code lại toàn bộ các tính năng trên. **Không có bất kỳ lợi ích nào xứng đáng với chi phí đó trong phạm vi hiện tại của dự án.**
 
-The principle is clear: KDS start/done/recall ticket, transfer table, submit order — all go through REST. Socket.IO only accepts `subscribe.kds` opt-ins.
+Nguyên tắc rất rõ ràng: KDS bắt đầu/hoàn thành/hủy ticket, chuyển bàn, gửi order — tất cả bắt buộc đi qua REST. Socket.IO chỉ tiếp nhận lệnh đăng ký thêm `subscribe.kds`.
 
-### 9.3 Four Channel Comparison
+### 9.3 So sánh bốn kênh truyền dữ liệu
 
-| Channel       | Sustainable     | Fan-out                     | Replay              | Suitable for                            |
-| ------------- | --------------- | --------------------------- | ------------------- | --------------------------------------- |
-| Socket.IO     | No              | Via Redis Adapter           | No                  | UI invalidation hint for browser        |
-| Kafka         | Yes (retention) | Via consumer groups         | Yes (offset rewind) | Domain events between services          |
-| Redis Pub/Sub | No              | In-process + multi-instance | No                  | Internal runtime hint is fast, may take |
-| HTTP Polling  | N/A             | Each client polls itself    | N/A                 | Fallback, data not needed immediately   |
+| Kênh truyền   | Bền vững (Durable) | Khả năng Fan-out                 | Khả năng Replay    | Phù hợp cho                               |
+| ------------- | ------------------ | -------------------------------- | ------------------ | ----------------------------------------- |
+| Socket.IO     | Không              | Thông qua Redis Adapter          | Không              | Gửi invalidation hint cho trình duyệt     |
+| Kafka         | Có (retention)     | Thông qua consumer group         | Có (offset rewind) | Truyền domain event giữa các service      |
+| Redis Pub/Sub | Không              | Trong tiến trình + liên instance | Không              | Báo hiệu nội bộ siêu nhanh, chấp nhận mất |
+| HTTP Polling  | Không áp dụng      | Mỗi client tự gửi request        | Không áp dụng      | Chạy dự phòng, dữ liệu không cần gấp      |
 
-**QRTable Short Rules:**
+**Quy tắc nhanh của QRTable:**
 
 ```txt
-Data to render UI → REST + TanStack Query
-Near realtime UI signal → Socket.IO
-Domain event between services → Kafka
-Internal fast runtime state → Redis
-Internal KDS Hint BFF → Redis Pub/Sub → BFF → Socket.IO
+Dữ liệu hiển thị UI → REST + TanStack Query
+Tín hiệu realtime cho UI → Socket.IO
+Domain event giữa các service → Kafka
+Trạng thái runtime nhanh nội bộ → Redis
+Tín hiệu KDS nội bộ BFF → Redis Pub/Sub → BFF → Socket.IO
 ```
 
 ---
 
-## 10. Configuration and Operational
+## 10. Cấu hình và Vận hành
 
-### 10.1 Local Configuration
+### 10.1 Cấu hình môi trường Local
 
-Dependencies backend:
+Các thư viện dependencies ở backend:
 
 ```txt
 @nestjs/websockets
@@ -844,38 +844,38 @@ socket.io
 redis
 ```
 
-Dependencies frontend:
+Các thư viện dependencies ở frontend:
 
 ```txt
 socket.io-client
 ```
 
-BFF environment:
+Các biến môi trường ở BFF:
 
 ```txt
 REDIS_HOST=localhost
 REDIS_PORT=6379
 ```
 
-Frontend environment:
+Các biến môi trường ở frontend:
 
 ```txt
-NEXT_PUBLIC_BFF_URL=http://localhost:3300/api/v1   ← Management App
-VITE_BFF_URL=http://localhost:3300/api/v1          ← Customer PWA
+NEXT_PUBLIC_BFF_URL=http://localhost:3300/api/v1   ← Ứng dụng quản lý (Management App)
+VITE_BFF_URL=http://localhost:3300/api/v1          ← Ứng dụng khách hàng (Customer PWA)
 ```
 
-Checklist before debugging Socket.IO local:
+Checklist cần kiểm tra trước khi tiến hành debug Socket.IO ở local:
 
-1. BFF is running at `http://localhost:3300`?
-2. Redis running at `localhost:6379`?
-3. Frontend env correct BFF URL?
-4. Actual Socket URL is `http://localhost:3300/orders` (no `/api/v1`)?
-5. Does staff have access tokens? Customer has `tenantId` and `sessionId`?
-6. Does BFF log have `WS rejected` or auth error?
+1. BFF đã chạy ở `http://localhost:3300` chưa?
+2. Redis đã chạy ở `localhost:6379` chưa?
+3. Biến môi trường BFF URL ở frontend đã trỏ đúng chưa?
+4. URL kết nối socket thực tế đã dùng đúng `http://localhost:3300/orders` (không có `/api/v1`) chưa?
+5. Staff đã có đầy đủ access token gửi lên chưa? Customer đã gửi kèm `tenantId` và `sessionId` chưa?
+6. Log của BFF có báo lỗi `WS rejected` hay auth error gì không?
 
-### 10.2 Reverse Proxy and WebSocket Upgrade
+### 10.2 Reverse Proxy và cấu hình WebSocket Upgrade
 
-If BFF runs behind Nginx/ingress, the proxy must support WebSocket upgrade:
+Nếu BFF chạy phía sau Nginx hoặc Ingress, cấu hình proxy phải hỗ trợ nâng cấp kết nối (WebSocket upgrade):
 
 ```nginx
 proxy_http_version 1.1;
@@ -885,141 +885,281 @@ proxy_set_header Host $host;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 ```
 
-Missing `Upgrade` and `Connection` headers → WebSocket upgrade failed → Socket.IO stuck in long-polling.
+Nếu thiếu các header `Upgrade` và `Connection`, quá trình nâng cấp WebSocket sẽ thất bại, khiến Socket.IO bị kẹt ở chế độ dự phòng long-polling.
 
-**CORS production:** Gateway is now open `origin: '*'`. Production should switch to allowlist:
+**Cấu hình CORS môi trường Production:** Hiện tại Gateway đang mở cấu hình `origin: '*'`. Khi deploy lên production, cần chuyển đổi sang danh sách cho phép (allowlist):
 
 ```txt
 https://management.example.com
 https://customer.example.com
 ```
 
-### 10.3 Rules for Adding New Event
+### 10.3 Quy tắc khi thêm Event mới
 
-Before adding a new event, you must finalize the spec according to 8 questions:
+Trước khi tiến hành thêm bất kỳ event nào, bạn phải trả lời đầy đủ 8 câu hỏi thiết kế sau:
 
-1. Which domain does the event belong to?
-2. Which service is Source of truth in?
-3. After which commit does the event occur? (BFF Direct / Kafka bridge / Redis Pub/Sub)
-4. Which room accepts?
-5. What is the minimum payload to filter/invalidate?
-6. Which frontend refetch TanStack Query key?
-7. Is there any fallback polling/reconnect?
-8. Does this domain event need Kafka instead of Socket.IO?
+1. Event này thuộc về domain nghiệp vụ nào?
+2. Service nào là Source of truth cho dữ liệu liên quan?
+3. Event xảy ra sau sự kiện commit nào? (BFF Direct / Kafka bridge / Redis Pub/Sub)
+4. Room nào sẽ nhận được event này?
+5. Payload tối thiểu cần gửi đi để frontend lọc/invalidate là gì?
+6. Frontend sẽ invalidate những query key nào của TanStack Query?
+7. Đã có cơ chế dự phòng polling/reconnect khi mất kết nối chưa?
+8. Kịch bản này có thực sự cần truyền tải qua Kafka thay vì Socket.IO hay không?
 
-### 10.4 Conflict and Failure Playbook
+### 10.4 Bảng hướng dẫn xử lý Sự cố và Lỗi (Conflict and Failure Playbook)
 
-| Conflict                                   | Signs                                                      | How to handle                                                            |
-| ------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Redis down on startup                      | BFF realtime path error, no fan-out multi-instance         | Check `REDIS_HOST`, `REDIS_PORT`, Redis containers                       |
-| Socket connect but not receiving event     | Client enters wrong room or emits to wrong room            | Check auth handshake, role, Redis session, room in `RealtimeAuthService` |
-| Receive event but UI does not change       | Query key invalidate is wrong or snapshot does not refetch | Check hook, TanStack Query key, Network tab REST request after event     |
-| Receive events of other tenants/stations   | Frontend lacks filter                                      | Filter required tenantId/sessionId/station                               |
-| Finished reconnecting old UI               | Hook does not refetch after reconnect                      | Invalidate active domain in `connect` handler                            |
-| Duplicate listeners after reconnect        | Handler calls multiple times                               | Do not register listener in `connect`; cleanup `socket.off`              |
-| `events.authError`                         | Token/session missing, expired, forbidden                  | Check `auth.token`, `tenantId/sessionId`, Redis session, role            |
-| HTTP 400 `Session ID unknown` when scaling | Long-polling routed to wrong instance                      | Sticky session or WebSocket-only transport                               |
-| Event fired before state ready             | Frontend refetch but no new data yet                       | Only emit after TCP success or after Kitchen finishes recording Redis    |
+| Lỗi / Trạng thái                                | Dấu hiệu nhận biết                                         | Cách xử lý                                                                                                |
+| ----------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Redis bị sập khi khởi động                      | BFF báo lỗi realtime, không đồng bộ được giữa các instance | Kiểm tra lại biến `REDIS_HOST`, `REDIS_PORT`, kiểm tra Docker container Redis                             |
+| Socket kết nối được nhưng không nhận event      | Client đi vào sai room hoặc server emit sai room           | Kiểm tra lại handshake xác thực, vai trò (role), Redis session, kiểm tra room trong `RealtimeAuthService` |
+| Nhận được event nhưng UI không đổi              | Thiết lập invalidate query key sai hoặc REST không refetch | Kiểm tra hook, TanStack Query key, xem tab Network có request REST sau event không                        |
+| Nhận nhầm event của tenant hoặc station khác    | Bộ lọc ở frontend bị thiếu                                 | Bổ sung bộ lọc kiểm tra tenantId/sessionId/station phù hợp                                                |
+| Giao diện bị đơ sau khi có mạng lại             | Hook không thực hiện refetch sau khi kết nối lại           | Thực hiện invalidate các query active ngay trong handler sự kiện `connect`                                |
+| Bị lặp xử lý (Duplicate listener) sau reconnect | Một event kích hoạt xử lý nhiều lần                        | Không đăng ký listener bên trong handler của `connect`; nhớ dọn dẹp bằng `socket.off`                     |
+| Lỗi `events.authError`                          | Token/session bị thiếu, hết hạn hoặc không đủ quyền        | Kiểm tra lại token gửi lên, `tenantId/sessionId`, session trong Redis, vai trò                            |
+| HTTP 400 `Session ID unknown` khi scale         | Request long-polling bị trỏ sang instance khác             | Cấu hình sticky session trên load balancer hoặc chuyển hẳn sang WebSocket-only                            |
+| Event bắn ra trước khi dữ liệu kịp ghi xong     | Frontend refetch nhưng chưa thấy dữ liệu mới               | Đảm bảo chỉ emit event sau khi gọi TCP thành công hoặc sau khi KDS ghi xong dữ liệu vào Redis             |
 
-### 10.5 Debug — Where to Look in Code
+### 10.5 Debug — Các điểm cần kiểm tra trong mã nguồn
 
-**Backend BFF:**
+**Phía Backend BFF:**
 
-| File                                                                           | Content                                          |
-| ------------------------------------------------------------------------------ | ------------------------------------------------ |
-| `apps/bff/src/main.ts`                                                         | Register `RedisIoAdapter`                        |
-| `apps/bff/src/app/modules/realtime/gateways/order-events.gateway.ts`           | Namespace `/orders`, auth, legacy join rejection |
-| `apps/bff/src/app/modules/realtime/services/realtime-auth.service.ts`          | Staff/customer handshake, server-derived rooms   |
-| `apps/bff/src/app/modules/realtime/services/realtime-events.service.ts`        | Mapping event → room → event name                |
-| `apps/bff/src/app/modules/realtime/adapters/redis-io.adapter.ts`               | Redis Adapter setup                              |
-| `apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts` | Redis Pub/Sub → KDS hints                        |
-| `apps/bff/src/app/modules/realtime/services/realtime-kafka-bridge.service.ts`  | Kafka bridge for payment/SLA                     |
+| Tập tin mã nguồn                                                                                                                                                                                  | Vai trò & Trách nhiệm chính                                                                                                                                 |
+| :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [main.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/main.ts)                                                                                   | File chạy ban đầu (Bootstrap) cho BFF. Thực hiện import tập tin `bootstrap.ts` để cấu hình Otel và chạy server.                                             |
+| [bootstrap.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/bootstrap.ts)                                                                         | Khởi tạo ứng dụng NestJS, khởi tạo `RedisIoAdapter` từ các cấu hình môi trường, và đăng ký adapter thông qua `app.useWebSocketAdapter(redisIoAdapter)`.     |
+| [redis-io.adapter.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/adapters/redis-io.adapter.ts)                             | Cấu hình cho Redis Adapter của Socket.IO, quản lý việc mở rộng ngang (horizontal scaling) của realtime trên nhiều instance BFF bằng Redis Pub/Sub.          |
+| [order-events.gateway.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/gateways/order-events.gateway.ts)                     | WebSocket Gateway chính cho namespace `/orders`. Quản lý vòng đời kết nối socket (`handleConnection`) và chặn các luồng xin join room thủ công từ client.   |
+| [realtime-auth.service.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/services/realtime-auth.service.ts)                   | Thực hiện giải mã, xác thực JWT (cho staff) hoặc xác minh session (cho customer) và tự động gán client kết nối vào các room tương ứng từ phía server.       |
+| [realtime-events.service.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/services/realtime-events.service.ts)               | Đóng gói (encapsulate) toàn bộ logic phát tin realtime hướng Client (xác định room nào cần nhận và kích hoạt `gateway.emitToRoom`).                         |
+| [kds-internal-events.subscriber.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts) | Subscribe kênh Redis Pub/Sub `realtime:kds:*` để cập nhật trạng thái KDS sau khi Kitchen service ghi dữ liệu vào Redis và truyền tin báo cho gateway.       |
+| [realtime-kafka-bridge.service.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/services/realtime-kafka-bridge.service.ts)   | Subscribe các Kafka topics từ các service nghiệp vụ (thành toán, cảnh báo SLA), thực hiện làm giàu dữ liệu thông qua TCP calls trước khi đẩy qua Socket.IO. |
 
-**Frontend hooks:**
+**Phía Frontend hooks:**
 
-| File                                                                        | Content                 |
-| --------------------------------------------------------------------------- | ----------------------- |
-| `apps/customer-pwa/src/features/order/hooks/use-customer-order-realtime.ts` | Customer session socket |
-| `apps/management-app/src/features/order/hooks/use-staff-order-realtime.ts`  | Staff POS socket        |
-| `apps/management-app/src/features/kds/hooks/use-kds-realtime.ts`            | KDS station socket      |
+| Tập tin mã nguồn                                                                                                                                                                            | Vai trò & Trách nhiệm chính                                                                                                                                    |
+| :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [use-customer-order-realtime.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/customer-pwa/src/features/order/hooks/use-customer-order-realtime.ts) | Hook quản lý kết nối socket của khách hàng (PWA). Gửi kèm `tenantId` & `sessionId` ở handshake xác thực và invalidate TanStack Query tương ứng.                |
+| [use-staff-order-realtime.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/order/hooks/use-staff-order-realtime.ts)     | Hook quản lý kết nối socket của nhân viên phục vụ (Staff POS). Gửi kèm JWT token để xác thực và subscribe các event thay đổi của hóa đơn, đơn hàng.            |
+| [use-kds-realtime.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/management-app/src/features/kds/hooks/use-kds-realtime.ts)                       | Hook quản lý kết nối socket tại màn hình nhà bếp (KDS). Cho phép đăng ký station (KITCHEN/BAR) thông qua event `subscribe.kds` và lắng nghe sự thay đổi queue. |
 
 ---
 
-## 11. Mental Model Summary
+## 11. Lộ trình đọc hiểu mã nguồn & Giải thích cấu hình thực tế
 
-#### Diagram: Synthetic Mental Model — Socket.IO In QRTable
+Để hiểu sâu sắc cách tổ chức, cấu hình và triển khai logic realtime trong codebase hiện tại, hãy đi theo lộ trình 4 bước bên dưới.
 
-> Mind map summarizing all Socket.IO knowledge applied to QRTable. From the essence (invalidation hint), through the architecture (BFF edge, three emit streams), to design decisions (not command bus, not source of truth).
+### Bước 1: Khởi tạo hạ tầng & Cấu hình Adapter
+
+Hãy bắt đầu bằng việc đọc cấu hình khởi chạy hạ tầng ở BFF để thấy cách Socket.IO server tích hợp với NestJS.
+
+- **Đọc file [bootstrap.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/bootstrap.ts):**
+  Xem từ dòng 20 đến 25, bạn sẽ thấy cách BFF tạo instance `RedisIoAdapter` bằng cách lấy các config về Redis và CORS của `AppModule.CONFIGURATION`. Sau đó, tiến hành kết nối tới Redis và khai báo sử dụng adapter:
+
+  ```typescript
+  const redisIoAdapter = new RedisIoAdapter(app, corsOrigin);
+  await redisIoAdapter.connectToRedis(`redis://${redisHost}:${redisPort}`);
+  app.useWebSocketAdapter(redisIoAdapter);
+  ```
+
+  _Giải thích cấu hình:_ Dòng `app.useWebSocketAdapter` thay thế adapter mặc định của NestJS bằng `RedisIoAdapter`. Lệnh này đảm bảo rằng mọi WebSocket gateway khai báo trong toàn bộ ứng dụng BFF sau đó đều sử dụng adapter này để quản lý kết nối và phát tin.
+
+- **Đọc file [redis-io.adapter.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/adapters/redis-io.adapter.ts):**
+  Xem cách lớp `RedisIoAdapter` kế thừa `IoAdapter` của NestJS và override hàm `createIOServer` để cấu hình CORS cho socket:
+  ```typescript
+  override createIOServer(port: number, options: SocketIoServerOptions = {}): ReturnType<IoAdapter['createIOServer']> {
+    const serverOptions: SocketIoServerOptions = {
+      ...options,
+      cors: {
+        ...existingCors,
+        origin: this.corsOrigin,
+      },
+    };
+    const server = super.createIOServer(port, serverOptions);
+    if (this.adapterConstructor) {
+      server.adapter(this.adapterConstructor);
+    }
+    return server;
+  }
+  ```
+  _Giải thích cấu hình:_ Hàm `createClient` của thư viện `redis` được khởi tạo và nhân bản (duplicate) làm hai kết nối riêng: `pubClient` (chuyên phát tin) và `subClient` (chuyên lắng nghe). `createAdapter` của `@socket.io/redis-adapter` sẽ liên kết hai client này để đồng bộ hóa các lệnh `emit` chéo qua lại giữa nhiều instance BFF khi hệ thống được scale lên theo chiều ngang.
+
+### Bước 2: Quá trình Handshake & Phân phối Room từ Server
+
+Tiếp theo, hãy đọc cách server thiết lập kết nối ban đầu và chặn các lỗ hổng bảo mật liên quan đến phân quyền room.
+
+- **Đọc file [order-events.gateway.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/gateways/order-events.gateway.ts):**
+  Xem hàm `handleConnection` (dòng 25-36): Khi client kết nối tới namespace `/orders`, gateway sẽ gọi sang `RealtimeAuthService` để phân giải các room hợp lệ và duyệt qua để cho socket join room:
+
+  ```typescript
+  const rooms = await this.auth.resolveConnectionRooms(socket);
+  for (const room of rooms) {
+    await socket.join(room);
+  }
+  ```
+
+  Nếu có bất kỳ lỗi nào xảy ra trong quá trình xác thực (ví dụ: token hết hạn, session không tồn tại), gateway sẽ bắn ngược lại sự kiện `events.authError` báo lỗi và chủ động ngắt kết nối (`socket.disconnect(true)`).
+  Đồng thời, hãy chú ý các callback xử lý các event legacy `join.session` và `join.staff` (dòng 42-56). Chúng được giữ lại để trả về lỗi phân quyền nếu client cố tình tự gửi yêu cầu join room từ phía trình duyệt.
+
+- **Đọc file [realtime-auth.service.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/services/realtime-auth.service.ts):**
+  Đọc hàm `resolveConnectionRooms` (dòng 58-73): Hàm này kiểm tra sự tồn tại của token xác thực. Nếu có JWT gửi lên trong trường `auth.token` (hoặc thông qua header `Authorization`), server coi đây là kết nối từ **Staff** và chuyển tới hàm `verifyStaffToken` rồi gán room qua `buildStaffRooms`. Ngược lại, nếu chỉ có thông tin `tenantId` & `sessionId` (trong `auth` hoặc headers), server coi đó là kết nối từ **Customer** và chuyển tới hàm `buildCustomerRooms`.
+
+  _Giải thích cấu hình gRPC xác thực:_
+
+  ```typescript
+  private async verifyStaffToken(token: string): Promise<AuthorizeResponse> {
+    const cacheKey = this.tokenCacheKey(token);
+    const cached = await this.cacheManager.get<AuthorizeResponse>(cacheKey);
+    if (cached?.valid) {
+      return cached;
+    }
+    const response = await firstValueFrom(
+      this.authorizer.verifyUserToken({ processId: randomUUID(), token })
+    );
+    // ... cache kết quả trong 30 phút ...
+  }
+  ```
+
+  BFF không trực tiếp lưu thông tin user hay mật khẩu mà nó đóng vai trò cổng trung gian. Nó sử dụng gRPC gọi sang `AuthorizerService` để kiểm tra tính hợp lệ của token và lấy về thông tin Tenant, danh sách Roles của nhân viên. Sau đó, lưu cache kết quả trong 30 phút vào Redis để tránh quá tải cho hệ thống gRPC khi client thực hiện kết nối lại liên tục do mạng kém.
+
+  _Giải thích cấu hình xác minh session khách hàng:_
+
+  ```typescript
+  private async buildCustomerRooms(...) {
+    const hasBffSession = Boolean(await this.cacheManager.get(getSessionCacheKey(sid, tid)));
+    if (!hasBffSession && !(await this.hasActiveOrderSession(tid, sid))) {
+      throw new UnauthorizedException();
+    }
+    // ...
+  }
+  ```
+
+  Để bảo vệ dữ liệu, server kiểm tra xem khách hàng có thực sự đang có một session truy cập hợp lệ hay không. Server sẽ kiểm tra session trong bộ nhớ BFF Cache hoặc kiểm tra trạng thái session trực tiếp trong Redis nghiệp vụ của Order Service (thông qua `hasActiveOrderSession` kiểm tra key hash `session:{tenantId}:{sessionId}` xem trường `status` có bằng `ACTIVE` không). Nếu hợp lệ mới cho phép join vào room `session:{sessionId}:customer` và `tenant:{tenantId}:customers`.
+
+### Bước 3: Phát tin (Emit) & 3 Luồng luân chuyển dữ liệu thực tế
+
+Khi dữ liệu nghiệp vụ thay đổi, BFF sẽ là Edge duy nhất phát tin realtime. Hãy tìm hiểu 3 luồng luân chuyển dữ liệu chính trong mã nguồn:
+
+- **Đọc file [realtime-events.service.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/services/realtime-events.service.ts):**
+  File này gom tất cả các logic emit event về một mối, đóng vai trò như một facade. Ví dụ khi order được tạo, hàm `emitOrderCreated` (dòng 28-33) sẽ xác định room customer (`WsRoom.customer`) và room staff (`WsRoom.staff`) tương ứng để gọi gateway gửi tin nhắn `events.orderCreated` đi.
+
+- **Đọc luồng 1 (BFF Direct):**
+  Được gọi trực tiếp trong các BFF controllers ngay khi có phản hồi TCP thành công từ microservices khác (ví dụ: ngay sau khi submit order thành công hoặc thay đổi trạng thái giỏ hàng).
+
+- **Đọc luồng 2 (Kafka Bridge) tại [realtime-kafka-bridge.service.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/services/realtime-kafka-bridge.service.ts):**
+  Khi module được khởi tạo, service này sẽ tạo kết nối `kafkajs` consumer và subscribe hai topic nghiệp vụ từ Kafka: `KITCHEN_SLA_WARNING_TOPIC` và `PAYMENT_COMPLETED_TOPIC`.
+  Hãy xem hàm `emitPaymentCompleted` (dòng 79-111):
+
+  ```typescript
+  const snapshot = await firstValueFrom(
+    this.orderClient.send(TCP_REQUEST_MESSAGE.ORDER.BILL_GET_PAYMENT_SNAPSHOT, req),
+  );
+  const sessionId = snapshot.data?.sessionId;
+  ```
+
+  _Giải thích cấu hình:_ Sự kiện thanh toán hoàn tất được sinh ra từ Payment Service và đẩy vào Kafka, nhưng event này chỉ chứa `billId` mà không có thông tin room của customer (`sessionId`). Do đó, BFF Kafka Bridge đóng vai trò trung gian: nó consume event, thực hiện gọi một TCP request tới `ORDER_SERVICE` để lấy snapshot hóa đơn chứa `sessionId` (làm giàu dữ liệu - enrichment), sau đó mới phát tin `events.paymentCompleted` tới đúng room của khách hàng đang đợi ở trình duyệt.
+
+- **Đọc luồng 3 (Redis Pub/Sub) tại [kds-internal-events.subscriber.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts):**
+  Khi module KDS khởi chạy, nó sử dụng Redis client để subscribe pattern `realtime:kds:*` từ Redis Pub/Sub:
+  ```typescript
+  await this.subClient.pSubscribe('realtime:kds:*', (message, channel) => {
+    void this.onKdsMessage(channel, message);
+  });
+  ```
+  _Giải thích cấu hình:_ Các thay đổi trong queue của màn hình nhà bếp (KDS) được ghi nhận và lưu trữ trực tiếp trên Redis bởi Kitchen Service. Khi có thay đổi, Kitchen Service sẽ publish một tín hiệu qua Redis Pub/Sub. BFF lắng nghe tín hiệu này thông qua `pSubscribe`, parse dữ liệu sự kiện thành `KdsQueueChangedEvent` và gọi `realtime.emitKdsQueueChanged` để phát tin cho KDS ở frontend. Cơ chế này đảm bảo dữ liệu queue luôn tồn tại sẵn sàng trên Redis trước khi frontend nhận được hint và đi refetch dữ liệu.
+
+### Bước 4: Tích hợp Realtime phía Client (Frontend)
+
+Cuối cùng, hãy xem cách frontend đăng ký lắng nghe và quản lý vòng đời socket để tránh rò rỉ bộ nhớ hoặc bị đơ giao diện.
+
+- **Đọc file [use-customer-order-realtime.ts](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/apps/customer-pwa/src/features/order/hooks/use-customer-order-realtime.ts):**
+  - **Khởi tạo và xác thực (dòng 70-79):** Hook sử dụng thư viện `socket.io-client` để khởi tạo kết nối thông qua hàm `io()` tới URL namespace `/orders`, tự động đính kèm thông tin `auth` chứa cặp `tenantId` và `sessionId` của khách hàng.
+  - **Quản lý vòng đời lắng nghe (dòng 157-202):** Bạn sẽ thấy toàn bộ các sự kiện kết nối (`connect`, `disconnect`, `reconnect`, `events.cartUpdated`, `events.orderCreated`...) được đăng ký lắng nghe một cách trực tiếp bên trong block `useEffect`.
+  - **Dọn dẹp tài nguyên (dòng 178-202):** Khi component hoặc hook unmount, hàm clean-up của `useEffect` sẽ được gọi để hủy bỏ lắng nghe (`socket.off`) và đóng kết nối hoàn toàn nhằm tránh rò rỉ bộ nhớ (memory leak) hoặc tạo ra các listener bị trùng lặp khi hook khởi chạy lại.
+  - **Bộ lọc an toàn (dòng 106-133):** Các callback lắng nghe event (như `onCartUpdated`...) luôn có câu lệnh kiểm tra:
+    ```typescript
+    if (event.tenantId !== tenantId || event.sessionId !== sessionId) return;
+    ```
+    Đây là bộ lọc cuối cùng nhằm đảm bảo rằng trình duyệt của khách hàng ở một bàn/ca session cụ thể sẽ không xử lý nhầm hoặc làm mới dữ liệu của các bàn/ca session khác cùng nằm trong một mạng thông báo chung.
+
+---
+
+## 12. Tóm tắt Mental Model
+
+#### Sơ đồ tư duy: Mental Model tổng hợp — Socket.IO trong QRTable
+
+> Sơ đồ tư duy tóm tắt toàn bộ kiến thức Socket.IO áp dụng cho dự án QRTable. Đi từ bản chất (invalidation hint), qua kiến trúc (BFF edge, ba luồng emit), đến các quyết định thiết kế (không làm command bus, không làm source of truth).
 
 ```mermaid
 mindmap
   root((Socket.IO\nQRTable))
-Nature
-      Invalidation hint → refetch REST
-      At-most-once delivery
-There are no durable replays
-REST snapshot is source of truth
-    Transport
-WebSocket is primary
-Long-polling is fallback
-Transport negotiation automatically
-Upgrade may fail at proxy
-Architecture
-BFF is the only edge
-Three streams: Direct / Kafka / Redis Pub/Sub
-Kitchen does not emit directly
-Hint plays after ready state
-    Namespace & Room
-Namespace /orders for all QRTable
-Room is inferred by the server from JWT/session
-Client does not choose room
-Legacy join.staff is rejected
-    Auth
-Staff: JWT in auth.token
-      Customer: tenantId + sessionId
-      events.authError → disconnect
-Cache token verify in Redis
+    Bản chất
+      Chỉ là Invalidation hint → kích hoạt refetch REST
+      Ngữ nghĩa at-most-once (tối đa một lần)
+      Không hỗ trợ lưu trữ phát lại (no durable replay)
+      REST snapshot luôn là source of truth duy nhất
+    Phương thức truyền tải
+      WebSocket là kênh chính (primary)
+      Long-polling là kênh dự phòng (fallback)
+      Tự động thương lượng nâng cấp (negotiation)
+      Upgrade có thể thất bại khi đi qua proxy
+    Kiến trúc
+      BFF là điểm duy nhất kết nối ra browser
+      Ba luồng emit chính: Direct / Kafka / Redis Pub/Sub
+      Kitchen không kết nối và phát tin trực tiếp
+      Hint phát đi sau khi trạng thái đã sẵn sàng
+    Namespace và Room
+      Namespace /orders dùng chung toàn hệ thống
+      Room được server gán dựa trên JWT/session
+      Client không được tự chọn room
+      Các event join tự chế (join.staff) bị chặn
+    Xác thực (Auth)
+      Staff: JWT truyền trong auth.token
+      Customer: truyền cặp tenantId + sessionId
+      events.authError → buộc ngắt kết nối
+      Cache xác thực token trong bộ nhớ Redis
     Frontend
-Hook owns socket lifecycle
-      Filter tenantId/sessionId/station
-Do not register listeners in connect
-      Reconnect → refetch active domain
-    Scale
-Redis Adapter for multi-instance fan-out
-Sticky session if still using polling
-Redis down = realtime no fan-out
-The adapter does not provide durable storage
-Decision
-      Socket.IO = UI browser hint
-      Kafka = domain event services
-      Redis Pub/Sub = internal runtime hint
-REST polling = fallback when needed
+      Hook quản lý trọn vẹn vòng đời socket
+      Bắt buộc lọc theo tenantId/sessionId/station
+      Không đăng ký listener bên trong handler connect
+      Reconnect thành công bắt buộc đi kèm refetch active domain
+    Quy mô (Scale)
+      Redis Adapter phục vụ fan-out giữa các instance
+      Dùng sticky session nếu vẫn muốn dự phòng long-polling
+      Redis sập = mất khả năng đồng bộ liên instance
+      Adapter không cung cấp khả năng lưu trữ tin nhắn
+    Quyết định
+      Socket.IO = UI browser hint (phát tin cho trình duyệt)
+      Kafka = domain event (giao tiếp giữa các service)
+      Redis Pub/Sub = runtime hint (giao tiếp nội bộ cực nhanh)
+      HTTP Polling = kênh dự phòng chậm khi cần
 ```
 
-After reading the entire document, here is a brief mental model to remember:
+Sau khi đọc xong tài liệu, đây là Mental Model ngắn gọn bạn cần ghi nhớ:
 
-**In essence:** Socket.IO is an invalidation hint layer for the UI — the server says "something just changed, please refetch". Not source of truth, not command bus, not Kafka alternative. At-most-once semantics, events can be lost — the design must accept this.
+**Về bản chất:** Socket.IO chỉ là lớp phát tín hiệu làm mới giao diện (invalidation hint) — server báo: "dữ liệu vừa đổi đấy, hãy đi lấy lại đi". Nó không phải là source of truth, không phải command bus, cũng không phải giải pháp thay thế cho Kafka. Truyền tin theo cơ chế at-most-once, chấp nhận mất gói tin — kiến trúc frontend phải được thiết kế để chịu được việc này.
 
-**About transport:** Socket.IO starts with long-polling and then upgrades to WebSocket. Not pure WebSocket. Fallback long-polling is advantageous in complex proxy environments but requires sticky sessions when scaling multiple instances.
+**Về truyền tải:** Socket.IO bắt đầu bằng long-polling rồi nâng cấp lên WebSocket. Không phải WebSocket thuần túy. Việc dự phòng bằng long-polling rất có lợi trong môi trường proxy phức tạp, nhưng yêu cầu cấu hình sticky session nếu bạn muốn chạy nhiều instance BFF đồng thời.
 
-**About architecture:** BFF is the only emit point about the browser. Three different streams — Direct (after TCP success), Kafka bridge (domain events enrich), Redis Pub/Sub (KDS must wait for state to be ready). Do not emit from the service domain directly to the browser.
+**Về kiến trúc:** BFF là điểm duy nhất kết nối với trình duyệt. Có ba luồng đẩy tin — Direct (ngay sau TCP thành công), Kafka bridge (domain event làm giàu dữ liệu), Redis Pub/Sub (KDS phải đợi ghi xong trạng thái mới phát tin). Tuyệt đối không để các service nghiệp vụ phát tin trực tiếp tới trình duyệt.
 
-**About namespace and room:** One namespace `/orders` for the entire QRTable. Room is inferred by the server from the verified JWT/session — the client cannot choose it themselves. This is a security boundary, not a convention.
+**Về namespace và room:** Một namespace duy nhất `/orders` cho toàn bộ dự án QRTable. Room do server tự quyết định dựa trên JWT/session đã xác thực — client không được tự ý chọn room. Đây là ranh giới bảo mật, không phải là một quy ước thiết kế thông thường.
 
-**About the frontend:** Hooks own the entire socket lifecycle. Required filter by tenantId/sessionId/station. Do not register listeners in `connect`. Reconnect must come with refetch active domain. Payload events are only used to filter and trigger invalidate — not to render UI directly.
+**Về frontend:** Các hook tự chịu trách nhiệm quản lý vòng đời socket của mình. Bắt buộc phải lọc tin theo tenantId/sessionId/station. Không đăng ký lắng nghe event bên trong callback `connect`. Khi có kết nối lại (reconnect) bắt buộc phải refetch lại domain hiện tại. Payload của event chỉ dùng để lọc và kích hoạt invalidate — không bao giờ được dùng để trực tiếp vẽ UI.
 
-**About scaling:** Redis Adapter solves fan-out between multiple BFF instances. Does not provide durable storage — just real-time relay. If you still use long-polling fallback, the load balancer needs a sticky session.
+**Về scaling:** Redis Adapter giúp đồng bộ hóa các lệnh emit chéo giữa nhiều instance BFF. Nó không cung cấp khả năng lưu trữ tin nhắn bền vững. Nếu giữ cơ chế dự phòng long-polling, load balancer bắt buộc phải bật sticky session.
 
-**About the decision:** The core question is "Who needs to know about this change?". Browser → Socket.IO. service backend → Kafka. Internal BFF/KDS runtime → Redis Pub/Sub. Do not share channels between these purposes.
+**Về lựa chọn công nghệ:** Hãy luôn tự hỏi: "Ai cần nhận thông báo về sự thay đổi này?". Trình duyệt → dùng Socket.IO. Các service ở backend → dùng Kafka. Các tiến trình nghiệp vụ nhanh của BFF/KDS → dùng Redis Pub/Sub. Không dùng chung một kênh cho nhiều mục đích khác nhau.
 
-#### Diagram: Cheat Sheet — Emit Stream By Event
+#### Sơ đồ: Bảng tra nhanh — Các luồng Emit theo Sự kiện
 
-> Quick summary table of source, receiving room and frontend action for each event group. Use as a "quick reference" when adding features or debugging.
+> Bảng tóm tắt nhanh nguồn phát, room nhận và hành động ở frontend tương ứng với từng nhóm sự kiện. Hãy sử dụng bảng này làm tài liệu tham khảo nhanh khi phát triển tính năng hoặc khi cần debug.
 
-| Event Group                                                       | Source              | Receiving Room                                 | Frontend                          |
-| ----------------------------------------------------------------- | ------------------- | ---------------------------------------------- | --------------------------------- |
-| `events.orderCreated`, `events.orderStatusChanged`, `cartUpdated` | BFF Direct (TCP)    | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate order/cart/bill        |
-| `events.paymentCompleted`                                         | Kafka bridge        | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate payment/bill/order     |
-| `events.kdsQueueChanged`                                          | Redis Pub/Sub → BFF | `tenant:{tid}:kds:kitchen/bar`, `management`   | Filter station → invalidate queue |
-| `events.kitchenSlaWarning`                                        | Kafka bridge        | Station room, `management`                     | Filter station → invalidate queue |
-| `tenant.suspended/activated/closed`                               | BFF Direct (admin)  | `tenant:{tid}:customers`                       | Patch tenant lifecycle context    |
+| Nhóm sự kiện                                                      | Nguồn phát          | Room nhận tin                                  | Hành động ở Frontend                  |
+| ----------------------------------------------------------------- | ------------------- | ---------------------------------------------- | ------------------------------------- |
+| `events.orderCreated`, `events.orderStatusChanged`, `cartUpdated` | BFF Direct (TCP)    | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate order/cart/bill            |
+| `events.paymentCompleted`                                         | Kafka bridge        | `session:{sid}:customer`, `tenant:{tid}:staff` | Invalidate payment/bill/order         |
+| `events.kdsQueueChanged`                                          | Redis Pub/Sub → BFF | `tenant:{tid}:kds:kitchen/bar`, `management`   | Lọc station → invalidate queue        |
+| `events.kitchenSlaWarning`                                        | Kafka bridge        | Station room, `management`                     | Lọc station → invalidate queue        |
+| `tenant.suspended/activated/closed`                               | BFF Direct (admin)  | `tenant:{tid}:customers`                       | Cập nhật lại ngữ cảnh vòng đời tenant |

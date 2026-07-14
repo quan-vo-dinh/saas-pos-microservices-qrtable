@@ -372,7 +372,10 @@ sequenceDiagram
 | Layer       | Files                                                                                   |
 | ----------- | --------------------------------------------------------------------------------------- |
 | Customer UI | `apps/customer-pwa/src/features/order/services/order.service.ts`                        |
+| Customer UI | `apps/customer-pwa/src/features/order/hooks/order-query-keys.ts`                        |
+| Customer UI | `apps/customer-pwa/src/features/order/hooks/use-cart-query.ts`                          |
 | Customer UI | `apps/customer-pwa/src/features/order/hooks/use-order-query.ts`                         |
+| Customer UI | `apps/customer-pwa/src/features/order/hooks/use-bill-query.ts`                          |
 | Customer UI | `apps/customer-pwa/src/lib/idempotency.ts`                                              |
 | BFF         | `apps/bff/src/app/modules/order/controllers/customer-order.controller.ts`               |
 | Order       | `apps/order/src/app/modules/order/controllers/order.controller.ts`                      |
@@ -677,6 +680,7 @@ sequenceDiagram
 | Layer         | Files                                                                                           |
 | ------------- | ----------------------------------------------------------------------------------------------- |
 | Customer UI   | `apps/customer-pwa/src/features/payment/services/payment.service.ts`                            |
+| Customer UI   | `apps/customer-pwa/src/features/payment/hooks/use-create-vietqr-mutation.ts`                    |
 | Customer UI   | `apps/customer-pwa/src/pages/request-payment-page.tsx`                                          |
 | Management UI | `apps/management-app/src/features/payment/services/payment.service.ts`                          |
 | Management UI | `apps/management-app/src/features/payment/hooks/use-payment.ts`                                 |
@@ -1242,6 +1246,14 @@ Cần nắm:
 - Session context và headers quan trọng hơn global login.
 - React Query hooks là nơi trace server state.
 - WebSocket hooks chỉ bổ sung realtime invalidation.
+
+### Customer PWA State Ownership
+
+- `SessionProvider` chỉ sở hữu session identity persist trong browser: session ID, tenant ID, table metadata và tenant lifecycle presentation state.
+- TanStack React Query sở hữu dữ liệu do BFF trả về: menu, Redis-backed cart snapshot, order, bill và Payment command state.
+- Feature gọi BFF qua `services/`, rồi expose hành vi qua `hooks/`; page/component không gọi feature service trực tiếp.
+- `features/order/hooks/order-query-keys.ts` là nguồn duy nhất cho customer cart/order/bill cache keys. Socket.IO chỉ invalidate các key đó, không trở thành source of truth thứ hai.
+- Không thêm local cart Context, Zustand store hoặc cart reducer song song khi Redis cart đang là server-authoritative state.
 
 ### Management App Reading Order
 
