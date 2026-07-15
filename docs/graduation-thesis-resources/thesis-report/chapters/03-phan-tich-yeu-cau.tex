@@ -4,15 +4,15 @@ Chương này chuyển bài toán SaaS POS tích hợp đặt món qua mã QR th
 
 Các yêu cầu được tổng hợp từ tài liệu nghiệp vụ, ma trận phân quyền, ma trận đối chiếu yêu cầu–kiểm thử và phạm vi triển khai của dự án. Đặc điểm nhiều đơn vị thuê bao, nhiều vai trò và nhiều vòng đời trạng thái dẫn đến ba yêu cầu phân tích xuyên suốt: phân biệt rõ tác nhân, xác định nguồn trạng thái có thẩm quyền và gắn yêu cầu phi chức năng với tiêu chí kiểm chứng.
 
-\section{Bối cảnh vận hành và phạm vi nghiệp vụ của QRTable}
+\section{Bối cảnh vận hành F\&B}
 
-QRTable là nền tảng POS theo mô hình SaaS dành cho nhà hàng, quán ăn và quán đồ uống. Mỗi nhà hàng được quản lý như một đơn vị thuê bao độc lập trên cùng nền tảng. Phạm vi nghiệp vụ của một đơn vị thuê bao gồm thông tin nhà hàng, thực đơn, khu vực và bàn, mã QR tại bàn, đơn hàng, điều phối bếp và quầy bar, thanh toán, nhân sự vận hành, báo cáo và gói dịch vụ.
+QRTable là nền tảng POS theo mô hình SaaS dành cho nhà hàng, quán ăn và quán đồ uống. Mỗi nhà hàng được quản lý như một đơn vị thuê bao độc lập trên cùng nền tảng. Hoạt động của một đơn vị thuê bao bao gồm quản lý thông tin nhà hàng, thực đơn, khu vực và bàn, mã QR tại bàn, đơn hàng, điều phối bếp và quầy bar, thanh toán, nhân sự vận hành, báo cáo và gói dịch vụ.
 
 Các trường hợp sử dụng hình thành ba lớp nghiệp vụ liên kết. Ở lớp nền tảng, quản trị viên khởi tạo đơn vị thuê bao, chủ nhà hàng, gói dịch vụ và cấu hình thanh toán. Ở lớp vận hành nhà hàng, chủ quán quản lý nhân sự, thực đơn, bàn và mã QR; nhân viên phục vụ xác nhận đơn và xử lý hóa đơn; nhân viên bếp hoặc quầy bar xử lý phiếu theo trạm. Ở lớp khách hàng, nhiều khách cùng bàn tham gia một phiên qua mã QR, dùng chung giỏ đặt món, theo dõi đơn và yêu cầu thanh toán. Vòng đời phiên kết thúc khi hóa đơn được thanh toán và bàn chuyển qua trạng thái dọn dẹp trước lần phục vụ tiếp theo.
 
 Từ góc nhìn yêu cầu, QRTable là một hệ thống vận hành nhà hàng có kiểm soát trạng thái và phân quyền, vượt ra ngoài phạm vi một thực đơn điện tử đơn lẻ. Hệ thống phải đồng bộ nhiều luồng nghiệp vụ có ràng buộc trạng thái: bàn không thể vừa đang thanh toán vừa nhận thêm món; đơn chưa được xác nhận không được trừ tồn kho; khách không được nhìn thấy đơn của bàn khác; quản lý không được thực hiện các thao tác tài chính nhạy cảm dành riêng cho chủ quán; webhook thanh toán có thể đến trùng lặp nhưng không được làm hóa đơn bị đóng nhiều lần.
 
-Về phạm vi nghiệp vụ, hệ thống tập trung vào các miền chính sau:
+Từ bối cảnh trên, hệ thống liên quan đến các miền nghiệp vụ chính sau:
 
 \begin{itemize}
   \item \textbf{Vòng đời SaaS}: quản lý đơn vị thuê bao, gói dịch vụ, đăng ký thuê bao, hạn mức và trạng thái hoạt động của đơn vị thuê bao.
@@ -24,7 +24,7 @@ Về phạm vi nghiệp vụ, hệ thống tập trung vào các miền chính s
   \item \textbf{Bảo mật, RBAC và cô lập dữ liệu theo đơn vị thuê bao}: xác thực nhân viên/quản trị bằng JWT, kiểm soát quyền theo vai trò và cô lập dữ liệu theo đơn vị thuê bao.
 \end{itemize}
 
-\section{Bản đồ tác nhân, phạm vi truy cập và trường hợp sử dụng chính}
+\section{Tác nhân và phạm vi truy cập}
 
 QRTable có hai nhóm tác nhân lớn: nhóm vận hành nền tảng/nhà hàng và nhóm theo phiên của khách hàng. Nhóm vận hành sử dụng tài khoản, vai trò và quyền được kiểm soát qua hệ thống xác thực và phân quyền. Khách hàng không phải là một vai trò trong cơ sở dữ liệu phân quyền; khách vào hệ thống qua mã QR và phiên của bàn. Phân biệt này quan trọng vì nếu xem khách như người dùng đăng nhập thông thường, yêu cầu bảo mật và trải nghiệm đặt món qua QR sẽ bị hiểu sai.
 
@@ -222,9 +222,9 @@ Vòng đời KDS bắt đầu sau khi đơn được xác nhận. Phiếu cần 
 
 Vòng đời hóa đơn/thanh toán kết thúc phiên bàn. Hóa đơn chỉ nên vào chờ thanh toán khi không còn giỏ đang mở và các đơn cần thanh toán đã sẵn sàng. Thanh toán tiền mặt do nhân viên xác nhận trực tiếp, còn VietQR/SePay được xác nhận qua webhook. Vì thanh toán liên quan tiền và đối soát, các trường hợp thiếu tiền, trùng lặp hoặc webhook sau khi đã thanh toán phải được xử lý lặp an toàn. Sau khi hóa đơn đã thanh toán, phiên được đóng, dữ liệu giỏ/phiên tạm được dọn và bàn chuyển sang dọn dẹp.
 
-\section{Phạm vi yêu cầu của QRTable}
+\section{Phạm vi yêu cầu}
 
-Phạm vi yêu cầu của QRTable tập trung vào các năng lực cần thiết để một đơn vị thuê bao F\&B vận hành quy trình đặt món tại bàn: quản lý đơn vị thuê bao và gói thuê bao, thực đơn, bàn và mã QR, phiên khách, giỏ đặt món dùng chung, đơn hàng, KDS, thanh toán, phân quyền và báo cáo vận hành mức MVP. Các yêu cầu này là cơ sở để Chương 4 thiết kế ranh giới dịch vụ, Chương 5 trình bày các luồng triển khai và Chương 6 đánh giá mức đáp ứng.
+Phạm vi yêu cầu tập trung vào các năng lực cần thiết để một đơn vị thuê bao F\&B vận hành quy trình đặt món tại bàn: quản lý đơn vị thuê bao và gói thuê bao, thực đơn, bàn và mã QR, phiên khách, giỏ đặt món dùng chung, đơn hàng, KDS, thanh toán, phân quyền và báo cáo vận hành mức MVP. Các yêu cầu này là cơ sở để Chương 4 thiết kế ranh giới dịch vụ, Chương 5 trình bày các luồng triển khai và Chương 6 đánh giá mức đáp ứng.
 
 Các năng lực mở rộng như quản trị nhân sự nâng cao, quản trị quan hệ khách hàng/chương trình khách hàng thân thiết, kho dữ liệu phân tích, phân tích thông minh, ứng dụng di động gốc, hàng đợi thao tác ngoại tuyến đầy đủ, tích hợp sâu với nền tảng giao đồ ăn, hoàn tiền phức tạp hoặc nhiều ngân hàng thanh toán đồng thời nằm ngoài phạm vi yêu cầu chính. Ranh giới này giữ trọng tâm đánh giá ở các luồng chính, thay vì mở rộng sang những miền sản phẩm cần thiết kế, triển khai và kiểm chứng riêng.
 

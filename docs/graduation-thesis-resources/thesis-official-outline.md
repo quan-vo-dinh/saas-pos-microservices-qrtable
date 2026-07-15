@@ -72,16 +72,16 @@ Mục tiêu thực tế cho bản nháp đầu: khoảng 105-130 trang nội dun
 
 ## 5. Page budget dự kiến
 
-| Phần                                                             | Số trang gợi ý | Vai trò                                                                                 |
-| ---------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------- |
-| Tóm tắt khóa luận / Abstract                                     | 1-2            | Tóm tắt vấn đề, hướng tiếp cận, giải pháp và kết quả.                                   |
-| Chương 1. Mở đầu                                                 | 8-10           | Đặt vấn đề, mục tiêu, phạm vi và đóng góp.                                              |
-| Chương 2. Cơ sở lý thuyết và công trình liên quan                | 18-24          | Tạo nền tảng học thuật và khoảng trống nghiên cứu.                                      |
-| Chương 3. Từ vận hành F&B đến yêu cầu hệ thống QRTable           | 12-16          | Chuyển bài toán thành yêu cầu hệ thống và ràng buộc chất lượng.                         |
-| Chương 4. Thiết kế kiến trúc và quyết định công nghệ cho QRTable | 20-26          | Giải thích kiến trúc, quyết định công nghệ, service boundaries, giao tiếp và trade-off. |
-| Chương 5. Hiện thực các luồng vận hành cốt lõi của QRTable       | 24-32          | Chứng minh hệ thống đã được hiện thực hóa bằng code evidence và các luồng đại diện.     |
-| Chương 6. Đánh giá                                               | 14-20          | Đánh giá chức năng, kiến trúc và NFR với claim policy an toàn.                          |
-| Chương 7. Kết luận và hướng phát triển                           | 5-7            | Tổng kết đóng góp, hạn chế và hướng phát triển.                                         |
+| Phần                                                                     | Số trang gợi ý | Vai trò                                                                             |
+| ------------------------------------------------------------------------ | -------------- | ----------------------------------------------------------------------------------- |
+| Tóm tắt khóa luận / Abstract                                             | 1-2            | Tóm tắt vấn đề, hướng tiếp cận, giải pháp và kết quả.                               |
+| Chương 1. Giới thiệu                                                     | 8-10           | Đặt vấn đề, mục tiêu, phạm vi và đóng góp.                                          |
+| Chương 2. Cơ sở lý thuyết và công trình liên quan                        | 18-24          | Tạo nền tảng học thuật và khoảng trống nghiên cứu.                                  |
+| Chương 3. Phân tích yêu cầu hệ thống QRTable trong bối cảnh vận hành F&B | 12-16          | Chuyển bài toán thành yêu cầu hệ thống và ràng buộc chất lượng.                     |
+| Chương 4. Thiết kế kiến trúc và lựa chọn công nghệ cho QRTable           | 20-26          | Giải thích kiến trúc, lựa chọn công nghệ, ranh giới dịch vụ, giao tiếp và đánh đổi. |
+| Chương 5. Các luồng vận hành chính của QRTable                           | 24-32          | Trình bày kết quả triển khai qua các luồng vận hành đại diện.                       |
+| Chương 6. Kiểm chứng và đánh giá hệ thống QRTable                        | 14-20          | Đánh giá chức năng, kiến trúc và yêu cầu phi chức năng theo phạm vi bằng chứng.     |
+| Chương 7. Kết luận và hướng phát triển                                   | 5-7            | Tổng kết đóng góp, hạn chế và hướng phát triển.                                     |
 
 Tổng mục tiêu cho nội dung chính: khoảng 102-137 trang tùy mức chi tiết. Bản nháp nên hướng tới 105-130 trang để có dáng của một báo cáo khóa luận đầy đủ; các phần mở rộng nên tập trung vào Chương 2, Chương 4, Chương 5 và Chương 6 thay vì kéo dài phần mở đầu hoặc kết luận.
 
@@ -218,16 +218,16 @@ Artifact nên có:
 - Bảng 2.3. So sánh giao tiếp đồng bộ và bất đồng bộ trong microservices.
 - Hình 2.1. Mô hình khái niệm SaaS multi-tenancy.
 
-### Chương 3. Từ vận hành F&B đến yêu cầu hệ thống QRTable
+### Chương 3. Phân tích yêu cầu hệ thống QRTable trong bối cảnh vận hành F&B
 
 Vai trò: Chuyển bối cảnh và lý thuyết thành yêu cầu cụ thể cho hệ thống QRTable.
 
-#### 3.1. Bối cảnh vận hành và phạm vi nghiệp vụ của QRTable
+#### 3.1. Bối cảnh vận hành F&B
 
 - Các nhóm người dùng: Super Admin, Restaurant Owner, Manager/Staff, Chef/Barista, Customer.
 - Ngữ cảnh vận hành: tenant onboarding, quản lý menu/bàn/staff, quét QR, gọi món, bếp xử lý, thanh toán, dashboard/reporting tenant và quản trị gói dịch vụ.
 
-#### 3.2. Bản đồ tác nhân, phạm vi truy cập và use case cốt lõi
+#### 3.2. Tác nhân và phạm vi truy cập
 
 - Super Admin: tenant onboarding, lifecycle, plan/subscription, platform analytics và tenant drilldown qua `report.read_any`.
 - Owner/Manager: menu, table/QR, staff, payment settings, subscription, dashboard/reporting tenant qua `report.read_own` và plan feature entitlement.
@@ -264,7 +264,7 @@ Vai trò: Chuyển bối cảnh và lý thuyết thành yêu cầu cụ thể ch
 - Bill/payment lifecycle.
 - Tenant/subscription lifecycle.
 
-#### 3.6. Ranh giới phạm vi và giới hạn của các claim đánh giá
+#### 3.6. Phạm vi yêu cầu
 
 - Không claim benchmark tải lớn nếu chưa đo.
 - Không claim production-grade observability/deployment nếu chỉ có thiết kế hoặc demo giới hạn.
@@ -300,11 +300,11 @@ Vai trò: Giải thích QRTable được thiết kế như thế nào, vì sao c
 - PostgreSQL, MongoDB, Redis, Kafka, Keycloak, Socket.IO/WebSocket, SePay/VietQR, Cloudinary và Docker/Docker Compose.
 - Luôn nêu lý do chọn và giới hạn claim, không viết như danh sách công nghệ.
 
-#### 4.3. Kiến trúc tổng thể và bản đồ tích hợp công nghệ
+#### 4.3. Kiến trúc tổng thể của hệ thống
 
-- Hình bản đồ tích hợp công nghệ: ứng dụng người dùng -> BFF -> dịch vụ miền nghiệp vụ -> dữ liệu/sự kiện -> nhà cung cấp ngoài.
+- Hình 4.1 trình bày các thành phần và công nghệ theo từng lớp: ứng dụng người dùng -> BFF -> dịch vụ miền nghiệp vụ -> dữ liệu/sự kiện -> nhà cung cấp ngoài.
 - Hình kiến trúc tổng thể và C4/container để giữ góc nhìn hệ thống.
-- Bản đồ công nghệ không phải logo gallery; mỗi công nghệ phải gắn với lớp kiến trúc hoặc luồng sử dụng cụ thể.
+- Hình 4.1 không phải logo gallery; mỗi công nghệ phải gắn với lớp kiến trúc hoặc luồng sử dụng cụ thể.
 
 #### 4.4. Tổ chức Nx monorepo và ranh giới module
 
@@ -382,7 +382,7 @@ Nguồn chính: `docs/technical-architecture.md`, `docs/guides/codebase-reading-
 
 Artifact nên có:
 
-- Hình 4.1. Bản đồ tích hợp công nghệ QRTable.
+- Hình 4.1. Các thành phần và công nghệ trong kiến trúc QRTable.
 - Hình 4.2. Kiến trúc tổng thể QRTable.
 - Hình 4.3. C4/container diagram.
 - Hình 4.4. Ranh giới module trong Nx monorepo.
@@ -478,86 +478,69 @@ Artifact nên có:
 - Bảng 5.x. Dashboard/reporting implementation addendum nếu backfill technical Phase 4D vào report.
 - Screenshot 5.x. Customer PWA, Staff POS, KDS, Owner dashboard, Super Admin.
 
-### Chương 6. Đánh giá
+### Chương 6. Kiểm chứng và đánh giá hệ thống QRTable
 
-Vai trò: Đánh giá khách quan dựa trên bằng chứng, không overclaim.
+Vai trò: Đánh giá kết quả dựa trên yêu cầu, kiểm thử, trạng thái quan sát được và giới hạn của bằng chứng.
 
-#### 6.1. Chiến lược đánh giá
+#### 6.1. Phương pháp đánh giá
 
-- Functional validation.
-- Architecture validation.
-- Non-functional evaluation bằng architecture/code evidence.
-- Demo evidence.
-- Giới hạn môi trường đánh giá.
+- Phân loại cơ sở đánh giá thành kiểm thử tự động, quan sát bằng công cụ, phân tích kiến trúc và giới hạn kết luận.
+- Giới thiệu k6 và vai trò của công cụ này trong phần đo tải đại diện.
 
-#### 6.2. Evaluation Claim Policy
+#### 6.2. Đối chiếu yêu cầu và kết quả kiểm thử
 
-- Mức 1: đã kiểm chứng bằng test/demo.
-- Mức 2: được hỗ trợ bởi thiết kế/kiến trúc.
-- Mức 3: định hướng/hạn chế cần phát triển.
-- Không claim production-ready, high availability, stress test, chaos engineering hoặc observability production-grade nếu chưa có bằng chứng.
+- Tổng hợp trạng thái kiểm chứng của các yêu cầu ưu tiên cao.
+- Liên kết yêu cầu với kết quả kiểm thử hoặc trạng thái quan sát được.
 
-#### 6.3. Requirement traceability
+#### 6.3. Kiểm chứng các luồng nghiệp vụ chính
 
-- Mapping yêu cầu P0/P1 sang test/evidence.
-- Phân biệt `covered`, `partial`, `implementation-gap`, `security-gap`, `deferred-by-phase` trong tài liệu nội bộ; bản khóa luận diễn đạt bằng ngôn ngữ học thuật.
+- Tổng hợp kết quả theo trường hợp sử dụng thay vì theo từng dịch vụ riêng lẻ.
+- Giữ trọng tâm ở tính đúng đắn của trạng thái nghiệp vụ qua nhiều thành phần.
 
-#### 6.4. Functional validation
+#### 6.4. Luồng đặt món qua mã QR, POS và KDS
 
-- QR/menu/session/cart/order.
-- Staff confirmation và stock consistency.
-- KDS ticket flow.
-- Payment settlement.
-- SaaS onboarding và subscription/payment settings.
-- RBAC/tenant lifecycle flow nếu có evidence.
+- Kiểm chứng toàn luồng từ khách đặt món đến POS, KDS và trạng thái phục vụ.
+- Dùng Playwright và Allure cho kịch bản hộp đen đại diện.
 
-#### 6.5. Architecture validation
+#### 6.5. Saga, xử lý yêu cầu lặp và tính nhất quán liên dịch vụ
 
-- Service boundary và database ownership.
-- Kafka topic registry.
-- Redis access policy.
-- WebSocket hint/refetch model.
-- Tenant isolation và permission matrix.
+- Đánh giá Order Confirm Saga và SaaS Onboarding Mini-Saga.
+- Đối chiếu bù trừ, tranh chấp tồn kho, phản hồi bị mất và thông điệp lỗi thời.
 
-#### 6.6. Non-functional evaluation
+#### 6.6. Trạng thái khi vận hành của kiến trúc microservices
 
-- Performance efficiency: chỉ nêu method/metric hoặc kết quả smoke nhỏ nếu có chạy; không claim benchmark tải lớn.
-- Scalability: đánh giá bằng architecture evidence như service boundaries, stateless candidates, Kafka consumer group, cache separation và deployment design; không claim đã chứng minh scale dưới tải lớn.
-- Maintainability/modifiability: đánh giá bằng scenario như thêm payment method, thêm Kafka consumer, thêm role/permission hoặc thêm tenant lifecycle rule.
-- Reliability/resilience: idempotency, duplicate webhook, reconnect/refetch, outbox/replay nếu có evidence.
-- Security/tenant isolation: guard tests, permission matrix, tenant A/B tests và security gaps nếu còn.
-- Observability/deployment: chỉ claim demo-limited nếu có screenshot/log/health check; nếu chưa có, viết là hướng hoàn thiện.
+- Đối chiếu sự kiện Kafka và bản chiếu KDS trong Redis trong một lần chạy cụ thể.
+- Phân biệt trạng thái nghiệp vụ với tín hiệu thời gian thực.
 
-#### 6.7. Demo và artifact validation
+#### 6.7. Đánh giá định lượng bằng k6 và khả năng quan sát
 
-- GitHub repository/release/commit hash.
-- Demo domain nếu còn hoạt động.
-- Screenshot/UI gallery.
-- Test command outputs quan trọng.
-- Video demo nếu có.
+- Tổng hợp độ trễ, thông lượng, tỷ lệ lỗi và điều kiện đạt của ba kịch bản đại diện.
+- Đối chiếu số liệu k6 với Prometheus, Grafana và Tempo.
 
-#### 6.8. Giới hạn của quá trình đánh giá
+#### 6.8. Đánh giá kiến trúc và vận hành thử nghiệm
 
-- Server demo nhỏ.
-- Không có stress test/chaos engineering/production-grade observability.
-- Một số kiểm thử cần full-stack hoặc provider thật có thể ở mức manual/opt-in.
-- Benchmark tải lớn và deployment hardening là hướng phát triển.
+- Xem xét ranh giới dịch vụ, quyền sở hữu dữ liệu và khả năng bảo trì.
+- Diễn giải kết quả đo tải, kiểm thử đa thực thể, đóng gói và triển khai một phần.
 
-#### 6.9. Thảo luận kết quả
+#### 6.9. Giới hạn của quá trình đánh giá
 
-- Kết quả chứng minh điều gì về hướng tiếp cận SaaS POS + QR ordering + microservices.
-- Những gì chưa thể kết luận.
-- Tác động thực tiễn và bài học kỹ thuật.
+- Xác định phạm vi suy luận của benchmark cục bộ, kiểm thử Saga, phân quyền, triển khai và khả năng quan sát.
+- Chuyển các phần chưa đủ bằng chứng thành hướng kiểm chứng tiếp theo.
+
+#### 6.10. Thảo luận kết quả
+
+- Tổng hợp mức độ đáp ứng mục tiêu đề tài ở lớp sản phẩm, nghiệp vụ và kiến trúc.
+- Nêu rõ điều có thể kết luận và điều chưa thể suy rộng từ bằng chứng hiện có.
 
 Nguồn chính: `docs/testing/README.md`, `docs/testing/traceability-matrix.md`, tests trong `apps/**`, `libs/**`, `tests/e2e`, demo artifacts.
 
 Artifact nên có:
 
-- Bảng 6.1. Evaluation claim policy.
-- Bảng 6.2. Requirement traceability summary.
-- Bảng 6.3. Functional validation result.
-- Bảng 6.4. Architecture/NFR evidence status.
-- Hình 6.1. Demo/test evidence screenshot nếu có.
+- Bảng 6.1. Nguyên tắc phân loại kết luận theo cơ sở đánh giá.
+- Bảng 6.2. Đối chiếu yêu cầu và kết quả kiểm thử.
+- Bảng 6.3. Ma trận kiểm chứng chức năng.
+- Bảng 6.4. Kết quả đo tải k6 trên môi trường cục bộ.
+- Hình 6.1. Kết quả kiểm thử hoặc trạng thái quan sát đại diện.
 
 ### Chương 7. Kết luận và hướng phát triển
 
@@ -622,7 +605,7 @@ Nguyên tắc chọn artifact cho chương chính: mỗi hình, bảng hoặc sc
 | Bảng 3.2  | Non-functional requirements và tiêu chí đánh giá    | 3      | Tác giả xây dựng từ ISO/IEC 25010 và yêu cầu QRTable.                    |
 | Hình 3.2  | Business flow từ khách hàng đến bếp và thanh toán   | 3      | Tác giả xây dựng từ phân tích nghiệp vụ QRTable.                         |
 | Bảng 3.3  | Actor, vai trò và quyền truy cập chính              | 3      | Tác giả xây dựng từ permission matrix và yêu cầu RBAC.                   |
-| Hình 4.1  | Bản đồ tích hợp công nghệ QRTable                   | 4      | Tác giả xây dựng từ Ch4 evidence, source tree và tài liệu Nx chính thức. |
+| Hình 4.1  | Các thành phần và công nghệ trong kiến trúc QRTable | 4      | Tác giả xây dựng từ Ch4 evidence, source tree và tài liệu Nx chính thức. |
 | Hình 4.2  | Overall architecture                                | 4      | Tác giả xây dựng từ `docs/technical-architecture.md` và source code.     |
 | Hình 4.3  | C4/container diagram                                | 4      | Tác giả xây dựng từ cấu trúc `apps/`, `libs/` và tài liệu kiến trúc.     |
 | Hình 4.4  | Nx monorepo/module boundary                         | 4      | Tác giả xây dựng từ source tree, Nx workspace và rule service boundary.  |

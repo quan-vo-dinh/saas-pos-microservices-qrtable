@@ -242,7 +242,7 @@ Các mục đề xuất:
 
 1. Mục tiêu thiết kế và nguyên tắc kiến trúc.
 2. Lựa chọn công nghệ và vai trò trong QRTable.
-3. Kiến trúc tổng thể và bản đồ tích hợp công nghệ.
+3. Kiến trúc tổng thể của hệ thống.
 4. Tổ chức Nx monorepo và ranh giới module.
 5. Service boundaries và data ownership.
 6. Chiến lược multi-tenancy.

@@ -55,14 +55,14 @@ Các công nghệ trong Bảng~\ref{tab:chapter4-technology-decision} được �
 \end{longtable}
 }
 
-\section{Kiến trúc tổng thể và bản đồ tích hợp công nghệ}
+\section{Kiến trúc tổng thể của hệ thống}
 
-Hình~\ref{fig:chapter4-technology-integration-map} đặt các công nghệ chạy hệ thống vào năm lớp kiến trúc: ứng dụng người dùng, lớp biên, dịch vụ miền nghiệp vụ, hạ tầng dữ liệu và sự kiện, cùng nhà cung cấp ngoài. Các luồng chính thể hiện ứng dụng truy cập qua BFF, các dịch vụ phối hợp bằng TCP/gRPC, Kafka truyền một số sự kiện miền, Redis giữ bộ nhớ đệm hoặc trạng thái khi vận hành, và webhook thanh toán được BFF định tuyến đến Payment hoặc SaaS. Lớp quan sát và công cụ đo tải được trình bày trong bảng công nghệ vì chúng phục vụ vận hành và đánh giá, nhưng không làm thay đổi ranh giới nghiệp vụ của hình.
+Hình~\ref{fig:chapter4-technology-integration-map} trình bày các thành phần và công nghệ theo năm lớp kiến trúc: ứng dụng người dùng, lớp biên, dịch vụ miền nghiệp vụ, hạ tầng dữ liệu và sự kiện, cùng nhà cung cấp ngoài. Các luồng chính thể hiện ứng dụng truy cập qua BFF, các dịch vụ phối hợp bằng TCP/gRPC, Kafka truyền một số sự kiện miền, Redis giữ bộ nhớ đệm hoặc trạng thái khi vận hành, và webhook thanh toán được BFF định tuyến đến Payment hoặc SaaS. Lớp quan sát và công cụ đo tải được trình bày trong bảng công nghệ vì chúng phục vụ vận hành và đánh giá, nhưng không làm thay đổi ranh giới nghiệp vụ của hình.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{chapter4-technology-integration-map.pdf}
-  \caption{Bản đồ tích hợp công nghệ trong kiến trúc QRTable.}
+  \caption{Các thành phần và công nghệ trong kiến trúc QRTable.}
   \label{fig:chapter4-technology-integration-map}
 \end{figure}
 

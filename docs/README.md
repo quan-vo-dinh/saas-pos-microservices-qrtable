@@ -33,6 +33,7 @@ If current code and an accepted spec disagree, verify the behavior in code first
 | `references/`                               | Long-form references that are too detailed for core docs but still current and linked from canonical docs when relevant.                                                                                                                                                        |
 | `testing/`                                  | Durable [testing evidence](testing/README.md), traceability, and representative Saga validation.                                                                                                                                                                                |
 | `presentations/`                            | Thesis and presentation assets; not an engineering source of truth.                                                                                                                                                                                                             |
+| `interview-preparation/`                    | Personal, non-canonical interview preparation. Start with the bilingual [VILIHA interview preparation hub](interview-preparation/README.md); Vietnamese is intentionally retained for rehearsal support.                                                                        |
 
 Guides remain operational references; update one only when a canonical behavior or route it documents changes.
 

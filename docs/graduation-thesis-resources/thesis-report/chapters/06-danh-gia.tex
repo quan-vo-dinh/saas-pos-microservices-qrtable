@@ -42,9 +42,11 @@ Do QRTable là hệ thống phân tán, một kết quả kiểm thử đơn l�
 
 Cơ sở đối chiếu trực tiếp của chương là các nội dung đã trình bày ở Chương 4 và Chương 5: quyền sở hữu dữ liệu, giao tiếp liên dịch vụ, mô hình phân quyền, các luồng triển khai và bảng tổng hợp kết quả triển khai. Chương này không lặp lại toàn bộ thiết kế, mà tập trung vào mức độ các thiết kế đó được kiểm chứng qua kiểm thử và kết quả quan sát được.
 
-\section{Phương pháp đánh giá và phân loại cơ sở kết luận}
+\section{Phương pháp đánh giá}
 
 Phương pháp đánh giá được tổ chức theo các lớp bằng chứng khác nhau. Lớp thứ nhất là kiểm thử tự động ở mức dịch vụ và luồng nghiệp vụ. Lớp thứ hai là quan sát trực tiếp trên các công cụ như Allure, Kafka, Redis, Docker và Vercel. Lớp thứ ba là phân tích kiến trúc dựa trên ranh giới dịch vụ, quyền sở hữu dữ liệu và cách các thành phần phối hợp với nhau. Lớp cuối cùng là phân tích giới hạn, nhằm tránh biến kết quả kiểm thử đại diện thành những kết luận vượt quá phạm vi của đề tài.
+
+Trong phần đánh giá định lượng, khóa luận sử dụng k6, một công cụ nguồn mở dùng để kiểm thử tải và hiệu năng. Công cụ này mô phỏng tải bằng người dùng ảo (Virtual User -- VU), thực thi các kịch bản được mô tả bằng mã và thu thập các chỉ số như số yêu cầu mỗi giây, độ trễ, tỷ lệ lỗi và tỷ lệ các phép kiểm tra đạt yêu cầu. Đối với QRTable, k6 không thay thế kiểm thử chức năng; nó tạo tải cho ba kịch bản đại diện và cung cấp số liệu để đối chiếu với Prometheus, Grafana và Tempo ở phần sau của chương.
 
 Việc phân lớp bằng chứng tạo cơ sở cho kết luận thận trọng hơn. Ví dụ, một luồng Playwright đạt trạng thái thành công cho thấy hệ thống xử lý được kịch bản QR--POS--KDS đại diện, nhưng chưa thay thế kiểm thử toàn bộ phạm vi API hoặc kiểm thử tải diện rộng. Tương tự, hình minh họa Kafka hoặc Redis phản ánh trạng thái trong một luồng cụ thể, nhưng không phải bằng chứng cho mọi trường hợp vận hành dài hạn.
 
@@ -336,7 +338,7 @@ Các hình đối chiếu bổ sung được trình bày tại Phụ lục~\ref{
 
 Tương quan nhật ký bằng Loki chưa được sử dụng như bằng chứng chính trong lần đánh giá này. Lý do là chỉ nhật ký ứng dụng có \texttt{traceId} mới đủ cơ sở để làm bằng chứng truy vết; nhật ký của các thành phần quan sát không được dùng thay cho nhật ký nghiệp vụ.
 
-\section{Đánh giá kiến trúc và khả năng bảo trì}
+\section{Đánh giá kiến trúc và vận hành thử nghiệm}
 
 Đánh giá kiến trúc xem xét QRTable có giữ được các nguyên tắc đã thiết kế hay không. Các nguyên tắc chính gồm: có điểm vào thống nhất cho ứng dụng phía người dùng, mỗi dịch vụ chịu trách nhiệm cho miền nghiệp vụ tương ứng, dữ liệu không bị ghi chéo giữa các dịch vụ, và trạng thái của đơn vị thuê bao được duy trì xuyên suốt các luồng quan trọng. Những nguyên tắc này tương thích với quan điểm microservices có ranh giới dịch vụ và dữ liệu rõ ràng \cite{lewis-fowler-microservices-2014,newman-building-microservices-2021}.
 
@@ -367,9 +369,7 @@ Tương quan nhật ký bằng Loki chưa được sử dụng như bằng chứ
 \end{longtable}
 }
 
-\section{Hiệu năng, khả năng mở rộng và triển khai thử nghiệm}
-
-Bảng~\ref{tab:chapter6-k6-benchmark-summary} cung cấp phần đo định lượng bằng k6 cho một số luồng đại diện trên môi trường cục bộ. Mục này không lặp lại số liệu đo tải, mà diễn giải ý nghĩa của chúng đối với hiệu năng, khả năng mở rộng và triển khai thử nghiệm.
+Bên cạnh các tiêu chí về ranh giới dịch vụ và khả năng bảo trì, Bảng~\ref{tab:chapter6-k6-benchmark-summary} cung cấp phần đo định lượng bằng k6 cho một số luồng đại diện trên môi trường cục bộ. Phần này không lặp lại số liệu đo tải, mà diễn giải ý nghĩa của chúng đối với hiệu năng, khả năng mở rộng và triển khai thử nghiệm.
 
 Trong một lần chạy cục bộ, các luồng đọc công khai, đặt món qua QR và xác nhận đơn/KDS đều phản hồi thành công theo kiểm tra của k6, đồng thời tạo được tín hiệu chỉ số và truy vết để quan sát. Tuy nhiên, kết quả này chưa đủ để kết luận sức chứa tối đa, độ ổn định khi tải tăng dài hạn, chi phí tài nguyên, khả năng mở rộng ngang (Horizontal Scaling) hoặc tính sẵn sàng cao.
 

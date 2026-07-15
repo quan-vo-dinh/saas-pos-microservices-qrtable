@@ -46,16 +46,13 @@ bash thesis-report/tools/render-chapter2-diagrams.sh
 
 Pipeline: PlantUML `.puml` → SVG → PDF/PNG bằng `rsvg-convert`.
 
-## Chương 4 — Mermaid source và Iconify icons
+## Chương 4 — PlantUML source
 
-- Source chính: `diagrams/chapter4-*.mmd`.
+- Source chính: `diagrams/chapter4-*.puml`.
 - Hình cho LaTeX: `figures/chapter4-*.pdf`; PNG cùng tên dùng để preview nhanh.
-- Hình 4.1 `chapter4-technology-integration-map.mmd` dùng Mermaid flowchart icon shape và Iconify packs để thể hiện trực quan các công nghệ chính.
-- Các diagram chuyên đề Chương 4 chỉ gắn logo công nghệ đại diện cho trách nhiệm của mục đó, ví dụ: Nx cho ranh giới monorepo, PostgreSQL/Redis/Kafka/Socket.IO cho tenant isolation, Redis cho key ownership, Kafka cho decision flow, Keycloak cho auth và SePay cho payment. Không copy toàn bộ tech stack từ Hình 4.1 vào từng hình.
-- Các icon pack hiện dùng: `@iconify-json/logos`, `@iconify-json/simple-icons`, `@iconify-json/mdi`.
-- Mermaid CLI 11.15.0 tải icon pack qua `--iconPacks` từ `unpkg.com` khi render; không cần thêm dependency vào `package.json`. Vì vậy bước render icon cần network, nhưng LaTeX build chỉ dùng PDF/PNG đã render trong repo.
-- Node Next.js dùng image node trỏ tới `diagrams/icons/nextjs-black.png` để giữ đúng logo màu đen khi Mermaid export.
-- Node Keycloak dùng Simple Icons dạng monochrome và class riêng `identityProvider` để tránh bị áp màu của nhóm external provider.
+- Hình 4.1 `chapter4-technology-integration-map.puml` trình bày các thành phần và công nghệ theo từng lớp kiến trúc.
+- Các diagram chuyên đề Chương 4 chỉ gắn nhãn công nghệ đại diện cho trách nhiệm của mục đó, ví dụ: Nx cho ranh giới monorepo, PostgreSQL/Redis/Kafka/Socket.IO cho tenant isolation, Redis cho key ownership, Kafka cho decision flow, Keycloak cho auth và SePay cho payment. Không lặp lại toàn bộ tech stack từ Hình 4.1 trong từng hình.
+- Pipeline render dùng PlantUML và Graphviz để tạo SVG, sau đó dùng `rsvg-convert` để sinh PDF/PNG. LaTeX chỉ dùng các artifact đã render trong repo.
 - Node SePay dùng image node trỏ tới `diagrams/icons/sepay-placeholder.png`. Đây là ảnh placeholder nhỏ, không phải logo chính thức; khi có logo đúng, thay file PNG cùng đường dẫn, giữ kích thước file gọn rồi render lại.
 - `render-chapter4-diagrams.sh` tự nhúng các image path dạng `assets/...` thành data URI trong file Mermaid tạm để PDF/PNG không bị mất ảnh khi Mermaid CLI export.
 

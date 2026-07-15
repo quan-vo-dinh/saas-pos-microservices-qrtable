@@ -58,7 +58,7 @@ Cấu trúc dưới đây là hướng đề xuất. Agent triển khai được
 | ---- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | 4.1  | Mục tiêu thiết kế và architecture drivers                        | Nêu các driver: multi-tenant SaaS, QR ordering, POS/KDS realtime, payment settlement, maintainability, bounded context.                     |
 | 4.2  | Lựa chọn công nghệ và vai trò trong QRTable                      | Giải thích vì sao dùng Nx, NestJS, Next.js/React, PostgreSQL, MongoDB, Redis, Kafka, Keycloak, Socket.IO, SePay/VietQR, Cloudinary, Docker. |
-| 4.3  | Kiến trúc tổng thể và bản đồ tích hợp công nghệ                  | Đặt Hình 4.x mới: technology integration map; sau đó giữ/điều chỉnh Hình overall/C4 hiện có.                                                |
+| 4.3  | Kiến trúc tổng thể của hệ thống                                  | Đặt hình các thành phần và công nghệ; sau đó giữ/điều chỉnh Hình overall/C4 hiện có.                                                        |
 | 4.4  | Tổ chức Nx monorepo và kiểm soát module boundary                 | Làm rõ `apps/`, `libs/`, shared contracts, affected build/test, không làm mờ service boundary.                                              |
 | 4.5  | Service boundary và data ownership                               | Giữ Bảng service ownership, cập nhật thêm reporting Phase 4D nếu viết vào Chương 4.                                                         |
 | 4.6  | Multi-tenancy và tenant isolation                                | Giữ hình tenant isolation, nhấn mạnh database-per-service + `tenant_id`, không claim database-per-tenant.                                   |
@@ -74,12 +74,12 @@ Cấu trúc dưới đây là hướng đề xuất. Agent triển khai được
 
 ### 5.1. P0 - Nên có trong lượt polish
 
-| Artifact                                                 | Vai trò                                                                                                     | Ghi chú                                                                            |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Hình 4.x - Bản đồ tích hợp công nghệ QRTable             | Hình trung tâm mới cho thấy công nghệ nào nằm ở lớp nào và nối vào service nào.                             | Không phải logo gallery. Mỗi icon/nhãn phải gắn với flow hoặc architecture driver. |
-| Bảng 4.x - Quyết định công nghệ theo architecture driver | Tóm tắt technology, QRTable component, lý do chọn, trade-off/giới hạn.                                      | Dùng để trả lời câu hỏi "tại sao chọn công nghệ này".                              |
-| Cập nhật overall architecture                            | Sửa source nếu có thông tin sai, ví dụ `Kafka 6 approved domain topics` phải thành 5 topic nếu còn tồn tại. | Sửa `.mmd`, render PDF, không sửa PDF trực tiếp.                                   |
-| Cập nhật prose Chương 4                                  | Đổi tên chương/mục, thêm phần lựa chọn công nghệ, giảm cảm giác toàn chữ.                                   | Viết tiếng Việt học thuật, không thành README.                                     |
+| Artifact                                                       | Vai trò                                                                                                     | Ghi chú                                                                       |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Hình 4.x - Các thành phần và công nghệ trong kiến trúc QRTable | Hình trung tâm mới cho thấy công nghệ nào nằm ở lớp nào và nối vào service nào.                             | Không phải logo gallery. Mỗi nhãn phải gắn với flow hoặc architecture driver. |
+| Bảng 4.x - Quyết định công nghệ theo architecture driver       | Tóm tắt technology, QRTable component, lý do chọn, trade-off/giới hạn.                                      | Dùng để trả lời câu hỏi "tại sao chọn công nghệ này".                         |
+| Cập nhật overall architecture                                  | Sửa source nếu có thông tin sai, ví dụ `Kafka 6 approved domain topics` phải thành 5 topic nếu còn tồn tại. | Sửa `.mmd`, render PDF, không sửa PDF trực tiếp.                              |
+| Cập nhật prose Chương 4                                        | Đổi tên chương/mục, thêm phần lựa chọn công nghệ, giảm cảm giác toàn chữ.                                   | Viết tiếng Việt học thuật, không thành README.                                |
 
 ### 5.2. P1 - Nên thêm nếu scope đủ
 
@@ -100,7 +100,7 @@ Cấu trúc dưới đây là hướng đề xuất. Agent triển khai được
 
 Các artifact P2 không nên đẩy vào chương chính nếu làm chương quá nặng hoặc chưa có bằng chứng runtime đủ chắc.
 
-## 6. Thiết kế hình "Bản đồ tích hợp công nghệ QRTable"
+## 6. Thiết kế hình "Các thành phần và công nghệ trong kiến trúc QRTable"
 
 Hình này là điểm chốt theo thảo luận với người viết. Nó nên có dạng architecture map, không phải danh sách logo.
 
@@ -171,7 +171,7 @@ Nếu thêm nguồn học thuật/chính thức mới, cập nhật:
 Task polish Chương 4 chỉ được xem là hoàn tất khi:
 
 1. Chương 4 có tên chương/tên mục rõ hơn và có phần lựa chọn công nghệ theo lý do/trade-off.
-2. Ít nhất một bản đồ tích hợp công nghệ QRTable được tạo, render và chèn vào LaTeX.
+2. Ít nhất một hình thể hiện các thành phần và công nghệ của QRTable được tạo, render và chèn vào LaTeX.
 3. Diagram source và rendered PDF khớp nhau; không sửa trực tiếp file PDF.
 4. Các bảng/hình mới đã được ghi đúng trạng thái trong artifact backlog.
 5. Workflow plan đã cập nhật Current Status, Next Concrete Step, Open Questions và Risks.
