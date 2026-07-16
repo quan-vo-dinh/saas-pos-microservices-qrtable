@@ -36,15 +36,3 @@
 	import security_headers
 	reverse_proxy keycloak:8080
 }
-
-{$CADDY_GRAFANA_HOST:grafana.qrtable.vodinhquan.dev} {
-	import security_headers
-
-	basic_auth bcrypt {
-		{$GRAFANA_BASIC_AUTH_USER} {$GRAFANA_BASIC_AUTH_HASH}
-	}
-
-	reverse_proxy grafana:3000 {
-		header_up -Authorization
-	}
-}

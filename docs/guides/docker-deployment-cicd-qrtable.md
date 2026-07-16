@@ -21,7 +21,7 @@
 2. [Container Fundamentals — What Docker Is and Why](#2-container-fundamentals--what-docker-is-and-why)
 3. [Dockerfile — Packaging the Application](#3-dockerfile--packaging-the-application)
 4. [Docker Compose — Orchestrating Multiple Services](#4-docker-compose--orchestrating-multiple-services)
-5. [QRTable Production 4-Layer Architecture](#5-qrtable-production-4-layer-architecture)
+5. [QRTable Production 3-Layer Architecture](#5-qrtable-production-3-layer-architecture)
 6. [Reverse Proxy and HTTPS](#6-reverse-proxy-and-https)
 7. [Secrets and Environment Management](#7-secrets-and-environment-management)
 8. [DigitalOcean Deployment — Infrastructure and Provisioning](#8-digitalocean-deployment--infrastructure-and-provisioning)
@@ -62,7 +62,7 @@ Primary sources:
 
 ### How this guide covers the Phase 7 plan
 
-`docs/superpowers/plans/2026-06-06-phase-7-docker-digitalocean-deployment.md` is the implementation plan. This document is the foundation guide. When the plan requires creating a file or workflow, this guide explains why that file exists, which risk it addresses, and how to debug when deploy fails.
+This document is the Phase 7 foundation guide. It explains why each deployment artifact exists, which risk it addresses, and how to debug a failed deployment.
 
 | Phase 7 tasks                                               | Foundational knowledge in this guide                                                                    |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -72,7 +72,6 @@ Primary sources:
 | Task 7: Caddy reverse proxy                                 | Reverse proxy role, TLS termination, Let's Encrypt ACME, WebSocket forwarding                           |
 | Task 8: Production env and secrets                          | Secret taxonomy, runtime env files, file permissions, no secret build args                              |
 | Task 9: Production bootstrap                                | Per-service migrations, ownership verification, Kafka topics, and Keycloak bootstrap                    |
-| Task 10: Monitoring baseline                                | Internal scrape targets, private observability stores, Grafana behind HTTPS/auth                        |
 | Task 11: DigitalOcean provisioning and deployment           | 4 GB budget profile, firewall, Porkbun DNS, Docker setup, preflight, startup order, and public HTTPS    |
 | Task 12: Smoke, backup, rollback, demo, and docs            | External smoke, logical backup, restore proof, image rollback, demo evidence, and canonical docs        |
 
@@ -82,7 +81,7 @@ Primary sources:
 
 ### 1.1 The Root Problem: "It Works on My Machine"
 
-QRTable has 8 NestJS services, 2 frontend apps, PostgreSQL, MongoDB, Redis, Kafka, Keycloak, and the full observability stack (Prometheus, Loki, Tempo, Grafana). On a dev machine, everything runs with `docker compose up` and works fine.
+QRTable has 8 NestJS services, 2 frontend apps, PostgreSQL, MongoDB, Redis, Kafka, and Keycloak. On a dev machine, everything runs with `docker compose up` and works fine.
 
 But when you need to deploy to a real server — a DigitalOcean Droplet running Ubuntu 24.04 — the problem changes entirely:
 
@@ -181,12 +180,12 @@ Container registry
   store and distribute images
 ```
 
-| Component      | Responsibility                                           | QRTable example                          |
-| -------------- | -------------------------------------------------------- | ---------------------------------------- |
-| Docker CLI     | Receives commands from a developer or CI                 | `docker compose up -d`                   |
-| Docker daemon  | Executes builds and manages containers on the host       | Daemon on the DigitalOcean Droplet       |
-| Image registry | Stores images so other machines can pull them            | DigitalOcean Container Registry          |
-| Docker Compose | Reads YAML and calls Docker APIs for multiple containers | Starts app, infra, proxy, and monitoring |
+| Component      | Responsibility                                           | QRTable example                              |
+| -------------- | -------------------------------------------------------- | -------------------------------------------- |
+| Docker CLI     | Receives commands from a developer or CI                 | `docker compose up -d`                       |
+| Docker daemon  | Executes builds and manages containers on the host       | Daemon on the DigitalOcean Droplet           |
+| Image registry | Stores images so other machines can pull them            | DigitalOcean Container Registry              |
+| Docker Compose | Reads YAML and calls Docker APIs for multiple containers | Starts app, infrastructure, and proxy layers |
 
 Example:
 
@@ -1038,8 +1037,8 @@ secrets:
     file: ./secrets/database_password.txt
 
 configs:
-  prometheus_config:
-    file: ./docker/monitoring/prometheus.yml
+  application_config:
+    file: ./docker/config/application.yml
 ```
 
 | Top-level key | Responsibility                                                        |
@@ -1373,21 +1372,19 @@ Docker Compose provides:
 
 ### 4.7 Networks — Isolation and Routing
 
-Docker networks in QRTable Production separate public routing, identity, observability, and
-datastore traffic:
+Docker networks in QRTable Production separate public routing, identity, and datastore traffic:
 
 ```yaml
 qrtable-edge: # Caddy, BFF, Management App, Customer PWA
 qrtable-identity: # Caddy, Keycloak, Authorizer/User-Access where required
-qrtable-observability: # Caddy and the monitoring stack
-qrtable-data: # Datastores, internal services, metrics/traces
+qrtable-data: # Datastores and internal services
 ```
 
 #### Diagram: QRTable Production Network Topology
 
-> Four purpose-specific networks enforce defense in depth. Internet reaches only Caddy. Caddy can
-> reach approved edge, identity, and observability upstreams, while `qrtable-data` remains outside
-> the proxy boundary.
+> Three purpose-specific networks enforce defense in depth. Internet reaches only Caddy. Caddy can
+> reach approved edge and identity upstreams, while `qrtable-data` remains outside the proxy
+> boundary.
 
 ```mermaid
 graph LR
@@ -1420,12 +1417,8 @@ graph LR
         KC["Keycloak :8080"]
     end
 
-    subgraph "qrtable-observability network (internal)"
-        GRAFANA["Grafana :3000"]
-    end
-
     USER -->|"HTTPS 443"| CADDY
-    CADDY --> BFF & MGMT & PWA & KC & GRAFANA
+    CADDY --> BFF & MGMT & PWA & KC
     BFF <-->|"TCP"| ORDER & CATALOG & KITCHEN & PAYMENT & SAAS & AUTH & UA
     ORDER & SAAS & PAYMENT & CATALOG --> PG
     UA --> MONGO
@@ -1442,11 +1435,9 @@ graph LR
 **QRTable network rules:**
 
 - **Only Caddy** publishes host ports 80/443 and UDP 443.
-- **Caddy** joins `qrtable-edge`, `qrtable-identity`, and `qrtable-observability`, but never
-  `qrtable-data`.
+- **Caddy** joins `qrtable-edge` and `qrtable-identity`, but never `qrtable-data`.
 - **BFF and frontends** share `qrtable-edge`; BFF also joins `qrtable-data` for internal clients.
 - **Keycloak** shares `qrtable-identity` with Caddy and `qrtable-data` with PostgreSQL.
-- **Grafana** shares `qrtable-observability` with Caddy; Prometheus, Loki, and Tempo remain private.
 - **Datastores and internal services** use `qrtable-data`; none publish host ports.
 
 Every container has its own loopback interface. Inside the BFF container:
@@ -1464,8 +1455,8 @@ redis:6379
 Docker's embedded DNS only resolves service names when two containers share at least one network.
 
 `internal: true` isolates a network from external connectivity. However, Caddy deliberately bridges
-the public edge to the identity and observability networks. Its Caddyfile must therefore proxy only
-the approved Keycloak HTTP port and Grafana HTTP port, never datastore or management ports.
+the public edge to the identity network. Its Caddyfile must therefore proxy only the approved
+Keycloak HTTP port, never datastore or management ports.
 
 ### 4.8 Volumes — Persistent Storage
 
@@ -1545,35 +1536,24 @@ Timing fields:
 
 Healthcheck exit code `0` means success. A non-zero exit code means failure.
 
-**Important limitation:** `depends_on: condition: service_healthy` only coordinates startup. If PostgreSQL dies after Order has started, Compose does not understand the business dependency and does not automatically restart Order from the dependency graph. The application still needs retry/reconnect logic and monitoring.
+**Important limitation:** `depends_on: condition: service_healthy` only coordinates startup. If PostgreSQL dies after Order has started, Compose does not understand the business dependency and does not automatically restart Order from the dependency graph. The application still needs retry/reconnect logic and operational health checks.
 
 ### 4.10 Layered Compose — Separating Concerns
 
-QRTable uses 4 separate compose files, each with a clear responsibility:
+QRTable uses 3 separate compose files, each with a clear responsibility:
 
-| File                                                      | Contains                                    | How to start                                        |
-| --------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------- |
-| `docker-compose.infra.yaml`                               | PostgreSQL, MongoDB, Redis, Kafka, Keycloak | `docker compose -f docker-compose.infra.yaml up -d` |
-| `docker-compose.app.yaml`                                 | 8 NestJS services + 2 frontend apps         | `docker compose -f docker-compose.app.yaml up -d`   |
-| `docker-compose.proxy.yaml`                               | Caddy reverse proxy                         | `docker compose -f docker-compose.proxy.yaml up -d` |
-| `docker-compose.monitoring.yaml` + `monitoring.prod.yaml` | Prometheus, Loki, Promtail, Tempo, Grafana  | `docker compose -f ...yaml -f ...prod.yaml up -d`   |
+| File                        | Contains                                    | How to start                                        |
+| --------------------------- | ------------------------------------------- | --------------------------------------------------- |
+| `docker-compose.infra.yaml` | PostgreSQL, MongoDB, Redis, Kafka, Keycloak | `docker compose -f docker-compose.infra.yaml up -d` |
+| `docker-compose.app.yaml`   | 8 NestJS services + 2 frontend apps         | `docker compose -f docker-compose.app.yaml up -d`   |
+| `docker-compose.proxy.yaml` | Caddy reverse proxy                         | `docker compose -f docker-compose.proxy.yaml up -d` |
 
 **Reasons for separation:**
 
 - New deploy: only restart `docker-compose.app.yaml` — infra does not need restart
 - Update proxy config: only restart `docker-compose.proxy.yaml` — apps stay up
-- Monitoring optional: can disable monitoring layer to save RAM
-- Compose override: `monitoring.prod.yaml` overrides production-specific parts of `monitoring.yaml`
-
-**External networks:** Different compose files communicate through shared networks:
-
-```yaml
-# docker-compose.app.yaml
-networks:
-  qrtable-app:
-    external: true # already created by docker-compose.infra.yaml
-    name: qrtable-app
-```
+  **External networks:** Different compose files communicate through the shared networks created by
+  the infrastructure layer.
 
 ### 4.11 Compose Validation — Why `docker compose config` Is Mandatory Preflight
 
@@ -1601,7 +1581,7 @@ docker compose --env-file docker/env/.env.production \
 
 ---
 
-## 5. QRTable Production 4-Layer Architecture
+## 5. QRTable Production 3-Layer Architecture
 
 ### 5.1 Start Order — Cannot Be Arbitrary
 
@@ -1611,23 +1591,17 @@ docker compose --env-file docker/env/.env.production \
    → Keycloak connects to Postgres to bootstrap database
    → Wait a few minutes for Keycloak init to complete
 
-2. docker compose -f docker-compose.monitoring.yaml -f docker-compose.monitoring.prod.yaml up -d
-   → Prometheus, Loki, Promtail, Tempo, Grafana start
-   → Promtail begins collecting logs from containers (including infra layer)
-
-3. tools/deploy/phase7-run-production-bootstrap.sh
+2. tools/deploy/phase7-run-production-bootstrap.sh
    → Migrations → ownership verification → Kafka topics → Keycloak bootstrap
    → Any failure blocks application startup
 
-4. docker compose -f docker-compose.app.yaml up -d
+3. docker compose -f docker-compose.app.yaml up -d
    → All services start with explicit per-service environment mappings
 
-5. docker compose -f docker-compose.proxy.yaml up -d
+4. docker compose -f docker-compose.proxy.yaml up -d
    → Caddy starts, requests Let's Encrypt certs
-   → HTTPS live for api, app, qr, auth, grafana subdomains
+   → HTTPS live for api, app, qr, auth subdomains
 ```
-
-**Why monitoring before app?** Promtail needs to see Docker containers when they start to collect logs from the beginning. If monitoring starts after app, startup logs will be missed.
 
 **Why proxy last?** Caddy requests Let's Encrypt certificates on start — DNS must already resolve to Droplet IP. If proxy starts before DNS propagates, cert request will fail.
 
@@ -1648,45 +1622,9 @@ All ports below are NOT published by Compose:
   9092         Kafka
   8080         Keycloak HTTP (via Caddy → auth.domain)
   9000         Keycloak management/health (never via Caddy)
-  3000         Grafana (via Caddy → grafana.domain)
-  3100, 9090, 3200, 4318  Monitoring (not exposed externally)
 ```
 
 **Principle:** Every service is internal. Only Caddy touches the internet. Caddy performs TLS termination and forwards to internal services over Docker network.
-
-### 5.3 Monitoring Layer — Observable but Not Public
-
-Production monitoring has two seemingly opposing goals:
-
-1. The team must be able to view logs, metrics, and traces when the system fails.
-2. External parties must not access observability data, because logs and traces may contain tenant id, route, error message, provider response, or payment metadata.
-
-Therefore Phase 7 uses this policy:
-
-| Component  | Public?                         | How to access                              |
-| ---------- | ------------------------------- | ------------------------------------------ |
-| Grafana    | Yes, but via HTTPS + basic auth | `grafana.qrtable.vodinhquan.dev` via Caddy |
-| Prometheus | No                              | Internal Docker network only               |
-| Loki       | No                              | Internal Docker network only               |
-| Tempo      | No                              | Internal Docker network only               |
-| Promtail   | No UI                           | Reads internal Docker logs                 |
-
-Prometheus in production must scrape by service name, not `host.docker.internal`:
-
-```yaml
-scrape_configs:
-  - job_name: qrtable-backend
-    metrics_path: /api/v1/metrics
-    static_configs:
-      - targets:
-          - bff:3300
-          - order:3301
-          - catalog:3305
-          - kitchen:3307
-          - payment:3308
-```
-
-**Mental model:** Grafana is the window for observation. Prometheus/Loki/Tempo are internal data stores. Public Grafana is already a risk, so it must have HTTPS, auth, strong password, and optionally IP restriction after thesis.
 
 ---
 
@@ -1694,7 +1632,7 @@ scrape_configs:
 
 ### 6.1 Why a Reverse Proxy Is Needed
 
-Without a reverse proxy, serving HTTPS for 5 subdomains requires:
+Without a reverse proxy, serving HTTPS for 4 subdomains requires:
 
 - Handling TLS certificates for each domain in each app
 - Each app managing cert renewal itself
@@ -1739,34 +1677,14 @@ qr.qrtable.vodinhquan.dev {
 auth.qrtable.vodinhquan.dev {
   reverse_proxy keycloak:8080
 }
-
-grafana.qrtable.vodinhquan.dev {
-  basic_auth bcrypt {
-    {$GRAFANA_BASIC_AUTH_USER} {$GRAFANA_BASIC_AUTH_HASH}
-  }
-  reverse_proxy grafana:3000 {
-    header_up -Authorization
-  }
-}
 ```
 
-The tracked Caddyfile contains no password. Generate the bcrypt hash directly into the protected
-server environment:
-
-```bash
-docker run --rm -it caddy:2.10.2-alpine caddy hash-password
-```
-
-Store the output as `GRAFANA_BASIC_AUTH_HASH` in `/opt/qrtable/.env.production` with mode `0600`.
-Grafana still requires its own login after the outer Caddy basic-auth gate.
-
-Validate the production file with a real generated hash before DNS cutover:
+Validate the production files before DNS cutover:
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.infra.yaml \
   -f docker-compose.app.yaml \
-  -f docker-compose.monitoring.yaml \
   -f docker-compose.proxy.yaml \
   config -q
 
@@ -1777,7 +1695,7 @@ docker compose --env-file /opt/qrtable/.env.production \
 ```
 
 Configuration validation does not request a certificate. Public certificate issuance is not proven
-until Task 11 points all five DNS records at the Droplet, opens TCP 80/443 and UDP 443, and starts
+until Task 11 points all four DNS records at the Droplet, opens TCP 80/443 and UDP 443, and starts
 Caddy with the protected production environment.
 
 This is the equivalent Nginx config with manual TLS:
@@ -1956,14 +1874,12 @@ because it would inject unrelated secrets into every container.
 
 | Tier                  | Config                        | Use case                                                   |
 | --------------------- | ----------------------------- | ---------------------------------------------------------- |
-| Budget pilot (target) | 2 vCPU / 4 GiB + 2–4 GiB swap | Thesis demo and limited use with bounded retention         |
+| Budget pilot (target) | 2 vCPU / 4 GiB + 2–4 GiB swap | Thesis demo and limited use                                |
 | Temporary resize      | 4 vCPU / 8 GiB                | Only after measured OOM, sustained low memory, or paging   |
 | Hardening             | 4+ vCPU / 8+ GiB + managed DB | After thesis when availability and data safety need growth |
 
-Local Phase 7 evidence measured the idle infrastructure and monitoring containers at about 2.4 GiB
-before the budget tuning. The production profile limits Kafka to a 512 MiB heap and Keycloak to a
-384 MiB heap. The 4 GiB target therefore requires swap, bounded logs/retention, off-host image
-builds, and runtime monitoring. See
+The production profile limits Kafka to a 512 MiB heap and Keycloak to a 384 MiB heap. The 4 GiB
+target therefore requires swap, bounded container logs, and off-host image builds. See
 [`production-deployment-runbook.md`](production-deployment-runbook.md) for resize thresholds.
 
 **Region `sgp1` (Singapore):** Closest to Vietnam → lowest latency. Check availability because not every DO product is in every region.
@@ -1985,8 +1901,6 @@ Deny everything else:
   TCP 6379       (Redis)       → DENY
   TCP 27017      (MongoDB)     → DENY
   TCP 9092       (Kafka)       → DENY
-  TCP 3000-3001  (Grafana)     → DENY
-  TCP 9090       (Prometheus)  → DENY
 ```
 
 **Why Cloud Firewall is better than relying on Docker network alone?** Defense in depth — two protection layers. If Docker network config is wrong (e.g. accidentally exposing PostgreSQL port), Cloud Firewall still blocks from the external network layer.
@@ -2017,7 +1931,6 @@ api.qrtable      → <Reserved IP or approved final IPv4>
 app.qrtable      → <same IPv4>
 qr.qrtable       → <same IPv4>
 auth.qrtable     → <same IPv4>
-grafana.qrtable  → <same IPv4>
 
 # Verify propagation (may take 5-30 minutes)
 dig +short api.qrtable.vodinhquan.dev
@@ -2056,7 +1969,7 @@ ENV_FILE=/opt/qrtable/.env.production tools/deploy/phase7-preflight.sh
 
 It checks the non-root operator, env ownership/mode, unresolved placeholders, immutable tag,
 production safety values, 4 GiB RAM profile, at least 2 GiB swap, disk headroom, Docker access, and
-the rendered four-layer Compose configuration. Image pull is a separate explicit step after
+the rendered three-layer Compose configuration. Image pull is a separate explicit step after
 preflight passes.
 
 **Do not confuse preflight with smoke test:**
@@ -2668,8 +2581,8 @@ Use this checklist to self-verify: if after reading the guide you still cannot e
 - Can read YAML mappings, sequences, scalars, indentation, and variable interpolation.
 - Can distinguish `image`/`build`, `command`/`entrypoint`, `environment`/`env_file`, and `ports`/`expose`.
 - Understands the lifecycle of `pull`, `build`, `create`, `start`, `up -d`, `restart`, `down`, `exec`, `run`, and `config`.
-- Infra, app, proxy, monitoring are independent layers.
-- Databases, Redis, Kafka, Prometheus, Loki, Tempo have no public port.
+- Infra, app, and proxy are independent layers.
+- Databases, Redis, and Kafka have no public port.
 - Caddy is the only service exposing `80` and `443`.
 - App containers call each other by service name (`order`, `catalog`, `postgres`, `redis`, `kafka`), not `localhost`.
 - Named volumes hold database, Kafka, Redis, Keycloak, and Caddy certificate data.
@@ -2678,11 +2591,10 @@ Use this checklist to self-verify: if after reading the guide you still cannot e
 ### 12.3 Production Readiness
 
 - DigitalOcean Cloud Firewall opens only SSH from trusted IP, `80`, and `443`.
-- DNS A records for `api`, `app`, `qr`, `auth`, `grafana` resolve to Droplet IP before starting Caddy.
+- DNS A records for `api`, `app`, `qr`, and `auth` resolve to Droplet IP before starting Caddy.
 - `/opt/qrtable/.env.production` exists on server, permission `0600`, not committed.
 - `TYPEORM_SYNCHRONIZE=false` is paired with per-service migrations, and deploy runs them before app startup.
 - Keycloak runs production `start`, not `start-dev`.
-- Grafana goes through HTTPS and auth; observability stores are private.
 
 ### 12.4 CI/CD and Operations
 
@@ -2721,15 +2633,13 @@ mindmap
       Volumes = persistent storage
       Health checks = dependency ordering
       Layered compose = separation of concerns
-    4-Layer Architecture
+    3-Layer Architecture
       infra: PostgreSQL MongoDB Redis Kafka Keycloak
       app: 8 NestJS + 2 frontend
       proxy: Caddy HTTPS termination
-      monitoring: PLG + Prometheus + Tempo
     Network Topology
       qrtable-edge: Caddy, BFF, frontends
       qrtable-identity: Caddy, Keycloak
-      qrtable-observability: Caddy, Grafana, monitoring
       qrtable-data: datastores and internal services
       Only Caddy publishes 80/tcp, 443/tcp, 443/udp
     Secrets Management
@@ -2746,7 +2656,7 @@ mindmap
     DigitalOcean
       Droplet: 2 vCPU 4 GiB Ubuntu 24.04 plus 2–4 GiB swap
       Cloud Firewall: only 22/80/443 public
-      DNS: A records for 5 subdomains
+      DNS: A records for 4 subdomains
       Caddy: automatic Let's Encrypt TLS
     Migration Lifecycle
       TYPEORM_SYNCHRONIZE=false everywhere
@@ -2758,12 +2668,13 @@ After reading the entire document, this is the mental model to remember:
 
 **About Docker:** Image is an immutable template, container is a running instance. Multi-stage build creates a compact runtime image. Layers are cached — rarely changing instructions at top, frequently changing at bottom. `NEXT_PUBLIC_`\_ and `VITE\__` are build-time, baked into JS bundle — cannot change at runtime. Secrets must never be Docker build args.
 
-**About Docker Compose:** Purpose-specific edge, identity, observability, and data networks reflect
-defense in depth. Only Caddy publishes internet ports. Health checks are prerequisite for
-`depends_on` to mean something. Layered compose files separate concerns:
-infra/app/proxy/monitoring restart independently.
+**About Docker Compose:** Purpose-specific edge, identity, and data networks reflect defense in
+depth. Only Caddy publishes internet ports. Health checks are prerequisite for `depends_on` to mean
+something. Layered compose files separate concerns: infra/app/proxy restart independently.
 
-**About deployment flow:** Order matters: infra healthy → monitoring → app containers → proxy (Caddy needs DNS resolved before requesting cert). Caddy data volume holds Let's Encrypt cert — do not delete. Secrets in `/opt/qrtable/.env.production` with permission 0600 — never world-readable.
+**About deployment flow:** Order matters: infra healthy → bootstrap → app containers → proxy
+(Caddy needs DNS resolved before requesting cert). Caddy data volume holds Let's Encrypt cert — do
+not delete. Secrets in `/opt/qrtable/.env.production` with permission 0600 — never world-readable.
 
 **About CI/CD:** Three separate workflows: CI (quality gate), Release (build immutable images), Deploy (approval + remote SSH). Immutable tags with git SHA — never use `:latest` in production. Rollback = redeploy old image tag — not "deploy old code". Schema migration is a hard gate — cannot skip.
 

@@ -18,7 +18,6 @@ import type {
   StockReleaseForOrderTcpRequest,
 } from '@common/interfaces/tcp/catalog/menu-item-request.interface';
 import type { TcpClient } from '@common/interfaces/tcp/common/tcp-client.interface';
-import { QrtableMetricsService } from '@common/observability/metrics/metrics.service';
 import { BillStatus, OrderItemStatus, OrderStatus, SessionStatus } from '@einvoice/types';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { randomUUID } from 'node:crypto';
@@ -224,7 +223,6 @@ function createOrderConfirmSaga(
     new OrderItemRepository(dataSource.getRepository(OrderItem)),
     new BillRepository(dataSource.getRepository(Bill)),
     catalogGateway as CatalogStockGatewayService,
-    { recordOrderConfirmed: jest.fn() } as unknown as QrtableMetricsService,
   );
 }
 

@@ -1,545 +1,465 @@
-# Mock Interviews and Last-Minute Sheet / Mock Interview và Tờ Ôn Cuối
+# Mock Interview and Last-Minute Sheet — Friday Onsite
 
-## How to Use This File / Cách Sử Dụng
+> File này dùng để kiểm tra phản xạ sau khi học [Friday Onsite Core Pack](11-friday-onsite-core-pack.md). Mỗi câu vẫn có Q&A song ngữ đặt cạnh nhau, nhưng model answer được rút ngắn để tránh lặp lại toàn bộ Core Pack.
+>
+> Tạm thời không luyện live coding trong file này.
 
-Run each mock aloud without reading the model answer. Record the session. Allow at most five seconds of silent thinking before using an English recovery phrase.
+## How to Run the Mock / Cách Chạy Mock
 
-Thực hiện toàn bộ bằng tiếng Anh. Không dừng recording khi trả lời sai. Sau mỗi câu, tự chấm:
+1. Che phần answer hoặc nhờ người khác đọc question.
+2. Trả lời technical question trong 30–60 giây và team-fit question trong 30–45 giây.
+3. Sau đó mới so sánh với short answer và Core Pack.
+4. Chỉ mở answer bank khác cho câu có điểm 0 hoặc 1.
 
-| Score | Meaning                                                           |
-| ----: | ----------------------------------------------------------------- |
-|     0 | No answer, incorrect, or invented claim                           |
-|     1 | Partly correct but unstructured or no evidence                    |
-|     2 | Correct direct answer with reason or example                      |
-|     3 | Correct, concise, evidence-based, and handles trade-off/follow-up |
+| Score | Meaning / Ý nghĩa                                             |
+| ----: | ------------------------------------------------------------- |
+|     0 | Không hiểu hoặc không thể bắt đầu                             |
+|     1 | Có ý đúng nhưng rời rạc, thiếu reason hoặc example            |
+|     2 | Trả lời trực tiếp, đúng bản chất và có reason hoặc example    |
+|     3 | Trả lời tự nhiên, có project evidence và xử lý được follow-up |
 
-Pass condition: no P0 question at 0 and an average of at least 2.
+Mục tiêu: không có core question nào bằng 0 và điểm trung bình ít nhất là 2.
 
 ---
 
-## Mock 1 — CEO Fit and Fundamentals (50–60 Minutes)
+# Mock 1 — Core Onsite Interview
 
-### 1. Tell me about yourself.
+## Round 1 — Background
 
-**Model answer**
+### 1. Tell Me About Yourself
 
-> I am a final-year Information Systems student at UIT and recently completed my thesis defense. I gained frontend experience through GEEK Up, freelance ERP work, and QRTable, a Next.js and React SaaS POS platform. My strength is connecting frontend architecture and user flows with API, realtime, and system constraints. I am applying for a frontend ownership role and can start immediately.
+**English question:** Could you tell us about yourself and your recent experience?
 
-**Follow-up:** “Why frontend if your thesis is backend-heavy?”
+**Simple English answer**
 
-> The product includes two substantial frontends, and the backend depth helps me design better API, state, consistency, and failure behavior. My current goal is to deepen production frontend ownership.
+> My name is Minh Quan, and you can call me Minh. I am a final-year Information Systems student at UIT, and I recently completed my thesis defense. My QRTable thesis has a NestJS microservices backend and two frontend apps; I worked on both sides but focused more on frontend work.
 
-**Follow-up tiếng Việt:** “Vì sao chọn frontend khi khóa luận của bạn nặng backend?”
+**Câu hỏi tiếng Việt:** Bạn có thể giới thiệu về bản thân và kinh nghiệm gần đây không?
 
-> Sản phẩm có hai frontend lớn, và độ sâu backend giúp tôi thiết kế API, state, consistency và failure behavior tốt hơn. Mục tiêu hiện tại của tôi là đào sâu production frontend ownership.
+**Câu trả lời tiếng Việt**
 
-**Câu hỏi tiếng Việt:** Hãy giới thiệu về bản thân
+> Tôi là Minh Quân, sinh viên năm cuối ngành Hệ thống Thông tin tại UIT và vừa hoàn thành bảo vệ khóa luận. QRTable có backend Microservices bằng NestJS cùng hai frontend app; tôi làm cả hai phía nhưng tập trung nhiều hơn vào Frontend.
 
-**Trả lời tiếng Việt**
+**Review:** Core Pack — Part A.
 
-> Tôi là sinh viên năm cuối ngành Hệ thống Thông tin tại UIT và vừa hoàn thành bảo vệ khóa luận. Tôi có kinh nghiệm frontend từ GEEK Up, ERP freelance và QRTable—một SaaS POS dùng Next.js/React. Điểm mạnh là kết nối frontend architecture/user flow với API, realtime và system constraints. Tôi đang tìm vai trò frontend ownership và có thể bắt đầu ngay.
+### Follow-Up: Why Frontend If Your Thesis Is Backend-Heavy?
 
-### 2. Why VILIHA and why this contract?
+**English question:** Your thesis sounds backend-heavy. Why are you applying for a frontend role?
 
-**Model answer**
+**Simple English answer**
 
-> The stack directly matches my recent work, and the role values architecture, state management, UI quality, and AI review rather than syntax alone. I also want an English-speaking production environment with real ownership. I am comfortable with the initial six-month contract and would like to understand the outcomes that lead to extension.
+> QRTable also has two real frontend applications, and I worked on components, API integration, state, tables, and realtime updates. My backend knowledge helps me understand contracts and data flow, but I want to focus on frontend delivery in this role.
 
-**Câu hỏi tiếng Việt:** Vì sao VILIHA và vì sao hợp đồng này?
+**Câu hỏi tiếng Việt:** Khóa luận của bạn nghe có vẻ nặng Backend. Vì sao bạn ứng tuyển vị trí Frontend?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Stack trùng trực tiếp kinh nghiệm gần đây; vai trò coi trọng architecture, state, UI quality và AI review hơn cú pháp. Tôi muốn môi trường production dùng tiếng Anh và có ownership thật. Tôi chấp nhận hợp đồng sáu tháng và muốn hiểu outcomes quyết định gia hạn.
-
-### 3. Explain Server and Client Components.
-
-**Model answer**
-
-> Server Components execute on the server and are suitable for server data access, static structure, and reducing client JavaScript. Client Components are required for state, effects, events, browser APIs, and client-only libraries. I start server-first and place the client boundary around the smallest interactive feature. The boundary is an architectural and bundle decision, not a rule that Client Components are bad.
-
-**Câu hỏi tiếng Việt:** Hãy giải thích Server và Client Components
-
-**Trả lời tiếng Việt**
-
-> Server Components chạy server, phù hợp server data, static structure và giảm client JavaScript. Client Components cần state, effect, event, browser API và client library. Tôi bắt đầu server-first rồi đặt client boundary quanh vùng interactive nhỏ nhất; Client Component không phải điều xấu.
-
-### 4. What does `'use client'` actually do?
-
-**Model answer**
-
-> It marks a client entry boundary, and its client dependency graph becomes eligible for the browser bundle. It does not mean the component cannot contribute server-generated HTML, and every descendant does not need another directive. I place it deliberately because a high boundary can pull unnecessary code client-side.
-
-**Câu hỏi tiếng Việt:** `'use client'` thực sự làm gì?
-
-**Trả lời tiếng Việt**
-
-> Nó đánh dấu client entry boundary và client dependency graph liên quan. Không có nghĩa component chỉ CSR hay mọi child phải có directive. Boundary cao có thể kéo code không cần thiết vào client nên phải đặt có chủ ý.
-
-### 5. Explain hydration and a hydration mismatch.
-
-**Model answer**
-
-> Hydration attaches React behavior to server-generated HTML. A mismatch means the client’s first output differs from the server HTML. I look for time, randomness, locale, browser-only APIs, invalid markup, or changing initial data, then make the first render deterministic rather than hiding the warning.
-
-**Câu hỏi tiếng Việt:** Hãy giải thích hydration và hydration mismatch
-
-**Trả lời tiếng Việt**
-
-> Hydration gắn React behavior vào server HTML. Mismatch nghĩa first client output khác server output. Tôi tìm time, random, locale, browser-only API, invalid markup hoặc changing initial data rồi làm render deterministic, không chỉ suppress warning.
-
-### 6. How would you divide state among TanStack Query, Zustand, Context, and local state?
-
-**Model answer**
-
-> TanStack Query owns remote resources. URL state owns shareable navigation. Local state owns one interaction boundary. Context fits a cohesive subtree dependency, and Zustand fits client-owned cross-tree state that benefits from selectors. I avoid copying remote Query data into Zustand because that creates two sources of truth.
-
-**Câu hỏi tiếng Việt:** Bạn chia state giữa Query, Zustand, Context và local state thế nào?
-
-**Trả lời tiếng Việt**
-
-> TanStack Query cho remote resources; URL cho shareable navigation; local state cho một interaction boundary; Context cho coherent subtree dependency; Zustand cho cross-tree client state cần selectors. Không copy Query data vào Zustand vì tạo hai source of truth.
-
-### 7. Design query keys for a multi-tenant order page.
-
-**Model answer**
-
-> I would use a key factory with resource, tenant, list or detail, and normalized inputs—for example orders, tenant ID, list, and filter object. Every input that changes the result belongs in the key. The hierarchy must support invalidating one detail, all order lists for one tenant, or the complete tenant scope.
-
-**Câu hỏi tiếng Việt:** Hãy thiết kế query keys cho trang order multi-tenant
-
-**Trả lời tiếng Việt**
-
-> Dùng key factory gồm resource, tenant, list/detail và normalized inputs, ví dụ orders–tenantId–list–filters. Mọi input đổi result phải vào key; hierarchy phải invalidate được một detail, mọi list của một tenant hoặc cả tenant scope.
-
-### 8. Explain an optimistic update and its failure behavior.
-
-**Model answer**
-
-> Cancel conflicting reads, snapshot the previous cache, apply an immutable predicted change, send the request, roll back on error, and reconcile from the response or invalidation. In QRTable, cart mutations also send the expected cart version; a conflict restores and refetches authoritative state.
-
-**Câu hỏi tiếng Việt:** Hãy giải thích optimistic update và khi thất bại
-
-**Trả lời tiếng Việt**
-
-> Cancel conflicting reads, snapshot cache cũ, apply immutable predicted change, gửi request, rollback khi error và reconcile bằng response/invalidation. Trong QRTable, cart mutation còn gửi expected version; conflict sẽ restore và refetch server truth.
-
-### 9. How do Socket.io and TanStack Query work together in QRTable?
-
-**Model answer**
-
-> Socket events are scoped change signals, while Query remains the server-state cache. The handler verifies tenant and other available scope, then invalidates the affected query family. On reconnect, focus, or online recovery, the client refetches because events may have been missed. Staff order queries also use polling fallback.
-
-**Câu hỏi tiếng Việt:** Socket.io và TanStack Query phối hợp thế nào trong QRTable?
-
-**Trả lời tiếng Việt**
-
-> Socket event là scoped change signal; Query là server-state cache. Handler kiểm tra tenant/scope rồi invalidate query family liên quan. Reconnect/focus/online sẽ refetch vì có thể miss event; staff order còn polling fallback.
-
-### 10. Why TanStack Table instead of a pre-styled data grid?
-
-**Model answer**
-
-> TanStack Table is a typed headless engine for row models, sorting, filtering, visibility, and pagination, so the UI can follow our shadcn and domain design. The trade-off is that we own markup, accessibility, and server integration. For bounded QRTable admin lists, client row models are sufficient; large remote datasets should use server operations.
-
-**Câu hỏi tiếng Việt:** Vì sao dùng TanStack Table thay data grid có style sẵn?
-
-**Trả lời tiếng Việt**
-
-> Đây là typed headless engine cho row model, sorting, filtering, visibility, pagination nên UI theo đúng shadcn/domain design. Đổi lại team tự chịu markup, accessibility và server integration. Bounded admin list dùng client operations; remote data lớn dùng server operations.
-
-### 11. Walk me through your Figma-to-code process.
-
-**Model answer**
-
-> I understand the user flow, audit tokens and component variants, identify missing responsive and error states, map to existing primitives, and build semantic mobile-first structure. Then I connect real data and compare at matching viewports. I verify keyboard, long content, loading, empty, error, and permission states instead of only matching one screenshot.
-
-**Câu hỏi tiếng Việt:** Hãy trình bày workflow Figma-to-code
-
-**Trả lời tiếng Việt**
-
-> Hiểu user flow, audit tokens/variants, tìm missing responsive/error states, map sang existing primitives và dựng semantic mobile-first structure. Sau khi nối data, tôi so sánh cùng viewport, test keyboard, long content, loading, empty, error và permission.
-
-### 12. How do you keep AI-generated frontend code trustworthy?
-
-**Model answer**
-
-> I provide architecture and acceptance constraints, ask for small diffs, and review requirement, types, state ownership, security scope, effects, accessibility, performance, and edge states. I compare with existing patterns, run tests and static checks, and manually exercise the feature. I accept only code I can explain.
-
-**Câu hỏi tiếng Việt:** Bạn giữ AI-generated frontend code đáng tin thế nào?
-
-**Trả lời tiếng Việt**
-
-> Cung cấp architecture/acceptance constraints, yêu cầu diff nhỏ và review requirement, type, state ownership, scope security, effect, accessibility, performance, edge states. So với project patterns, chạy tests/static checks, exercise feature và chỉ nhận code tôi giải thích được.
-
-### 13. What is a frontend weakness in QRTable?
-
-**Model answer**
-
-> Operational Next.js screens are client-heavy, route-level loading and error conventions are limited, and server-side Query hydration is not broadly used. The Customer App is mobile-first but does not currently show complete offline or installable PWA infrastructure. I would improve these incrementally after measuring rather than rewriting working realtime flows.
-
-**Câu hỏi tiếng Việt:** Một điểm yếu frontend của QRTable là gì?
-
-**Trả lời tiếng Việt**
-
-> Operational Next.js screens client-heavy, route-level loading/error còn hạn chế, Query server hydration chưa dùng rộng. Customer App mobile-first nhưng chưa có offline/installable PWA hoàn chỉnh. Tôi cải thiện từng bước sau khi đo, không rewrite realtime flows đang hoạt động.
-
-### 14. Tell me about a mistake.
-
-**Model answer**
-
-> Earlier, I sometimes implemented before writing all data and failure states, which caused rework when contracts changed. I now define the user flow, source of truth, state transitions, and acceptance checks first. The lesson is not to over-plan, but to remove high-impact uncertainty before coding.
-
-**Câu hỏi tiếng Việt:** Hãy kể một sai lầm
-
-**Trả lời tiếng Việt**
-
-> Trước đây tôi đôi khi implement trước khi explicit data/failure states nên rework khi contract đổi. Giờ tôi định nghĩa flow, source of truth, transitions và acceptance checks trước. Bài học là giảm uncertainty lớn, không phải over-plan.
-
-### 15. What would you ask me?
-
-**Model answer**
-
-> What outcome would make you say this hire was successful after the first six to eight weeks? Also, when the team uses AI-generated frontend code, which architectural or product mistakes are you most concerned about?
-
-**Câu hỏi tiếng Việt:** Bạn muốn hỏi tôi điều gì?
-
-**Trả lời tiếng Việt**
-
-> Outcome nào khiến anh đánh giá người mới thành công sau sáu đến tám tuần? Và khi team dùng AI-generated frontend code, anh lo ngại architectural hoặc product mistakes nào nhất?
-
-### Mock 1 Review
-
-- [ ] Introduction under 90 seconds.
-- [ ] No answer longer than two minutes without interviewer request.
-- [ ] At least four QRTable examples.
-- [ ] At least three explicit trade-offs.
-- [ ] No exaggerated RSC, PWA, or personal-ownership claim.
-- [ ] At least one clarification question used naturally.
+> QRTable cũng có hai frontend application thật và tôi đã làm component, API integration, state, table cùng realtime update. Kiến thức Backend giúp tôi hiểu contract và data flow, nhưng ở vị trí này tôi muốn tập trung vào frontend delivery.
 
 ---
 
-## Mock 2 — Technical Pressure and Follow-Ups (55–65 Minutes)
+## Round 2 — React, Next.js, and Frontend Practice
 
-### 1. Your POS page is a thin server wrapper around a Client Component. Are you really using Next.js well?
+### 2. React Versus Next.js
 
-**Model answer**
+**English question:** What is the difference between React and Next.js, and why did QRTable use both?
 
-> That is a fair challenge. The current operational use of App Router is moderate, not fully server-first. POS needs realtime subscriptions, mutations, timers, filters, and selection, so substantial client code is justified. I would improve the server shell, route boundaries, selective prefetching, and bundle measurement, but I would not move interactive state server-side merely to increase Server Component count.
+**Simple English answer**
 
-**Câu hỏi tiếng Việt:** POS page chỉ là server wrapper mỏng quanh Client Component; bạn có thật sự dùng Next.js tốt không?
+> React is a UI library, while Next.js is a React framework with routing, layouts, Server Components, and server rendering. QRTable uses Next.js for the larger Management App and React with Vite for the focused Customer App.
 
-**Trả lời tiếng Việt**
+**Câu hỏi tiếng Việt:** React khác Next.js như thế nào và vì sao QRTable dùng cả hai?
 
-> Đây là challenge hợp lý. App Router usage hiện tại ở mức vừa, chưa fully server-first. POS cần realtime, mutations, timers, filters, selection nên client code lớn là có lý do. Tôi sẽ cải thiện server shell, route boundaries, selective prefetch và bundle measurement, không chuyển interactive state lên server chỉ để tăng RSC count.
+**Câu trả lời tiếng Việt**
 
-### 2. Why is your Query provider so high in the tree?
+> React là UI library, còn Next.js là React framework có routing, layout, Server Component và server rendering. QRTable dùng Next.js cho Management App lớn hơn và React với Vite cho Customer App tập trung hơn.
 
-**Model answer**
+**Review:** Core Pack — Technical Question 1.
 
-> It gives the operational feature areas one client cache and integrates with session and theme providers. A Client Provider can still receive server-rendered children, so it does not automatically put every child module in the client bundle. The real costs are a long-lived global cache, a root-level client runtime, and broad dependency on that context. I would split or move providers deeper only if measurement shows a benefit without fragmenting shared operational state.
+### 3. Reusable Component Design
 
-**Câu hỏi tiếng Việt:** Vì sao Query provider nằm cao trong tree?
+**English question:** How do you create a reusable component without making it too generic?
 
-**Trả lời tiếng Việt**
+**Simple English answer**
 
-> Nó cho operational features dùng chung một client cache và tích hợp session/theme. Client Provider vẫn nhận server-rendered children nên không tự kéo mọi child module vào client bundle. Chi phí thật là long-lived global cache, root client runtime và dependency rộng vào context; chỉ split/move khi measurement chứng minh lợi ích.
+> I give the component one responsibility, define typed props, decide who owns its state, and handle important UI states. I prefer composition and extract a shared component only when its reusable purpose is clear.
 
-### 3. Why do some management query keys not contain a tenant ID?
+**Câu hỏi tiếng Việt:** Bạn tạo reusable component như thế nào mà không generic hóa nó quá mức?
 
-**Model answer**
+**Câu trả lời tiếng Việt**
 
-> Those features currently assume one active tenant during an authenticated client-cache lifetime, and the tenant is attached at the request boundary. That assumption should be explicit. If tenant switching or multiple tenant contexts are supported without a full session reset, tenant ID must become part of all scoped keys and old tenant data must be cleared or isolated.
+> Tôi cho component một responsibility, định nghĩa typed props, xác định ai sở hữu state và xử lý các UI state quan trọng. Tôi ưu tiên composition và chỉ extract shared component khi mục đích tái sử dụng đã rõ.
 
-**Câu hỏi tiếng Việt:** Vì sao một số management query keys không có tenant ID?
+**Review:** Core Pack — Technical Question 2.
 
-**Trả lời tiếng Việt**
+### 4. Rendering and `useEffect`
 
-> Các feature đó hiện giả định một active tenant trong authenticated cache lifetime và tenant được gắn ở request boundary. Nếu hỗ trợ tenant switching/multiple contexts không reset session, mọi scoped key phải thêm tenant và old data phải clear/isolate.
+**English question:** What causes a React component to render, and when should you use `useEffect`?
 
-### 4. An order-status event contains the correct tenant but no session. Is client filtering enough?
+**Simple English answer**
 
-**Model answer**
+> A component can render when state, props, or context changes, or when its parent renders. I use `useEffect` to synchronize with an external system and measure a real problem before adding memoization.
 
-> No. Client filtering is defense in depth, not authorization. The server must authenticate the socket and emit only to appropriate rooms. The client should validate every scope present in the contract and update only a known order key. If session-level isolation is required, the event contract or room design should include that guarantee and tests should verify it.
+**Câu hỏi tiếng Việt:** Điều gì làm React component render và khi nào bạn nên dùng `useEffect`?
 
-**Câu hỏi tiếng Việt:** Event order status có đúng tenant nhưng không có session; client filtering đủ chưa?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
+> Component có thể render khi state, props hoặc context thay đổi, hoặc khi parent render. Tôi dùng `useEffect` để đồng bộ với external system và đo vấn đề thật trước khi thêm memoization.
 
-> Chưa. Client filtering là defense in depth, không phải authorization. Server phải authenticate socket và emit đúng room; client validate mọi scope contract có. Nếu cần session isolation, event contract/room design phải bảo đảm và có tests.
+**Review:** Core Pack — Technical Question 3.
 
-### 5. Why not patch the order cache directly from every event?
+### 5. Feature Organization
 
-**Model answer**
+**English question:** How do you organize a frontend feature in a Next.js project?
 
-> Many events are not complete resource snapshots and may arrive after related changes. Direct patching could create a partial or out-of-order view. Invalidation costs another request but restores canonical state. I would patch only when the payload is complete, versioned, and the latency benefit matters.
+**Simple English answer**
 
-**Câu hỏi tiếng Việt:** Vì sao không patch order cache trực tiếp từ mọi event?
+> We organize most code by business feature: the route composes the screen, the component owns the flow, the hook owns state or cache behavior, and the typed service calls the API. I add a layer only when it has a clear responsibility.
 
-**Trả lời tiếng Việt**
+**Câu hỏi tiếng Việt:** Bạn tổ chức một frontend feature trong Next.js project như thế nào?
 
-> Nhiều event không phải full resource snapshot và có thể đến sau related changes. Patch trực tiếp có thể tạo partial/out-of-order view. Invalidation tốn request nhưng lấy canonical state; chỉ patch khi payload complete, versioned và latency benefit đáng kể.
+**Câu trả lời tiếng Việt**
 
-### 6. Optimistic cart updates use temporary IDs. What can go wrong?
+> Chúng tôi tổ chức phần lớn code theo business feature: route compose screen, component sở hữu flow, hook sở hữu state hoặc cache behavior và typed service gọi API. Tôi chỉ thêm layer khi nó có responsibility rõ ràng.
 
-**Model answer**
+**Review:** Core Pack — Technical Question 4.
 
-> A temporary line ID must be replaced by the authoritative server snapshot, and a second mutation that targets the temporary ID can conflict if the first request has not reconciled. The current success response replaces the cart snapshot, while pending actions are constrained by mutation state. I would test rapid multi-action behavior and consider per-line queues or client IDs if the product permits concurrent edits.
+### 6. Server and Client Components
 
-**Câu hỏi tiếng Việt:** Optimistic cart dùng temporary IDs; điều gì có thể sai?
+**English question:** How do you choose between a Server Component and a Client Component? What does `'use client'` do?
 
-**Trả lời tiếng Việt**
+**Simple English answer**
 
-> Temporary ID phải được server snapshot thay thế; mutation thứ hai nhắm temporary ID có thể conflict nếu request đầu chưa reconcile. Success hiện thay toàn cart snapshot và pending actions bị giới hạn. Cần test rapid multi-action, cân nhắc per-line queue/client IDs nếu product cho concurrent edits.
+> I use a Server Component for suitable server data and static content, and a Client Component for state, effects, events, or browser APIs. `'use client'` starts the client boundary, so I keep it close to the interactive part.
 
-### 7. Why is an idempotency key persisted in local storage?
+**Câu hỏi tiếng Việt:** Bạn chọn Server Component hay Client Component như thế nào? `'use client'` làm gì?
 
-**Model answer**
+**Câu trả lời tiếng Việt**
 
-> Persistence can allow the same logical order submission to reuse its key across a retry or refresh. However, lifecycle is critical: a new logical order needs a new key, and a completed operation should not accidentally reuse an old key. The backend must scope and expire keys and compare the request meaning; client persistence alone is not the guarantee.
+> Tôi dùng Server Component cho server data và static content phù hợp, còn Client Component dành cho state, effect, event hoặc browser API. `'use client'` bắt đầu client boundary nên tôi giữ nó gần phần tương tác.
 
-**Câu hỏi tiếng Việt:** Vì sao persist idempotency key trong local storage?
+**Review:** Core Pack — Technical Question 5.
 
-**Trả lời tiếng Việt**
+### 7. API Calls in Next.js
 
-> Để logical submit dùng lại key qua retry/refresh. Nhưng lifecycle rất quan trọng: logical order mới cần key mới và completed operation không được reuse key cũ. Backend phải scope/expire key và so request meaning; client persistence không tự bảo đảm idempotency.
+**English question:** When would you fetch data on the server, and when would you use TanStack Query?
 
-### 8. Your realtime layer also polls. Is that wasteful?
+**Simple English answer**
 
-**Model answer**
+> I fetch on the server for useful initial HTML or public, read-heavy content. I use TanStack Query when the client needs caching, refetching, mutations, or realtime recovery through feature hooks and typed services.
 
-> It adds request cost, but provides bounded recovery when sockets degrade or events are missed. The interval should reflect operational freshness and backend capacity, and it can adapt to connection status rather than run equally all the time. I would measure socket reliability and request volume before removing the fallback.
+**Câu hỏi tiếng Việt:** Khi nào bạn fetch data ở server và khi nào dùng TanStack Query?
 
-**Câu hỏi tiếng Việt:** Realtime layer vừa dùng socket vừa poll có lãng phí không?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
+> Tôi fetch ở server cho initial HTML hữu ích hoặc public content chủ yếu để đọc. Tôi dùng TanStack Query khi client cần cache, refetch, mutation hoặc realtime recovery thông qua feature hook và typed service.
 
-> Có thêm request cost nhưng tạo bounded recovery khi socket degrade hoặc miss event. Interval phải theo operational freshness/backend capacity và có thể thay đổi theo connection status. Cần đo reliability/request volume trước khi bỏ fallback.
+**Review:** Core Pack — Technical Question 6.
 
-### 9. Would you use Server Actions for all mutations now?
+### 8. State Ownership
 
-**Model answer**
+**English question:** How do you decide between local state, URL state, Context, Zustand, and TanStack Query?
 
-> No. The existing applications already have typed BFF services, client Query mutations, and realtime contracts. Server Actions may simplify selected form workflows, but changing every mutation would add migration risk without guaranteed benefit. I would choose them when server ownership, progressive enhancement, and revalidation fit the specific flow.
+**Simple English answer**
 
-**Câu hỏi tiếng Việt:** Bạn có chuyển mọi mutation sang Server Actions không?
+> I start from the source of truth: API data belongs in Query, small interactions in local state, shareable filters in the URL, simple subtree state in Context, and shared client state in Zustand. I avoid storing the same data twice.
 
-**Trả lời tiếng Việt**
+**Câu hỏi tiếng Việt:** Bạn quyết định giữa local state, URL state, Context, Zustand và TanStack Query như thế nào?
 
-> Không. App hiện có typed BFF services, Query mutations và realtime contracts. Server Actions có thể đơn giản một số form workflows, nhưng migrate mọi mutation tăng risk không có lợi ích chắc chắn. Chọn khi server ownership, progressive enhancement và revalidation phù hợp flow cụ thể.
+**Câu trả lời tiếng Việt**
 
-### 10. How would you make the Customer App a real PWA?
+> Tôi bắt đầu từ source of truth: API data thuộc Query, interaction nhỏ thuộc local state, filter cần chia sẻ thuộc URL, subtree state đơn giản thuộc Context và shared client state thuộc Zustand. Tôi tránh lưu cùng dữ liệu hai lần.
 
-**Model answer**
+**Review:** Core Pack — Technical Question 7.
 
-> First define the offline product contract. Static shell and safe public assets can be cached, but menu freshness, cart writes, order submission, and payment state need explicit policies. Then add a manifest, service worker strategy, install criteria, update behavior, offline UI, and tests. I would not queue financial or inventory-affecting writes offline without idempotency, conflict handling, and clear user status.
+### 9. TanStack Query in Practice
 
-**Câu hỏi tiếng Việt:** Bạn biến Customer App thành PWA thực sự thế nào?
+**English question:** How did you set up and use TanStack Query in QRTable?
 
-**Trả lời tiếng Việt**
+**Simple English answer**
 
-> Định nghĩa offline product contract trước. Cache shell/public assets an toàn; menu freshness, cart write, order submission, payment cần policy rõ. Sau đó thêm manifest, service worker, install/update/offline UI và tests. Không queue financial/inventory writes offline nếu thiếu idempotency/conflict/status rõ.
+> Each app has one QueryClient, while each feature has query keys, a typed service, and query or mutation hooks. Protected queries wait for authentication, and successful mutations update known data or invalidate the smallest related query.
 
-### 11. Review this generated component: it fetches in `useEffect`, copies the result to Zustand, uses array indexes as keys, and has a clickable `div`. What do you say?
+**Câu hỏi tiếng Việt:** Bạn setup và sử dụng TanStack Query trong QRTable như thế nào?
 
-**Model answer**
+**Câu trả lời tiếng Việt**
 
-> I would first confirm the requirement, then replace the duplicated server-data store with the existing Query pattern, use stable domain IDs, and use a semantic button or link with keyboard behavior. I would add loading, empty, error, and retry states, check cancellation or stale responses, and create tests around the user behavior. The problem is not style; it is source of truth, identity, and accessibility.
+> Mỗi app có một QueryClient, còn mỗi feature có query key, typed service và query hoặc mutation hook. Protected query đợi authentication và mutation thành công sẽ update dữ liệu đã biết hoặc invalidate query liên quan nhỏ nhất.
 
-**Câu hỏi tiếng Việt:** Review component AI fetch trong effect, copy vào Zustand, dùng index key và clickable `div`
+**Review:** Core Pack — Technical Question 8.
 
-**Trả lời tiếng Việt**
+### 10. TanStack Table in Practice
 
-> Xác nhận requirement, thay duplicated server store bằng Query pattern, dùng stable domain IDs và semantic button/link. Thêm loading/empty/error/retry, xử lý stale/cancellation và tests user behavior. Lỗi chính là source of truth, identity và accessibility chứ không chỉ style.
+**English question:** How did you use TanStack Table and shadcn/ui for complex data screens?
 
-### 12. A designer asks for an exact desktop table on a 360-pixel screen. What do you do?
+**Simple English answer**
 
-**Model answer**
+> TanStack Query provides the data, TanStack Table manages headless behavior, and shadcn provides the visual table components. I use typed columns and controlled state, then move sorting or pagination to the server when the dataset becomes large.
 
-> I clarify the mobile task: comparison, scanning, or acting on one record. Then I propose options such as horizontal scroll with priority columns, column visibility, expansion, or a card representation. I preserve semantics and show the designer a working prototype. “Pixel-perfect” should preserve intent across constraints, not force an unusable screenshot.
+**Câu hỏi tiếng Việt:** Bạn dùng TanStack Table và shadcn/ui cho complex data screen như thế nào?
 
-**Câu hỏi tiếng Việt:** Designer yêu cầu desktop table chính xác trên màn hình 360px; bạn làm gì?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
+> TanStack Query cung cấp data, TanStack Table quản lý headless behavior và shadcn cung cấp visual table component. Tôi dùng typed column cùng controlled state rồi chuyển sorting hoặc pagination sang server khi dataset lớn.
 
-> Làm rõ mobile task: comparison, scanning hay action một record. Đề xuất horizontal scroll với priority columns, visibility, expansion hoặc card, giữ semantics và đưa working prototype. Pixel-perfect là giữ intent trong constraints, không ép screenshot unusable.
+**Review:** Core Pack — Technical Question 9.
 
-### 13. Your English is slow. How can you work directly with me?
+### 11. Figma to Production UI
 
-**Model answer**
+**English question:** How do you translate a Figma design into a responsive and maintainable interface?
 
-> My speaking is slower than my technical reading, but I communicate with structure, confirm requirements, and summarize decisions in writing. I use diagrams and concrete examples when a concept is complex, and I raise blockers rather than hide them. Fluency will improve through daily work; technical clarity and reliability are already habits I can apply.
+**Simple English answer**
 
-**Câu hỏi tiếng Việt:** Tiếng Anh của bạn chậm; làm sao làm việc trực tiếp với tôi?
+> I inspect the flow, layout, tokens, breakpoints, reusable components, and UI states before coding. Then I compose Tailwind and shadcn components, keep business behavior in the feature, and compare the result at important viewport sizes.
 
-**Trả lời tiếng Việt**
+**Câu hỏi tiếng Việt:** Bạn chuyển Figma design thành responsive và maintainable interface như thế nào?
 
-> Speaking của tôi chậm hơn technical reading nhưng tôi giao tiếp có cấu trúc, confirm requirement và summarize decision bằng văn bản. Tôi dùng diagram/example cho concept phức tạp và báo blocker thay vì giấu. Fluency sẽ tăng qua công việc hằng ngày; clarity/reliability là thói quen hiện có.
+**Câu trả lời tiếng Việt**
 
-### 14. What would you do in your first month?
+> Tôi xem flow, layout, token, breakpoint, reusable component và UI state trước khi code. Sau đó tôi compose Tailwind cùng shadcn component, giữ business behavior trong feature và so sánh kết quả ở các viewport quan trọng.
 
-**Model answer**
+**Review:** Core Pack — Technical Question 10.
 
-> I would learn the product, users, repository conventions, release process, and current risks; deliver one small real feature end to end; then take ownership of a meaningful frontend area with predictable communication. I would review AI workflow and quality gates early, but avoid proposing a broad rewrite before understanding delivery constraints.
+### 12. Build Time and Runtime Performance
 
-**Câu hỏi tiếng Việt:** Bạn làm gì trong tháng đầu?
+**English question:** How would you optimize a slow Next.js project?
 
-**Trả lời tiếng Việt**
+**Simple English answer**
 
-> Học product, users, repo conventions, release process và risks; ship một small real feature end-to-end; sau đó ownership frontend area có ý nghĩa với communication predictable. Review AI workflow/quality gates sớm nhưng không đề xuất rewrite trước khi hiểu delivery constraints.
+> First, I ask whether the problem is build time or browser runtime. I measure before checking build tools and caches, imports, Tailwind scanning, Server/Client boundaries, bundles, network requests, or React rendering.
 
-### 15. Why should I choose you over a stronger pure frontend candidate?
+**Câu hỏi tiếng Việt:** Bạn sẽ tối ưu một Next.js project đang chậm như thế nào?
 
-**Model answer**
+**Câu trả lời tiếng Việt**
 
-> A stronger specialist may know more UI details today, and I would not deny that. My value is the combination of the exact stack, practical frontend delivery, and end-to-end system reasoning around API contracts, auth, realtime, consistency, and failure. I can communicate with backend engineers, control AI-generated code, and learn frontend gaps systematically. If the role needs ownership across the complete user-to-system flow, that combination is useful.
+> Đầu tiên tôi hỏi vấn đề nằm ở build time hay browser runtime. Tôi đo trước khi kiểm tra build tool và cache, import, Tailwind scanning, Server/Client boundary, bundle, network request hoặc React rendering.
 
-**Câu hỏi tiếng Việt:** Vì sao chọn bạn thay vì ứng viên pure frontend mạnh hơn?
+**Required clarification:** “Do you mean development and build time, or runtime performance in the browser?”
 
-**Trả lời tiếng Việt**
+**Review:** Core Pack — Technical Question 11.
 
-> Một specialist có thể biết nhiều UI details hơn hôm nay và tôi không phủ nhận. Giá trị của tôi là exact stack, practical delivery và end-to-end reasoning về API, auth, realtime, consistency, failure. Tôi giao tiếp được với backend, kiểm soát AI code và đóng frontend gaps có hệ thống; combination này phù hợp nếu role cần ownership toàn flow.
+### 13. Complete QRTable Flow
 
-### Mock 2 Review
+**English question:** Can you walk us through one complete flow from the frontend to the backend and back to the UI?
 
-- [ ] Challenges were accepted without becoming defensive.
-- [ ] “Current implementation” and “proposed improvement” stayed separate.
-- [ ] Each design answer identified a product assumption.
-- [ ] At least one answer explicitly protected tenant/security boundaries.
-- [ ] English remained short after pressure follow-ups.
+**Simple English answer**
+
+> A feature component calls a mutation hook, which calls a typed service and sends the request through the BFF to the correct NestJS microservice. The response updates Query data, and a later Socket.io event can invalidate the related query.
+
+**Câu hỏi tiếng Việt:** Bạn có thể trình bày một flow hoàn chỉnh từ Frontend đến Backend rồi quay lại UI không?
+
+**Câu trả lời tiếng Việt**
+
+> Feature component gọi mutation hook; hook gọi typed service rồi gửi request qua BFF đến NestJS microservice phù hợp. Response update Query data và Socket.io event sau đó có thể invalidate query liên quan.
+
+**Review:** Core Pack — Technical Question 12.
+
+### 14. Personal Contribution
+
+**English question:** What did you personally implement, and what did you design with your teammate?
+
+**Simple English answer framework**
+
+> This was a two-person project. I directly worked on […], and we designed […] together. My teammate mainly handled […], but I integrated or reviewed that part and understand how it connects.
+
+**Câu hỏi tiếng Việt:** Bạn trực tiếp implement phần nào và phần nào được thiết kế cùng teammate?
+
+**Khung trả lời tiếng Việt**
+
+> Đây là dự án hai người. Tôi trực tiếp làm […] và chúng tôi cùng thiết kế […]. Teammate của tôi phụ trách chính […], nhưng tôi có tích hợp hoặc review phần đó và hiểu cách nó kết nối.
 
 ---
 
-## Optional Practical Exercises / Bài Thực Hành Có Thể Xuất Hiện
+## Round 3 — Team Fit
 
-### Exercise A — Component Review (15 Minutes)
+### 15. Learning a New Technology
 
-Ask for a generated CRUD table and review it in this order:
+**English question:** How do you learn a new technology, especially when you cannot use AI?
 
-1. Requirement and user states.
-2. Data source and query key.
-3. Sorting/filtering/pagination ownership.
-4. Component responsibilities.
-5. Semantic table and action controls.
-6. Pending, empty, error, permission, and long-content behavior.
-7. Tests and verification.
+**Simple English answer**
 
-### Exercise B — Architecture Whiteboard (10 Minutes)
+> I read official documentation, build a small example, and apply the technology to a real feature. AI can speed up research at work, but I can still use requirements, existing code, search, and documentation, and I verify the result myself.
 
-Draw:
+**Câu hỏi tiếng Việt:** Bạn học công nghệ mới như thế nào, đặc biệt khi không thể dùng AI?
 
-`User action → Client Component → Query mutation → BFF → domain service → response/event → scoped invalidation → authoritative query → UI`
+**Câu trả lời tiếng Việt**
 
-Explain failure at the mutation, event, and reconnect boundaries.
+> Tôi đọc official documentation, làm example nhỏ rồi áp dụng công nghệ vào feature thật. AI có thể tăng tốc research trong công việc, nhưng tôi vẫn có thể dùng requirement, existing code, search và documentation rồi tự kiểm tra kết quả.
 
-### Exercise C — Figma Screen (20–30 Minutes)
+### 16. Blockers and Changing Requirements
 
-Before coding, say aloud:
+**English question:** What do you do when you are blocked or when a requirement changes?
 
-> I will identify reusable primitives, layout behavior, responsive assumptions, and all async states first. Then I will implement the smallest semantic structure and validate it at the target viewports.
+**Simple English answer**
+
+> I identify the exact blocker, inspect the error and code, and check the documentation before asking one clear question. When a requirement changes, I confirm the new goal and communicate the affected flow, state, API, and delivery time early.
+
+**Câu hỏi tiếng Việt:** Bạn làm gì khi bị blocked hoặc requirement thay đổi?
+
+**Câu trả lời tiếng Việt**
+
+> Tôi xác định blocker chính xác, kiểm tra error và code rồi xem documentation trước khi đặt một câu hỏi rõ ràng. Khi requirement thay đổi, tôi xác nhận goal mới và báo sớm flow, state, API cùng delivery time bị ảnh hưởng.
+
+### 17. Startup Fit and Feedback
+
+**English question:** Why do you fit a startup team, and how do you respond to feedback?
+
+**Simple English answer**
+
+> I like working close to the product, learning unfamiliar tools, sharing progress, and owning a complete feature. I understand the problem behind feedback, discuss different opinions respectfully, and support the final team decision.
+
+**Câu hỏi tiếng Việt:** Vì sao bạn phù hợp startup team và bạn phản hồi feedback như thế nào?
+
+**Câu trả lời tiếng Việt**
+
+> Tôi thích làm việc gần product, học tool chưa quen, chia sẻ progress và chịu ownership cho một feature hoàn chỉnh. Tôi hiểu vấn đề phía sau feedback, trao đổi quan điểm khác một cách tôn trọng và ủng hộ quyết định cuối cùng của team.
+
+### 18. Questions for the Team
+
+**English question:** Do you have any questions for us?
+
+**Simple English answer**
+
+> Yes. What result matters most for the new frontend developer in the first six to eight weeks? Also, what are the biggest frontend problems that the team wants this person to solve?
+
+**Câu hỏi tiếng Việt:** Bạn có câu hỏi nào dành cho team không?
+
+**Câu trả lời tiếng Việt**
+
+> Có. Kết quả nào là quan trọng nhất với Frontend Developer mới trong sáu đến tám tuần đầu? Ngoài ra, những vấn đề Frontend lớn nhất mà team muốn người này giải quyết là gì?
 
 ---
 
-# Last-Minute Sheet / Tờ Ôn Hai Giờ Cuối
+## Mock 1 Review
 
-## Positioning
+- [ ] Introduction không dài hơn 60 giây.
+- [ ] Mỗi answer có direct answer trước explanation.
+- [ ] Có ít nhất sáu QRTable hoặc GEEK Up examples.
+- [ ] Nói được component design và feature organization.
+- [ ] Phân biệt được server data với client-owned state.
+- [ ] Phân biệt được build time với runtime performance.
+- [ ] Nói đúng phần trực tiếp implement trong dự án hai người.
+- [ ] Thể hiện friendly, active và eager learner.
+- [ ] Không có core question nào bằng 0; điểm trung bình ít nhất là 2.
 
-> I am a frontend-focused TypeScript developer with full-stack system awareness. I can own user flows, state, API integration, realtime consistency, and AI-assisted code quality. I am available immediately.
+---
 
-## Five Stories
+# Mock 2 — Optional Pressure Follow-Ups
 
-1. GEEK Up: Figma → responsive React → API states → MR feedback.
-2. Freelance ERP: ambiguous payroll rules → clarify business behavior.
-3. QRTable cart: optimistic UI + cart version + rollback.
-4. QRTable auth: session resolved before BFF token hydration → query gating.
-5. QRTable realtime: scoped event → targeted invalidation → reconnect recovery.
+> Không học phần này trước khi Mock 1 đạt yêu cầu.
 
-## Next.js
+## 1. Your POS Is Client-Heavy. Are You Really Using Next.js Well?
 
-- React is the UI library; Next.js is a React framework with routing, server rendering, RSC, caching conventions, backend boundaries, and production tooling.
-- Choose React/Vite for a focused client-heavy SPA with a separate backend; choose Next.js when its server, routing, metadata, and rendering capabilities solve real requirements.
-- Server Component: server execution, data/security/static structure, less client code.
-- Client Component: state, effects, handlers, browser APIs, client libraries.
-- `'use client'`: client entry boundary, not “CSR only”.
-- Hydration: attach behavior to server HTML; first outputs must match.
-- App Router: nested layouts, special files, RSC, streaming.
-- Current QRTable: public server page; operational client-heavy features.
-- No broad Query dehydration; no Cache Components enabled.
+**Simple English answer**
 
-## State
+> POS needs sockets, mutations, timers, filters, and user interaction, so its main UI needs client code. I would measure and move suitable static work to the server, but I would not move interactive state only to increase the Server Component count.
 
-- Remote data → TanStack Query.
-- Shareable navigation → URL.
-- Local interaction → local state.
-- Scoped low-frequency dependency → Context.
-- Cross-tree client state with selectors → Zustand.
-- Never duplicate one source of truth without a deliberate draft boundary.
+**Câu hỏi tiếng Việt:** POS thiên về client; bạn có thật sự dùng Next.js tốt không?
 
-## Query
+**Câu trả lời tiếng Việt**
 
-- Key contains every result-changing input and scope.
-- `staleTime` = freshness; GC time = inactive cache retention.
-- Mutation: pending → success/cache or invalidation → error/recovery.
-- Optimistic: cancel → snapshot → patch → rollback → reconcile.
-- Socket event is a hint; Query snapshot is authoritative.
+> POS cần socket, mutation, timer, filter và user interaction nên UI chính cần client code. Tôi sẽ đo rồi chuyển phần static phù hợp lên server, nhưng không chuyển interactive state chỉ để tăng số Server Component.
 
-## Table
+## 2. Why Not Store API Data in Zustand?
 
-- Headless engine; application owns UI and accessibility.
-- Bounded full dataset → client operations.
-- Large/remote dataset → server pagination, sorting, filtering together.
-- Virtualize only after rendering volume becomes a bottleneck.
+**Simple English answer**
 
-## UI
+> TanStack Query already owns loading, errors, caching, and refetching for API data. Copying it to Zustand creates two sources of truth, so Zustand should keep client-owned state instead.
 
-- Figma: flow → tokens → components → responsive → states → visual QA.
-- Pixel-perfect includes dynamic content and accessibility.
-- Native semantics before ARIA.
-- Loading, empty, error, permission, long content, keyboard, focus.
-- shadcn code is owned by the project; customization requires maintenance.
+**Câu hỏi tiếng Việt:** Vì sao không lưu API data trong Zustand?
 
-## QRTable Truths
+**Câu trả lời tiếng Việt**
 
-- Two apps: Next.js Management + React/Vite Customer.
-- REST through BFF; Socket.io for realtime hints.
-- Customer cart has optimistic patch and expected version.
-- KDS queue keyed by tenant/station; events invalidate matching queue.
-- POS virtualizes above 50 rows.
-- 37 Management and 15 Customer spec files at audit time.
-- Do not claim full offline/installable PWA.
-- Do not claim all screens are server-first.
-- Do not claim personal authorship without checking two-person ownership.
+> TanStack Query đã sở hữu loading, error, caching và refetching cho API data. Copy nó sang Zustand tạo hai source of truth nên Zustand chỉ nên giữ client-owned state.
 
-## AI
+## 3. Why Not Put Everything in a Shared Component Library?
 
-> Requirement → context and constraints → small draft → architecture review → types/security/a11y/performance → tests/static checks → manual verification.
+**Simple English answer**
 
-Red flags: invented API · stale docs · duplicate utility · broad client boundary · wrong state owner · missing cleanup · inaccessible controls · fake tests.
+> I share a component when its meaning and behavior are stable across products. Business-specific components stay inside their features so the shared API does not become too generic.
 
-## English Rescue
+**Câu hỏi tiếng Việt:** Vì sao không đưa mọi component vào shared library?
 
-1. “Let me think for a moment and structure the answer.”
-2. “If I understand correctly, you are asking about…”
-3. “Do you mean the initial render or later client updates?”
-4. “Let me connect that to QRTable.”
-5. “The current implementation does X; an improvement would be Y.”
-6. “I have not implemented that directly, so I do not want to guess.”
-7. “Both options are valid, but they optimize for different things.”
-8. “The main trade-off is…”
-9. “Could I draw a small data-flow diagram?”
-10. “Let me correct one part of my previous answer.”
+**Câu trả lời tiếng Việt**
 
-## Final Questions for the CEO
+> Tôi share component khi meaning và behavior ổn định giữa các product. Business-specific component nằm trong feature để shared API không trở nên quá generic.
 
-1. “What outcome matters most in the first six to eight weeks?”
-2. “Which frontend mistakes do you most want this hire to prevent when working with AI-generated code?”
-3. “How do product, design, frontend, and backend agree that a feature is ready?”
+## 4. Your Build Is Slow. What Will You Change First?
 
-## Stop Rule
+**Simple English answer**
 
-Two hours before the interview:
+> I do not change a configuration first. I reproduce and measure the build, find whether compilation, types, dependencies, or cache is slow, change that bottleneck, and measure again.
 
-- Do not open a new technical topic.
-- Review introduction, five stories, Next/Query/state, QRTable truth, and English rescue.
-- Check logistics, water, notebook, laptop, charger, and arrival time.
-- Speak slowly. Direct answer first. One example. One trade-off. Stop.
+**Câu hỏi tiếng Việt:** Build chậm; bạn sẽ thay đổi gì đầu tiên?
+
+**Câu trả lời tiếng Việt**
+
+> Tôi không thay configuration ngay. Tôi tái hiện và đo build, tìm xem compile, type, dependency hay cache đang chậm, thay đổi bottleneck đó rồi đo lại.
+
+## 5. What If You Cannot Use AI?
+
+**Simple English answer**
+
+> I read the requirement, inspect existing code, search official documentation, build the smallest correct part, and verify it. AI can make work faster, but I still need to understand and explain the code myself.
+
+**Câu hỏi tiếng Việt:** Bạn làm gì nếu không được dùng AI?
+
+**Câu trả lời tiếng Việt**
+
+> Tôi đọc requirement, kiểm tra existing code, tìm official documentation, xây phần đúng nhỏ nhất rồi verify. AI có thể giúp làm nhanh hơn, nhưng tôi vẫn phải tự hiểu và giải thích code.
+
+## 6. Why Should We Choose You over a Pure Frontend Candidate?
+
+**Simple English answer**
+
+> I would not claim that I am stronger than every pure frontend candidate. I can show real React and Next.js work, while my backend knowledge helps me understand API contracts, data flow, and failure cases; I also learn quickly and own the final result.
+
+**Câu hỏi tiếng Việt:** Vì sao nên chọn bạn thay vì một ứng viên Frontend thuần?
+
+**Câu trả lời tiếng Việt**
+
+> Tôi không claim mình mạnh hơn mọi ứng viên Frontend thuần. Tôi có thể chứng minh kinh nghiệm React và Next.js thật, còn kiến thức Backend giúp tôi hiểu API contract, data flow và failure case; tôi cũng học nhanh và chịu ownership cho kết quả cuối cùng.
+
+---
+
+# Last-Minute Sheet / Tờ Ôn Trước Khi Đi Phỏng Vấn
+
+## Positioning Sentence
+
+> I am a frontend-focused TypeScript developer. I have worked with React, Next.js, TanStack Query, TanStack Table, Tailwind, and shadcn/ui. My backend knowledge helps me understand API contracts and data flow.
+
+## Five Stories to Remember
+
+1. Vì sao QRTable tách Management App và Customer App.
+2. Route → feature → hook → service → BFF.
+3. Query, Zustand, Context và local state có ownership khác nhau.
+4. TanStack Table behavior kết hợp shadcn visual components.
+5. GEEK Up: Figma → responsive React UI → API states → review.
+
+## Easy English Rescue Lines
+
+1. “Could you repeat the question a little more slowly?”
+2. “Please give me a few seconds to think.”
+3. “Do you mean A or B?”
+4. “The main reason is…”
+5. “I can give an example from QRTable.”
+6. “I have not used that directly, so I do not want to guess.”
+7. “Sorry, let me say that again.”
+
+## Facts to Keep Consistent
+
+- Preferred name in the current script: Minh.
+- Expected salary: `16M VND gross`.
+- Location: Cobi Tower 1, floor 2, District 7.
+- Confirm Monday availability only if it remains true.
+- QRTable was a two-person project.
+
+## Stop Rule / Quy Tắc Dừng Ôn
+
+Hai giờ trước phỏng vấn:
+
+- Không mở topic mới hoặc Mock 2.
+- Xem lại Core Pack keywords, Personal Ownership và năm stories.
+- Nói lại introduction, build-time answer và team-fit answers một lần.
+- Kiểm tra đường đi, laptop, charger, nước và notebook.
+- Nói chậm, trả lời trực tiếp, đưa một reason hoặc example rồi dừng.

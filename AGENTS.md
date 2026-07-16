@@ -90,7 +90,6 @@ If the ambiguity is minor and does not affect implementation correctness:
 | Auth       | Keycloak (JWT/OIDC) cho staff/owner/admin · Session Redis cho customer |
 | Real-time  | Socket.io (NestJS Gateway)                                             |
 | Payment    | SePay (VietQR)                                                         |
-| Monitoring | Grafana + Loki + Promtail + Prometheus + Tempo                         |
 
 ---
 
@@ -142,8 +141,6 @@ Các alias dưới đây là toàn bộ mapping hiện có trong `tsconfig.base.
 | `libs/entities/src/lib/`               | `@common/entities/*`               | TypeORM entities.                                                      |
 | `libs/guards/src/lib/`                 | `@common/guards/*`                 | Auth, session, tenant, và plan guards.                                 |
 | `libs/error-messages/src/lib/`         | `@common/error-messages/*`         | Business exceptions và error codes.                                    |
-| `libs/observability/src/index.ts`      | `@common/observability`            | Public observability module exports.                                   |
-| `libs/observability/src/lib/`          | `@common/observability/*`          | Observability internals.                                               |
 | `libs/providers/cloudinary/src/lib/`   | `@common/providers/cloudinary/*`   | Cloudinary provider code.                                              |
 | `libs/providers/redis-client/src/lib/` | `@common/providers/redis-client/*` | Redis client module and service.                                       |
 

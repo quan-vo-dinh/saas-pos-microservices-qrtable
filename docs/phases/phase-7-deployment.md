@@ -7,12 +7,12 @@ Docker/Compose/Caddy/package/local validation artifacts are IMPLEMENTED + VERIFI
 ## Final Scope
 
 - Reproducible application images, layered Compose topology, Caddy reverse proxy, production environment/package artifacts, local validation, and deployment documentation.
-- The canonical execution details remain in the [Phase 7 Docker and DigitalOcean deployment plan](../superpowers/plans/2026-06-06-phase-7-docker-digitalocean-deployment.md); this record states final behavior and evidence, not its execution checklist.
+- The production runbook and human checklist contain the operator procedure; this record states final behavior and evidence.
 
 ## Accepted Decisions
 
 - BFF is the public API/WebSocket edge; Caddy is the public reverse-proxy boundary for web applications and approved public routes.
-- Internal databases, Redis, Kafka, services, and observability backends use private network boundaries and are not public ports.
+- Internal databases, Redis, Kafka, and services use private network boundaries and are not public ports.
 - Production configuration uses explicit service environment mappings, migrations, health checks, named volumes, and production-safe Keycloak/CORS constraints.
 - A public deployment is not claimed complete until its manual infrastructure, certificate, smoke, backup, and rollback evidence exists.
 
@@ -23,13 +23,13 @@ Docker/Compose/Caddy/package/local validation artifacts are IMPLEMENTED + VERIFI
 
 ## Final Technical Behavior
 
-- Backend and frontend Dockerfiles, application/infrastructure/monitoring/proxy Compose assets, Caddy routing, package scripts, environment templates, seed/reset and preflight/runbook artifacts are implemented.
-- Local Compose/configuration validation demonstrates the packaged boundary; production deployment requires the retained execution plan and real server evidence.
+- Backend and frontend Dockerfiles, application/infrastructure/proxy Compose assets, Caddy routing, package scripts, environment templates, seed/reset and preflight/runbook artifacts are implemented.
+- Local Compose/configuration validation demonstrates the packaged boundary; production deployment requires the documented operator procedure and real server evidence.
 
 ## Acceptance Evidence
 
-- Docker, Compose, Caddy, package, validation, production-runbook, checklist, and preflight artifacts are present and locally verified as recorded by the deployment plan.
-- The repository retains the English plan and Vietnamese translation for the human deployment procedure and public-evidence collection.
+- Docker, Compose, Caddy, package, validation, production-runbook, checklist, and preflight artifacts are present and locally verified.
+- The repository retains the runbook and checklist for the human deployment procedure and public-evidence collection.
 
 ## Deferred Work
 

@@ -7,9 +7,6 @@ networks:
   qrtable-identity:
     external: true
     name: qrtable-identity
-  qrtable-observability:
-    external: true
-    name: qrtable-observability
 
 volumes:
   caddy_data:
@@ -24,7 +21,6 @@ services:
     networks:
       - qrtable-edge
       - qrtable-identity
-      - qrtable-observability
     ports:
       - '80:80'
       - '443:443'
@@ -32,8 +28,6 @@ services:
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?required}
       GLOBAL_PREFIX: ${GLOBAL_PREFIX:-api/v1}
-      GRAFANA_BASIC_AUTH_USER: ${GRAFANA_BASIC_AUTH_USER:?required}
-      GRAFANA_BASIC_AUTH_HASH: ${GRAFANA_BASIC_AUTH_HASH:?required}
     volumes:
       - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

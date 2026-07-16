@@ -16,7 +16,7 @@ Complete this checklist before the deployment session. Keep all secrets redacted
 - [ ] **SSH:** key login works for non-root user `deploy` in a fresh session.
 - [ ] **SSH hardening:** password login and root login are disabled only after `deploy` login is
       proven.
-- [ ] **DNS:** five Porkbun A records resolve to the stable IPv4 from public resolvers.
+- [ ] **DNS:** four Porkbun A records resolve to the stable IPv4 from public resolvers.
 - [ ] **Payment mode:** choose exactly one:
       `sepay-live` with real approved provider values, or `cash-demo` after a tested cash-only
       production startup contract exists.
@@ -34,7 +34,6 @@ All answers must be the same approved stable IPv4.
 - [ ] `app.qrtable.vodinhquan.dev`
 - [ ] `qr.qrtable.vodinhquan.dev`
 - [ ] `auth.qrtable.vodinhquan.dev`
-- [ ] `grafana.qrtable.vodinhquan.dev`
 
 ## Redacted Session 2 Handoff
 
@@ -53,7 +52,7 @@ Stable IPv4: <x.x.x.x or redacted suffix>
 Admin CIDR: <redacted CIDR>
 Firewall: 22/tcp restricted; 80/tcp public; 443/tcp public; 443/udp=<enabled|disabled>
 SSH deploy login: <verified timestamp>
-DNS: five A records resolved from <resolver names> at <timestamp>
+DNS: four A records resolved from <resolver names> at <timestamp>
 Payment mode: <sepay-live | cash-demo>
 Provider credentials present: <yes|not-applicable>; values not shared
 Image repository: <registry path>

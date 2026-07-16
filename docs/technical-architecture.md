@@ -23,10 +23,9 @@
 10. [Payment Integration](#10-payment-integration)
 11. [Canonical Redis Ownership](#11-canonical-redis-ownership)
 12. [Distributed Transaction Processing](#12-distributed-transaction-processing)
-13. [Observability & Monitoring](#13-observability--monitoring)
-14. [Implementation Strategy](#14-implementation-strategy)
-15. [Technical Challenges](#15-technical-challenges)
-16. [Offline & Sync Strategy](#16-offline--sync-strategy)
+13. [Implementation Strategy](#13-implementation-strategy)
+14. [Technical Challenges](#14-technical-challenges)
+15. [Offline & Sync Strategy](#15-offline--sync-strategy)
 
 ---
 
@@ -68,10 +67,9 @@ QRTable is a SaaS (Software as a service) platform serving the F&B industry, all
 | 4   | **API Gateway as Single Entry**       | The BFF service is the single entry point from the client, handling auth/routing/rate-limit                                          |
 | 5   | **Cache-First for Verified Hot Data** | Redis is used only for current, source-backed cache and ephemeral-state ownership; see §11                                           |
 | 6   | **Fail-Safe & Idempotent**            | Every write operation has an idempotency key; Saga compensation for distributed tx                                                   |
-| 7   | **Observe Everything**                | Centralized logging (Loki), metrics (Prometheus), tracing (Tempo)                                                                    |
-| 8   | **Server Timestamp (UTC)**            | Every timestamp uses `server UTC` (`Date.now()`); DO NOT use client timestamp                                                        |
-| 9   | **VND Rounding Convention**           | All VND amounts rounded to thousands: `Math.ceil(amount / 1000) * 1000`                                                              |
-| 10  | **Session Lifecycle**                 | Session lifetime = 2 hours (max), idle timeout = 30 minutes (auto-close if inactive)                                                 |
+| 7   | **Server Timestamp (UTC)**            | Every timestamp uses `server UTC` (`Date.now()`); DO NOT use client timestamp                                                        |
+| 8   | **VND Rounding Convention**           | All VND amounts rounded to thousands: `Math.ceil(amount / 1000) * 1000`                                                              |
+| 9   | **Session Lifecycle**                 | Session lifetime = 2 hours (max), idle timeout = 30 minutes (auto-close if inactive)                                                 |
 
 ---
 
@@ -125,15 +123,10 @@ QRTable is a SaaS (Software as a service) platform serving the F&B industry, all
 │  │ :5432      │  │ :6379      │  │ :9092      │  │ :8180            │  │
 │  └────────────┘  └────────────┘  └────────────┘  └──────────────────┘  │
 │                                                                         │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌──────────────────┐  │
-│  │ 📊 Grafana │  │ 📋 Loki    │  │ 📡 Promtail│  │ ☁️ Cloudinary    │  │
-│  │ :3001      │  │ :3100      │  │ (Agent)    │  │ (File Storage)   │  │
-│  └────────────┘  └────────────┘  └────────────┘  └──────────────────┘  │
-│                                                                         │
-│  ┌────────────┐  ┌────────────┐                                         │
-│  │ 📈 Promethe│  │ 🔍 Tempo   │                                         │
-│  │ us :9090   │  │ :3200      │                                         │
-│  └────────────┘  └────────────┘                                         │
+│  ┌──────────────────┐                                                   │
+│  │ ☁️ Cloudinary    │                                                   │
+│  │ (File Storage)   │                                                   │
+│  └──────────────────┘                                                   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -186,9 +179,6 @@ BFF → validate token (HMAC) → resolve tenant_id + table_id
 | **Payment**              | SePay (VietQR)                         | Payment by bank transfer in Vietnam                | VietQR dynamic inline, HMAC direct webhook + tenant x-secret routes |
 | **Real-time**            | Socket.io (NestJS GW)                  | WebSocket bidirectional                            | Room-based, auto-reconnect, fallback transport                      |
 | **File Storage**         | Cloudinary                             | Menu image, QR export                              | Integrated CDN, image transformation, free tier                     |
-| **Monitoring**           | Grafana + Loki + Promtail              | Centralized logging & dashboard                    | PLG Stack, LogQL, Docker-native log collection                      |
-| **Metrics**              | Prometheus                             | Application & infra metrics                        | Pull-based, PromQL, Grafana integration                             |
-| **Tracing**              | Grafana Tempo + OTel                   | Distributed tracing                                | OpenTelemetry standard, propagation context                         |
 | **Container**            | Docker + Docker Compose                | Containerization & orchestration                   | Reproductive environments, service isolation                        |
 | **Code Quality**         | ESLint + Prettier + Husky + Commitlint | Lint, format, commit convention                    | Team consistency, pre-commit hooks                                  |
 
@@ -231,9 +221,7 @@ qrtable/
 ├── docker/
 │   ├── docker-compose.infra.yaml     # Infrastructure services
 │   ├── docker-compose.app.yaml       # Application services
-│   ├── grafana/                       # Dashboards & datasources
-│   ├── loki-config.yaml
-│   └── promtail-config.yaml
+│   └── docker-compose.proxy.yaml      # Caddy reverse proxy
 ├── nx.json
 ├── tsconfig.base.json
 └── package.json
@@ -1419,63 +1407,11 @@ Implementation:
 
 ---
 
-## 13. OBSERVABILITY & MONITORING
+## 13. IMPLEMENTATION STRATEGY
 
-### 13.1 Implemented Application Observability
+### 13.1 Docker Compose Configuration
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                    OBSERVABILITY STACK                    │
-├──────────────────────────────────────────────────────────┤
-│                                                          │
-│  📋 LOGS (Loki + Promtail + Grafana)                     │
-│    • Docker container logs → Promtail auto-discover      │
-│    • Structured JSON logs (Pino logger)                  │
-│    • LogQL queries: {app="order"} |= "ERROR"             │
-│    • Process ID tracking across services                  │
-│                                                          │
-│  📈 METRICS (Prometheus + Grafana)                       │
-│    • HTTP request duration, status codes                  │
-│    • Kafka consumer lag                                  │
-│    • Redis cache hit/miss ratio                          │
-│    • Active WebSocket connections per tenant              │
-│    • Orders per minute (business metric)                  │
-│                                                          │
-│  🔍 TRACES (Tempo + OpenTelemetry)                       │
-│    • End-to-end request tracing                          │
-│    • Context propagation: BFF → TCP → Kafka → Consumer   │
-│    • Latency breakdown per service hop                   │
-│    • Identify bottlenecks in distributed flow             │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-```
-
-### 13.2 Health Checks
-
-Each service expose health endpoint checks:
-
-| Service     | Health Checks                                                                     |
-| ----------- | --------------------------------------------------------------------------------- |
-| BFF         | Redis connection, TCP clients reachable                                           |
-| Authorizer  | Keycloak reachable, gRPC listener active                                          |
-| Catalog     | PostgreSQL connection                                                             |
-| Order       | PostgreSQL connection, Redis connection, Kafka                                    |
-| Kitchen     | Redis connection, Kafka consumer status                                           |
-| Payment     | PostgreSQL connection, Redis OAuth state cache, SePay webhook/OAuth config loaded |
-| SaaS Mgmt   | PostgreSQL connection, Redis suspend/subscription cache                           |
-| User-Access | MongoDB connection                                                                |
-
-### 13.3 Alerting
-
-Alert thresholds, routing, and delivery are deployment configuration rather than application facts; they are not asserted here as active monitoring behavior.
-
----
-
-## 14. IMPLEMENTATION STRATEGY
-
-### 14.1 Docker Compose Configuration
-
-The following is repository configuration, not evidence of a deployed or publicly reachable environment. Public exposure, monitoring access control, retention, alert routing, and operational capacity require separate deployment verification.
+The following is repository configuration, not evidence of a deployed or publicly reachable environment. Public exposure and operational capacity require separate deployment verification.
 
 ```yaml
 # docker-compose.infra.yaml — Datastores and identity
@@ -1500,22 +1436,14 @@ services:
   management-app: # HTTP 3000 — authenticated frontend
   customer-pwa:   # HTTP 80 — customer frontend
 
-# docker-compose.monitoring.yaml — observability configuration
-services:
-  grafana:      # HTTP 3000, qrtable-observability
-  loki:         # HTTP 3100, private
-  promtail:     # Docker log collection
-  prometheus:   # HTTP 9090, private
-  tempo:        # HTTP 3200 / OTLP 4318, private
-
 # docker-compose.proxy.yaml — reverse-proxy configuration
 services:
   caddy:        # publishes 80/tcp, 443/tcp, 443/udp
 ```
 
-The Compose files define service/network relationships and ports. They do not by themselves prove that Caddy, Grafana, Prometheus, Loki, or Tempo are deployed, reachable, secured, or monitored in an environment.
+The Compose files define service/network relationships and ports. They do not by themselves prove that Caddy or the application stack is deployed, reachable, or secured in an environment.
 
-### 14.2 Build Pipeline
+### 13.2 Build Pipeline
 
 ```bash
 # Development
@@ -1528,7 +1456,6 @@ pnpm nx affected -t test       # Test only affected by changes
 # Docker Build (Multi-stage, trusted workstation or CI)
 pnpm nx run-many -t build      # Build all apps
 docker compose -f docker-compose.infra.yaml up -d   # Infra
-docker compose -f docker-compose.monitoring.yaml up -d # Monitoring
 
 # Production Deploy
 tools/deploy/phase7-preflight.sh                    # Host, env, capacity, Compose
@@ -1537,19 +1464,19 @@ docker compose -f docker-compose.app.yaml up -d    # Apps after bootstrap gate
 docker compose -f docker-compose.proxy.yaml up -d  # Proxy after DNS/firewall readiness
 ```
 
-### 14.3 Environment Strategy
+### 13.3 Environment Strategy
 
-| Environment    | Database  | Kafka  | Keycloak | SePay         | Monitoring |
-| -------------- | --------- | ------ | -------- | ------------- | ---------- |
-| **Local**      | Docker PG | Docker | Docker   | SePay sandbox | Optional   |
-| **Staging**    | Docker PG | Docker | Docker   | SePay sandbox | Full stack |
-| **Production** | Docker PG | Docker | Docker   | Approved mode | Full stack |
+| Environment    | Database  | Kafka  | Keycloak | SePay         |
+| -------------- | --------- | ------ | -------- | ------------- |
+| **Local**      | Docker PG | Docker | Docker   | SePay sandbox |
+| **Staging**    | Docker PG | Docker | Docker   | SePay sandbox |
+| **Production** | Docker PG | Docker | Docker   | Approved mode |
 
 ---
 
-## 15. TECHNICAL CHALLENGES
+## 14. TECHNICAL CHALLENGES
 
-### 15.1 List of Challenges & Solutions
+### 14.1 List of Challenges & Solutions
 
 | #   | Challenge                                                                   | Solution                                                                                                                                         | Complexity |
 | --- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
@@ -1564,7 +1491,7 @@ docker compose -f docker-compose.proxy.yaml up -d  # Proxy after DNS/firewall re
 | 9   | **Distributed transaction** (order confirm saga)                            | Saga Orchestration pattern + compensation steps + idempotent operations                                                                          | Medium     |
 | 10  | **Subscription feature gating**                                             | SaaS plan features + subscription cache + BFF `PlanFeatureGuard` for package-gated routes                                                        | Small      |
 
-### 15.2 Deployment Priorities (Phased)
+### 14.2 Deployment Priorities (Phased)
 
 The order below is the canonical roadmap after closing Phase 4D.1; when detailed status is needed, use [project status](project-status.md) as the truth source.
 
@@ -1596,19 +1523,22 @@ Phase 4C — Staff Management:
 Phase 4D — Dashboard + Reporting:
 └── Completed. Includes report permissions, source-owner reporting read models, package feature gating, and dashboard UI polish.
 
-Phase 5 + Phase 7 — Testing + Deploy:
-└── In progress. Phase 7 deployment foundation and Task 11 preparation are implemented; DigitalOcean provisioning, public HTTPS, smoke, recovery, and demo evidence remain.
+Phase 5 — Testing:
+└── Implemented according to the evidence map in docs/testing/.
+
+Phase 7 — Deployment:
+└── Local packaging and configuration are implemented. Public deployment and operations evidence require separate verification.
 ```
 
 ---
 
-## 16. OFFLINE & SYNC STRATEGY
+## 15. OFFLINE & SYNC STRATEGY
 
-### 16.1 Client-side Offline (Customer PWA)
+### 15.1 Client-side Offline (Customer PWA)
 
 Customer order writes are online-only. IndexedDB/Background Sync write queues, automatic order replay, and a sync indicator are deferred; a network failure requires an explicit retry after connectivity returns.
 
-### 16.2 Staff-side Offline (POS/KDS)
+### 15.2 Staff-side Offline (POS/KDS)
 
 No source-backed staff/POS/KDS offline write queue is documented as current behavior. Any future queue must preserve tenant context and use the owning write flow's idempotency contract.
 

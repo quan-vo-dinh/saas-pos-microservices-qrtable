@@ -6,6 +6,7 @@ const mockAcknowledgeServiceRequest = jest.fn();
 const mockResolveServiceRequest = jest.fn();
 const mockToastError = jest.fn();
 const mockToastSuccess = jest.fn();
+const mockSuccessMessage = jest.fn((_action: string, entity?: string) => entity ?? 'success');
 
 jest.mock('sonner', () => ({
   toast: {
@@ -16,7 +17,7 @@ jest.mock('sonner', () => ({
 
 jest.mock('@einvoice/frontend-utils', () => ({
   getErrorDisplayMessage: (error: Error) => error.message,
-  successMessage: (_action: string, entity?: string) => entity ?? 'success',
+  successMessage: (...args: Parameters<typeof mockSuccessMessage>) => mockSuccessMessage(...args),
 }));
 
 jest.mock('../../services/service-request.service', () => ({
@@ -55,7 +56,8 @@ describe('service request mutations', () => {
 
     expect(mockAcknowledgeServiceRequest).toHaveBeenCalledWith('request-1');
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: serviceRequestKeys.lists() });
-    expect(mockToastSuccess).toHaveBeenCalledWith('service request');
+    expect(mockSuccessMessage).toHaveBeenCalledWith('updated', 'serviceRequest');
+    expect(mockToastSuccess).toHaveBeenCalledWith('serviceRequest');
   });
 
   it('invalidates service request lists after resolve succeeds', async () => {
@@ -73,6 +75,7 @@ describe('service request mutations', () => {
 
     expect(mockResolveServiceRequest).toHaveBeenCalledWith('request-1');
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: serviceRequestKeys.lists() });
-    expect(mockToastSuccess).toHaveBeenCalledWith('service request');
+    expect(mockSuccessMessage).toHaveBeenCalledWith('updated', 'serviceRequest');
+    expect(mockToastSuccess).toHaveBeenCalledWith('serviceRequest');
   });
 });

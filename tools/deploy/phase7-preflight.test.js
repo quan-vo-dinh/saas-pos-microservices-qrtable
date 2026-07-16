@@ -7,12 +7,7 @@ const { spawnSync } = require('node:child_process');
 
 const scriptPath = path.resolve('tools/deploy/phase7-preflight.sh');
 const buildScript = fs.readFileSync(path.resolve('tools/deploy/phase7-build-images.sh'), 'utf8');
-const composeFiles = [
-  'docker-compose.infra.yaml',
-  'docker-compose.app.yaml',
-  'docker-compose.monitoring.yaml',
-  'docker-compose.proxy.yaml',
-];
+const composeFiles = ['docker-compose.infra.yaml', 'docker-compose.app.yaml', 'docker-compose.proxy.yaml'];
 
 const validEnv = `IMAGE_TAG=abcdef1
 NODE_ENV=production
@@ -24,7 +19,6 @@ TYPEORM_PASSWORD=postgres-secret
 MANAGEMENT_APP_CLIENT_SECRET=management-secret
 AUTH_KEYCLOAK_SECRET=management-secret
 PAYMENT_SECRETS_ENCRYPTION_KEY=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-GRAFANA_BASIC_AUTH_HASH='$2a$14$example'
 `;
 
 function createFixture({ env = validEnv, mode = 0o600, swapKib = 2097152 } = {}) {

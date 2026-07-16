@@ -1,75 +1,126 @@
 # VILIHA Interview Preparation Hub / Kho Ôn Phỏng Vấn VILIHA
 
-> Candidate: Võ Đình Minh Quân  
-> Role: Front-End Developer (Next.js)  
-> Language: English answers with Vietnamese coaching notes  
-> Status: Ready for rehearsal
+> Candidate: Võ Đình Minh Quân
+>
+> Role: Front-End Developer (Next.js)
+>
+> Interview style: React/Next.js fundamentals, practical experience, project discussion and team fit
+>
+> Language: Simple spoken English with natural Vietnamese explanations
 
-This directory is the actual study system for the VILIHA interview. The English blocks are designed to be spoken, not read like essays. Vietnamese notes explain the reasoning, guardrails, and likely follow-ups.
+Thư mục có nhiều answer bank để tra cứu, nhưng **không phải mọi file đều là curriculum bắt buộc**. Trước vòng onsite, Quân chỉ cần học một Core Pack, luyện một Mock và dùng các file còn lại để sửa đúng phần đang yếu.
 
-Thư mục này là kho tài liệu ôn luyện thực tế cho buổi phỏng vấn VILIHA. Phần tiếng Anh được viết để nói thành lời, không phải để đọc như bài luận. Ghi chú tiếng Việt giải thích tư duy, giới hạn claim và các hướng CEO có thể hỏi sâu.
+## Start Here / Bắt Đầu Từ Đây
 
-## Study Map / Bản Đồ Tài Liệu
+Thực hiện đúng ba bước:
 
-| Order | Document                                                                                        | Purpose / Mục đích                                                                                            | Priority  |
-| ----: | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------- |
-|     0 | [Master plan and JD analysis](00-master-plan-and-jd-analysis.md)                                | Scope, JD signals, evidence matrix, 24/48-hour schedule / Phạm vi, tín hiệu JD, ma trận bằng chứng và lịch ôn | Reference |
-|     1 | [Personal and career answer bank](01-personal-career-answer-bank.md)                            | Self-introduction, motivation, career, availability, salary and background                                    | P0        |
-|     2 | [English survival kit](02-english-survival-kit.md)                                              | Clarification, thinking time, recovery, disagreement and technical communication                              | P0        |
-|     3 | [JavaScript and React fundamentals](03-javascript-react-fundamentals.md)                        | Browser, JavaScript, React mental models and performance                                                      | P0        |
-|     4 | [Next.js App Router deep dive](04-nextjs-app-router-deep-dive.md)                               | Server/Client Components, rendering, caching, hydration, architecture, and React comparison                   | P0        |
-|     5 | [State, Query and Table answer bank](05-state-query-table-answer-bank.md)                       | TanStack Query, TanStack Table, Zustand and state ownership                                                   | P0        |
-|     6 | [Tailwind, shadcn and Figma UI](06-tailwind-shadcn-figma-ui.md)                                 | Pixel-perfect workflow, responsive UI, accessibility and component systems                                    | P0        |
-|     7 | [QRTable frontend defense](07-qrtable-frontend-defense.md)                                      | Project-specific questions backed by current code                                                             | P0        |
-|     8 | [Quality, testing, debugging, AI and behavioral](08-quality-testing-debugging-ai-behavioral.md) | Clean Design, DRY, verification, AI review and situational answers                                            | P0/P1     |
-|     9 | [Mock interviews and last-minute sheet](09-mock-interviews-and-last-minute-sheet.md)            | Two full mock scripts, scoring and final review                                                               | Final     |
+1. Học [Friday Onsite Core Pack](11-friday-onsite-core-pack.md).
+2. Đọc nhanh [English Survival Kit](02-english-survival-kit.md).
+3. Đóng tài liệu và chạy [Mock 1](09-mock-interviews-and-last-minute-sheet.md).
 
-## Answer Format / Cấu Trúc Mỗi Câu
+Nếu một câu Mock chưa đạt, chỉ mở answer bank liên quan. Không đọc tuần tự từ file `00` đến `11`.
 
-Most question banks use these layers:
+## Document Tiers / Ba Nhóm Tài Liệu
 
-1. **English question and Core answer:** the version used during the interview.
-2. **Vietnamese question and answer:** the corresponding full translation using the same number.
-3. **Deepening points:** optional details for follow-up questions.
-4. **Evidence or coaching:** QRTable reference, risks, wording, or likely challenge.
+### Tier 1 — Required Before Friday / Bắt Buộc
 
-Phần nên học thuộc là **Core answer** và 3–5 keywords. Trong mỗi answer bank, câu hỏi và câu trả lời tiếng Việt nằm ngay sau English Q&A tương ứng để có thể đọc song ngữ liên tục. Không học thuộc toàn bộ đoạn dài theo từng chữ; mục tiêu là giữ cấu trúc để vẫn nói được khi CEO đổi cách hỏi.
+| Document                                                                  | Use / Cách dùng                                                                                      |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [Friday Onsite Core Pack](11-friday-onsite-core-pack.md)                  | Một self-introduction, 12 technical answers, 5 follow-ups, 4 team-fit answers và ownership guardrail |
+| [English Survival Kit](02-english-survival-kit.md)                        | Luyện xin nhắc lại, xin thời gian suy nghĩ, xác nhận câu hỏi và giải thích flow bằng câu ngắn        |
+| [Mock and Last-Minute Sheet](09-mock-interviews-and-last-minute-sheet.md) | Tự kiểm tra phản xạ; Mock 2 chỉ là optional pressure appendix                                        |
 
-## Priority Rules / Quy Tắc Ưu Tiên
+### Tier 2 — Lookup Only / Chỉ Mở Khi Cần
 
-- **P0:** must answer clearly before the interview / bắt buộc trả lời rõ.
-- **P1:** likely follow-up or differentiation / câu đào sâu hoặc tạo khác biệt.
-- **P2:** useful only if time remains / chỉ học khi còn thời gian.
-- A truthful partial answer is better than an invented implementation.
-- Always separate **implemented**, **collaborated**, **studied**, and **proposed**.
+| Weak area / Phần đang yếu                                      | Open / Mở file                                                                                                                        |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Background, career direction, availability, salary             | [Personal and Career Answer Bank](01-personal-career-answer-bank.md)                                                                  |
+| React components, rendering, state and effects                 | [JavaScript and React Fundamentals](03-javascript-react-fundamentals.md) — ưu tiên React Q16–Q30; không học JavaScript Q1–Q15 lúc này |
+| App Router, Server/Client Components, rendering and build time | [Next.js App Router Deep Dive](04-nextjs-app-router-deep-dive.md)                                                                     |
+| TanStack Query, Zustand and TanStack Table                     | [State, Query and Table Answer Bank](05-state-query-table-answer-bank.md)                                                             |
+| Figma, Tailwind, shadcn/ui and responsive UI                   | [Tailwind, shadcn and Figma UI](06-tailwind-shadcn-figma-ui.md)                                                                       |
+| QRTable decisions, architecture and code evidence              | [QRTable Frontend Defense](07-qrtable-frontend-defense.md)                                                                            |
+| Clean code, debugging, AI and behavioral follow-ups            | [Quality and Behavioral Answer Bank](08-quality-testing-debugging-ai-behavioral.md)                                                   |
 
-## Recommended Rehearsal Loop / Vòng Luyện Tập
+### Tier 3 — Reference Only / Không Cần Học Trước Onsite
 
-For each P0 question:
+| Document                                                         | Reason / Lý do                                                               |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [Master Plan and JD Analysis](00-master-plan-and-jd-analysis.md) | Giữ lại phân tích JD và evidence matrix; không phải spoken-answer curriculum |
+| [Phone Screening Script](10-viliha-phone-screening-script.md)    | Vòng phone screening đã hoàn thành                                           |
 
-1. Read the Vietnamese coaching once.
-2. Highlight five English keywords.
-3. Speak the core answer without looking.
-4. Record the answer; target 30–60 seconds.
-5. Repeat with a differently worded question.
-6. Add one concrete QRTable example when relevant.
+## Current Interview Focus / Trọng Tâm Hiện Tại
 
-Đạt yêu cầu khi câu trả lời có mở đầu trực tiếp, có reason hoặc trade-off, không overclaim và không cần dịch từng câu từ tiếng Việt trong đầu.
+Theo thông tin trực tiếp từ anh Quý, hãy ưu tiên:
 
-## Completion Checklist / Theo Dõi Tiến Độ
+1. React component design và rendering mindset.
+2. Next.js App Router cùng Server/Client Component boundaries.
+3. Cách tổ chức code theo feature và responsibility.
+4. Cách gọi API và phân chia server state/client state.
+5. TanStack Query, TanStack Table và Zustand trong thực tế.
+6. Figma → Tailwind → shadcn/ui → responsive interface.
+7. Development/build time khác runtime performance như thế nào.
+8. Kinh nghiệm thật trong hai QRTable frontend apps.
+9. Friendly, active, eager learner, communication và ownership.
 
-- [ ] Personal and career P0 answers can be delivered without notes.
-- [ ] Ten English recovery phrases feel automatic.
-- [ ] JavaScript/React P0 score is at least 80%.
-- [ ] Next.js P0 score is at least 80%.
-- [ ] Query/Table/state P0 score is at least 80%.
-- [ ] UI/Figma workflow can be explained in three minutes.
-- [ ] QRTable architecture can be explained in three and eight minutes.
-- [ ] One behavioral mock and one technical mock are completed.
-- [ ] Last-minute sheet is reviewed, then study stops.
+Tạm thời không ưu tiên JavaScript/HTML/CSS trivia, testing theory, PWA internals, deep Microservices defense hoặc Next.js experimental features.
+
+## Answer Format / Cấu Trúc Câu Trả Lời
+
+Question banks đặt nội dung theo thứ tự:
+
+1. English question.
+2. Simple English answer bằng câu đầy đủ.
+3. Câu hỏi tiếng Việt.
+4. Câu trả lời tiếng Việt diễn đạt cùng ý.
+5. Keywords, QRTable evidence hoặc honest limit khi cần.
+
+Không học thuộc từng chữ. Hãy hiểu bản tiếng Việt, nhớ 3–5 English keywords rồi tự nói lại. Ưu tiên chủ thể rõ ràng như `I`, `we`, `the component`, `the app`, hoặc `the server`.
+
+Khung nói mặc định:
+
+```text
+Direct answer → Main reason → Project example → Stop
+```
+
+## Emergency Study Order / Lịch Ôn Khi Chỉ Còn Vài Giờ
+
+1. Nói self-introduction trong Core Pack ba lần.
+2. Học 12 keyword chains rồi tự trả lời 12 technical questions.
+3. Học bốn team-fit answers và điền Personal Ownership Guardrail.
+4. Luyện ba English rescue lines trong file `02`.
+5. Chạy Mock 1 trong file `09`.
+6. Chỉ mở `03`–`08` cho câu có điểm 0 hoặc 1.
+7. Chạy lại những câu yếu; không cần lặp toàn bộ Mock nếu thời gian ngắn.
+
+## Stop Studying These for Now / Tạm Bỏ Khỏi Lịch Ôn
+
+- JavaScript Q1–Q15, prototype, `this`, closure và browser lifecycle.
+- HTML/CSS definition questions riêng lẻ.
+- Cache Components, PPR, streaming và Server Actions chuyên sâu.
+- TanStack Query race-condition/testing edge cases.
+- Authentication, tenant isolation, Socket.io và optimistic cart internals.
+- Detailed testing strategy, offline PWA và deployment internals.
+- Mock 2 trước khi Mock 1 đạt điểm trung bình 2.
 
 ## Truth Guardrail / Ranh Giới Claim
 
-The current repository supports strong claims about client-side data orchestration, realtime updates, state ownership, responsive component composition, and integration testing. It does **not** support claiming that every operational screen is server-first, that Server Component hydration with TanStack Query is already implemented, or that the Customer App currently has verified offline/installable PWA behavior.
+Always separate:
 
-Codebase hiện tại cho phép claim mạnh về data orchestration phía client, realtime update, state ownership, responsive component composition và integration testing. Không claim rằng mọi màn hình vận hành đều server-first, đã có TanStack Query server hydration, hoặc Customer App đã có offline/installable PWA hoàn chỉnh.
+- **I implemented:** phần Quân trực tiếp làm.
+- **We designed:** quyết định của team hai người.
+- **I integrated or reviewed:** phần Quân hiểu và kết nối nhưng không làm chính.
+- **I would improve:** đề xuất chưa triển khai.
+
+QRTable có bằng chứng mạnh về client-side data orchestration, state ownership, complex tables, responsive component composition, REST/Socket.io integration và Microservices integration. Không claim rằng mọi operational screen đều server-first, TanStack Query server hydration đã dùng rộng rãi, mọi build optimization đã được triển khai, hoặc Customer App đã là offline/installable PWA hoàn chỉnh.
+
+## Definition of Ready / Khi Nào Dừng Học Nội Dung Mới
+
+- [ ] Self-introduction dài không quá 60 giây.
+- [ ] 12 technical answers không có câu nào bằng 0 điểm.
+- [ ] Mỗi answer có direct answer và reason hoặc project example.
+- [ ] Bốn team-fit answers có thể nói bằng simple English.
+- [ ] Personal ownership đã được điền trung thực.
+- [ ] Phân biệt được build time và runtime performance.
+- [ ] Mock 1 đạt điểm trung bình ít nhất là 2.
+- [ ] Salary `16M gross`, location và availability được nói nhất quán.

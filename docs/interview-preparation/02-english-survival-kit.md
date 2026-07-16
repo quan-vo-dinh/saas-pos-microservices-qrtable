@@ -1,216 +1,226 @@
-# English Survival Kit / Bộ Phản Xạ Tiếng Anh Phỏng Vấn
+# English Survival Kit — Easy Speaking / Bộ Câu Tiếng Anh Chữa Cháy
 
-> Goal: stay in control when vocabulary or response speed is limited.  
-> Mục tiêu: giữ quyền kiểm soát câu trả lời khi phản xạ hoặc từ vựng chưa đủ nhanh.
+> Bạn không cần nói tiếng Anh “hay”. Bạn cần giúp CEO hiểu **bạn chọn gì, vì sao và ví dụ thật là gì**. Câu ngắn và đúng ý tốt hơn câu dài nhưng bị mắc giữa chừng.
 
-Good interview English is not complicated English. Use short sentences, technical keywords, and visible structure.
+## 0. Word by Word, but Use Full Sentences / Nói Từng Câu Ngắn Nhưng Đủ Ý
 
-Tiếng Anh phỏng vấn tốt không đồng nghĩa dùng câu phức tạp. Ưu tiên câu ngắn, đúng technical keyword và có cấu trúc.
+CEO cho phép bạn nói chậm và word by word. Điều đó **không có nghĩa** chỉ đọc các keyword rời rạc. Mỗi câu vẫn nên có một chủ thể và một động từ.
 
-## 1. The Default Answer Shape / Khung Trả Lời Mặc Định
+**Không nên nói**
 
-Use **ARET**:
+> Next.js. Many layouts. Server Components. Better performance.
 
-1. **Answer:** give the conclusion first.
-2. **Reason:** explain why.
-3. **Example:** connect to QRTable or previous work.
-4. **Trade-off:** state a limitation or alternative.
+**Nên nói**
 
-**Example**
+> We chose Next.js. The Management App has many layouts. Next.js gives us the App Router and server features. It fits this app better.
 
-> I would keep remote order data in TanStack Query. The reason is that it has server-state lifecycle such as fetching, caching, invalidation, and retries. In QRTable, a Socket.io event can invalidate only the affected order query. The trade-off is that query keys and event mapping must be designed carefully, or the UI can become stale.
+Chỉ cần thành thạo sáu mẫu câu:
 
-Khi bí, chỉ cần nói được bốn câu theo ARET. Không cố tạo một đoạn văn hoàn hảo.
+1. `I use X for Y.` — Tôi dùng X cho Y.
+2. `We chose X because Y.` — Chúng tôi chọn X vì Y.
+3. `The app needs X.` — Ứng dụng cần X.
+4. `The server returns X.` — Server trả X.
+5. `This helps us X.` — Điều này giúp chúng tôi X.
+6. `The downside is X.` — Điểm hạn chế là X.
 
-## 2. Buying Thinking Time / Xin Thời Gian Suy Nghĩ
+### How to Use `I`, `We`, and `The Project`
 
-- “Let me think for a moment and structure the answer.”
-- “That is a good question. I would break it into two parts.”
-- “My first thought is…, but let me check the trade-off.”
-- “I have not answered this exact scenario before. Let me reason through it.”
+- Dùng **`I`** cho việc Quân trực tiếp làm hoặc suy nghĩ cá nhân: “I review the code.”
+- Dùng **`we`** cho quyết định của team hai người: “We chose React with Vite.”
+- Dùng **`the app` / `the server` / `the project`** để mô tả cách hệ thống hoạt động: “The app restores the session.”
+- Dùng **`I would`** cho đề xuất chưa được implement: “I would add route-level error handling.”
 
-Avoid filler loops such as “uhm… actually… maybe…”. One explicit thinking sentence sounds more confident.
+Không cần gọi CEO là `sir` trong mọi câu. Dùng `you` một cách lịch sự là tự nhiên: “Could you repeat the question, please?”
 
-## 3. Confirming the Question / Xác Nhận Câu Hỏi
+## 1. The Easiest Answer Structure / Khung Trả Lời Dễ Nhất
 
-- “If I understand correctly, you are asking about the boundary between server state and UI state. Is that right?”
-- “Do you mean the initial page render or updates after the page becomes interactive?”
-- “Are we assuming the data is user-specific or public?”
-- “Should I answer based on the current QRTable implementation or design an ideal solution?”
-- “When you say mobile application, do you mean responsive web/PWA or native mobile?”
+Chỉ dùng ba bước:
 
-**Coaching tiếng Việt:** Clarifying question là dấu hiệu reasoning, không phải dấu hiệu yếu tiếng Anh.
+1. **Answer:** trả lời thẳng.
+2. **Why:** nói một lý do chính.
+3. **Example:** đưa ví dụ từ QRTable nếu cần.
 
-## 4. Asking the Interviewer to Repeat or Slow Down / Xin Nhắc Lại
+**Example / Ví dụ**
 
-- “Could you please repeat the last part a little more slowly?”
-- “I understood the first part, but I missed the condition after ‘when’. Could you repeat that condition?”
-- “Could you rephrase the question? I want to make sure I answer the correct problem.”
-- “I know the concept, but I may have missed one word. Are you asking about hydration?”
+> I use TanStack Query for API data. It already handles loading, caching, errors, and refetching. In QRTable, I also use it to refresh the correct order after a Socket.io event.
 
-Ask specifically what was missed. Do not repeatedly say only “Pardon?”.
+> Tôi dùng TanStack Query cho dữ liệu API. Nó đã xử lý loading, caching, error và refetch. Trong QRTable, tôi còn dùng nó để cập nhật đúng order sau Socket.io event.
 
-## 5. When You Know the Concept but Forget a Word / Biết Ý Nhưng Quên Từ
+Sau ba bước, hãy **dừng lại**. Chỉ nói thêm khi interviewer hỏi sâu hơn.
 
-- “I do not remember the exact term, but I mean the process where React attaches behavior to server-rendered HTML.”
-- “I may not use the precise word, so I will describe the data flow.”
-- “Let me draw the components and arrows; that will make the idea clearer.”
-- “The exact API name is not coming to me, but the responsibility belongs at this boundary.”
+## 2. When You Need Time to Think / Khi Cần Thời Gian Suy Nghĩ
 
-**Rule:** Describe responsibility and flow. Technical understanding matters more than recalling one API name.
+Chọn một câu dễ nhớ:
+
+- “Please give me a few seconds to think.”
+- “Let me think about it for a moment.”
+- “I will answer this in two parts.”
+
+**Nghĩa:** Cho tôi vài giây suy nghĩ / Tôi sẽ chia câu trả lời thành hai phần.
+
+Không cần nói một câu dài như “Let me structure my thoughts and evaluate the trade-offs.”
+
+## 3. When You Did Not Hear the Question / Khi Không Nghe Kịp
+
+- “Could you repeat the question more slowly, please?”
+- “Sorry, I missed the last part. Could you repeat it?”
+- “Could you ask the question in another way?”
+
+**Nghĩa:** Anh có thể nhắc lại chậm hơn không? / Tôi bị lỡ phần cuối / Anh có thể hỏi theo cách khác không?
+
+Đây là câu bình thường trong giao tiếp. Không cần xin lỗi nhiều lần.
+
+## 4. When You Want to Confirm the Question / Khi Muốn Xác Nhận
+
+- “Do you mean the first page load or later updates?”
+- “Are you asking about server state or UI state?”
+- “Should I explain the current code or my suggested solution?”
+- “If I understand correctly, you are asking about hydration. Is that right?”
+
+**Mẫu dễ dùng nhất:** “Do you mean A or B?”
+
+## 5. When You Know the Idea but Forget a Word / Khi Biết Ý Nhưng Quên Từ
+
+- “I do not remember the exact word, but I can explain the idea.”
+- “I cannot remember the API name, but the flow works like this.”
+- “Let me describe it with a simple example.”
+- “Can I draw a small diagram?”
+
+**Nghĩa:** Tôi không nhớ đúng từ hoặc tên API, nhưng tôi có thể giải thích ý và data flow.
 
 ## 6. When You Do Not Know / Khi Không Biết
 
-Use three steps: admit → reason → verify.
+**Short safe answer / Câu ngắn an toàn**
 
-> I have not implemented that feature directly, so I do not want to guess. My current understanding is that it works by […]. I would verify the exact behavior in the official documentation and with a small reproduction before using it in production.
+> I have not used that feature directly, so I do not want to guess. I know the basic idea, but I would check the official documentation and test it before using it in production.
 
-> I do not know the exact answer. I would first check whether the problem is caused by rendering, network state, or cache state, then narrow it down with the browser tools and a minimal test.
+> Tôi chưa trực tiếp dùng tính năng đó nên không muốn đoán. Tôi biết ý cơ bản, nhưng sẽ kiểm tra official documentation và test trước khi dùng ở production.
 
-Never end at “I don’t know.” Show the next responsible action.
+**If you know nothing / Nếu hoàn toàn chưa biết**
 
-## 7. Correcting Yourself / Tự Sửa Câu Trả Lời
+> I do not know this one yet. I would like to learn it after the interview.
 
-- “Let me correct one part of my previous answer.”
-- “I said server state, but in that example it is actually local UI state.”
-- “That statement was too broad. A more accurate answer is…”
-- “I need to distinguish the framework behavior from what QRTable currently implements.”
+> Phần này hiện tại tôi chưa biết. Tôi muốn tìm hiểu nó sau buổi phỏng vấn.
 
-Self-correction increases trust when done quickly and precisely.
+Không bịa. Một câu “I don’t know yet” trung thực tốt hơn một câu trả lời sai kéo dài.
 
-## 8. Moving from Theory to Evidence / Chuyển Sang Ví Dụ Thật
+## 7. When You Need to Correct Yourself / Khi Cần Tự Sửa
 
-- “Let me connect that to QRTable.”
-- “A concrete example is the customer cart flow.”
-- “In the current codebase, the boundary is visible in…”
-- “We made a similar trade-off in the POS screen.”
-- “The current implementation does X; an improvement would be Y.”
+- “Sorry, let me correct that.”
+- “I said server state, but I mean local UI state.”
+- “My first answer was too general. In QRTable, we actually do this…”
+- “That is an idea for improvement. It is not in the current code yet.”
 
-This is the safest way to move the conversation toward Quân’s strength.
+Tự sửa nhanh làm câu trả lời đáng tin hơn, không làm bạn yếu đi.
 
-## 9. Explaining an Architecture / Trình Bày Kiến Trúc
+## 8. Moving to Your Project / Chuyển Sang Dự Án Của Bạn
 
-Use this sequence:
+- “I can give an example from QRTable.”
+- “We had a similar case in the POS screen.”
+- “In our customer cart flow, we did this…”
+- “The current code works like this…”
 
-> I will explain it from the user action to the final UI update. First, […]. Then, the frontend sends […]. The backend responds or publishes […]. The client validates the scope and updates […]. The main failure cases are […]. The trade-off is […].
+Đây là cách an toàn nhất để đưa cuộc nói chuyện về phần bạn hiểu rõ.
 
-Useful connectors:
+## 9. Explaining a Technical Flow / Giải Thích Một Luồng Kỹ Thuật
 
-- first / then / after that / finally
-- because / therefore / however
-- on the client / on the server
-- the source of truth is…
-- the responsibility belongs to…
+Không cần dùng câu phức tạp. Chỉ nối từng bước:
 
-## 10. Comparing Two Options / So Sánh Hai Phương Án
+> First, the user clicks the button. Then, the frontend calls the API. The backend returns the result. After that, TanStack Query updates the data. Finally, the UI shows the new state.
 
-> Both options are valid, but they optimize for different things. Option A is better when […], while option B is better when […]. In this case, I would choose A because […]. The cost is […], and I would reconsider if […].
+> Đầu tiên, người dùng bấm button. Sau đó frontend gọi API. Backend trả kết quả. Tiếp theo TanStack Query cập nhật dữ liệu. Cuối cùng UI hiển thị state mới.
 
-**Example opener:**
+**Từ nối đủ dùng:** first → then → after that → finally → because → but
 
-> React Context and Zustand can both share client state, but Context is often enough for low-frequency scoped state, while Zustand is convenient for independent subscriptions and actions.
+## 10. Comparing Two Options / So Sánh Hai Lựa Chọn
 
-## 11. Explaining a Bug / Giải Thích Bug
+> Both can work. I use A when […]. I use B when […]. In this case, I choose A because […].
 
-> The user-visible symptom was […]. I reproduced it under […]. Then I separated possible causes into UI state, network behavior, and backend data. The root cause was […]. I fixed it by […], and I verified it with […]. To prevent regression, I added or would add […].
+> Cả hai đều có thể dùng. Tôi dùng A khi […]. Tôi dùng B khi […]. Trong trường hợp này, tôi chọn A vì […].
 
-Keywords: symptom · reproduction · hypothesis · root cause · fix · regression
+**Example / Ví dụ**
 
-## 12. Giving a Status Update / Báo Cáo Tiến Độ
+> Both Zustand and TanStack Query manage state, but they solve different problems. I use Query for API data. I use Zustand for shared UI state.
 
-> The UI and API integration are complete. I am currently verifying the error and responsive states. The main risk is that the API contract for […] is still unclear. I need confirmation by 2 PM to keep the delivery date; otherwise, I can complete the rest and isolate that part behind a temporary adapter.
+## 11. Explaining a Bug / Giải Thích Một Bug
 
-Do not say only “I am still working on it.” State completed work, current work, risk, and request.
+> First, I reproduced the bug. Then, I checked the UI state, the network request, and the backend data. I found that […]. I fixed it by […]. Finally, I tested the same flow again.
 
-## 13. Reporting a Blocker / Báo Blocker
+> Đầu tiên, tôi tái hiện bug. Sau đó tôi kiểm tra UI state, network request và dữ liệu backend. Tôi phát hiện […]. Tôi sửa bằng cách […]. Cuối cùng, tôi test lại cùng flow.
 
-> I am blocked by the missing response contract for the payment status. I checked the existing documentation and current endpoint, but they disagree. I can continue the layout and local states, but I need the backend owner to confirm the source of truth before I implement the final mapping.
+Chỉ cần nhớ: **see bug → reproduce → check → find cause → fix → test again**.
 
-This demonstrates progress without silently guessing.
+## 12. Explaining Your AI Workflow / Giải Thích Cách Dùng AI
 
-## 14. Disagreeing Respectfully / Phản Biện Lịch Sự
+> I use AI to create a first draft and explore ideas. Then I review the code myself. I check the requirement, types, state, security, loading, errors, and tests. I only keep code that I can explain.
 
-- “I see the benefit of that approach. My concern is…”
-- “I may be missing some context, but this could create…”
-- “Could we compare it against the requirement for…?”
-- “I would prefer the smaller change first because it is easier to verify and roll back.”
-- “If the priority is delivery speed, I agree. If long-term reuse is the priority, I would suggest…”
+> Tôi dùng AI để tạo bản đầu tiên và tìm ý tưởng. Sau đó tôi tự review code. Tôi kiểm tra requirement, type, state, security, loading, error và test. Tôi chỉ giữ code mà mình có thể giải thích.
 
-Disagree about risks and requirements, not about people.
+## 13. When the CEO Challenges Your Answer / Khi CEO Bắt Bẻ
 
-## 15. Reviewing AI-Generated Code / Review Code AI Sinh
+- “Yes, that is a fair point.”
+- “You are right. My first answer was too general.”
+- “My assumption was […]. If that is not true, I would change the solution.”
+- “The current code does X. What I described is an improvement.”
 
-> I would not review AI-generated code differently from human code in terms of quality. I would first check whether it solves the correct requirement, then inspect architecture, types, state ownership, accessibility, security, performance, and tests. I pay special attention to confident-looking duplicated logic, unnecessary abstractions, stale APIs, and missing edge states. I accept only changes I can explain and verify.
+Không cố bảo vệ một ý sai. Xác nhận điểm đúng rồi sửa câu trả lời.
 
-## 16. Asking to Draw or Write / Xin Vẽ Sơ Đồ hoặc Code
+## 14. Asking to Use Code or a Diagram / Xin Dùng Code hoặc Sơ Đồ
 
-- “Would it be okay if I draw a small data-flow diagram?”
-- “I can explain this more clearly with a short example. May I write it down?”
-- “Let me sketch the query key and event flow.”
-- “I will use pseudocode so we can focus on the decision rather than syntax.”
+- “Can I draw a small data-flow diagram?”
+- “Can I explain it with a short code example?”
+- “I will use pseudocode, so we can focus on the idea.”
 
-## 17. Handling an Interruption / Khi Bị Ngắt Lời
+## 15. When You Are Interrupted / Khi Bị Ngắt Lời
 
 - “Sure. The short answer is…”
-- “Yes, I will focus on that part.”
-- “Understood. The key trade-off is…”
-- “I will stop there. Would you like the implementation detail or the reason?”
+- “Okay. I will focus on that part.”
+- “Understood. The main reason is…”
+- “I will stop there.”
 
-Do not restart the entire answer after interruption.
+Không bắt đầu lại toàn bộ câu trả lời.
 
-## 18. When the Interviewer Challenges Your Claim / Khi CEO Bắt Bẻ
+## 16. How to End an Answer / Cách Kết Thúc
 
-> You are right that my first answer was too general. In the current QRTable implementation, […]. What I described after that is an improvement I would propose, not something already implemented.
+- “That is why I chose this solution.”
+- “That is the main idea.”
+- “That is how we use it in QRTable.”
+- “I can explain the code in more detail if needed.”
 
-> That is a fair concern. My assumption was […]. If that assumption is false, I would change the design by […].
+Kết thúc rõ giúp bạn không nói lan man.
 
-This protects credibility. Do not defend an inaccurate claim just to appear confident.
+## 17. Easy Technical Words / Từ Kỹ Thuật Cần Nhớ
 
-## 19. Closing an Answer / Kết Thúc Câu Trả Lời
+| Ý tiếng Việt                | English dễ dùng                 |
+| --------------------------- | ------------------------------- |
+| dữ liệu chính xác nhất      | source of truth                 |
+| dữ liệu từ API/server       | server state / API data         |
+| state của giao diện         | UI state                        |
+| dữ liệu đã cũ               | stale data                      |
+| cập nhật lại dữ liệu        | refresh / refetch / invalidate  |
+| cập nhật trước khi API xong | optimistic update               |
+| hoàn tác khi lỗi            | rollback                        |
+| điểm đánh đổi               | trade-off / downside            |
+| trường hợp đặc biệt         | edge case                       |
+| tái hiện bug                | reproduce the bug               |
+| nguyên nhân thật            | root cause                      |
+| làm rõ yêu cầu              | clarify the requirement         |
+| quyền truy cập              | permission / authorization      |
+| dễ bảo trì                  | easy to maintain / maintainable |
 
-- “That is why I would choose this boundary.”
-- “The main trade-off is consistency versus additional complexity.”
-- “That is the current implementation; the next improvement would be…”
-- “I can go deeper into the code path if that would be useful.”
+Không bắt buộc dùng từ khó như `ephemeral`, `reconciliation`, `architectural boundary` nếu bạn có thể nói cùng ý bằng từ đơn giản.
 
-A clear closing prevents rambling.
+## 18. Ten Lines to Practice First / Mười Câu Luyện Trước
 
-## 20. Technical Vocabulary Pack / Bộ Từ Vựng Kỹ Thuật
+1. “Please give me a few seconds to think.”
+2. “Could you repeat the question more slowly?”
+3. “Do you mean A or B?”
+4. “The short answer is yes.”
+5. “The main reason is…”
+6. “I can give an example from QRTable.”
+7. “I have not used that directly, so I do not want to guess.”
+8. “Both can work, but I would choose A because…”
+9. “Sorry, let me correct that.”
+10. “I can explain it with a small diagram.”
 
-| Intent                     | Useful English          |
-| -------------------------- | ----------------------- |
-| nguồn dữ liệu chuẩn        | source of truth         |
-| ranh giới trách nhiệm      | responsibility boundary |
-| dữ liệu lỗi thời           | stale data              |
-| làm mới đúng mục tiêu      | targeted invalidation   |
-| cập nhật lạc quan          | optimistic update       |
-| hoàn tác                   | rollback                |
-| trạng thái dẫn xuất        | derived state           |
-| trạng thái tạm thời của UI | ephemeral UI state      |
-| đánh đổi                   | trade-off               |
-| trường hợp biên            | edge case               |
-| tái hiện lỗi               | reproduce the issue     |
-| nguyên nhân gốc            | root cause              |
-| ngăn lỗi quay lại          | prevent regression      |
-| làm rõ yêu cầu             | clarify the requirement |
-| hợp đồng API               | API contract            |
-| tương thích ngược          | backward compatible     |
-| tách biệt tenant           | tenant isolation        |
-| nhất quán cuối cùng        | eventual consistency    |
-| giảm dần chức năng an toàn | graceful degradation    |
-| có thể bảo trì             | maintainable            |
-
-## 21. Ten Lines to Make Automatic / Mười Câu Phải Thành Phản Xạ
-
-1. “If I understand correctly, you are asking about…”
-2. “Let me think for a moment and structure the answer.”
-3. “The short answer is yes, because…”
-4. “I would separate this into server state and UI state.”
-5. “Let me connect that to QRTable.”
-6. “The current implementation does X; an improvement would be Y.”
-7. “I have not implemented that directly, so I do not want to guess.”
-8. “Both options are valid, but they optimize for different things.”
-9. “The main trade-off is…”
-10. “Could you rephrase the last condition so I answer the correct problem?”
-
-Practice these until they require no translation from Vietnamese.
+Luyện đến khi có thể nói mười câu này mà không cần dịch trong đầu.

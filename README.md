@@ -28,7 +28,7 @@
 | Kitchen display       | Kafka-driven ticket ingestion, station routing, Redis-backed queues, and KDS status updates.   |
 | Payments              | Cash settlement, tenant-owned VietQR through SePay, payment history, and reconciliation.       |
 | SaaS administration   | Tenant lifecycle, plans, subscriptions, staff access, feature entitlements, and reporting.     |
-| Reliability           | Explicit tenant isolation, idempotent writes, Saga compensation, and end-to-end observability. |
+| Reliability           | Explicit tenant isolation, idempotent writes, transactional outbox, and Saga compensation.     |
 
 ## How QRTable Works
 
@@ -50,7 +50,6 @@ flowchart LR
   AUTH --> KC["Keycloak"]
   SERVICES <--> KAFKA["Kafka"]
   SERVICES --> DATA["PostgreSQL · MongoDB · Redis"]
-  SERVICES --> OBS["Prometheus · Loki · Tempo · Grafana"]
 ```
 
 The BFF is the single client entry point. Each service owns its domain data and communicates through TCP or gRPC contracts for synchronous work and Kafka events for asynchronous side effects.
@@ -107,7 +106,7 @@ QRTable uses two frontend applications so the anonymous customer journey stays l
 | Backend     | NestJS, TypeScript, Nx                                          |
 | Data        | PostgreSQL, TypeORM, MongoDB, Mongoose, Redis                   |
 | Integration | Apache Kafka, TCP, gRPC, Socket.IO, Keycloak, SePay/VietQR      |
-| Operations  | Docker Compose, Prometheus, Grafana, Loki, Tempo, OpenTelemetry |
+| Operations  | Docker Compose, Caddy, migration tooling, and deployment scripts |
 
 ## Engineering Model
 
@@ -116,15 +115,14 @@ QRTable uses two frontend applications so the anonymous customer journey stays l
 - **Event-driven side effects:** synchronous contracts handle immediate coordination; Kafka carries asynchronous domain events and recovery paths.
 - **Resilient writes:** order and payment workflows use idempotency, transactional outbox records, replay-safe consumers, and compensation where a distributed step can fail.
 - **Authoritative snapshots:** WebSocket messages notify clients that state changed; REST/TCP snapshots remain the source of truth.
-- **Operational visibility:** structured logs, metrics, distributed traces, health checks, and Grafana dashboards cover the main service flows.
 
 ## Workspace
 
 | Path                                  | Purpose                                                                         |
 | ------------------------------------- | ------------------------------------------------------------------------------- |
 | `apps/`                               | BFF, seven domain services, Customer PWA, Management App, and Keycloak theme.   |
-| `libs/`                               | Shared contracts, configuration, guards, UI, observability, and utilities.      |
-| `docker/` and `docker-compose.*.yaml` | Local infrastructure, application, monitoring, and proxy layers.                |
+| `libs/`                               | Shared contracts, configuration, guards, UI, providers, and utilities.          |
+| `docker/` and `docker-compose.*.yaml` | Local infrastructure, application, scale-test, and proxy layers.                |
 | `tools/`                              | Database, Kafka, seed, deployment, verification, and performance tooling.       |
 | `docs/`                               | Canonical architecture, business, phase, testing, and operations documentation. |
 
@@ -155,12 +153,6 @@ pnpm nx show projects
 pnpm nx show project <name>
 ```
 
-Start the observability stack when working with metrics, logs, or traces:
-
-```sh
-docker compose -f docker-compose.monitoring.yaml up -d
-```
-
 ## Validation
 
 | Command                    | Purpose                                                                             |
@@ -176,7 +168,7 @@ Run integration, end-to-end, and scale checks only with their required local ser
 
 ## Deployment and Operations
 
-The repository separates infrastructure, application services, monitoring, and reverse proxy configuration into composable Docker Compose layers. Production bootstrap runs migrations, verifies database ownership, provisions Kafka topics, and configures Keycloak before application startup.
+The repository separates infrastructure, application services, scale testing, and reverse proxy configuration into composable Docker Compose layers. Production bootstrap runs migrations, verifies database ownership, provisions Kafka topics, and configures Keycloak before application startup.
 
 Deployment artifacts are configuration, not proof of a live public environment. Use the production runbook to provision a target host, validate HTTPS and health endpoints, record the deployed revision, and prepare rollback before declaring a release operational.
 

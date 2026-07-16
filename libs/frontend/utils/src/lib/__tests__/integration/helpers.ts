@@ -1,6 +1,11 @@
 const BFF_BASE = process.env['BFF_URL'] || 'http://localhost:3300/api/v1';
 const KEYCLOAK_URL = process.env['KEYCLOAK_URL'] || 'http://localhost:8180';
 const TENANT_ID = '023772bb-391b-401c-936a-ed7034b69cec';
+const MANAGEMENT_APP_CLIENT_ID = process.env['MANAGEMENT_APP_CLIENT_ID'] || 'management-app';
+const MANAGEMENT_APP_CLIENT_SECRET =
+  process.env['MANAGEMENT_APP_CLIENT_SECRET'] ||
+  process.env['AUTH_KEYCLOAK_SECRET'] ||
+  'RHRjKOPDywQxSG7qjcGM1XsfmE6ikR8B';
 
 interface TokenCache {
   token: string;
@@ -19,7 +24,8 @@ export async function getOwnerToken(): Promise<string> {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'password',
-      client_id: 'management-app',
+      client_id: MANAGEMENT_APP_CLIENT_ID,
+      client_secret: MANAGEMENT_APP_CLIENT_SECRET,
       username: 'owner.1700000002@gmail.com',
       password: 'owner123',
       scope: 'openid',

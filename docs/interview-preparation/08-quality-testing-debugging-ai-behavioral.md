@@ -1,513 +1,515 @@
-# Quality, Testing, Debugging, AI, and Behavioral Answer Bank
+# Quality, Testing, Debugging, AI, and Behavioral — Simple Answers
 
-## Code Integrity and Architecture
+> Với behavioral question, đừng học một câu chuyện không phải của mình. Dùng answer trong file làm khung rồi thêm chi tiết thật trước khi phỏng vấn.
+
+## Clean Code and Architecture / Code Sạch và Kiến Trúc
 
 ### 1. What Does Clean Design Mean to You? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Clean Design means responsibilities and dependencies are visible and changes remain local. Components focus on rendering and interaction, hooks coordinate state lifecycle, services own transport details, and domain rules are not hidden inside generic UI. Names express intent, data has one source of truth, and tests protect important behavior. Clean code is not the maximum number of layers; it is the minimum structure that keeps change safe.
+> Clean design means each part has a clear job. Components handle UI, hooks manage state behavior, and services call APIs. Data should have one source of truth. The code should be easy to change and test. Clean design does not mean creating many layers for a simple feature.
 
 **Câu hỏi tiếng Việt:** Clean Design có nghĩa gì với bạn?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Clean Design nghĩa là responsibilities và dependencies nhìn thấy rõ, change giữ được cục bộ. Component tập trung render/interaction, hook phối hợp state lifecycle, service sở hữu transport, domain rule không ẩn trong generic UI. Clean code không phải nhiều layer nhất mà là structure tối thiểu giúp thay đổi an toàn.
+> Clean Design nghĩa là mỗi phần có một nhiệm vụ rõ ràng. Component xử lý UI, hook quản lý behavior của state và service gọi API. Dữ liệu nên có một source of truth. Code phải dễ thay đổi và test. Clean Design không có nghĩa tạo nhiều layer cho một feature đơn giản.
 
 ### 2. How Do You Apply DRY? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> DRY means avoiding duplicated knowledge, not eliminating every repeated line. I extract when multiple places must change together because they represent the same rule or contract. I do not force two visually similar features into one abstraction if their behavior is evolving differently. A premature abstraction can be harder to maintain than small duplication.
+> DRY means I do not repeat the same business rule or knowledge in many places. I extract shared code when those places must always change together. I do not remove every repeated line. Sometimes small duplication is clearer than one abstraction that tries to support unrelated features.
 
-**Câu hỏi tiếng Việt:** Bạn áp dụng DRY thế nào?
+**Câu hỏi tiếng Việt:** Bạn áp dụng DRY như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> DRY là tránh duplicated knowledge, không phải xóa mọi dòng lặp. Tôi extract khi nhiều nơi phải đổi cùng nhau vì cùng một rule/contract. Không ép hai feature chỉ nhìn giống nhau vào abstraction khi behavior đang phát triển khác nhau.
+> DRY nghĩa là không lặp cùng một business rule hoặc knowledge ở nhiều nơi. Tôi tách shared code khi các nơi đó luôn phải thay đổi cùng nhau. Tôi không xóa mọi dòng lặp; đôi khi một chút duplication rõ hơn một abstraction cố hỗ trợ các feature không liên quan.
 
 ### 3. What Makes a Component Too Large? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Size alone is a signal, but mixed reasons to change are the real problem. If one component fetches data, owns multiple workflows, defines complex table columns, handles several dialogs, and renders the entire page, I separate orchestration, domain hooks, and focused visual components. I keep related code together when splitting would only create indirection.
+> A component is too large when it has too many jobs. For example, it fetches data, manages several dialogs, defines a large table, handles business rules, and renders the whole page. I separate data and actions into hooks and split the UI into smaller parts with clear names.
 
-**Câu hỏi tiếng Việt:** Khi nào một component được xem là quá lớn?
+**Câu hỏi tiếng Việt:** Khi nào một component quá lớn?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Số dòng chỉ là signal; vấn đề thật là nhiều reasons to change. Nếu một component vừa fetch, sở hữu nhiều workflow, định nghĩa table columns, quản lý dialogs và render toàn page, tôi tách orchestration, domain hooks và focused UI. Không tách nếu chỉ tạo indirection.
+> Component quá lớn khi nó có quá nhiều nhiệm vụ. Ví dụ, nó vừa fetch data, quản lý nhiều dialog, định nghĩa table lớn, xử lý business rule và render toàn page. Tôi tách data/action vào hook rồi chia UI thành các phần nhỏ có tên rõ ràng.
 
 ### 4. How Do You Avoid Prop Drilling? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> First I check whether the state is owned too high. Component composition or colocating state may remove the drilling. Context fits a coherent subtree dependency, and a store fits independent cross-tree subscriptions. I do not move state global only to avoid passing two or three clear props.
+> First, I check whether the state is placed too high. Sometimes moving it closer or using component composition solves the problem. I use Context for one shared subtree and Zustand for state needed by separate components. I do not make state global only to avoid two simple props.
 
-**Câu hỏi tiếng Việt:** Bạn tránh prop drilling thế nào?
+**Câu hỏi tiếng Việt:** Bạn tránh prop drilling như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Trước hết xem state có được đặt quá cao không. Composition hoặc colocation có thể giải quyết; Context hợp coherent subtree dependency, store hợp cross-tree subscriptions. Tôi không globalize state chỉ để tránh truyền hai ba props rõ ràng.
+> Đầu tiên tôi kiểm tra state có được đặt quá cao không. Đôi khi đưa state lại gần hoặc dùng component composition đã giải quyết được. Tôi dùng Context cho một subtree và Zustand cho state cần bởi nhiều component tách biệt. Tôi không biến state thành global chỉ để tránh hai prop đơn giản.
 
 ### 5. How Do SOLID Principles Apply to React? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> I apply the intent rather than forcing class patterns. A component or hook should have one reason to change. Feature code depends on stable service or hook contracts rather than transport details. Composition and small interfaces support extension without modifying one giant conditional component. I avoid abstractions that exist only to mention SOLID.
+> I use the main ideas, not class patterns. A component or hook should have one clear reason to change. Feature code should depend on a clear service or hook API, not low-level transport details. Composition helps us add behavior without making one component full of conditions.
 
-**Câu hỏi tiếng Việt:** SOLID áp dụng vào React thế nào?
+**Câu hỏi tiếng Việt:** SOLID được áp dụng vào React như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi dùng intent chứ không ép class pattern: component/hook có một reason to change, feature phụ thuộc stable contracts thay transport details, composition và interface nhỏ hỗ trợ mở rộng. Không tạo abstraction chỉ để nói đã dùng SOLID.
+> Tôi dùng ý chính của SOLID chứ không ép class pattern. Component hoặc hook nên có một lý do thay đổi rõ ràng. Feature code nên phụ thuộc vào service/hook API rõ, không phụ thuộc transport detail. Composition giúp thêm behavior mà không làm một component chứa quá nhiều condition.
 
 ### 6. How Do You Enforce Type Safety? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I define types at real boundaries, reuse shared wire contracts, validate external data when runtime trust is required, and keep transformations explicit. I prefer `unknown` plus narrowing over `any`, use discriminated unions for state or events, and avoid unsafe assertions that merely silence the compiler. TypeScript reduces classes of bugs but does not replace runtime validation.
+> I define types at API and component boundaries and reuse shared contracts. I prefer `unknown` with a type check instead of `any`. I avoid type assertions only used to silence an error. TypeScript checks compile-time code, but external API data may still need runtime validation.
 
-**Câu hỏi tiếng Việt:** Bạn bảo đảm type safety thế nào?
+**Câu hỏi tiếng Việt:** Bạn bảo đảm type safety như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Định nghĩa type ở boundaries thật, reuse shared wire contracts, runtime-validate external data khi cần, dùng `unknown` + narrowing thay `any`, discriminated union cho state/event và tránh assertion chỉ để im compiler. TypeScript không thay runtime validation.
+> Tôi định nghĩa type tại API và component boundary rồi reuse shared contract. Tôi ưu tiên `unknown` kèm type check thay cho `any`. Tôi tránh type assertion chỉ để làm mất error. TypeScript kiểm tra lúc compile nhưng dữ liệu API bên ngoài vẫn có thể cần runtime validation.
 
 ### 7. How Do You Review a Pull Request? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I review from risk to detail: requirement and user behavior, security and data scope, architecture and state ownership, error and loading paths, accessibility and performance, tests, then naming and duplication. I run or interact with high-risk behavior instead of relying only on the diff. Review comments explain impact and distinguish blockers from optional suggestions.
+> I first check whether the change solves the correct requirement. Then I review security, data scope, state ownership, loading and error states, accessibility, performance, tests, and finally code style. For important behavior, I run the feature instead of only reading the diff. I explain why a problem matters.
 
-**Câu hỏi tiếng Việt:** Bạn review pull request thế nào?
+**Câu hỏi tiếng Việt:** Bạn review pull request như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Review từ risk đến detail: requirement/user behavior, security/data scope, architecture/state ownership, loading/error, accessibility/performance, tests rồi naming/duplication. Tôi chạy high-risk behavior thay vì chỉ đọc diff và phân biệt blocker với optional suggestion.
+> Đầu tiên tôi kiểm tra change có giải đúng requirement không. Sau đó tôi review security, data scope, state ownership, loading/error state, accessibility, performance, test rồi mới đến code style. Với behavior quan trọng, tôi chạy feature thay vì chỉ đọc diff. Tôi giải thích vì sao một vấn đề quan trọng.
 
 ### 8. When Would You Refactor? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I refactor when the current structure makes the requested change unsafe, repeated, or difficult to test, and I keep the scope near the feature being changed. For a broader refactor, I need evidence such as recurring defects, slow delivery, or measurable performance cost. I preserve behavior with tests and avoid combining an unbounded rewrite with an urgent feature.
+> I refactor when the current code makes a needed change risky, repeated, or hard to test. I keep the refactor close to the feature I am changing. A large refactor needs clear evidence, such as repeated bugs or slow delivery. I use tests to keep the old behavior safe.
 
 **Câu hỏi tiếng Việt:** Khi nào bạn refactor?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Khi structure hiện tại làm change unsafe, lặp hoặc khó test; giữ scope gần feature đang sửa. Refactor lớn cần evidence như defect lặp, delivery chậm hoặc performance cost. Dùng test bảo vệ behavior và tránh ghép rewrite vô hạn với feature gấp.
+> Tôi refactor khi code hiện tại làm change cần thiết trở nên rủi ro, lặp lại hoặc khó test. Tôi giữ refactor gần feature đang thay đổi. Refactor lớn cần evidence rõ như bug lặp hoặc delivery chậm. Tôi dùng test để bảo vệ behavior cũ.
 
-## Testing
+## Testing / Kiểm Thử
 
 ### 9. What Is Your Frontend Testing Strategy? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I test important behavior at the cheapest reliable boundary. Pure transformations get unit tests. Hooks and components get integration tests around user-visible state, API contracts, cache changes, and permissions. A small E2E suite protects critical journeys such as login, ordering, and payment. Static types, linting, and accessibility checks support the suite but do not replace runtime tests.
+> I use unit tests for small functions and business rules. I use integration tests for components, hooks, API states, and user actions. I use a smaller number of E2E tests for critical flows such as login, ordering, and payment. I focus on risky behavior, not only a coverage number.
 
 **Câu hỏi tiếng Việt:** Testing strategy frontend của bạn là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Test behavior quan trọng ở boundary rẻ và đáng tin nhất. Pure transformation dùng unit; hook/component dùng integration quanh UI state, API/cache/permission; một số ít E2E bảo vệ login, ordering, payment. Type/lint/a11y checks hỗ trợ nhưng không thay runtime tests.
+> Tôi dùng unit test cho function nhỏ và business rule. Tôi dùng integration test cho component, hook, API state và user action. Tôi dùng ít E2E test hơn cho critical flow như login, ordering và payment. Tôi tập trung vào behavior rủi ro chứ không chỉ coverage number.
 
-### 10. Unit, Integration, and E2E Tests [P0]
+### 10. What Is the Difference Between Unit, Integration, and E2E Tests? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Unit tests isolate a small function or rule and give fast diagnosis. Integration tests verify several real pieces together, such as a component with Query state and mocked network behavior. E2E tests verify the deployed user path through browser and backend boundaries. I use more unit and integration tests, with fewer high-value E2E tests because they cost more to run and maintain.
+> A unit test checks one small function or rule. An integration test checks several parts working together, for example a component with TanStack Query and a mocked API. An E2E test uses the browser to check a complete user flow. E2E tests give confidence but cost more to maintain.
 
 **Câu hỏi tiếng Việt:** Unit, integration và E2E test khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Unit isolate function/rule nhỏ, chạy nhanh và dễ chẩn đoán. Integration kiểm tra nhiều phần thật cùng nhau, như component + Query + mocked network. E2E kiểm tra deployed user path qua browser/backend nhưng tốn thời gian và maintenance nên chỉ giữ critical journeys.
+> Unit test kiểm tra một function hoặc rule nhỏ. Integration test kiểm tra nhiều phần hoạt động cùng nhau, ví dụ component với TanStack Query và mocked API. E2E test dùng browser để kiểm tra user flow hoàn chỉnh. E2E cho confidence cao nhưng tốn công maintain hơn.
 
 ### 11. What Should You Test in a TanStack Query Mutation? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I test the request inputs, pending behavior, success cache update or invalidation, expected user feedback, error message, optimistic snapshot, rollback, and conflict reconciliation. I isolate the QueryClient and control retries. The assertion should focus on observable behavior and cache contract rather than implementation call order unless that order is the behavior.
+> I test the request data, pending UI, successful cache update or invalidation, and user feedback. I also test errors. If the mutation is optimistic, I test the old snapshot, the temporary update, rollback, and final refetch. Each test uses its own QueryClient.
 
 **Câu hỏi tiếng Việt:** Cần test gì trong TanStack Query mutation?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Request inputs, pending behavior, success cache update/invalidation, user feedback, error, optimistic snapshot, rollback và conflict reconciliation. QueryClient phải cô lập và retry được kiểm soát; assert observable behavior hơn internal call order.
+> Tôi test request data, pending UI, cache update hoặc invalidation khi thành công và user feedback. Tôi cũng test error. Nếu mutation là optimistic, tôi test old snapshot, temporary update, rollback và final refetch. Mỗi test dùng QueryClient riêng.
 
 ### 12. How Do You Test Realtime Behavior? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I use a controllable socket mock, mount the hook with a scoped QueryClient, emit matching and non-matching events, and assert targeted invalidation. I also test reconnect, auth error, cleanup, and that old listeners do not remain after unmount or identity change. Cross-tenant events must not update the current view.
+> I use a socket mock that I can control. I send matching and non-matching events and check that only the correct query changes. I also test reconnect, auth errors, cleanup after unmount, and identity changes. An event from another tenant must not update the current screen.
 
-**Câu hỏi tiếng Việt:** Bạn test realtime behavior thế nào?
+**Câu hỏi tiếng Việt:** Bạn test realtime behavior như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Dùng controllable socket mock, mount hook với scoped QueryClient, emit matching/non-matching events và assert targeted invalidation. Test reconnect, auth error, cleanup, old listeners sau unmount/identity change và bảo đảm cross-tenant event không update view.
+> Tôi dùng socket mock có thể điều khiển. Tôi gửi event matching và non-matching rồi kiểm tra chỉ đúng query thay đổi. Tôi cũng test reconnect, auth error, cleanup sau unmount và identity change. Event từ tenant khác không được update current screen.
 
 ### 13. What Makes a Test Brittle? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> A test is brittle when it depends on implementation details that users and contracts do not care about—for example internal state shape, exact hook call order, arbitrary timing, or fragile selectors. I prefer roles, accessible names, stable contracts, controlled time, and explicit async waiting. Some low-level unit tests can inspect implementation when that implementation is itself the contract.
+> A test is brittle when it depends on internal details that users do not care about. Examples are exact hook call order, private state shape, fixed delays, or weak CSS selectors. I prefer user-visible behavior, accessible names, stable contracts, and proper waiting for async results.
 
-**Câu hỏi tiếng Việt:** Điều gì làm test brittle?
+**Câu hỏi tiếng Việt:** Điều gì làm một test dễ vỡ?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Phụ thuộc implementation details user/contract không quan tâm: internal state, exact hook order, arbitrary timing, fragile selectors. Tôi ưu tiên roles, accessible names, stable contracts, controlled time và explicit async waits.
+> Test dễ vỡ khi phụ thuộc internal detail mà user không quan tâm. Ví dụ là exact hook call order, private state shape, fixed delay hoặc CSS selector yếu. Tôi ưu tiên user-visible behavior, accessible name, stable contract và cách đợi async result đúng.
 
-### 14. How Much Coverage Is Enough? [P1]
+### 14. How Much Test Coverage Is Enough? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> Coverage is a signal, not the goal. I prioritize financial actions, authorization, tenant scope, state transitions, error recovery, and code that changes frequently. A high percentage can still miss the main user risk. I use coverage reports to find untested branches, then decide from impact.
+> Coverage is useful, but there is no perfect number for every project. I first cover payments, permissions, tenant scope, state changes, error recovery, and code that changes often. A high percentage can still miss the most important user risk.
 
-**Câu hỏi tiếng Việt:** Coverage bao nhiêu là đủ?
+**Câu hỏi tiếng Việt:** Test coverage bao nhiêu là đủ?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Coverage là signal chứ không phải mục tiêu. Tôi ưu tiên financial action, authorization, tenant scope, state transitions, recovery và code hay đổi. Percentage cao vẫn có thể bỏ sót risk chính; report dùng để tìm branch rồi đánh giá theo impact.
+> Coverage hữu ích nhưng không có một con số hoàn hảo cho mọi dự án. Tôi ưu tiên payment, permission, tenant scope, state change, error recovery và code hay thay đổi. Percentage cao vẫn có thể bỏ sót user risk quan trọng nhất.
 
-## Debugging
+## Debugging / Tìm và Sửa Lỗi
 
 ### 15. Describe Your Debugging Process [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I first make the symptom reproducible and record the exact inputs and environment. Then I divide the path into UI event, component state, query cache, network request, and backend response. I inspect evidence at each boundary, form one hypothesis, and run the smallest experiment that can disprove it. After fixing the root cause, I add a regression check and verify related flows.
+> First, I reproduce the bug and record the exact steps. Then I check the UI event, component state, query cache, network request, and backend response. I form one idea about the cause and test it with a small experiment. After the fix, I test the original flow and related cases.
 
-**Câu hỏi tiếng Việt:** Hãy mô tả quy trình debug của bạn
+**Câu hỏi tiếng Việt:** Hãy mô tả quy trình debug của bạn.
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Làm symptom reproduce được và ghi input/environment. Chia path thành UI event, component state, query cache, network, backend response; xem evidence từng boundary, đưa một hypothesis và experiment nhỏ để bác bỏ. Sửa root cause, thêm regression check và verify related flows.
+> Đầu tiên tôi reproduce bug và ghi lại exact steps. Sau đó tôi kiểm tra UI event, component state, query cache, network request và backend response. Tôi đưa ra một giả thuyết về nguyên nhân rồi test bằng experiment nhỏ. Sau khi sửa, tôi test flow ban đầu và các case liên quan.
 
 ### 16. A Page Renders Too Often. What Do You Do? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I use React DevTools Profiler or focused logging to identify which component renders, why it renders, and whether the cost is meaningful. Then I check broad Context or store subscriptions, state placed too high, unstable props, effects that update state, and expensive calculations. I fix ownership first and memoize only a measured boundary.
+> I use React DevTools Profiler to find which component renders and why. Then I check state placed too high, broad Context or store subscriptions, unstable props, and effects that update state. I fix the state ownership first. I add memoization only when measurement shows it helps.
 
 **Câu hỏi tiếng Việt:** Page render quá nhiều; bạn làm gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Dùng React Profiler/log tập trung để biết component nào render, vì sao và cost có đáng kể không. Kiểm tra broad Context/store subscriptions, state quá cao, unstable props, effect update state và expensive calculation. Sửa ownership trước, memoize sau khi đo.
+> Tôi dùng React DevTools Profiler để tìm component nào render và vì sao. Sau đó tôi kiểm tra state đặt quá cao, Context/store subscription quá rộng, unstable prop và effect update state. Tôi sửa state ownership trước và chỉ memoize khi kết quả đo cho thấy có ích.
 
 ### 17. A Page Is Slow. How Do You Diagnose It? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I separate network, server response, bundle loading, JavaScript execution, React rendering, layout, and asset cost. Browser performance and network tools show where the time goes. Then I optimize the largest bottleneck—for example parallelizing requests, reducing client code, virtualizing a large list, or fixing repeated rendering—and measure again.
+> I separate the problem into network time, server time, bundle loading, JavaScript work, React rendering, layout, and images. Browser Network and Performance tools show where most time is spent. I fix the largest bottleneck first and measure again after the change.
 
-**Câu hỏi tiếng Việt:** Page chậm; bạn chẩn đoán thế nào?
+**Câu hỏi tiếng Việt:** Page chậm; bạn chẩn đoán như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tách network, server response, bundle, JavaScript execution, React render, layout và assets. Browser tools cho biết bottleneck; sau đó tối ưu phần lớn nhất như parallel requests, giảm client code, virtualize list hoặc sửa rerender rồi đo lại.
+> Tôi tách vấn đề thành network time, server time, bundle loading, JavaScript work, React rendering, layout và image. Browser Network và Performance tool cho biết phần nào tốn nhiều thời gian nhất. Tôi sửa bottleneck lớn nhất trước rồi đo lại sau thay đổi.
 
 ### 18. The UI Shows Stale Data after a Mutation. What Do You Check? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I check whether the mutation response is canonical, whether the correct query family was updated or invalidated, whether the key includes all filters and scope, and whether another event or optimistic update overwrote the result. I inspect Query Devtools and network timing. The fix should restore one source of truth, not add an arbitrary timeout.
+> I check whether the correct query key was updated or invalidated. I check that the key contains all filters and tenant scope. I also look for an old response, socket event, or optimistic update that may overwrite new data. I use Query Devtools and the Network panel instead of adding a timeout.
 
-**Câu hỏi tiếng Việt:** UI stale sau mutation; bạn kiểm tra gì?
+**Câu hỏi tiếng Việt:** UI hiện stale data sau mutation; bạn kiểm tra gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Kiểm tra mutation response có canonical không, đúng query family đã update/invalidate chưa, key đủ filter/scope chưa và event/optimistic update khác có overwrite không. Dùng Query Devtools/network timing; sửa source of truth, không thêm timeout tùy tiện.
+> Tôi kiểm tra đúng query key đã được update hoặc invalidate chưa. Tôi kiểm tra key có đủ filter và tenant scope không. Tôi cũng tìm old response, socket event hoặc optimistic update có thể ghi đè dữ liệu mới. Tôi dùng Query Devtools và Network panel thay vì thêm timeout.
 
 ### 19. A Socket Event Fires Twice. What Do You Check? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I check whether the component mounted twice in development, whether cleanup removes the exact handler reference, whether multiple sockets exist, and whether the server emitted duplicate events. I distinguish duplicate delivery from duplicate side effects. Event handling should be safe under retries where practical, but I still remove the duplicate source.
+> I check whether two sockets exist, whether the component mounted twice in development, and whether cleanup removes the same handler that was added. I also check if the server sent the event twice. The handler should be safe for retries, but I still remove the duplicate source.
 
 **Câu hỏi tiếng Việt:** Socket event chạy hai lần; bạn kiểm tra gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Kiểm tra development double mount, cleanup có remove đúng handler reference, có nhiều socket không và server có emit duplicate không. Phân biệt duplicate delivery với duplicate side effects; làm handler an toàn trước retry nhưng vẫn loại nguyên nhân trùng.
+> Tôi kiểm tra có hai socket không, component có mount hai lần trong development không và cleanup có remove đúng handler đã add không. Tôi cũng kiểm tra server có gửi event hai lần không. Handler nên an toàn khi retry nhưng tôi vẫn loại bỏ nguồn gây duplicate.
 
 ### 20. An Issue Happens Only in Production. What Do You Do? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> I compare environment, build mode, data volume, permissions, cache, network, and feature flags. I use production-safe logs, traces, error reports, and request correlation rather than adding sensitive console output. I reproduce the closest safe conditions locally or in staging, reduce the difference, deploy the smallest fix with a rollback path, and monitor the result.
+> I compare production with local and staging: environment variables, build mode, data size, permissions, cache, network, and feature flags. I use safe logs and error reports without private data. I reproduce the closest safe case, make the smallest fix, keep a rollback plan, and monitor the result.
 
-**Câu hỏi tiếng Việt:** Lỗi chỉ xảy ra production; bạn làm gì?
+**Câu hỏi tiếng Việt:** Lỗi chỉ xảy ra ở production; bạn làm gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> So sánh environment, build mode, data volume, permission, cache, network và feature flags. Dùng production-safe logs/traces/error reports, không log sensitive data. Reproduce môi trường gần nhất, deploy fix nhỏ có rollback và monitor kết quả.
+> Tôi so sánh production với local/staging về environment variable, build mode, data size, permission, cache, network và feature flag. Tôi dùng safe log và error report không chứa private data. Tôi reproduce case gần nhất, tạo fix nhỏ, có rollback plan rồi monitor kết quả.
 
-## AI-Assisted Development
+## AI-Assisted Development / Làm Việc Với AI
 
 ### 21. How Do You Use Claude Code or Cursor? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I use AI for repository exploration, a first implementation draft, test generation, refactoring options, and documentation. I provide the requirement, relevant architecture, constraints, examples, and acceptance checks. I ask for small diffs, inspect every change, run verification, and keep responsibility for the final behavior. The tool accelerates work; it does not decide the product or architecture by itself.
+> I use AI to explore the repository, create a first draft, suggest tests, explain unfamiliar code, and compare solutions. I give it the requirement, project rules, relevant files, and acceptance checks. I ask for small changes, review every line, run tests, and keep responsibility for the result.
 
-**Câu hỏi tiếng Việt:** Bạn dùng Claude Code hoặc Cursor thế nào?
+**Câu hỏi tiếng Việt:** Bạn dùng Claude Code hoặc Cursor như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Dùng để explore repo, tạo first draft, test, refactor options và docs. Tôi cung cấp requirement, architecture, constraints, examples, acceptance checks, yêu cầu diff nhỏ, inspect mọi change, chạy verification và chịu trách nhiệm final behavior.
+> Tôi dùng AI để explore repository, tạo first draft, gợi ý test, giải thích code lạ và so sánh solution. Tôi cung cấp requirement, project rule, relevant file và acceptance check. Tôi yêu cầu change nhỏ, review từng phần, chạy test và chịu trách nhiệm cho kết quả.
 
 ### 22. How Do You Prompt AI for a Frontend Feature? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I include the user outcome, current component and data flow, design-system primitives, state ownership, API contract, responsive and accessibility requirements, edge states, files in scope, and verification criteria. I ask it to inspect existing patterns before creating new abstractions. A good prompt narrows the decision space but still requires review.
+> I explain the user goal, current code flow, API contract, state owner, design components, responsive behavior, accessibility, loading, errors, and files in scope. I ask AI to inspect existing patterns before writing code. I also give clear checks that must pass.
 
-**Câu hỏi tiếng Việt:** Bạn prompt AI cho frontend feature thế nào?
+**Câu hỏi tiếng Việt:** Bạn prompt AI cho frontend feature như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Cung cấp user outcome, current component/data flow, design primitives, state ownership, API contract, responsive/a11y requirements, edge states, file scope và verification criteria. Yêu cầu AI inspect existing patterns trước khi tạo abstraction mới.
+> Tôi giải thích user goal, current code flow, API contract, state owner, design component, responsive behavior, accessibility, loading, error và file trong scope. Tôi yêu cầu AI kiểm tra existing pattern trước khi viết code và cung cấp các check rõ ràng phải pass.
 
 ### 23. What AI-Generated Mistakes Do You Expect? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Common mistakes are inventing APIs, using stale framework behavior, duplicating existing utilities, putting server state in local state, broad `'use client'` boundaries, missing loading or error states, inaccessible custom controls, fake performance optimization, and tests that only confirm the mock. AI code can look confident, so I verify assumptions in code and official documentation.
+> AI may invent an API, use an old framework rule, duplicate an existing utility, put API data in local state, or add `'use client'` too high. It may also miss loading, errors, accessibility, cleanup, and edge cases. The code can look confident, so I verify it.
 
-**Câu hỏi tiếng Việt:** Bạn dự đoán AI-generated code hay sai gì?
+**Câu hỏi tiếng Việt:** AI-generated code thường có thể sai gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Bịa API, dùng framework behavior cũ, duplicate utility, cho server state vào local state, mở `'use client'` quá rộng, thiếu loading/error, custom control không accessible, tối ưu giả và test chỉ chứng minh mock. Phải verify assumptions bằng code và official docs.
+> AI có thể bịa API, dùng framework rule cũ, duplicate utility đã có, đưa API data vào local state hoặc đặt `'use client'` quá cao. Nó cũng có thể thiếu loading, error, accessibility, cleanup và edge case. Code có thể nhìn rất tự tin nên tôi luôn verify.
 
 ### 24. How Do You Review AI-Generated Code? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> First I confirm it solves the actual requirement. Then I review file placement, responsibilities, types, data and tenant scope, state ownership, effects and cleanup, accessibility, performance, and failure states. I compare with existing project patterns, remove unnecessary abstractions, run targeted tests and static checks, and manually exercise the workflow. I accept only code I can explain.
+> First, I check that it solves the correct problem. Then I check file placement, types, state ownership, tenant scope, effects, cleanup, accessibility, performance, errors, and tests. I compare it with current project patterns and remove unnecessary code. I keep only code that I can explain.
 
-**Câu hỏi tiếng Việt:** Bạn review AI-generated code thế nào?
+**Câu hỏi tiếng Việt:** Bạn review AI-generated code như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Xác nhận nó giải đúng requirement, rồi review placement, responsibility, types, tenant/data scope, state ownership, effect cleanup, accessibility, performance và failure states. So với project patterns, xóa abstraction thừa, chạy tests/static checks và exercise workflow. Chỉ nhận code tôi giải thích được.
+> Đầu tiên tôi kiểm tra nó có giải đúng vấn đề không. Sau đó tôi kiểm tra file placement, type, state ownership, tenant scope, effect, cleanup, accessibility, performance, error và test. Tôi so với pattern hiện tại và xóa code không cần thiết. Tôi chỉ giữ code mình có thể giải thích.
 
 ### 25. What If AI Produces Working but Ugly Code? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Passing the happy path is only the first checkpoint. I identify duplicated knowledge, mixed responsibilities, unclear state ownership, and untested edge cases. I refactor within the feature scope while preserving behavior, then verify again. I do not keep poor structure merely because generation was fast; maintenance cost belongs to the team.
+> A working happy path is only the first step. I look for repeated logic, mixed responsibilities, unclear state, missing error states, and missing tests. I refactor the feature in small steps and test again. The team still has to maintain the code after AI creates it.
 
 **Câu hỏi tiếng Việt:** Nếu AI tạo code chạy được nhưng xấu thì sao?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Happy path pass chỉ là checkpoint đầu. Tôi tìm duplicated knowledge, mixed responsibility, unclear state ownership và untested edges, refactor trong feature scope, giữ behavior rồi verify lại. Generation nhanh không chuyển maintenance cost khỏi team.
+> Happy path chạy được chỉ là bước đầu. Tôi tìm logic lặp, mixed responsibility, state không rõ, error state thiếu và test thiếu. Tôi refactor feature theo các bước nhỏ rồi test lại. Team vẫn phải maintain code sau khi AI tạo ra nó.
 
 ### 26. Can AI Replace Frontend Fundamentals? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> No. AI can produce syntax quickly, but someone must decide component boundaries, source of truth, rendering strategy, accessibility, performance trade-offs, and whether generated code matches the actual framework version. Strong fundamentals make AI useful because they allow fast rejection and correction of plausible mistakes.
+> No. AI can write syntax quickly, but a developer must still choose the component structure, source of truth, Server and Client boundaries, accessibility, and performance trade-offs. Fundamentals help me see when generated code looks correct but is actually wrong.
 
-**Câu hỏi tiếng Việt:** AI có thay thế frontend fundamentals không?
+**Câu hỏi tiếng Việt:** AI có thể thay thế frontend fundamentals không?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Không. AI sinh syntax nhanh nhưng vẫn cần người quyết định component boundary, source of truth, rendering, accessibility, performance trade-offs và framework version. Fundamentals mạnh giúp reject/correct plausible mistakes nhanh.
+> Không. AI có thể viết syntax nhanh nhưng developer vẫn phải chọn component structure, source of truth, Server/Client boundary, accessibility và performance trade-off. Fundamentals giúp tôi nhận ra khi generated code nhìn đúng nhưng thật ra sai.
 
-## Behavioral and Situational Questions
+## Behavioral Questions / Câu Hỏi Hành Vi
 
-Use **STAR-L**: Situation, Task, Action, Result, Learning. Keep Situation short; spend most time on Action.
+> Dùng khung đơn giản: **Situation → What I did → Result → What I learned**. Phần “What I did” phải dài nhất.
 
 ### 27. Tell Me About a Technical Challenge [P0]
 
-**Core answer**
+**Simple English answer**
 
-> One challenge in QRTable was keeping customer cart interactions fast while preventing stale clients from overwriting newer state. The UI applies an optimistic patch so quantity changes feel immediate, but every request includes the expected cart version. We snapshot the previous cache, roll back on failure, and refetch on a version conflict. The result is responsive interaction with an explicit recovery path. The lesson was that visual optimism and data consistency must be designed together.
+> One challenge in QRTable was making cart updates feel fast without overwriting newer data. We updated the UI before the API finished, but every request also included the cart version. If the request failed, we restored the old cart. If the version was old, we fetched the latest data. I learned that speed and data safety must work together.
 
-**Ownership note:** Say “I implemented” only if Quân directly owned this hook; otherwise keep “we designed” or “the project uses”.
+**Câu hỏi tiếng Việt:** Hãy kể một technical challenge.
 
-**Câu hỏi tiếng Việt:** Hãy kể một technical challenge
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
+> Một challenge trong QRTable là làm cart update nhanh nhưng không ghi đè dữ liệu mới hơn. Chúng tôi update UI trước khi API xong nhưng mỗi request còn gửi cart version. Nếu request lỗi, chúng tôi khôi phục cart cũ. Nếu version cũ, chúng tôi fetch dữ liệu mới nhất. Tôi học được rằng tốc độ và data safety phải đi cùng nhau.
 
-> Một challenge của QRTable là làm cart interaction nhanh mà không để stale client overwrite state mới. UI optimistic patch ngay, request gửi expected cart version; previous cache được snapshot để rollback và conflict sẽ refetch. Bài học là visual optimism và data consistency phải thiết kế cùng nhau. Chỉ nói “tôi implement” nếu đúng ownership.
+**Ownership check:** Chỉ nói “I implemented” nếu Quân trực tiếp làm hook này; nếu không, dùng “we designed” hoặc “the project uses”.
 
 ### 28. Tell Me About a Bug You Solved [P0]
 
-**Repository-grounded answer**
+**Safe project-based answer**
 
-> A frontend integration risk we addressed was authenticated queries running before the client had hydrated the access token. The visible symptom was an avoidable unauthorized request even though the user had a valid session. We separated NextAuth session resolution from BFF readiness and gated feature queries until the token and profile were available. We added tests around auth readiness. The lesson was to model authentication as a lifecycle state, not a simple boolean.
+> One problem was that an API query could start before the client had prepared the access token. The user had a valid session, but the request could still get a 401 error. We made the query wait until the token and profile were ready and added tests for that state. I learned that authentication has several loading steps.
 
-**Personalize:** Confirm this matches a bug Quân actually investigated before presenting it as personal ownership.
+**Câu hỏi tiếng Việt:** Hãy kể một bug bạn đã giải quyết.
 
-**Câu hỏi tiếng Việt:** Hãy kể một bug bạn đã giải quyết
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
+> Một vấn đề là API query có thể chạy trước khi client chuẩn bị xong access token. User có session hợp lệ nhưng request vẫn có thể nhận lỗi 401. Chúng tôi cho query đợi đến khi token và profile sẵn sàng rồi thêm test cho state đó. Tôi học được rằng authentication có nhiều bước loading.
 
-> Một integration risk là query chạy trước khi access token hydrate, tạo unauthorized request dù session hợp lệ. Chúng tôi tách NextAuth resolution khỏi BFF readiness và gate queries đến khi token/profile sẵn sàng, kèm test. Bài học là auth là lifecycle state, không chỉ boolean. Cần cá nhân hóa nếu Quân trực tiếp debug.
+**Ownership check:** Xác nhận Quân thật sự tham gia debug phần này trước khi kể là câu chuyện cá nhân.
 
 ### 29. Tell Me About a Time Requirements Were Unclear [P0]
 
-**Core answer**
+**Simple English answer**
 
-> In the freelance payroll project, rules around salary records, allowances, deductions, and payroll periods affected both the interface and API behavior. Instead of implementing from labels alone, I listed the state transitions and edge cases, discussed them with the team, and separated confirmed rules from assumptions. That reduced rework and made manual testing more focused. I learned to ask questions in terms of business outcomes and examples, not only technical fields.
+> In the freelance payroll project, some rules for salary, allowances, deductions, and payroll periods were not clear. I listed examples and edge cases and discussed them with the team before changing the UI and API. We separated confirmed rules from assumptions. This reduced rework and made testing clearer.
 
-**Câu hỏi tiếng Việt:** Hãy kể khi requirement không rõ
+**Câu hỏi tiếng Việt:** Hãy kể khi requirement không rõ.
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Trong freelance payroll, rules về salary, allowance, deduction, period ảnh hưởng cả UI/API. Tôi liệt kê transitions/edge cases, trao đổi với team và tách confirmed rules khỏi assumptions. Điều này giảm rework và tập trung manual test; câu hỏi nên dựa vào business outcomes/examples.
+> Trong freelance payroll, một số rule về salary, allowance, deduction và payroll period chưa rõ. Tôi liệt kê example và edge case rồi trao đổi với team trước khi thay đổi UI và API. Chúng tôi tách confirmed rule khỏi assumption. Điều này giảm rework và giúp testing rõ hơn.
 
 ### 30. Tell Me About Working under a Tight Deadline [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Under a tight deadline, I first separate the critical user journey from optional polish, identify external dependencies, and make risks visible early. I deliver a vertical slice that can be reviewed, then add edge states and polish in priority order. I do not hide missing requirements until the end. My goal is a smaller verified result rather than a larger unreviewed change.
+> Under a tight deadline, I first choose the most important user flow. I separate required work from optional polish and report risks early. I deliver one small complete flow for review, then add error states and visual polish in order. I prefer a smaller tested result to a large unfinished change.
 
-**Personalize:** Add one real deadline from GEEK Up, freelance work, or the thesis defense.
+**Câu hỏi tiếng Việt:** Hãy kể khi làm việc dưới deadline gấp.
 
-**Câu hỏi tiếng Việt:** Hãy kể khi làm dưới deadline gấp
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
+> Khi deadline gấp, đầu tiên tôi chọn user flow quan trọng nhất. Tôi tách required work khỏi optional polish và báo risk sớm. Tôi giao một flow nhỏ nhưng hoàn chỉnh để review rồi thêm error state và visual polish theo thứ tự. Tôi ưu tiên kết quả nhỏ đã test hơn change lớn chưa hoàn thành.
 
-> Tôi tách critical user journey khỏi optional polish, xác định dependency và báo risk sớm. Tôi giao vertical slice reviewable trước rồi thêm edge states/polish theo priority. Mục tiêu là kết quả nhỏ nhưng verified thay vì change lớn chưa review. Cần gắn một deadline thật.
+**Personalize:** Thêm một deadline thật từ GEEK Up, freelance hoặc thesis defense.
 
 ### 31. Tell Me About Receiving Critical Feedback [P0]
 
-**Core answer**
+**Simple English answer**
 
-> During my frontend internship, merge-request feedback taught me to separate personal effort from code quality. I first made sure I understood the risk behind the comment, then changed the implementation and checked similar code. If I disagreed, I asked about the requirement and explained the trade-off with evidence. The important result was not only resolving one comment but improving how I prepared later changes for review.
+> During my internship, I received feedback through GitLab merge requests. I first tried to understand the problem behind the comment, then changed the code and checked similar places. If I did not agree, I asked about the requirement and explained my reason. I learned to treat feedback as a way to improve the result, not as a personal attack.
 
-**Personalize:** Add the exact feedback if remembered. Do not invent a specific comment.
+**Câu hỏi tiếng Việt:** Hãy kể khi bạn nhận feedback khó.
 
-**Câu hỏi tiếng Việt:** Hãy kể khi nhận feedback khó
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
+> Trong kỳ thực tập, tôi nhận feedback qua GitLab merge request. Đầu tiên tôi cố hiểu vấn đề phía sau comment, sau đó sửa code và kiểm tra các nơi tương tự. Nếu chưa đồng ý, tôi hỏi về requirement và giải thích lý do. Tôi học cách xem feedback là cách cải thiện kết quả chứ không phải công kích cá nhân.
 
-> Trong internship, merge-request feedback dạy tôi tách effort cá nhân khỏi code quality. Tôi hiểu risk phía sau comment, sửa implementation, kiểm tra code tương tự; nếu disagree thì hỏi requirement và nêu trade-off bằng evidence. Cần thêm exact feedback thật nếu nhớ.
+**Personalize:** Thêm một review comment thật nếu còn nhớ; không tự bịa.
 
 ### 32. Tell Me About a Mistake or Failure [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Earlier in project work, I sometimes started implementation before making all data and failure states explicit. That could create rework when the API contract or business rule changed. I improved by writing the user flow, source of truth, states, and acceptance checks before coding, especially for order and payment flows. I still value speed, but now I spend a short amount of time reducing uncertainty first.
+> Earlier, I sometimes started coding before the API data and error states were clear. When the contract changed, I had to redo part of the UI. Now I write the user flow, source of truth, important states, and acceptance checks first. I still move quickly, but I remove important uncertainty before coding.
 
-**Câu hỏi tiếng Việt:** Hãy kể một sai lầm hoặc thất bại
+**Câu hỏi tiếng Việt:** Hãy kể một sai lầm hoặc thất bại.
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Trước đây tôi đôi khi code trước khi explicit data/failure states nên phải rework khi contract đổi. Tôi cải thiện bằng cách viết user flow, source of truth, states và acceptance checks trước, nhất là order/payment. Bài học là giảm uncertainty lớn trước khi code, không phải over-plan.
+> Trước đây, đôi khi tôi bắt đầu code khi API data và error state chưa rõ. Khi contract thay đổi, tôi phải làm lại một phần UI. Hiện tại tôi viết user flow, source of truth, state quan trọng và acceptance check trước. Tôi vẫn làm nhanh nhưng loại bỏ uncertainty quan trọng trước khi code.
 
 ### 33. Tell Me About a Disagreement [P1]
 
-**Core answer**
+**Simple English answer framework**
 
-> When I disagree, I try to move the conversation from preference to constraints. I restate the shared goal, compare options by delivery time, correctness, maintainability, and user impact, and suggest a small experiment when evidence is missing. Once the team decides, I support the decision and document the trade-off. I do not treat a technical disagreement as a personal conflict.
+> We disagreed about […]. First, I restated our shared goal. Then we compared the options by delivery time, correctness, and maintenance cost. We chose […] because […]. After the decision, I supported it and documented the reason. I learned to discuss requirements and risks, not personal preference.
 
-**Câu hỏi tiếng Việt:** Hãy kể một lần bất đồng
+**Câu hỏi tiếng Việt:** Hãy kể một lần bạn bất đồng với teammate.
 
-**Trả lời tiếng Việt**
+**Khung trả lời tiếng Việt**
 
-> Tôi đưa tranh luận từ preference về constraints: restate shared goal, so options theo delivery, correctness, maintainability, user impact và đề xuất experiment nhỏ khi thiếu evidence. Khi team quyết, tôi support và document trade-off. Cần thay bằng câu chuyện thật trước phỏng vấn.
+> Chúng tôi bất đồng về […]. Đầu tiên, tôi nhắc lại mục tiêu chung. Sau đó, chúng tôi so sánh các option theo thời gian delivery, correctness và maintenance cost. Chúng tôi chọn […] vì […]. Sau khi quyết định, tôi ủng hộ và ghi lại lý do. Tôi học cách thảo luận requirement và risk thay vì sở thích cá nhân.
+
+**Must personalize:** Điền một câu chuyện thật trước phỏng vấn.
 
 ### 34. How Do You Prioritize Multiple Tasks? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I prioritize by user or business impact, deadline, dependency, risk, and reversibility. A blocker for another developer or a production issue comes before isolated polish. I clarify competing priorities with the owner instead of silently choosing, then communicate what will not fit. I keep one main task in progress and break large work into reviewable outcomes.
+> I look at user impact, deadline, dependencies, and risk. A production problem or a task blocking another developer comes before small visual polish. If two tasks have the same priority, I ask the owner instead of guessing. I also say clearly what cannot fit in the current time.
 
-**Câu hỏi tiếng Việt:** Bạn ưu tiên nhiều task thế nào?
+**Câu hỏi tiếng Việt:** Bạn ưu tiên nhiều task như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Theo user/business impact, deadline, dependency, risk và reversibility. Production issue hoặc blocker cho người khác trước isolated polish. Khi priority xung đột, tôi hỏi owner, nói rõ phần không fit và giữ một main task in progress.
+> Tôi xem user impact, deadline, dependency và risk. Production problem hoặc task đang block developer khác được ưu tiên trước visual polish nhỏ. Nếu hai task cùng priority, tôi hỏi owner thay vì tự đoán. Tôi cũng nói rõ phần nào không thể hoàn thành trong thời gian hiện tại.
 
 ### 35. What Do You Do When You Are Blocked? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I first define the exact blocker and try bounded investigation using code, documentation, logs, or a small reproduction. If I still need another person or decision, I report what I tried, the evidence, the impact, and a specific question. I continue any independent work that remains safe. I avoid spending hours silently stuck or asking for help without context.
+> I first define the exact blocker. I check the code, documentation, logs, and a small reproduction for a limited time. If I still need help, I explain what I tried, what I found, the impact, and one clear question. I continue other safe work when possible.
 
 **Câu hỏi tiếng Việt:** Bạn làm gì khi bị block?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Xác định blocker chính xác, điều tra có giới hạn qua code/docs/log/reproduction. Nếu vẫn cần người/decision, tôi báo những gì đã thử, evidence, impact và câu hỏi cụ thể; tiếp tục phần independent an toàn. Không im lặng stuck nhiều giờ.
+> Đầu tiên tôi xác định blocker chính xác. Tôi kiểm tra code, documentation, log và small reproduction trong thời gian giới hạn. Nếu vẫn cần giúp, tôi nói đã thử gì, tìm thấy gì, ảnh hưởng ra sao và đưa một câu hỏi rõ ràng. Tôi tiếp tục phần khác an toàn khi có thể.
 
 ### 36. How Do You Estimate a Frontend Task? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> I break the task into requirement clarification, design and states, data contract, implementation, tests, review, and integration risk. I identify unknowns separately from known work and give a range when uncertainty is meaningful. After discovering new information, I update the estimate early rather than defend an outdated number.
+> I split the task into requirement questions, UI states, API work, implementation, tests, review, and integration. I separate work I understand from unknown parts. If there is real uncertainty, I give a range. When new information appears, I update the estimate early.
 
-**Câu hỏi tiếng Việt:** Bạn estimate frontend task thế nào?
+**Câu hỏi tiếng Việt:** Bạn estimate frontend task như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Chia thành requirement clarification, design/states, data contract, implementation, tests, review và integration risk. Tách unknown khỏi known work, đưa range khi uncertainty lớn và update estimate sớm khi có thông tin mới.
+> Tôi chia task thành requirement question, UI state, API work, implementation, test, review và integration. Tôi tách phần đã hiểu khỏi phần chưa rõ. Nếu có uncertainty thật, tôi đưa một khoảng thời gian. Khi có thông tin mới, tôi update estimate sớm.
 
 ### 37. How Do You Work in Scrum or Agile? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> For me, Agile means short feedback loops and visible risk, not only ceremonies. I clarify acceptance criteria, keep work reviewable, report blockers in daily communication, use merge requests for feedback, and demonstrate working behavior. Retrospectives should produce a concrete improvement. At GEEK Up, I experienced Scrum and GitLab merge-request workflows in a product team.
+> For me, Agile means getting feedback early and making problems visible. I clarify acceptance criteria, keep changes small enough to review, report blockers, and show working features. At GEEK Up, I worked with Scrum, daily communication, and GitLab merge requests.
 
-**Câu hỏi tiếng Việt:** Bạn làm việc theo Scrum/Agile thế nào?
+**Câu hỏi tiếng Việt:** Bạn làm việc theo Scrum hoặc Agile như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Agile với tôi là short feedback loops và visible risk, không chỉ ceremonies. Tôi làm rõ acceptance, giữ work reviewable, báo blocker, dùng merge request feedback và demo behavior chạy được; retrospective phải tạo concrete improvement.
+> Với tôi, Agile nghĩa là nhận feedback sớm và làm problem visible. Tôi làm rõ acceptance criteria, giữ change đủ nhỏ để review, báo blocker và demo feature chạy được. Tại GEEK Up, tôi làm việc với Scrum, daily communication và GitLab merge request.
 
 ### 38. How Do You Balance Speed and Quality? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I protect non-negotiable quality such as security, data integrity, accessibility of critical actions, and recoverable errors. For lower-risk polish, I can reduce scope or schedule follow-up work. I use existing patterns, small diffs, automation, and AI to increase speed without skipping verification. The trade-off should be explicit, not hidden inside rushed code.
+> I never skip security, data correctness, important accessibility, or recoverable errors. For lower-risk visual polish, I can reduce scope or do it later. I use existing patterns, small changes, tools, and AI to move faster, but I still review and test the result.
 
-**Câu hỏi tiếng Việt:** Bạn cân bằng tốc độ và chất lượng thế nào?
+**Câu hỏi tiếng Việt:** Bạn cân bằng tốc độ và chất lượng như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Bảo vệ non-negotiable quality như security, data integrity, critical accessibility và recoverable errors. Với low-risk polish, có thể giảm scope/follow-up. Dùng existing patterns, small diffs, automation, AI để nhanh nhưng không bỏ verification; trade-off phải explicit.
+> Tôi không bỏ qua security, data correctness, accessibility quan trọng hoặc recoverable error. Với visual polish ít rủi ro hơn, tôi có thể giảm scope hoặc làm sau. Tôi dùng existing pattern, change nhỏ, tool và AI để nhanh hơn nhưng vẫn review và test kết quả.
 
 ### 39. How Do You Communicate with Backend Engineers? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I discuss the API as a contract: inputs, identity and tenant context, success shape, error codes, idempotency, state transitions, and realtime events. I provide a failing request or example payload when there is a problem. My backend experience helps me ask feasible questions, but I still represent frontend needs such as stable errors and user-visible consistency.
+> I discuss the API as a clear contract: request data, user and tenant context, success response, error codes, state changes, and realtime events. When there is a problem, I share the real request and response. My backend knowledge helps me ask practical questions while still explaining frontend needs.
 
-**Câu hỏi tiếng Việt:** Bạn giao tiếp với backend engineers thế nào?
+**Câu hỏi tiếng Việt:** Bạn giao tiếp với backend engineer như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Thảo luận API như contract: input, identity/tenant, success shape, error codes, idempotency, transitions, realtime events. Khi có lỗi, đưa failing request/payload. Backend experience giúp tôi hỏi khả thi nhưng vẫn đại diện frontend needs như stable errors và visible consistency.
+> Tôi thảo luận API như một contract rõ ràng: request data, user/tenant context, success response, error code, state change và realtime event. Khi có vấn đề, tôi chia sẻ request và response thật. Kiến thức backend giúp tôi đặt câu hỏi thực tế trong khi vẫn giải thích frontend need.
 
 ### 40. How Do You Communicate with Designers? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I ask about user priority, responsive behavior, content extremes, component variants, and missing states rather than only requesting pixel measurements. I reuse the design system, share an early interactive version, and report technical constraints with alternatives. If implementation must differ, the decision should preserve intent and be visible to the designer.
+> I ask about the user goal, responsive behavior, long or empty content, component variants, and missing states. I share an early working version instead of waiting until the end. If a technical limit requires a change, I explain the problem and suggest options that keep the design goal.
 
-**Câu hỏi tiếng Việt:** Bạn giao tiếp với designers thế nào?
+**Câu hỏi tiếng Việt:** Bạn giao tiếp với designer như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Hỏi user priority, responsive behavior, content extremes, variants và missing states thay vì chỉ pixel. Reuse design system, chia sẻ interactive version sớm và nêu technical constraints cùng alternatives. Nếu khác design, quyết định phải giữ intent và designer nhìn thấy.
+> Tôi hỏi về user goal, responsive behavior, content dài hoặc rỗng, component variant và missing state. Tôi chia sẻ working version sớm thay vì đợi đến cuối. Nếu technical limit yêu cầu thay đổi, tôi giải thích vấn đề và đề xuất option vẫn giữ design goal.
 
-## Story Preparation Checklist / Checklist Cá Nhân Hóa Câu Chuyện
+## Story Preparation Checklist / Checklist Cá Nhân Hóa
 
-The answers above are safe structures, but Quân must add real details for these five stories:
+- [ ] Một code-review comment thật tại GEEK Up.
+- [ ] Một payroll requirement thật từng bị mơ hồ.
+- [ ] Một frontend bug Quân trực tiếp debug trong QRTable.
+- [ ] Một lần bất đồng thật với thesis teammate.
+- [ ] Một deadline thật khiến Quân phải đổi scope hoặc priority.
 
-- [ ] One exact GEEK Up code-review comment.
-- [ ] One exact freelance payroll requirement ambiguity.
-- [ ] One QRTable frontend bug Quân personally diagnosed.
-- [ ] One disagreement with the thesis teammate and how it ended.
-- [ ] One deadline where Quân changed scope or priority.
-
-For each story, write only five lines: Situation, Task, Action, Result, Learning. If an exact metric does not exist, describe the verified result without inventing a percentage.
+Mỗi câu chuyện chỉ cần năm dòng: **Situation → Task → Action → Result → Learning**. Không có metric thật thì không tự tạo percentage.

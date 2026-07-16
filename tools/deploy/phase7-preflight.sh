@@ -11,7 +11,6 @@ MIN_DISK_KIB="${MIN_DISK_KIB:-8388608}"
 COMPOSE_FILES=(
   docker-compose.infra.yaml
   docker-compose.app.yaml
-  docker-compose.monitoring.yaml
   docker-compose.proxy.yaml
 )
 
@@ -98,9 +97,6 @@ current_commit="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
   fail "MANAGEMENT_APP_CLIENT_SECRET and AUTH_KEYCLOAK_SECRET must match"
 [[ "$(read_env_value PAYMENT_SECRETS_ENCRYPTION_KEY)" =~ ^[0-9a-fA-F]{64}$ ]] ||
   fail "PAYMENT_SECRETS_ENCRYPTION_KEY must contain exactly 64 hexadecimal characters"
-[[ "$(read_env_value GRAFANA_BASIC_AUTH_HASH)" =~ ^\$2[aby]\$ ]] ||
-  fail "GRAFANA_BASIC_AUTH_HASH must be a bcrypt hash; single-quote it in the env file"
-
 memory_kib="$(awk '/^MemTotal:/ { print $2 }' "${PROC_MEMINFO}")"
 swap_kib="$(awk '/^SwapTotal:/ { print $2 }' "${PROC_MEMINFO}")"
 [[ "${memory_kib:-0}" -ge "${MIN_MEMORY_KIB}" ]] ||

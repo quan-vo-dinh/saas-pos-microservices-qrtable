@@ -9,7 +9,6 @@ import {
   SiDocker,
   SiEslint,
   SiFramer,
-  SiGrafana,
   SiGit,
   SiKeycloak,
   SiLucide,
@@ -18,10 +17,8 @@ import {
   SiNestjs,
   SiNextdotjs,
   SiNx,
-  SiOpentelemetry,
   SiPostgresql,
   SiPrettier,
-  SiPrometheus,
   SiPwa,
   SiRadixui,
   SiReact,
@@ -94,23 +91,6 @@ const GROUPS: { title: string; rows: StackRow[] }[] = [
     rows: [
       { label: 'Cloudinary', Icon: SiCloudinary, hint: 'Ảnh menu, QR export' },
       { label: 'Docker · Compose', Icon: SiDocker },
-    ],
-  },
-  {
-    title: 'Quan sát (Grafana stack + OTel)',
-    rows: [
-      {
-        label: 'Grafana · Loki · Promtail',
-        Icon: SiGrafana,
-        hint: 'Dashboard, log tập trung, thu thập log Docker',
-      },
-      { label: 'Prometheus', Icon: SiPrometheus },
-      {
-        label: 'Grafana Tempo',
-        Icon: SiGrafana,
-        hint: 'Distributed tracing (cùng hệ Grafana; không có SiTempo trong react-icons 5.6)',
-      },
-      { label: 'OpenTelemetry', Icon: SiOpentelemetry },
     ],
   },
   {

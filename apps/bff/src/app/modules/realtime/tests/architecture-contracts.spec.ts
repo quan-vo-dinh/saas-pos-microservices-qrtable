@@ -134,7 +134,6 @@ describe('Phase 5 architecture contracts', () => {
       'apps/payment/',
       'libs/configuration/',
       'libs/guards/',
-      'libs/observability/',
       'libs/providers/redis-client/',
     ];
 

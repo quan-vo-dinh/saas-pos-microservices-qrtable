@@ -29,5 +29,4 @@ The Phase 7 artifacts demonstrate deployment configuration only. They do not pro
 - [Customer PWA API client](../apps/customer-pwa/src/lib/api-client.ts) — active tenant and session request-header status evidence.
 - [Catalog stock reservation entity](../libs/entities/src/lib/stock-reservation.entity.ts) — durable reservation-state status evidence.
 - [Catalog stock reservation migration](../apps/catalog/src/database/migrations/1781971200000-AddStockReservations.ts) — schema-migration status evidence.
-- [Retained Phase 7 execution plan](superpowers/plans/2026-06-06-phase-7-docker-digitalocean-deployment.md) — planning evidence only; not public deployment evidence.
 - [Doc-code anchor inventory](DOC-CODE-ANCHORS.md) — verified-path inventory for these and related evidence anchors.

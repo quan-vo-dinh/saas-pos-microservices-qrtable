@@ -11,7 +11,6 @@ import {
   SiNextdotjs,
   SiNx,
   SiPostgresql,
-  SiPrometheus,
   SiRedis,
   SiSocketdotio,
 } from 'react-icons/si';
@@ -84,7 +83,6 @@ export function TechPlatformSection(): ReactElement {
   const dockerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<HTMLDivElement>(null);
   const cloudinaryRef = useRef<HTMLDivElement>(null);
-  const prometheusRef = useRef<HTMLDivElement>(null);
 
   return (
     <section
@@ -158,9 +156,6 @@ export function TechPlatformSection(): ReactElement {
             </Circle>
             <Circle ref={cloudinaryRef} label="Cloudinary">
               <SiCloudinary className="size-5 text-[#3448C5] sm:size-[1.35rem]" aria-hidden />
-            </Circle>
-            <Circle ref={prometheusRef} label="Prometheus">
-              <SiPrometheus className="size-5 text-[#E6522C] sm:size-[1.35rem]" aria-hidden />
             </Circle>
           </div>
 
@@ -314,21 +309,6 @@ export function TechPlatformSection(): ReactElement {
             toRef={hubRef}
             curvature={34}
             delay={0.83}
-            duration={4.2}
-            pathColor="rgb(63 63 70)"
-            pathOpacity={0.2}
-            pathWidth={2}
-            gradientStartColor="#22d3ee"
-            gradientStopColor="#34d399"
-            repeatDelay={0.35}
-            reverse
-          />
-          <AnimatedBeam
-            containerRef={containerRef}
-            fromRef={prometheusRef}
-            toRef={hubRef}
-            curvature={54}
-            delay={0.9}
             duration={4.2}
             pathColor="rgb(63 63 70)"
             pathOpacity={0.2}

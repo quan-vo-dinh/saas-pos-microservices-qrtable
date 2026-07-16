@@ -21,7 +21,7 @@
 2. [Container Fundamentals - Docker là Gì và Tại Sao](#2-container-fundamentals--docker-là-gì-và-tại-sao)
 3. [Dockerfile - Đóng Gói Ứng Dụng](#3-dockerfile--đóng-gói-ứng-dụng)
 4. [Docker Compose - Điều Phối Nhiều Service](#4-docker-compose--điều-phối-nhiều-service)
-5. [Kiến Trúc 4 Lớp Của QRTable Production](#5-kiến-trúc-4-lớp-của-qrtable-production)
+5. [Kiến Trúc 3 Lớp Của QRTable Production](#5-kiến-trúc-3-lớp-của-qrtable-production)
 6. [Reverse Proxy và HTTPS](#6-reverse-proxy-và-https)
 7. [Secrets và Environment Management](#7-secrets-và-environment-management)
 8. [DigitalOcean Deployment - Hạ Tầng Và Provisioning](#8-digitalocean-deployment--hạ-tầng-và-provisioning)
@@ -62,7 +62,7 @@ Nguồn chính:
 
 ### How this guide covers the Phase 7 plan
 
-`docs/superpowers/plans/2026-06-06-phase-7-docker-digitalocean-deployment.md` là implementation plan. Tài liệu này là foundation guide. Khi plan yêu cầu tạo một file hoặc workflow, guide này giải thích vì sao file đó tồn tại, nó giải quyết rủi ro nào, và cách debug khi deploy fail.
+Đây là foundation guide của Phase 7. Tài liệu giải thích vì sao mỗi deployment artifact tồn tại, nó giải quyết rủi ro nào, và cách debug khi deploy fail.
 
 | Phase 7 tasks                                               | Kiến thức nền trong guide này                                                                           |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -72,7 +72,6 @@ Nguồn chính:
 | Task 7: Caddy reverse proxy                                 | Reverse proxy role, TLS termination, Let's Encrypt ACME, WebSocket forwarding                           |
 | Task 8: Production env and secrets                          | Secret taxonomy, runtime env files, file permissions, no secret build args                              |
 | Task 9: Production bootstrap                                | Per-service migrations, ownership verification, Kafka topics và Keycloak bootstrap                      |
-| Task 10: Monitoring baseline                                | Internal scrape targets, private observability stores, Grafana sau HTTPS/auth                           |
 | Task 11: DigitalOcean provisioning và deployment            | 4 GB budget profile, firewall, Porkbun DNS, Docker setup, preflight, startup order và public HTTPS      |
 | Task 12: Smoke, backup, rollback, demo và docs              | External smoke, logical backup, restore proof, image rollback, demo evidence và canonical docs          |
 
@@ -82,7 +81,7 @@ Nguồn chính:
 
 ### 1.1 Bài Toán Gốc: "Chạy Được Trên Máy Tôi"
 
-QRTable có 8 NestJS services, 2 frontend apps, PostgreSQL, MongoDB, Redis, Kafka, Keycloak, và toàn bộ observability stack (Prometheus, Loki, Tempo, Grafana). Trên máy dev, tất cả chạy với `docker compose up` và mọi thứ hoạt động.
+QRTable có 8 NestJS services, 2 frontend apps, PostgreSQL, MongoDB, Redis, Kafka và Keycloak. Trên máy dev, tất cả chạy với `docker compose up` và mọi thứ hoạt động.
 
 Nhưng khi cần deploy lên server thật — DigitalOcean Droplet chạy Ubuntu 24.04 — bài toán thay đổi hoàn toàn:
 
@@ -181,12 +180,12 @@ Container registry
   lưu và phân phối image
 ```
 
-| Thành phần     | Vai trò                                        | Ví dụ QRTable                           |
-| -------------- | ---------------------------------------------- | --------------------------------------- |
-| Docker CLI     | Nhận lệnh từ developer hoặc CI                 | `docker compose up -d`                  |
-| Docker daemon  | Thực thi build và quản lý container trên host  | Daemon trên DigitalOcean Droplet        |
-| Image registry | Lưu image để máy khác có thể pull              | DigitalOcean Container Registry         |
-| Docker Compose | Đọc YAML và gọi Docker API cho nhiều container | Khởi động app, infra, proxy, monitoring |
+| Thành phần     | Vai trò                                        | Ví dụ QRTable                    |
+| -------------- | ---------------------------------------------- | -------------------------------- |
+| Docker CLI     | Nhận lệnh từ developer hoặc CI                 | `docker compose up -d`           |
+| Docker daemon  | Thực thi build và quản lý container trên host  | Daemon trên DigitalOcean Droplet |
+| Image registry | Lưu image để máy khác có thể pull              | DigitalOcean Container Registry  |
+| Docker Compose | Đọc YAML và gọi Docker API cho nhiều container | Khởi động app, hạ tầng và proxy  |
 
 Ví dụ:
 
@@ -1038,8 +1037,8 @@ secrets:
     file: ./secrets/database_password.txt
 
 configs:
-  prometheus_config:
-    file: ./docker/monitoring/prometheus.yml
+  application_config:
+    file: ./docker/config/application.yml
 ```
 
 | Top-level key | Vai trò                                                             |
@@ -1373,20 +1372,18 @@ Docker Compose cung cấp:
 
 ### 4.7 Networks — Cô Lập Và Định Tuyến
 
-Docker network trong QRTable Production tách public routing, identity, observability và datastore
-traffic:
+Docker network trong QRTable Production tách public routing, identity và datastore traffic:
 
 ```yaml
 qrtable-edge: # Caddy, BFF, Management App, Customer PWA
 qrtable-identity: # Caddy, Keycloak, Authorizer/User-Access khi cần
-qrtable-observability: # Caddy và monitoring stack
-qrtable-data: # Datastores, internal services, metrics/traces
+qrtable-data: # Datastores và internal services
 ```
 
 #### Sơ đồ: Network Topology QRTable Production
 
-> Bốn network theo mục đích áp dụng defense in depth. Internet chỉ đến Caddy. Caddy chỉ reach các
-> upstream edge, identity và observability đã phê duyệt, còn `qrtable-data` nằm ngoài proxy boundary.
+> Ba network theo mục đích áp dụng defense in depth. Internet chỉ đến Caddy. Caddy chỉ reach các
+> upstream edge và identity đã phê duyệt, còn `qrtable-data` nằm ngoài proxy boundary.
 
 ```mermaid
 graph LR
@@ -1419,12 +1416,8 @@ graph LR
         KC["Keycloak :8080"]
     end
 
-    subgraph "qrtable-observability network (internal)"
-        GRAFANA["Grafana :3000"]
-    end
-
     USER -->|"HTTPS 443"| CADDY
-    CADDY --> BFF & MGMT & PWA & KC & GRAFANA
+    CADDY --> BFF & MGMT & PWA & KC
     BFF <-->|"TCP"| ORDER & CATALOG & KITCHEN & PAYMENT & SAAS & AUTH & UA
     ORDER & SAAS & PAYMENT & CATALOG --> PG
     UA --> MONGO
@@ -1441,11 +1434,9 @@ graph LR
 **Quy tắc network của QRTable:**
 
 - **Chỉ Caddy** publish host ports 80/443 và UDP 443.
-- **Caddy** join `qrtable-edge`, `qrtable-identity`, và `qrtable-observability`, không join
-  `qrtable-data`.
+- **Caddy** join `qrtable-edge` và `qrtable-identity`, không join `qrtable-data`.
 - **BFF và frontends** dùng chung `qrtable-edge`; BFF còn join `qrtable-data` cho internal clients.
 - **Keycloak** dùng `qrtable-identity` với Caddy và `qrtable-data` với PostgreSQL.
-- **Grafana** dùng `qrtable-observability` với Caddy; Prometheus, Loki và Tempo vẫn private.
 - **Datastores và internal services** dùng `qrtable-data`; không service nào publish host port.
 
 Mỗi container có loopback riêng. Bên trong BFF container:
@@ -1463,8 +1454,8 @@ redis:6379
 Docker embedded DNS chỉ resolve service names khi hai containers chia sẻ ít nhất một network.
 
 `internal: true` cô lập network khỏi external connectivity. Tuy nhiên Caddy cố ý bridge public edge
-vào identity và observability network. Vì vậy Caddyfile chỉ được proxy Keycloak HTTP port và Grafana
-HTTP port đã phê duyệt, không proxy datastore hoặc management port.
+vào identity network. Vì vậy Caddyfile chỉ được proxy Keycloak HTTP port đã phê duyệt, không proxy
+datastore hoặc management port.
 
 ### 4.8 Volumes — Persistent Storage
 
@@ -1544,24 +1535,22 @@ Trong Compose string, `$$` escape để `$` được truyền vào container tha
 
 Healthcheck exit code `0` là success. Non-zero là failure.
 
-**Giới hạn quan trọng:** `depends_on: condition: service_healthy` chỉ điều phối startup. Nếu PostgreSQL chết sau khi Order đã start, Compose không tự hiểu business dependency và không tự restart Order theo dependency graph. Application vẫn cần retry/reconnect logic và monitoring.
+**Giới hạn quan trọng:** `depends_on: condition: service_healthy` chỉ điều phối startup. Nếu PostgreSQL chết sau khi Order đã start, Compose không tự hiểu business dependency và không tự restart Order theo dependency graph. Application vẫn cần retry/reconnect logic và operational health checks.
 
 ### 4.10 Layered Compose — Tách Concerns
 
-QRTable dùng 4 compose files riêng biệt, mỗi file có responsibility rõ ràng:
+QRTable dùng 3 compose files riêng biệt, mỗi file có responsibility rõ ràng:
 
-| File                             | Chứa gì                                     | Start bằng cách nào                                      |
-| -------------------------------- | ------------------------------------------- | -------------------------------------------------------- |
-| `docker-compose.infra.yaml`      | PostgreSQL, MongoDB, Redis, Kafka, Keycloak | `docker compose -f docker-compose.infra.yaml up -d`      |
-| `docker-compose.app.yaml`        | 8 NestJS services + 2 frontend apps         | `docker compose -f docker-compose.app.yaml up -d`        |
-| `docker-compose.proxy.yaml`      | Caddy reverse proxy                         | `docker compose -f docker-compose.proxy.yaml up -d`      |
-| `docker-compose.monitoring.yaml` | Prometheus, Loki, Promtail, Tempo, Grafana  | `docker compose -f docker-compose.monitoring.yaml up -d` |
+| File                        | Chứa gì                                     | Start bằng cách nào                                 |
+| --------------------------- | ------------------------------------------- | --------------------------------------------------- |
+| `docker-compose.infra.yaml` | PostgreSQL, MongoDB, Redis, Kafka, Keycloak | `docker compose -f docker-compose.infra.yaml up -d` |
+| `docker-compose.app.yaml`   | 8 NestJS services + 2 frontend apps         | `docker compose -f docker-compose.app.yaml up -d`   |
+| `docker-compose.proxy.yaml` | Caddy reverse proxy                         | `docker compose -f docker-compose.proxy.yaml up -d` |
 
 **Lý do tách:**
 
 - Deploy mới: chỉ cần restart `docker-compose.app.yaml` — infra không cần restart
 - Update config proxy: chỉ restart `docker-compose.proxy.yaml` — apps không downtime
-- Monitoring optional: có thể tắt monitoring layer khi cần tiết kiệm RAM
 
 **External networks:** Các compose file khác nhau communicate qua shared networks:
 
@@ -1591,7 +1580,6 @@ Phase 7 preflight nên render tất cả layer cùng nhau:
 docker compose --env-file docker/env/.env.production \
   -f docker-compose.infra.yaml \
   -f docker-compose.app.yaml \
-  -f docker-compose.monitoring.yaml \
   -f docker-compose.proxy.yaml \
   config -q
 ```
@@ -1600,7 +1588,7 @@ docker compose --env-file docker/env/.env.production \
 
 ---
 
-## 5. Kiến Trúc 4 Lớp Của QRTable Production
+## 5. Kiến Trúc 3 Lớp Của QRTable Production
 
 ### 5.1 Thứ Tự Start — Không Thể Tùy Tiện
 
@@ -1610,23 +1598,17 @@ docker compose --env-file docker/env/.env.production \
    → Keycloak connect Postgres để bootstrap database
    → Cần đợi vài phút cho Keycloak init hoàn tất
 
-2. docker compose -f docker-compose.monitoring.yaml up -d
-   → Prometheus, Loki, Promtail, Tempo, Grafana start
-   → Promtail bắt đầu collect log từ containers (kể cả infra layer)
-
-3. tools/deploy/phase7-run-production-bootstrap.sh
+2. tools/deploy/phase7-run-production-bootstrap.sh
    → Migrations → ownership verification → Kafka topics → Keycloak bootstrap
    → Bất kỳ lỗi nào cũng chặn application startup
 
-4. docker compose -f docker-compose.app.yaml up -d
+3. docker compose -f docker-compose.app.yaml up -d
    → All services start với explicit per-service environment mappings
 
-5. docker compose -f docker-compose.proxy.yaml up -d
+4. docker compose -f docker-compose.proxy.yaml up -d
    → Caddy start, request Let's Encrypt certs
-   → HTTPS live cho api, app, qr, auth, grafana subdomains
+   → HTTPS live cho api, app, qr, auth subdomains
 ```
-
-**Tại sao monitoring trước app?** Promtail cần nhìn thấy Docker containers khi chúng start để collect log từ đầu. Nếu start monitoring sau app, các log từ lúc start sẽ bị miss.
 
 **Tại sao proxy cuối cùng?** Caddy sẽ request Let's Encrypt certificate khi start — DNS phải đã resolve về Droplet IP. Nếu proxy start trước khi DNS propagate, cert request sẽ fail.
 
@@ -1647,45 +1629,9 @@ Tất cả ports sau KHÔNG được Compose publish:
   9092         Kafka
   8080         Keycloak HTTP (đi qua Caddy → auth.domain)
   9000         Keycloak management/health (không đi qua Caddy)
-  3000         Grafana (đi qua Caddy → grafana.domain)
-  3100, 9090, 3200, 4318  Monitoring (không expose ra ngoài)
 ```
 
 **Nguyên tắc:** Mọi service đều internal. Chỉ Caddy tiếp xúc với internet. Caddy làm TLS termination và forward về internal service qua Docker network.
-
-### 5.3 Monitoring Layer — Quan Sát Được Nhưng Không Public
-
-Monitoring production có hai mục tiêu tưởng như ngược nhau:
-
-1. Team phải xem được logs, metrics, traces khi hệ thống có lỗi.
-2. Người ngoài không được truy cập dữ liệu quan sát, vì logs và traces có thể chứa tenant id, route, error message, provider response, hoặc metadata thanh toán.
-
-Vì vậy Phase 7 dùng policy:
-
-| Component  | Public không?                    | Cách truy cập                              |
-| ---------- | -------------------------------- | ------------------------------------------ |
-| Grafana    | Có, nhưng qua HTTPS + basic auth | `grafana.qrtable.vodinhquan.dev` qua Caddy |
-| Prometheus | Không                            | Internal Docker network only               |
-| Loki       | Không                            | Internal Docker network only               |
-| Tempo      | Không                            | Internal Docker network only               |
-| Promtail   | Không có UI                      | Đọc Docker logs nội bộ                     |
-
-Prometheus production phải scrape bằng service name, không dùng `host.docker.internal`:
-
-```yaml
-scrape_configs:
-  - job_name: qrtable-backend
-    metrics_path: /api/v1/metrics
-    static_configs:
-      - targets:
-          - bff:3300
-          - order:3301
-          - catalog:3305
-          - kitchen:3307
-          - payment:3308
-```
-
-**Mental model:** Grafana là cửa sổ để quan sát. Prometheus/Loki/Tempo là kho dữ liệu nội bộ. Public Grafana đã là một rủi ro, nên phải có HTTPS, auth, strong password, và có thể thêm IP restriction sau thesis.
 
 ---
 
@@ -1693,7 +1639,7 @@ scrape_configs:
 
 ### 6.1 Tại Sao Cần Reverse Proxy
 
-Không có reverse proxy, muốn serve HTTPS cho 5 subdomains phải:
+Không có reverse proxy, muốn serve HTTPS cho 4 subdomains phải:
 
 - Handle TLS certificate cho từng domain trong mỗi app
 - Mỗi app tự quản lý cert renewal
@@ -1738,33 +1684,14 @@ qr.qrtable.vodinhquan.dev {
 auth.qrtable.vodinhquan.dev {
   reverse_proxy keycloak:8080
 }
-
-grafana.qrtable.vodinhquan.dev {
-  basic_auth bcrypt {
-    {$GRAFANA_BASIC_AUTH_USER} {$GRAFANA_BASIC_AUTH_HASH}
-  }
-  reverse_proxy grafana:3000 {
-    header_up -Authorization
-  }
-}
 ```
 
-Caddyfile tracked không chứa password. Sinh bcrypt hash trực tiếp vào protected server environment:
-
-```bash
-docker run --rm -it caddy:2.10.2-alpine caddy hash-password
-```
-
-Lưu output thành `GRAFANA_BASIC_AUTH_HASH` trong `/opt/qrtable/.env.production` với mode `0600`.
-Grafana vẫn yêu cầu login riêng sau outer Caddy basic-auth gate.
-
-Validate production file với hash thật trước DNS cutover:
+Validate production files trước DNS cutover:
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.infra.yaml \
   -f docker-compose.app.yaml \
-  -f docker-compose.monitoring.yaml \
   -f docker-compose.proxy.yaml \
   config -q
 
@@ -1775,7 +1702,7 @@ docker compose --env-file /opt/qrtable/.env.production \
 ```
 
 Config validation không request certificate. Public certificate issuance chỉ được chứng minh ở Task
-11 sau khi năm DNS records trỏ về Droplet, TCP 80/443 và UDP 443 được mở, và Caddy start với
+11 sau khi bốn DNS records trỏ về Droplet, TCP 80/443 và UDP 443 được mở, và Caddy start với
 protected production environment.
 
 Đây là equivalent Nginx config với manual TLS:
@@ -1954,13 +1881,12 @@ liên quan vào mọi container.
 
 | Tier                  | Config                        | Use case                                               |
 | --------------------- | ----------------------------- | ------------------------------------------------------ |
-| Budget pilot (target) | 2 vCPU / 4 GiB + 2–4 GiB swap | Thesis demo và limited use với retention có giới hạn   |
+| Budget pilot (target) | 2 vCPU / 4 GiB + 2–4 GiB swap | Thesis demo và limited use                             |
 | Temporary resize      | 4 vCPU / 8 GiB                | Chỉ sau measured OOM, sustained low memory hoặc paging |
 | Hardening             | 4+ vCPU / 8+ GiB + managed DB | Sau thesis khi availability và data safety cần tăng    |
 
-Evidence Phase 7 local đo infra và monitoring idle khoảng 2.4 GiB trước budget tuning. Production
-profile giới hạn Kafka ở heap 512 MiB và Keycloak ở heap 384 MiB. Vì vậy target 4 GiB cần swap,
-bounded logs/retention, build image ngoài host và runtime monitoring. Xem
+Production profile giới hạn Kafka ở heap 512 MiB và Keycloak ở heap 384 MiB. Vì vậy target 4 GiB
+cần swap, bounded container logs và build image ngoài host. Xem
 [`production-deployment-runbook.md`](production-deployment-runbook.md) cho resize thresholds.
 
 **Region `sgp1` (Singapore):** Gần nhất với Vietnam → latency thấp nhất. Kiểm tra availability vì không phải mọi DO product đều có ở mọi region.
@@ -1982,8 +1908,6 @@ Deny tất cả còn lại:
   TCP 6379       (Redis)       → DENY
   TCP 27017      (MongoDB)     → DENY
   TCP 9092       (Kafka)       → DENY
-  TCP 3000-3001  (Grafana)     → DENY
-  TCP 9090       (Prometheus)  → DENY
 ```
 
 **Tại sao Cloud Firewall tốt hơn chỉ dựa vào Docker network?** Defense in depth — hai lớp bảo vệ. Nếu config Docker network sai (ví dụ vô tình expose PostgreSQL port), Cloud Firewall vẫn chặn từ network layer bên ngoài.
@@ -2014,7 +1938,6 @@ api.qrtable      → <Reserved IP hoặc final IPv4 đã duyệt>
 app.qrtable      → <cùng IPv4>
 qr.qrtable       → <cùng IPv4>
 auth.qrtable     → <cùng IPv4>
-grafana.qrtable  → <cùng IPv4>
 
 # Verify propagation (có thể mất 5-30 phút)
 dig +short api.qrtable.vodinhquan.dev
@@ -2034,7 +1957,6 @@ Production server cần một layout ổn định để deploy script không ph�
     docker-compose.infra.yaml
     docker-compose.app.yaml
     docker-compose.proxy.yaml
-    docker-compose.monitoring.yaml
     docker/
     tools/deploy/
   releases/
@@ -2054,7 +1976,7 @@ ENV_FILE=/opt/qrtable/.env.production tools/deploy/phase7-preflight.sh
 
 Script kiểm tra non-root operator, env ownership/mode, unresolved placeholders, immutable tag,
 production safety values, 4 GiB RAM profile, ít nhất 2 GiB swap, disk headroom, Docker access và
-rendered four-layer Compose config. Image pull là bước explicit riêng sau khi preflight pass.
+rendered three-layer Compose config. Image pull là bước explicit riêng sau khi preflight pass.
 
 **Không nhầm preflight với smoke test:**
 
@@ -2664,8 +2586,8 @@ Checklist này dùng để tự kiểm tra: nếu đọc guide xong vẫn không
 - Có thể đọc YAML mapping, sequence, scalar, indentation và variable interpolation.
 - Phân biệt `image`/`build`, `command`/`entrypoint`, `environment`/`env_file`, `ports`/`expose`.
 - Hiểu lifecycle của `pull`, `build`, `create`, `start`, `up -d`, `restart`, `down`, `exec`, `run`, `config`.
-- Infra, app, proxy, monitoring là các layer độc lập.
-- Databases, Redis, Kafka, Prometheus, Loki, Tempo không có public port.
+- Infra, app và proxy là các layer độc lập.
+- Databases, Redis và Kafka không có public port.
 - Caddy là service duy nhất expose `80` và `443`.
 - App containers gọi nhau bằng service name (`order`, `catalog`, `postgres`, `redis`, `kafka`), không dùng `localhost`.
 - Named volumes giữ database, Kafka, Redis, Keycloak, và Caddy certificate data.
@@ -2674,11 +2596,10 @@ Checklist này dùng để tự kiểm tra: nếu đọc guide xong vẫn không
 ### 12.3 Production Readiness
 
 - DigitalOcean Cloud Firewall chỉ mở SSH từ IP tin cậy, `80`, và `443`.
-- DNS A records cho `api`, `app`, `qr`, `auth`, `grafana` đã resolve đúng Droplet IP trước khi start Caddy.
+- DNS A records cho `api`, `app`, `qr` và `auth` đã resolve đúng Droplet IP trước khi start Caddy.
 - `/opt/qrtable/.env.production` tồn tại trên server, permission `0600`, không commit.
 - `TYPEORM_SYNCHRONIZE=false` đi cùng per-service migrations, và deploy chạy migrations trước app startup.
 - Keycloak chạy production `start`, không dùng `start-dev`.
-- Grafana đi qua HTTPS và auth; observability stores private.
 
 ### 12.4 CI/CD Và Operations
 
@@ -2717,15 +2638,13 @@ mindmap
       Volumes = persistent storage
       Health checks = dependency ordering
       Layered compose = separation of concerns
-    Kiến Trúc 4 Lớp
+    Kiến Trúc 3 Lớp
       infra: PostgreSQL MongoDB Redis Kafka Keycloak
       app: 8 NestJS + 2 frontend
       proxy: Caddy HTTPS termination
-      monitoring: PLG + Prometheus + Tempo
     Network Topology
       qrtable-edge: Caddy, BFF, frontends
       qrtable-identity: Caddy, Keycloak
-      qrtable-observability: Caddy, Grafana, monitoring
       qrtable-data: datastores và internal services
       Chỉ Caddy publish 80/tcp, 443/tcp, 443/udp
     Secrets Management
@@ -2742,7 +2661,7 @@ mindmap
     DigitalOcean
       Droplet: 2 vCPU 4 GiB Ubuntu 24.04 với 2–4 GiB swap
       Cloud Firewall: chỉ 22/80/443 public
-      DNS: A records cho 5 subdomains
+      DNS: A records cho 4 subdomains
       Caddy: tự động Let's Encrypt TLS
     Migration Lifecycle
       TYPEORM_SYNCHRONIZE=false ở mọi môi trường
@@ -2754,11 +2673,13 @@ Sau khi đọc toàn bộ tài liệu, đây là mental model cần ghi nhớ:
 
 **Về Docker:** Image là template immutable, container là instance đang chạy. Multi-stage build tạo runtime image nhỏ gọn. Layers được cache — instruction ít thay đổi lên trên, hay thay đổi xuống dưới. `NEXT_PUBLIC_`\_ và `VITE\__` là build-time, baked vào JS bundle — không thể thay đổi runtime. Secrets không bao giờ là Docker build arg.
 
-**Về Docker Compose:** Các network edge, identity, observability và data theo mục đích phản ánh
-defense in depth. Chỉ Caddy publish internet ports. Health checks là tiên quyết để `depends_on` có ý
-nghĩa. Layered compose files tách concerns: infra/app/proxy/monitoring restart độc lập nhau.
+**Về Docker Compose:** Các network edge, identity và data theo mục đích phản ánh defense in depth.
+Chỉ Caddy publish internet ports. Health checks là tiên quyết để `depends_on` có ý nghĩa. Layered
+compose files tách concerns: infra/app/proxy restart độc lập nhau.
 
-**Về deployment flow:** Thứ tự quan trọng: infra healthy → monitoring → app containers → proxy (Caddy cần DNS đã resolve trước khi request cert). Caddy data volume giữ Let's Encrypt cert — không xóa. Secrets trong `/opt/qrtable/.env.production` với permission 0600 — không bao giờ world-readable.
+**Về deployment flow:** Thứ tự quan trọng: infra healthy → bootstrap → app containers → proxy
+(Caddy cần DNS đã resolve trước khi request cert). Caddy data volume giữ Let's Encrypt cert — không
+xóa. Secrets trong `/opt/qrtable/.env.production` với permission 0600 — không bao giờ world-readable.
 
 **Về CI/CD:** Ba workflow tách biệt: CI (quality gate), Release (build immutable images), Deploy (approval + remote SSH). Immutable tags với git SHA — không bao giờ dùng `:latest` trong production. Rollback = deploy lại tag cũ của image — không phải "deploy code cũ". Schema migration là hard gate — không thể skip.
 

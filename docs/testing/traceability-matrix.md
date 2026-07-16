@@ -20,7 +20,7 @@
 ## Inventory notes
 
 - Fast tests are mostly Jest or Nx specs under `apps/**` and `libs/**`.
-- Browser E2E today is limited to `tests/e2e/step-2.7-realtime.spec.ts` and `tests/e2e/phase-3-payment.spec.ts`.
+- Browser E2E today includes 15 tests across 5 Playwright files: `tests/e2e/step-2.7-realtime.spec.ts`, `tests/e2e/phase-3-payment.spec.ts`, `tests/e2e/phase-4c-staff-dashboard.spec.ts`, `tests/e2e/phase-5-admin-dashboard-routes.spec.ts`, and `tests/e2e/phase-5-suspended-tenant.spec.ts`.
 - **Stack-dependent** items need PostgreSQL, Redis, Kafka, Keycloak, frontend dev servers, or provider credentials when noted.
 - **No test file found** means the inventory did not locate an adequate spec for that rule; it does not mean the rule is unimportant.
 
@@ -32,7 +32,7 @@
 
 ## Catalog and QR
 
-### `P0-CAT-TENANT-ISOLATION` — `partial` (P0, tenant-isolation)
+### `P0-CAT-TENANT-ISOLATION` — `covered` (P0, tenant-isolation)
 
 **Requirement:** Catalog, admin, and public menu reads and writes must be tenant-scoped; tenant A must not see tenant B data.
 
@@ -42,7 +42,7 @@
 
 **Target layer:** integration. **Stack:** BFF, Catalog, auth seed.
 
-**Notes:** Unit or service coverage exists and stack-dependent frontend-utils integration files exist. Default `pnpm nx test frontend-utils` intentionally skips the live BFF/Keycloak integration suites. Opt-in prerequisites are BFF at `BFF_URL`, Keycloak at `KEYCLOAK_URL`, Catalog service and database with tenant A/B menu fixtures, seeded tenant-scoped users, and `RUN_FRONTEND_UTILS_INTEGRATION=1`. Run `RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils` against that seeded stack before treating this as a reliable live-stack gate.
+**Notes:** Unit or service coverage exists and stack-dependent frontend-utils integration files cover authenticated Catalog CRUD, missing tenant header rejection, and public menu tenant scoping. Default `pnpm nx test frontend-utils` intentionally skips the live BFF/Keycloak integration suites. The seeded M2 stack passed `RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils` with `72/72` tests after the integration helper was aligned with the `management-app` confidential client secret used by dev seed.
 
 ---
 
@@ -474,7 +474,7 @@
 
 **Target layer:** integration. **Stack:** SaaS database, Authorizer and Keycloak, User-Access, Payment TCP, Kafka or outbox.
 
-**Notes:** Step 5.3 SaaS PostgreSQL integration proves successful tenant, initial subscription, payment-settings TCP contract call, and `tenant.created` outbox persistence, plus compensation before and after subscription assignment. The live Payment slice was re-verified on 2026-05-31 with `RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-live-payment.integration.spec.ts`, proving real Payment TCP creates exactly one Payment-owned `tenant_payment_settings` row. The PostgreSQL integration was re-verified with `RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-db.integration.spec.ts`; test fixtures now use UUID-valid owner IDs because `tenants.owner_id` is a `uuid` column. This remains `partial` because Authorizer + real Keycloak and live User-Access are still represented by TCP contract doubles rather than a full live multi-service harness. Opt-in prerequisites are PostgreSQL for SaaS/Payment tables, Payment TCP for the live Payment slice, and, before full live multi-service readiness, Keycloak, Authorizer, User-Access, Payment TCP, and Kafka or outbox verification running and seeded.
+**Notes:** Step 5.3 SaaS PostgreSQL integration proves successful tenant, initial subscription, payment-settings TCP contract call, and `tenant.created` outbox persistence, plus compensation before and after subscription assignment. The live Payment slice was re-verified on 2026-06-01 with `NODE_ENV=development GLOBAL_PREFIX=api/v1 RUN_PHASE5_SAAS_ONBOARDING_LIVE_PAYMENT=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-live-payment.integration.spec.ts`, proving real Payment TCP creates exactly one Payment-owned `tenant_payment_settings` row. The PostgreSQL integration was re-verified with `NODE_ENV=development GLOBAL_PREFIX=api/v1 RUN_PHASE5_SAAS_ONBOARDING_INTEGRATION=1 pnpm exec jest --config apps/saas/jest.config.cts --runInBand apps/saas/src/services/onboarding-saga-db.integration.spec.ts`; test fixtures now use UUID-valid owner IDs because `tenants.owner_id` is a `uuid` column. This remains `partial` because Authorizer + real Keycloak and live User-Access are still represented by TCP contract doubles rather than a full live multi-service harness. Opt-in prerequisites are PostgreSQL for SaaS/Payment tables, Payment TCP for the live Payment slice, `GLOBAL_PREFIX=api/v1` for SaaS config validation in the direct Jest command, and, before full live multi-service readiness, Keycloak, Authorizer, User-Access, Payment TCP, and Kafka or outbox verification running and seeded.
 
 ---
 
@@ -612,7 +612,7 @@
 
 ### `P0-RBAC-PERMISSION-MATRIX-COUNTS` — `covered` (P0, rbac)
 
-**Requirement:** Canonical RBAC seed has six roles and sixty-five permissions with role counts `SUPER_ADMIN=65`, `OWNER=37`, `MANAGER=34`, `WAITER=15`, `CHEF=6`, `BARISTA=6`; live login smoke should verify representative permissions.
+**Requirement:** Canonical RBAC seed has six roles and sixty-seven permissions with role counts `SUPER_ADMIN=67`, `OWNER=38`, `MANAGER=35`, `WAITER=15`, `CHEF=6`, `BARISTA=6`; live login smoke should verify representative permissions.
 
 **Sources:** `permission-matrix` (4, 6, 9.3).
 
@@ -624,7 +624,7 @@
 
 ---
 
-### `P0-RBAC-TENANT-ISOLATION-API` — `partial` (P0, tenant-isolation)
+### `P0-RBAC-TENANT-ISOLATION-API` — `covered` (P0, tenant-isolation)
 
 **Requirement:** Non-SUPER_ADMIN actors must not override tenant scope from client input; SUPER_ADMIN cross-tenant access must be explicit and controlled.
 
@@ -634,7 +634,7 @@
 
 **Target layer:** integration. **Stack:** BFF, auth seed, service databases.
 
-**Notes:** Guard and client tests exist. Default `pnpm nx test frontend-utils` intentionally skips the live BFF/Keycloak integration suites; tenant-isolation API coverage still needs the opt-in seeded stack command plus broader representative endpoints before this row can move beyond `partial`. Opt-in prerequisites are BFF at `BFF_URL`, Keycloak, Authorizer, User-Access, service databases, auth bootstrap users from `tools/auth-bootstrap-users.json`, representative OWNER, MANAGER, WAITER, CHEF, BARISTA, and SUPER_ADMIN credentials, and `RUN_FRONTEND_UTILS_INTEGRATION=1`. Run `RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils` and `BFF_URL=http://localhost:3300/api/v1 AUTH_BOOTSTRAP_USERS_FILE=tools/auth-bootstrap-users.json bash tools/verify-permission-matrix.sh` against that seeded stack before promoting this row.
+**Notes:** Guard and client tests exist. Default `pnpm nx test frontend-utils` intentionally skips the live BFF/Keycloak integration suites. The seeded M2 stack passed both `RUN_FRONTEND_UTILS_INTEGRATION=1 BFF_URL=http://localhost:3300/api/v1 KEYCLOAK_URL=http://localhost:8180 pnpm nx test frontend-utils` and `BFF_URL=http://localhost:3300/api/v1 AUTH_BOOTSTRAP_USERS_FILE=tools/auth-bootstrap-users.json bash tools/verify-permission-matrix.sh`, verifying live login, role identity, exact role permission counts, tenant-scoped Catalog endpoints, missing tenant rejection, and public-menu non-leakage.
 
 ---
 
@@ -712,13 +712,13 @@
 
 ### `P1-PHASE4A-SAGA-HARDENING` — `deferred-by-phase` (P1, architecture)
 
-**Requirement:** Durable CDC or Debezium, full transactional outbox hardening, deep saga observability, and replay dashboards.
+**Requirement:** Durable CDC or Debezium, full transactional outbox hardening, deep saga diagnostics, and replay tooling.
 
 **Sources:** `technical-architecture` (12); `phase-5-testing` scope and deferred work.
 
 **Tests:** none.
 
-**Target layer:** deferred. **Stack:** Kafka, PostgreSQL, observability stack.
+**Target layer:** deferred. **Stack:** Kafka and PostgreSQL.
 
 **Notes:** The representative Order Confirm Saga is already implemented and tracked under `P0-ORD-STATE-STOCK`. This row only covers full operational hardening beyond the representative slice; do not fail Phase 5 Step 5.1 on missing tests for these future items.
 
@@ -744,15 +744,13 @@ Ordered by urgency; each line is **priority**, **rule id**, **status**, and **ne
 
 1. **P0** — `P0-ORD-STATE-STOCK` — `partial` — Add deterministic fault injection for Order commit/outbox failure after live Catalog deduct, then assert release-stock compensation.
 2. **P0** — `P0-SAAS-ONBOARDING-SAGA` — `partial` — Add live Authorizer + Keycloak and User-Access proof; DB success/compensation and live Payment TCP are now covered.
-3. **P0** — `P0-CAT-TENANT-ISOLATION` — `partial` — Run the opt-in seeded BFF/Keycloak/Catalog gate and record evidence before treating it as a reliable live-stack gate.
-4. **P0** — `P0-RBAC-TENANT-ISOLATION-API` — `partial` — Add representative live-stack API checks once BFF/auth/service seed policy is stable.
-5. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Extend the browser smoke with a seeded pending-bill payment exception path after Flow B/B+D data is stable.
+3. **P0** — `P0-SAAS-SUSPENDED-CUSTOMER-PWA` — `partial` — Extend the browser smoke with a seeded pending-bill payment exception path after Flow B/B+D data is stable.
 
 ---
 
 ## First P0 batch candidates
 
-1. **Integration:** Finish `P0-ORD-STATE-STOCK` compensation fault injection, then continue `P0-SAAS-ONBOARDING-SAGA` live Authorizer/Keycloak + User-Access or fix the frontend-utils Keycloak client mismatch before promoting `P0-CAT-TENANT-ISOLATION` / `P0-RBAC-TENANT-ISOLATION-API`.
+1. **Integration:** Finish `P0-ORD-STATE-STOCK` compensation fault injection, then continue `P0-SAAS-ONBOARDING-SAGA` live Authorizer/Keycloak + User-Access.
 2. **Browser E2E:** Extend `P0-SAAS-SUSPENDED-CUSTOMER-PWA` with pending-bill payment, then payment close-session coverage from `P1-PAY-BROWSER-CLOSE-SESSION` if promoted for demo risk.
 3. **Optional fast feedback:** BFF quota edge checks for `P0-SAAS-FEATURE-GATING-QUOTAS` if the UI needs pre-forward upgrade prompts.
 

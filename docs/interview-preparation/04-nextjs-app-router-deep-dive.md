@@ -1,500 +1,627 @@
-# Next.js App Router Deep Dive / Chuyên Sâu Next.js App Router
+# Next.js App Router — Simple Interview Answers / Câu Trả Lời Phỏng Vấn Dễ Nói
 
-> QRTable Management App currently uses Next.js 16.1.x without enabling Cache Components. Distinguish general Next.js capability from the current project implementation.
+> Mục tiêu của file này là **nói được**, không phải học thuộc một bài viết. Khi thiếu thời gian, hãy nhớ câu đầu tiên và hai ý chính. Các từ như `Server Component`, `hydration`, `cache`, `query` là technical terms nên giữ nguyên.
+>
+> QRTable Management App đang dùng Next.js 16.1.x và chưa bật Cache Components. Khi nói về caching, cần phân biệt tính năng chung của Next.js với những gì QRTable thật sự đang dùng.
 
 ## 1. What Is the App Router? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> The App Router is Next.js’s file-system router built around React Server Components, nested layouts, loading and error boundaries, streaming, and server-side data access. Folders define route segments while special files such as `page`, `layout`, `loading`, `error`, and `route` define behavior. The main architecture decision is not the folder syntax; it is where server and client responsibilities belong.
+> Basically, the App Router lets Next.js create routes from the `app` folder. When I add `app/dashboard/page.tsx`, Next.js creates the `/dashboard` page. A `layout.tsx` file can keep shared UI, like a sidebar, while the user moves between pages. It also gives me Server Components, loading UI, error UI, and server-side data fetching near the route.
 
 **Câu hỏi tiếng Việt:** App Router là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> App Router là file-system router của Next.js dựa trên React Server Components, nested layouts, loading/error boundaries, streaming và server-side data access. Folder tạo route segment; các file `page`, `layout`, `loading`, `error`, `route` định nghĩa behavior. Quyết định chính là đặt server/client responsibilities ở đâu.
+> Về cơ bản, App Router cho Next.js tạo route từ thư mục `app`. Khi tôi thêm `app/dashboard/page.tsx`, Next.js tạo page `/dashboard`. File `layout.tsx` có thể giữ UI dùng chung, như sidebar, khi user chuyển giữa các page. Nó cũng cho tôi Server Component, loading UI, error UI và server-side data fetching gần route đó.
 
-## 2. Server Components Versus Client Components [P0]
+## 2. What Is the Difference Between Server and Client Components? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Server Components execute on the server and can access server-side data without adding their component code to the client bundle. Client Components are required for state, effects, browser APIs, event handlers, and client-only libraries. I keep the client boundary as small as practical and compose interactive client leaves inside server-rendered structure.
+> A Server Component runs on the server. It is useful for reading data and keeping the client JavaScript smaller. A Client Component is needed for state, effects, click events, and browser APIs. I normally start with Server Components and add Client Components where needed.
 
-**Tiếng Việt:** Không nói Server Component “an toàn tự động”; vẫn phải kiểm soát authorization và dữ liệu trả về client.
+**Câu hỏi tiếng Việt:** Server Component và Client Component khác nhau thế nào?
 
-**Câu hỏi tiếng Việt:** Server Components và Client Components khác nhau thế nào?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
-
-> Server Components chạy trên server, truy cập server data và không đưa component code của chúng vào client bundle. Client Components cần cho state, effect, browser API, event handler và client-only library. Tôi giữ client boundary nhỏ và compose interactive leaves trong server structure.
+> Server Component chạy ở server, phù hợp để đọc dữ liệu và giúp giảm JavaScript gửi xuống browser. Client Component cần thiết khi có state, effect, sự kiện click hoặc browser API. Tôi thường bắt đầu bằng Server Component rồi chỉ thêm Client Component ở nơi cần tương tác.
 
 ## 3. What Does `'use client'` Mean? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> `'use client'` marks a module as a client entry boundary. Its imports and transitive client dependencies become part of the client module graph. It does not mean that the component can never be pre-rendered to HTML, and it does not need to appear in every descendant file. Because the boundary can expand the bundle, I place it close to the interactive feature.
+> `'use client'` tells Next.js that this file starts a client-side part of the UI. I need it when the component uses state, effects, event handlers, or browser APIs. I place it as low as possible because a high client boundary can send more JavaScript to the browser.
 
-**Câu hỏi tiếng Việt:** `'use client'` có nghĩa gì?
+**Câu hỏi tiếng Việt:** `'use client'` có nghĩa là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> `'use client'` đánh dấu module là client entry boundary; imports và transitive client dependencies đi vào client graph. Nó không có nghĩa component không thể được pre-render HTML và không cần ghi lại ở mọi descendant. Boundary càng cao có thể tăng bundle.
+> `'use client'` cho Next.js biết file này bắt đầu một phần UI chạy phía client. Tôi dùng nó khi component cần state, effect, event handler hoặc browser API. Tôi đặt nó càng gần phần tương tác càng tốt để tránh gửi quá nhiều JavaScript xuống browser.
 
 ## 4. Can a Server Component Render a Client Component? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Yes. A Server Component can render a Client Component and pass serializable props to it. Server-rendered content can also be composed into a Client Component through props such as `children`. However, a Client Component cannot directly import a Server Component as a normal client dependency.
+> A Server Component can render a Client Component. For example, it can fetch a list of restaurant tables and render a Client Component that handles filters and click events. It passes the table data through serializable props. However, the Client Component should not directly import a Server Component as a normal client dependency.
 
-**Câu hỏi tiếng Việt:** Server Component có render Client Component được không?
+**Câu hỏi tiếng Việt:** Server Component có thể render Client Component không?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Có. Server Component có thể render Client Component và truyền serializable props. Server-rendered content cũng có thể được compose qua `children`. Nhưng Client Component không thể import trực tiếp Server Component như normal client dependency.
+> Server Component có thể render một Client Component. Ví dụ, nó có thể fetch danh sách bàn rồi render một Client Component xử lý filter và click event. Nó truyền table data qua các prop có thể serialize. Tuy nhiên, Client Component không nên import trực tiếp Server Component như một dependency phía client.
 
-## 5. Why Must Props Crossing the Boundary Be Serializable? [P0]
+## 5. Why Must Props Be Serializable? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Values crossing from server execution to the client must be represented in the React transport payload. Functions, open database connections, and most class instances cannot cross as ordinary props. I pass plain data and keep server-only capabilities behind server functions, Route Handlers, or approved server actions.
+> Data must move from the server to the browser, so React needs a format that it can send and rebuild. Strings, numbers, arrays, and plain objects are usually fine. Functions, database connections, and many class objects cannot be passed as normal props.
 
-**Câu hỏi tiếng Việt:** Vì sao props qua server–client boundary phải serializable?
+**Câu hỏi tiếng Việt:** Vì sao props truyền từ server sang client phải serializable?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Giá trị qua React transport phải biểu diễn được trong payload. Function, open DB connection và đa số class instance không thể truyền như props thường. Tôi truyền plain data và giữ server capabilities sau server function, Route Handler hoặc server action phù hợp.
+> Vì dữ liệu phải được gửi từ server xuống browser nên React cần một định dạng có thể truyền và tạo lại được. String, number, array và object thông thường thường dùng được. Function, kết nối database và nhiều class object thì không thể truyền như props bình thường.
 
-## 6. How Do You Choose a Server/Client Boundary? [P0]
+## 6. How Do You Choose a Server or Client Component? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I start server-first for data access, security-sensitive work, static structure, and bundle reduction. I introduce a client boundary at the smallest area that needs interaction, browser state, effects, or a client library. Then I check whether the boundary causes a large subtree or provider to move client-side. The goal is not zero Client Components; it is intentional ownership.
+> I first ask whether the component needs state, effects, click events, or browser APIs. If not, I keep it as a Server Component. If yes, I make only that interactive part a Client Component. Data access and security checks should stay on the server when possible.
 
-**Câu hỏi tiếng Việt:** Bạn chọn Server/Client boundary thế nào?
+**Câu hỏi tiếng Việt:** Bạn chọn Server Component hay Client Component như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi bắt đầu server-first cho data access, security-sensitive work, static structure và giảm bundle. Tôi mở client boundary tại vùng nhỏ nhất cần interaction, browser state, effect hoặc client library, rồi kiểm tra boundary có kéo subtree/provider quá lớn sang client graph không.
+> Trước tiên, tôi xem component có cần state, effect, sự kiện click hoặc browser API không. Nếu không, tôi giữ nó là Server Component. Nếu có, tôi chỉ chuyển phần tương tác đó thành Client Component. Việc lấy dữ liệu và kiểm tra bảo mật nên ở server khi có thể.
 
-## 7. SSR, SSG, ISR, and CSR [P0]
+## 7. What Are SSR, SSG, ISR, and CSR? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> SSR produces route output on the server for a request. Static generation produces reusable output ahead of or independently from each request. Revalidation refreshes cached output or data after a policy interval or explicit invalidation. CSR fetches and renders data after client JavaScript runs. In the App Router these ideas can be mixed within a route, so I describe the actual data and cache behavior instead of forcing the whole page into one label.
+> I usually compare them by asking where and when the page is created. With SSR, the server creates it for each request. With SSG, the page is created before a request and reused later. ISR also reuses a saved page, but it refreshes the page after some time. With CSR, the browser waits for JavaScript and creates the main UI there. Next.js can mix these approaches.
 
-**Câu hỏi tiếng Việt:** SSR, SSG, ISR và CSR khác nhau thế nào?
+**Câu hỏi tiếng Việt:** SSR, SSG, ISR và CSR là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> SSR tạo output server theo request; static generation tạo output có thể reuse; revalidation refresh cached output/data theo policy; CSR fetch/render sau khi client JavaScript chạy. App Router có thể trộn chúng trong một route nên phải mô tả behavior thực tế từng data segment.
+> Tôi thường so sánh chúng bằng cách hỏi page được tạo ở đâu và khi nào. Với SSR, server tạo page cho từng request. Với SSG, page được tạo trước khi có request rồi được sử dụng lại. ISR cũng dùng lại một page đã lưu, nhưng có thể refresh page sau một khoảng thời gian. Với CSR, browser đợi JavaScript rồi tạo phần UI chính ở đó. Next.js có thể kết hợp các cách này.
 
 ## 8. What Is Streaming? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Streaming allows the server to send ready parts of the UI before every asynchronous dependency finishes. Suspense boundaries define meaningful fallbacks and reveal units. It improves perceived performance when slow regions are independent, but too many small boundaries can cause visual instability or a fragmented experience.
+> With streaming, I do not need to wait for the slowest part of the page. The server can send the header and sidebar first, while a slow report still shows a Suspense fallback. This lets the user see and use the ready part of the UI earlier.
 
 **Câu hỏi tiếng Việt:** Streaming là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Streaming cho server gửi phần UI đã sẵn sàng trước khi mọi dependency hoàn tất. Suspense boundary định nghĩa fallback và reveal unit. Nó cải thiện perceived performance cho vùng độc lập, nhưng quá nhiều boundary nhỏ có thể gây visual instability.
+> Với streaming, tôi không cần đợi phần chậm nhất của page. Server có thể gửi header và sidebar trước, trong khi report tải chậm vẫn hiện Suspense fallback. Nhờ vậy user có thể nhìn thấy và dùng phần UI đã sẵn sàng sớm hơn.
 
 ## 9. What Is Hydration? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Hydration is the process where React attaches client behavior to server-generated HTML and reconciles it with the client’s first render. A hydration mismatch occurs when the initial client output differs from the server HTML. Common causes include browser-only values during render, current time, random values, locale differences, invalid HTML, or data that changes between server render and hydration.
+> Hydration is the process where React takes the HTML created on the server and makes it interactive in the browser. The server HTML lets the user see the page early. When JavaScript loads, React attaches event handlers, so buttons, forms, and other interactions can work.
 
 **Câu hỏi tiếng Việt:** Hydration là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Hydration là quá trình React gắn client behavior vào HTML do server tạo và reconcile với first client render. Mismatch xảy ra khi hai output ban đầu khác nhau, thường do browser-only value, time, random, locale, invalid HTML hoặc data đổi giữa hai thời điểm.
+> Hydration là quá trình React lấy HTML được tạo trên server và làm cho nó có thể tương tác trong browser. HTML từ server giúp người dùng nhìn thấy trang sớm. Khi JavaScript được tải, React gắn các event handler để button, form và những tương tác khác có thể hoạt động.
 
 ## 10. How Do You Fix a Hydration Mismatch? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I reproduce the exact mismatch and identify the first differing node. Then I make the initial render deterministic, move browser-only work to an effect or client-only boundary, pass a stable server value, or fix invalid markup. I use suppression only for a deliberate unavoidable difference, not as a general way to hide the warning.
+> A hydration mismatch means the server HTML and the browser’s first render are different. I find the first different part and make both sides produce the same initial UI. For example, I move browser-only code into `useEffect`, use CSS for responsive UI, or pass the same initial value from the server.
 
-**Câu hỏi tiếng Việt:** Bạn sửa hydration mismatch thế nào?
+**Câu hỏi tiếng Việt:** Bạn sửa hydration mismatch như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi reproduce và tìm node khác đầu tiên, sau đó làm initial render deterministic, chuyển browser-only work sang effect/client-only boundary, truyền stable server value hoặc sửa markup. Chỉ suppress khi difference thật sự deliberate và không tránh được.
+> Hydration mismatch nghĩa là server HTML và lần render đầu tiên trong browser khác nhau. Tôi tìm phần khác nhau đầu tiên rồi làm cho hai bên tạo ra cùng một initial UI. Ví dụ, tôi chuyển browser-only code vào `useEffect`, dùng CSS cho responsive UI hoặc truyền cùng một initial value từ server.
 
-## 11. How Does Caching Work in the Current QRTable Next.js Version? [P0]
+## 11. How Does Caching Work in QRTable’s Next.js Version? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Caching depends on the Next.js mode and version. QRTable uses Next.js 16 without Cache Components enabled, so I reason with the previous caching model. In that model, `fetch` is not cached by default; a request can opt into data caching with options such as `cache: 'force-cache'` or a revalidation policy. I avoid memorizing one universal rule and verify route and data behavior against the project configuration.
+> For QRTable, I think about caching like this. By default, a `fetch` result is not reused for later requests because Cache Components is off. If public data changes slowly, I can choose `force-cache` or a revalidation time. So I first decide how fresh the data needs to be, and then I choose the cache policy.
 
-**QRTable evidence:** Public landing fetches opt into revalidation intervals; operational authenticated screens are mostly client-driven.
+**Câu hỏi tiếng Việt:** Caching hoạt động thế nào trong phiên bản Next.js của QRTable?
 
-**Câu hỏi tiếng Việt:** Caching hoạt động thế nào trong version Next.js hiện tại của QRTable?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
-
-> Caching phụ thuộc version/mode. QRTable dùng Next.js 16 nhưng không bật Cache Components, nên theo previous caching model: `fetch` không cache mặc định và có thể opt-in bằng `cache: 'force-cache'` hoặc revalidation policy. Tôi luôn kiểm tra config thay vì học một rule universal.
+> Với QRTable, tôi nghĩ về caching theo cách này. Mặc định, kết quả từ `fetch` không được dùng lại cho các request sau vì Cache Components đang tắt. Nếu public data ít thay đổi, tôi có thể chọn `force-cache` hoặc đặt thời gian revalidation. Vì vậy, trước tiên tôi xác định dữ liệu cần mới đến mức nào rồi mới chọn cache policy.
 
 ## 12. What Are Cache Components? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> Cache Components are an opt-in Next.js model that uses features such as the `use cache` directive and Partial Prerendering to combine static shells, cached work, and request-time content. QRTable does not currently enable that mode, so I can explain it as a framework capability but would not claim it as implemented.
+> Cache Components are optional in newer Next.js versions. The idea is simple: with `use cache`, one part of a page can be reused while another part is created for each request. It also works with Partial Prerendering. QRTable does not enable it yet, so I can explain the idea, but I would not say that I implemented it.
 
 **Câu hỏi tiếng Việt:** Cache Components là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Đây là mô hình opt-in của Next.js dùng `use cache` và Partial Prerendering để kết hợp static shell, cached work và request-time content. QRTable chưa bật nên tôi chỉ claim hiểu capability, không claim đã implement.
+> Cache Components là tính năng tùy chọn trong các phiên bản Next.js mới. Ý tưởng rất đơn giản: với `use cache`, một phần của page có thể được sử dụng lại còn phần khác vẫn được tạo theo từng request. Nó cũng hoạt động cùng Partial Prerendering. QRTable chưa bật tính năng này nên tôi có thể giải thích ý tưởng, nhưng không nói rằng mình đã triển khai nó.
 
 ## 13. What Is Revalidation? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Revalidation refreshes cached data or output after it becomes stale or after an explicit invalidation. Time-based revalidation fits data that can be slightly stale. On-demand invalidation fits mutations or external events where a specific tag or path is known. The policy should match business freshness rather than use one interval everywhere.
+> I use revalidation when cached data needs to become fresh again. For example, a public plan list can be reused for five minutes, or a mutation can refresh it immediately after the data changes. I choose the method based on how fresh the business data needs to be.
 
 **Câu hỏi tiếng Việt:** Revalidation là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Revalidation refresh cached data/output sau khi stale hoặc explicit invalidation. Time-based phù hợp data chịu được trễ; on-demand phù hợp mutation/event biết tag/path. Policy phải theo business freshness.
+> Tôi dùng revalidation khi dữ liệu đã cache cần mới lại. Ví dụ, public plan list có thể được sử dụng lại trong năm phút, hoặc một mutation có thể refresh nó ngay sau khi dữ liệu thay đổi. Tôi chọn cách làm dựa trên mức độ mới mà business data cần có.
 
-## 14. Layout Versus Template [P1]
+## 14. What Is the Difference Between a Layout and a Template? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> A layout wraps route segments and normally preserves its instance and state across navigation within that boundary. A template has similar nesting but creates a new instance on navigation, so child client state and effects reset. I use a layout for persistent navigation or providers and a template only when remounting is intentional.
+> The main difference is how they handle state.
+>
+> A layout stays mounted during navigation. It does not re-render its parent structure, so the state and DOM are kept.
+>
+> - **Example:** In QRTable, we use layouts for the main dashboard sidebar and navigation topbar. When a user goes from "Tenants" to "Plans", the sidebar stays the same, and the search input value is not lost.
+>
+> A template creates a new instance on every navigation. It resets its state and runs `useEffect` again.
+>
+> - **Example:** We use templates when we need page transition animations, or when we want to log page view events every time the user enters a page. It is also useful for multi-step forms where we want the state to reset when navigating away.
 
 **Câu hỏi tiếng Việt:** Layout và template khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Layout wrap route segments và thường giữ instance/state qua navigation trong boundary. Template có nesting tương tự nhưng tạo instance mới nên reset client state/effects. Dùng template khi remount là chủ ý.
+> Điểm khác biệt lớn nhất là cách chúng quản lý trạng thái (state).
+>
+> Layout được giữ nguyên (stay mounted) khi chuyển trang. Nó không render lại cấu trúc cha, giúp giữ nguyên state và DOM.
+>
+> - **Ví dụ (Case study):** Trong QRTable, layout dùng cho sidebar và topbar của dashboard. Khi chuyển từ trang "Tenants" sang "Plans", sidebar không bị nhấp nháy, và nội dung ô tìm kiếm (search input) không bị mất.
+>
+> Template tạo ra một instance hoàn toàn mới mỗi khi chuyển trang. Nó sẽ reset lại state và chạy lại các `useEffect`.
+>
+> - **Ví dụ (Case study):** Ta dùng template khi muốn làm hiệu ứng chuyển trang (page transition animations), hoặc cần ghi nhận lượt xem trang (log page view) mỗi khi người dùng click vào trang mới. Nó cũng hữu ích cho các biểu mẫu nhiều bước (multi-step form) khi bạn muốn dữ liệu tự động reset nếu người dùng chuyển trang khác.
 
 ## 15. What Are Route Groups? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Parentheses create route groups that organize segments without adding the group name to the URL. They are useful for separate layouts or product areas. QRTable uses groups such as auth, dashboard, POS, KDS, and admin to express different interface shells and responsibilities.
+> A route group is a folder name inside parentheses, such as `(admin)`. It helps organize routes or give different areas different layouts. The group name does not appear in the URL. QRTable uses route groups for areas such as auth, POS, KDS, and admin.
 
-**Câu hỏi tiếng Việt:** Route groups là gì?
+**Câu hỏi tiếng Việt:** Route group là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Folder trong ngoặc đơn tổ chức segments mà không thêm tên group vào URL, hữu ích cho layout/product area khác nhau. QRTable dùng groups cho auth, dashboard, POS, KDS và admin.
+> Route group là folder có tên nằm trong dấu ngoặc đơn, ví dụ `(admin)`. Nó giúp sắp xếp route hoặc dùng layout khác nhau cho từng khu vực. Tên group không xuất hiện trên URL. QRTable dùng route group cho auth, POS, KDS và admin.
 
-## 16. `loading.tsx`, `error.tsx`, and `not-found.tsx` [P0]
+## 16. What Do `loading.tsx`, `error.tsx`, and `not-found.tsx` Do? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> `loading` provides a route-segment Suspense fallback, `error` provides a client error boundary with a reset path, and `not-found` renders the not-found experience for a segment. They turn failure and waiting into architectural states rather than scattered conditions. QRTable currently has component-level loading and error handling but limited route-level special files, which is an improvement opportunity.
+> `loading.tsx` shows UI while a route is loading. `error.tsx` catches an error for that route area and can provide a retry action. `not-found.tsx` shows the not-found UI. These files keep loading and error behavior close to the route.
 
-**Câu hỏi tiếng Việt:** `loading.tsx`, `error.tsx`, `not-found.tsx` dùng để làm gì?
+**Câu hỏi tiếng Việt:** `loading.tsx`, `error.tsx` và `not-found.tsx` dùng để làm gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> `loading` cung cấp Suspense fallback theo segment, `error` tạo client error boundary có reset, `not-found` hiển thị trạng thái không tìm thấy. QRTable có feature-level states nhưng route-level special files còn hạn chế.
+> `loading.tsx` hiện giao diện trong lúc route đang tải. `error.tsx` bắt lỗi trong khu vực route đó và có thể cho phép thử lại. `not-found.tsx` hiện giao diện không tìm thấy. Các file này giúp đặt cách xử lý loading và error gần với route.
 
-## 17. Route Handlers Versus Server Components [P0]
+## 17. What Is the Difference Between a Route Handler and a Server Component? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> A Server Component can read data directly for rendering and does not need to call an internal HTTP endpoint merely to reach the same server. A Route Handler exposes an HTTP boundary and is appropriate for external clients, webhooks, callbacks, downloads, or client-side requests. I avoid unnecessary server-to-self HTTP calls because they add latency and duplicate contracts.
+> A Server Component runs on the server to build HTML and UI, while a Route Handler acts like a mini backend controller in Next.js, creating API endpoints to return raw data like JSON or files. I use Server Components to display layouts and pages, and I use Route Handlers for custom callbacks, external webhooks, or file downloads. Because Server Components already run on the server, they should call databases or services directly instead of fetching from internal Route Handlers, which avoids slow and unnecessary HTTP requests.
 
 **Câu hỏi tiếng Việt:** Route Handler và Server Component khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Server Component có thể đọc data trực tiếp để render, không cần gọi HTTP nội bộ đến chính server. Route Handler tạo HTTP boundary cho external client, webhook, callback, download hoặc client-side request. Tránh server tự gọi chính nó nếu không cần.
+> Server Component chạy trên server để tạo ra mã HTML và giao diện hiển thị, còn Route Handler hoạt động giống như một trình xử lý backend thu nhỏ của Next.js, tạo ra các API endpoint để trả về dữ liệu thuần như JSON hoặc file tải xuống. Tôi dùng Server Component để dựng các trang giao diện, và dùng Route Handler để nhận webhook từ bên thứ ba, callback hoặc xuất file Excel. Vì Server Component vốn dĩ đã chạy trên server, nó nên gọi trực tiếp database hoặc service nội bộ thay vì gửi request HTTP qua API của chính nó để tránh làm chậm hệ thống không đáng có.
 
-## 18. Server Actions: When Would You Use Them? [P1]
+## 18. When Would You Use a Server Action? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> A Server Action can execute a server-side mutation from a React form or client interaction. It can simplify form-oriented workflows and integrate with revalidation. I still treat it as a public mutation boundary: validate input, authenticate, authorize, handle idempotency where needed, and return safe errors. For QRTable’s existing BFF and realtime contracts, I would adopt actions selectively rather than rewrite every mutation.
+> A Server Action lets a React form or component run a mutation on the server. It can make simple form flows easier. However, I still validate the input and check authentication and permission. QRTable already has a NestJS BFF, so I would use Server Actions only where they clearly help.
 
-**Câu hỏi tiếng Việt:** Khi nào dùng Server Actions?
+**Câu hỏi tiếng Việt:** Khi nào bạn dùng Server Action?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Server Action thực thi mutation server từ form/client interaction và có thể đơn giản form workflow, revalidation. Nhưng vẫn phải validate, authenticate, authorize và idempotency khi cần. Với QRTable có BFF/realtime contracts, tôi chỉ áp dụng chọn lọc.
+> Server Action cho phép React form hoặc component chạy mutation ở server. Nó có thể làm các flow form đơn giản gọn hơn. Tuy nhiên, tôi vẫn phải validate input và kiểm tra đăng nhập, quyền truy cập. QRTable đã có NestJS BFF nên tôi chỉ dùng Server Action ở nơi nó thật sự có lợi.
 
-## 19. How Do You Handle Authentication in the App Router? [P0]
+## 19. How Do You Handle Authentication and Authorization in the App Router? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Authentication determines identity; authorization determines whether that identity may perform an action. I enforce security on the server or BFF boundary, not only by hiding client elements. Server-rendered routes can read a server session for early decisions, while client state can improve navigation and UX. Sensitive tokens should not be exposed to client JavaScript when an HttpOnly session flow is available.
+> For staff authentication in QRTable, the flow starts with Keycloak and NextAuth. They confirm who the user is. Before the BFF returns private data or changes data, it checks the token, tenant, role, and permission. The route layer can redirect early, and the UI can hide unavailable actions, but the final authorization check stays on the server.
 
-**Câu hỏi tiếng Việt:** Bạn xử lý authentication trong App Router thế nào?
+**Câu hỏi tiếng Việt:** Bạn xử lý authentication và authorization trong App Router như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Authentication xác định identity; authorization xác định quyền. Security enforce ở server/BFF, không chỉ ẩn UI. Server routes có thể đọc session sớm; client state hỗ trợ UX. Sensitive token không nên expose cho JavaScript nếu HttpOnly session đáp ứng được.
+> Với staff authentication trong QRTable, flow bắt đầu bằng Keycloak và NextAuth. Chúng xác nhận user là ai. Trước khi BFF trả private data hoặc thay đổi dữ liệu, nó kiểm tra token, tenant, role và permission. Route layer có thể redirect sớm và UI có thể ẩn action không được phép, nhưng authorization check cuối cùng vẫn nằm ở server.
 
-## 20. Middleware: What Is It Good For? [P1]
+## 20. What Is Proxy in Next.js 16 Good For? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> Middleware is useful for lightweight request-time routing concerns such as redirects, locale selection, or coarse access checks before a route runs. It should not become the only authorization layer or a place for heavy business logic. The final data or mutation boundary must still enforce access.
+> In our current project, `proxy.ts` is mainly a small route guard. It runs before Next.js continues to the matched page. QRTable uses it to redirect users without a session and send each staff role to the correct area. I keep it lightweight, so I do not put business logic or the final permission check there. Older Next.js versions called this file Middleware.
 
-**Câu hỏi tiếng Việt:** Middleware phù hợp cho việc gì?
+**Câu hỏi tiếng Việt:** Proxy trong Next.js 16 phù hợp cho việc gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Middleware phù hợp lightweight request routing như redirect, locale hoặc coarse access check. Không nên là authorization layer duy nhất hay nơi chứa heavy business logic; data/mutation boundary cuối vẫn enforce quyền.
+> Trong project hiện tại, `proxy.ts` chủ yếu là một route guard nhỏ. Nó chạy trước khi Next.js tiếp tục xử lý page phù hợp. QRTable dùng nó để redirect user chưa có session và đưa từng staff role đến đúng khu vực. Tôi giữ Proxy nhẹ nên không đặt business logic hoặc permission check cuối cùng ở đó. Các phiên bản Next.js cũ gọi file này là Middleware.
 
 ## 21. How Do You Avoid Data-Fetching Waterfalls? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I identify independent data requirements and start them in parallel, move fetching to the server when it reduces client round trips, and use Suspense boundaries where independent content can stream. On the client, I avoid mounting a chain of queries whose keys could have been known earlier. I also measure, because a parallel request set can still overload an endpoint or fetch unused data.
+> I first look at whether one request depends on another. If two requests are independent, I start them together with `Promise.all` instead of waiting for one and then starting the other. If request B needs the result of request A, only B should wait. I also fetch on the server when it removes an extra request from the browser.
 
-**Câu hỏi tiếng Việt:** Bạn tránh data-fetching waterfall thế nào?
+**Câu hỏi tiếng Việt:** Bạn tránh data-fetching waterfall như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Xác định data độc lập và khởi chạy song song, chuyển fetch lên server khi giảm client round trips, dùng Suspense cho content độc lập. Phía client tránh query chain khi key đã biết sớm, đồng thời đo để không parallel-fetch quá nhiều data không dùng.
+> Đầu tiên, tôi xem một request có phụ thuộc request khác không. Nếu hai request độc lập, tôi bắt đầu chúng cùng lúc bằng `Promise.all` thay vì đợi request này xong mới chạy request kia. Nếu request B cần kết quả của request A thì chỉ B phải đợi. Tôi cũng fetch trên server khi cách đó loại bỏ được một request thừa từ browser.
 
-## 22. How Would You Combine Next.js with TanStack Query? [P0]
+## 22. How Do You Use Next.js with TanStack Query? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I use Server Components for server-owned initial data when that benefits first render, and TanStack Query for client lifecycle such as background refetching, mutations, optimistic updates, and realtime invalidation. If I prefetch on the server, I dehydrate only safe query data and hydrate it at a deliberate client boundary. I also align `staleTime` with the server fetch so the client does not immediately refetch the same data.
+> For a read-heavy page, I can use a Server Component to fetch the first data before the UI reaches the browser. If the client later needs refetching, mutations, or realtime updates, I can hydrate that data into TanStack Query and continue there. QRTable does not use this pattern widely, so I describe it as an improvement.
 
-**QRTable truth:** This is a design Quân understands; the current operational screens do not broadly implement server-side Query dehydration.
+**Câu hỏi tiếng Việt:** Bạn kết hợp Next.js với TanStack Query như thế nào?
 
-**Câu hỏi tiếng Việt:** Kết hợp Next.js với TanStack Query thế nào?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
-
-> Dùng Server Components cho initial server-owned data khi có lợi cho first render; Query quản lý background refetch, mutation, optimistic update và realtime invalidation. Nếu server prefetch thì chỉ dehydrate safe data và align `staleTime` để tránh refetch ngay. QRTable chưa dùng rộng pattern này.
+> Với page chủ yếu đọc dữ liệu, tôi có thể dùng Server Component để fetch dữ liệu đầu tiên trước khi UI được gửi đến browser. Nếu client sau đó cần refetch, mutation hoặc realtime update, tôi có thể hydrate dữ liệu đó vào TanStack Query rồi tiếp tục ở client. QRTable chưa dùng rộng rãi pattern này nên tôi mô tả nó như một hướng cải thiện.
 
 ## 23. How Do You Reduce the Client Bundle? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I keep server-capable components outside client boundaries, import packages from focused entry points, dynamically load genuinely optional heavy interactions, remove unused dependencies, and inspect bundle output rather than guessing. I also avoid putting a global client provider above content that does not need it. Bundle size matters together with execution and hydration cost.
+> When I reduce the client bundle, I first ask which code the browser really needs. I keep data work and static layout in Server Components, and I make only the interactive part a Client Component. I lazy-load heavy charts or editors when they are not needed immediately. Then I check the bundle report instead of guessing.
 
-**Câu hỏi tiếng Việt:** Bạn giảm client bundle thế nào?
+**Câu hỏi tiếng Việt:** Bạn giảm client bundle như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Giữ server-capable component ngoài client boundary, import package entry nhỏ, dynamic-load interaction tùy chọn, xóa dependency không dùng và đo bundle output. Không đặt global client provider cao hơn mức cần thiết; xem cả execution/hydration cost, không chỉ bytes.
+> Khi giảm client bundle, đầu tiên tôi xem browser thật sự cần phần code nào. Tôi giữ data work và static layout trong Server Component, rồi chỉ chuyển phần tương tác thành Client Component. Tôi lazy-load chart hoặc editor nặng nếu chưa cần dùng ngay. Sau đó, tôi kiểm tra bundle report thay vì đoán.
 
 ## 24. How Do You Handle SEO and Metadata? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> Public routes should provide meaningful titles, descriptions, canonical information where needed, semantic headings, and server-readable content. The App Router supports static or generated metadata. Authenticated POS screens are not SEO targets, so there I prioritize performance, accessibility, and correct access behavior rather than public indexing.
+> For a public page, I add a clear title, description, semantic headings, and content that search engines can read. Next.js supports static and generated metadata. Private POS and admin pages are not SEO targets, so I focus more on speed, accessibility, and correct access.
 
-**Câu hỏi tiếng Việt:** Bạn xử lý SEO và metadata thế nào?
+**Câu hỏi tiếng Việt:** Bạn xử lý SEO và metadata như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Public route cần title, description, canonical khi cần, semantic headings và server-readable content; App Router hỗ trợ static/generated metadata. POS authenticated không phải SEO target nên ưu tiên performance, accessibility và access correctness.
+> Với public page, tôi thêm title, description, heading có ý nghĩa và nội dung mà search engine có thể đọc. Next.js hỗ trợ metadata tĩnh hoặc tạo động. Các page POS và admin riêng tư không phải mục tiêu SEO nên tôi tập trung hơn vào tốc độ, accessibility và quyền truy cập.
 
 ## 25. How Do You Protect Server-Only Code? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I keep secrets and privileged clients in server-only modules, avoid passing sensitive values through props, validate every server mutation, and prevent server-only modules from entering the client graph. I do not rely on a hidden button for authorization. I also review environment variable exposure because only explicitly public variables should reach the browser.
+> I keep secrets, private environment variables, and database clients in server-only files. I never send them through props or expose them to browser code. I also validate every server mutation and check permission on the server. A hidden button is not security.
 
-**Câu hỏi tiếng Việt:** Bạn bảo vệ server-only code thế nào?
+**Câu hỏi tiếng Việt:** Bạn bảo vệ server-only code như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Giữ secret và privileged client trong server-only modules, không truyền sensitive value qua props, validate mọi server mutation và ngăn server module vào client graph. Hidden button không phải authorization. Chỉ biến môi trường public rõ ràng mới được đến browser.
+> Tôi giữ secret, biến môi trường riêng tư và database client trong các file chỉ chạy ở server. Tôi không truyền chúng qua props hoặc để code browser truy cập. Tôi cũng validate mọi server mutation và kiểm tra quyền ở server. Ẩn button không phải là bảo mật.
 
-## 26. Why Can a Provider Make Too Much of the App Client-Side? [P1]
+## 26. Why Can a Provider Add Too Much Client JavaScript? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> A provider is a Client Component, so where it is placed defines a client boundary for its imported client subtree and serialized interface. I put providers as deep as practical and separate concerns when only one product area needs them. However, a client provider can still receive server-rendered children, so I reason about the actual module graph rather than assuming the entire document becomes client-rendered.
+> With providers, I try not to place one at the root if only one feature needs it. Otherwise, its JavaScript loads for a much larger part of the app. I place it close to the routes that use it. Server-rendered children can still pass through the provider, so it does not automatically make the whole app CSR.
 
-**Câu hỏi tiếng Việt:** Vì sao provider có thể làm quá nhiều phần app phụ thuộc client runtime?
+**Câu hỏi tiếng Việt:** Vì sao provider có thể làm app dùng quá nhiều JavaScript phía client?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Provider là Client Component nên vị trí của nó ảnh hưởng client graph/imports và serialized interface. Tôi đặt provider đủ sâu và tách concern khi chỉ một product area cần. Client provider vẫn có thể nhận server-rendered children nên phải reasoning module graph thực, không kết luận cả document thành CSR.
+> Với provider, tôi cố không đặt nó ở root nếu chỉ một feature cần nó. Nếu đặt ở root, JavaScript của nó phải load cho một phần app lớn hơn nhiều. Tôi đặt provider gần những route thật sự sử dụng nó. Server-rendered children vẫn có thể đi qua provider nên nó không tự động biến toàn bộ app thành CSR.
 
 ## 27. How Would You Improve QRTable’s App Router Usage? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I would first measure the operational routes instead of rewriting them. Likely improvements are route-level loading and error boundaries, clearer server shells around client-heavy features, selective server prefetch and Query hydration for suitable read-heavy pages, and bundle analysis for large POS or KDS features. Realtime screens will still require substantial client logic, so the goal is a better boundary, not forcing everything onto the server.
+> I would measure the current pages first. Then I would add better route-level loading and error UI, review large client boundaries, and use server prefetch for suitable read-heavy pages. POS and KDS are realtime screens, so they will still need a lot of client-side logic.
 
-**Câu hỏi tiếng Việt:** Bạn sẽ cải thiện cách QRTable dùng App Router thế nào?
+**Câu hỏi tiếng Việt:** Bạn sẽ cải thiện cách QRTable dùng App Router như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi đo operational routes trước, rồi thêm route-level loading/error, server shell rõ hơn quanh client-heavy features, selective server prefetch/Query hydration cho read-heavy pages và bundle analysis cho POS/KDS. Realtime screen vẫn cần client logic; mục tiêu là boundary tốt hơn, không ép mọi thứ lên server.
+> Tôi sẽ đo các page hiện tại trước. Sau đó, tôi sẽ cải thiện loading và error UI ở mức route, kiểm tra các client boundary lớn và dùng server prefetch cho những page chủ yếu đọc dữ liệu. POS và KDS là màn hình realtime nên vẫn cần khá nhiều logic phía client.
 
 ## React and Next.js Comparison / So Sánh React và Next.js
 
 ### 28. What Is the Difference Between React and Next.js? [P0]
 
-**English answer**
+**Simple English answer**
 
-> React is a library for building component-based user interfaces. It provides the component, state, and rendering model, but it does not prescribe a complete application architecture. Next.js is a React framework that adds routing, server rendering, Server Components, data and cache conventions, backend endpoints, asset optimization, and production build behavior. Next.js uses React; it does not replace React fundamentals.
+> React is a library for building user interfaces with components. Next.js is a framework built on React. It adds routing, server rendering, Server Components, backend endpoints, caching tools, and production setup. Next.js does not replace React. We still need to understand React first.
 
 **Câu hỏi tiếng Việt:** React và Next.js khác nhau như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> React là thư viện xây dựng giao diện theo component, cung cấp mô hình component, state và rendering nhưng không quy định toàn bộ kiến trúc ứng dụng. Next.js là framework dựa trên React, bổ sung routing, server rendering, Server Components, quy ước data/cache, backend endpoints, tối ưu asset và production build. Next.js sử dụng React chứ không thay thế kiến thức React.
+> React là library để xây dựng giao diện bằng component. Next.js là framework được xây trên React. Nó bổ sung routing, server rendering, Server Components, backend endpoint, công cụ caching và cấu hình production. Next.js không thay thế React; ta vẫn cần hiểu React trước.
 
-### 29. Why Is React Called a Library and Next.js a Framework? [P0]
+### 29. Why Is React a Library and Next.js a Framework? [P0]
 
-**English answer**
+**Simple English answer**
 
-> React focuses on the UI layer and lets the application choose routing, build tooling, rendering, and server architecture. Next.js provides an opinionated application runtime and file conventions, so the framework controls more of the execution flow and the developer fills defined extension points. The distinction is useful, but the practical question is which responsibilities the tool provides.
+> React mainly solves the UI problem. We normally choose other tools for routing, building, and server features. Next.js gives us a full structure and clear rules for these parts. That is why React is usually called a library and Next.js is called a framework.
 
-**Câu hỏi tiếng Việt:** Vì sao React được gọi là library còn Next.js là framework?
+**Câu hỏi tiếng Việt:** Vì sao React là library còn Next.js là framework?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> React tập trung vào UI layer và để ứng dụng tự chọn router, build tool, rendering và server architecture. Next.js cung cấp runtime cùng file conventions có định hướng, nên framework kiểm soát nhiều phần của execution flow hơn và developer làm việc trong các extension points đã định nghĩa.
+> React chủ yếu giải quyết phần UI. Ta thường tự chọn thêm công cụ cho routing, build và tính năng server. Next.js cung cấp một cấu trúc đầy đủ và các quy tắc rõ ràng cho những phần này. Vì vậy React thường được gọi là library còn Next.js là framework.
 
 ### 30. Can You Use React Without Next.js, and Next.js Without React? [P0]
 
-**English answer**
+**Simple English answer**
 
-> React can be used without Next.js through tools such as Vite or another framework. Next.js, however, is built on React, so its component model and rendering behavior still depend on React. A Next.js developer must understand React state, rendering, effects, composition, and performance rather than learning only Next.js file conventions.
+> We can use React without Next.js, for example with Vite. However, we cannot use Next.js without React because Next.js is built on React. A Next.js developer still needs to understand React state, effects, rendering, and component design.
 
-**Câu hỏi tiếng Việt:** Có thể dùng React không cần Next.js, và dùng Next.js không cần React không?
+**Câu hỏi tiếng Việt:** Có thể dùng React không cần Next.js và dùng Next.js không cần React không?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Có thể dùng React mà không cần Next.js, chẳng hạn với Vite hoặc framework khác. Nhưng Next.js được xây trên React nên vẫn phụ thuộc component model và rendering behavior của React. Developer Next.js phải hiểu React chứ không thể chỉ học file conventions.
+> Chúng ta có thể dùng React mà không cần Next.js, ví dụ dùng React với Vite. Tuy nhiên, chúng ta không thể dùng Next.js mà không có React vì Next.js được xây trên React. Developer Next.js vẫn phải hiểu state, effect, rendering và cách thiết kế component trong React.
 
 ### 31. When Would You Choose React with Vite Instead of Next.js? [P0]
 
-**English answer**
+**Simple English answer**
 
-> I would choose React with Vite for a client-heavy application that does not need server rendering, Server Components, framework-managed backend routes, or public SEO, especially when a separate backend already owns the server boundary. It offers a smaller mental model and flexible deployment. I would choose Next.js when its server rendering, routing, caching, metadata, and full-stack conventions solve real product requirements.
+> I choose React with Vite for a client-heavy app that already has a separate backend and does not need public SEO or server rendering. It is simpler for that case. I choose Next.js when the product needs its routing, server rendering, metadata, or server features.
 
 **Câu hỏi tiếng Việt:** Khi nào bạn chọn React với Vite thay vì Next.js?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi chọn React/Vite cho ứng dụng thiên về client, không cần server rendering, Server Components, backend routes do framework quản lý hoặc public SEO, đặc biệt khi đã có backend riêng. Tôi chọn Next.js khi routing, server rendering, caching, metadata và full-stack conventions của nó giải quyết nhu cầu thật.
+> Tôi chọn React với Vite cho app thiên về client, đã có backend riêng và không cần public SEO hoặc server rendering. Cách này đơn giản hơn trong trường hợp đó. Tôi chọn Next.js khi sản phẩm cần routing, server rendering, metadata hoặc các tính năng server của nó.
 
 ### 32. How Is Routing Different in React/Vite and Next.js? [P0]
 
-**English answer**
+**Simple English answer**
 
-> React itself does not include an application router, so a Vite application usually adds a client router and defines routes in code. Next.js App Router derives route segments and nested layouts from files and integrates them with Server Components, loading, errors, metadata, and streaming. Client navigation exists in both, but the route execution and rendering model are different.
+> React itself does not include a router. In a Vite app, we normally add a library such as React Router and define routes in code. Next.js has built-in file-based routing. Folders and special files create routes, layouts, loading UI, and error UI.
 
 **Câu hỏi tiếng Việt:** Routing trong React/Vite và Next.js khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> React không có application router tích hợp nên ứng dụng Vite thường thêm client router và khai báo route bằng code. Next.js App Router tạo route segments và nested layouts từ file, đồng thời tích hợp Server Components, loading, error, metadata và streaming.
+> Bản thân React không có router. Trong app Vite, ta thường thêm library như React Router và khai báo route bằng code. Next.js có sẵn file-based routing. Folder và các file đặc biệt tạo route, layout, loading UI và error UI.
 
 ### 33. How Is Data Fetching Different? [P0]
 
-**English answer**
+**Simple English answer**
 
-> In a typical React/Vite SPA, initial data is fetched from the browser through effects or a server-state library. Next.js can fetch data in Server Components near the route, stream server-rendered UI, and then use client libraries for interactive lifecycle and mutations. Neither approach removes the need to design cache identity, freshness, errors, and authorization.
+> In a normal React/Vite SPA, the browser usually fetches the first data from an API. In Next.js, a Server Component can fetch data before sending the UI to the browser. We can still use TanStack Query on the client for updates, mutations, and refetching.
 
 **Câu hỏi tiếng Việt:** Data fetching trong React/Vite và Next.js khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> React/Vite SPA thường fetch initial data từ browser bằng effect hoặc server-state library. Next.js có thể fetch trong Server Component gần route, stream UI từ server rồi dùng client library cho interaction và mutation. Cả hai vẫn phải thiết kế cache, freshness, error và authorization.
+> Trong React/Vite SPA thông thường, browser thường gọi API để lấy dữ liệu ban đầu. Trong Next.js, Server Component có thể lấy dữ liệu trước khi gửi UI xuống browser. Ta vẫn có thể dùng TanStack Query ở client cho update, mutation và refetch.
 
-### 34. How Do Rendering and SEO Differ? [P0]
+### 34. How Are Rendering and SEO Different? [P0]
 
-**English answer**
+**Simple English answer**
 
-> A conventional Vite SPA often sends a small HTML shell and renders the main content after JavaScript loads, although it can be extended with separate SSR tooling. Next.js provides integrated server rendering, static generation, streaming, and metadata, which can improve public content discovery and initial delivery. SEO still depends on content quality, semantics, performance, and crawlability—not the framework name alone.
+> A normal Vite SPA often sends a small HTML file and renders the main content after JavaScript loads. Next.js has built-in server rendering and static generation, so public content can be available earlier. This can help SEO, but good SEO still needs useful content, semantic HTML, and good performance.
 
-**Câu hỏi tiếng Việt:** Rendering và SEO giữa React/Vite và Next.js khác nhau thế nào?
+**Câu hỏi tiếng Việt:** Rendering và SEO trong React/Vite và Next.js khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Vite SPA thông thường gửi HTML shell rồi render nội dung chính sau khi JavaScript tải, dù có thể bổ sung SSR bằng tooling khác. Next.js tích hợp server rendering, static generation, streaming và metadata nên thuận lợi hơn cho public content. SEO vẫn phụ thuộc content, semantics, performance và crawlability.
+> Vite SPA thông thường gửi một HTML nhỏ rồi render nội dung chính sau khi JavaScript tải xong. Next.js có sẵn server rendering và static generation nên public content có thể xuất hiện sớm hơn. Điều này có thể giúp SEO, nhưng SEO tốt vẫn cần nội dung hữu ích, semantic HTML và performance tốt.
 
 ### 35. Does Next.js Replace a Backend? [P0]
 
-**English answer**
+**Simple English answer**
 
-> Next.js can implement server-side endpoints, actions, authentication integration, and backend-for-frontend logic, so it may be enough for some products. It does not automatically replace domain services, asynchronous processing, independent scaling, or specialized data ownership. In QRTable, Next.js is the management frontend while the NestJS BFF and microservices own the backend domains.
+> Next.js can handle some backend work, but it does not replace a full backend in every system. It can create API endpoints, Server Actions, and simple server logic, which may be enough for a small product. A large system can still need separate services for business logic, background jobs, and scaling. QRTable uses NestJS services for those backend responsibilities.
 
 **Câu hỏi tiếng Việt:** Next.js có thay thế backend không?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Next.js có thể làm server endpoints, actions, auth integration và BFF logic nên đủ cho một số sản phẩm. Nhưng nó không tự thay thế domain services, async processing, independent scaling hoặc data ownership chuyên biệt. Trong QRTable, NestJS BFF và microservices vẫn sở hữu backend domains.
+> Next.js có thể xử lý một phần backend work, nhưng nó không thay thế full backend trong mọi hệ thống. Nó có thể tạo API endpoint, Server Action và server logic đơn giản; như vậy có thể đủ cho sản phẩm nhỏ. Hệ thống lớn vẫn có thể cần service riêng cho business logic, background job và scaling. QRTable dùng các service NestJS cho những trách nhiệm backend đó.
 
 ### 36. Is Next.js Always Faster Than React/Vite? [P0]
 
-**English answer**
+**Simple English answer**
 
-> No. Next.js provides more rendering and optimization options, but performance depends on architecture and implementation. A small client application may load faster with Vite, while a public content page may benefit from server rendering and reduced client JavaScript in Next.js. I compare user metrics, bundle cost, network waterfalls, and server latency instead of assuming one tool is always faster.
+> Next.js is not always faster than React with Vite. Speed depends on the product and the code. A small client app may be faster and simpler with Vite, while a public page may benefit from Next.js server rendering and less client JavaScript. I compare real loading time, bundle size, network requests, and server time.
 
 **Câu hỏi tiếng Việt:** Next.js có luôn nhanh hơn React/Vite không?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Không. Next.js có nhiều lựa chọn rendering và optimization hơn nhưng performance phụ thuộc kiến trúc và cách triển khai. Một client app nhỏ có thể phù hợp với Vite, còn public content có thể hưởng lợi từ server rendering của Next.js. Phải đo user metrics, bundle, waterfall và server latency.
+> Next.js không phải lúc nào cũng nhanh hơn React với Vite. Tốc độ phụ thuộc vào sản phẩm và cách viết code. Một client app nhỏ có thể nhanh và đơn giản hơn với Vite, trong khi public page có thể hưởng lợi từ server rendering và ít JavaScript phía client hơn trong Next.js. Tôi so sánh thời gian tải thật, bundle size, network request và thời gian server.
 
-### 37. What Are the Costs of Choosing Next.js? [P1]
+### 37. What Are the Disadvantages of Next.js? [P1]
 
-**English answer**
+**Simple English answer**
 
-> Next.js adds a server and caching mental model, Server/Client boundaries, framework upgrades, deployment constraints, and the risk of using features without understanding their version-specific behavior. Those costs are justified when the product benefits from its capabilities. For a simple internal SPA, the additional complexity may not provide enough value.
+> Next.js adds more things to learn, such as server and client boundaries, caching rules, deployment, and version changes. This is useful when the product needs these features. For a simple internal SPA, the extra complexity may not be worth it.
 
-**Câu hỏi tiếng Việt:** Chi phí hoặc nhược điểm khi chọn Next.js là gì?
+**Câu hỏi tiếng Việt:** Nhược điểm của Next.js là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Next.js bổ sung mental model về server/cache, Server–Client boundary, framework upgrades và deployment constraints; behavior còn phụ thuộc version. Complexity này hợp lý khi sản phẩm cần các capability đó, nhưng có thể dư thừa với một internal SPA đơn giản.
+> Next.js có nhiều thứ phải học hơn, như ranh giới giữa server và client, quy tắc caching, deployment và thay đổi giữa các phiên bản. Những phần này có ích khi sản phẩm cần chúng. Với một internal SPA đơn giản, độ phức tạp thêm vào có thể không đáng.
 
 ### 38. Why Does QRTable Use Both Next.js and React/Vite? [P0]
 
-**English answer**
+**Simple English answer**
 
-> The Management App has public landing content, multiple authenticated layouts, metadata, and distinct administrative and operational areas, so Next.js provides useful structure and server capability. The Customer App is a focused, mobile-first QR session with a separate backend and mostly client interaction, so React/Vite keeps that surface simpler. The choice follows each product boundary rather than enforcing one frontend stack everywhere.
+> The Management App has many layouts, admin areas, public content, and server features, so Next.js is a good fit. The Customer App is a focused mobile ordering flow with a separate backend. React with Vite keeps that app smaller and simpler. We chose the tool based on each product’s needs.
 
 **Câu hỏi tiếng Việt:** Vì sao QRTable dùng cả Next.js và React/Vite?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Management App có public landing, nhiều authenticated layouts, metadata và các vùng admin/operation khác nhau nên Next.js đem lại structure và server capability hữu ích. Customer App là QR session mobile-first, backend tách riêng và chủ yếu tương tác client nên React/Vite giữ bề mặt đơn giản hơn.
+> Management App có nhiều layout, khu vực admin, public content và tính năng server nên Next.js phù hợp. Customer App tập trung vào flow đặt món trên mobile và đã có backend riêng. React với Vite giúp app đó nhỏ và đơn giản hơn. Chúng tôi chọn công cụ theo nhu cầu của từng sản phẩm.
 
-## Rapid Scenario Questions
+## Build Time and Runtime Performance / Thời Gian Build và Hiệu Năng Runtime
 
-### A dashboard needs user-specific data and interactive filters. What would you do?
+### 39. What Is the Difference Between Build Time and Runtime Performance? [FRIDAY CORE]
 
-> Authenticate and fetch stable initial data on the server when practical, render the shell, and put interactive filters and client data lifecycle in a focused Client Component. I would keep authorization at the server boundary and choose URL state for shareable filters.
+**Simple English answer**
 
-**Câu hỏi tiếng Việt:** Dashboard cần user-specific data và interactive filters; bạn sẽ làm gì?
+> Build time is the time the toolchain needs to compile and prepare the application before it runs. Runtime performance is what happens when the server handles a request or when the user opens and interacts with the page. A slow build and a slow page can have different causes. Before I optimize, I ask which problem we are discussing and measure that part.
 
-**Trả lời tiếng Việt:** Authenticate và fetch stable initial data trên server khi phù hợp, render shell rồi đặt filters và client data lifecycle trong Client Component tập trung. Authorization vẫn ở server; shareable filters nên vào URL.
+**Câu hỏi tiếng Việt:** Build time khác runtime performance như thế nào?
 
-### A component uses `window.innerWidth` during render and causes a mismatch. What would you do?
+**Câu trả lời tiếng Việt**
 
-> Make the first render independent of `window`, use CSS for responsive layout when possible, or read browser state after mount through a focused hook when JavaScript behavior is required.
+> Build time là thời gian toolchain cần để compile và chuẩn bị application trước khi nó chạy. Runtime performance là những gì xảy ra khi server xử lý request hoặc khi user mở và tương tác với page. Build chậm và page chậm có thể đến từ những nguyên nhân khác nhau. Trước khi tối ưu, tôi hỏi rõ đang nói về vấn đề nào rồi đo đúng phần đó.
 
-**Câu hỏi tiếng Việt:** Component đọc `window.innerWidth` khi render và gây mismatch; bạn làm gì?
+**Useful clarification**
 
-**Trả lời tiếng Việt:** Làm first render không phụ thuộc `window`, ưu tiên CSS responsive. Nếu cần JavaScript behavior, đọc browser state sau mount trong hook/client boundary nhỏ.
+> Do you mean development and build time, or runtime performance in the browser?
+
+### 40. How Would You Improve Development and Build Time in Next.js? [FRIDAY CORE]
+
+**Simple English answer**
+
+> I start by reproducing the slow build and measuring which step takes time. For a Next.js project, I check whether Turbopack and build caches are being used correctly. I restore the `.next/cache` folder in CI, avoid expensive barrel imports, keep Tailwind scanning focused, and transpile only the packages that need it. In an Nx monorepo, I also use task caching and build only affected projects when possible. I change the measured bottleneck instead of enabling many options without evidence.
+
+**Câu hỏi tiếng Việt:** Bạn sẽ cải thiện development và build time trong Next.js như thế nào?
+
+**Câu trả lời tiếng Việt**
+
+> Tôi bắt đầu bằng việc tái hiện build chậm và đo bước nào đang tốn thời gian. Với Next.js project, tôi kiểm tra Turbopack và build cache đã được dùng đúng chưa. Tôi khôi phục folder `.next/cache` trong CI, tránh barrel import tốn kém, giới hạn phạm vi Tailwind scan và chỉ transpile package thật sự cần. Trong Nx monorepo, tôi cũng tận dụng task cache và chỉ build affected project khi có thể. Tôi thay đổi bottleneck đã đo được thay vì bật nhiều option mà chưa có bằng chứng.
+
+**QRTable reality check**
+
+> The Management App is configured for Turbopack inside the Nx workspace and has an explicit `transpilePackages` list. I can explain the optimization options, but I would measure the current build and verify cache behavior before claiming that every option is already implemented.
+
+> Management App đã cấu hình Turbopack trong Nx workspace và có danh sách `transpilePackages` rõ ràng. Tôi có thể giải thích các hướng tối ưu, nhưng sẽ đo build hiện tại và kiểm tra cache behavior trước khi claim rằng mọi option đã được triển khai.
+
+## Applied in QRTable / Cách Tôi Áp Dụng Next.js Trong QRTable [PROJECT FOLLOW-UP]
+
+> Không cần học thuộc cả section này. Khi interviewer hỏi thêm “How did you use it in your project?”, hãy chọn đúng câu liên quan rồi trình bày theo thứ tự **decision → implementation → reason**.
+
+### A. How Did You Organize the Management App with the App Router?
+
+**Simple English answer**
+
+> In QRTable, I organized the Management App with route groups such as `(auth)`, `(dashboard)`, `(pos)`, `(kds)`, and `(admin)`. These groups separate different work areas without adding the group names to the URL. Each group layout provides the correct application shell, while each `page.tsx` stays small and renders a feature component. For example, the POS page renders `LiveOrdersTable`, and the kitchen page renders `KdsBoard`. The detailed components, hooks, and services stay inside `src/features`. I used this structure to keep routing and layout code separate from business UI logic.
+
+**Câu hỏi tiếng Việt:** Bạn đã tổ chức Management App bằng App Router như thế nào?
+
+**Câu trả lời tiếng Việt**
+
+> Trong QRTable, tôi tổ chức Management App bằng các route group như `(auth)`, `(dashboard)`, `(pos)`, `(kds)` và `(admin)`. Các group này tách từng khu vực làm việc nhưng không làm tên group xuất hiện trên URL. Layout của mỗi group cung cấp application shell phù hợp, còn mỗi file `page.tsx` được giữ nhỏ và chỉ render feature component. Ví dụ, trang POS render `LiveOrdersTable`, còn trang bếp render `KdsBoard`. Component, hook và service chi tiết được đặt trong `src/features`. Tôi chọn cấu trúc này để tách routing và layout khỏi business UI logic.
+
+**Flow to remember / Luồng cần nhớ:** `URL → route group → layout shell → page → feature component`
+
+**Code evidence / Code thực tế:** [root route](../../apps/management-app/src/app/page.tsx), [POS route](<../../apps/management-app/src/app/(pos)/pos/page.tsx>), [KDS route](<../../apps/management-app/src/app/(kds)/kds/kitchen/page.tsx>)
+
+### B. How Did You Choose Server and Client Component Boundaries?
+
+**Simple English answer**
+
+> I kept the route and layout files as Server Components by default. On the public landing page, the server fetches pricing plans and landing information before it renders the page. For highly interactive areas such as POS and KDS, the server page stays thin and renders a Client Component that owns hooks, events, and realtime behavior. The root `Providers` component is also a Client Component because session, theme, TanStack Query, and auth hydration need React context and client-side hooks. I did not mark the whole application as client-side; I moved the client boundary only to the interactive part.
+
+**Câu hỏi tiếng Việt:** Bạn đã chọn ranh giới giữa Server Component và Client Component như thế nào?
+
+**Câu trả lời tiếng Việt**
+
+> Tôi giữ các file route và layout là Server Component theo mặc định. Ở public landing page, server fetch pricing plan và landing information trước khi render page. Với các khu vực tương tác nhiều như POS và KDS, server page được giữ mỏng rồi render một Client Component chịu trách nhiệm cho hook, event và realtime behavior. Root `Providers` cũng là Client Component vì session, theme, TanStack Query và auth hydration cần React context cùng client-side hook. Tôi không biến toàn bộ application thành client-side; tôi chỉ đặt client boundary ở phần thật sự cần tương tác.
+
+**Flow to remember / Luồng cần nhớ:** `Server page fetches or composes → serializable props → interactive Client Component`
+
+**Code evidence / Code thực tế:** [landing Server Component](../../apps/management-app/src/app/page.tsx), [client providers](../../apps/management-app/src/app/providers.tsx)
+
+### C. How Does Authentication and API Data Flow Through the Next.js App?
+
+**Simple English answer**
+
+> For staff users, Auth.js works with Keycloak to create the session. `AuthSessionHydrator` reads that session and stores the access token and user profile in a small Zustand auth store. A TanStack Query hook waits until this hydration is ready. Then its feature service calls `authApiClient`, which adds the access token and tenant ID before sending the request to the BFF. The Next.js proxy redirects unauthenticated users or users on the wrong work area, but I do not treat that redirect as the final security layer. The BFF and backend guards still verify authentication, roles, permissions, and tenant access.
+
+**Câu hỏi tiếng Việt:** Authentication và API data đi qua Next.js app theo flow nào?
+
+**Câu trả lời tiếng Việt**
+
+> Với staff user, Auth.js làm việc với Keycloak để tạo session. `AuthSessionHydrator` đọc session đó rồi lưu access token và user profile vào một Zustand auth store nhỏ. TanStack Query hook sẽ đợi quá trình hydration này sẵn sàng. Sau đó, feature service gọi `authApiClient`; client này gắn access token và tenant ID trước khi gửi request đến BFF. Next.js proxy redirect user chưa đăng nhập hoặc đi vào sai khu vực làm việc, nhưng tôi không xem redirect đó là security layer cuối cùng. BFF và backend guard vẫn phải kiểm tra authentication, role, permission và tenant access.
+
+**Flow to remember / Luồng cần nhớ:** `Keycloak session → AuthSessionHydrator → auth store → enabled query → feature service → authenticated client → BFF → backend service`
+
+**Code evidence / Code thực tế:** [auth hydrator](../../apps/management-app/src/components/auth/auth-session-hydrator.tsx), [authenticated API client](../../apps/management-app/src/lib/api/authenticated-client.ts), [Next.js proxy](../../apps/management-app/src/proxy.ts)
+
+### D. What Build-Time Decisions Are Already Used in the Management App?
+
+**Simple English answer**
+
+> The current Next.js configuration sets the Turbopack root to the Nx workspace, transpiles the internal workspace packages used by the app, and creates a standalone production output. These settings help the monorepo resolve shared packages and produce a deployable build, but I would not say that they automatically make every build fast. If the build becomes slow, I first compare cold and warm builds, check Nx and `.next` cache behavior, inspect expensive imports, and measure again after one change. This helps me optimize the real bottleneck instead of guessing.
+
+**Câu hỏi tiếng Việt:** Management App hiện đã áp dụng những quyết định nào liên quan đến build time?
+
+**Câu trả lời tiếng Việt**
+
+> Next.js configuration hiện tại đặt Turbopack root ở Nx workspace, transpile các internal workspace package mà app sử dụng và tạo standalone production output. Các setting này giúp monorepo resolve shared package và tạo build có thể deploy, nhưng tôi không nói rằng chúng tự động làm mọi build nhanh. Nếu build chậm, trước tiên tôi so sánh cold build với warm build, kiểm tra cache của Nx và `.next`, xem lại import tốn chi phí rồi đo lại sau từng thay đổi. Cách này giúp tôi tối ưu bottleneck thật thay vì đoán.
+
+**Flow to remember / Luồng cần nhớ:** `reproduce → measure → check cache and imports → change one cause → compare again`
+
+**Code evidence / Code thực tế:** [Management App Next.js configuration](../../apps/management-app/next.config.ts)
+
+## Rapid Scenario Questions / Câu Hỏi Tình Huống Nhanh
+
+### A dashboard needs user data and interactive filters. What would you do?
+
+> I would load the user and initial data on the server when it helps. Then I would put the interactive filters in a small Client Component. If the filters should survive a page refresh or be shared with another user, I would keep them in the URL.
+
+**Câu hỏi tiếng Việt:** Dashboard cần dữ liệu người dùng và bộ lọc tương tác; bạn sẽ làm gì?
+
+> Tôi sẽ load user và initial data trên server khi cách đó có lợi. Sau đó, tôi đặt interactive filter trong một Client Component nhỏ. Nếu filter cần được giữ lại sau khi refresh page hoặc cần chia sẻ cho user khác, tôi lưu chúng trong URL.
+
+### A component reads `window.innerWidth` during render and causes a mismatch. What would you do?
+
+> I would avoid reading `window` in the first render. I would use CSS for responsive layout when possible. If JavaScript is required, I would read the browser value after the component mounts.
+
+**Câu hỏi tiếng Việt:** Component đọc `window.innerWidth` khi render và gây mismatch; bạn sẽ làm gì?
+
+> Tôi sẽ không đọc `window` trong lần render đầu tiên. Tôi ưu tiên dùng CSS cho responsive layout. Nếu bắt buộc cần JavaScript, tôi đọc giá trị từ browser sau khi component đã mount.
 
 ### Public content changes every five minutes. What would you do?
 
-> Opt into a five-minute revalidation policy if that freshness is acceptable, provide explicit invalidation when edits must appear immediately, and confirm the policy against the project’s current caching mode.
+> If a five-minute delay is acceptable, I would use a five-minute revalidation time. If an important edit must appear immediately, I would also add on-demand revalidation after the edit.
 
-**Câu hỏi tiếng Việt:** Public content thay đổi mỗi năm phút; bạn làm gì?
+**Câu hỏi tiếng Việt:** Public content thay đổi mỗi năm phút; bạn sẽ làm gì?
 
-**Trả lời tiếng Việt:** Dùng revalidation năm phút nếu business chấp nhận freshness đó, bổ sung explicit invalidation khi edit phải hiện ngay và xác nhận policy theo caching mode hiện tại.
+> Nếu chậm tối đa năm phút là chấp nhận được, tôi đặt thời gian revalidation là năm phút. Nếu một thay đổi quan trọng phải xuất hiện ngay, tôi bổ sung on-demand revalidation sau khi chỉnh sửa.
+
+## How to Study This File Tonight / Cách Học File Này Tối Nay
+
+1. Hoàn thành [Friday Onsite Core Pack](11-friday-onsite-core-pack.md) trước; không học tuần tự toàn bộ file này.
+2. Chỉ mở đúng câu liên quan khi một core answer còn yếu.
+3. Những nhóm dễ cần tra cứu là Server/Client Components, App Router, API fetching, React versus Next.js và câu 39–40 về build time.
+4. Tạm bỏ qua Cache Components, streaming, Server Actions, SEO, Proxy và caching edge cases nếu thời gian ngắn.
+5. Khi luyện, hãy nhớ **direct answer + main reason + one QRTable example**, không học thuộc nguyên paragraph.
 
 ## Sources / Nguồn
 
 - [Next.js Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components)
 - [Next.js caching without Cache Components](https://nextjs.org/docs/app/guides/caching-without-cache-components)
 - [Next.js Cache Components](https://nextjs.org/docs/app/getting-started/caching)
+- [Next.js Proxy](https://nextjs.org/docs/app/api-reference/file-conventions/proxy)
 - [Next.js App Router](https://nextjs.org/docs/app)
+- [Next.js local development performance](https://nextjs.org/docs/app/guides/local-development)
+- [Next.js CI build caching](https://nextjs.org/docs/app/guides/ci-build-caching)

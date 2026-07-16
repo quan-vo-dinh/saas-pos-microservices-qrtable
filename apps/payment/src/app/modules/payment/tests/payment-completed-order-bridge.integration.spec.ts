@@ -4,6 +4,7 @@ import { Area } from '@common/entities/area.entity';
 import { Bill } from '@common/entities/bill.entity';
 import { Session } from '@common/entities/session.entity';
 import { Table } from '@common/entities/table.entity';
+import { ErrorCode } from '@common/error-messages/error-code.enum';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { BillStatus, PaymentMethod, SessionStatus } from '@einvoice/types';
 import { randomUUID } from 'crypto';
@@ -105,7 +106,7 @@ maybeDescribe('Phase 5 P0-PAY-COMPLETED-ORDER-BRIDGE external-stack integration'
         amountReceived: 128_000,
         processId: 'phase5-pay-bridge-duplicate',
       }),
-    ).rejects.toThrow('Bill is not pending payment');
+    ).rejects.toMatchObject({ errorCode: ErrorCode.PAYMENT_BILL_NOT_PENDING_PAYMENT });
 
     const paymentRows = await paymentDataSource.getRepository(PaymentEntity).findBy({
       tenantId: seed.tenantId,

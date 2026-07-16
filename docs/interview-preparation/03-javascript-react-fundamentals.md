@@ -1,401 +1,391 @@
-# JavaScript and React Fundamentals / Nền Tảng JavaScript và React
+# JavaScript and React Fundamentals — Simple Answers / Kiến Thức Nền Tảng Dễ Nói
 
-> Core answers are intentionally compact. Add the deepening point only when the interviewer follows up.
+> Hãy hiểu ví dụ trước rồi mới nhớ định nghĩa. Khi trả lời, nói ý chính trong câu đầu và chỉ giải thích thêm một ví dụ.
 
-## JavaScript and Browser
+## JavaScript Fundamentals / Nền Tảng JavaScript
 
 ### 1. What Is a Closure? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> A closure is a function together with access to the lexical variables from the scope where it was created, even after that outer function has finished. Closures are useful for encapsulation, callbacks, and hooks, but they can also keep stale values if a React dependency is missing.
-
-**Example:** An event handler captures the state from the render that created it.
-
-**Tiếng Việt:** Closure không phải chỉ là “function inside function”; điểm cốt lõi là function giữ được lexical environment.
+> A closure happens when a function remembers variables from the place where it was created. It can still use those variables after the outer function has finished. Closures are useful for callbacks and private state. In React, they can also cause stale values if dependencies are missing.
 
 **Câu hỏi tiếng Việt:** Closure là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Closure là một function đi cùng khả năng truy cập các biến lexical tại scope nơi nó được tạo, kể cả sau khi outer function đã kết thúc. Closure hữu ích cho encapsulation, callback và hook, nhưng có thể giữ giá trị cũ trong React nếu dependency bị thiếu.
+> Closure xảy ra khi một function ghi nhớ các biến ở nơi nó được tạo. Function vẫn có thể dùng các biến đó sau khi outer function đã chạy xong. Closure hữu ích cho callback và state riêng, nhưng trong React nó có thể giữ giá trị cũ nếu thiếu dependency.
 
 ### 2. Explain the JavaScript Event Loop [P0]
 
-**Core answer**
+**Simple English answer**
 
-> JavaScript executes synchronous code on the call stack. Asynchronous browser or runtime operations schedule callbacks. Promise callbacks enter the microtask queue, while timers and many events enter task queues. After the current stack is empty, the runtime drains microtasks before moving to the next task, which is why a resolved Promise normally runs before a zero-delay timeout.
+> JavaScript runs normal code on one call stack. Async work, such as a timer or network request, finishes outside that stack and puts a callback in a queue. When the stack is empty, JavaScript runs queued work. Promise callbacks normally run before timer callbacks.
 
-**Follow-up:** Too many microtasks can delay rendering or other tasks.
+**Câu hỏi tiếng Việt:** Hãy giải thích JavaScript event loop.
 
-**Giải thích follow-up:** Quá nhiều microtasks có thể trì hoãn browser rendering hoặc các tasks khác.
+**Câu trả lời tiếng Việt**
 
-**Câu hỏi tiếng Việt:** Hãy giải thích JavaScript event loop
+> JavaScript chạy code thông thường trên một call stack. Công việc async như timer hoặc network request hoàn thành bên ngoài stack rồi đưa callback vào queue. Khi stack trống, JavaScript xử lý công việc trong queue. Callback của Promise thường chạy trước callback của timer.
 
-**Trả lời tiếng Việt**
+**Easy follow-up:** Too many Promise microtasks can delay browser rendering.
 
-> JavaScript chạy code đồng bộ trên call stack. Browser/runtime operation bất đồng bộ sẽ xếp callback; Promise callback vào microtask queue, timer và nhiều event vào task queue. Khi stack trống, microtask được xử lý trước task tiếp theo nên resolved Promise thường chạy trước timeout 0 ms.
+**Giải thích:** Quá nhiều Promise microtask có thể làm browser chậm render giao diện.
 
 ### 3. What Is the Difference Between `var`, `let`, and `const`? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> `let` and `const` are block-scoped and have a temporal dead zone. `var` is function-scoped and its declaration is hoisted with an initial value of `undefined`. I use `const` by default, `let` when reassignment is required, and avoid `var` in modern code. `const` prevents rebinding; it does not make an object deeply immutable.
+> `var` is function-scoped and has older hoisting behavior, so it can cause confusing bugs. `let` and `const` are block-scoped. I use `const` by default and `let` when a variable must be assigned again. `const` does not make an object fully immutable.
 
 **Câu hỏi tiếng Việt:** `var`, `let` và `const` khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> `let` và `const` có block scope và temporal dead zone. `var` có function scope và declaration được hoist với giá trị `undefined`. Tôi dùng `const` mặc định, `let` khi cần gán lại và tránh `var`; `const` không làm object immutable sâu.
+> `var` có function scope và cách hoisting cũ nên dễ gây lỗi khó hiểu. `let` và `const` có block scope. Tôi dùng `const` mặc định và dùng `let` khi cần gán lại biến. `const` không làm cho object trở thành bất biến hoàn toàn.
 
 ### 4. What Is the Difference Between `==` and `===`? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Strict equality compares without implicit type coercion, while loose equality applies coercion rules that can be surprising. I use `===` by default. A rare deliberate exception is checking `value == null` when I explicitly want to match both `null` and `undefined`, but the intent should be clear.
+> `==` can change the types before comparing two values. `===` compares both the type and the value without that conversion. I use `===` in normal application code because its behavior is clearer and safer.
 
 **Câu hỏi tiếng Việt:** `==` và `===` khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Strict equality so sánh không ép kiểu, còn loose equality áp dụng coercion dễ gây bất ngờ. Tôi dùng `===` mặc định; ngoại lệ hiếm là `value == null` khi cố ý muốn khớp cả `null` và `undefined` và intent phải rõ.
+> `==` có thể chuyển đổi type trước khi so sánh hai giá trị. `===` so sánh cả type và value mà không thực hiện chuyển đổi đó. Tôi dùng `===` trong code thông thường vì behavior rõ ràng và an toàn hơn.
 
 ### 5. How Does `this` Work in JavaScript? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> For a normal function, `this` depends on how the function is called. Methods receive the object before the dot, and `call`, `apply`, or `bind` can set it explicitly. Arrow functions do not create their own `this`; they capture it lexically. That difference matters when passing methods as callbacks.
+> For a normal function, `this` mainly depends on how the function is called. In a method call, it is usually the object before the dot. An arrow function does not create its own `this`; it uses `this` from the outer scope.
 
 **Câu hỏi tiếng Việt:** `this` hoạt động thế nào trong JavaScript?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Với normal function, `this` phụ thuộc cách function được gọi; method nhận object trước dấu chấm và `call/apply/bind` có thể đặt rõ. Arrow function không có `this` riêng mà bắt từ lexical scope, điều này quan trọng khi truyền callback.
+> Với normal function, `this` chủ yếu phụ thuộc vào cách function được gọi. Khi gọi method, nó thường là object đứng trước dấu chấm. Arrow function không tạo `this` riêng mà dùng `this` từ outer scope.
 
 ### 6. Classes Versus Prototypes [P1]
 
-**Core answer**
+**Simple English answer**
 
-> JavaScript inheritance is prototype-based. The `class` syntax provides a clearer abstraction over prototypes, constructor calls, and inheritance, but it does not introduce a separate class-based runtime model. In React application code I usually favor composition and small functions; classes are still appropriate for some domain models and current React Error Boundaries.
+> JavaScript uses prototypes for inheritance. The `class` syntax gives us a cleaner way to write the same object model. Methods written in a class are shared through the prototype. I normally use classes when they make the code clearer, but I know the prototype is still underneath.
 
-**Câu hỏi tiếng Việt:** Class và prototype khác nhau thế nào?
+**Câu hỏi tiếng Việt:** Class và prototype trong JavaScript khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> JavaScript có inheritance dựa trên prototype. Syntax `class` là abstraction rõ hơn cho prototype, constructor và inheritance chứ không tạo runtime class-based riêng. Trong React tôi thường ưu tiên composition/function; class vẫn phù hợp cho một số domain model và Error Boundary hiện tại.
+> JavaScript dùng prototype cho inheritance. Cú pháp `class` là cách dễ đọc hơn để viết cùng object model đó. Method trong class vẫn được chia sẻ qua prototype. Tôi dùng class khi nó giúp code rõ hơn nhưng hiểu rằng bên dưới vẫn là prototype.
 
 ### 7. Shallow Copy Versus Deep Copy [P0]
 
-**Core answer**
+**Simple English answer**
 
-> A shallow copy creates a new top-level object but keeps references to nested objects. Spread syntax is shallow. A deep copy recursively creates independent nested values, but it must respect types and semantics. I avoid blindly deep-cloning state; instead, I update only the changed path immutably.
+> A shallow copy creates a new top-level object, but nested objects can still point to the old references. A deep copy also copies the nested data. The spread operator makes only a shallow copy. For supported data, `structuredClone` can make a deep copy.
 
 **Câu hỏi tiếng Việt:** Shallow copy và deep copy khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Shallow copy tạo object tầng trên mới nhưng giữ reference nested object; spread là shallow. Deep copy tạo nested values độc lập nhưng phải tôn trọng type/semantics. Tôi không deep clone state tùy tiện mà immutable update đúng path thay đổi.
+> Shallow copy tạo object mới ở cấp ngoài cùng, nhưng các object bên trong vẫn có thể trỏ đến reference cũ. Deep copy sao chép cả dữ liệu bên trong. Spread operator chỉ tạo shallow copy. Với dữ liệu được hỗ trợ, `structuredClone` có thể tạo deep copy.
 
 ### 8. Why Is Immutability Important in React? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> React and state libraries commonly use reference identity to detect changes and optimize subscriptions. Immutable updates create a new reference for changed data while preserving unchanged references. Direct mutation can make updates invisible, break memoization, and make rollback or debugging harder.
+> React often checks whether a reference changed to know that state has new data. If I mutate the old object directly, React or memoized code may not see the change correctly. I create a new object or array when updating state. This also makes updates easier to understand.
 
 **Câu hỏi tiếng Việt:** Vì sao immutability quan trọng trong React?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> React và state library thường dùng reference identity để nhận biết change và tối ưu subscription. Immutable update tạo reference mới cho dữ liệu đổi, giữ reference cũ cho phần không đổi. Mutate trực tiếp có thể làm change bị bỏ qua, phá memoization và khiến rollback/debug khó hơn.
+> React thường kiểm tra reference có thay đổi không để biết state có dữ liệu mới. Nếu tôi sửa trực tiếp object cũ, React hoặc code đã memoize có thể không nhận ra thay đổi đúng cách. Vì vậy, khi update state tôi tạo object hoặc array mới. Cách này cũng dễ hiểu hơn.
 
 ### 9. Promise Versus `async/await` [P0]
 
-**Core answer**
+**Simple English answer**
 
-> `async/await` is syntax built on Promises; it does not make asynchronous work synchronous. It usually makes sequential control flow and error handling easier to read. For independent operations, I start them together and use `Promise.all` so I do not create an unnecessary waterfall.
+> A Promise represents a result that may arrive later. `async/await` is a cleaner way to write code that uses Promises. It does not make the work synchronous. I use `try/catch` with `await` when I need clear error handling.
 
 **Câu hỏi tiếng Việt:** Promise và `async/await` khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> `async/await` là syntax xây trên Promise, không biến async thành sync. Nó giúp đọc sequential flow và error handling dễ hơn. Với operation độc lập, tôi khởi chạy cùng lúc và dùng `Promise.all` để tránh waterfall không cần thiết.
+> Promise đại diện cho một kết quả có thể có trong tương lai. `async/await` là cách dễ đọc hơn để viết code dùng Promise. Nó không biến công việc thành synchronous. Tôi dùng `try/catch` với `await` khi cần xử lý lỗi rõ ràng.
 
 ### 10. `Promise.all` Versus `Promise.allSettled` [P1]
 
-**Core answer**
+**Simple English answer**
 
-> `Promise.all` rejects when any input rejects, so it fits operations that must all succeed. `Promise.allSettled` waits for every operation and reports each outcome, which fits independent results or partial failure. The choice comes from product semantics, not only convenience.
+> `Promise.all` runs Promises together but rejects when one of them rejects. I use it when all results are required. `Promise.allSettled` waits for every Promise and tells me which ones passed or failed. I use it when partial results are still useful.
 
 **Câu hỏi tiếng Việt:** `Promise.all` và `Promise.allSettled` khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> `Promise.all` reject khi bất kỳ input reject nên phù hợp khi tất cả phải thành công. `allSettled` đợi mọi operation và trả outcome riêng, phù hợp independent results hoặc partial failure. Chọn theo product semantics.
+> `Promise.all` chạy các Promise cùng nhau nhưng reject khi một Promise bị lỗi. Tôi dùng nó khi cần đủ tất cả kết quả. `Promise.allSettled` đợi mọi Promise và cho biết cái nào thành công hoặc thất bại. Tôi dùng khi kết quả một phần vẫn có ích.
 
 ### 11. Debounce Versus Throttle [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Debounce waits until calls stop for a period, so it is useful for search input or validation. Throttle limits execution to at most once per interval, so it is useful for scroll or resize work. Both need cleanup, and a request-producing debounce should also handle stale responses or cancellation.
+> Debounce waits until events stop for a short time, then runs once. It is useful for a search input. Throttle allows a function to run at most once in a time period. It is useful for scroll or resize events.
 
 **Câu hỏi tiếng Việt:** Debounce và throttle khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Debounce đợi cho đến khi các lần gọi dừng một khoảng, phù hợp search/validation. Throttle giới hạn tối đa một lần mỗi interval, phù hợp scroll/resize. Cả hai cần cleanup; request debounce còn phải xử lý stale response hoặc cancellation.
+> Debounce đợi event dừng trong một khoảng ngắn rồi mới chạy một lần, phù hợp cho ô search. Throttle giới hạn function chỉ được chạy tối đa một lần trong mỗi khoảng thời gian, phù hợp cho scroll hoặc resize event.
 
 ### 12. What Causes Memory Leaks in Frontend Applications? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> Common causes are subscriptions, timers, event listeners, observers, or asynchronous callbacks that outlive the component or retain large references. I prevent them by returning cleanup functions, cancelling obsolete work where possible, and verifying mount–unmount behavior. A leak is about retained resources, not simply high memory at one moment.
+> Common causes are event listeners, timers, socket listeners, or subscriptions that are not cleaned up. Large caches and old object references can also keep memory. In React, I return a cleanup function from `useEffect` and check that I remove the exact listener I added.
 
-**Câu hỏi tiếng Việt:** Điều gì gây memory leak trong frontend?
+**Câu hỏi tiếng Việt:** Điều gì gây memory leak trong frontend application?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Nguyên nhân thường là subscription, timer, listener, observer hoặc async callback sống lâu hơn component hay giữ reference lớn. Tôi ngăn bằng cleanup, cancel obsolete work và kiểm tra mount–unmount. Memory leak là resource bị giữ lại, không chỉ memory cao tại một thời điểm.
+> Nguyên nhân thường gặp là event listener, timer, socket listener hoặc subscription không được cleanup. Cache lớn và reference cũ cũng có thể giữ memory. Trong React, tôi trả về cleanup function từ `useEffect` và bảo đảm xóa đúng listener đã thêm.
 
 ### 13. What Is CORS? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> CORS is a browser-enforced policy controlling whether a page from one origin may read a response from another origin. The server declares allowed origins, methods, headers, and credentials. It is not an authentication mechanism and does not protect a server from non-browser clients.
+> CORS is a browser security rule for requests between different origins. The server must return the correct CORS headers to allow the frontend origin. It is mainly a browser rule, so changing frontend code alone usually cannot fix a missing server permission.
 
 **Câu hỏi tiếng Việt:** CORS là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> CORS là policy do browser enforce, kiểm soát trang ở một origin có được đọc response origin khác không. Server công bố origins, methods, headers và credentials được phép. Nó không phải authentication và không bảo vệ server khỏi non-browser clients.
+> CORS là quy tắc bảo mật của browser cho request giữa các origin khác nhau. Server phải trả đúng CORS header để cho phép frontend origin. Đây chủ yếu là quy tắc của browser nên chỉ sửa frontend thường không thể giải quyết permission bị thiếu ở server.
 
-### 14. `localStorage`, `sessionStorage`, Cookies, and Memory [P0]
+### 14. Compare `localStorage`, `sessionStorage`, Cookies, and Memory [P0]
 
-**Core answer**
+**Simple English answer**
 
-> `localStorage` persists across sessions and is synchronous; `sessionStorage` is scoped to a tab session. Both are accessible to JavaScript and should not hold sensitive tokens when an XSS-safe alternative exists. Cookies can be `HttpOnly`, `Secure`, and `SameSite` and are sent with matching requests. In-memory state disappears on reload but reduces persistence risk. The choice depends on security and lifecycle.
+> `localStorage` stays after the browser closes. `sessionStorage` normally stays only for one tab session. Cookies can be sent with HTTP requests and can be `HttpOnly`. Memory state disappears after a reload. For sensitive tokens, an `HttpOnly` secure cookie is usually safer than browser storage.
 
 **Câu hỏi tiếng Việt:** `localStorage`, `sessionStorage`, cookie và memory khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> `localStorage` tồn tại qua nhiều session và synchronous; `sessionStorage` theo tab. Cả hai đọc được bằng JavaScript nên không nên chứa sensitive token nếu có giải pháp an toàn hơn. Cookie có thể HttpOnly/Secure/SameSite; memory mất khi reload nhưng giảm persistence risk. Chọn theo security và lifecycle.
+> `localStorage` vẫn còn sau khi đóng browser. `sessionStorage` thường chỉ tồn tại trong session của một tab. Cookie có thể được gửi cùng HTTP request và có thể đặt `HttpOnly`. State trong memory mất sau khi reload. Với token nhạy cảm, secure cookie `HttpOnly` thường an toàn hơn browser storage.
 
-### 15. What Happens After Entering a URL? [P1]
+### 15. What Happens After You Enter a URL? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> At a high level, the browser resolves the domain, establishes a network connection, sends an HTTP request, receives and parses the response, constructs the DOM and CSSOM, calculates layout, paints, and runs JavaScript. Modern frameworks can stream or hydrate HTML, so network, parsing, rendering, and JavaScript execution may overlap rather than form one strict sequence.
+> The browser finds the server address with DNS, opens a network connection, and sends an HTTP request. The server returns HTML and other data. The browser reads the HTML, downloads CSS and JavaScript, builds the page, and paints it. React may then hydrate the server HTML.
 
-**Câu hỏi tiếng Việt:** Điều gì xảy ra sau khi nhập một URL?
+**Câu hỏi tiếng Việt:** Điều gì xảy ra sau khi bạn nhập một URL?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Browser resolve domain, thiết lập connection, gửi HTTP request, nhận và parse response, tạo DOM/CSSOM, tính layout, paint và chạy JavaScript. Framework hiện đại có thể stream hoặc hydrate nên các bước network, parsing, rendering và execution có thể chồng lấp.
+> Browser tìm địa chỉ server qua DNS, mở network connection rồi gửi HTTP request. Server trả HTML và dữ liệu khác. Browser đọc HTML, tải CSS và JavaScript, dựng page rồi vẽ nó lên màn hình. Sau đó React có thể hydrate HTML từ server.
 
-## React Mental Models
+## React Fundamentals / Nền Tảng React
 
 ### 16. What Causes a React Component to Render? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> A component renders initially and when its state, consumed context, or parent render causes React to evaluate it again. A render means React calls the component to calculate the next UI; it does not automatically mean every DOM node changes. React then commits only the required host updates.
+> A component renders when its state changes, its props change, a context it uses changes, or an external store sends an update. It may also render when its parent renders. A render does not always mean the browser DOM will change.
 
-**Câu hỏi tiếng Việt:** Điều gì làm React component render?
+**Câu hỏi tiếng Việt:** Điều gì làm React component render lại?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Component render lần đầu và khi state, context được dùng hoặc parent render khiến React tính lại nó. Render nghĩa là gọi component để tính UI kế tiếp, không có nghĩa mọi DOM node thay đổi; commit chỉ áp host updates cần thiết.
+> Component render khi state đổi, props đổi, context nó sử dụng đổi hoặc external store gửi update. Nó cũng có thể render khi parent render. Một lần render không phải lúc nào cũng làm browser DOM thay đổi.
 
 ### 17. Rendering Versus Committing [P0]
 
-**Core answer**
+**Simple English answer**
 
-> During render, React calculates what the UI should look like. The render phase must stay pure because React may pause, restart, or repeat it. During commit, React applies changes to the DOM and runs layout-related effects. Keeping side effects out of render makes concurrent rendering safe.
+> During rendering, React calls components and calculates what the UI should look like. During the commit step, React applies the required changes to the DOM. Keeping render logic pure is important because React may run it more than once.
 
-**Câu hỏi tiếng Việt:** Render và commit khác nhau thế nào?
+**Câu hỏi tiếng Việt:** Rendering và committing khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Trong render phase, React tính UI; phase này phải pure vì có thể pause/restart/repeat. Trong commit phase, React áp thay đổi DOM và chạy layout-related effects. Tách side effect khỏi render giúp concurrent rendering an toàn.
+> Trong bước render, React gọi component và tính UI nên trông thế nào. Trong bước commit, React áp dụng những thay đổi cần thiết vào DOM. Render logic phải pure vì React có thể chạy nó nhiều hơn một lần.
 
 ### 18. What Is Reconciliation? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Reconciliation is React’s process for comparing the previous and next element trees to determine which components and DOM nodes can be reused. Element type and key are important signals. It is an implementation strategy for updating the UI efficiently, not a guarantee that a component will never render again.
+> Reconciliation is how React compares the new element tree with the previous tree. It uses the element type and key to decide what can stay and what must change. The goal is to update only the necessary parts of the DOM.
 
 **Câu hỏi tiếng Việt:** Reconciliation là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Reconciliation là quá trình React so sánh element tree cũ và mới để quyết định component/DOM nào reuse. Element type và key là tín hiệu quan trọng. Nó là chiến lược update UI hiệu quả, không bảo đảm component sẽ không render lại.
+> Reconciliation là cách React so sánh element tree mới với tree trước đó. React dùng element type và key để quyết định phần nào được giữ và phần nào phải thay đổi. Mục tiêu là chỉ cập nhật những phần DOM cần thiết.
 
 ### 19. Why Are Keys Important? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Keys give sibling elements stable identity across renders. React uses them to preserve or reset component state correctly when items move, are added, or are removed. I use a stable domain identifier, not the array index when order can change. A random key forces remounting and loses state.
+> Keys give list items a stable identity between renders. This helps React match the old item with the new item. I use a stable database ID when possible. An array index can cause wrong state or UI when items are added, removed, or reordered.
 
-**Câu hỏi tiếng Việt:** Vì sao key quan trọng?
+**Câu hỏi tiếng Việt:** Vì sao key quan trọng trong React?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Key cho sibling identity ổn định qua render, giúp React giữ/reset state đúng khi item di chuyển, thêm hoặc xóa. Tôi dùng domain ID ổn định, không dùng index nếu order đổi; random key buộc remount và mất state.
+> Key cho mỗi item trong list một identity ổn định giữa các lần render. Nó giúp React ghép đúng item cũ với item mới. Tôi dùng database ID ổn định khi có thể. Dùng array index có thể gây sai state hoặc UI khi thêm, xóa hoặc đổi thứ tự item.
 
 ### 20. Props Versus State [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Props are inputs owned by a parent; state is memory owned by a component or external store. Both should be treated as immutable snapshots. I avoid copying props into state unless I intentionally need an editable draft, because duplicate sources of truth easily diverge.
+> Props are inputs passed from a parent component. State is data owned and changed by a component or store. Props should not be changed by the child. When several components need the same state, I move it to the closest common owner.
 
 **Câu hỏi tiếng Việt:** Props và state khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Props là input do parent sở hữu; state là memory do component hoặc external store sở hữu. Cả hai được xem như immutable snapshots. Tôi tránh copy props vào state trừ khi cố ý tạo editable draft vì hai source có thể lệch nhau.
+> Props là input được truyền từ parent component. State là dữ liệu do component hoặc store sở hữu và thay đổi. Child không nên sửa props. Khi nhiều component cần cùng state, tôi chuyển state đến owner chung gần nhất.
 
 ### 21. Controlled Versus Uncontrolled Components [P0]
 
-**Core answer**
+**Simple English answer**
 
-> A controlled input gets its current value from React state and reports changes through a handler. An uncontrolled input lets the DOM keep the current value and is read through a ref or form submission. Controlled inputs give explicit validation and coordination; uncontrolled inputs can reduce wiring for simple forms. Form libraries often combine both ideas.
+> A controlled input gets its value from React state and updates through a handler. An uncontrolled input keeps its value in the DOM and is usually read with a ref or form submit. Controlled inputs give more control. Uncontrolled inputs can be simpler for basic forms.
 
 **Câu hỏi tiếng Việt:** Controlled và uncontrolled component khác nhau thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Controlled input lấy value từ React state và báo change qua handler. Uncontrolled input để DOM giữ value và đọc qua ref/submission. Controlled cho validation/coordination rõ; uncontrolled giảm wiring cho form đơn giản; form library thường kết hợp hai cách.
+> Controlled input lấy value từ React state và update qua handler. Uncontrolled input giữ value trong DOM và thường được đọc bằng ref hoặc lúc submit form. Controlled input cho nhiều quyền kiểm soát hơn; uncontrolled input có thể đơn giản hơn cho form cơ bản.
 
 ### 22. What Is `useEffect` For? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> `useEffect` synchronizes a component with an external system after a commit—for example a subscription, browser API, or non-React widget. It is not the default place for deriving data or handling every user action. If a value can be calculated during render, I calculate it; if work is caused by a click, I usually handle it in that event.
+> `useEffect` is for synchronizing a component with something outside React, such as a socket, timer, browser API, or manual subscription. It is not needed for normal calculations from props or state. For API server state, I usually prefer TanStack Query instead of a manual fetch effect.
 
 **Câu hỏi tiếng Việt:** `useEffect` dùng để làm gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> `useEffect` đồng bộ component với external system sau commit, như subscription, browser API hoặc non-React widget. Nó không phải chỗ mặc định cho derived data hay mọi user action. Giá trị tính được thì tính trong render; work do click thì xử lý trong event.
+> `useEffect` dùng để đồng bộ component với thứ bên ngoài React như socket, timer, browser API hoặc manual subscription. Không cần dùng nó cho phép tính thông thường từ props hoặc state. Với server state từ API, tôi thường ưu tiên TanStack Query thay vì tự fetch trong effect.
 
 ### 23. How Do Effect Dependencies Work? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Every reactive value read by an effect belongs in its dependency list. The list describes the synchronization contract, not a manual scheduling preference. If adding a dependency causes a loop, I reconsider the effect, move event-specific logic, stabilize an input only when appropriate, or remove duplicated state instead of hiding the dependency.
+> The dependency list contains values used by the effect that can change between renders. When one changes, React runs the effect again. Missing a dependency can make the effect use an old value. I fix the code structure instead of hiding the lint warning.
 
-**Câu hỏi tiếng Việt:** Effect dependencies hoạt động thế nào?
+**Câu hỏi tiếng Việt:** Dependency của effect hoạt động thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Mọi reactive value effect đọc phải nằm trong dependency list. List mô tả synchronization contract, không phải lịch chạy tùy ý. Nếu thêm dependency gây loop, cần xem lại effect, event logic, duplicated state hoặc input identity thay vì giấu dependency.
+> Dependency list chứa những value mà effect sử dụng và có thể thay đổi giữa các lần render. Khi một value đổi, React chạy lại effect. Thiếu dependency có thể làm effect dùng giá trị cũ. Tôi sửa cấu trúc code thay vì ẩn lint warning.
 
-### 24. `useMemo`, `useCallback`, and `React.memo` [P0]
+### 24. Explain `useMemo`, `useCallback`, and `React.memo` [P0]
 
-**Core answer**
+**Simple English answer**
 
-> They are performance tools, not correctness tools. `useMemo` caches a calculated value, `useCallback` caches a function identity, and `React.memo` can skip a component render when props are equal. I use them after identifying a meaningful render or computation cost, especially when stable identity affects a memoized child or dependency. Overuse adds complexity and may provide no benefit.
+> `useMemo` remembers a calculated value. `useCallback` remembers a function reference. `React.memo` can skip a child render when its props are unchanged. I use them only when there is a measured problem, because unnecessary memoization also makes code harder to read.
 
-**Câu hỏi tiếng Việt:** `useMemo`, `useCallback` và `React.memo` dùng khi nào?
+**Câu hỏi tiếng Việt:** `useMemo`, `useCallback` và `React.memo` dùng để làm gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Đây là performance tools, không phải correctness tools. `useMemo` cache value, `useCallback` cache function identity, `React.memo` có thể skip render khi props bằng nhau. Tôi chỉ dùng khi có cost rõ hoặc identity ảnh hưởng boundary; lạm dụng làm code phức tạp.
+> `useMemo` ghi nhớ một giá trị đã tính. `useCallback` giữ ổn định function reference. `React.memo` có thể bỏ qua child render khi props không đổi. Tôi chỉ dùng chúng khi có vấn đề đã đo được vì memoization không cần thiết cũng làm code khó đọc hơn.
 
 ### 25. Local State, Context, and External Store [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I keep state as close as possible to its owner. Local state fits one component or small subtree. Context fits scoped values needed by many descendants, especially when updates are not extremely frequent. An external store fits cross-tree client state that benefits from selectors and independent subscriptions. Remote server state belongs in a server-state library rather than being copied into a global UI store.
+> I keep state local when only one small area needs it. I use Context for simple state shared inside one part of the tree. I use an external store such as Zustand when many separate components need the same client state or actions. I use TanStack Query for API data.
 
 **Câu hỏi tiếng Việt:** Khi nào dùng local state, Context và external store?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Giữ state gần owner nhất. Local state cho component/subtree nhỏ; Context cho value có scope và update không quá thường xuyên; external store cho cross-tree client state cần selector/subscription độc lập. Remote server state nên ở server-state library.
+> Tôi giữ state local khi chỉ một khu vực nhỏ cần nó. Tôi dùng Context cho state đơn giản được chia sẻ trong một phần component tree. Tôi dùng external store như Zustand khi nhiều component tách biệt cần cùng client state hoặc action. Tôi dùng TanStack Query cho dữ liệu API.
 
-### 26. Why Avoid Derived State? [P0]
+### 26. Why Should You Avoid Derived State? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> If a value can be calculated from existing props or state, storing another copy creates synchronization work and possible contradictions. I derive it during render, memoizing only if the calculation is expensive. State should represent information that cannot be derived from another current source of truth.
+> If a value can be calculated from current props or state, I usually calculate it during render. Saving the same information in another state creates two sources of truth. They can become different and cause bugs. I only store it when there is a real reason.
 
-**Câu hỏi tiếng Việt:** Vì sao nên tránh derived state dư thừa?
+**Câu hỏi tiếng Việt:** Vì sao nên tránh derived state không cần thiết?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Nếu giá trị tính được từ props/state hiện có, lưu thêm một bản tạo synchronization work và contradiction. Tôi tính trong render, chỉ memoize nếu calculation đắt. State chỉ nên chứa thông tin không thể derive từ source hiện tại.
+> Nếu một value có thể tính từ props hoặc state hiện tại, tôi thường tính nó trong lúc render. Lưu cùng thông tin vào một state khác sẽ tạo hai source of truth. Chúng có thể lệch nhau và gây bug. Tôi chỉ lưu riêng khi có lý do thật sự.
 
 ### 27. What Is Lifting State Up? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Lifting state means moving shared state to the closest common owner so multiple components receive a consistent value and actions. I do not automatically move it to a global store; the correct owner is the smallest boundary that needs to coordinate it.
+> Lifting state up means moving shared state to the closest parent that needs to coordinate its children. The parent owns the value and passes data and handlers down. I do not move state higher than needed because that can cause extra complexity and renders.
 
 **Câu hỏi tiếng Việt:** Lifting state up là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Là chuyển shared state lên closest common owner để nhiều component nhận cùng value/action. Không có nghĩa đưa lên global store; owner đúng là boundary nhỏ nhất cần phối hợp.
+> Lifting state up là chuyển shared state lên parent gần nhất cần phối hợp các child. Parent sở hữu value rồi truyền data và handler xuống. Tôi không đưa state lên cao hơn mức cần thiết vì có thể làm code phức tạp và render nhiều hơn.
 
 ### 28. What Are Error Boundaries? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> Error Boundaries catch rendering and lifecycle errors below them and show a fallback instead of losing the entire interface. They do not replace API error handling and do not catch every event-handler or asynchronous error automatically. I place them around meaningful product regions and provide recovery or retry behavior.
+> An Error Boundary catches rendering errors in child components and shows fallback UI instead of breaking the whole screen. It does not catch every error, such as an error inside an event handler. In Next.js App Router, `error.tsx` gives us a route-level error boundary.
 
 **Câu hỏi tiếng Việt:** Error Boundary là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Error Boundary bắt rendering/lifecycle errors phía dưới và hiển thị fallback thay vì mất toàn giao diện. Nó không thay API error handling và không tự bắt mọi event-handler/async error. Tôi đặt quanh product regions có ý nghĩa và cung cấp recovery/retry.
+> Error Boundary bắt lỗi render trong child component và hiện fallback UI thay vì làm hỏng toàn bộ màn hình. Nó không bắt mọi loại lỗi, ví dụ lỗi bên trong event handler. Trong Next.js App Router, `error.tsx` cung cấp error boundary ở mức route.
 
 ### 29. How Do You Optimize React Rendering? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I measure or inspect the actual render path first. Then I reduce unnecessary state, colocate it, split large components, subscribe to the smallest store slice, keep list keys stable, virtualize genuinely large lists, and memoize only expensive or identity-sensitive boundaries. Network waterfalls and oversized client bundles can matter more than a small component rerender, so I optimize the whole user path.
+> I measure first with React DevTools or the browser profiler. Then I keep state close to where it is used, split large components, avoid unnecessary effects, and use stable keys. I add memoization or list virtualization only when the measurement shows that they help.
 
-**Câu hỏi tiếng Việt:** Bạn tối ưu React rendering thế nào?
+**Câu hỏi tiếng Việt:** Bạn tối ưu React rendering như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi đo hoặc inspect render path trước. Sau đó giảm state dư, colocate state, chia component lớn, subscribe store slice nhỏ, giữ key ổn định, virtualize list thật sự lớn và memoize boundary có chi phí. Network waterfall và client bundle đôi khi quan trọng hơn rerender nhỏ.
+> Trước tiên tôi đo bằng React DevTools hoặc browser profiler. Sau đó tôi giữ state gần nơi sử dụng, tách component lớn, tránh effect không cần thiết và dùng key ổn định. Tôi chỉ thêm memoization hoặc list virtualization khi kết quả đo cho thấy chúng có ích.
 
 ### 30. How Do You Design a Reusable Component? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I start from a repeated semantic behavior, not visual similarity alone. A reusable component should have one clear responsibility, typed inputs, accessible defaults, composable slots or children, and controlled escape hatches. I avoid a large component with many boolean props because it hides multiple components behind one API. I extract only after the repeated contract is understood.
+> A reusable component should have one clear job and a small, clear API. I prefer composition, such as `children` or small slots, instead of many boolean props. I also support accessibility and the important states. I only extract a shared component when there is real repeated use.
 
-**Câu hỏi tiếng Việt:** Bạn thiết kế reusable component thế nào?
+**Câu hỏi tiếng Việt:** Bạn thiết kế reusable component như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi bắt đầu từ semantic behavior lặp lại, không chỉ visual giống nhau. Component cần responsibility rõ, typed inputs, accessible defaults, composable slots/children và escape hatch có kiểm soát. Tôi tránh component nhiều boolean props và chỉ extract khi contract lặp đã rõ.
+> Reusable component nên có một nhiệm vụ rõ ràng và API nhỏ, dễ hiểu. Tôi ưu tiên composition như `children` hoặc các slot nhỏ thay vì quá nhiều boolean prop. Tôi cũng hỗ trợ accessibility và các state quan trọng. Tôi chỉ tách shared component khi thật sự có nhu cầu dùng lặp lại.
 
-## Quick Drills / Bài Luyện Nhanh
+## Quick Drills / Câu Hỏi Nhanh
 
-Answer each in one sentence:
+### Why can using an array index as a key be dangerous?
 
-1. Why is state a snapshot?  
-   Because each render and its closures observe the state values associated with that render.
-   **Tiếng Việt:** Vì sao state là snapshot? Vì mỗi render và closure của nó quan sát state values thuộc về render đó.
-2. Why not use array index as a key?  
-   Reordering can attach existing component state to the wrong item.
-   **Tiếng Việt:** Vì sao không dùng array index làm key? Reorder có thể gắn state component cũ vào sai item.
-3. Why can an effect loop?  
-   It updates a reactive value that changes one of its own dependencies.
-   **Tiếng Việt:** Vì sao effect có thể loop? Nó update một reactive value đồng thời làm dependency của chính effect thay đổi.
-4. Why not memoize everything?  
-   Memoization has comparison, memory, and maintenance cost and may not avoid meaningful work.
-   **Tiếng Việt:** Vì sao không memoize mọi thứ? Memoization có chi phí comparison, memory, maintenance và có thể không tránh meaningful work.
-5. What is the safest default for state ownership?  
-   Keep one source of truth at the closest boundary that needs it.
-   **Tiếng Việt:** Mặc định an toàn cho state ownership là gì? Giữ một source of truth tại boundary gần nhất cần sở hữu nó.
+> If the list order changes, React may connect the old state to the wrong item. I use a stable item ID when possible.
 
-## Sources / Nguồn
+**Tiếng Việt:** Nếu thứ tự list đổi, React có thể gắn state cũ vào sai item. Tôi dùng ID ổn định khi có thể.
 
-- [React documentation](https://react.dev/learn)
-- [MDN JavaScript guide](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide)
-- [MDN event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop)
+### Why can fetching inside `useEffect` be a problem?
+
+> A manual effect needs extra work for loading, errors, race conditions, caching, and refetching. For API state, TanStack Query or server fetching usually handles these problems better.
+
+**Tiếng Việt:** Manual effect cần tự xử lý loading, error, race condition, cache và refetch. Với API state, TanStack Query hoặc server fetching thường xử lý tốt hơn.
+
+### Why should a state update use a new object?
+
+> React often depends on a new reference to detect a change. Mutating the old object can make the update hard to detect and understand.
+
+**Tiếng Việt:** React thường dựa vào reference mới để phát hiện thay đổi. Sửa trực tiếp object cũ có thể làm update khó được nhận ra và khó hiểu.

@@ -11,7 +11,7 @@ Tuyệt đối KHÔNG:
 
 - Dán các secrets của production vào chat, ticket, ảnh chụp màn hình, lịch sử shell hoặc git;
 - Build các image QRTable trên Droplet;
-- Expose các cổng ứng dụng, database, Kafka, Keycloak management hoặc monitoring;
+- Expose các cổng ứng dụng, database, Kafka hoặc Keycloak management;
 - Sử dụng thông tin xác thực SePay giả để vượt qua kiểm tra (production validation);
 - Khôi phục dữ liệu production như một phần của quá trình rollback ứng dụng thông thường.
 
@@ -35,15 +35,12 @@ Các tra cứu Context7 vào ngày 13-06-2026 đã sử dụng `/websites/digita
 
 Bắt đầu với Droplet 4 GB hiện tại. Không thay đổi kích thước (resize) trước khi thực sự cần thiết.
 
-Các đo lường thực tế tại Local Phase 7 cho thấy hạ tầng nhàn rỗi (idle) và các container giám sát (monitoring) chiếm khoảng 2.4 GiB:
-Kafka sử dụng khoảng 721 MiB và Keycloak khoảng 538 MiB trước khi tinh chỉnh ngân sách (budget tuning). Cấu hình production Compose hiện tại giới hạn Kafka ở mức tối đa 1 GiB với heap 512 MiB và Keycloak ở mức 768 MiB với heap 384 MiB.
+Các đo lường thực tế tại Local Phase 7 cho thấy Kafka sử dụng khoảng 721 MiB và Keycloak khoảng 538 MiB trước khi tinh chỉnh ngân sách (budget tuning). Cấu hình production Compose hiện tại giới hạn Kafka ở mức tối đa 1 GiB với heap 512 MiB và Keycloak ở mức 768 MiB với heap 384 MiB.
 
 Các biện pháp bảo vệ bắt buộc:
 
 - Cấu hình swap từ 2–4 GB trước khi khởi chạy toàn bộ stack;
 - Giữ trống ít nhất 8 GiB trước khi pull một bản release;
-- Giới hạn lưu trữ Prometheus tối đa 2 GB và 15 ngày;
-- Giữ thời gian lưu trữ Loki và Tempo ở mức 7 ngày;
 - Cấu hình Docker JSON log rotation;
 - Chỉ lưu giữ các image tag tốt hiện tại và trước đó trên host 25 GB;
 - Tuyệt đối không build image trên Droplet.
@@ -117,7 +114,7 @@ Các inbound rules (luật đi vào):
 | TCP      |  443 | Tất cả IPv4 và IPv6                             |
 | UDP      |  443 | Tất cả IPv4 và IPv6 chỉ khi bật HTTP/3          |
 
-Không thêm các inbound rules cho các cổng `3000`, `3201-3208`, `3300-3308`, `4318`, `5432`, `6379`, `8080`, `9000`, `9090`, `9092` hoặc `27017`.
+Không thêm các inbound rules cho các cổng `3000`, `3201-3208`, `3300-3308`, `5432`, `6379`, `8080`, `9000`, `9092` hoặc `27017`.
 
 Giữ quyền truy cập outbound (đi ra ngoài) đủ cho DNS, NTP, các package Ubuntu, container registry, ACME và các provider bên ngoài. DigitalOcean Cloud Firewalls là stateful, vì vậy lưu lượng phản hồi cho các kết nối được phép sẽ tự động được chấp nhận.
 
@@ -126,20 +123,19 @@ Giữ quyền truy cập outbound (đi ra ngoài) đủ cho DNS, NTP, các packa
 Quản lý DNS dưới tên miền `vodinhquan.dev`. Trường `Host` hoặc `Name` của Porkbun sẽ tương đối với domain đó.
 Tạo các bản ghi này với TTL `600` trong suốt quá trình triển khai ban đầu:
 
-| Type | Host / Name       | Answer                                     |
-| ---- | ----------------- | ------------------------------------------ |
-| A    | `api.qrtable`     | Reserved IP hoặc IPv4 cuối cùng được duyệt |
-| A    | `app.qrtable`     | Cùng IPv4                                  |
-| A    | `qr.qrtable`      | Cùng IPv4                                  |
-| A    | `auth.qrtable`    | Cùng IPv4                                  |
-| A    | `grafana.qrtable` | Cùng IPv4                                  |
+| Type | Host / Name    | Answer                                     |
+| ---- | -------------- | ------------------------------------------ |
+| A    | `api.qrtable`  | Reserved IP hoặc IPv4 cuối cùng được duyệt |
+| A    | `app.qrtable`  | Cùng IPv4                                  |
+| A    | `qr.qrtable`   | Cùng IPv4                                  |
+| A    | `auth.qrtable` | Cùng IPv4                                  |
 
-Trước khi lưu, hãy xóa hoặc giải quyết các bản ghi `A`, `AAAA`, `CNAME` hoặc các bản ghi chuyển tiếp (forwarding records) bị xung đột tại 5 tên này. Không tạo bản ghi wildcard trừ khi được xem xét riêng.
+Trước khi lưu, hãy xóa hoặc giải quyết các bản ghi `A`, `AAAA`, `CNAME` hoặc các bản ghi chuyển tiếp (forwarding records) bị xung đột tại 4 tên này. Không tạo bản ghi wildcard trừ khi được xem xét riêng.
 
 Xác minh từ ít nhất hai public resolver trước khi khởi chạy Caddy:
 
 ```bash
-for host in api app qr auth grafana; do
+for host in api app qr auth; do
   dig +short A "${host}.qrtable.vodinhquan.dev" @1.1.1.1
   dig +short A "${host}.qrtable.vodinhquan.dev" @8.8.8.8
 done
@@ -239,7 +235,6 @@ Sử dụng cấu trúc thư mục sau:
   current/
     docker-compose.infra.yaml
     docker-compose.app.yaml
-    docker-compose.monitoring.yaml
     docker-compose.proxy.yaml
     docker/
     tools/
@@ -278,20 +273,15 @@ Tạo các giá trị bảo mật cục bộ trong SSH session và chỉ dán v�
 openssl rand -hex 32
 openssl rand -base64 32
 docker run --rm apache/kafka:4.3.0 /opt/kafka/bin/kafka-storage.sh random-uuid
-docker run --rm -it caddy:2.10.2-alpine caddy hash-password
 ```
 
-Sử dụng chuỗi 64 ký tự hex cho `PAYMENT_SECRETS_ENCRYPTION_KEY`. Đặt giá trị bcrypt của Caddy trong dấu nháy đơn để các ký tự đô la (`$`) được hiểu là chuỗi thuần túy:
-
-```dotenv
-GRAFANA_BASIC_AUTH_HASH='$2a$...'
-```
+Sử dụng chuỗi 64 ký tự hex cho `PAYMENT_SECRETS_ENCRYPTION_KEY`.
 
 Đặt `IMAGE_TAG` thành Git SHA bất biến có các image `linux/amd64` đã được build và push từ bên ngoài Droplet. Xác nhận các ràng buộc tương đương sau:
 
 - `POSTGRES_PASSWORD` bằng với `TYPEORM_PASSWORD`;
 - `MANAGEMENT_APP_CLIENT_SECRET` bằng với `AUTH_KEYCLOAK_SECRET`;
-- Cả 5 URL công khai đều sử dụng các tên miền production;
+- Cả 4 URL công khai đều sử dụng các tên miền production;
 - `CORS_ORIGINS` chỉ chứa origin của Management App và Customer PWA;
 - Mọi placeholder đều được thay thế;
 - Các giá trị provider phải là thật, nếu không đợt triển khai phải dừng lại.
@@ -324,7 +314,6 @@ ENV_FILE=/opt/qrtable/.env.production tools/deploy/phase7-preflight.sh
 docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.infra.yaml \
   -f docker-compose.app.yaml \
-  -f docker-compose.monitoring.yaml \
   -f docker-compose.proxy.yaml \
   pull
 ```
@@ -338,13 +327,6 @@ Khởi động phần hạ tầng (infrastructure) và đợi trạng thái heal
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.infra.yaml up -d --wait --wait-timeout 300
-```
-
-Khởi động các dịch vụ giám sát (monitoring) trước ứng dụng để các startup trace có nơi nhận dữ liệu:
-
-```bash
-docker compose --env-file /opt/qrtable/.env.production \
-  -f docker-compose.monitoring.yaml up -d --wait --wait-timeout 180
 ```
 
 Chạy lệnh bootstrap cho môi trường production:
@@ -362,7 +344,7 @@ docker compose --env-file /opt/qrtable/.env.production \
   -f docker-compose.app.yaml up -d --wait --wait-timeout 300
 ```
 
-Chỉ khởi động Caddy sau khi cả 5 tên miền DNS đã phân giải về IPv4 ổn định:
+Chỉ khởi động Caddy sau khi cả 4 tên miền DNS đã phân giải về IPv4 ổn định:
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production \
@@ -375,7 +357,6 @@ Kiểm tra trạng thái hệ thống runtime mà không hiển thị các secre
 
 ```bash
 docker compose --env-file /opt/qrtable/.env.production -f docker-compose.infra.yaml ps
-docker compose --env-file /opt/qrtable/.env.production -f docker-compose.monitoring.yaml ps
 docker compose --env-file /opt/qrtable/.env.production -f docker-compose.app.yaml ps
 docker compose --env-file /opt/qrtable/.env.production -f docker-compose.proxy.yaml ps
 docker stats --no-stream
@@ -390,13 +371,12 @@ curl -fsS https://api.qrtable.vodinhquan.dev/api/v1/health/live
 curl -fsSI https://app.qrtable.vodinhquan.dev/
 curl -fsSI https://qr.qrtable.vodinhquan.dev/
 curl -fsSI https://auth.qrtable.vodinhquan.dev/
-curl -sSI https://grafana.qrtable.vodinhquan.dev/ | head -1
 ```
 
-Grafana sẽ trả về mã lỗi `401` nếu không có cấu hình Caddy basic authentication. Xác minh quyền truy cập có xác thực một cách thủ công mà không ghi lại mật khẩu. Xác nhận tên miền chứng chỉ (certificate hostname) và ngày hết hạn:
+Xác nhận tên miền chứng chỉ (certificate hostname) và ngày hết hạn:
 
 ```bash
-for host in api app qr auth grafana; do
+for host in api app qr auth; do
   echo | openssl s_client \
     -connect "${host}.qrtable.vodinhquan.dev:443" \
     -servername "${host}.qrtable.vodinhquan.dev" 2>/dev/null |

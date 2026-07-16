@@ -40,9 +40,15 @@ export class CatalogStockGatewayService {
     try {
       const response = await firstValueFrom(
         this.catalogClient
-          .send<ResponseType<StockMutationOperationResult>, StockMutationPayload>(
+          .send<
+            ResponseType<StockMutationOperationResult>,
+            StockMutationPayload
+          >(
             message,
-            new Request<StockMutationPayload>({ tenantId: payload.tenantId, data: payload }),
+            new Request<StockMutationPayload>({
+              tenantId: payload.tenantId,
+              data: payload,
+            }),
           )
           .pipe(timeout({ first: STOCK_MUTATION_TCP_TIMEOUT_MS })),
       );

@@ -12,7 +12,7 @@ QRTable uses Saga in two representative workflows:
 2. **SaaS Onboarding Mini-Saga** in platform provisioning.
    `OnboardingSagaService` orchestrates tenant, owner identity, User-Access profile, initial subscription, Payment settings, and `tenant.created` outbox. Compensation disables the owner user and removes partially created SaaS state.
 
-These two flows are the thesis evidence for applying Saga. Durable saga state tables, retry workers, CDC/Debezium, stock ledger, and deep compensation observability are future hardening, not current thesis claims.
+These two flows are the thesis evidence for applying Saga. Durable saga state tables, retry workers, CDC/Debezium, stock ledger, and deep compensation diagnostics are future hardening, not current thesis claims.
 
 ## Evidence Model
 

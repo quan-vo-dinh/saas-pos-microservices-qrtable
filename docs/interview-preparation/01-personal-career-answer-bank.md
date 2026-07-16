@@ -1,475 +1,450 @@
-# Personal and Career Answer Bank / Bộ Câu Trả Lời Cá Nhân và Nghề Nghiệp
+# Personal and Career Questions — Simple Spoken English / Câu Hỏi Cá Nhân Dễ Nói
 
-> Goal: sound clear, honest, motivated, and ready to contribute.  
-> Mục tiêu: nói rõ ràng, trung thực, có động lực và sẵn sàng tạo giá trị.
-
-Do not memorize every word. Memorize the opening sentence, the story order, and five keywords. Replace any detail that is no longer true before the interview.
-
-Không học thuộc từng chữ. Học câu mở đầu, thứ tự câu chuyện và năm keywords. Kiểm tra lại mọi chi tiết có thể thay đổi trước phỏng vấn.
+> Đây là phần để **nói như một cuộc trò chuyện**, không phải đọc CV. Hãy nhớ thứ tự ý và keywords, không học thuộc từng chữ. Nếu CEO ngắt lời sau hai câu thì dừng và nghe câu hỏi tiếp theo.
 
 ## 1. Tell Me About Yourself — 30 Seconds [P0]
 
-**Core answer**
+**Simple English answer**
 
-> My name is Minh Quân. I am a final-year Information Systems student at the University of Information Technology, VNU-HCM, and I recently completed my graduation thesis defense. I have hands-on frontend experience from my internship at GEEK Up, freelance full-stack work, and QRTable, a SaaS POS platform built with Next.js and React. My strongest advantage is that I understand both frontend user flows and backend system constraints, so I can build interfaces that integrate reliably with real APIs and realtime events. I am available to start immediately.
+> My name is Minh Quan. I am a final-year Information Systems student at UIT, and I recently finished my thesis defense. I have frontend experience from GEEK Up, freelance ERP work, and QRTable, a POS system built with Next.js and React. I can start immediately.
 
-**Keywords:** final-year · frontend experience · QRTable · system thinking · immediate
+**Câu hỏi tiếng Việt:** Hãy giới thiệu về bản thân trong 30 giây.
 
-**Coaching tiếng Việt:** Đây là bản mở đầu mặc định. Không kể toàn bộ tech stack. Câu cuối chốt đúng nhu cầu “Immediate Joiner”.
+**Câu trả lời tiếng Việt**
 
-**Câu hỏi tiếng Việt:** Hãy giới thiệu về bản thân trong 30 giây
+> Tôi là Minh Quân, sinh viên năm cuối ngành Hệ thống Thông tin tại UIT và vừa hoàn thành bảo vệ khóa luận. Tôi có kinh nghiệm frontend từ GEEK Up, công việc freelance ERP và QRTable—một hệ thống POS xây bằng Next.js và React. Tôi có thể bắt đầu ngay.
 
-**Trả lời tiếng Việt**
+**Keywords:** UIT → frontend experience → QRTable → Next.js/React → start now
 
-> Tôi là Minh Quân, sinh viên năm cuối ngành Hệ thống Thông tin tại UIT và vừa hoàn thành bảo vệ khóa luận. Tôi có kinh nghiệm frontend thực tế từ kỳ thực tập tại GEEK Up, công việc freelance full-stack và QRTable—một SaaS POS xây bằng Next.js và React. Điểm mạnh của tôi là hiểu cả user flow phía frontend lẫn ràng buộc backend, nên có thể xây UI tích hợp API và realtime đáng tin cậy. Tôi có thể bắt đầu ngay.
+## 2. Tell Me About Yourself — Longer Version [P0]
 
-## 2. Tell Me About Yourself — 90 Seconds [P0]
+**Simple English answer**
 
-**Core answer**
-
-> My name is Minh Quân, and I am a final-year Information Systems student at UIT. I completed my graduation thesis defense recently. My first professional frontend experience was a Product Frontend Internship at GEEK Up, where I translated Figma designs into responsive React interfaces, integrated APIs, and worked with Scrum and merge-request workflows.
+> My name is Minh Quan, and I am a final-year Information Systems student at UIT. I recently finished my thesis defense.
 >
-> After that, I worked as a freelance full-stack developer on an internal ERP payroll module. Most recently, I built QRTable with one teammate. It is a multi-tenant SaaS POS and QR ordering platform. On the frontend, we built a Next.js management application for POS, KDS, dashboards, and administration, plus a React customer application for QR ordering. I worked with TanStack Query, TanStack Table, Zustand, Tailwind, shadcn/ui, REST APIs, and Socket.io.
+> My first professional frontend experience was at GEEK Up. I built responsive React screens from Figma, connected APIs, and worked with Scrum and code review. After that, I joined a small freelance team and worked on payroll features for an ERP system.
 >
-> Although my thesis includes a strong backend and distributed-systems component, I see that as an advantage for this position. I understand API contracts, authentication, consistency, and realtime flows, while still focusing on frontend architecture and user experience. I am now looking for a role where I can take real frontend ownership, learn from production delivery, and contribute immediately.
-
-**Coaching tiếng Việt:** Cấu trúc thời gian: GEEK Up → freelance → QRTable → lý do phù hợp. Nếu bị ngắt giữa chừng, dừng tự nhiên sau mỗi đoạn.
-
-**Câu hỏi tiếng Việt:** Hãy giới thiệu về bản thân trong 90 giây
-
-**Trả lời tiếng Việt**
-
-> Tôi là Minh Quân, sinh viên năm cuối ngành Hệ thống Thông tin tại UIT và vừa hoàn thành bảo vệ khóa luận. Kinh nghiệm frontend chuyên nghiệp đầu tiên của tôi là kỳ thực tập Product Frontend tại GEEK Up, nơi tôi chuyển thiết kế Figma thành React UI responsive, tích hợp API và làm việc theo Scrum, merge request.
+> My latest project is QRTable, a SaaS POS and QR ordering platform. The backend uses NestJS microservices, Kafka, and Redis. We also built a Next.js app for restaurant staff and a React app for customers. I worked on both sides, but I focused more on frontend. I worked with APIs, TanStack Query, Zustand, Tailwind, and Socket.io.
 >
-> Sau đó, tôi làm freelance full-stack cho module payroll của một ERP. Gần đây nhất, tôi cùng một teammate xây QRTable—nền tảng SaaS POS và QR ordering multi-tenant. Frontend gồm Management App dùng Next.js cho POS, KDS, dashboard, administration và Customer App dùng React cho đặt món. Tôi làm việc với TanStack Query/Table, Zustand, Tailwind, shadcn/ui, REST và Socket.io.
+> I now want to focus on frontend work. My backend knowledge also helps me understand APIs, authentication, and realtime data. I am ready to learn and can start immediately.
+
+**Câu hỏi tiếng Việt:** Hãy giới thiệu đầy đủ hơn về bản thân.
+
+**Câu trả lời tiếng Việt**
+
+> Tôi là Minh Quân, sinh viên năm cuối ngành Hệ thống Thông tin tại UIT và vừa hoàn thành bảo vệ khóa luận.
 >
-> Khóa luận có phần backend và distributed systems mạnh, nhưng điều đó giúp tôi đưa ra quyết định frontend tốt hơn về API contract, authentication, consistency và realtime. Tôi đang tìm một vai trò có thể ownership frontend thật sự và tạo giá trị ngay.
+> Kinh nghiệm frontend chuyên nghiệp đầu tiên của tôi là tại GEEK Up. Tôi xây các màn hình React responsive từ Figma, tích hợp API và làm việc với Scrum, code review. Sau đó, tôi tham gia một nhóm freelance nhỏ và phát triển các tính năng payroll cho hệ thống ERP.
+>
+> Dự án gần nhất của tôi là QRTable, một nền tảng SaaS POS và QR ordering. Backend dùng NestJS microservices, Kafka và Redis. Chúng tôi cũng xây một app Next.js cho nhân viên nhà hàng và một app React cho khách hàng. Tôi làm cả hai phía nhưng tập trung frontend nhiều hơn. Tôi làm việc với API, TanStack Query, Zustand, Tailwind và Socket.io.
+>
+> Hiện tại tôi muốn tập trung vào frontend. Kiến thức backend cũng giúp tôi hiểu API, authentication và dữ liệu realtime. Tôi sẵn sàng học và có thể bắt đầu ngay.
+
+**Story map:** UIT → GEEK Up → freelance ERP → QRTable → why frontend → available now
 
 ## 3. Walk Me Through Your Background [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I study Information Systems, so my background combines software engineering with business processes and system analysis. I moved from academic React projects into a frontend internship at GEEK Up, then gained full-stack exposure through freelance ERP work. My graduation thesis brought those areas together: I had to understand restaurant workflows, design frontend journeys, define API contracts, and connect the UI to a distributed backend. That progression is why I describe myself as a frontend-focused TypeScript developer with full-stack system awareness.
+> I study Information Systems, so I learned both software development and business processes. I started with React projects, then joined GEEK Up as a frontend intern. After that, I did freelance full-stack work and built QRTable for my thesis. Today, I focus on frontend but also understand the full system.
 
-**Likely follow-up:** “Which experience taught you the most?”
+**Câu hỏi tiếng Việt:** Hãy trình bày quá trình học tập và kinh nghiệm của bạn.
 
-> QRTable taught me the most about ownership because we had to make architecture decisions, debug cross-service behavior, and handle the complete flow instead of only implementing isolated tickets.
+**Câu trả lời tiếng Việt**
 
-**Follow-up tiếng Việt:** “Trải nghiệm nào giúp bạn học được nhiều nhất?”
+> Tôi học Hệ thống Thông tin nên được học cả phát triển phần mềm và quy trình nghiệp vụ. Tôi bắt đầu bằng các dự án React, sau đó thực tập frontend tại GEEK Up. Tiếp theo, tôi làm freelance full-stack và xây QRTable cho khóa luận. Hiện tại tôi tập trung vào frontend nhưng vẫn hiểu toàn bộ hệ thống.
 
-> QRTable giúp tôi học nhiều nhất về ownership vì chúng tôi phải tự đưa ra architecture decisions, debug cross-service behavior và xử lý toàn flow thay vì chỉ làm ticket riêng lẻ.
+**Possible follow-up:** Which experience taught you the most?
 
-**Coaching tiếng Việt:** “Frontend-focused” bảo vệ positioning; “full-stack system awareness” giữ lợi thế backend nhưng không làm role FE trông như lựa chọn tạm thời.
+> QRTable taught me the most because our team had only two people. I had to understand the whole flow, make decisions, and debug problems between the frontend and backend.
 
-**Câu hỏi tiếng Việt:** Hãy trình bày quá trình học tập và kinh nghiệm của bạn
+**Câu hỏi phụ:** Trải nghiệm nào giúp bạn học được nhiều nhất?
 
-**Trả lời tiếng Việt**
-
-> Tôi học Hệ thống Thông tin nên background kết hợp software engineering, business process và system analysis. Tôi đi từ dự án React trong trường đến frontend internship, sau đó có thêm góc nhìn full-stack qua ERP freelance. QRTable kết nối các phần đó: hiểu workflow nhà hàng, thiết kế user journey, định nghĩa API contract và nối UI với distributed backend. Vì vậy tôi định vị mình là frontend-focused TypeScript developer có tư duy hệ thống full-stack.
+> QRTable giúp tôi học nhiều nhất vì team chỉ có hai người. Tôi phải hiểu toàn bộ flow, tự đưa ra quyết định và debug các vấn đề giữa frontend với backend.
 
 ## 4. Why Are You Applying for a Frontend Role? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I enjoy frontend work because it is where technical decisions become visible to the user. A good frontend is not only styling; it requires data modeling, state ownership, performance, accessibility, and careful handling of incomplete or asynchronous backend data. My recent work reminded me that I enjoy solving those problems. This role is especially attractive because it requires strong Next.js and data-management thinking, not only writing UI markup.
+> I like frontend because users can directly see and use what I build. Frontend is not only about colors and CSS. It also includes state, API data, errors, performance, and user experience. I want to become stronger in these areas, especially with Next.js.
 
-**Do not say:** “I am actually a backend developer, but this opportunity is available.”
+**Câu hỏi tiếng Việt:** Vì sao bạn ứng tuyển vị trí frontend?
 
-**Coaching tiếng Việt:** Trả lời bằng điều hấp dẫn thật sự của FE. Không trình bày frontend như bước đệm chờ việc backend.
+**Câu trả lời tiếng Việt**
 
-**Câu hỏi tiếng Việt:** Vì sao bạn ứng tuyển một vị trí frontend?
+> Tôi thích frontend vì người dùng có thể trực tiếp nhìn thấy và sử dụng thứ tôi xây. Frontend không chỉ là màu sắc hay CSS; nó còn gồm state, dữ liệu API, xử lý lỗi, performance và trải nghiệm người dùng. Tôi muốn giỏi hơn ở những phần này, đặc biệt với Next.js.
 
-**Trả lời tiếng Việt**
+**Không nói:** “I am actually a backend developer, but this job is available.”
 
-> Tôi thích frontend vì đây là nơi quyết định kỹ thuật trở thành trải nghiệm trực tiếp của người dùng. Frontend tốt không chỉ là styling; nó còn gồm data modeling, state ownership, performance, accessibility và xử lý dữ liệu backend bất đồng bộ hoặc chưa hoàn chỉnh. Vai trò này hấp dẫn vì yêu cầu tư duy Next.js và data management mạnh, không chỉ viết UI markup.
+## 5. Your Thesis Is Backend-Heavy. Why Frontend? [P0]
 
-## 5. Your Thesis Is Backend-Heavy. Why Should We Consider You for Frontend? [P0]
+**Simple English answer**
 
-**Core answer**
+> The backend part is large, but QRTable also has two real frontend apps. I worked on POS, KDS, menu, table, dashboard, and customer ordering flows. My backend knowledge helps me understand API contracts, authentication, realtime events, and error cases. It helps me build a better frontend.
 
-> The thesis architecture is backend-heavy, but the product cannot work without two substantial frontend applications. I designed and implemented management workflows for POS, KDS, menus, tables, dashboards, and role-based access, as well as the customer QR-ordering flow. The backend depth improves my frontend decisions because I understand API contracts, eventual updates, authentication, tenant boundaries, and failure states. I would not claim to know every advanced UI detail, but I can reason about the full data flow and learn gaps quickly.
+**Câu hỏi tiếng Việt:** Khóa luận của bạn nặng backend; vì sao bạn vẫn phù hợp với frontend?
 
-**Follow-up challenge:** “What frontend decision did you personally make?”
+**Câu trả lời tiếng Việt**
 
-> One example was separating server state from UI state. Remote resources and mutations stay in TanStack Query, while small interaction state such as selected views or auth-ready data is kept in scoped stores or local state. That makes invalidation and realtime reconciliation easier to reason about.
+> Phần backend khá lớn, nhưng QRTable cũng có hai frontend app thật. Tôi làm các flow POS, KDS, menu, table, dashboard và customer ordering. Kiến thức backend giúp tôi hiểu API contract, authentication, realtime event và các trường hợp lỗi. Nó giúp tôi xây frontend tốt hơn.
 
-**Follow-up tiếng Việt:** “Bạn đã trực tiếp đưa ra quyết định frontend nào?”
+**Possible follow-up:** What frontend decision did you personally make?
 
-> Một ví dụ là tách server state khỏi UI state. Remote resources và mutations nằm trong TanStack Query; interaction state nhỏ như selected view hoặc auth-ready data nằm trong scoped store/local state. Nhờ đó invalidation và realtime reconciliation dễ reasoning hơn.
+> One decision was to separate server data from UI state. API data and mutations stay in TanStack Query. Small UI state stays in local state or Zustand. This makes updates and realtime events easier to manage.
 
-**Câu hỏi tiếng Việt:** Khóa luận của bạn nặng backend; vì sao chúng tôi nên tuyển bạn cho frontend?
+**Câu hỏi phụ:** Bạn đã trực tiếp đưa ra quyết định frontend nào?
 
-**Trả lời tiếng Việt**
-
-> Kiến trúc khóa luận nặng backend nhưng sản phẩm có hai frontend lớn: Management App cho POS, KDS, menu, table, dashboard, role-based access và Customer App cho QR ordering. Độ sâu backend giúp tôi hiểu API contract, eventual updates, authentication, tenant boundary và failure states. Tôi không claim biết mọi chi tiết UI nâng cao, nhưng có thể reasoning toàn bộ data flow và học gap nhanh.
+> Một quyết định là tách dữ liệu server khỏi UI state. Dữ liệu API và mutation nằm trong TanStack Query. UI state nhỏ nằm trong local state hoặc Zustand. Nhờ vậy việc cập nhật dữ liệu và xử lý realtime event dễ quản lý hơn.
 
 ## 6. Why VILIHA? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Three things attract me to VILIHA. First, the role matches the stack I have used: Next.js App Router, TanStack Query, TanStack Table, Tailwind, and shadcn/ui. Second, the job expects frontend ownership and architectural thinking, which fits how I like to work. Third, working directly with an experienced technical leader in an international environment would improve both my engineering judgment and English communication. I also understand that the team needs someone quickly, and I am available to start immediately.
-
-**Guardrail:** Only mention facts present in the JD or confirmed by the referrer. Do not invent a client, product, or culture detail.
+> First, the job uses the same tools I have used, such as Next.js, TanStack Query, Tailwind, and shadcn/ui. Second, the role needs someone who can take care of the frontend, and I want that responsibility. Third, I want to work in an English-speaking technical team. I can also start immediately.
 
 **Câu hỏi tiếng Việt:** Vì sao bạn chọn VILIHA?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Có ba lý do. Thứ nhất, stack của vị trí trùng với kinh nghiệm gần đây của tôi: Next.js App Router, TanStack Query/Table, Tailwind và shadcn/ui. Thứ hai, công việc yêu cầu ownership và architectural thinking, phù hợp với cách tôi làm việc. Thứ ba, làm trực tiếp trong môi trường quốc tế với technical leader giàu kinh nghiệm sẽ giúp tôi cải thiện engineering judgment và English communication. Tôi cũng có thể bắt đầu ngay.
+> Thứ nhất, công việc dùng đúng những công cụ tôi đã sử dụng như Next.js, TanStack Query, Tailwind và shadcn/ui. Thứ hai, vị trí cần người có thể chịu trách nhiệm cho frontend và tôi muốn nhận trách nhiệm đó. Thứ ba, tôi muốn làm việc trong một technical team dùng tiếng Anh. Tôi cũng có thể bắt đầu ngay.
 
-## 7. What Do You Know About Our Company and This Role? [P0]
+## 7. What Do You Know About VILIHA and This Role? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> From the job description, VILIHA is a Singapore-based software partner delivering custom digital products, API integrations, and cloud solutions. This is a full-time frontend contract based in District 7, initially for six months with a possible extension. The role needs someone who can build responsive web interfaces, translate business and Figma requirements into maintainable code, and work deeply with the modern Next.js ecosystem. I would also like to learn more about the specific product, team structure, and success criteria during this interview.
+> From the job post, VILIHA is a Singapore-based software company that builds custom digital products. This is a full-time frontend role in District 7. The first contract is six months and may be extended. The role focuses on Next.js, TanStack Query, Tailwind, shadcn/ui, responsive UI, and Figma.
 
-**Coaching tiếng Việt:** Kết thúc bằng điều muốn tìm hiểu thể hiện chuẩn bị kỹ nhưng không giả vờ đã biết nội bộ dự án.
+**Câu hỏi tiếng Việt:** Bạn biết gì về VILIHA và vị trí này?
 
-**Câu hỏi tiếng Việt:** Bạn biết gì về công ty và vị trí này?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
+> Theo bài tuyển dụng, VILIHA là công ty phần mềm tại Singapore, xây các sản phẩm số theo yêu cầu. Đây là vị trí frontend full-time ở Quận 7. Hợp đồng đầu tiên kéo dài sáu tháng và có thể gia hạn. Công việc tập trung vào Next.js, TanStack Query, Tailwind, shadcn/ui, responsive UI và Figma.
 
-> Theo JD, VILIHA là software partner tại Singapore cung cấp digital products, API integration và cloud solutions. Đây là frontend contract full-time tại Quận 7, ban đầu sáu tháng và có thể gia hạn. Vai trò cần người xây responsive UI, chuyển business/Figma requirements thành code maintainable và làm sâu với Next.js hiện đại. Tôi muốn tìm hiểu thêm về sản phẩm, team structure và success criteria cụ thể.
+**Safe ending:** I would also like to learn more about the product and the team today.
 
 ## 8. Why Should We Hire You? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> You should hire me if you need someone early in their career who can still reason beyond isolated components. I already have practical experience with the exact frontend stack, real API integration, realtime events, role-specific workflows, and team delivery. My system background helps me communicate with backend engineers and detect contract or consistency problems early. I am also comfortable using AI as an accelerator while taking responsibility for architecture, review, testing, and the final result. Most importantly, I am available and motivated to take ownership rather than wait for perfectly defined tasks.
-
-**Keywords:** exact stack · integration · system thinking · AI control · ownership
+> I already have experience with the main tools in this job. I can build UI, connect APIs, manage server state, and handle realtime updates. I also understand backend systems, so I can work well with backend developers. I am early in my career, but I learn quickly, use AI carefully, and take responsibility for my work.
 
 **Câu hỏi tiếng Việt:** Vì sao chúng tôi nên tuyển bạn?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi phù hợp nếu team cần một developer đầu sự nghiệp nhưng có thể reasoning vượt ra ngoài component riêng lẻ. Tôi có kinh nghiệm đúng stack, API integration, realtime events, role-specific workflows và team delivery. Tư duy hệ thống giúp tôi giao tiếp tốt với backend và phát hiện sớm lỗi contract/consistency. Tôi cũng dùng AI để tăng tốc nhưng vẫn chịu trách nhiệm architecture, review, testing và kết quả cuối.
+> Tôi đã có kinh nghiệm với các công cụ chính của công việc này. Tôi có thể xây UI, tích hợp API, quản lý server state và xử lý realtime update. Tôi cũng hiểu hệ thống backend nên có thể phối hợp tốt với backend developer. Tôi còn ở đầu sự nghiệp nhưng học nhanh, sử dụng AI cẩn thận và chịu trách nhiệm cho công việc của mình.
 
-## 9. What Is Your Strongest Technical Advantage? [P0]
+## 9. What Is Your Strongest Technical Skill? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> My strongest advantage is end-to-end reasoning. When I build a screen, I think about the user action, component boundary, source of truth, API contract, loading and failure states, cache behavior, authorization, and realtime consistency together. That helps me avoid a UI that looks correct but breaks under real data or concurrent updates.
+> My strongest skill is seeing the full data flow. When I build a screen, I think about the user action, the API, the source of truth, loading, errors, permission, and realtime updates. This helps me find problems that are not visible in the UI at first.
 
-**QRTable example:** Socket events are scoped and translated into targeted query updates or invalidation instead of blindly refetching every resource.
+**Câu hỏi tiếng Việt:** Điểm mạnh kỹ thuật lớn nhất của bạn là gì?
 
-**Câu hỏi tiếng Việt:** Lợi thế kỹ thuật lớn nhất của bạn là gì?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
-
-> Lợi thế lớn nhất của tôi là end-to-end reasoning. Khi xây một màn hình, tôi nghĩ cùng lúc về user action, component boundary, source of truth, API contract, loading/failure, cache, authorization và realtime consistency. Điều đó giúp tránh một UI nhìn đúng nhưng hỏng khi gặp dữ liệu thật hoặc concurrent updates.
+> Điểm mạnh lớn nhất của tôi là nhìn được toàn bộ data flow. Khi xây một màn hình, tôi nghĩ về hành động của người dùng, API, nguồn dữ liệu chính, loading, error, permission và realtime update. Điều này giúp tôi tìm ra những vấn đề ban đầu chưa thể nhìn thấy trên UI.
 
 ## 10. What Is Your Main Weakness? [P0]
 
-**Core answer**
+**Option A — Frontend knowledge**
 
-> My current weakness is that I have spent much of the last year on the full system and backend architecture of my thesis, so some frontend details are less automatic than they were during my internship. I am addressing that with a focused review of Next.js rendering, state management, and UI implementation, and by explaining decisions from my own code instead of only rereading documentation. The advantage is that I am very aware of the gap and can close it systematically.
+> During the last year, I spent a lot of time on the backend and system design of my thesis. Because of that, some frontend details are not as fast for me as before. I am reviewing them now through my own project and daily speaking practice. I can learn the missing parts quickly.
 
-**Alternative if asked about English**
+**Option B — Spoken English**
 
-> My spoken English is not yet as fluent as my technical reading, but I can communicate technical ideas with structure and ask for clarification when needed. I am practicing aloud every day, and I do not let imperfect grammar stop me from making the engineering point clear.
+> My spoken English is not as strong as my technical reading. Sometimes I need a few seconds to organize an answer. However, I can explain technical ideas with simple words, ask when I do not understand, and use examples or code. I practice speaking every day.
 
-**Bản tiếng Việt:** Spoken English của tôi chưa trôi chảy bằng technical reading, nhưng tôi có thể trình bày ý kỹ thuật có cấu trúc và xin clarification khi cần. Tôi luyện nói mỗi ngày và không để grammar chưa hoàn hảo cản trở việc truyền đạt engineering point rõ ràng.
-
-**Do not use both weaknesses in one answer.** Choose the one that best fits the conversation.
+**Chỉ chọn một option, không nói cả hai.**
 
 **Câu hỏi tiếng Việt:** Điểm yếu lớn nhất của bạn là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt — Option A**
 
-> Một năm vừa qua tôi dành nhiều thời gian cho toàn hệ thống và backend architecture của khóa luận nên một số frontend details chưa còn tự động như lúc thực tập. Tôi đang xử lý bằng cách ôn có trọng tâm Next.js rendering, state management, UI implementation và giải thích quyết định từ chính code của mình. Tôi nhận diện rõ gap và có phương pháp đóng nó.
+> Trong năm vừa qua, tôi dành nhiều thời gian cho backend và system design của khóa luận. Vì vậy, một số chi tiết frontend chưa còn nhanh như trước. Hiện tại tôi đang ôn lại chúng từ chính dự án của mình và luyện nói mỗi ngày. Tôi có thể nhanh chóng bù những phần còn thiếu.
+
+**Câu trả lời tiếng Việt — Option B**
+
+> Khả năng nói tiếng Anh của tôi chưa tốt bằng khả năng đọc tài liệu kỹ thuật. Đôi khi tôi cần vài giây để sắp xếp câu trả lời. Tuy vậy, tôi có thể giải thích ý kỹ thuật bằng từ đơn giản, hỏi lại khi chưa hiểu và dùng ví dụ hoặc code. Tôi luyện nói mỗi ngày.
 
 ## 11. Where Do You See Yourself in Three to Five Years? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> In the next three to five years, I want to become a strong full-stack TypeScript engineer who can own a product area from frontend architecture to reliable backend integration. In the near term, I want to deepen my frontend delivery skills in a production team—especially Next.js architecture, performance, accessibility, and code review. Longer term, I would like to take broader technical ownership, but first I want to build a strong record of shipping dependable products.
-
-**Coaching tiếng Việt:** Cho thấy định hướng full-stack nhưng cam kết rất rõ với việc đào sâu frontend trước. Không nhắc chuyển sang backend sớm.
+> In three to five years, I want to be a strong full-stack TypeScript developer. My current goal is to become very good at frontend delivery with React and Next.js. Later, I want to take care of a larger product area from the frontend to backend integration.
 
 **Câu hỏi tiếng Việt:** Bạn thấy mình ở đâu trong ba đến năm năm tới?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Trong ba đến năm năm, tôi muốn trở thành full-stack TypeScript engineer mạnh, có thể ownership một product area từ frontend architecture đến backend integration đáng tin cậy. Trước mắt tôi muốn đào sâu frontend production delivery—Next.js, performance, accessibility và code review. Về lâu dài tôi muốn nhận technical ownership rộng hơn, nhưng trước hết phải xây lịch sử ship sản phẩm ổn định.
+> Trong ba đến năm năm, tôi muốn trở thành một full-stack TypeScript developer vững. Mục tiêu hiện tại là thật sự giỏi frontend delivery với React và Next.js. Sau đó, tôi muốn chịu trách nhiệm một khu vực sản phẩm lớn hơn, từ frontend đến tích hợp backend.
 
 ## 12. What Are Your Short-Term Career Goals? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> My short-term goal is to move from project and internship experience into consistent production ownership. I want to become faster at turning requirements into maintainable frontend features, improve my English collaboration, and learn how an experienced team makes trade-offs under real delivery pressure. Success for me would mean that the team can trust me with a feature from clarification through implementation, testing, and follow-up.
+> My short-term goal is to become a reliable frontend developer in a production team. I want to turn requirements into complete features, not only finish small coding tasks. I also want to improve code review, testing, performance, and English communication.
 
 **Câu hỏi tiếng Việt:** Mục tiêu nghề nghiệp ngắn hạn của bạn là gì?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Mục tiêu ngắn hạn là chuyển từ kinh nghiệm dự án/thực tập sang production ownership ổn định. Tôi muốn nhanh hơn trong việc chuyển requirement thành frontend maintainable, cải thiện English collaboration và học cách team giàu kinh nghiệm trade-off dưới delivery pressure. Thành công là team có thể tin tôi xử lý một feature từ clarification đến test và follow-up.
+> Mục tiêu ngắn hạn của tôi là trở thành một frontend developer đáng tin cậy trong production team. Tôi muốn chuyển requirement thành feature hoàn chỉnh, không chỉ hoàn thành các task code nhỏ. Tôi cũng muốn cải thiện code review, testing, performance và giao tiếp tiếng Anh.
 
 ## 13. You Have Limited Full-Time Experience. Can You Handle This Role? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I understand that my full-time experience is limited, so I would not pretend to have seen every production situation. However, I have worked in an internship, a freelance team, and a complex thesis product, and I can show concrete decisions instead of only course knowledge. I learn quickly because I break unclear problems into contracts, state, UI behavior, and verification. I would expect feedback early, but I can take ownership and become productive without needing every implementation detail prescribed.
+> I understand that my full-time experience is limited. However, I have worked in an internship, a freelance team, and a complex thesis project. I can show real decisions and real code, not only course knowledge. I ask for feedback early, learn quickly, and do not need every step to be explained.
 
-**Tone:** confident but not defensive.
+**Câu hỏi tiếng Việt:** Bạn có ít kinh nghiệm full-time; bạn có thể làm được vị trí này không?
 
-**Câu hỏi tiếng Việt:** Bạn có ít kinh nghiệm full-time; bạn có làm được vai trò này không?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
-
-> Tôi hiểu kinh nghiệm full-time của mình còn hạn chế và không giả vờ đã gặp mọi production situation. Tuy vậy, tôi đã làm trong internship, freelance team và một thesis product phức tạp, có thể đưa ra quyết định cụ thể thay vì chỉ kiến thức khóa học. Tôi phân rã vấn đề thành contract, state, UI behavior và verification nên học khá nhanh. Tôi cần feedback sớm nhưng có thể ownership mà không cần chỉ dẫn từng bước.
+> Tôi hiểu kinh nghiệm full-time của mình còn hạn chế. Tuy nhiên, tôi đã làm việc trong kỳ thực tập, một nhóm freelance và một dự án khóa luận phức tạp. Tôi có thể trình bày những quyết định và code thật, không chỉ kiến thức khóa học. Tôi xin feedback sớm, học nhanh và không cần được hướng dẫn từng bước.
 
 ## 14. Tell Me About Your GEEK Up Internship [P0]
 
-**Core answer**
+**Simple English answer**
 
-> At GEEK Up, I worked as a Product Frontend Intern on the Commitment Module of OGeek 2.0. I translated Figma designs into responsive React interfaces, implemented user and admin workflows, and integrated APIs with loading, error, and empty states. I also worked with Scrum, GitLab merge requests, feedback, and integration documentation. The experience taught me that production frontend work includes communication and edge cases, not only completing the happy-path UI.
+> I was a Product Frontend Intern at GEEK Up. I worked on user and admin flows for the Commitment Module of OGeek 2.0. I turned Figma designs into responsive React screens and connected APIs with loading, error, and empty states. I also worked with Scrum and GitLab merge requests.
 
-**Follow-up:** “What changed after code review?”
+**Câu hỏi tiếng Việt:** Hãy kể về kỳ thực tập tại GEEK Up.
 
-Use one real example you remember. If the exact example is unclear, say:
+**Câu trả lời tiếng Việt**
 
-> I do not want to invent the exact review comment from memory, but the general lesson was to make state handling and component responsibilities explicit before polishing the UI.
+> Tôi là Product Frontend Intern tại GEEK Up. Tôi làm các user flow và admin flow cho Commitment Module của OGeek 2.0. Tôi chuyển thiết kế Figma thành các màn hình React responsive và tích hợp API với loading, error, empty state. Tôi cũng làm việc với Scrum và GitLab merge request.
 
-**Follow-up tiếng Việt:** “Điều gì đã thay đổi sau code review?”
+**Possible follow-up:** What did you learn from code review?
 
-> Tôi không muốn bịa exact review comment khi không nhớ rõ, nhưng bài học chung là phải làm explicit state handling và component responsibilities trước khi polish UI.
+> I learned to make state and component responsibilities clear before polishing the UI. I also learned to explain why I chose a solution, not only show that it works.
 
-**Câu hỏi tiếng Việt:** Hãy kể về kỳ thực tập tại GEEK Up
+**Câu hỏi phụ:** Bạn học được gì từ code review?
 
-**Trả lời tiếng Việt**
-
-> Tại GEEK Up, tôi là Product Frontend Intern cho Commitment Module của OGeek 2.0. Tôi chuyển Figma thành React UI responsive, triển khai user/admin workflows và tích hợp API với loading, error, empty states. Tôi cũng làm việc với Scrum, GitLab merge requests, feedback và integration documentation. Tôi học được rằng frontend production gồm communication và edge cases, không chỉ happy-path UI.
+> Tôi học được rằng phải làm rõ state và trách nhiệm của component trước khi hoàn thiện UI. Tôi cũng phải giải thích vì sao chọn giải pháp đó, không chỉ chứng minh rằng nó chạy được.
 
 ## 15. Tell Me About Your Freelance Experience [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I worked with three other freelance developers on payroll workflows in an internal ERP system. My tasks included salary records, allowances, deductions, payroll periods, responsive UI, API integration, bug fixing, and manual workflow testing. Payroll rules can be ambiguous, so an important part of the work was clarifying business behavior with the team before changing the interface or API. The startup later stopped operating, so the engagement ended; it was not a performance-related departure.
+> I worked with three other freelance developers to build a custom internal ERP system for MW Media, an entertainment company. I was responsible for implementing the full-stack payroll module using React.js, Charka UI, Express.js, and PostgreSQL.
 
-**Coaching tiếng Việt:** Nói factually về việc startup dừng. Không kể drama hoặc suy đoán nguyên nhân.
+**Câu hỏi tiếng Việt:** Hãy kể về kinh nghiệm freelance của bạn.
 
-**Câu hỏi tiếng Việt:** Hãy kể về kinh nghiệm freelance
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
-
-> Tôi làm cùng ba freelancer khác cho payroll workflows của một ERP nội bộ, gồm salary records, allowances, deductions, payroll periods, responsive UI, API integration, bug fixing và manual testing. Payroll rule có thể mơ hồ nên chúng tôi phải làm rõ business behavior trước khi đổi UI/API. Startup sau đó dừng hoạt động nên engagement kết thúc, không phải do performance của tôi.
+> Tôi đã làm việc với ba nhà phát triển tự do khác để xây dựng một hệ thống ERP nội bộ tùy chỉnh cho MW Media, một công ty giải trí. Tôi chịu trách nhiệm triển khai toàn bộ mô-đun tính lương bằng React.js, Charka UI, Express.js và PostgreSQL.
 
 ## 16. Tell Me About QRTable [P0]
 
-**Core answer — one minute**
+**Simple English answer**
 
-> QRTable is a multi-tenant SaaS POS and QR-ordering platform for food and beverage businesses. A restaurant can manage menus, tables, staff, orders, kitchen queues, payments, and subscriptions, while customers scan a table QR code to create a session and order from their phones. We built a Next.js management application and a React/Vite customer application connected to a NestJS microservice backend through REST and Socket.io. On the frontend, the main challenges were role-specific workflows, server-state consistency, realtime updates, responsive interaction, and making asynchronous order and payment states understandable to users.
+> QRTable is a SaaS POS and QR ordering platform for restaurants. Staff can manage menus, tables, orders, kitchen tasks, payments, and subscriptions. Customers scan a QR code at the table and order on their phones. We built a Next.js management app, a React customer app, and a NestJS microservice backend.
 
-**Do not overload this answer with Kafka, Redis, and every backend service.** Wait for the architecture follow-up.
+**Câu hỏi tiếng Việt:** Hãy giới thiệu về QRTable.
 
-**Câu hỏi tiếng Việt:** Hãy giới thiệu QRTable
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
+> QRTable là nền tảng SaaS POS và QR ordering cho nhà hàng. Nhân viên có thể quản lý menu, table, order, kitchen task, payment và subscription. Khách quét QR tại bàn rồi đặt món trên điện thoại. Chúng tôi xây Management App bằng Next.js, Customer App bằng React và backend microservices bằng NestJS.
 
-> QRTable là nền tảng SaaS POS và QR ordering multi-tenant cho F&B. Nhà hàng quản lý menu, table, staff, order, kitchen queue, payment và subscription; khách quét QR tại bàn để tạo session và đặt món. Chúng tôi xây Management App bằng Next.js và Customer App bằng React/Vite, kết nối NestJS backend qua REST và Socket.io. Thách thức frontend chính là role workflows, server-state consistency, realtime updates và responsive interaction.
+## 17. What Was Your Contribution to QRTable? [P0]
 
-## 17. What Was Your Exact Contribution to QRTable? [P0]
+**Simple English answer**
 
-**Core answer**
+> QRTable was a two-person project, so I worked on both frontend and backend. On the backend, I worked with NestJS microservices, API contracts, Kafka events, and Redis. On the frontend, I worked with management and customer flows, API integration, state management, and realtime updates. I focused more on frontend, and I can clearly say which parts I coded directly and which parts we designed together.
 
-> QRTable was a two-person graduation-thesis project, so responsibilities were collaborative rather than isolated by a large team structure. On the frontend, I contributed to the Next.js management workflows and the React customer ordering flow, including component structure, API integration, state management, realtime behavior, and frontend–backend contracts. I can explain the decisions and current code in detail. For any individual feature, I will distinguish what I implemented directly from what we designed or reviewed together.
+**Câu hỏi tiếng Việt:** Đóng góp của bạn trong QRTable là gì?
 
-**Coaching tiếng Việt:** Trước phỏng vấn, đánh dấu 5–7 feature do Quân trực tiếp làm nhiều nhất. Không dùng “I built everything”.
+**Câu trả lời tiếng Việt**
 
-**Câu hỏi tiếng Việt:** Đóng góp chính xác của bạn trong QRTable là gì?
-
-**Trả lời tiếng Việt**
-
-> QRTable là khóa luận hai người nên nhiều trách nhiệm được cộng tác thay vì chia cứng. Phía frontend, tôi đóng góp cho Management workflows và Customer ordering flow, gồm component structure, API integration, state management, realtime behavior và frontend–backend contracts. Với từng feature, tôi sẽ phân biệt rõ phần trực tiếp implement và phần cùng thiết kế/review.
+> QRTable là dự án hai người nên tôi làm cả frontend và backend. Phía backend, tôi làm việc với NestJS microservices, API contract, Kafka event và Redis. Phía frontend, tôi làm các flow quản lý và khách hàng, tích hợp API, state management và realtime update. Tôi tập trung frontend nhiều hơn và có thể nói rõ phần nào mình trực tiếp code, phần nào hai người cùng thiết kế.
 
 ## 18. Are You Available to Start Immediately? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Yes. I have completed my thesis defense and can start immediately. I still have university graduation procedures to complete, but they do not prevent me from working full-time. If needed, I can clarify any specific administrative dates in advance so the team can plan reliably.
-
-**Verify before speaking:** Confirm there is no remaining class, defense revision, or mandatory daytime appointment that changes this answer.
+> Yes. I have completed my thesis defense, and I can start immediately. I still have some university paperwork, but it does not stop me from working full-time. I will inform the team early if I have any important university date.
 
 **Câu hỏi tiếng Việt:** Bạn có thể bắt đầu ngay không?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Có. Tôi đã hoàn thành bảo vệ khóa luận và có thể bắt đầu ngay. Tôi vẫn còn một số thủ tục tốt nghiệp nhưng chúng không cản trở lịch full-time. Nếu có ngày hành chính cụ thể, tôi sẽ thông báo trước để team chủ động kế hoạch.
+> Có. Tôi đã hoàn thành bảo vệ khóa luận và có thể bắt đầu ngay. Tôi vẫn còn một số thủ tục của trường nhưng chúng không cản trở việc làm full-time. Tôi sẽ báo sớm cho team nếu có ngày quan trọng cần đến trường.
 
 ## 19. You Graduate in October 2026. Can You Work Full-Time Now? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Yes. The expected graduation date refers to the university’s administrative timeline. I have already completed the thesis defense, so I am available for a full-time schedule now. I will communicate any remaining university paperwork early, but it will not affect my normal working commitment.
+> Yes. October is the university’s official graduation timeline. I have already finished my thesis defense, so I can work full-time now. The remaining paperwork will not affect my normal working schedule.
 
-**Câu hỏi tiếng Việt:** Bạn dự kiến tốt nghiệp tháng 10/2026; hiện tại có làm full-time được không?
+**Câu hỏi tiếng Việt:** Bạn tốt nghiệp tháng 10/2026; bây giờ có làm full-time được không?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Có. Thời điểm tháng 10 là timeline hành chính của trường; tôi đã hoàn thành bảo vệ khóa luận nên có thể làm full-time ngay. Tôi sẽ thông báo sớm mọi thủ tục còn lại nhưng chúng không ảnh hưởng cam kết làm việc bình thường.
+> Có. Tháng 10 là thời gian tốt nghiệp chính thức theo quy trình của trường. Tôi đã hoàn thành bảo vệ khóa luận nên có thể làm full-time ngay. Các thủ tục còn lại không ảnh hưởng lịch làm việc bình thường.
 
-## 20. Are You Comfortable with Onsite Work in District 7? [P0]
+## 20. Are You Comfortable Working Onsite in District 7? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Yes, I understand that the role requires working from the Cobi Office Tower in District 7, and I am prepared for that arrangement. I would only like to confirm how the stated hybrid model works in practice, so I can follow the team’s schedule from the beginning.
+> Yes. I understand that I need to work at Cobi Office Tower in District 7, and I am ready for that. I would only like to confirm how the hybrid schedule works, so I can follow the team’s plan from the beginning.
 
-**Câu hỏi tiếng Việt:** Bạn có thoải mái làm onsite ở Quận 7 không?
+**Câu hỏi tiếng Việt:** Bạn có thể làm onsite ở Quận 7 không?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Có. Tôi hiểu công việc yêu cầu làm tại Cobi Office Tower, Quận 7 và đã chuẩn bị cho hình thức đó. Tôi chỉ muốn xác nhận mô hình hybrid trong JD vận hành cụ thể thế nào để theo đúng lịch team từ đầu.
+> Có. Tôi hiểu rằng công việc yêu cầu làm tại Cobi Office Tower ở Quận 7 và tôi đã sẵn sàng. Tôi chỉ muốn xác nhận lịch hybrid hoạt động thế nào để có thể theo đúng kế hoạch của team ngay từ đầu.
 
 ## 21. Are You Comfortable with a Six-Month Contract? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Yes. I understand that the initial contract is six months and may be extended based on performance. I am comfortable being evaluated through delivery and collaboration. I would like to understand the performance expectations and extension process, because my intention is to contribute for the longer term if the fit is good for both sides.
+> Yes. I understand that the first contract is six months and can be extended based on performance. I am comfortable with that. I would like to understand the success criteria because I hope to continue longer if both sides work well together.
 
 **Câu hỏi tiếng Việt:** Bạn có chấp nhận hợp đồng sáu tháng không?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Có. Tôi hiểu hợp đồng ban đầu sáu tháng và có thể gia hạn theo performance. Tôi thoải mái được đánh giá bằng delivery và collaboration. Tôi muốn hiểu success criteria và quy trình gia hạn vì mong muốn đóng góp lâu dài nếu hai bên phù hợp.
+> Có. Tôi hiểu hợp đồng đầu tiên kéo dài sáu tháng và có thể gia hạn dựa trên performance. Tôi thoải mái với điều đó. Tôi muốn hiểu rõ tiêu chí đánh giá vì hy vọng có thể tiếp tục lâu hơn nếu hai bên làm việc phù hợp.
 
 ## 22. What Is Your Salary Expectation? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> Based on the responsibilities and the published range, I think around eighteen million VND gross per month would be reasonable. However, I am flexible within the stated range and would consider the complete role, expectations, benefits, and learning opportunity. I would also like to confirm whether the range is gross and how the six-month contract handles benefits.
-
-**Coaching tiếng Việt:** `18M gross` là anchor hợp lý trong range 15–20M, không tự hạ xuống đáy. Quân phải tự xác nhận con số này trước khi học. Không trả lời “anything is fine”.
+> My expected salary is sixteen million VND gross per month. This is also the amount I submitted in the application form.
 
 **Câu hỏi tiếng Việt:** Mức lương kỳ vọng của bạn là bao nhiêu?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Dựa trên trách nhiệm và range đã công bố, tôi cho rằng khoảng 18 triệu đồng gross mỗi tháng là hợp lý. Tuy vậy, tôi linh hoạt trong range và sẽ cân nhắc tổng thể trách nhiệm, benefit và cơ hội học hỏi. Tôi cũng muốn xác nhận range là gross hay net và benefit của hợp đồng sáu tháng.
+> Mức lương kỳ vọng của tôi là 16 triệu đồng gross mỗi tháng. Đây cũng là mức tôi đã điền trong application form.
+
+**Thông tin đã chốt:** `16M gross`, theo trao đổi với anh Quý và application form đã submit.
 
 ## 23. How Is Your English? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I can read technical documentation, write developer communication, and discuss architecture in English. My speaking is still slower than my reading, especially when I need to answer an unexpected question, but I handle that by structuring the answer, confirming the question, and using concrete examples. I am actively practicing, and I am comfortable working in an English-speaking environment even though my grammar is not perfect.
+> I can read technical documents and write about development in English. My speaking is slower, especially with unexpected questions. However, I can use simple words, confirm the question, and explain with an example or code. My grammar is not perfect, but I can communicate and I practice every day.
 
-**Do not apologize repeatedly.** Demonstrate English by continuing the conversation.
+**Câu hỏi tiếng Việt:** Khả năng tiếng Anh của bạn thế nào?
 
-**Câu hỏi tiếng Việt:** Trình độ tiếng Anh của bạn thế nào?
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
-
-> Tôi có thể đọc tài liệu kỹ thuật, viết developer communication và thảo luận architecture bằng tiếng Anh. Speaking của tôi chậm hơn reading, nhất là với câu bất ngờ, nên tôi trả lời có cấu trúc, xác nhận câu hỏi và dùng ví dụ cụ thể. Tôi đang luyện hằng ngày và có thể làm việc trong môi trường tiếng Anh dù grammar chưa hoàn hảo.
+> Tôi có thể đọc tài liệu kỹ thuật và viết về công việc development bằng tiếng Anh. Khả năng nói của tôi chậm hơn, đặc biệt với câu hỏi bất ngờ. Tuy vậy, tôi có thể dùng từ đơn giản, xác nhận lại câu hỏi và giải thích bằng ví dụ hoặc code. Ngữ pháp của tôi chưa hoàn hảo nhưng tôi có thể giao tiếp và đang luyện mỗi ngày.
 
 ## 24. How Do You Use AI in Development? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> I use AI to accelerate exploration, generate a first draft, explain unfamiliar code, and create test cases, but I do not delegate responsibility for the result. Before accepting code, I check whether it matches the requirement, existing architecture, types, security boundaries, loading and error states, performance, and tests. I prefer small, reviewable changes with explicit acceptance criteria. AI improves my speed, while design judgment and verification remain my responsibility.
+> I use AI to explore ideas, create a first draft, understand unfamiliar code, and suggest test cases. I do not accept the result without checking it. I review the requirement, types, security, loading and error states, performance, and tests. AI helps me work faster, but the final result is my responsibility.
 
-**Câu hỏi tiếng Việt:** Bạn sử dụng AI trong development thế nào?
+**Câu hỏi tiếng Việt:** Bạn dùng AI trong development như thế nào?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi dùng AI để tăng tốc exploration, tạo first draft, giải thích code lạ và tạo test cases, nhưng không giao trách nhiệm kết quả cho AI. Trước khi nhận code, tôi kiểm tra requirement, architecture, types, security boundary, loading/error, performance và tests. Tôi ưu tiên change nhỏ, reviewable, có acceptance criteria rõ.
+> Tôi dùng AI để tìm ý tưởng, tạo bản đầu tiên, hiểu code chưa quen và gợi ý test case. Tôi không nhận kết quả mà không kiểm tra. Tôi review requirement, type, security, loading và error state, performance và test. AI giúp tôi làm nhanh hơn nhưng kết quả cuối cùng vẫn là trách nhiệm của tôi.
 
 ## 25. Do You Prefer Frontend, Backend, or Full Stack? [P0]
 
-**Core answer**
+**Simple English answer**
 
-> My long-term direction is full stack in the TypeScript ecosystem, but my current focus is frontend ownership. I want to become genuinely strong at Next.js architecture and frontend delivery rather than remain shallow across both sides. My backend knowledge is useful because it improves integration and system reasoning; it does not reduce my commitment to the frontend role.
+> My long-term direction is full-stack TypeScript, but my focus now is frontend. I want to become strong at React, Next.js, and production UI work. My backend knowledge helps me with APIs and system problems, but it does not reduce my interest in this frontend role.
 
 **Câu hỏi tiếng Việt:** Bạn thích frontend, backend hay full-stack?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Định hướng dài hạn của tôi là full-stack trong TypeScript ecosystem, nhưng trọng tâm hiện tại là frontend ownership. Tôi muốn thật sự mạnh về Next.js architecture và frontend delivery thay vì biết nông cả hai phía. Kiến thức backend giúp integration và system reasoning tốt hơn, không làm giảm cam kết với frontend role.
+> Định hướng dài hạn của tôi là full-stack TypeScript, nhưng hiện tại tôi tập trung vào frontend. Tôi muốn trở nên vững về React, Next.js và công việc UI ở production. Kiến thức backend giúp tôi xử lý API và vấn đề hệ thống tốt hơn, nhưng không làm giảm sự quan tâm của tôi với vị trí frontend này.
 
 ## 26. Tell Me Something That Is Not on Your CV [P1]
 
-**Safe answer framework**
+**Simple English answer**
 
-> Something that may not be obvious from my CV is that I enjoy understanding why a system behaves the way it does, not only making a feature pass. When I find an issue, I usually trace it from the user action through state and API behavior until I can explain the cause. That curiosity is one reason my thesis became architecture-heavy, and I am now applying the same habit to frontend performance and user experience.
+> One thing that may not be clear from my CV is that I like to understand why a system behaves in a certain way. When I find a bug, I usually follow it from the user action to the state and API until I understand the real cause. I enjoy that investigation process.
 
-**Personalize before the interview:** If Quân has a genuine hobby or community activity, add one short sentence. Do not invent a hobby merely to sound interesting.
+**Câu hỏi tiếng Việt:** Hãy kể một điều không có trong CV của bạn.
 
-**Câu hỏi tiếng Việt:** Hãy kể một điều không có trong CV
+**Câu trả lời tiếng Việt**
 
-**Trả lời tiếng Việt**
-
-> Một điều có thể CV chưa thể hiện là tôi thích hiểu vì sao hệ thống hoạt động như vậy, không chỉ làm feature pass. Khi gặp lỗi, tôi thường trace từ user action qua state và API cho đến khi giải thích được nguyên nhân. Sự tò mò này khiến khóa luận của tôi nặng architecture và giờ tôi đang áp dụng nó cho frontend performance, user experience.
+> Một điều có thể chưa rõ trong CV là tôi thích hiểu vì sao hệ thống hoạt động theo một cách nhất định. Khi gặp bug, tôi thường lần theo từ hành động người dùng đến state và API cho đến khi hiểu nguyên nhân thật. Tôi thích quá trình điều tra đó.
 
 ## 27. What Do You Expect from Your Manager? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> I value clear outcomes, honest feedback, and enough context to understand why a feature matters. I do not need every implementation step defined, but early feedback on architecture or priority helps me avoid solving the wrong problem. In return, I communicate progress, risks, and questions instead of hiding uncertainty until the deadline.
+> I expect clear goals, enough product context, and honest feedback. I do not need every coding step to be given to me. Early feedback helps me avoid solving the wrong problem. In return, I will share my progress, risks, and questions clearly.
 
 **Câu hỏi tiếng Việt:** Bạn kỳ vọng gì từ manager?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tôi coi trọng outcome rõ, feedback thẳng và đủ context để hiểu vì sao feature quan trọng. Tôi không cần từng implementation step, nhưng feedback sớm về architecture/priority giúp tránh giải sai bài toán. Đổi lại, tôi báo progress, risk và question thay vì giấu uncertainty đến deadline.
+> Tôi mong có mục tiêu rõ ràng, đủ bối cảnh sản phẩm và feedback thẳng thắn. Tôi không cần được đưa sẵn từng bước code. Feedback sớm giúp tôi tránh giải sai vấn đề. Đổi lại, tôi sẽ trao đổi rõ progress, risk và câu hỏi của mình.
 
-## 28. What Would Your First 30 Days Look Like? [P1]
+## 28. What Would You Do in Your First 30 Days? [P1]
 
-**Core answer**
+**Simple English answer**
 
-> In the first week, I would understand the product, users, repository conventions, release process, and current frontend risks. Then I would take a small but real feature or bug through the full workflow to learn the system with feedback. By the end of the first month, I would aim to own a meaningful frontend area, document important decisions, and make my delivery predictable. I would avoid proposing a large rewrite before understanding why the current system exists.
+> First, I would learn the product, users, codebase, team process, and release flow. Then I would complete a small real feature or bug with feedback. By the end of the month, I would like to take care of a meaningful frontend area. I would not suggest a large rewrite before understanding the current system.
 
-**Câu hỏi tiếng Việt:** Ba mươi ngày đầu của bạn sẽ như thế nào?
+**Câu hỏi tiếng Việt:** Bạn sẽ làm gì trong 30 ngày đầu tiên?
 
-**Trả lời tiếng Việt**
+**Câu trả lời tiếng Việt**
 
-> Tuần đầu tôi sẽ hiểu product, user, repository conventions, release process và frontend risks. Sau đó tôi đưa một feature hoặc bug nhỏ đi trọn workflow để học hệ thống bằng feedback. Cuối tháng đầu, tôi muốn ownership một khu vực frontend có ý nghĩa và delivery predictable. Tôi không đề xuất rewrite lớn trước khi hiểu hệ thống hiện tại.
+> Đầu tiên, tôi sẽ tìm hiểu sản phẩm, người dùng, codebase, quy trình team và release flow. Sau đó, tôi sẽ hoàn thành một feature hoặc bug nhỏ với feedback. Cuối tháng, tôi muốn có thể chịu trách nhiệm một khu vực frontend có ý nghĩa. Tôi sẽ không đề xuất rewrite lớn trước khi hiểu hệ thống hiện tại.
 
 ## 29. Are You Interviewing with Other Companies? [P1]
 
-**Core answer**
+**Simple English answer — if true**
 
-> I am exploring opportunities that fit my frontend and full-stack TypeScript direction, but I am evaluating them based on role fit and learning, not only speed. VILIHA is particularly relevant because the technical requirements match my recent work and the role offers real frontend ownership. I will communicate honestly about any timeline that affects a decision.
+> I am also exploring some roles that match my frontend and TypeScript direction. However, I care more about the role and learning opportunity than only getting the fastest offer. VILIHA is a strong match because the stack is close to my recent work.
 
-**Use only if true.** If no other process exists, say so directly.
+**Simple English answer — if not true**
 
-**Câu hỏi tiếng Việt:** Bạn có đang phỏng vấn công ty khác không?
+> At the moment, I am focusing on this opportunity. The role matches my recent frontend work, so I want to prepare well and understand whether I can contribute to the team.
 
-**Trả lời tiếng Việt**
+**Câu hỏi tiếng Việt:** Bạn có đang phỏng vấn với công ty khác không?
 
-> Tôi đang tìm hiểu các cơ hội phù hợp định hướng frontend/full-stack TypeScript và đánh giá theo role fit, learning chứ không chỉ tốc độ. VILIHA đặc biệt phù hợp vì requirements trùng với công việc gần đây và có frontend ownership thật. Tôi sẽ trao đổi trung thực nếu có timeline khác ảnh hưởng quyết định.
+**Câu trả lời tiếng Việt — nếu có**
+
+> Tôi cũng đang tìm hiểu một số vị trí phù hợp với định hướng frontend và TypeScript. Tuy nhiên, tôi quan tâm đến công việc và cơ hội học hỏi hơn là chỉ nhận offer nhanh nhất. VILIHA khá phù hợp vì stack gần với công việc gần đây của tôi.
+
+**Câu trả lời tiếng Việt — nếu không**
+
+> Hiện tại tôi đang tập trung vào cơ hội này. Vị trí khá phù hợp với công việc frontend gần đây của tôi nên tôi muốn chuẩn bị tốt và hiểu xem mình có thể đóng góp thế nào cho team.
 
 ## 30. Do You Have Any Questions for Us? [P0]
 
-Choose two or three:
+**Simple English answer**
 
-> What would be the most important outcome for this frontend developer in the first six to eight weeks?
+> Yes, I have two questions. First, what is the most important result you expect from this developer in the first six to eight weeks? Second, what frontend problems do you most want the new developer to prevent when working with AI-generated code?
 
-> How do you currently decide Server and Client Component boundaries in the product?
+**Câu hỏi tiếng Việt:** Bạn có câu hỏi gì cho chúng tôi không?
 
-> What kinds of frontend mistakes do you most want the new developer to prevent when working with AI-generated code?
+**Câu trả lời tiếng Việt**
 
-> How do product, design, frontend, and backend clarify requirements and approve a feature?
+> Có, tôi có hai câu hỏi. Thứ nhất, kết quả quan trọng nhất mà anh mong đợi từ developer này trong sáu đến tám tuần đầu là gì? Thứ hai, anh muốn developer mới đặc biệt phòng tránh những vấn đề frontend nào khi làm việc với code do AI tạo ra?
 
-> What performance criteria determine an extension after the initial six-month contract?
+**Other safe questions / Câu hỏi khác có thể dùng**
 
-Do not ask all five. Prioritize product and engineering questions before benefits or leave.
+- How does the team decide that a feature is ready for release?
+- How do frontend and backend developers agree on API contracts?
+- How is performance reviewed before extending the six-month contract?
 
-**Câu hỏi tiếng Việt:** Bạn có câu hỏi gì cho chúng tôi?
+Chỉ chọn hai hoặc ba câu. Ưu tiên hỏi về product và engineering trước benefits.
 
-**Trả lời tiếng Việt**
-
-> Tôi muốn hỏi outcome quan trọng nhất của frontend developer trong sáu đến tám tuần đầu là gì; team đang lo ngại những lỗi frontend nào nhất khi dùng AI-generated code; và product, design, frontend, backend thống nhất một feature đã sẵn sàng bằng cách nào. Tôi sẽ chọn hai hoặc ba câu phù hợp với diễn biến buổi phỏng vấn.
-
-## Rapid Personal Facts / Dữ Kiện Cá Nhân Cần Nhớ
+## Rapid Personal Facts / Thông Tin Cá Nhân Cần Nhớ
 
 | Topic         | Safe fact                                                                      |
 | ------------- | ------------------------------------------------------------------------------ |
-| Name          | Võ Đình Minh Quân; “Quân” is the simplest name to use professionally           |
+| Name          | Võ Đình Minh Quân; recommend “Minh” for easy, consistent English conversation  |
 | University    | University of Information Technology, VNU-HCM                                  |
 | Major         | Information Systems                                                            |
 | Status        | Final-year student; thesis defense completed; expected graduation October 2026 |
 | Internship    | Product Frontend Intern at GEEK Up, June–September 2025                        |
 | Freelance     | Full-Stack Developer at WM Media, November 2025–January 2026                   |
 | Thesis        | QRTable, two-person team, December 2025–June 2026                              |
-| Direction     | Frontend-focused now; long-term full-stack TypeScript engineer                 |
-| Availability  | Immediate, subject to confirming remaining university administration           |
-| Salary anchor | Around 18M VND gross; flexible within published range                          |
+| Direction     | Frontend focus now; full-stack TypeScript in the long term                     |
+| Availability  | Can start immediately, after confirming remaining university paperwork         |
+| Salary anchor | 16M VND gross; already discussed with the referrer and submitted in the form   |
