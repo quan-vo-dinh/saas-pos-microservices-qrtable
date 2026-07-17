@@ -43,8 +43,9 @@
   - 16. UI/UX Consistency and Design Decisions
   - 17. Explaining QRTable’s UI and Layout Choices
   - 18. How SEO Works and How to Implement It in Next.js
-  - 19. Image, Font, Build-Time, and Runtime Optimization
-  - 19A. Dynamic Import and Code Splitting
+  - 19. Image Optimization in Next.js
+  - 19A. Runtime Performance Optimization
+  - 19B. Build-Time Optimization
 - [Part D — QRTable Practical Defense](#part-d)
   - 20. Walk Through the Frontend Architecture of Both Apps
   - 21. Explain One Real Order Flow in the Management App
@@ -100,7 +101,7 @@ Nếu chỉ còn **60 phút**, đừng cố học cả file. Hãy học đúng 1
 6. Câu 10 — chọn `useState`, Context, Zustand hay TanStack Query.
 7. Câu 11 — setup TanStack Query và call API trong QRTable.
 8. Câu 15 — quy trình chuyển Figma thành production UI.
-9. Câu 19 — image, build-time và runtime optimization.
+9. Câu 19–19B — image, runtime và build-time optimization.
 10. Câu 21 — kể một data flow có thật trong QRTable.
 
 Nếu còn thêm **20–30 phút**, học Câu 13A–13D, 14, 18 và 25 về clean code, DRY, SOLID, OOP, UI system, SEO và team fit. Sau đó mới mở rộng sang các câu còn lại. Câu 28–34 chỉ là follow-up, không phải phần phải học đầu tiên.
@@ -115,15 +116,15 @@ Nếu còn thêm **20–30 phút**, học Câu 13A–13D, 14, 18 và 25 về cle
 
 **Simple English answer:**
 
-> Hello, I am Vo Dinh Minh Quan, and you can call me Minh Quan. I am a final-year Information Systems student at UIT, and I recently defended my graduation thesis. My thesis project is QRTable, a SaaS POS and QR ordering platform. It has a Next.js app for restaurant staff and a React/Vite app for customers to scan a QR code and order. I worked on both frontend and backend, with more focus on the frontend. I was also a Product Frontend Intern at GEEK Up, where I built responsive React screens from Figma and connected APIs. Later, I worked as a freelance Full-Stack Developer on payroll features for an internal ERP. I am now looking for a frontend-focused full-time role, and I can start immediately.
+> Hello, I am Vo Dinh Minh Quan, and you can call me Minh Quan. I am a final-year Information Systems student at UIT. I have been working with React and Next.js for more than one year through my projects and work experience. My most recent project using React and Next.js is my graduation thesis. I was also a Product Frontend Intern at GEEK Up, where I built responsive React screens from Figma and connected APIs. Later, I worked as a freelance Full-Stack Developer on payroll features for an internal ERP. I am now looking for a frontend-focused full-time role, and I can start immediately.
 
 **Câu hỏi tiếng Việt:** Bạn có thể giới thiệu về bản thân và kinh nghiệm gần đây không?
 
 **Câu trả lời tiếng Việt:**
 
-> Em tên là Võ Đình Minh Quân và mọi người có thể gọi em là Minh Quân. Em là sinh viên năm cuối ngành Hệ thống Thông tin tại UIT và vừa bảo vệ khóa luận tốt nghiệp. Dự án khóa luận của em là QRTable, một nền tảng SaaS POS và đặt món bằng QR. Dự án có một app Next.js cho nhân viên nhà hàng và một app React/Vite để khách scan QR rồi đặt món. Em làm cả Frontend và Backend nhưng tập trung nhiều hơn vào Frontend. Em cũng từng làm Product Frontend Intern tại GEEK Up, nơi em xây responsive React screen từ Figma và kết nối API. Sau đó, em làm freelance Full-Stack Developer cho các payroll feature của một hệ thống ERP nội bộ. Hiện tại, em đang tìm một vị trí full-time tập trung vào Frontend và có thể bắt đầu ngay.
+> Em tên là Võ Đình Minh Quân và mọi người có thể gọi em là Minh Quân. Em là sinh viên năm cuối ngành Hệ thống Thông tin tại UIT và vừa bảo vệ khóa luận tốt nghiệp. Em đã làm việc với React và Next.js hơn một năm thông qua các dự án và kinh nghiệm làm việc. Dự án gần nhất em sử dụng React và Next.js là khóa luận tốt nghiệp. Em cũng từng làm Product Frontend Intern tại GEEK Up, nơi em xây responsive React screen từ Figma và kết nối API. Sau đó, em làm freelance Full-Stack Developer cho các payroll feature của một hệ thống ERP nội bộ. Hiện tại, em đang tìm một vị trí full-time tập trung vào Frontend và có thể bắt đầu ngay.
 
-**Keywords:** `UIT` → `thesis defense` → `QRTable and two apps` → `GEEK Up` → `freelance ERP` → `frontend-focused`
+**Keywords:** `UIT` → `more than one year with React and Next.js` → `QRTable thesis` → `two frontend apps` → `GEEK Up` → `freelance ERP`
 
 **Cách dùng câu này:** Đây chỉ là bản đồ tổng quan về background của bạn. Bạn chỉ nói QRTable trong 2–3 câu để người phỏng vấn biết dự án gần nhất là gì. Bạn chưa cần kể Microservices, TanStack Query, Socket.io hoặc data flow ở đây; những phần đó thuộc Câu 3 và các câu project follow-up.
 
@@ -205,13 +206,13 @@ Nếu còn thêm **20–30 phút**, học Câu 13A–13D, 14, 18 và 25 về cle
 
 **Simple English answer:**
 
-> App Router is the routing system in Next.js that uses the `app` directory to define pages and layouts. A `page.tsx` file creates a page, while a `layout.tsx` file keeps shared UI around related pages. Route groups help organize different work areas without changing the URL. For example, `app/(kds)/kds/kitchen/page.tsx` creates the `/kds/kitchen` URL. The `(kds)` folder organizes that work area but does not appear in the URL, and its `layout.tsx` provides the shared KDS layout around the kitchen and bar pages.
+> App Router is the routing system in Next.js that uses the `app` directory. I organize routes with folders, and each folder represents a part of the URL. I use `page.tsx` to define the content of a page and `layout.tsx` to share UI between related pages. I can also use nested routes and route groups to keep the project organized without changing the URL. App Router supports Server Components by default and provides special files for loading, error, and not-found states.
 
 **Câu hỏi tiếng Việt:** App Router là gì và bạn sử dụng nó như thế nào?
 
 **Câu trả lời tiếng Việt:**
 
-> App Router là cơ chế định tuyến trong Next.js, sử dụng folder `app` để định nghĩa page và layout. File `page.tsx` tạo một page, còn `layout.tsx` giữ UI dùng chung cho các page liên quan. Route group giúp tổ chức các khu vực làm việc khác nhau mà không làm thay đổi URL. Ví dụ, `app/(kds)/kds/kitchen/page.tsx` tạo URL `/kds/kitchen`. Folder `(kds)` giúp tổ chức khu vực KDS nhưng không xuất hiện trong URL, còn `layout.tsx` của nó cung cấp layout dùng chung cho kitchen page và bar page.
+> App Router là cơ chế routing của Next.js và sử dụng folder `app`. Em tổ chức các route bằng folder, trong đó mỗi folder đại diện cho một phần của URL. Em dùng `page.tsx` để định nghĩa nội dung của page và dùng `layout.tsx` để chia sẻ UI giữa các page liên quan. Em cũng có thể dùng nested route và route group để giữ cấu trúc dự án rõ ràng mà không làm thay đổi URL. App Router mặc định hỗ trợ Server Component và cung cấp các file đặc biệt để xử lý trạng thái loading, error và not found.
 
 **Keywords:** `app folder` → `page` → `layout` → `route group` → `work areas`
 
@@ -638,13 +639,13 @@ app/(kds)/kds/kitchen/page.tsx
 
 **Simple English answer:**
 
-> A search engine first discovers a public page through links or a sitemap. It crawls the page, reads its content and metadata, and may add the page to its index. When a user searches, it can show the page if the content is relevant. Because of that, I start with useful content, semantic HTML, clear headings, links that can be followed, and good page speed. In Next.js, I add a clear title and description through static metadata or `generateMetadata`. I can also provide a sitemap, robots rules, and Open Graph information. Private pages such as POS or admin screens do not need public SEO.
+> A search engine discovers a public page through links or a sitemap. It crawls the content and metadata, then may add the page to its index and show it for a relevant search. I support this with useful content, semantic HTML, clear headings, and good page speed. In Next.js, I add a title and description with static metadata or `generateMetadata`, together with sitemap and robots rules. Private pages such as POS or admin screens do not need public SEO.
 
 **Câu hỏi tiếng Việt:** SEO hoạt động như thế nào và bạn triển khai nó trong Next.js ra sao?
 
 **Câu trả lời tiếng Việt:**
 
-> Đầu tiên, search engine tìm thấy public page thông qua link hoặc sitemap. Nó crawl page, đọc content cùng metadata rồi có thể thêm page vào index. Khi user search, search engine có thể hiển thị page nếu content phù hợp. Vì vậy, em bắt đầu bằng content hữu ích, semantic HTML, heading rõ ràng, link có thể được crawl và page speed tốt. Trong Next.js, em thêm title cùng description bằng static metadata hoặc `generateMetadata`. Em cũng có thể cung cấp sitemap, robots rule và Open Graph information. Các private page như POS hoặc admin screen không cần public SEO.
+> Search engine tìm thấy public page thông qua link hoặc sitemap. Nó crawl content cùng metadata, sau đó có thể thêm page vào index và hiển thị khi user search nội dung phù hợp. Em hỗ trợ quá trình này bằng content hữu ích, semantic HTML, heading rõ ràng và page speed tốt. Trong Next.js, em thêm title cùng description bằng static metadata hoặc `generateMetadata`, kết hợp với sitemap và robots rule. Các private page như POS hoặc admin screen không cần public SEO.
 
 **QRTable example in English:** The public landing page has a title, description, and Open Graph metadata. Operational screens are not treated as public SEO pages.
 
@@ -652,57 +653,85 @@ app/(kds)/kds/kitchen/page.tsx
 
 **Keywords:** `discover` → `understand` → `index` → `metadata plus content` → `public pages only`
 
-## 19. Image, Font, Build-Time, and Runtime Optimization [CORE]
+## 19. Image Optimization in Next.js [CORE]
 
-**English question:** How do you optimize images and performance in a Next.js application?
+**English question:** How do you optimize images in a Next.js application?
 
 **Simple English answer:**
 
-> I do not start by guessing; I measure the problem first. For images, I use `next/image` with the correct width, height, and `sizes`. If the page is slow, I check how much client JavaScript it sends, how long API requests take, and whether React renders too much. Then I change one cause and measure the same result again. For example, if a bundle report shows that a heavy chart is increasing the first load, I can load that chart later with a dynamic import and compare the first-load JavaScript again. If the build is slow, I find which build step is taking the time before changing the configuration.
-
-**If they ask about slow builds:**
-
-> After I find the slow step, I check the build cache, large imports, Tailwind file scanning, and workspace packages. I change one thing at a time and compare the build time again.
+> First, I make sure the image matches the size shown on the screen. In Next.js, I use `next/image` with the correct dimensions so the browser can reserve space and avoid layout shift. For responsive images, I set `sizes` so the browser does not download a file that is larger than needed. Finally, I check the rendered image and the downloaded file in the browser.
 
 **If they ask for more detail:**
 
-> An image that gives information needs useful alt text, while a decorative image should use an empty alt value. I only preload an important image near the top of the page when it is really needed. I also use `next/font` or a well-configured local font, and I load heavy code later if the first screen does not need it.
+> I use `width` and `height`, or `fill`, depending on the layout. I only preload an important image near the top of the page. An informative image needs useful alt text, while a decorative image should use an empty alt value.
 
-**Câu hỏi tiếng Việt:** Bạn tối ưu image và performance trong Next.js application như thế nào?
+**Câu hỏi tiếng Việt:** Bạn tối ưu image trong Next.js application như thế nào?
 
 **Câu trả lời tiếng Việt:**
 
-> Em không bắt đầu bằng việc đoán mà đo vấn đề trước. Với image, em dùng `next/image` cùng width, height và `sizes` đúng. Nếu page chậm, em kiểm tra app gửi xuống bao nhiêu client JavaScript, API request mất bao lâu và React có render quá nhiều hay không. Sau đó, em thay đổi một nguyên nhân rồi đo lại cùng kết quả. Ví dụ, nếu bundle report cho thấy một chart nặng làm tăng first load, em có thể load chart đó trễ hơn bằng dynamic import rồi so sánh lại lượng JavaScript của lần tải đầu. Nếu build chậm, em tìm bước build nào đang tốn thời gian trước khi thay đổi configuration.
-
-**Nếu họ hỏi về build chậm:**
-
-> Sau khi tìm được bước chậm, em kiểm tra build cache, import lớn, phạm vi file Tailwind phải scan và workspace package. Em thay đổi từng thứ một rồi so sánh lại build time.
+> Đầu tiên, em bảo đảm image phù hợp với kích thước hiển thị trên screen. Trong Next.js, em dùng `next/image` với dimension đúng để browser giữ sẵn không gian và tránh layout shift. Với responsive image, em đặt `sizes` để browser không tải file lớn hơn cần thiết. Cuối cùng, em kiểm tra image hiển thị và file thật sự được tải trong browser.
 
 **Nếu họ hỏi chi tiết hơn:**
 
-> Image cung cấp thông tin cần alt text có ý nghĩa, còn decorative image nên dùng alt rỗng. Em chỉ preload image quan trọng gần đầu page khi thật sự cần. Em cũng dùng `next/font` hoặc local font được cấu hình tốt và load phần code nặng trễ hơn nếu first screen chưa cần nó.
+> Em dùng `width` và `height`, hoặc `fill`, tùy theo layout. Em chỉ preload image quan trọng gần đầu page. Image cung cấp thông tin cần alt text có ý nghĩa, còn decorative image nên dùng alt rỗng.
 
-**QRTable example in English:** The Management App sets the Turbopack root for the Nx workspace, transpiles the required internal packages, creates standalone output, and limits remote image hosts. These settings exist in the project, but I still need measurements before saying that the build is fully optimized.
+**QRTable example in English:** The Management App limits the allowed remote image sources in its Next.js configuration. That is one safety and configuration step, but I still need to use the correct dimensions and `sizes` where each image is rendered.
 
-**Ví dụ QRTable:** Management App cấu hình Turbopack root cho Nx workspace, transpile các internal package cần thiết, tạo standalone output và giới hạn remote image host. Đây là configuration thật, nhưng em vẫn phải đo trước khi nói build đã được tối ưu hoàn toàn.
+**Ví dụ QRTable:** Management App giới hạn các remote image source được phép trong Next.js configuration. Đây là một bước về safety và configuration, nhưng tại mỗi nơi render image, em vẫn phải dùng dimension cùng `sizes` phù hợp.
 
-**Keywords:** `clarify build or runtime` → `Image sizes` → `avoid layout shift` → `measure` → `cache/imports/bundle`
+**Keywords:** `display size` → `next/image` → `dimensions or fill` → `sizes` → `avoid layout shift` → `verify in browser`
 
-## 19A. Dynamic Import and Code Splitting [FOLLOW-UP]
+## 19A. Runtime Performance Optimization [CORE]
 
-**English question:** When would you use dynamic import or code splitting in Next.js?
+**English question:** How do you optimize runtime performance in a Next.js application?
 
 **Simple English answer:**
 
-> I use dynamic import when a component is heavy and the first screen does not need it. For example, a chart, rich text editor, large modal, or client-only library can load later. This can reduce the JavaScript needed for the first page load. I do not split every small component because extra network requests also have a cost. I use `ssr: false` only for a component that depends on browser APIs and should run only in a Client Component.
+> Runtime performance is what the user experiences after opening the application. I measure the slow part first, such as too much JavaScript, a slow API request, or unnecessary React renders. Then I fix the main cause and measure the same result again. I do not add optimization everywhere before finding a real problem.
 
-**Câu hỏi tiếng Việt:** Khi nào bạn dùng dynamic import hoặc code splitting trong Next.js?
+**If they ask for more detail:**
+
+> I keep the Client Component boundary small, use TanStack Query to avoid unnecessary requests, and only add memoization after finding a render problem. If a heavy chart is not needed on the first screen, I can load it later with a dynamic import. For fonts, I only load the files and weights the application needs.
+
+**Câu hỏi tiếng Việt:** Bạn tối ưu runtime performance trong Next.js application như thế nào?
 
 **Câu trả lời tiếng Việt:**
 
-> Em dùng dynamic import khi component nặng nhưng first screen chưa cần nó. Ví dụ như chart, rich text editor, large modal hoặc client-only library có thể được load sau. Cách này có thể giảm lượng JavaScript cần tải ở lần mở page đầu tiên. Em không tách mọi component nhỏ vì thêm network request cũng có chi phí. Em chỉ dùng `ssr: false` cho component phụ thuộc browser API và chỉ nên chạy trong Client Component.
+> Runtime performance là những gì user trải nghiệm sau khi mở application. Em đo phần đang chậm trước, ví dụ như quá nhiều JavaScript, API request chậm hoặc React render không cần thiết. Sau đó, em sửa nguyên nhân chính rồi đo lại cùng kết quả. Em không thêm optimization ở mọi nơi trước khi tìm thấy problem thật.
 
-**Keywords:** `heavy but not first screen` → `load later` → `smaller initial JavaScript` → `do not split everything` → `browser-only component`
+**Nếu họ hỏi chi tiết hơn:**
+
+> Em giữ Client Component boundary nhỏ, dùng TanStack Query để tránh request không cần thiết và chỉ thêm memoization sau khi tìm thấy render problem. Nếu một chart nặng chưa cần xuất hiện ở first screen, em có thể load nó trễ hơn bằng dynamic import. Với font, em chỉ load những file và weight application cần.
+
+**Keywords:** `user experience` → `measure` → `JavaScript/network/render` → `fix one cause` → `remeasure` → `dynamic import when useful`
+
+## 19B. Build-Time Optimization [CORE]
+
+**English question:** How do you optimize build time in a Next.js and Nx project?
+
+**Simple English answer:**
+
+> Build time is the time the project needs to create its build output, so it is different from runtime performance in the browser. I run the same build command, record the time, and find which step is slow. Then I change one cause, run the same command again, and compare the result. This helps me know whether the change actually improves the build.
+
+**If they ask for more detail:**
+
+> In an Nx and Next.js project, I check task caching, unnecessary projects, large or barrel imports, internal packages that need transpilation, and the files scanned by Tailwind.
+
+**QRTable example in English:** The Management App sets the Turbopack root for the Nx workspace and lists the internal packages that Next.js must transpile. These settings exist in the project, but I would still measure before saying that the build is fully optimized.
+
+**Câu hỏi tiếng Việt:** Bạn tối ưu build time trong Next.js và Nx project như thế nào?
+
+**Câu trả lời tiếng Việt:**
+
+> Build time là thời gian project cần để tạo build output, nên nó khác với runtime performance trong browser. Em chạy cùng một build command, ghi lại thời gian rồi tìm bước nào đang chậm. Sau đó, em thay đổi một nguyên nhân, chạy lại cùng command và so sánh kết quả. Cách này giúp em biết thay đổi đó có thật sự cải thiện build hay không.
+
+**Nếu họ hỏi chi tiết hơn:**
+
+> Trong Nx và Next.js project, em kiểm tra task cache, các project không cần thiết, large hoặc barrel import, internal package cần được transpile và phạm vi file mà Tailwind phải scan.
+
+**Ví dụ QRTable:** Management App cấu hình Turbopack root cho Nx workspace và liệt kê các internal package mà Next.js cần transpile. Các setting này có trong project, nhưng em vẫn phải đo trước khi nói build đã được tối ưu hoàn toàn.
+
+**Keywords:** `compile, not browser` → `same build command` → `find slow step` → `cache/imports/packages/scanning` → `change one cause` → `compare again`
 
 ---
 
@@ -975,7 +1004,7 @@ Later backend change
 
 > Dữ liệu từ API thuộc về server. TanStack Query đã xử lý cache, loading, error và refetch cho dữ liệu đó. Nếu em copy cùng data vào Zustand, em sẽ có hai bản dữ liệu có thể bị lệch nhau. Em dùng Zustand cho client state, ví dụ UI state được chia sẻ giữa các component tách biệt, chứ không dùng nó như cache thứ hai cho cùng API response.
 
-## 34. Client-Side Versus Server-Side Table Operations [FOLLOW-UP]
+## 34. Client-Side Versus Sever-Side Table Operations [FOLLOW-UP]
 
 **English question:** When do you use client-side or server-side table pagination, filtering, and sorting?
 
@@ -1047,9 +1076,9 @@ Later backend change
 | Figma          | `understand → sections → layout + content → interaction → API → compare` |
 | UI/UX          | `user context → consistency → semantic colors → clear feedback`          |
 | SEO            | `discover → understand → index → metadata + content + performance`       |
-| Image          | `dimensions/fill → sizes → alt → avoid layout shift → measure`           |
-| Build          | `clarify → measure → cache → imports/packages → compare`                 |
-| Lazy loading   | `heavy, not first screen → dynamic import → load later → measure`        |
+| Image          | `display size → dimensions/fill → sizes → layout shift → verify`         |
+| Runtime        | `measure → JavaScript/network/render → fix one cause → measure again`    |
+| Build          | `same command → slow step → cache/imports/packages → compare again`      |
 | QRTable        | `two apps → BFF → microservices → Query cache → Socket invalidation`     |
 | Team fit       | `active → friendly → eager learner → share blockers → ownership`         |
 
