@@ -2,7 +2,7 @@
 
 > Guide to reading the QRTable codebase in accordance with the project's current architecture.
 >
-> **Last verified:** 2026-05-27, cross-referenced with the current source code after session recovery and domain-label stabilization.
+> **Last verified:** 2026-07-24, after running `codegraph sync .` and cross-checking entry points, module wiring, transports, state owners, domain flows, active tests, and canonical documentation.
 >
 > **Canonical role:** This document serves as the codebase reading map. In case of conflicts, prioritize current code/tests, `docs/README.md`, phase records, and accepted specs.
 
@@ -17,6 +17,23 @@ After reading this guide, you should be able to answer:
 - Which files to read first, which ones to read later, and which folders can be temporarily bypassed.
 - Where the current implementation differs from old specs/roadmaps.
 - How to explain the project using architectural theory rather than just describing the code during interviews.
+
+### Scope and Completion Criteria
+
+This is a **critical-path reading map**, not an inventory of every file in the monorepo. A flow is sufficiently traced only when you have followed:
+
+```text
+UI route/service/hook
+  -> BFF controller/guard
+  -> TCP, gRPC, or Kafka contract
+  -> owner-service controller/consumer
+  -> domain service
+  -> repository/state store
+  -> side effect/outbox/realtime
+  -> boundary-protecting test
+```
+
+Globs such as `features/*` or `controllers/*.ts` are discovery aids after you have read the exact paths listed here. If a mapped file no longer exists, treat it as documentation drift and inspect `git log -- <path>`; do not guess its replacement.
 
 ## How to Read This Repo
 
@@ -58,7 +75,7 @@ flowchart TB
 
   subgraph EDGE["Edge / BFF"]
     BFF["apps/bff\nHTTP + WebSocket + TCP clients"]
-    Guards["Global guards\nUser -> Session -> Tenant -> TenantLifecycle -> Permission -> Throttler"]
+    Guards["Global guards\nUser -> Session -> Tenant -> CustomerLifecycle -> Permission\n-> SubscriptionContext -> PlanFeature -> Throttler"]
     Realtime["Socket.IO namespace /orders\nRedis adapter"]
   end
 
@@ -92,10 +109,10 @@ flowchart TB
   BFF -- "TCP" --> Payment
   BFF -- "TCP" --> SaaS
   BFF -- "gRPC/TCP" --> Authorizer
-  BFF -- "gRPC/TCP" --> UserAccess
+  BFF -- "TCP" --> UserAccess
 
   Authorizer --> Keycloak
-  Authorizer --> UserAccess
+  Authorizer -- "gRPC" --> UserAccess
   UserAccess --> Mongo
   SaaS --> Pg
   Catalog --> Pg
@@ -143,7 +160,7 @@ Read in this order of priority:
 1. Current code and tests.
 2. `docs/README.md`, canonical business/technical docs, and accepted phase records.
 3. `docs/testing/README.md` and the traceability matrix if tracing test coverage.
-4. Legacy guides in `docs/guides/*`.
+4. Supporting guides in `docs/guides/*`; always re-check paths and behavior against source.
 5. README boilerplate, generated output, build folders.
 
 Important note: `AGENTS.md` describes target standards of the project. In the current code, import aliases are still `@common/*` and `@einvoice/*`, not yet fully transitioned to `@qrtable/*`.
@@ -155,7 +172,8 @@ Read these files to acquire context:
 | File                                              | What to understand                                                  |
 | ------------------------------------------------- | ------------------------------------------------------------------- |
 | `docs/README.md`                                  | Which docs are canonical, which ones are reference-only.            |
-| `docs/implementation_plan.md`                     | Which phases are completed, which ones are deferred.                |
+| `docs/DOC-CODE-ANCHORS.md`                        | Which source paths anchor each documentation topic.                 |
+| `docs/project-status.md`                          | Which phases are verified, pending, or deferred.                    |
 | `docs/technical-architecture.md`                  | Microservices, database per service, Redis, Kafka, WebSocket rooms. |
 | `docs/business-logic.md`                          | State machine, business rules, business edge cases.                 |
 | `docs/architecture/permission-matrix.md`          | Roles and permissions before reading admin, POS, and KDS.           |
@@ -178,7 +196,12 @@ Then read phase records in chronological order:
 5. `docs/phases/phase-3-payment.md`
 6. `docs/phases/phase-4a-saga-hardening.md`
 7. `docs/phases/phase-4b-saas-onboarding.md`
-8. `docs/phases/phase-5-testing.md` and `docs/phases/phase-7-deployment.md`
+8. `docs/phases/phase-4c-staff-management.md`
+9. `docs/phases/phase-4d-dashboard-reporting.md`
+10. `docs/phases/phase-5-testing.md`
+11. `docs/phases/phase-7-deployment.md`
+
+`docs/graduation-thesis-resources/thesis-workflow-plan.md`, the LaTeX files under `docs/graduation-thesis-resources/thesis-report/`, and `.mmd` diagrams are thesis explanation/corroboration sources; they do **not override** current code or canonical engineering documentation. Historical workflow sections may describe components that were refactored or removed. Edit them only when the task explicitly includes thesis/PDF impact.
 
 ## Round 1: Nx Workspace and Aliases
 
@@ -215,48 +238,118 @@ An Nx monorepo groups multiple deployable apps and shared libraries under a sing
 
 ## Round 2: Backend Boundary First
 
-Analyze BFF before diving into service internals.
+The goal of this round is to establish the **process, transport, and state-ownership boundaries** before entering business logic. Read the BFF first, then each service entry point and root module; do not open every service implementation yet.
 
-### BFF Entry Points
+### Step 1: BFF Process Bootstrap
 
-Read:
+Read in this exact order:
 
-- `apps/bff/src/main.ts`
-- `apps/bff/src/app/app.module.ts`
-- `apps/bff/src/app/modules/*/controllers/*.ts`
-- `apps/bff/src/app/modules/realtime/gateways/order-events.gateway.ts`
-- `apps/bff/src/app/modules/realtime/services/realtime-auth.service.ts`
-- `apps/bff/src/app/modules/realtime/services/realtime-events.service.ts`
-- `apps/bff/src/app/modules/realtime/services/realtime-kafka-bridge.service.ts`
+1. `apps/bff/src/main.ts`
+2. `apps/bff/src/configuration/index.ts`
+3. `apps/bff/src/configuration/cors-origins.ts`
+4. `apps/bff/src/app/app.module.ts`
+5. `libs/configuration/src/lib/tcp.config.ts`
+6. `libs/configuration/src/lib/grpc.config.ts`
 
 Key takeaways:
 
+- Bootstrap now lives directly in `main.ts`; `apps/bff/src/bootstrap.ts` **no longer exists**.
 - `main.ts` configures `rawBody` parsing, the Redis Socket.IO adapter, global route prefixing, `ValidationPipe`, CORS, and Swagger.
-- `app.module.ts` registers global middleware, interceptors, and the guard chain.
-- BFF controllers map HTTP routes to `TCP_REQUEST_MESSAGE` patterns.
+- `app.module.ts` is the composition root: it imports BFF features and registers middleware, the global interceptor, and global guards in declaration order.
+- Trace transport configuration through shared factories/service tokens instead of inferring hosts and ports from app names.
 - BFF performs orchestration at the edge boundary, but does not own domain state.
 
-### Middleware, Guards, Interceptors
+### Step 2: BFF Modules and Downstream Clients
 
-| Order | File                                                         | Role                                                                                            |
-| ----- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| 1     | `libs/middlewares/src/lib/logger.middleware.ts`              | Request logging.                                                                                |
-| 2     | `libs/middlewares/src/lib/tenant.middleware.ts`              | Resolves and injects tenant context from the incoming request.                                  |
-| 3     | `libs/guards/src/lib/user.guard.ts`                          | Verifies JWTs via the Authorizer and caches user metadata with `user-token:{sha256}`.           |
-| 4     | `libs/guards/src/lib/session.guard.ts`                       | Handles customer session headers, cache validation, and metadata skips.                         |
-| 5     | `libs/guards/src/lib/tenant.guard.ts`                        | Resolves tenant context from middleware, headers, claims, or session; bypasses for Super Admin. |
-| 6     | `apps/bff/src/app/guards/customer-tenant-lifecycle.guard.ts` | Blocks customer/menu requests if a tenant is suspended/closed; read this specific path.         |
-| 7     | `libs/guards/src/lib/permission.guard.ts`                    | Evaluates `@Permissions` metadata.                                                              |
-| 8     | `@nestjs/throttler` `ThrottlerGuard`                         | Edge rate limiting.                                                                             |
-| 9     | `libs/interceptors/src/lib/exception.interceptor.ts`         | Normalizes backend exception shapes.                                                            |
+Read a module before its controller so you know which owners an HTTP surface is allowed to call:
+
+| BFF module                                                 | Primary downstream boundary                                    |
+| ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `apps/bff/src/app/modules/authorizer/authorizer.module.ts` | Authorizer TCP and gRPC.                                       |
+| `apps/bff/src/app/modules/catalog/catalog.module.ts`       | Catalog TCP.                                                   |
+| `apps/bff/src/app/modules/order/order.module.ts`           | Order, Kitchen, Payment, SaaS TCP and realtime emission.       |
+| `apps/bff/src/app/modules/kitchen/kitchen.module.ts`       | Kitchen + Order TCP and realtime; includes edge orchestration. |
+| `apps/bff/src/app/modules/payment/payment.module.ts`       | Payment TCP.                                                   |
+| `apps/bff/src/app/modules/saas/saas.module.ts`             | SaaS + Payment TCP and realtime.                               |
+| `apps/bff/src/app/modules/user/user.module.ts`             | User Access TCP.                                               |
+| `apps/bff/src/app/modules/reporting/reporting.module.ts`   | Order + Payment + Catalog + SaaS TCP reporting surface.        |
+| `apps/bff/src/app/modules/realtime/realtime.module.ts`     | Authorizer, Order, Kafka/Redis bridges, and Socket.IO.         |
+| `apps/bff/src/app/modules/health/health.module.ts`         | Local health endpoint; not every controller forwards over TCP. |
+
+For each route, follow this chain:
+
+1. BFF feature module.
+2. Exact controller and route decorator.
+3. Guard/decorator plus gateway request/response interface.
+4. `TCP_REQUEST_MESSAGE` or Kafka topic.
+5. Downstream `@MessagePattern` controller/consumer.
+6. Domain service -> repository/store -> test.
+
+`apps/bff/src/app/modules/*/controllers/*.ts` is only a discovery glob. Do not read every controller alphabetically. Recognize the exceptions: Health is local, Reporting exposes a read surface backed by multiple owners, Kitchen performs compensation orchestration, and Realtime bridges Kafka/Redis into Socket.IO.
+
+### Step 3: HTTP Cross-Cutting Lifecycle
+
+Middleware, guards, and the interceptor are different stages; do not flatten them into one sequence.
+
+**Middleware order in `AppModule.configure()`:**
+
+| Order | File                                            | Role                                      |
+| ----- | ----------------------------------------------- | ----------------------------------------- |
+| 1     | `libs/middlewares/src/lib/logger.middleware.ts` | Request/process logging.                  |
+| 2     | `libs/middlewares/src/lib/tenant.middleware.ts` | Resolves/injects a tenant hint from HTTP. |
+
+**Global guard order in `app.module.ts`:**
+
+| Order | File                                                                             | Role                                                                     |
+| ----- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1     | `libs/guards/src/lib/user.guard.ts`                                              | Verifies JWT via Authorizer and caches by SHA-256 token.                 |
+| 2     | `libs/guards/src/lib/session.guard.ts`                                           | Resolves customer session header/cache and skip metadata.                |
+| 3     | `libs/guards/src/lib/tenant.guard.ts`                                            | Resolves tenant from middleware, headers, claims, or session.            |
+| 4     | `apps/bff/src/app/guards/customer-tenant-lifecycle.guard.ts`                     | Gates customer/menu flows by tenant lifecycle.                           |
+| 5     | `libs/guards/src/lib/permission.guard.ts`                                        | Evaluates `@Permissions`.                                                |
+| 6     | `apps/bff/src/app/modules/reporting/guards/tenant-subscription-context.guard.ts` | Hydrates subscription/feature context for tenant report routes.          |
+| 7     | `libs/guards/src/lib/plan-feature.guard.ts`                                      | Evaluates `@RequiresPlanFeature`; skips routes without feature metadata. |
+| 8     | `@nestjs/throttler` `ThrottlerGuard`                                             | Edge rate limiting.                                                      |
+
+`libs/interceptors/src/lib/exception.interceptor.ts` is the global interceptor that normalizes exception/response shapes; it is not a ninth guard.
+
+### Step 4: Service Entry Points, Root Modules, and State Owners
+
+Read each row left to right. `main.ts` reveals inbound transports; the root module and DataSource reveal which state the service is actually allowed to own.
+
+| Service     | Entry point + root module                                                  | Inbound runtime   | State owner to verify                                                                         |
+| ----------- | -------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------- |
+| Authorizer  | `apps/authorizer/src/main.ts` -> `apps/authorizer/src/app/app.module.ts`   | TCP + gRPC + HTTP | Keycloak integration; no domain database.                                                     |
+| Catalog     | `apps/catalog/src/main.ts` -> `apps/catalog/src/app/app.module.ts`         | TCP + HTTP        | PostgreSQL: Area, Category, MenuItem, StockReservation, Table.                                |
+| Order       | `apps/order/src/main.ts` -> `apps/order/src/app/app.module.ts`             | TCP + HTTP        | PostgreSQL: Session, Order, OrderItem, Bill, ServiceRequest, OutboxEvent; Redis cart/session. |
+| Kitchen     | `apps/kitchen/src/main.ts` -> `apps/kitchen/src/app/app.module.ts`         | TCP + HTTP        | Redis KDS queue/dedupe/SLA/recovery; **no domain database**.                                  |
+| Payment     | `apps/payment/src/main.ts` -> `apps/payment/src/app/app.module.ts`         | TCP + HTTP        | PostgreSQL: Payment, audit, payment outbox, tenant payment settings.                          |
+| SaaS        | `apps/saas/src/main.ts` -> `apps/saas/src/app.module.ts`                   | TCP + HTTP        | PostgreSQL: Tenant, PricingPlan, Subscription, SubscriptionInvoice, SaaS outbox; Redis cache. |
+| User Access | `apps/user-access/src/main.ts` -> `apps/user-access/src/app/app.module.ts` | TCP + gRPC + HTTP | MongoDB: user profile, role, staff/tenant membership.                                         |
+
+After each root module, verify migration/runtime ownership in:
+
+- `apps/catalog/src/database/catalog.data-source.ts`
+- `apps/order/src/database/order.data-source.ts`
+- `apps/payment/src/database/payment.data-source.ts`
+- `apps/saas/src/database/saas.data-source.ts`
+
+Entities live in `libs/entities` for shared type/metadata reuse, but that does **not authorize** another service to query the owner's database. Root-module/DataSource registration and tenant-scoped repositories establish ownership.
 
 **Theory to know:**
 
-The guard chain resolves cross-cutting concerns: authentication, session validation, tenant isolation, authorization, and rate limiting. Controllers should not parse tokens, check roles, or resolve tenants using local business logic.
+The guard chain handles authentication, session validation, tenant isolation, authorization, plan entitlement, and rate limiting. Controllers should not parse tokens, check roles, or resolve tenants using local business logic. A service boundary is demonstrated by transport wiring, root-module composition, and repository ownership—not merely by folder names.
+
+**Round 2 exit criteria:**
+
+- Draw which services the BFF calls through TCP/gRPC and identify orchestration exceptions.
+- State all eight global guards in order and distinguish middleware/interceptor stages.
+- Identify the state store for all seven backend services, especially Kitchen's lack of a database.
+- Start from any BFF route and find the exact owning `@MessagePattern` without reading the entire service.
 
 **How to explain in interviews:**
 
-> I positioned the BFF as an edge boundary to centralize HTTP concerns: request validation, authentication, tenant context resolution, permission evaluation, and response normalization. Domain microservices behind the BFF receive clean, pre-validated payloads via TCP, meaning they are detached from the Express request/response context.
+> I start from composition roots and transport boundaries: the BFF normalizes HTTP, auth, tenant, and plan context before sending typed TCP/gRPC payloads to an owner service. I establish ownership through root modules, DataSources, and repositories—not service names—so domain services remain detached from Express and from one another's databases.
 
 ## Round 3: Read by Domain Flow
 
@@ -272,11 +365,16 @@ Read in order:
 | Customer UI | `apps/customer-pwa/src/features/session/context/session-provider.tsx`             |
 | Customer UI | `apps/customer-pwa/src/features/menu/hooks/use-menu-query.ts`                     |
 | Customer UI | [api-client.ts](../../apps/customer-pwa/src/lib/api-client.ts)                    |
+| BFF         | `apps/bff/src/app/modules/saas/controllers/public-tenant.controller.ts`           |
 | BFF         | `apps/bff/src/app/modules/catalog/controllers/menu.controller.ts`                 |
 | BFF         | `apps/bff/src/app/modules/order/controllers/customer-session.controller.ts`       |
+| SaaS        | `apps/saas/src/controllers/saas.controller.ts`                                    |
+| SaaS        | `apps/saas/src/services/saas.service.ts`                                          |
+| SaaS        | `apps/saas/src/repositories/saas.repository.ts`                                   |
 | Catalog     | `apps/catalog/src/app/modules/table/controllers/table.controller.ts`              |
 | Catalog     | `apps/catalog/src/app/modules/table/services/table.service.ts`                    |
 | Catalog     | `apps/catalog/src/app/modules/menu/services/menu.service.ts`                      |
+| Order       | `apps/order/src/app/modules/order/controllers/order.controller.ts`                |
 | Order       | `apps/order/src/app/modules/order/services/order.service.ts` method `joinSession` |
 | Order       | `apps/order/src/app/modules/order/services/session.service.ts`                    |
 
@@ -372,7 +470,10 @@ Read in order:
 | Layer       | Files                                                                                   |
 | ----------- | --------------------------------------------------------------------------------------- |
 | Customer UI | `apps/customer-pwa/src/features/order/services/order.service.ts`                        |
+| Customer UI | `apps/customer-pwa/src/features/order/hooks/order-query-keys.ts`                        |
+| Customer UI | `apps/customer-pwa/src/features/order/hooks/use-cart-query.ts`                          |
 | Customer UI | `apps/customer-pwa/src/features/order/hooks/use-order-query.ts`                         |
+| Customer UI | `apps/customer-pwa/src/features/order/hooks/use-bill-query.ts`                          |
 | Customer UI | `apps/customer-pwa/src/lib/idempotency.ts`                                              |
 | BFF         | `apps/bff/src/app/modules/order/controllers/customer-order.controller.ts`               |
 | Order       | `apps/order/src/app/modules/order/controllers/order.controller.ts`                      |
@@ -462,23 +563,30 @@ sequenceDiagram
 
 Read in order:
 
-| Layer         | Files                                                                                |
-| ------------- | ------------------------------------------------------------------------------------ |
-| Management UI | `apps/management-app/src/app/(pos)/pos/page.tsx`                                     |
-| Management UI | `apps/management-app/src/components/pos/*`                                           |
-| Management UI | `apps/management-app/src/features/order/services/order.service.ts`                   |
-| Management UI | `apps/management-app/src/features/order/hooks/use-order-query.ts`                    |
-| BFF           | `apps/bff/src/app/modules/order/controllers/staff-order.controller.ts`               |
-| Order         | `apps/order/src/app/modules/order/services/order.service.ts` facade                  |
-| Order         | `apps/order/src/app/modules/order/services/session.service.ts`                       |
-| Order         | `apps/order/src/app/modules/order/services/order-state-transition.service.ts`        |
-| Order         | `apps/order/src/app/modules/order/services/order-kds-event.service.ts`               |
-| Order         | `apps/order/src/app/modules/order/services/outbox-publisher.service.ts`              |
-| Catalog       | `apps/catalog/src/app/modules/menu-item/services/menu-item.service.ts`               |
-| Catalog       | `apps/catalog/src/app/modules/menu-item/repositories/menu-item.repository.ts`        |
-| Tests         | `apps/order/src/app/modules/order/tests/order-state-transition.service.spec.ts`      |
-| Tests         | `apps/order/src/app/modules/order/tests/session.service.spec.ts`                     |
-| Tests         | `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts` |
+| Layer         | Files                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| Management UI | `apps/management-app/src/app/(pos)/pos/page.tsx`                                             |
+| Management UI | `apps/management-app/src/features/pos/components/*`                                          |
+| Management UI | `apps/management-app/src/features/order/services/order.service.ts`                           |
+| Management UI | `apps/management-app/src/features/order/hooks/use-order-query.ts`                            |
+| BFF           | `apps/bff/src/app/modules/order/controllers/staff-order.controller.ts`                       |
+| Order         | `apps/order/src/app/modules/order/controllers/order.controller.ts`                           |
+| Order         | `apps/order/src/app/modules/order/services/order.service.ts` facade                          |
+| Order         | `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`                    |
+| Order         | `apps/order/src/app/modules/order/services/catalog-stock-gateway.service.ts`                 |
+| Order         | `apps/order/src/app/modules/order/services/order-state-transition.service.ts` cancel paths   |
+| Order         | `apps/order/src/app/modules/order/services/outbox-publisher.service.ts`                      |
+| Catalog       | `apps/catalog/src/app/modules/menu-item/controllers/menu-item.controller.ts`                 |
+| Catalog       | `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts`               |
+| Catalog       | `apps/catalog/src/app/modules/menu-item/repositories/stock-reservation.repository.ts`        |
+| Catalog       | `apps/catalog/src/app/modules/menu-item/repositories/menu-item.repository.ts`                |
+| Shared        | `libs/entities/src/lib/stock-reservation.entity.ts`                                          |
+| Shared        | `libs/interfaces/src/lib/tcp/catalog/menu-item-request.interface.ts`                         |
+| Shared        | `libs/interfaces/src/lib/tcp/catalog/menu-item-response.interface.ts`                        |
+| Tests         | `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`                  |
+| Tests         | `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts` |
+| Tests         | `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts`         |
+| Tests         | `apps/catalog/src/app/modules/menu-item/tests/stock-reservation.service.spec.ts`             |
 
 Sequence of events:
 
@@ -507,10 +615,11 @@ sequenceDiagram
     Order-->>BFF: ORDER_INVALID_STATE
     BFF-->>Mgmt: 409 conflict
   else Order is PENDING
-    Order->>Catalog: TCP MENU_ITEM.STOCK_DEDUCT_FOR_ORDER
+    Order->>Catalog: TCP STOCK_DEDUCT_FOR_ORDER + idempotencyKey
+    Catalog->>CatalogDB: Claim/lock StockReservation
     Catalog->>CatalogDB: Lock menu items and deduct stock
-    Catalog-->>Order: Stock mutation result
-    Order->>OrderDB: Set order PROCESSING
+    Catalog-->>Order: reservationVersion + APPLIED/REPLAYED
+    Order->>OrderDB: Set order/items PROCESSING and persist reservationVersion
     Order->>OrderDB: Save OutboxEvent order.confirmed
     Order-->>BFF: OrderActionTcpResponse with orderStatusChanged
     BFF->>Realtime: emit events.orderStatusChanged
@@ -525,22 +634,25 @@ sequenceDiagram
 1. Staff monitors pending/live orders in the POS.
 2. Staff confirms the order via `POST /admin/orders/:id/confirm`.
 3. BFF forwards the `ORDER.CONFIRM` TCP message.
-4. `OrderStateTransitionService.confirmOrder` locks the order and verifies status is `PENDING`.
-5. Order invokes Catalog `MENU_ITEM.STOCK_DEDUCT_FOR_ORDER` with idempotency key `confirm-order:{orderId}`.
-6. If Catalog stock deduction succeeds, Order sets status to `PROCESSING` and writes the `order.confirmed` outbox event.
-7. Outbox publisher pushes the event to Kafka; Kitchen consumes it to generate KDS tickets.
-8. Canceling a processing order releases stock back via Catalog and publishes `order.status_changed`.
+4. `OrderService.confirmOrder` delegates to `OrderConfirmSagaService`; the saga locks the order, loads items/the open bill, and verifies `PENDING`.
+5. `CatalogStockGatewayService` sends `MENU_ITEM.STOCK_DEDUCT_FOR_ORDER` with idempotency key `confirm-order:{orderId}`.
+6. Catalog `StockReservationService` claims a reservation by tenant/order/key/hash, locks menu items, mutates stock, and returns a `reservationVersion` with `APPLIED` or `REPLAYED`.
+7. Order persists `stockReservationVersion`, transitions order/items to `PROCESSING`, and writes the `order.confirmed` outbox event.
+8. If the Order step fails after stock deduction, the saga compensates with a release carrying the same `reservationVersion`; an old release returns `STALE` instead of incrementing stock incorrectly.
+9. The outbox publisher pushes the event to Kafka; Kitchen consumes it to generate KDS tickets.
+10. Processing cancellation in `OrderStateTransitionService` releases stock with the persisted version and publishes `order.status_changed`.
 
 **Theory to know:**
 
 - Stock belongs to the Catalog domain, not Order, because Catalog owns menu item inventory records.
 - The Order state machine manages transitions: `PENDING -> PROCESSING -> READY -> SERVED` or cancellation paths.
 - Confirming an order requires a synchronous stock mutation call because the staff needs immediate feedback if items are out of stock.
+- `reservationVersion` protects deduct/release retries and old compensations; an idempotency key alone cannot distinguish a stale release across multiple reservation cycles.
 - The transactional outbox pattern guarantees that side-effect events are published after the DB transaction commits successfully, preventing dual-write issues.
 
 **How to explain in interviews:**
 
-> I don't deduct stock when a customer submits an order, because the order can still be rejected by staff. Stock is deducted only when staff confirms the order. Catalog acts as the source of truth for stock; Order simply makes an idempotent TCP stock deduction call. Once the order transitions to PROCESSING, Order persists the `order.confirmed` outbox event to be consumed by Kitchen asynchronously.
+> I do not deduct stock when a customer submits an order because staff may still reject it. On confirm, `OrderConfirmSagaService` calls Catalog synchronously; Catalog uses a reservation plus row locks and returns a version. Order persists that version so compensation/cancellation cannot release a newer reservation, then writes `order.confirmed` to the outbox for Kitchen.
 
 ### Flow 4: KDS Queue, Ticket Lifecycle, Recovery, SLA
 
@@ -670,29 +782,39 @@ sequenceDiagram
 
 > KDS is an operational queue, so I used Redis instead of a relational database. Kitchen consumes the `order.confirmed` event to generate tickets, applying deduplication to prevent double-processing. When the chef completes a ticket, the BFF orchestrates Kitchen and Order services. If Order fails to update item statuses, BFF triggers a compensation call to Kitchen to roll back the ticket state.
 
-### Flow 5: Bill, Payment, VietQR/SePay, Refund
+### Flow 5: Bill, Payment, VietQR/SePay
 
 Read in order:
 
 | Layer         | Files                                                                                           |
 | ------------- | ----------------------------------------------------------------------------------------------- |
 | Customer UI   | `apps/customer-pwa/src/features/payment/services/payment.service.ts`                            |
+| Customer UI   | `apps/customer-pwa/src/features/payment/hooks/use-create-vietqr-mutation.ts`                    |
 | Customer UI   | `apps/customer-pwa/src/pages/request-payment-page.tsx`                                          |
 | Management UI | `apps/management-app/src/features/payment/services/payment.service.ts`                          |
 | Management UI | `apps/management-app/src/features/payment/hooks/use-payment.ts`                                 |
 | Management UI | `apps/management-app/src/features/payment/components/bill-settlement-panel.tsx`                 |
 | BFF           | `apps/bff/src/app/modules/payment/controllers/payment.controller.ts`                            |
+| BFF           | `apps/bff/src/app/modules/payment/guards/sepay-webhook-secret.guard.ts`                         |
+| BFF           | `apps/bff/src/app/modules/saas/controllers/sepay-webhook.controller.ts`                         |
+| BFF           | `apps/bff/src/app/modules/saas/saas-bff-routes.ts`                                              |
 | BFF           | `apps/bff/src/app/modules/order/controllers/customer-order.controller.ts` customer bill APIs    |
 | Order         | `apps/order/src/app/modules/order/services/bill.service.ts`                                     |
 | Order         | `apps/order/src/app/modules/order/services/payment-events-consumer.service.ts`                  |
+| Payment       | `apps/payment/src/app/modules/payment/controllers/payment.controller.ts`                        |
 | Payment       | `apps/payment/src/app/modules/payment/services/payment.service.ts` facade                       |
 | Payment       | `apps/payment/src/app/modules/payment/services/payment-settlement.service.ts`                   |
+| Payment       | `apps/payment/src/app/modules/payment/services/payment-query.service.ts`                        |
 | Payment       | `apps/payment/src/app/modules/payment/services/sepay-webhook.service.ts`                        |
-| Payment       | `apps/payment/src/app/modules/payment/services/payment.service.ts`                              |
 | Payment       | `apps/payment/src/app/modules/payment/services/payment-order.gateway.ts`                        |
 | Payment       | `apps/payment/src/app/modules/payment/services/payment-reference.service.ts`                    |
+| Payment       | `apps/payment/src/app/modules/payment/repositories/payment.repository.ts`                       |
+| Payment       | `apps/payment/src/app/modules/payment/repositories/audit-payment.repository.ts`                 |
+| Payment       | `apps/payment/src/app/modules/payment/repositories/payment-outbox.repository.ts`                |
 | Payment       | `apps/payment/src/app/modules/payment/services/payment-outbox-publisher.service.ts`             |
 | Tests         | `apps/payment/src/app/modules/payment/tests/payment-completed-order-bridge.integration.spec.ts` |
+
+Refund handling is not implemented in accepted Phase 3; broader refund/financial operations are deferred. A nullable `refundId` in the audit schema is not evidence of a current refund use case.
 
 Cash flow diagram:
 
@@ -772,7 +894,7 @@ sequenceDiagram
   BFF-->>PWA: QR URL and payment info
 
   SePay->>BFF: POST /api/v1/payment/sepay/webhook/{tenantSlug} (Tier 1) or /platform (Tier 2 QRSUB)
-  BFF->>BFF: SepayWebhookSecretGuard
+  BFF->>BFF: Validate route-specific secret (controller or legacy guard)
   BFF->>Payment: TCP PAYMENT.HANDLE_SEPAY_WEBHOOK
   Payment->>Payment: Extract billReference and verify tenant secret if tenant route
   Payment->>PaymentDB: Lock payment by billReference
@@ -798,8 +920,8 @@ sequenceDiagram
 
 1. UI hits `POST /payment/vietqr/create-qr` or the customer PWA route through BFF.
 2. Payment creates a pending payment structure, computes the bill reference, and generates the QR presentation parameters.
-3. SePay webhook alerts the BFF: Tier 1 at `/api/v1/payment/sepay/webhook/:tenantSlug`, Tier 2 at `/webhook/platform`, or the legacy webhook at `/payment/sepay/webhook`.
-4. `SepayWebhookService` validates the tenant webhook secret (if using tenant-specific routes), extracts the bill reference, locks the payment record, and prevents double-processing or underpayment.
+3. SePay reaches the BFF through Tier 1 `/api/v1/payment/sepay/webhook/:tenantSlug` or Tier 2 `.../webhook/platform` on the SaaS BFF controller, while legacy HMAC `.../payment/sepay/webhook` goes through the Payment controller and `SepayWebhookSecretGuard`.
+4. The BFF resolves the secret according to route topology; `SepayWebhookService` validates the tenant secret for tenant routes, extracts the bill reference, locks the payment record, and prevents duplicate/underpaid processing.
 5. On a valid transfer match, it updates payment to `PAID`, audits it, writes to the outbox, and fires a TCP call to Order Service to close the bill.
 6. Order handles the transition idempotently if the event is delivered via the async broker path.
 7. BFF Kafka bridge consumes `payment.completed`, queries the session ID from Order, and emits WebSocket notices to clients.
@@ -810,6 +932,7 @@ sequenceDiagram
 - Payment does not compute bill totals; it acquires a read snapshot from Order and validates the VND rounding.
 - Webhook processing must be idempotent because payment providers may retry webhooks multiple times.
 - Audit logs for payment entries track external money movements for reconciliation.
+- Refunds are outside the current accepted scope; do not infer a use case from a nullable audit field or an older roadmap.
 
 **How to explain in interviews:**
 
@@ -821,7 +944,8 @@ Read in order:
 
 | Layer         | Files                                                                           |
 | ------------- | ------------------------------------------------------------------------------- |
-| Management UI | `apps/management-app/src/features/saas/api.ts`                                  |
+| Management UI | `apps/management-app/src/features/saas/services/saas.service.ts`                |
+| Management UI | `apps/management-app/src/features/saas/saas-keys.ts`                            |
 | Management UI | `apps/management-app/src/features/saas/README.md` (labels vs badges)            |
 | Management UI | `apps/management-app/src/features/saas/components/badges/*`                     |
 | Management UI | `libs/shared/constants/src/lib/vi-domain-labels.ts`                             |
@@ -898,7 +1022,9 @@ sequenceDiagram
 1. Admin triggers tenant onboarding from the Management App.
 2. BFF SaaS controller forwards the request via TCP message `TENANT.ONBOARD`.
 3. `OnboardingSagaService` manages tenant creation, Owner provisioning on Authorizer/Keycloak, Owner profile synchronization on User Access, empty payment settings setups on Payment, subscription plans setups, and logs outbox events.
-4. If a critical step fails, the saga triggers compensating actions to clean up partially created user/tenant records.
+4. If a critical step fails, the current catch path disables the Keycloak owner if created, compensates the initial subscription if assigned, and deletes the tenant.
+
+Do not infer a full rollback: the catch path does not issue commands to delete an already-created User Access profile or Payment settings. This residual-state question should be checked against tests and the operational cleanup policy when reviewing the saga.
 
 Tenant lifecycle sequence diagram:
 
@@ -937,6 +1063,7 @@ sequenceDiagram
     Guard-->>Customer: 403 TENANT_SUSPENDED
   else Tenant ACTIVE or allowed read/join/payment path
     Guard-->>BFF: Allow request to continue
+  end
 ```
 
 1. Tenants are assigned a status: active, suspended, or closed.
@@ -954,7 +1081,7 @@ sequenceDiagram
 
 **How to explain in interviews:**
 
-> Tenant onboarding is a distributed workflow, so I implemented it as a saga without distributed transactions. SaaS creates the tenant, owner credentials, user profile, payment settings, and subscription; if a step fails, it compensates by rolling back changes. Tenant statuses are cached in Redis to let the BFF guard quickly block customer flows when a tenant is suspended or closed.
+> Tenant onboarding is a distributed workflow, so it uses a saga rather than a distributed transaction. Current compensation disables the owner identity, rolls back the initial subscription, and deletes the tenant; I do not claim full User Access/Payment rollback without matching cleanup commands. Tenant status is cached so the BFF can quickly gate suspended or closed tenants.
 
 ### Flow 7: Auth, Keycloak, User Access, RBAC
 
@@ -963,7 +1090,7 @@ Read in order:
 | Layer          | Files                                                                          |
 | -------------- | ------------------------------------------------------------------------------ |
 | Management App | `apps/management-app/src/auth.ts`                                              |
-| Management App | `apps/management-app/src/middleware.ts`                                        |
+| Management App | `apps/management-app/src/proxy.ts`                                             |
 | Management App | `apps/management-app/src/lib/auth/*`                                           |
 | BFF            | `libs/guards/src/lib/user.guard.ts`                                            |
 | BFF            | `libs/guards/src/lib/permission.guard.ts`                                      |
@@ -997,16 +1124,16 @@ sequenceDiagram
   Mgmt->>Keycloak: OIDC/NextAuth login flow
   Keycloak-->>Mgmt: Access token/session
   Mgmt->>BFF: API request with Bearer token and tenant context
-  BFF->>UserGuard: Global guard step 1
-  UserGuard->>Authorizer: gRPC/TCP verify user token
+  BFF->>UserGuard: Authentication guard
+  UserGuard->>Authorizer: gRPC verify user token
   Authorizer->>Keycloak: Verify token/JWKS or admin lookup
   Authorizer->>UserAccess: Load app profile/roles if needed
   Authorizer-->>UserGuard: User metadata and roles
   UserGuard-->>BFF: Attach USER_DATA
-  BFF->>TenantGuard: Global guard step 2
+  BFF->>TenantGuard: Tenant-context guard
   TenantGuard->>TenantGuard: Resolve tenant from header/claims/session
   TenantGuard-->>BFF: Attach TENANT_ID
-  BFF->>PermissionGuard: Global guard step 3
+  BFF->>PermissionGuard: Route permission guard
   PermissionGuard->>PermissionGuard: Match @Permissions metadata
 
   alt Missing permission or invalid tenant
@@ -1024,6 +1151,20 @@ sequenceDiagram
 4. `TenantGuard` extracts and resolves the tenant ID from the token claims, session, or headers.
 5. `PermissionGuard` checks if the user possesses the permissions required by the route decorators.
 6. Domain services receive pre-resolved tenant and user IDs inside TCP payloads, bypassing HTTP layer dependencies.
+
+**Staff-management subtrack (Phase 4C):**
+
+1. `apps/management-app/src/features/staff/staff-page-client.tsx`
+2. `apps/management-app/src/features/staff/services/staff.service.ts`
+3. `apps/management-app/src/features/staff/hooks/use-staff-query.ts`
+4. `apps/bff/src/app/modules/user/controllers/dashboard-staff.controller.ts`
+5. `apps/user-access/src/app/modules/user/controllers/user.controller.ts`
+6. `apps/user-access/src/app/modules/user/services/staff-management.service.ts`
+7. `apps/user-access/src/app/modules/user/services/staff-quota.enforcer.ts`
+8. `apps/user-access/src/app/modules/user/repositories/user.repository.ts`
+9. `apps/user-access/src/app/modules/user/services/staff-management.service.spec.ts`
+
+Staff creation checks actor-role policy and the active subscription's `maxStaff`, creates the Keycloak identity through Authorizer, then creates the Mongo profile. If profile creation fails, it disables the newly created identity. Role changes and enable/disable operations also coordinate Keycloak with Mongo and compensate toward the previous state on failure. Repository operations remain tenant-scoped, and Owner/Manager capabilities differ.
 
 **Theory to know:**
 
@@ -1116,6 +1257,74 @@ sequenceDiagram
 
 > Realtime events in QRTable function as query invalidation hints. When order, payment, or KDS events occur, BFF pushes a WebSocket event to let the client refetch data. I avoided placing business state inside WebSocket payloads because the database and domain services remain the source of truth.
 
+### Flow 9: Dashboard Reporting, Plan Entitlement, Admin Analytics
+
+This Phase 4D flow is the clearest example of read-side composition without introducing a shared reporting database.
+
+Read in order:
+
+| Layer         | Files                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| Management UI | `apps/management-app/src/app/(dashboard)/dashboard/page.tsx`                                      |
+| Management UI | `apps/management-app/src/app/(admin)/admin/analytics/page.tsx`                                    |
+| Management UI | `apps/management-app/src/features/reports/services/reports.service.ts`                            |
+| Management UI | `apps/management-app/src/features/reports/reports-keys.ts`                                        |
+| Management UI | `apps/management-app/src/features/reports/hooks/use-report-query.ts`                              |
+| Management UI | `apps/management-app/src/features/reports/hooks/use-dashboard-entitlements.ts`                    |
+| BFF           | `apps/bff/src/app/modules/reporting/reporting.module.ts`                                          |
+| BFF           | `apps/bff/src/app/modules/reporting/controllers/dashboard-report.controller.ts`                   |
+| BFF           | `apps/bff/src/app/modules/reporting/controllers/admin-analytics.controller.ts`                    |
+| BFF           | `apps/bff/src/app/modules/reporting/guards/tenant-subscription-context.guard.ts`                  |
+| BFF           | `apps/bff/src/app/modules/reporting/services/tenant-subscription-resolver.service.ts`             |
+| Shared        | `libs/guards/src/lib/plan-feature.guard.ts`                                                       |
+| Shared        | `libs/decorators/src/lib/requires-plan-feature.decorator.ts`                                      |
+| Order         | `apps/order/src/app/modules/order/services/order-report.service.ts`                               |
+| Payment       | `apps/payment/src/app/modules/payment/services/payment-report.service.ts`                         |
+| Catalog       | `apps/catalog/src/app/modules/table/services/catalog-report.service.ts`                           |
+| SaaS          | `apps/saas/src/services/platform-report.service.ts`                                               |
+| Tests         | `apps/bff/src/app/modules/reporting/controllers/dashboard-report.controller.plan-feature.spec.ts` |
+| Tests         | `apps/order/src/app/modules/order/tests/order-report.service.spec.ts`                             |
+| Tests         | `apps/payment/src/app/modules/payment/tests/payment-report.service.spec.ts`                       |
+| Tests         | `apps/catalog/src/app/modules/table/services/catalog-report.service.spec.ts`                      |
+| Tests         | `apps/saas/src/services/platform-report.service.spec.ts`                                          |
+
+Tenant dashboard flow:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant UI as Management dashboard
+  participant BFF as DashboardReportController
+  participant Context as TenantSubscriptionContextGuard
+  participant SaaS as SaaS subscription
+  participant Plan as PlanFeatureGuard
+  participant Owner as Payment / Order / Catalog
+
+  UI->>BFF: GET dashboard report endpoint
+  BFF->>Context: Route requires analytics_basic
+  Context->>SaaS: SUBSCRIPTION.GET_CURRENT
+  SaaS-->>Context: ACTIVE plan + feature codes
+  Context->>Plan: Attach subscription context
+  Plan->>Plan: Check analytics_basic
+  alt Missing/inactive feature
+    Plan-->>UI: 403 SAAS_PLAN_FEATURE_REQUIRED + upgradeUrl
+  else Feature allowed
+    BFF->>Owner: Tenant-scoped report TCP query
+    Owner-->>BFF: Owner-local aggregate
+    BFF-->>UI: Report response
+  end
+```
+
+- Tenant routes require both `REPORT_READ_OWN` and `analytics_basic`.
+- `TenantSubscriptionContextGuard` must run before `PlanFeatureGuard` so the subscription context exists.
+- Super Admin analytics uses `REPORT_READ_ANY` and is not gated by a tenant plan. Platform reports belong to SaaS; tenant drilldowns still call the appropriate domain owner.
+- Payment aggregates revenue, Order aggregates orders/bills, Catalog aggregates table/menu availability, and SaaS aggregates platform/subscription metrics.
+- BFF exposes one reporting HTTP surface through several TCP clients; it neither joins databases nor becomes the report-data owner.
+
+**How to explain in interviews:**
+
+> Reporting has no shared database. Each service aggregates the data it owns, while the BFF exposes a unified read surface. Tenant dashboards are gated by both permission and an active subscription feature; Super Admin uses a global permission and does not depend on one tenant's plan.
+
 ### Deep Dive: Realtime, Kafka, Redis Reading Strategy
 
 Trace these three parts by **data signals** rather than analyzing each tool in isolation. A single business event often flows through Kafka, Redis, and WebSockets, with each layer serving a specific purpose:
@@ -1160,14 +1369,15 @@ Do not view the BFF bridge as the owner of payment state. It simply translates K
 
 Read contracts first:
 
-| Contract                 | File                                                                     | Key Question to Answer                                     |
-| ------------------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| WebSocket rooms          | `libs/constants/src/lib/ws-room.constants.ts`                            | Which tenant, session, or KDS station room gets the event? |
-| Realtime event payloads  | `libs/shared/types/src/lib/realtime-events.types.ts`                     | Is the payload data a hint or canonical state?             |
-| Redis key builders       | `libs/constants/src/lib/redis-key.constants.ts`                          | Are keys scoped correctly to tenant/session boundaries?    |
-| KDS Redis key/score      | `apps/kitchen/src/app/modules/kitchen/utils/kds-keys.ts`, `kds-score.ts` | How are queues sorted by time, priority, and SLA?          |
-| Kafka config/topic names | `libs/configuration/src/lib/kafka.config.ts`                             | Which topics are active, and which consumers are bound?    |
-| TCP messages             | `libs/constants/src/lib/enum/tcp-request-message.ts`                     | What sync boundaries must occur before async events?       |
+| Contract                | File                                                                                                                | Key Question to Answer                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| WebSocket rooms         | `libs/constants/src/lib/ws-room.constants.ts`                                                                       | Which tenant, session, or KDS station room gets the event? |
+| Realtime event payloads | `libs/shared/types/src/lib/realtime-events.types.ts`                                                                | Is the payload data a hint or canonical state?             |
+| Redis key builders      | `libs/constants/src/lib/redis-key.constants.ts`                                                                     | Are keys scoped correctly to tenant/session boundaries?    |
+| KDS Redis key/score     | `apps/kitchen/src/app/modules/kitchen/utils/kds-keys.ts`, `apps/kitchen/src/app/modules/kitchen/utils/kds-score.ts` | How are queues sorted by time, priority, and SLA?          |
+| Kafka topic registry    | `libs/constants/src/lib/kafka-topic.constants.ts`                                                                   | Which canonical topic do producers/consumers use?          |
+| Kafka runtime config    | `libs/configuration/src/lib/kafka.config.ts`                                                                        | How are brokers, groups, and default topics wired?         |
+| TCP messages            | `libs/constants/src/lib/enum/tcp-request-message.ts`                                                                | What sync boundaries must occur before async events?       |
 
 Rule of thumb: If you spot hardcoded rooms, keys, or topics, trace them back to shared constants. If a WebSocket payload contains large data structures, find the underlying API query hook.
 
@@ -1200,6 +1410,7 @@ Review shared libraries after understanding domain flows to see how contracts ar
 **Read closely:**
 
 - `libs/constants/src/lib/enum/tcp-request-message.ts`
+- `libs/constants/src/lib/kafka-topic.constants.ts`
 - `libs/constants/src/lib/redis-key.constants.ts`
 - `libs/constants/src/lib/ws-room.constants.ts`
 - `libs/constants/src/lib/saas.constants.ts`
@@ -1207,10 +1418,14 @@ Review shared libraries after understanding domain flows to see how contracts ar
 - `libs/interfaces/src/lib/gateway/*`
 - `libs/entities/src/lib/*.entity.ts`
 - `libs/error-messages/src/lib/error-code.enum.ts`
+- `apps/catalog/src/database/catalog.data-source.ts`
+- `apps/order/src/database/order.data-source.ts`
+- `apps/payment/src/database/payment.data-source.ts`
+- `apps/saas/src/database/saas.data-source.ts`
 
 **Theory to know:**
 
-Shared libraries should not be used as dumping grounds for any shared code. They should house cross-cutting concerns: contract boundaries, DTO interfaces, global constants, and core utilities. Keep business logic encapsulated within its owning service.
+Shared libraries should not be used as dumping grounds for any shared code. They should house cross-cutting concerns: contract boundaries, DTO interfaces, global constants, and core utilities. Keep business logic encapsulated within its owning service. A shared entity class does not dissolve the database-per-service boundary; return to the root module, DataSource, and tenant-scoped repository to identify the owner.
 
 **How to explain in interviews:**
 
@@ -1242,6 +1457,14 @@ Key takeaways:
 - React Query hooks act as the layer interfacing with server states.
 - WebSocket hooks provide realtime invalidation triggers.
 
+### Customer PWA State Ownership
+
+- `SessionProvider` owns only browser-persisted session identity: session ID, tenant ID, table metadata, and tenant-lifecycle presentation state.
+- TanStack React Query owns BFF-backed data: menu, Redis-backed cart snapshots, orders, bills, and Payment command state.
+- Features call the BFF through `services/` and expose behavior through `hooks/`; pages/components do not call feature services directly.
+- `apps/customer-pwa/src/features/order/hooks/order-query-keys.ts` is the single source for customer cart/order/bill query keys. Socket.IO invalidates those keys rather than becoming a second state owner.
+- Do not introduce a parallel local cart Context, Zustand store, or reducer while the Redis cart remains server-authoritative.
+
 ### Management App Reading Order
 
 Read in order:
@@ -1249,7 +1472,7 @@ Read in order:
 1. `apps/management-app/src/app/layout.tsx`
 2. `apps/management-app/src/app/providers.tsx`
 3. `apps/management-app/src/auth.ts`
-4. `apps/management-app/src/middleware.ts`
+4. `apps/management-app/src/proxy.ts`
 5. `apps/management-app/src/components/layout/data/sidebar-data.ts`
 6. `apps/management-app/src/lib/api/authenticated-client.ts`
 7. `apps/management-app/src/app/(dashboard)/*`
@@ -1262,15 +1485,17 @@ Read in order:
 14. `apps/management-app/src/features/payment/*`
 15. `apps/management-app/src/features/kds/*`
 16. `apps/management-app/src/features/saas/*`
-17. `apps/management-app/src/features/service-requests/*`
-18. `apps/management-app/src/features/tenant/*`
+17. `apps/management-app/src/features/staff/*`
+18. `apps/management-app/src/features/reports/*`
+19. `apps/management-app/src/features/service-requests/*`
+20. `apps/management-app/src/features/tenant/*`
 
 Key takeaways:
 
 - Next.js route groups organize workspaces: admin, dashboard, POS, and KDS.
 - `features/*/services` encapsulate API calls.
 - `features/*/hooks` manage server mutations and real-time triggers.
-- `components/pos/*` and `components/kds/*` implement high-frequency staff UI workflows.
+- `features/pos/components/*` and `features/kds/components/*` implement high-frequency staff UI workflows.
 
 **Theory to know:**
 
@@ -1284,22 +1509,26 @@ Separating local UI state from server state is a frontend best practice. Server 
 
 Analyze test structures by business flow, rather than looking at all tests at once.
 
-| Flow            | Target Tests to Read                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------------ |
-| Cart/order      | `apps/order/src/app/modules/order/tests/order-submit-cart.integration.spec.ts`                   |
-| Stock/confirm   | `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts`             |
-| Payment/bill    | `apps/payment/src/app/modules/payment/tests/payment-completed-order-bridge.integration.spec.ts`  |
-| KDS dedupe      | `apps/kitchen/src/app/modules/kitchen/tests/order-confirmed-dedupe.integration.spec.ts`          |
-| Realtime        | `apps/bff/src/app/modules/realtime/tests/*`                                                      |
-| BFF controllers | `apps/bff/src/app/modules/**/**/*.spec.ts`                                                       |
-| Frontend hooks  | `apps/customer-pwa/src/features/**/*.spec.tsx`, `apps/management-app/src/features/**/*.spec.tsx` |
-| E2E             | `tests/e2e/*.spec.ts` and the scripts defined in `package.json`                                  |
+| Flow              | Target tests to read                                                                                                   |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Cart/order        | `apps/order/src/app/modules/order/tests/order-submit-cart.integration.spec.ts`                                         |
+| Stock/confirm     | `apps/order/src/app/modules/order/tests/order-confirm-saga.service.spec.ts`                                            |
+| Stock/versioning  | `apps/order/src/app/modules/order/tests/order-confirm-stock-idempotency.integration.spec.ts`                           |
+| Stock/concurrency | `apps/order/src/app/modules/order/tests/order-stock-concurrency.integration.spec.ts`                                   |
+| Payment/bill      | `apps/payment/src/app/modules/payment/tests/payment-completed-order-bridge.integration.spec.ts`                        |
+| KDS dedupe        | `apps/kitchen/src/app/modules/kitchen/tests/order-confirmed-dedupe.integration.spec.ts`                                |
+| Realtime          | `apps/bff/src/app/modules/realtime/tests/*`                                                                            |
+| Staff             | `apps/user-access/src/app/modules/user/services/staff-management.service.spec.ts`                                      |
+| Reporting/plan    | `apps/bff/src/app/modules/reporting/controllers/dashboard-report.controller.plan-feature.spec.ts`                      |
+| Frontend          | Exact colocated `*.spec.ts(x)`, for example under `features/order/hooks/`, `features/staff/`, and `features/reports/`. |
 
 Read also:
 
 - `docs/testing/README.md`
 - `docs/testing/traceability-matrix.md`
 - `docs/testing/saga-validation-strategy.md` when a flow touches consistency or compensation
+
+**Current test-tree caveat:** `tests/e2e/` and `tests/benchmark/` were removed from this checkout. The `e2e:*` scripts in `package.json` still target Playwright specs that no longer exist, so they are **not runnable evidence** until the suite is restored or the scripts are cleaned up. Active tests are colocated with app/domain code as shown above. If testing docs or the traceability matrix still list old E2E suites, record documentation/tooling debt rather than assuming the tests still run.
 
 Key commands to run:
 
@@ -1308,7 +1537,8 @@ pnpm nx test order
 pnpm nx test kitchen
 pnpm nx test payment
 pnpm nx test bff
-pnpm e2e:demo
+pnpm nx test user-access
+pnpm nx test management-app
 ```
 
 **Theory to know:**
@@ -1317,39 +1547,49 @@ Microservice testing should protect boundary contracts: state transitions, idemp
 
 ## File Landmarks
 
-| Concept to Understand     | Target File to Open                                                             |
-| ------------------------- | ------------------------------------------------------------------------------- |
-| BFF bootstrap             | `apps/bff/src/main.ts`                                                          |
-| BFF guard chain           | `apps/bff/src/app/app.module.ts`                                                |
-| TCP message patterns      | `libs/constants/src/lib/enum/tcp-request-message.ts`                            |
-| Kafka topic configuration | `libs/configuration/src/lib/kafka.config.ts`                                    |
-| Redis keys                | `libs/constants/src/lib/redis-key.constants.ts` and Kitchen `utils/kds-keys.ts` |
-| WebSocket rooms           | `libs/constants/src/lib/ws-room.constants.ts`                                   |
-| Realtime event payloads   | `libs/shared/types/src/lib/realtime-events.types.ts`                            |
-| BFF realtime registration | `apps/bff/src/app/modules/realtime/realtime.module.ts`                          |
-| BFF KDS Redis subscriber  | `apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts`  |
-| Error hierarchy           | `libs/error-messages/src/lib/business.exception.ts`, `error-code.enum.ts`       |
-| Order facade              | `apps/order/src/app/modules/order/services/order.service.ts`                    |
-| Order submit logic        | `apps/order/src/app/modules/order/services/order-submit.service.ts`             |
-| Order state machine       | `apps/order/src/app/modules/order/services/order-state-transition.service.ts`   |
-| Order bill management     | `apps/order/src/app/modules/order/services/bill.service.ts`                     |
-| Order outbox publishing   | `apps/order/src/app/modules/order/services/outbox-publisher.service.ts`         |
-| Kitchen ticket logic      | `apps/kitchen/src/app/modules/kitchen/services/kds-ticket.service.ts`           |
-| Kitchen Redis repository  | `apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts`     |
-| Kitchen realtime publish  | `apps/kitchen/src/app/modules/kitchen/services/kitchen-events.publisher.ts`     |
-| Payment settlement        | `apps/payment/src/app/modules/payment/services/payment-settlement.service.ts`   |
-| SePay webhook parsing     | `apps/payment/src/app/modules/payment/services/sepay-webhook.service.ts`        |
-| SaaS onboarding saga      | `apps/saas/src/services/onboarding-saga.service.ts`                             |
-| Tenant lifecycle rules    | `apps/saas/src/services/tenant-lifecycle.service.ts`                            |
-| Authorizer token checks   | `apps/authorizer/src/app/authorizer/services/authorizer.service.ts`             |
-| User profile management   | `apps/user-access/src/app/modules/user/services/user.service.ts`                |
-| Customer PWA client       | `apps/customer-pwa/src/lib/api-client.ts`                                       |
-| Management app client     | `apps/management-app/src/lib/api/authenticated-client.ts`                       |
-| Management sidebar map    | `apps/management-app/src/components/layout/data/sidebar-data.ts`                |
+| Concept to Understand     | Target File to Open                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| BFF bootstrap             | `apps/bff/src/main.ts`                                                                                       |
+| BFF guard chain           | `apps/bff/src/app/app.module.ts`                                                                             |
+| TCP message patterns      | `libs/constants/src/lib/enum/tcp-request-message.ts`                                                         |
+| Kafka topic registry      | `libs/constants/src/lib/kafka-topic.constants.ts`                                                            |
+| Kafka runtime config      | `libs/configuration/src/lib/kafka.config.ts`                                                                 |
+| Redis keys                | `libs/constants/src/lib/redis-key.constants.ts` and `apps/kitchen/src/app/modules/kitchen/utils/kds-keys.ts` |
+| WebSocket rooms           | `libs/constants/src/lib/ws-room.constants.ts`                                                                |
+| Realtime event payloads   | `libs/shared/types/src/lib/realtime-events.types.ts`                                                         |
+| BFF realtime registration | `apps/bff/src/app/modules/realtime/realtime.module.ts`                                                       |
+| BFF KDS Redis subscriber  | `apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts`                               |
+| Error hierarchy           | `libs/error-messages/src/lib/business.exception.ts`, `libs/error-messages/src/lib/error-code.enum.ts`        |
+| Order facade              | `apps/order/src/app/modules/order/services/order.service.ts`                                                 |
+| Order submit logic        | `apps/order/src/app/modules/order/services/order-submit.service.ts`                                          |
+| Order confirm saga        | `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`                                    |
+| Order state machine       | `apps/order/src/app/modules/order/services/order-state-transition.service.ts`                                |
+| Order bill management     | `apps/order/src/app/modules/order/services/bill.service.ts`                                                  |
+| Order outbox publishing   | `apps/order/src/app/modules/order/services/outbox-publisher.service.ts`                                      |
+| Catalog stock reservation | `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts`                               |
+| Kitchen ticket logic      | `apps/kitchen/src/app/modules/kitchen/services/kds-ticket.service.ts`                                        |
+| Kitchen Redis repository  | `apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts`                                  |
+| Kitchen realtime publish  | `apps/kitchen/src/app/modules/kitchen/services/kitchen-events.publisher.ts`                                  |
+| Payment settlement        | `apps/payment/src/app/modules/payment/services/payment-settlement.service.ts`                                |
+| SePay webhook parsing     | `apps/payment/src/app/modules/payment/services/sepay-webhook.service.ts`                                     |
+| SaaS onboarding saga      | `apps/saas/src/services/onboarding-saga.service.ts`                                                          |
+| Tenant lifecycle rules    | `apps/saas/src/services/tenant-lifecycle.service.ts`                                                         |
+| Authorizer token checks   | `apps/authorizer/src/app/authorizer/services/authorizer.service.ts`                                          |
+| User profile management   | `apps/user-access/src/app/modules/user/services/user.service.ts`                                             |
+| Staff management          | `apps/user-access/src/app/modules/user/services/staff-management.service.ts`                                 |
+| Tenant reports            | `apps/bff/src/app/modules/reporting/controllers/dashboard-report.controller.ts`                              |
+| Plan feature gate         | `libs/guards/src/lib/plan-feature.guard.ts`                                                                  |
+| Customer PWA client       | `apps/customer-pwa/src/lib/api-client.ts`                                                                    |
+| Management app client     | `apps/management-app/src/lib/api/authenticated-client.ts`                                                    |
+| Management sidebar map    | `apps/management-app/src/components/layout/data/sidebar-data.ts`                                             |
 
 ## Command Cheat Sheet
 
 ```bash
+# Refresh the graph before trusting query results
+codegraph sync .
+codegraph status .
+
 # Workspace analysis
 npx nx show projects
 npx nx graph
@@ -1367,7 +1607,7 @@ rg "@MessagePattern" apps/order apps/kitchen apps/payment apps/catalog apps/saas
 rg "TCP_REQUEST_MESSAGE\\.ORDER" apps libs -n
 rg "WsRoom" apps libs -n
 rg "RedisKey" apps libs -n
-rg "KAFKA_CONFIG|ORDER_CONFIRMED_TOPIC|PAYMENT_COMPLETED_TOPIC|KITCHEN_SLA_WARNING_TOPIC|TENANT_CREATED_TOPIC" apps libs -n
+rg "KafkaTopic|ORDER_CONFIRMED_TOPIC|PAYMENT_COMPLETED_TOPIC|KITCHEN_SLA_WARNING_TOPIC|TENANT_CREATED_TOPIC" apps libs -n
 rg "realtime:kds|KdsInternalEventsSubscriber|KitchenEventsPublisher" apps libs -n
 rg "events\\.(orderCreated|orderStatusChanged|kdsQueueChanged|paymentCompleted)" apps libs -n
 
@@ -1376,8 +1616,9 @@ pnpm dev:bff-order
 pnpm dev:bff-payment
 pnpm dev:bff-auth
 
-# Validate documentation format
-pnpm exec prettier --check docs/guides/codebase-reading-map.md
+# Validate documentation and anchors
+pnpm exec prettier --check docs/guides/codebase-reading-map.md docs/guides/codebase-reading-map.en.md
+pnpm verify:doc-anchors
 ```
 
 ## Common Mistakes When Reading the Codebase
@@ -1385,7 +1626,7 @@ pnpm exec prettier --check docs/guides/codebase-reading-map.md
 | Mistake                                                 | Correction                                                                                             |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Analyzing `apps/order` before BFF and Catalog.          | Start with the BFF routes and TCP message types, then inspect Order internals.                         |
-| Assuming Payment Service owns Bills.                    | Order Service owns Bills; Payment Service manages Payments/Auditing/Refunds.                           |
+| Assuming Payment owns Bills or Refund exists.           | Order owns Bills; Payment owns the ledger/audit. Refund remains deferred.                              |
 | Assuming Kitchen Service owns an SQL database.          | Kitchen Service is currently a Redis-backed KDS queue.                                                 |
 | Looking for SaaS modules under `src/app/modules`.       | SaaS files are placed directly under `apps/saas/src/controllers`, `services`, and `repositories`.      |
 | Treating WebSocket payloads as the state source.        | WebSockets provide realtime invalidation; API queries back to owning services are the source of truth. |
@@ -1394,15 +1635,21 @@ pnpm exec prettier --check docs/guides/codebase-reading-map.md
 | Analyzing generated build folders.                      | Ignore `.next`, `dist`, and `node_modules`; analyze code under `src`.                                  |
 | Treating BFF as the home of business logic.             | BFF coordinates boundaries; domain state rules belong to service owners.                               |
 | Bypassing test files.                                   | Tests document application expectations and verify state behaviors.                                    |
+| Trusting `codegraph status` without refreshing.         | Run `codegraph sync .`; a stale graph can retain deleted files.                                        |
+| Treating thesis workflow/LaTeX as engineering truth.    | Use them to corroborate the report; current code/tests and canonical docs take priority.               |
+| Running `e2e:*` only because a package script exists.   | Confirm target specs exist; current `tests/e2e/` has been removed.                                     |
+| Looking for confirm logic in the transition service.    | Confirm delegates to `OrderConfirmSagaService`; the transition service handles cancel/serve paths.     |
+| Skipping subscription guards when reading reports.      | The context guard hydrates the plan before `PlanFeatureGuard` checks the feature.                      |
 
 ## Recommended Study Plan
 
 ### Step 1: Map the Boundaries
 
-1. Read `docs/README.md`, `technical-architecture.md`, and `business-logic.md`.
+1. Read `docs/README.md`, `docs/DOC-CODE-ANCHORS.md`, `docs/project-status.md`, `docs/technical-architecture.md`, and `docs/business-logic.md`.
 2. Open `package.json`, `tsconfig.base.json`, and `nx.json`.
-3. Review `apps/bff/src/app/app.module.ts` to trace the guard chain.
-4. Examine `libs/constants/src/lib/enum/tcp-request-message.ts` to map internal message boundaries.
+3. Read `apps/bff/src/main.ts`, then `apps/bff/src/app/app.module.ts`.
+4. Build a service table from each `main.ts`, root module, and DataSource.
+5. Examine `libs/constants/src/lib/enum/tcp-request-message.ts` and `libs/constants/src/lib/kafka-topic.constants.ts`.
 
 Target: Understand which services interact and identify request flow paths.
 
@@ -1421,9 +1668,11 @@ Target: Trace a dining session from the initial QR scan to final bill payment.
 
 1. Trace Authentication, Keycloak interactions, and User Access profiles.
 2. Trace Permission matrices and BFF guard validations.
-3. Trace SaaS onboarding sagas, subscriptions, and tenant lifecycles.
-4. Trace Management App pages: Admin, Dashboard, POS, and KDS.
-5. Trace Phase 5 testing strategies and traceability matrices.
+3. Trace staff management, quota checks, and Keycloak compensation.
+4. Trace SaaS onboarding sagas, subscriptions, and tenant lifecycles.
+5. Trace reporting, plan entitlement, and Super Admin analytics.
+6. Trace Management App pages: Admin, Dashboard, POS, and KDS.
+7. Trace active colocated tests; compare Phase 5/traceability records without running removed E2E paths.
 
 Target: Understand the SaaS POS platform model, going beyond order-taking details.
 
@@ -1441,8 +1690,11 @@ Answer these questions to test your understanding:
 8. How does the SePay webhook handler manage duplicate or underpaid transfers?
 9. At which layer does a suspended tenant block customer actions?
 10. Should WebSocket events in QRTable be treated as the source of truth or as invalidation hints?
+11. Why do tenant reports require both a permission and a plan feature while Super Admin analytics bypasses tenant plan gating?
+12. Why is there no shared reporting database, and which owner aggregates revenue, order, table, and platform metrics?
+13. What does `reservationVersion` solve that an idempotency key alone cannot?
 
-If you can answer these 10 questions using flow and ownership principles, your codebase understanding is interview-ready.
+If you can answer these questions using flows, ownership, and failure paths, your codebase understanding is interview-ready.
 
 ## Summary
 
