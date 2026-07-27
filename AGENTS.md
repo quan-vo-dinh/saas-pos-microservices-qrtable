@@ -79,17 +79,17 @@ If the ambiguity is minor and does not affect implementation correctness:
 
 **QRTable** là một SaaS POS platform cho ngành F&B, multi-tenant, triển khai theo kiến trúc **Event-Driven Microservices** trong một **Nx Monorepo**.
 
-| Aspect     | Decision                                                               |
-| ---------- | ---------------------------------------------------------------------- |
-| Monorepo   | Nx — tất cả apps và libs trong 1 repo                                  |
-| Backend    | NestJS + TypeScript — 7 microservices                                  |
-| Frontend   | Next.js (Management App) + React/Vite (Customer PWA)                   |
-| Database   | PostgreSQL + TypeORM (per-service) · MongoDB + Mongoose (user-access)  |
-| Cache      | Redis — session store, menu cache, KDS queue (Sorted Set), rate limit  |
-| Events     | Apache Kafka — async inter-service communication                       |
-| Auth       | Keycloak (JWT/OIDC) cho staff/owner/admin · Session Redis cho customer |
-| Real-time  | Socket.io (NestJS Gateway)                                             |
-| Payment    | SePay (VietQR)                                                         |
+| Aspect    | Decision                                                               |
+| --------- | ---------------------------------------------------------------------- |
+| Monorepo  | Nx — tất cả apps và libs trong 1 repo                                  |
+| Backend   | NestJS + TypeScript — 7 microservices                                  |
+| Frontend  | Next.js (Management App) + React/Vite (Customer PWA)                   |
+| Database  | PostgreSQL + TypeORM (per-service) · MongoDB + Mongoose (user-access)  |
+| Cache     | Redis — session store, menu cache, KDS queue (Sorted Set), rate limit  |
+| Events    | Apache Kafka — async inter-service communication                       |
+| Auth      | Keycloak (JWT/OIDC) cho staff/owner/admin · Session Redis cho customer |
+| Real-time | Socket.io (NestJS Gateway)                                             |
+| Payment   | SePay (VietQR)                                                         |
 
 ---
 
@@ -437,6 +437,24 @@ Scope là thứ đang được yêu cầu refactor, không phải toàn bộ cod
 ❌ Copy lại pattern bẩn vì xung quanh cũng đang làm vậy
 ✅ Clean chỗ đang touch, flag chỗ không touch, giữ PR nhỏ gọn
 ```
+
+### Khi hỗ trợ đọc hiểu mã nguồn (Code Reading & Mentoring)
+
+Khi người dùng yêu cầu hướng dẫn hoặc giải thích mã nguồn để tự đọc hiểu, AI Agent phải tuân thủ các nguyên tắc sau:
+
+1. **Follow lộ trình [codebase-reading-map.md](file:///Users/vodinhquan/Developer/Graduation-Thesis/graduation-thesis/qr-order/docs/guides/codebase-reading-map.md):**
+   - Tuyệt đối không tự ý nhảy cóc hoặc đi chệch khỏi lộ trình trừ khi người dùng yêu cầu rõ ràng.
+   - Luôn nhắc nhở người dùng về vị trí hiện tại trong lộ trình (ví dụ: Round 2 - Step 1).
+
+2. **Phương pháp "Hộp đen" (Black-Box Thinking) & Trừu tượng hóa:**
+   - Khi giải thích một file, hãy chia nhỏ nó thành các khối chức năng chính và mô tả vai trò của từng khối ở mức trừu tượng cao nhất (Input/Output/Nhiệm vụ chính), nhưng vẫn đủ chi tiết và giải thích rõ toàn bộ và hiểu được toàn bộ nội dung logic, ý nghĩa được viết trong chính file hiện tại đang đọc.
+   - Tránh đi quá sâu vào thuật toán hoặc nhảy sang phân tích mã nguồn chi tiết của các file con/thư viện được import bên trong khi người dùng chưa đến bước đó. Điều này giúp ngăn chặn hiện tượng "Rabbit Hole" gây quá tải nhận thức.
+
+3. **Phương pháp "Nạp trì hoãn" (Lazy Loading) & Ghi nhận câu hỏi:**
+   - Nếu người dùng có thắc mắc hoặc phát hiện điểm kỳ lạ nằm ngoài phạm vi bước đọc hiện tại, hãy khuyên họ ghi chú lại để giải quyết sau khi đi tới bước tương ứng trên bản đồ.
+
+4. **Kết nối với Quy chuẩn & Kiến trúc (Conventions & Architecture):**
+   - Luôn đối chiếu code đang đọc với các quy chuẩn bảo mật/kỹ thuật của dự án được định nghĩa ở các phần trên (như Tenant Isolation, VND rounding, Redis key pattern, Kafka topic...). Giải thích rõ _tại sao_ đoạn code đó lại được viết theo cách này.
 
 ---
 

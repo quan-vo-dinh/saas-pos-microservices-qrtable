@@ -2,7 +2,7 @@
 
 > Hướng dẫn đọc codebase QRTable theo đúng kiến trúc hiện tại của dự án.
 >
-> **Last verified:** 2026-07-24, sau khi chạy `codegraph sync .` và đối chiếu lại entry point, module graph, transport, state owner, domain flow, active tests và canonical docs.
+> **Last verified:** 2026-07-27, sau khi chạy `codegraph sync .` và đối chiếu lại entry point, configuration composition, module/caller graph, shared-lib usage, transport, state owner, domain flow, active tests và canonical docs.
 >
 > **Canonical role:** Tài liệu này là bản đồ đọc code. Khi có xung đột, ưu tiên current code/tests, `docs/README.md`, phase records và accepted specs.
 
@@ -46,6 +46,18 @@ Mỗi khi mở một file, hãy hỏi 5 câu:
 3. Nếu có lỗi, lỗi này nên được chặn ở guard, controller, service hay repository?
 4. Nếu flow cần gọi service khác, nó gọi sync TCP/gRPC hay publish async Kafka event?
 5. Nếu frontend nhận WebSocket event, event đó là source of truth hay chỉ là invalidation hint?
+
+### Quy Tắc Mở Dependency: Read Now, Route Later, Ignore For Now
+
+Một file import nhiều dependency không có nghĩa là phải mở tất cả dependency ngay lập tức. Với mỗi import, phân loại thành ba nhóm:
+
+| Nhóm                      | Khi nào mở                                                                                  | Ví dụ ở BFF bootstrap                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Read now**              | Dependency quyết định trực tiếp input/output, lifecycle hoặc side effect của bước hiện tại. | `base.config.ts`, `app.config.ts`, `redis.config.ts`, CORS validator, Redis I/O adapter. |
+| **Route to a later step** | Dependency khai báo boundary sẽ được phân tích ở bước/flow kế tiếp.                         | `tcp.config.ts`, `grpc.config.ts` sang Round 2 - Bước 2; `kafka.config.ts` sang Flow 8.  |
+| **Ignore for now**        | Type/framework helper không đổi mental model hiện tại; chỉ mở khi xuất hiện câu hỏi cụ thể. | NestJS decorator internals, Swagger helpers và generated/build output.                   |
+
+Quy tắc này giữ được **Black-Box Thinking** mà không bỏ sót dependency: ghi lại điểm hẹn đọc tiếp, không mở cả `libs/` theo alphabet và cũng không giả định import nào là không quan trọng.
 
 **Cách nói trong phỏng vấn:**
 
@@ -163,29 +175,30 @@ flowchart TB
 4. Supporting guides trong `docs/guides/*`; luôn re-check path và behavior với source.
 5. README boilerplate, generated output, folder build.
 
-Lưu ý quan trọng: `AGENTS.md` mô tả target standards của dự án. Trong code hiện tại, import alias vẫn là `@common/*` và `@einvoice/*`, chưa phải tất cả đều là `@qrtable/*`.
+Lưu ý quan trọng: `AGENTS.md` mô tả engineering standards hiện tại, còn `tsconfig.base.json` là nguồn xác nhận mapping import alias. Backend dùng `@common/*`; frontend/shared vẫn dùng legacy-but-valid `@einvoice/*`. Không tự suy ra hoặc tạo alias `@qrtable/*` khi source chưa khai báo.
 
 ## Round 0: Đọc Map Trước Code
 
 Đọc các file này để lấy context:
 
-| File                                              | Đọc để nắm gì                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------- |
-| `docs/README.md`                                  | Tài liệu nào canonical, tài liệu nào chỉ là reference.              |
-| `docs/DOC-CODE-ANCHORS.md`                        | Topic tài liệu đang anchor vào file source nào.                     |
-| `docs/project-status.md`                          | Phase nào đã verified, pending hoặc deferred.                       |
-| `docs/technical-architecture.md`                  | Microservices, database per service, Redis, Kafka, WebSocket rooms. |
-| `docs/business-logic.md`                          | State machine, business rules, edge cases nghiệp vụ.                |
-| `docs/architecture/permission-matrix.md`          | Role/permission trước khi đọc admin, POS, KDS.                      |
-| `docs/testing/README.md`                          | Taxonomy, gate policy và cách đọc evidence.                         |
-| `docs/testing/traceability-matrix.md`             | Mapping requirement -> unit/integration/e2e tests và trạng thái.    |
-| `docs/guides/react-nextjs-qrtable.md`             | Nên đọc kèm khi trace frontend React/Next.js.                       |
-| `docs/guides/kafka-qrtable.md`                    | Đọc khi cần mở rộng event-driven flow.                              |
-| `docs/guides/redis-qrtable.md`                    | Đọc khi cần nắm Redis key/session/cart/KDS.                         |
-| `docs/guides/websocket-socketio-qrtable.md`       | Đọc khi trace realtime.                                             |
-| `docs/guides/keycloak-qrtable.md`                 | Đọc khi trace auth/Keycloak.                                        |
-| `docs/guides/sepay-configuration-guide-phase3.md` | Đọc khi trace VietQR/SePay setup.                                   |
-| `docs/guides/frontend-domain-display.md`          | Map enum wire → nhãn UI; cấu trúc `vi-domain-labels`, SaaS badges.  |
+| File                                              | Đọc để nắm gì                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `AGENTS.md`                                       | Working protocol, service boundary, shared-lib aliases và convention bắt buộc. |
+| `docs/README.md`                                  | Tài liệu nào canonical, tài liệu nào chỉ là reference.                         |
+| `docs/DOC-CODE-ANCHORS.md`                        | Topic tài liệu đang anchor vào file source nào.                                |
+| `docs/project-status.md`                          | Phase nào đã verified, pending hoặc deferred.                                  |
+| `docs/technical-architecture.md`                  | Microservices, database per service, Redis, Kafka, WebSocket rooms.            |
+| `docs/business-logic.md`                          | State machine, business rules, edge cases nghiệp vụ.                           |
+| `docs/architecture/permission-matrix.md`          | Role/permission trước khi đọc admin, POS, KDS.                                 |
+| `docs/testing/README.md`                          | Taxonomy, gate policy và cách đọc evidence.                                    |
+| `docs/testing/traceability-matrix.md`             | Mapping requirement -> unit/integration/e2e tests và trạng thái.               |
+| `docs/guides/react-nextjs-qrtable.md`             | Nên đọc kèm khi trace frontend React/Next.js.                                  |
+| `docs/guides/kafka-qrtable.md`                    | Đọc khi cần mở rộng event-driven flow.                                         |
+| `docs/guides/redis-qrtable.md`                    | Đọc khi cần nắm Redis key/session/cart/KDS.                                    |
+| `docs/guides/websocket-socketio-qrtable.md`       | Đọc khi trace realtime.                                                        |
+| `docs/guides/keycloak-qrtable.md`                 | Đọc khi trace auth/Keycloak.                                                   |
+| `docs/guides/sepay-configuration-guide-phase3.md` | Đọc khi trace VietQR/SePay setup.                                              |
+| `docs/guides/frontend-domain-display.md`          | Map enum wire → nhãn UI; cấu trúc `vi-domain-labels`, SaaS badges.             |
 
 Sau đó đọc phase records theo thứ tự:
 
@@ -210,8 +223,10 @@ Sau đó đọc phase records theo thứ tự:
 - `package.json`
 - `nx.json`
 - `tsconfig.base.json`
-- `apps/*/project.json`
-- `libs/*/project.json`
+- `apps/bff/project.json`
+- `apps/bff/webpack.config.js`
+- `libs/configuration/project.json`
+- Sau đó dùng `apps/*/project.json`, `apps/*/webpack.config.js` và `libs/*/project.json` như glob so sánh/discovery.
 
 Lệnh nên chạy:
 
@@ -224,6 +239,7 @@ Cần rút ra:
 
 - Project nào là deployable app, project nào là library.
 - `package.json` script nào chạy domain slice nào: `dev:bff-order`, `dev:bff-payment`, `dev:bff-auth`.
+- `project.json` giao build/serve cho executor nào; `webpack.config.js` mới xác nhận backend process entry thực tế là `./src/main.ts`.
 - `tsconfig.base.json` map alias nào vào folder nào.
 - Backend code hiện tại import `@common/constants/*`, `@common/interfaces/*`, `@common/entities/*`, ...
 - Frontend/shared code hiện tại import `@einvoice/types`, `@einvoice/frontend-ui`, `@einvoice/frontend-hooks`, ...
@@ -242,50 +258,87 @@ Mục tiêu của round này là dựng đúng **process boundary, transport bou
 
 ### Bước 1: BFF Process Bootstrap
 
-Đọc đúng thứ tự:
+Đọc **bắt buộc** theo đúng thứ tự:
 
 1. `apps/bff/src/main.ts`
 2. `apps/bff/src/configuration/index.ts`
-3. `apps/bff/src/configuration/cors-origins.ts`
-4. `apps/bff/src/app/app.module.ts`
-5. `libs/configuration/src/lib/tcp.config.ts`
-6. `libs/configuration/src/lib/grpc.config.ts`
+3. `libs/configuration/src/lib/base.config.ts`
+4. `libs/configuration/src/lib/app.config.ts`
+5. `libs/configuration/src/lib/redis.config.ts`
+6. `apps/bff/src/configuration/cors-origins.ts`
+7. `apps/bff/src/app/modules/realtime/adapters/redis-io.adapter.ts`
+8. `apps/bff/src/app/app.module.ts`
+9. `libs/configuration/src/lib/throttler.config.ts`
+10. `libs/providers/redis-client/src/lib/redis-client.module.ts`
+11. `libs/providers/redis-client/src/lib/redis-client.service.ts`
 
 Cần nắm:
 
 - Bootstrap hiện được viết trực tiếp trong `main.ts`; **không còn** `apps/bff/src/bootstrap.ts`.
 - `main.ts` bật `rawBody`, Redis Socket.IO adapter, global prefix, `ValidationPipe`, CORS và Swagger.
+- `configuration/index.ts` là **composition tree**, không phải danh sách yêu cầu phải đọc sâu ngay: nó kết hợp Base/App/TCP/Redis/Kafka/gRPC với BFF payment/platform/CORS config rồi gọi validation.
+- Ở lần đọc đầu, vẫn đọc hết ba class local `BffPaymentConfiguration`, `BffPlatformConfiguration`, `BffCorsConfiguration` ngay trong `configuration/index.ts` để biết key/default/validation; chỉ hoãn việc trace consumer của payment/platform sang domain flow tương ứng.
+- `BaseConfiguration` giải thích `NODE_ENV`, `GLOBAL_PREFIX` và validation; `AppConfiguration` giải thích listen port; `RedisConfiguration` giải thích cùng một Redis host/port được dùng cho cache và Socket.IO scale-out.
+- `RedisIoAdapter` là runtime WebSocket adapter trong `main.ts`; `RedisProvider` và `RedisClientModule` là hai abstraction khác nhau cho cache-manager và direct Redis commands. Đọc tiếp `RedisClientService` để thấy direct client được tạo/đóng theo provider lifecycle; domain key/store consumer được hoãn sang flow sử dụng nó.
 - `app.module.ts` là composition root: import BFF feature modules, middleware, global interceptor và global guard theo thứ tự đăng ký.
-- Config transport phải được lần từ shared factory/service token, không suy ra host/port từ tên app.
+- `ThrottlerProvider` nằm ngoài BFF configuration index nhưng vẫn là dependency bootstrap vì `AppModule` đăng ký global rate-limit storage trên Redis.
 - BFF được phép orchestration ở boundary, nhưng không sở hữu domain state.
+
+**Các nhánh configuration đã nhìn thấy nhưng cố ý chưa trace sâu ở Bước 1:**
+
+| Nhánh/source                                        | Điểm hẹn đọc sâu            | Lý do                                                                                         |
+| --------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
+| `libs/configuration/src/lib/tcp.config.ts`          | Round 2 - Bước 2            | Client token/provider và downstream sync boundary.                                            |
+| `libs/configuration/src/lib/grpc.config.ts`         | Round 2 - Bước 2, Flow 7    | Authorizer/User Access gRPC boundary và proto assets.                                         |
+| `libs/configuration/src/lib/kafka.config.ts`        | Flow 8 / Realtime deep dive | Kafka client/group/topic wiring chỉ được consume bởi realtime bridge.                         |
+| `BFF_PAYMENT_CONFIG` trong BFF configuration index  | Flow 2 và Flow 5            | Timeout nằm trên Order/Payment HTTP boundary; secret/base URL thuộc payment/VietQR behavior.  |
+| `BFF_PLATFORM_CONFIG` trong BFF configuration index | Flow 6                      | Contact metadata thuộc public SaaS/platform response, không quyết định BFF process lifecycle. |
+
+`libs/configuration/src/lib/type-orm.config.ts`, `libs/configuration/src/lib/mongo.config.ts` và `libs/configuration/src/lib/keycloak.config.ts` không được BFF configuration index import. Chúng thuộc service owner ở Bước 4, vì vậy đọc chúng trong Bước 1 sẽ trộn process boundary của BFF với persistence/identity boundary của service khác.
+
+**Checkpoint:** kết thúc Bước 1, bạn phải giải thích được process BFF khởi tạo như thế nào và config nào phục vụ HTTP/CORS/Redis/rate limit. Chưa cần thuộc port của bảy service hoặc Kafka consumer group.
 
 ### Bước 2: BFF Module Và Downstream Client
 
+Trước khi đọc từng feature module, đọc một lần transport foundation:
+
+1. `libs/configuration/src/lib/tcp.config.ts`
+2. `libs/configuration/src/lib/grpc.config.ts`
+3. `libs/interfaces/src/lib/tcp/common/request.interface.ts`
+4. `libs/interfaces/src/lib/tcp/common/response.interface.ts`
+5. `libs/interfaces/src/lib/tcp/common/tcp-client.interface.ts`
+6. `libs/constants/src/lib/enum/tcp-request-message.ts`
+7. `libs/interfaces/src/lib/proto/authorizer/authorizer.proto`
+8. `libs/interfaces/src/lib/proto/user-access/user-access.proto`
+
+Thứ tự này trả lời lần lượt: **client token/provider nào được inject -> request/response envelope trông ra sao -> message pattern nào định tuyến -> gRPC wire contract nào được copy vào backend build**.
+
 Đọc module trước controller để biết một HTTP surface được phép gọi những owner nào:
 
-| BFF module                                                 | Downstream boundary chính                                         |
-| ---------------------------------------------------------- | ----------------------------------------------------------------- |
-| `apps/bff/src/app/modules/authorizer/authorizer.module.ts` | Authorizer TCP và gRPC.                                           |
-| `apps/bff/src/app/modules/catalog/catalog.module.ts`       | Catalog TCP.                                                      |
-| `apps/bff/src/app/modules/order/order.module.ts`           | Order, Kitchen, Payment, SaaS TCP và realtime emit.               |
-| `apps/bff/src/app/modules/kitchen/kitchen.module.ts`       | Kitchen + Order TCP và realtime; có boundary orchestration.       |
-| `apps/bff/src/app/modules/payment/payment.module.ts`       | Payment TCP.                                                      |
-| `apps/bff/src/app/modules/saas/saas.module.ts`             | SaaS + Payment TCP và realtime.                                   |
-| `apps/bff/src/app/modules/user/user.module.ts`             | User Access TCP.                                                  |
-| `apps/bff/src/app/modules/reporting/reporting.module.ts`   | Order + Payment + Catalog + SaaS TCP; compose read model tại BFF. |
-| `apps/bff/src/app/modules/realtime/realtime.module.ts`     | Authorizer, Order, Kafka/Redis bridge và Socket.IO.               |
-| `apps/bff/src/app/modules/health/health.module.ts`         | Health endpoint local; không phải mọi controller đều forward TCP. |
+| BFF module                                                 | Downstream boundary chính                                                              |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `apps/bff/src/app/modules/authorizer/authorizer.module.ts` | Authorizer TCP và gRPC.                                                                |
+| `apps/bff/src/app/modules/catalog/catalog.module.ts`       | Catalog TCP; Cloudinary + cache cho menu image/public menu.                            |
+| `apps/bff/src/app/modules/order/order.module.ts`           | Order, Kitchen, Payment, SaaS TCP và realtime emit.                                    |
+| `apps/bff/src/app/modules/kitchen/kitchen.module.ts`       | Kitchen + Order TCP và realtime; có boundary orchestration.                            |
+| `apps/bff/src/app/modules/payment/payment.module.ts`       | Payment TCP.                                                                           |
+| `apps/bff/src/app/modules/saas/saas.module.ts`             | SaaS + Payment TCP và realtime.                                                        |
+| `apps/bff/src/app/modules/user/user.module.ts`             | User Access TCP.                                                                       |
+| `apps/bff/src/app/modules/reporting/reporting.module.ts`   | Order + Payment + Catalog + SaaS TCP; compose read model tại BFF.                      |
+| `apps/bff/src/app/modules/realtime/realtime.module.ts`     | Authorizer, Order, Kafka/Redis bridge và Socket.IO.                                    |
+| `apps/bff/src/app/modules/health/health.module.ts`         | BFF aggregate health qua Catalog + SaaS TCP; controller compose kết quả `UP/DEGRADED`. |
 
 Với mỗi route, đọc theo chuỗi:
 
 1. BFF feature module.
 2. Exact controller file và route decorator.
-3. Guard/decorator + gateway request/response interface.
-4. `TCP_REQUEST_MESSAGE` hoặc Kafka topic.
-5. Downstream `@MessagePattern` controller/consumer.
-6. Domain service -> repository/store -> test.
+3. Guard/decorator + `libs/interfaces/src/lib/gateway/<domain>/` request/response DTO.
+4. `buildTcpRequestContext()` + common TCP envelope.
+5. `TCP_REQUEST_MESSAGE.<DOMAIN>` và `libs/interfaces/src/lib/tcp/<domain>/` request/response contract.
+6. Downstream `@MessagePattern` controller/consumer.
+7. Domain service -> repository/store -> test.
 
-`apps/bff/src/app/modules/*/controllers/*.ts` chỉ là glob khám phá. Không đọc tất cả controller theo alphabet. Ngoại lệ cần nhận diện: Health xử lý local, Reporting compose read model từ nhiều owner, Kitchen có compensation orchestration, Realtime bridge Kafka/Redis sang Socket.IO.
+`apps/bff/src/app/modules/*/controllers/*.ts` và `libs/interfaces/src/lib/tcp/*` chỉ là glob khám phá. Chỉ mở subfolder của domain đang trace. Ngoại lệ cần nhận diện: Health compose downstream health, Reporting compose read model từ nhiều owner, Kitchen có compensation orchestration, Catalog có Cloudinary/cache side effect, Realtime bridge Kafka/Redis sang Socket.IO.
 
 ### Bước 3: HTTP Cross-Cutting Lifecycle
 
@@ -313,28 +366,65 @@ Middleware, guards và interceptor là các stage khác nhau; không gộp chún
 
 `libs/interceptors/src/lib/exception.interceptor.ts` là global interceptor để normalize exception/response shape; nó không phải guard cuối cùng.
 
+Sau khi nắm thứ tự trên, đọc supporting core theo chuỗi dữ liệu thay vì theo folder:
+
+1. `libs/constants/src/lib/common.constant.ts` — metadata key/skip flag mà middleware, decorators và guards chia sẻ.
+2. `libs/constants/src/lib/request-context.constant.ts` — canonical header/session/tenant policy.
+3. `libs/decorators/src/lib/authorizer.decorator.ts` — route secured metadata.
+4. `libs/decorators/src/lib/permission.decorator.ts` — permission metadata.
+5. `libs/decorators/src/lib/requires-plan-feature.decorator.ts` — plan-feature metadata.
+6. `libs/utils/src/lib/request.util.ts` — đọc HTTP metadata và build typed TCP request context.
+7. `libs/error-messages/src/lib/business.exception.ts` — domain error envelope.
+8. `libs/error-messages/src/lib/error-code.enum.ts` và `libs/error-messages/src/lib/error-messages.registry.ts` — stable error code -> localized message.
+9. `libs/interceptors/src/lib/tcpLogging.interceptor.ts` — service-side `BusinessException`/DB error -> `RpcException`.
+10. `libs/interceptors/src/lib/exception.interceptor.ts` — BFF-side RPC/HTTP/DB/unknown error -> normalized HTTP response.
+
+Đây là một lifecycle có hai nửa:
+
+```text
+HTTP request
+  -> middleware ghi process/tenant hint
+  -> decorators khai báo metadata
+  -> guards hydrate/check context
+  -> buildTcpRequestContext tạo transport envelope
+  -> downstream TcpLoggingInterceptor map lỗi thành RpcException
+  -> BFF ExceptionInterceptor map lỗi về HTTP response
+```
+
+**Active wiring caveat:** `libs/guards/src/lib/tenant-plan.guard.ts` và `libs/guards/src/lib/tenant-status.guard.ts` tồn tại trong library nhưng không được đăng ký trong `apps/bff/src/app/app.module.ts` hiện tại. Không tính chúng là runtime guard chỉ vì file tồn tại; registration tại composition root mới là bằng chứng.
+
 ### Bước 4: Service Entry Point, Root Module Và State Owner
 
-Đọc mỗi hàng từ trái sang phải. `main.ts` cho biết inbound transport; root module/DataSource cho biết service thực sự được phép sở hữu state nào.
+Không lặp lại toàn bộ shared config cho mỗi service. Với mỗi service, dùng năm pass:
 
-| Service     | Entry point + root module                                                  | Inbound runtime   | State owner cần xác nhận                                                                      |
-| ----------- | -------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------- |
-| Authorizer  | `apps/authorizer/src/main.ts` -> `apps/authorizer/src/app/app.module.ts`   | TCP + gRPC + HTTP | Keycloak integration; không sở hữu database domain.                                           |
-| Catalog     | `apps/catalog/src/main.ts` -> `apps/catalog/src/app/app.module.ts`         | TCP + HTTP        | PostgreSQL: Area, Category, MenuItem, StockReservation, Table.                                |
-| Order       | `apps/order/src/main.ts` -> `apps/order/src/app/app.module.ts`             | TCP + HTTP        | PostgreSQL: Session, Order, OrderItem, Bill, ServiceRequest, OutboxEvent; Redis cart/session. |
-| Kitchen     | `apps/kitchen/src/main.ts` -> `apps/kitchen/src/app/app.module.ts`         | TCP + HTTP        | Redis KDS queue/dedupe/SLA/recovery; **không có domain database**.                            |
-| Payment     | `apps/payment/src/main.ts` -> `apps/payment/src/app/app.module.ts`         | TCP + HTTP        | PostgreSQL: Payment, audit, payment outbox, tenant payment settings.                          |
-| SaaS        | `apps/saas/src/main.ts` -> `apps/saas/src/app.module.ts`                   | TCP + HTTP        | PostgreSQL: Tenant, PricingPlan, Subscription, SubscriptionInvoice, SaaS outbox; Redis cache. |
-| User Access | `apps/user-access/src/main.ts` -> `apps/user-access/src/app/app.module.ts` | TCP + gRPC + HTTP | MongoDB: user profile, role, staff/tenant membership.                                         |
+1. `main.ts` — process bootstrap, HTTP/TCP/gRPC inbound transport.
+2. `configuration/index.ts` — service-specific composition và override.
+3. Root module — module/provider/entity registration.
+4. Chỉ mở shared infrastructure factory mà root/config thực sự dùng.
+5. DataSource/schema + feature module/repository — bằng chứng state ownership.
 
-Sau root module, kiểm tra migration/runtime ownership ở:
+Đọc mỗi hàng từ trái sang phải:
+
+| Service     | Entry -> local config -> root module                                                                                        | Shared infrastructure cần mở tại pass 4                                                                                                                                                       | Inbound runtime   | State owner cần xác nhận                                                                      |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------- |
+| Authorizer  | `apps/authorizer/src/main.ts` -> `apps/authorizer/src/configuration/index.ts` -> `apps/authorizer/src/app/app.module.ts`    | `libs/configuration/src/lib/grpc.config.ts`, `libs/configuration/src/lib/keycloak.config.ts`; TCP foundation đã đọc ở Bước 2.                                                                 | TCP + gRPC + HTTP | Keycloak integration; không sở hữu database domain.                                           |
+| Catalog     | `apps/catalog/src/main.ts` -> `apps/catalog/src/configuration/index.ts` -> `apps/catalog/src/app/app.module.ts`             | `libs/configuration/src/lib/type-orm.config.ts`; chỉ mở sâu `libs/configuration/src/lib/kafka.config.ts` khi trace `tenant.created`.                                                          | TCP + HTTP        | PostgreSQL: Area, Category, MenuItem, StockReservation, Table.                                |
+| Order       | `apps/order/src/main.ts` -> `apps/order/src/configuration/index.ts` -> `apps/order/src/app/app.module.ts`                   | `libs/configuration/src/lib/type-orm.config.ts`, `libs/providers/redis-client/src/lib/redis-client.module.ts`; Kafka ở confirm/payment flows.                                                 | TCP + HTTP        | PostgreSQL: Session, Order, OrderItem, Bill, ServiceRequest, OutboxEvent; Redis cart/session. |
+| Kitchen     | `apps/kitchen/src/main.ts` -> `apps/kitchen/src/configuration/index.ts` -> `apps/kitchen/src/app/app.module.ts`             | `libs/providers/redis-client/src/lib/redis-client.module.ts`; Kafka mở sâu ở KDS ingestion/SLA.                                                                                               | TCP + HTTP        | Redis KDS queue/dedupe/SLA/recovery; **không có domain database/DataSource**.                 |
+| Payment     | `apps/payment/src/main.ts` -> `apps/payment/src/configuration/index.ts` -> `apps/payment/src/app/app.module.ts`             | `libs/configuration/src/lib/type-orm.config.ts`; Kafka mở sâu ở payment outbox.                                                                                                               | TCP + HTTP        | PostgreSQL: Payment, audit, payment outbox, tenant payment settings.                          |
+| SaaS        | `apps/saas/src/main.ts` -> `apps/saas/src/configuration/index.ts` -> `apps/saas/src/app.module.ts`                          | `libs/configuration/src/lib/type-orm.config.ts`, `libs/providers/redis-client/src/lib/redis-client.module.ts`; Kafka ở tenant outbox.                                                         | TCP + HTTP        | PostgreSQL: Tenant, PricingPlan, Subscription, SubscriptionInvoice, SaaS outbox; Redis cache. |
+| User Access | `apps/user-access/src/main.ts` -> `apps/user-access/src/configuration/index.ts` -> `apps/user-access/src/app/app.module.ts` | `libs/configuration/src/lib/mongo.config.ts`, `libs/schemas/src/lib/base.schema.ts`, `libs/schemas/src/lib/user.schema.ts`, `libs/schemas/src/lib/role.schema.ts`; gRPC foundation từ Bước 2. | TCP + gRPC + HTTP | MongoDB: user profile, role, staff/tenant membership.                                         |
+
+Sau root module, kiểm tra migration/runtime ownership ở exact path:
 
 - `apps/catalog/src/database/catalog.data-source.ts`
 - `apps/order/src/database/order.data-source.ts`
 - `apps/payment/src/database/payment.data-source.ts`
 - `apps/saas/src/database/saas.data-source.ts`
 
-Entity được đặt trong `libs/entities` để reuse type/metadata, nhưng điều đó **không cho phép** service khác query database owner. Registration trong root module/DataSource và repository tenant-scoped mới xác định ownership.
+Với User Access, thay DataSource bằng `libs/configuration/src/lib/mongo.config.ts`, `apps/user-access/src/app/modules/user/user.module.ts`, `apps/user-access/src/app/modules/role/role.module.ts` và ba schema trong bảng. Với Kitchen, việc không có DataSource/TypeORM/Mongoose registration là evidence quan trọng, không phải file bị thiếu.
+
+Entity của Catalog/Order/SaaS được đặt trong `libs/entities` để reuse type/metadata; Payment giữ entity local trong module. Cả hai cách đều **không cho phép** service khác query database owner. Registration trong root module/DataSource và repository tenant-scoped mới xác định ownership.
 
 **Lý thuyết cần nắm:**
 
@@ -342,9 +432,10 @@ Guard chain xử lý cross-cutting concerns: authentication, session, tenant iso
 
 **Exit criteria của Round 2:**
 
+- Giải thích được BFF bootstrap/configuration tree và vì sao TCP/gRPC/Kafka được lazy-load sang đúng bước.
 - Vẽ được BFF gọi service nào qua TCP/gRPC và biết các ngoại lệ orchestration.
 - Nói đúng thứ tự tám global guards và vai trò của middleware/interceptor.
-- Chỉ ra state store của bảy backend services, đặc biệt Kitchen không có DB.
+- Chỉ ra local configuration, infrastructure provider và state store của bảy backend services, đặc biệt Kitchen không có DB.
 - Từ một BFF route bất kỳ, tìm được exact `@MessagePattern` owner mà chưa cần đọc toàn bộ service.
 
 **Cách nói trong phỏng vấn:**
@@ -1383,45 +1474,184 @@ Rule đọc nhanh: nếu thấy hardcoded room/key/topic trong app code, kiểm 
 
 ## Round 4: Shared Libs Và Contracts
 
-Đọc shared libs sau khi đã nắm flow, vì lúc đó bạn mới hiểu contract nào được dùng ở đâu.
+Đọc shared libs sau khi đã nắm ít nhất một domain flow. Mục tiêu không phải “đọc hết `libs/`”, mà là mở đúng **contract bundle** hoặc **infrastructure bundle** mà flow đang đi qua.
 
-| Lib path                      | Current role                                                                            |
-| ----------------------------- | --------------------------------------------------------------------------------------- |
-| `libs/configuration`          | Config modules, TCP service tokens, Redis/throttler config.                             |
-| `libs/constants`              | TCP messages, role/permission enum, RedisKey, WsRoom, SaaS constants.                   |
-| `libs/interfaces`             | Gateway DTOs, TCP request/response interfaces, gRPC proto/contracts.                    |
-| `libs/entities`               | TypeORM entities shared by backend services.                                            |
-| `libs/schemas`                | Mongo/Mongoose schemas for user-access.                                                 |
-| `libs/guards`                 | BFF global guards.                                                                      |
-| `libs/middlewares`            | Logger/tenant middleware.                                                               |
-| `libs/interceptors`           | Exception/TCP logging interceptors.                                                     |
-| `libs/decorators`             | Authorization, permission, request/process decorators.                                  |
-| `libs/error-messages`         | BusinessException, ErrorCode, i18n error registry, DB error transformer.                |
-| `libs/providers/redis-client` | Redis client module/service.                                                            |
-| `libs/providers/cloudinary`   | Cloudinary integration.                                                                 |
-| `libs/utils`                  | Shared backend utilities, request helpers, VND rounding checks.                         |
-| `libs/shared/types`           | Cross-platform shared frontend/backend types exposed as `@einvoice/types`.              |
-| `libs/shared/constants`       | Cross-platform constants; `vi-domain-labels.ts` maps wire enums → Vietnamese UI labels. |
-| `libs/frontend/ui`            | Frontend UI components.                                                                 |
-| `libs/frontend/hooks`         | Shared frontend hooks.                                                                  |
-| `libs/frontend/utils`         | Shared frontend utilities.                                                              |
-| `libs/shared/mock-data`       | Mock/seed data for frontend/test contexts.                                              |
+### Protocol: Từ Import Quay Lại Owner
 
-**Cần đọc kỹ:**
+Mỗi khi gặp import từ `@common/*` hoặc `@einvoice/*`, làm theo thứ tự:
 
-- `libs/constants/src/lib/enum/tcp-request-message.ts`
-- `libs/constants/src/lib/kafka-topic.constants.ts`
-- `libs/constants/src/lib/redis-key.constants.ts`
-- `libs/constants/src/lib/ws-room.constants.ts`
-- `libs/constants/src/lib/saas.constants.ts`
-- `libs/interfaces/src/lib/tcp/*`
-- `libs/interfaces/src/lib/gateway/*`
-- `libs/entities/src/lib/*.entity.ts`
-- `libs/error-messages/src/lib/error-code.enum.ts`
-- `apps/catalog/src/database/catalog.data-source.ts`
-- `apps/order/src/database/order.data-source.ts`
-- `apps/payment/src/database/payment.data-source.ts`
-- `apps/saas/src/database/saas.data-source.ts`
+1. Xác nhận alias trong `tsconfig.base.json`.
+2. Mở đúng leaf file được import, không mở cả folder.
+3. Chỉ mở core dependency của leaf file nếu nó thay đổi contract/lifecycle.
+4. Quay lại app/service owner để xem dependency được register và sử dụng ở đâu.
+5. Đọc test của contract/boundary trước khi chuyển sang lib khác.
+
+### Lib Routing Table
+
+| Lib path                                    | Khi nào đọc                                                                   | Core entry/file nên bắt đầu                                                                             |
+| ------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `libs/configuration`                        | Process bootstrap, transport, DB, Redis, Kafka.                               | `base.config.ts`, rồi factory cụ thể mà app configuration/root module dùng.                             |
+| `libs/constants`                            | Cần biết stable message/topic/key/room/permission/wire value.                 | `tcp-request-message.ts`, `kafka-topic.constants.ts`, `redis-key.constants.ts`, `ws-room.constants.ts`. |
+| `libs/interfaces`                           | Trace HTTP DTO -> TCP/gRPC wire contract.                                     | Common TCP envelope, sau đó chỉ subfolder `gateway/<domain>` và `tcp/<domain>` đang dùng.               |
+| `libs/entities`                             | Xác nhận TypeORM shape của Catalog/Order/SaaS.                                | `base.entity.ts`, entity của flow, rồi quay lại owner DataSource/module/repository.                     |
+| `libs/schemas`                              | Trace User Access Mongo documents.                                            | `base.schema.ts` -> `user.schema.ts` / `role.schema.ts` -> Mongoose module/repository.                  |
+| `libs/guards`                               | Trace active BFF auth/session/tenant/permission/plan lifecycle.               | Bắt đầu từ registration trong `apps/bff/src/app/app.module.ts`; không đọc file chưa được wire.          |
+| `libs/middlewares`                          | Trace process ID/logging và tenant hint trước guards.                         | `logger.middleware.ts` -> `tenant.middleware.ts`.                                                       |
+| `libs/decorators`                           | Hiểu route metadata hoặc parameter extraction mà guard/controller dùng.       | Mở decorator xuất hiện trên route hiện tại; không đọc theo alphabet.                                    |
+| `libs/interceptors` + `libs/error-messages` | Trace response/error qua HTTP <-> TCP boundary.                               | `business.exception.ts` -> `tcpLogging.interceptor.ts` -> `exception.interceptor.ts`.                   |
+| `libs/providers/redis-client`               | Service dùng direct Redis commands cho cart/KDS/cache/lifecycle.              | `redis-client.module.ts` -> `redis-client.service.ts` -> domain key builder/store.                      |
+| `libs/providers/cloudinary`                 | Chỉ khi trace Catalog menu-image upload/delete tại BFF.                       | `cloudinary.module.ts` -> `cloudinary.service.ts` -> BFF menu-item controller.                          |
+| `libs/utils`                                | Khi flow dùng request context, VND rounding hoặc reporting range/bucket.      | Mở đúng `request.util.ts`, `vnd-rounding.util.ts`, `report-range.util.ts` hoặc `report-bucket.util.ts`. |
+| `libs/shared/types`                         | Cross-platform API/domain/realtime type dùng bởi frontend hoặc event payload. | `src/index.ts`, rồi leaf `order.types.ts`, `kds.types.ts`, `realtime-events.types.ts`, ...              |
+| `libs/shared/constants`                     | Frontend wire enum, display label và query/default config.                    | `src/index.ts` -> `saas-wire-types.ts` / `vi-domain-labels.ts` / `config.ts`.                           |
+| `libs/frontend/ui`                          | Khi một app import component shared cụ thể.                                   | `src/index.ts`, rồi đúng component; không đọc toàn bộ Shadcn primitives.                                |
+| `libs/frontend/hooks`                       | Shared UI hook nhỏ. Hiện chỉ export `useIsMobile` và `useDialogState`.        | `src/index.ts` -> leaf hook đang được import. Query/realtime hooks vẫn nằm trong app features.          |
+| `libs/frontend/utils`                       | Shared `cn`, format, generic API/upload client và message helper.             | `src/index.ts` -> leaf utility được app import.                                                         |
+| `libs/shared/mock-data`                     | Test/demo/mock data; không phải production state owner.                       | `src/index.ts` và data-conformance test, chỉ khi flow/test dùng mock.                                   |
+
+### Track A: Configuration Và Runtime Provider
+
+Đọc theo concern, không đọc toàn bộ `libs/configuration/src/lib/*.ts`:
+
+| Concern        | Exact order                                                                                                                                                                                                                            | Điểm dừng                                                                |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| BFF process    | `libs/configuration/src/lib/base.config.ts` -> `libs/configuration/src/lib/app.config.ts` -> `libs/configuration/src/lib/redis.config.ts` -> `apps/bff/src/configuration/index.ts` -> `libs/configuration/src/lib/throttler.config.ts` | Dừng trước TCP/gRPC/Kafka internals ở Round 2 - Bước 1.                  |
+| Sync transport | `libs/configuration/src/lib/tcp.config.ts` -> `libs/configuration/src/lib/grpc.config.ts` -> proto files trong `libs/interfaces/src/lib/proto/`                                                                                        | Quay lại BFF/service module để xác nhận provider token được register.    |
+| Kafka          | `libs/configuration/src/lib/kafka.config.ts` -> `libs/constants/src/lib/kafka-topic.constants.ts` -> producer/consumer của flow                                                                                                        | Không đọc mọi producer/consumer cùng lúc.                                |
+| PostgreSQL     | `libs/configuration/src/lib/type-orm.config.ts` -> `apps/<service>/src/configuration/index.ts` -> root module -> app DataSource                                                                                                        | DataSource/entity registration đủ để xác nhận owner trước khi đọc query. |
+| MongoDB        | `libs/configuration/src/lib/mongo.config.ts` -> `apps/user-access/src/configuration/index.ts` -> `apps/user-access/src/app/app.module.ts` -> user/role schemas                                                                         | Chỉ User Access dùng Mongo provider trong backend core.                  |
+| Direct Redis   | `libs/configuration/src/lib/redis.config.ts` để hiểu host/port -> `libs/providers/redis-client/src/lib/redis-client.module.ts` -> `libs/providers/redis-client/src/lib/redis-client.service.ts` -> domain-specific key/store           | Redis cache-manager và direct Redis client là hai abstraction khác nhau. |
+| Keycloak       | `libs/configuration/src/lib/keycloak.config.ts` -> `apps/authorizer/src/configuration/index.ts` -> Keycloak module/services                                                                                                            | Chỉ mở sâu ở Flow 7 hoặc SaaS/staff compensation.                        |
+
+Service-local classes như BFF payment/CORS, Order payment consumer, Kitchen KDS, Payment SePay/OAuth/secrets và SaaS platform payment config nằm ngay trong từng `apps/<service>/src/configuration/index.ts`. Shared factory cung cấp baseline; local index mới là cấu hình thực sự của process đó.
+
+### Track B: Synchronous Boundary Contract Bundle
+
+Với một HTTP -> TCP route, đọc đúng bundle này:
+
+1. BFF `apps/bff/src/app/modules/<domain>/<domain>.module.ts`.
+2. Exact BFF controller method.
+3. `libs/interfaces/src/lib/gateway/<domain>/` request/response DTO được method dùng.
+4. `libs/utils/src/lib/request.util.ts` method `buildTcpRequestContext`.
+5. `libs/interfaces/src/lib/tcp/common/request.interface.ts`.
+6. `libs/interfaces/src/lib/tcp/common/response.interface.ts`.
+7. `libs/interfaces/src/lib/tcp/common/tcp-client.interface.ts`.
+8. `libs/constants/src/lib/enum/tcp-request-message.ts` đúng domain member.
+9. `libs/interfaces/src/lib/tcp/<domain>/` exact request/response type.
+10. Owner controller có matching `@MessagePattern`.
+11. Owner service/repository và boundary test.
+
+Không đọc toàn bộ `gateway/*` hoặc `tcp/*`. Ví dụ trace Order submit thì chỉ mở gateway/order, TCP order, common envelope và matching Order controller; Catalog/Payment/SaaS contracts được lazy-load khi flow thực sự gọi chúng.
+
+Với gRPC, thay TCP message/interface bằng:
+
+1. `libs/configuration/src/lib/grpc.config.ts`.
+2. `libs/interfaces/src/lib/proto/authorizer/authorizer.proto` hoặc `libs/interfaces/src/lib/proto/user-access/user-access.proto`.
+3. Matching `libs/interfaces/src/lib/grpc/<domain>/` DTO/interface.
+4. BFF/Authorizer/User Access client/controller implementation.
+
+### Track C: Request Context Và Error Propagation
+
+Đọc theo thứ tự:
+
+1. `libs/constants/src/lib/common.constant.ts`
+2. `libs/constants/src/lib/request-context.constant.ts`
+3. `libs/middlewares/src/lib/logger.middleware.ts`
+4. `libs/middlewares/src/lib/tenant.middleware.ts`
+5. Active guards theo registration trong BFF `AppModule`
+6. Decorator đang xuất hiện trên route
+7. `libs/utils/src/lib/request.util.ts`
+8. `libs/error-messages/src/lib/business.exception.ts`
+9. `libs/error-messages/src/lib/error-code.enum.ts`
+10. `libs/error-messages/src/lib/error-messages.registry.ts`
+11. `libs/error-messages/src/lib/db-error.transformer.ts`
+12. `libs/interceptors/src/lib/tcpLogging.interceptor.ts`
+13. `libs/interceptors/src/lib/exception.interceptor.ts`
+
+Chuỗi này cho thấy tenant/user/session/process context được tạo ở HTTP edge, truyền vào typed TCP envelope, rồi error code đi ngược từ domain service về HTTP client mà không làm service phụ thuộc Express.
+
+### Track D: Persistence Ownership
+
+**PostgreSQL/TypeORM:**
+
+1. Service `configuration/index.ts` — dedicated database name.
+2. `libs/configuration/src/lib/type-orm.config.ts` — provider và deployed-environment fallback policy.
+3. Root module — entity list của runtime connection.
+4. Service DataSource — entity + migration list cho CLI.
+5. Feature module `TypeOrmModule.forFeature(...)`.
+6. Entity của flow.
+7. Tenant-scoped repository.
+8. Service/test.
+
+Catalog, Order và SaaS dùng entity từ `libs/entities`. Payment giữ entity local tại:
+
+- `apps/payment/src/app/modules/payment/entities/payment.entity.ts`
+- `apps/payment/src/app/modules/payment/entities/audit-payment.entity.ts`
+- `apps/payment/src/app/modules/payment/entities/payment-outbox-event.entity.ts`
+- `apps/payment/src/app/modules/payment/entities/tenant-payment-settings.entity.ts`
+
+**Mongo/Mongoose:**
+
+1. `apps/user-access/src/configuration/index.ts`
+2. `libs/configuration/src/lib/mongo.config.ts`
+3. `libs/schemas/src/lib/base.schema.ts`
+4. `libs/schemas/src/lib/user.schema.ts`
+5. `libs/schemas/src/lib/role.schema.ts`
+6. User/Role module registration
+7. Repository -> service -> test
+
+Import entity/schema ở service khác chỉ có thể là type/shape reuse; chỉ root module, DataSource/Mongoose registration và repository query mới chứng minh ownership. Nếu thấy cross-service entity import, kiểm tra nó có được đăng ký/query hay chỉ dùng làm type trước khi kết luận vi phạm.
+
+### Track E: Async, Redis Và Realtime Contracts
+
+Đọc theo thứ tự tín hiệu:
+
+1. `libs/constants/src/lib/kafka-topic.constants.ts`
+2. `libs/configuration/src/lib/kafka.config.ts`
+3. Producer payload type/builder tại owner
+4. Consumer parser/dedupe
+5. `libs/constants/src/lib/redis-key.constants.ts` hoặc KDS-local `kds-keys.ts`
+6. `libs/constants/src/lib/ws-room.constants.ts`
+7. `libs/shared/types/src/lib/realtime-events.types.ts` hoặc `kds.types.ts`
+8. BFF bridge/realtime service
+9. Frontend query-key + realtime hook + refetch test
+
+Kafka topic, Redis key và WebSocket room là ba contract khác nhau; không gom chúng thành một “realtime constant”.
+
+### Track F: Cross-Platform Frontend Contracts
+
+Khi frontend import bare alias, đọc barrel trước để biết public API, rồi mở leaf file:
+
+1. `libs/shared/types/src/index.ts` -> exact domain type.
+2. `libs/shared/constants/src/index.ts` -> wire constant/label/config.
+3. Feature service của app -> API shape.
+4. Feature query/mutation hook -> server-state ownership.
+5. Shared UI/hook/util leaf chỉ khi component thực sự import.
+
+Đặc biệt:
+
+- `libs/shared/constants/src/lib/saas-wire-types.ts` phải khớp `libs/constants/src/lib/saas.constants.ts`.
+- `libs/shared/constants/src/lib/vi-domain-labels.ts` là display mapping, không phải backend wire source.
+- `libs/frontend/hooks` không chứa TanStack Query hoặc Socket.IO business hooks; các hook đó nằm trong `apps/customer-pwa/src/features/*` và `apps/management-app/src/features/*`.
+- `libs/shared/mock-data` không phải bằng chứng runtime hoặc source of truth.
+
+### Active, On-Demand Và Unwired
+
+| Item                                                                                                                       | Trạng thái đọc hiện tại                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `libs/guards/src/lib/user.guard.ts`, `session.guard.ts`, `tenant.guard.ts`, `permission.guard.ts`, `plan-feature.guard.ts` | Active qua BFF `AppModule`; đọc trong Round 2 - Bước 3.                                  |
+| `libs/guards/src/lib/tenant-plan.guard.ts`, `libs/guards/src/lib/tenant-status.guard.ts`                                   | Có file/test nhưng không được current BFF composition root register; không claim active. |
+| `libs/providers/cloudinary`                                                                                                | Active cho BFF Catalog menu-image flow; on-demand ngoài flow đó.                         |
+| `libs/frontend/hooks`                                                                                                      | Active nhỏ ở UI (`useIsMobile`); không phải business state layer.                        |
+| `libs/shared/mock-data`                                                                                                    | Test/demo support; bỏ qua trong production flow reading.                                 |
+
+**Exit criteria của Round 4:**
+
+- Từ một import alias, tìm đúng leaf file và caller/owner mà không đọc cả library.
+- Trace được HTTP DTO -> TCP/gRPC envelope -> owner contract -> error response.
+- Phân biệt config baseline với service-local configuration composition.
+- Chứng minh database/Redis ownership bằng registration + repository, không chỉ bằng entity location.
+- Phân biệt active shared code với file chỉ tồn tại nhưng chưa được wire.
 
 **Lý thuyết cần nắm:**
 
@@ -1547,41 +1777,51 @@ Test trong microservices nên bảo vệ boundary: state machine, idempotency, c
 
 ## File Landmarks
 
-| Muốn hiểu                 | Đọc file                                                                                                    |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| BFF bootstrap             | `apps/bff/src/main.ts`                                                                                      |
-| BFF guard chain           | `apps/bff/src/app/app.module.ts`                                                                            |
-| TCP message names         | `libs/constants/src/lib/enum/tcp-request-message.ts`                                                        |
-| Kafka topic registry      | `libs/constants/src/lib/kafka-topic.constants.ts`                                                           |
-| Kafka runtime config      | `libs/configuration/src/lib/kafka.config.ts`                                                                |
-| Redis keys                | `libs/constants/src/lib/redis-key.constants.ts` và `apps/kitchen/src/app/modules/kitchen/utils/kds-keys.ts` |
-| WebSocket rooms           | `libs/constants/src/lib/ws-room.constants.ts`                                                               |
-| Realtime event contracts  | `libs/shared/types/src/lib/realtime-events.types.ts`                                                        |
-| BFF realtime wiring       | `apps/bff/src/app/modules/realtime/realtime.module.ts`                                                      |
-| BFF KDS Redis subscriber  | `apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts`                              |
-| Error model               | `libs/error-messages/src/lib/business.exception.ts`, `libs/error-messages/src/lib/error-code.enum.ts`       |
-| Order facade              | `apps/order/src/app/modules/order/services/order.service.ts`                                                |
-| Order submit              | `apps/order/src/app/modules/order/services/order-submit.service.ts`                                         |
-| Order confirm saga        | `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`                                   |
-| Order transitions         | `apps/order/src/app/modules/order/services/order-state-transition.service.ts`                               |
-| Order bill                | `apps/order/src/app/modules/order/services/bill.service.ts`                                                 |
-| Order outbox publisher    | `apps/order/src/app/modules/order/services/outbox-publisher.service.ts`                                     |
-| Catalog stock reservation | `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts`                              |
-| Kitchen ticket logic      | `apps/kitchen/src/app/modules/kitchen/services/kds-ticket.service.ts`                                       |
-| Kitchen Redis facade      | `apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts`                                 |
-| Kitchen realtime publish  | `apps/kitchen/src/app/modules/kitchen/services/kitchen-events.publisher.ts`                                 |
-| Payment settlement        | `apps/payment/src/app/modules/payment/services/payment-settlement.service.ts`                               |
-| SePay webhook             | `apps/payment/src/app/modules/payment/services/sepay-webhook.service.ts`                                    |
-| SaaS onboarding           | `apps/saas/src/services/onboarding-saga.service.ts`                                                         |
-| Tenant lifecycle          | `apps/saas/src/services/tenant-lifecycle.service.ts`                                                        |
-| Authorizer token verify   | `apps/authorizer/src/app/authorizer/services/authorizer.service.ts`                                         |
-| User profile              | `apps/user-access/src/app/modules/user/services/user.service.ts`                                            |
-| Staff management          | `apps/user-access/src/app/modules/user/services/staff-management.service.ts`                                |
-| Tenant reports            | `apps/bff/src/app/modules/reporting/controllers/dashboard-report.controller.ts`                             |
-| Plan feature gate         | `libs/guards/src/lib/plan-feature.guard.ts`                                                                 |
-| Customer PWA API client   | `apps/customer-pwa/src/lib/api-client.ts`                                                                   |
-| Management API client     | `apps/management-app/src/lib/api/authenticated-client.ts`                                                   |
-| Management sidebar/routes | `apps/management-app/src/components/layout/data/sidebar-data.ts`                                            |
+| Muốn hiểu                   | Đọc file                                                                                                                                                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BFF bootstrap               | `apps/bff/src/main.ts`                                                                                                                                                              |
+| BFF configuration tree      | `apps/bff/src/configuration/index.ts`                                                                                                                                               |
+| Shared config baseline      | `libs/configuration/src/lib/base.config.ts`, `libs/configuration/src/lib/app.config.ts`, `libs/configuration/src/lib/redis.config.ts`                                               |
+| BFF rate-limit provider     | `libs/configuration/src/lib/throttler.config.ts`                                                                                                                                    |
+| TCP/gRPC client registry    | `libs/configuration/src/lib/tcp.config.ts`, `libs/configuration/src/lib/grpc.config.ts`                                                                                             |
+| TCP common envelope         | `libs/interfaces/src/lib/tcp/common/request.interface.ts`, `libs/interfaces/src/lib/tcp/common/response.interface.ts`, `libs/interfaces/src/lib/tcp/common/tcp-client.interface.ts` |
+| gRPC proto source           | `libs/interfaces/src/lib/proto/authorizer/authorizer.proto`, `libs/interfaces/src/lib/proto/user-access/user-access.proto`                                                          |
+| PostgreSQL/Mongo provider   | `libs/configuration/src/lib/type-orm.config.ts`, `libs/configuration/src/lib/mongo.config.ts`                                                                                       |
+| Direct Redis provider       | `libs/providers/redis-client/src/lib/redis-client.module.ts`, `libs/providers/redis-client/src/lib/redis-client.service.ts`                                                         |
+| BFF guard chain             | `apps/bff/src/app/app.module.ts`                                                                                                                                                    |
+| HTTP -> TCP request context | `libs/utils/src/lib/request.util.ts`                                                                                                                                                |
+| TCP message names           | `libs/constants/src/lib/enum/tcp-request-message.ts`                                                                                                                                |
+| Kafka topic registry        | `libs/constants/src/lib/kafka-topic.constants.ts`                                                                                                                                   |
+| Kafka runtime config        | `libs/configuration/src/lib/kafka.config.ts`                                                                                                                                        |
+| Redis keys                  | `libs/constants/src/lib/redis-key.constants.ts` và `apps/kitchen/src/app/modules/kitchen/utils/kds-keys.ts`                                                                         |
+| WebSocket rooms             | `libs/constants/src/lib/ws-room.constants.ts`                                                                                                                                       |
+| Realtime event contracts    | `libs/shared/types/src/lib/realtime-events.types.ts`                                                                                                                                |
+| BFF realtime wiring         | `apps/bff/src/app/modules/realtime/realtime.module.ts`                                                                                                                              |
+| BFF KDS Redis subscriber    | `apps/bff/src/app/modules/realtime/services/kds-internal-events.subscriber.ts`                                                                                                      |
+| Error model                 | `libs/error-messages/src/lib/business.exception.ts`, `libs/error-messages/src/lib/error-code.enum.ts`                                                                               |
+| TCP -> HTTP error bridge    | `libs/interceptors/src/lib/tcpLogging.interceptor.ts`, `libs/interceptors/src/lib/exception.interceptor.ts`                                                                         |
+| Order facade                | `apps/order/src/app/modules/order/services/order.service.ts`                                                                                                                        |
+| Order submit                | `apps/order/src/app/modules/order/services/order-submit.service.ts`                                                                                                                 |
+| Order confirm saga          | `apps/order/src/app/modules/order/services/order-confirm-saga.service.ts`                                                                                                           |
+| Order transitions           | `apps/order/src/app/modules/order/services/order-state-transition.service.ts`                                                                                                       |
+| Order bill                  | `apps/order/src/app/modules/order/services/bill.service.ts`                                                                                                                         |
+| Order outbox publisher      | `apps/order/src/app/modules/order/services/outbox-publisher.service.ts`                                                                                                             |
+| Catalog stock reservation   | `apps/catalog/src/app/modules/menu-item/services/stock-reservation.service.ts`                                                                                                      |
+| Kitchen ticket logic        | `apps/kitchen/src/app/modules/kitchen/services/kds-ticket.service.ts`                                                                                                               |
+| Kitchen Redis facade        | `apps/kitchen/src/app/modules/kitchen/repositories/kds-redis.repository.ts`                                                                                                         |
+| Kitchen realtime publish    | `apps/kitchen/src/app/modules/kitchen/services/kitchen-events.publisher.ts`                                                                                                         |
+| Payment settlement          | `apps/payment/src/app/modules/payment/services/payment-settlement.service.ts`                                                                                                       |
+| SePay webhook               | `apps/payment/src/app/modules/payment/services/sepay-webhook.service.ts`                                                                                                            |
+| SaaS onboarding             | `apps/saas/src/services/onboarding-saga.service.ts`                                                                                                                                 |
+| Tenant lifecycle            | `apps/saas/src/services/tenant-lifecycle.service.ts`                                                                                                                                |
+| Authorizer token verify     | `apps/authorizer/src/app/authorizer/services/authorizer.service.ts`                                                                                                                 |
+| User profile                | `apps/user-access/src/app/modules/user/services/user.service.ts`                                                                                                                    |
+| Staff management            | `apps/user-access/src/app/modules/user/services/staff-management.service.ts`                                                                                                        |
+| Tenant reports              | `apps/bff/src/app/modules/reporting/controllers/dashboard-report.controller.ts`                                                                                                     |
+| Plan feature gate           | `libs/guards/src/lib/plan-feature.guard.ts`                                                                                                                                         |
+| Customer PWA API client     | `apps/customer-pwa/src/lib/api-client.ts`                                                                                                                                           |
+| Management API client       | `apps/management-app/src/lib/api/authenticated-client.ts`                                                                                                                           |
+| Management sidebar/routes   | `apps/management-app/src/components/layout/data/sidebar-data.ts`                                                                                                                    |
 
 ## Command Cheat Sheet
 
@@ -1623,35 +1863,41 @@ pnpm verify:doc-anchors
 
 ## Common Mistakes Khi Đọc Codebase
 
-| Mistake                                                | Cách sửa                                                                                     |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Đọc `apps/order` trước BFF và Catalog.                 | Đọc BFF route + TCP message trước, sau đó mới vào Order internals.                           |
-| Tưởng Payment sở hữu Bill hoặc Refund đã có.           | Order sở hữu Bill; Payment sở hữu ledger/audit. Refund vẫn deferred.                         |
-| Tưởng Kitchen có database.                             | Kitchen hiện là Redis-backed KDS queue.                                                      |
-| Mở sai SaaS path theo `src/app/modules`.               | SaaS hiện ở `apps/saas/src/controllers`, `services`, `repositories`.                         |
-| Nghĩ WebSocket payload là state chính.                 | WebSocket là realtime/invalidation; query service owner mới là source of truth.              |
-| Hardcode topic/room/key khi đọc/implement.             | Đọc constants: `TCP_REQUEST_MESSAGE`, `RedisKey`, `WsRoom`, SaaS constants.                  |
-| Bị rối vì alias docs target và alias code khác nhau.   | Theo `tsconfig.base.json`: hiện tại là `@common/*` và `@einvoice/*`.                         |
-| Đọc generated folders `.next`, `dist`, `node_modules`. | Bỏ qua; đọc source trong `src`.                                                              |
-| Xem BFF là nơi chứa business logic.                    | BFF chỉ coordination/boundary; domain state/rules thuộc service owner.                       |
-| Đọc test như phần phụ.                                 | Test là evidence tốt nhất cho behavior sau refactor.                                         |
-| Tin `codegraph status` mà không sync index.            | Chạy `codegraph sync .` trước; stale graph có thể giữ file đã bị xoá.                        |
-| Dùng thesis workflow/LaTeX làm engineering truth.      | Dùng để đối chiếu báo cáo; code/tests + canonical docs mới ưu tiên.                          |
-| Chạy `e2e:*` vì thấy script trong `package.json`.      | Kiểm tra target spec tồn tại; current `tests/e2e/` đã bị xoá.                                |
-| Đọc confirm trong state-transition service.            | Confirm hiện delegate sang `OrderConfirmSagaService`; transition service xử lý cancel/serve. |
-| Bỏ qua subscription guard khi đọc report.              | Context guard hydrate plan trước, rồi `PlanFeatureGuard` check feature.                      |
+| Mistake                                                | Cách sửa                                                                                              |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Đọc `apps/order` trước BFF và Catalog.                 | Đọc BFF route + TCP message trước, sau đó mới vào Order internals.                                    |
+| Thấy BFF config index import nhiều file rồi mở hết.    | Step 1 chỉ mở Base/App/Redis/CORS/runtime providers; route TCP/gRPC sang Step 2 và Kafka sang Flow 8. |
+| Đọc `libs/` theo alphabet hoặc đọc toàn bộ glob.       | Mở exact leaf import -> contract bundle -> caller/owner -> boundary test.                             |
+| Coi mọi guard trong `libs/guards` là active.           | Chỉ claim runtime guard khi thấy registration trong BFF `AppModule`.                                  |
+| Coi Health là endpoint local-only.                     | BFF Health controller aggregate Catalog + SaaS health qua TCP.                                        |
+| Tưởng Payment sở hữu Bill hoặc Refund đã có.           | Order sở hữu Bill; Payment sở hữu ledger/audit. Refund vẫn deferred.                                  |
+| Tưởng Kitchen có database.                             | Kitchen hiện là Redis-backed KDS queue.                                                               |
+| Mở sai SaaS path theo `src/app/modules`.               | SaaS hiện ở `apps/saas/src/controllers`, `services`, `repositories`.                                  |
+| Nghĩ WebSocket payload là state chính.                 | WebSocket là realtime/invalidation; query service owner mới là source of truth.                       |
+| Hardcode topic/room/key khi đọc/implement.             | Đọc constants: `TCP_REQUEST_MESSAGE`, `RedisKey`, `WsRoom`, SaaS constants.                           |
+| Tự suy ra alias `@qrtable/*` từ tên sản phẩm.          | Theo `tsconfig.base.json`: hiện tại là `@common/*` và legacy-but-valid `@einvoice/*`.                 |
+| Đọc generated folders `.next`, `dist`, `node_modules`. | Bỏ qua; đọc source trong `src`.                                                                       |
+| Xem BFF là nơi chứa business logic.                    | BFF chỉ coordination/boundary; domain state/rules thuộc service owner.                                |
+| Đọc test như phần phụ.                                 | Test là evidence tốt nhất cho behavior sau refactor.                                                  |
+| Tin `codegraph status` mà không sync index.            | Chạy `codegraph sync .` trước; stale graph có thể giữ file đã bị xoá.                                 |
+| Dùng thesis workflow/LaTeX làm engineering truth.      | Dùng để đối chiếu báo cáo; code/tests + canonical docs mới ưu tiên.                                   |
+| Chạy `e2e:*` vì thấy script trong `package.json`.      | Kiểm tra target spec tồn tại; current `tests/e2e/` đã bị xoá.                                         |
+| Đọc confirm trong state-transition service.            | Confirm hiện delegate sang `OrderConfirmSagaService`; transition service xử lý cancel/serve.          |
+| Bỏ qua subscription guard khi đọc report.              | Context guard hydrate plan trước, rồi `PlanFeatureGuard` check feature.                               |
 
 ## Recommended Study Plan
 
 ### Vòng 1: Lấy Bản Đồ
 
-1. Đọc `docs/README.md`, `docs/DOC-CODE-ANCHORS.md`, `docs/project-status.md`, `docs/technical-architecture.md`, `docs/business-logic.md`.
-2. Mở `package.json`, `tsconfig.base.json`, `nx.json`.
-3. Đọc `apps/bff/src/main.ts` rồi `apps/bff/src/app/app.module.ts`.
-4. Lập bảng service từ từng `main.ts`, root module và DataSource.
-5. Mở `libs/constants/src/lib/enum/tcp-request-message.ts` và `libs/constants/src/lib/kafka-topic.constants.ts`.
+1. Đọc `AGENTS.md`, `docs/README.md`, `docs/DOC-CODE-ANCHORS.md`, `docs/project-status.md`, `docs/technical-architecture.md`, `docs/business-logic.md`.
+2. Mở `package.json`, `tsconfig.base.json`, `nx.json`, `apps/bff/project.json`, `apps/bff/webpack.config.js`.
+3. Đi hết Round 2 - Bước 1: BFF `main.ts` -> configuration tree -> Base/App/Redis/CORS/Redis adapter -> `AppModule` -> throttler/direct Redis module.
+4. Đi Round 2 - Bước 2 transport foundation: TCP/gRPC config -> common envelope -> message registry/proto -> một BFF feature module/controller.
+5. Đi Round 2 - Bước 3: middleware -> active guards -> decorators/request context -> TCP/HTTP error bridge.
+6. Lập bảng service từ từng `main.ts` -> local `configuration/index.ts` -> root module -> đúng TypeORM/Mongo/Redis provider -> DataSource/schema.
+7. Chỉ sau đó mở `kafka-topic.constants.ts`, `kafka.config.ts` và producer/consumer của flow đầu tiên.
 
-Kết quả mong đợi: biết service nào nói với service nào, request đi qua đâu.
+Kết quả mong đợi: biết process nào chạy, config/provider nào wire nó, service nào nói với service nào, request envelope/error đi qua đâu và state store thuộc owner nào.
 
 ### Vòng 2: Một Customer Order End-To-End
 
