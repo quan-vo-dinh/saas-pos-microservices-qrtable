@@ -10,17 +10,16 @@ import { TechPlatformReveal } from '@/features/landing/tech-platform-reveal';
 import { DataFlowSection } from '@/features/landing/data-flow-section';
 import { WorkflowSection } from '@/features/landing/workflow-section';
 import { PricingSection } from '@/features/landing/pricing-section';
-import { PaymentSection } from '@/features/landing/payment-section';
 import { ContactSection } from '@/features/landing/contact-section';
 
 export const metadata: Metadata = {
-  title: 'QRTable — Đặt món qua QR, POS & thanh toán cho nhà hàng',
+  title: 'QRTable — Đặt món qua QR và POS cho nhà hàng',
   description:
-    'Giúp khách gọi món bằng điện thoại, nhân viên xử lý trên một màn hình, tiền bill về đúng tài khoản quán — tích hợp VietQR & SePay phổ biến tại Việt Nam.',
+    'Giúp khách gọi món bằng điện thoại, nhân viên xử lý trên một màn hình và quán vận hành gọn hơn mỗi ngày.',
   openGraph: {
     title: 'QRTable — Vận hành nhà hàng gọn hơn với QR',
     description:
-      'Menu luôn cập nhật, đơn về bếp nhanh, thanh toán minh bạch. Dành cho chủ quán và chuỗi F&B muốn giảm nhầm lẫn và tăng tốc phục vụ.',
+      'Menu luôn cập nhật, đơn về bếp nhanh, vận hành minh bạch. Dành cho chủ quán và chuỗi F&B muốn giảm nhầm lẫn và tăng tốc phục vụ.',
     type: 'website',
   },
 };
@@ -47,7 +46,6 @@ export default async function Home(): Promise<React.ReactElement> {
         <WorkflowSection />
         <DashboardMacbookSection />
         <PricingSection plans={plans} />
-        <PaymentSection />
         <ContactSection contactEmail={landing.contactEmail} />
       </main>
       <footer className="border-t border-zinc-900 py-6 text-center font-mono text-[10px] text-zinc-600">
@@ -55,7 +53,7 @@ export default async function Home(): Promise<React.ReactElement> {
           Đăng nhập quản lý
         </Link>
         <span className="mx-2 text-zinc-700">·</span>
-        <span>QRTable — thông tin thanh toán nhạy cảm chỉ xử lý trên máy chủ, an toàn cho quán và khách.</span>
+        <span>QRTable — vận hành nhà hàng gọn hơn từ lúc khách quét QR đến khi món được phục vụ.</span>
       </footer>
     </div>
   );

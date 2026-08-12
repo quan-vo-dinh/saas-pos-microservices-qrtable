@@ -29,7 +29,7 @@ export function DashboardMacbookSection(): React.ReactElement {
               Màn hình nhân viên: đơn trực tiếp &amp; chi tiết từng bàn
               <br />
               <span className="text-xl font-normal text-neutral-500 dark:text-zinc-400">
-                Cuộn để “mở” laptop — xem cách xác nhận món, theo dõi bếp và chốt thanh toán trong một chỗ. Chạm vào màn hình
+                Cuộn để “mở” laptop — xem cách xác nhận món, theo dõi bếp và quản lý từng bàn trong một chỗ. Chạm vào màn hình
                 để xem ảnh lớn.
               </span>
             </span>

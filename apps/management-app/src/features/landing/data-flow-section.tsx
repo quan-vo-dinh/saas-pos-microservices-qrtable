@@ -1,12 +1,12 @@
 import clsx from 'clsx';
-import { QrCode, ShoppingCart, UtensilsCrossed, Webhook } from 'lucide-react';
+import { QrCode, Radio, ShoppingCart, UtensilsCrossed } from 'lucide-react';
 import styles from './landing.module.css';
 
 const nodes = [
   { title: 'Khách quét QR tại bàn', body: 'Mở thực đơn đúng quán, đúng bàn — không xếp hàng chờ order.', icon: QrCode },
   { title: 'Gọi món trên điện thoại', body: 'Giỏ hàng theo bàn, giới hạn thời gian phù hợp giờ phục vụ.', icon: ShoppingCart },
-  { title: 'Bếp & thu ngân cùng nhịp', body: 'Đơn vào POS nhân viên, trạng thái món và bill thống nhất.', icon: UtensilsCrossed },
-  { title: 'Thanh toán VietQR', body: 'Khách quét mã, tiền khớp bill — ít thao tác thủ công cho thu ngân.', icon: Webhook },
+  { title: 'Bếp & nhân viên cùng nhịp', body: 'Đơn vào POS, trạng thái món và tiến độ phục vụ thống nhất.', icon: UtensilsCrossed },
+  { title: 'Theo dõi theo thời gian thực', body: 'Mọi thay đổi được cập nhật nhanh để quán xử lý đúng lúc.', icon: Radio },
 ] as const;
 
 export function DataFlowSection(): React.ReactElement {
@@ -21,7 +21,7 @@ export function DataFlowSection(): React.ReactElement {
       <div className="relative z-10 mx-auto max-w-7xl px-4">
         <div className="max-w-3xl">
           <h2 id="qrt-flow-heading" className="font-sans text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">
-            Từ lúc khách ngồi xuống đến lúc thanh toán
+            Từ lúc khách ngồi xuống đến lúc món được phục vụ
           </h2>
         </div>
 

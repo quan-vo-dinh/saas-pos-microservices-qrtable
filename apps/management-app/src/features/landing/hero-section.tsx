@@ -41,9 +41,6 @@ export function HeroSection(): React.ReactElement {
                 <Shield className="size-3.5" aria-hidden />
                 Dữ liệu từng quán riêng biệt
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 font-mono text-[11px] uppercase tracking-wider text-emerald-300">
-                VietQR · SePay
-              </span>
             </div>
 
             <div>
@@ -57,8 +54,8 @@ export function HeroSection(): React.ReactElement {
                 </Cover>
               </h1>
               <p className="mt-4 max-w-xl font-sans text-base leading-relaxed text-zinc-400 sm:text-lg">
-                QRTable gom menu, đơn từ khách và màn hình nhân viên vào một luồng: ít nhầm bàn, bếp nhận đúng món, thanh toán
-                VietQR khớp bill — phù hợp nhà hàng, quán cafe và F&amp;B tại Việt Nam.
+                QRTable gom menu, đơn từ khách và màn hình nhân viên vào một luồng: ít nhầm bàn, bếp nhận đúng món, phục vụ
+                nhanh hơn — phù hợp nhà hàng, quán cafe và F&amp;B tại Việt Nam.
               </p>
             </div>
 
@@ -78,7 +75,7 @@ export function HeroSection(): React.ReactElement {
             </div>
 
             <p className="font-sans text-xs text-zinc-500">
-              Đăng ký mở quán do đội QRTable hỗ trợ — chúng tôi cấu hình gói, bàn và thanh toán phù hợp từng mô hình.
+              Đăng ký mở quán do đội QRTable hỗ trợ — chúng tôi cấu hình gói, bàn và quy trình phù hợp từng mô hình.
             </p>
           </div>
 

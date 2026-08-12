@@ -14,6 +14,7 @@ import { Request } from 'express';
 import { map } from 'rxjs';
 import { CreatePlanDto, ListPlansQueryDto, UpdatePlanDto } from '../dtos/admin-plan.dto';
 import { SAAS_BFF_ROUTES } from '../saas-bff-routes';
+import { ClientProxy } from '@nestjs/microservices';
 
 @ApiTags('SaaS Admin — Plans')
 @Controller()

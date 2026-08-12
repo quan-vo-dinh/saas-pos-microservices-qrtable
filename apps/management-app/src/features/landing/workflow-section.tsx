@@ -1,4 +1,4 @@
-import { Bot, CreditCard, Link2, UserCog } from 'lucide-react';
+import { BarChart3, Bot, GitBranch, UserCog } from 'lucide-react';
 import styles from './landing.module.css';
 
 const steps = [
@@ -9,21 +9,21 @@ const steps = [
     tag: '01',
   },
   {
-    title: 'Kết nối ngân hàng (SePay)',
-    body: 'Bạn ủy quyền một lần; tiền bill và phí dịch vụ được định tuyến đúng tài khoản — không lưu mật khẩu ngân hàng trên trình duyệt.',
-    icon: Link2,
+    title: 'Đồng bộ menu & bàn',
+    body: 'Thiết lập menu, khu vực và bàn theo mô hình phục vụ của quán — dễ thay đổi khi quy trình vận hành cập nhật.',
+    icon: GitBranch,
     tag: '02',
   },
   {
     title: 'Phục vụ hằng ngày',
-    body: 'Cập nhật menu, nhận đơn từ khách, in bếp và chốt bill trên cùng một luồng — giảm gọi điện nội bộ.',
+    body: 'Cập nhật menu, nhận đơn từ khách và theo dõi bếp trên cùng một luồng — giảm gọi điện nội bộ.',
     icon: Bot,
     tag: '03',
   },
   {
-    title: 'Đối soát cuối ngày',
-    body: 'Bill khách về tài khoản quán; phí gói QRTable tách riêng — nhìn báo cáo là biết thực thu.',
-    icon: CreditCard,
+    title: 'Theo dõi vận hành',
+    body: 'Xem báo cáo và tình trạng phục vụ để chủ quán nắm được điểm nghẽn, từ đó cải thiện quy trình mỗi ngày.',
+    icon: BarChart3,
     tag: '04',
   },
 ] as const;

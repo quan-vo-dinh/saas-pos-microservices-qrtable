@@ -36,8 +36,8 @@ export function ContactSection({ contactEmail }: ContactSectionProps): React.Rea
                 Muốn thử QRTable tại quán?
               </h2>
               <p className="mt-3 max-w-xl font-sans text-sm leading-relaxed text-zinc-500 sm:text-base">
-                Gửi email giới thiệu quy mô (số bàn, chi nhánh, giờ cao điểm). Đội QRTable sẽ đề xuất gói, demo luồng khách
-                và hướng dẫn kết nối VietQR/SePay phù hợp mô hình của bạn.
+                Gửi email giới thiệu quy mô (số bàn, chi nhánh, giờ cao điểm). Đội QRTable sẽ đề xuất gói và demo luồng
+                khách phù hợp mô hình của bạn.
               </p>
               <p className="mt-4 font-mono text-sm text-zinc-400">
                 <a href={mail} className="inline-flex items-center gap-2 text-cyan-400 underline-offset-4 hover:underline">
@@ -63,7 +63,7 @@ export function ContactSection({ contactEmail }: ContactSectionProps): React.Rea
           </div>
         </div>
         <p className="mt-10 text-center font-sans text-[11px] text-zinc-600">
-          © {new Date().getFullYear()} QRTable — đặt món bằng QR, POS và thanh toán cho nhà hàng Việt Nam.
+          © {new Date().getFullYear()} QRTable — đặt món bằng QR, POS và vận hành nhà hàng Việt Nam.
         </p>
       </div>
     </section>

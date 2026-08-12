@@ -5,7 +5,6 @@ import {
   SiChartdotjs,
   SiCloudinary,
   SiCommitlint,
-  SiContactlesspayment,
   SiDocker,
   SiEslint,
   SiFramer,
@@ -76,14 +75,9 @@ const GROUPS: { title: string; rows: StackRow[] }[] = [
     ],
   },
   {
-    title: 'Nhận dạng & thanh toán',
+    title: 'Nhận dạng & bảo mật',
     rows: [
       { label: 'Keycloak', Icon: SiKeycloak, hint: 'OAuth 2.0 / OIDC' },
-      {
-        label: 'SePay · VietQR',
-        Icon: SiContactlesspayment,
-        hint: 'Chuyển khoản QR — tích hợp VietQR (không có logo Simple Icons riêng)',
-      },
     ],
   },
   {

@@ -1,12 +1,12 @@
 import clsx from 'clsx';
-import { Boxes, GitBranch, Timer, Webhook } from 'lucide-react';
+import { Boxes, GitBranch, Timer, UtensilsCrossed } from 'lucide-react';
 import styles from './landing.module.css';
 
 const metrics = [
   {
     label: 'Mỗi quán một không gian',
     value: 'Riêng tư',
-    hint: 'Menu, đơn và lịch sử thanh toán tách biệt — không lẫn với quán bên cạnh.',
+    hint: 'Menu, đơn và dữ liệu vận hành tách biệt — không lẫn với quán bên cạnh.',
     icon: Boxes,
   },
   {
@@ -16,10 +16,10 @@ const metrics = [
     icon: GitBranch,
   },
   {
-    label: 'Hai luồng tiền rõ ràng',
-    value: 'Bill & gói',
-    hint: 'Tiền khách trả bill về tài khoản quán; phí dùng QRTable được đối soát riêng — dễ kiểm kê cuối ngày.',
-    icon: Webhook,
+    label: 'Bếp nhận đúng món',
+    value: 'Đồng bộ',
+    hint: 'Đơn được chuyển đúng khu vực chế biến, giúp nhân viên theo dõi tiến độ và hạn chế sai sót.',
+    icon: UtensilsCrossed,
   },
   {
     label: 'Phiên theo bàn',
@@ -45,7 +45,7 @@ export function MetricsSection(): React.ReactElement {
               Vì sao chủ quán chọn QRTable
             </h2>
             <p className="mt-2 max-w-2xl font-sans text-xs text-zinc-500 sm:text-sm">
-              Tập trung vào trải nghiệm khách và kiểm soát tiền — không cần hiểu sâu về phần mềm để thấy lợi ích hằng ngày.
+              Tập trung vào trải nghiệm khách và kiểm soát vận hành — không cần hiểu sâu về phần mềm để thấy lợi ích hằng ngày.
             </p>
           </div>
           <a
