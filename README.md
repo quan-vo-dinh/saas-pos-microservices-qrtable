@@ -19,6 +19,12 @@
   <img src="docs/assets/readme/qrtable-landing-page.jpg" alt="QRTable landing page showing the restaurant platform and customer ordering experience" width="100%" />
 </p>
 
+## Demo Preview
+
+[Watch the project preview video](https://jumpshare.com/share/EQA2R9Y48flq6plbDIOa)
+
+> Due to current infrastructure and budget constraints, the backend platform is not publicly deployed. The preview video demonstrates the project's main flows and interface.
+
 ## Platform Highlights
 
 | Area                  | Capabilities                                                                                 |
