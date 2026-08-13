@@ -26,12 +26,6 @@ table=11111111-ddde-4111-8111-111111111111
 table key=S01
 ```
 
-Playwright smoke:
-
-```bash
-pnpm e2e:phase5:suspended
-```
-
 ## Phase 4D dashboard demo data (Phở Việt)
 
 Sau catalog seed, script `seed-dashboard-demo.js` ghi **dữ liệu cố định** cho tenant `pho-viet`:

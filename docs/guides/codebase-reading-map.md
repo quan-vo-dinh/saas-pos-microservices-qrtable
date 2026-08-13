@@ -1758,7 +1758,7 @@ Frontend nên tách UI state và server state. Server state nên đi qua TanStac
 - `docs/testing/traceability-matrix.md`
 - `docs/testing/saga-validation-strategy.md` khi flow chạm consistency hoặc compensation
 
-**Current test-tree caveat:** thư mục `tests/e2e/` và `tests/benchmark/` đã bị xoá khỏi checkout hiện tại. Các script `e2e:*` trong `package.json` vẫn trỏ tới các Playwright spec không còn tồn tại, nên **không** dùng chúng làm runnable evidence cho tới khi suite được restore hoặc script được dọn. Các test active hiện nằm cạnh app/domain code như bảng trên. Nếu testing docs hoặc traceability matrix còn liệt kê E2E cũ, ghi nhận đó là documentation/tooling debt thay vì giả định test vẫn chạy.
+**Current test-tree note:** thư mục `tests/e2e/` và `tests/benchmark/` không còn trong checkout hiện tại, đồng thời không còn browser E2E harness được duy trì. Các test active nằm cạnh app/domain code như bảng trên; chỉ dùng các test đó làm runnable evidence.
 
 Lệnh tham khảo:
 

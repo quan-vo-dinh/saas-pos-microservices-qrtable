@@ -43,10 +43,6 @@
       "env": {
         "REDIS_URL": "redis://localhost:6379"
       }
-    },
-    "playwright": {
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"]
     }
   }
 }

@@ -20,11 +20,11 @@
 ## Inventory notes
 
 - Fast tests are mostly Jest or Nx specs under `apps/**` and `libs/**`.
-- Browser E2E today includes 15 tests across 5 Playwright files: `tests/e2e/step-2.7-realtime.spec.ts`, `tests/e2e/phase-3-payment.spec.ts`, `tests/e2e/phase-4c-staff-dashboard.spec.ts`, `tests/e2e/phase-5-admin-dashboard-routes.spec.ts`, and `tests/e2e/phase-5-suspended-tenant.spec.ts`.
+- No browser E2E harness is maintained in the current checkout.
 - **Stack-dependent** items need PostgreSQL, Redis, Kafka, Keycloak, frontend dev servers, or provider credentials when noted.
 - **No test file found** means the inventory did not locate an adequate spec for that rule; it does not mean the rule is unimportant.
 
-**Current verification sync (2026-06-01):** `pnpm nx test frontend-utils` is green with runtime-dependent integration suites skipped, `pnpm exec nx run-many -t test --parallel=3` is green for all 23 projects after the M1 stale-expectation fixes, and the M2 seeded integration gates are green for Order, Payment, Kitchen, SaaS, frontend-utils live BFF/Keycloak, and the permission-matrix smoke. The latest saved Playwright artifact is still red because the Customer PWA was not running. Do not treat browser E2E as green until rerun against a live full stack.
+**Current verification sync (2026-06-01):** `pnpm nx test frontend-utils` is green with runtime-dependent integration suites skipped, `pnpm exec nx run-many -t test --parallel=3` is green for all 23 projects after the M1 stale-expectation fixes, and the M2 seeded integration gates are green for Order, Payment, Kitchen, SaaS, frontend-utils live BFF/Keycloak, and the permission-matrix smoke.
 
 **How test locations are written:** Paths are given as bullets under each rule so they wrap in the editor. The first path segment is the app or library root; deeper paths follow in the same bullet where helpful.
 
@@ -448,17 +448,17 @@
 
 ---
 
-### `P1-PAY-BROWSER-CLOSE-SESSION` — `partial` (P1, demo)
+### `P1-PAY-CLOSE-SESSION` — `missing` (P1, demo)
 
-**Requirement:** Browser E2E should prove payment close-session: bill immutable, session closed, table moves to Cleaning after cash or VietQR.
+**Requirement:** Payment close-session should prove bill immutability, session closure, and the table transition to Cleaning after cash or VietQR.
 
 **Sources:** `phase-5-testing` browser-E2E scope; `phase-3-payment` acceptance evidence.
 
-**Tests:** `tests/e2e/phase-3-payment.spec.ts` only.
+**Tests:** No dedicated automated scenario was found for the complete close-session flow.
 
-**Target layer:** browser-e2e. **Stack:** PWA, management-app, BFF, Payment, Order, Catalog, Keycloak, seeded paid and pending bills.
+**Target layer:** integration. **Stack:** PWA, management-app, BFF, Payment, Order, Catalog, Keycloak, seeded paid and pending bills.
 
-**Notes:** Current Playwright coverage is smoke for screens, tabs, and payment history visibility; add a deterministic close-session journey once seed or fixture is stable.
+**Notes:** Add a deterministic close-session integration scenario once the required seed or fixture is stable.
 
 ---
 
@@ -496,11 +496,11 @@
 
 **Sources:** `business-logic` (1.B); `phase-4b-saas-onboarding` final business behavior.
 
-**Tests:** BFF customer tenant lifecycle guard; customer PWA tenant status hook and banner specs; customer PWA request payment spec; customer order realtime hook spec; optional Playwright smoke `tests/e2e/phase-5-suspended-tenant.spec.ts`.
+**Tests:** BFF customer tenant lifecycle guard; customer PWA tenant status hook and banner specs; customer PWA request payment spec; customer order realtime hook spec.
 
-**Target layer:** browser-e2e. **Stack:** PWA, BFF, seeded suspended tenant and session.
+**Target layer:** unit-contract. **Stack:** PWA, BFF, seeded suspended tenant and session.
 
-**Notes:** Unit/component coverage exists, dev seed includes the `pho-viet-suspended` fixture, and the local browser smoke passed with `pnpm e2e:phase5:suspended` against seeded BFF plus `customer-pwa`. Keep status `partial` because pending-bill payment exception is still covered at component and BFF guard level only; full browser pending-bill payment remains a later Flow B/B+D combination.
+**Notes:** Unit/component coverage exists and dev seed includes the `pho-viet-suspended` fixture. Keep status `partial` because the pending-bill payment exception is covered at component and BFF guard level only.
 
 ---
 
@@ -588,11 +588,11 @@
 
 **Sources:** `phase-4b-saas-onboarding` UI surfaces; `phase-5-testing` browser-E2E scope.
 
-**Tests:** BFF Phase 4B contract spec; SaaS controller specs; shared-constants label tests; management-app dashboard query auth readiness spec; Playwright route smoke `tests/e2e/phase-5-admin-dashboard-routes.spec.ts`.
+**Tests:** BFF Phase 4B contract spec; SaaS controller specs; shared-constants label tests; management-app dashboard query auth readiness spec.
 
-**Target layer:** browser-e2e. **Stack:** management-app, BFF, Keycloak, seeded SUPER_ADMIN, OWNER, and MANAGER.
+**Target layer:** unit-contract. **Stack:** management-app, BFF, Keycloak, seeded SUPER_ADMIN, OWNER, and MANAGER.
 
-**Notes:** Dedicated Phase 4B Playwright route smoke covers public landing, SUPER_ADMIN admin routes, OWNER dashboard routes, and OAuth invalid-state with explicit local readiness skips. The seeded local stack passed `pnpm e2e:phase5:admin-routes` with all seven tests passing after frontend and Keycloak warm-up.
+**Notes:** Route contracts, label tests, and dashboard query readiness provide the maintained automated evidence for this surface.
 
 ---
 

@@ -1758,7 +1758,7 @@ Read also:
 - `docs/testing/traceability-matrix.md`
 - `docs/testing/saga-validation-strategy.md` when a flow touches consistency or compensation
 
-**Current test-tree caveat:** `tests/e2e/` and `tests/benchmark/` were removed from this checkout. The `e2e:*` scripts in `package.json` still target Playwright specs that no longer exist, so they are **not runnable evidence** until the suite is restored or the scripts are cleaned up. Active tests are colocated with app/domain code as shown above. If testing docs or the traceability matrix still list old E2E suites, record documentation/tooling debt rather than assuming the tests still run.
+**Current test-tree note:** `tests/e2e/` and `tests/benchmark/` are absent from this checkout, and no browser E2E harness is maintained. Active tests are colocated with app/domain code as shown above; use only those tests as runnable evidence.
 
 Key commands to run:
 

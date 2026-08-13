@@ -8,8 +8,6 @@ export default [
     ignores: [
       '**/dist',
       '**/vite.config.*.timestamp*',
-      '**/allure-report*',
-      '**/allure-results*',
     ],
   },
   {

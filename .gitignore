@@ -60,12 +60,6 @@ vite.config.*.timestamp*
 # Local ngrok config (may contain authtoken) — keep example only in git
 tools/ngrok/qrtable-dev-ngrok.yml
 
-# Playwright
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
-
 # LaTeX build artifacts for the graduation thesis report
 docs/graduation-thesis-resources/thesis-report/*.aux
 docs/graduation-thesis-resources/thesis-report/*.bbl
@@ -84,10 +78,10 @@ docs/graduation-thesis-resources/thesis-report/*.synctex.gz
 docs/graduation-thesis-resources/thesis-report/*.toc
 docs/graduation-thesis-resources/thesis-report/*.xdv
 
-# Allure Report
-/allure-results*
-/allure-report*
-
+# Local root artifacts
+/error.log
+/terminalOutput
+/keycloak-test.json
 # Personal CV materials (kept locally; never commit)
 /docs/cv/
 /frontend-cv.md

@@ -125,8 +125,8 @@ QRTable uses two frontend applications so the anonymous customer journey stays l
 | ------------------------------------- | ------------------------------------------------------------------------------- |
 | `apps/`                               | BFF, seven domain services, Customer PWA, Management App, and Keycloak theme.   |
 | `libs/`                               | Shared contracts, configuration, guards, UI, providers, and utilities.          |
-| `docker/` and `docker-compose.*.yaml` | Local infrastructure, application, scale-test, and proxy layers.                |
-| `tools/`                              | Database, Kafka, seed, deployment, verification, and performance tooling.       |
+| `docker/` and `docker-compose.*.yaml` | Local infrastructure, application, and proxy layers.                            |
+| `tools/`                              | Database, Kafka, seed, deployment, and verification tooling.                    |
 | `docs/`                               | Canonical architecture, business, phase, testing, and operations documentation. |
 
 ## Local Development
@@ -157,20 +157,18 @@ pnpm nx show project <name>
 
 ## Validation
 
-| Command                    | Purpose                                                                    |
-| -------------------------- | -------------------------------------------------------------------------- |
-| `pnpm verify:doc-anchors`  | Verify that long-lived documentation still points to real source paths.    |
-| `pnpm db:verify:ownership` | Check database-per-service ownership and configuration.                    |
-| `pnpm db:test`             | Run database provisioning and ownership tests.                             |
-| `pnpm e2e:demo`            | Exercise representative customer, tenant, and admin flows with Playwright. |
-| `pnpm scale-test`          | Run the local BFF and Order performance scenarios.                         |
-| `pnpm theme:build`         | Build the custom Keycloak theme.                                           |
+| Command                    | Purpose                                                                 |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `pnpm verify:doc-anchors`  | Verify that long-lived documentation still points to real source paths. |
+| `pnpm db:verify:ownership` | Check database-per-service ownership and configuration.                 |
+| `pnpm db:test`             | Run database provisioning and ownership tests.                          |
+| `pnpm theme:build`         | Build the custom Keycloak theme.                                        |
 
-Run integration, end-to-end, and scale checks only with their required local services, fixtures, and browsers available.
+Run integration checks only with their required local services and fixtures available.
 
 ## Deployment and Operations
 
-The repository separates infrastructure, application services, scale testing, and reverse proxy configuration into composable Docker Compose layers. Production bootstrap runs migrations, verifies database ownership, provisions Kafka topics, and configures Keycloak before application startup.
+The repository separates infrastructure, application services, and reverse proxy configuration into composable Docker Compose layers. Production bootstrap runs migrations, verifies database ownership, provisions Kafka topics, and configures Keycloak before application startup.
 
 Deployment artifacts are configuration, not proof of a live public environment. Use the production runbook to provision a target host, validate HTTPS and health endpoints, record the deployed revision, and prepare rollback before declaring a release operational.
 

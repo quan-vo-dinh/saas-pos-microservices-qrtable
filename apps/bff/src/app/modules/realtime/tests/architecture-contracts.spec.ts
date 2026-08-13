@@ -31,7 +31,6 @@ function walk(dir: string, files: string[] = []): string[] {
       entry === 'dist' ||
       entry === 'coverage' ||
       entry === '.next' ||
-      entry === 'playwright-report' ||
       rel.includes('/pnpm-lock.yaml')
     ) {
       continue;
