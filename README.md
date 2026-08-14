@@ -175,11 +175,10 @@ Deployment artifacts are configuration, not proof of a live public environment. 
 ## Documentation
 
 | Document                                                           | Focus                                                                            |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------- | --- |
 | [Documentation index](docs/README.md)                              | Source-of-truth order and the complete documentation map.                        |
 | [Business logic](docs/business-logic.md)                           | Actors, operational workflows, state transitions, and business rules.            |
 | [Technical architecture](docs/technical-architecture.md)           | Service boundaries, data ownership, communication, security, and infrastructure. |
-| [Permission matrix](docs/architecture/permission-matrix.md)        | Role and permission boundaries across platform and tenant operations.            |
-| [Testing](docs/testing/README.md)                                  | Validation strategy, traceability, and durable evidence.                         |
+| [Permission matrix](docs/architecture/permission-matrix.md)        | Role and permission boundaries across platform and tenant operations.            |     |
 | [Deployment runbook](docs/guides/production-deployment-runbook.md) | Production provisioning, bootstrap, verification, and rollback.                  |
 | [Project status](docs/project-status.md)                           | Evidence-based implementation, verification, and deployment status.              |
