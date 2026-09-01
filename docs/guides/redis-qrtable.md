@@ -1,5 +1,7 @@
 # Redis: In-depth Theory — For QRTable
 
+> **English canonical** — Vietnamese translation: [redis-qrtable.vi.md](redis-qrtable.vi.md)
+>
 > **Document philosophy:** Understand the _why_ before the _how_. Every concept is anchored in context
 > QRTable's specifics so you don't learn abstract theory but learn to apply it immediately.
 >

@@ -1,5 +1,7 @@
 # Keycloak Instructions In QRTable
 
+> **English canonical** — Vietnamese translation: [keycloak-qrtable.vi.md](keycloak-qrtable.vi.md)
+>
 > **Role:** Supporting guide, not canonical source.
 > When you need the current architectural state, prioritize `[../technical-architecture.md](../technical-architecture.md)`, `[../architecture/permission-matrix.md](../architecture/permission-matrix.md)`, `[../references/auth-system-reference.md](../references/auth-system-reference.md)`, and code above `main`.
 >
