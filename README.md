@@ -1,3 +1,10 @@
+## Demo Preview
+
+[Watch the project preview video](https://jumpshare.com/share/EQA2R9Y48flq6plbDIOa)
+
+> Due to current infrastructure and budget constraints, the backend platform is not publicly deployed. The preview video demonstrates the project's main flows and interface.
+
+
 <h1 align="center">QRTable</h1>
 
 <p align="center">
@@ -21,17 +28,7 @@
 
 ## Demo Preview
 
-<p align="center">
-  <a href="https://youtu.be/5qJRyP1HIvs">
-    <img src="https://img.youtube.com/vi/5qJRyP1HIvs/maxresdefault.jpg"
-         alt="QRTable Project Demo"
-         width="800" />
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://youtu.be/5qJRyP1HIvs"><strong>▶ Watch the full project demo</strong></a>
-</p>
+[Watch the project preview video](https://jumpshare.com/share/EQA2R9Y48flq6plbDIOa)
 
 > Due to current infrastructure and budget constraints, the backend platform is not publicly deployed. The preview video demonstrates the project's main flows and interface.
 
