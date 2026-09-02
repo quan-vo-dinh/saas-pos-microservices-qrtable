@@ -21,9 +21,12 @@
 
 ## Demo Preview
 
-[Watch the project preview video](https://jumpshare.com/share/EQA2R9Y48flq6plbDIOa)
+[![Watch the QRTable project demo](https://img.youtube.com/vi/5qJRyP1HIvs/maxresdefault.jpg)](https://youtu.be/5qJRyP1HIvs)
 
+> Click the preview above to watch the project demo on YouTube.
+>
 > Due to current infrastructure and budget constraints, the backend platform is not publicly deployed. The preview video demonstrates the project's main flows and interface.
+
 
 ## Platform Highlights
 
